@@ -25,7 +25,7 @@ CC = gcc
 #
 CFLAGS += -g -fPIC $(shell pkg-config --cflags glib-2.0) -I../lib/stratis \
 	-I../lib
-LDFLAGS +=  -L../lib -ldl -lpthread $(shell pkg-config --libs glib-2.0) \
+LDFLAGS +=  -L../lib -ldl -lpthread $(shell pkg-config --libs glib-2.0 libsystemd) \
 	-lstratis
 
 %.o:	%.c

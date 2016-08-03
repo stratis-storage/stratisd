@@ -271,4 +271,27 @@ STRATIS_EXPORT struct stratis_list_entry *stratis_thing_get_some_list_entry(stru
         return NULL;
 }
 
+STRATIS_EXPORT char * stratis_get_user_message(int stratis_code) {
+
+	switch (stratis_code) {
+	case STRATIS_OK:
+		return "ok";
+	case STRATIS_ERROR:
+		return "error";
+	case STRATIS_NULL:
+		return "NULL parameter";
+	case STRATIS_MALLOC:
+		return "malloc failed";
+	case STRATIS_NOTFOUND:
+		return "not found";
+	case STRATIS_BAD_PARAM:
+		return "bad parameter";
+	case STRATIS_ALREADY_EXISTS:
+		return "already exists";
+	case STRATIS_DUPLICATE_NAME:
+		return "duplicate name";
+	}
+
+	return "unknown error";
+}
 

@@ -28,13 +28,17 @@
         } while(0)
 #define PASS(...) fprintf(stdout, "PASS: "__VA_ARGS__ );
 
-#define VERSION "1"
+#define DBUS_MAX_NAME 255
+
+#define STRATIS_VERSION "1"
 #define MANAGER_NAME "/Manager"
-#define STRATIS_BASE_PATH "/org/storage/stratis" VERSION
-#define STRATIS_BASE_INTERFACE "org.storage.stratis" VERSION
-#define STRATIS_POOL_BASE_INTERFACE "org.storage.stratis" VERSION ".pool"
-#define STRATIS_VOLUME_BASE_INTERFACE "org.storage.stratis" VERSION ".volume"
-#define STRATIS_DEV_BASE_INTERFACE "org.storage.stratis" VERSION ".dev"
+#define STRATIS_BASE_PATH "/org/storage/stratis" STRATIS_VERSION
+#define STRATIS_BASE_SERVICE "org.storage.stratis" STRATIS_VERSION
+#define STRATIS_BASE_MANAGER STRATIS_BASE_PATH "/Manager"
+#define STRATIS_MANAGER_INTERFACE "org.storage.stratis" STRATIS_VERSION ".Manager"
+#define STRATIS_POOL_BASE_INTERFACE "org.storage.stratis" STRATIS_VERSION ".pool"
+#define STRATIS_VOLUME_BASE_INTERFACE "org.storage.stratis" STRATIS_VERSION ".volume"
+#define STRATIS_DEV_BASE_INTERFACE "org.storage.stratis" STRATIS_VERSION ".dev"
 
 /* Volume Property Definitions */
 #define VOLUME_NAME 		"Volume"

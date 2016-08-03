@@ -23,60 +23,96 @@
 #include "libstratis.h"
 #include "stratis-common.h"
 
-#define TEST_DEV_COUNT 20
-#define TEST_POOL_COUNT 10
-#define TEST_VOLUME_COUNT 5
-
-GList * stratis_pools 	= NULL;
-GList * stratis_volumes = NULL;
-GList * stratis_devs 	= NULL;
+spool_list_t *the_spool_list = NULL;
 
 static int pool_id 		= 0;
 static int volume_id 	= 0;
-static int dev_id 		= 0;
+
 /*
  * Pools
  */
 
 int stratis_spool_create(spool_t **spool,
-		char *name,
+		const char *name,
 		sdev_list_t *disk_list,
 		stratis_volume_raid_type raid_level) {
 	int rc = STRATIS_OK;
-	spool_t *return_spool;
+	spool_t *return_spool = NULL;
 
 	return_spool = malloc(sizeof(spool_t));
 
-    if (return_spool == NULL)
-    	return STRATIS_MALLOC;
+    if (return_spool == NULL) {
+    	rc = STRATIS_MALLOC;
+    	goto out;
+    }
 
-	return_spool->svolume_list = malloc(sizeof(svolume_list_t));
+    return_spool->svolume_list = malloc(sizeof(svolume_list_t));
 
-    if (return_spool->svolume_list == NULL)
-    	return STRATIS_MALLOC;
+    if (return_spool->svolume_list == NULL) {
+    	rc = STRATIS_MALLOC;
+    	goto out;
+    }
 
+	return_spool->sdev_list  = malloc(sizeof(sdev_list_t));
+
+    if (return_spool->sdev_list == NULL) {
+    	rc = STRATIS_MALLOC;
+    	goto out;
+    }
+
+    return_spool->slot = NULL;
     return_spool->svolume_list->list = NULL;
-
-	return_spool->sdev_list = malloc(sizeof(sdev_list_t));
-
-    if (return_spool->sdev_list == NULL)
-    	return STRATIS_MALLOC;
-
-    return_spool->sdev_list->list = NULL;
-
+	return_spool->sdev_list->list = NULL;
+	return_spool->id = pool_id++;
+	return_spool->size = 32767;
     strncpy(return_spool->name, name, MAX_STRATIS_NAME_LEN);
 
     /* TODO should we duplicate the disk_list? */
     return_spool->sdev_list = disk_list;
 
-	stratis_pools =  g_list_append (stratis_pools, return_spool);
+    if (the_spool_list == NULL) {
+    	the_spool_list = malloc(sizeof(spool_list_t));
+    	the_spool_list->list = NULL;
+    }
+
+    the_spool_list->list =  g_list_append (the_spool_list->list, return_spool);
 
 	*spool = return_spool;
 	return rc;
+
+out:
+
+	if (return_spool != NULL) {
+
+	    if (return_spool->svolume_list != NULL) {
+	    	// TODO fix memory leak of list elements
+	    	free(return_spool->svolume_list);
+	    }
+		if (return_spool->sdev_list != NULL) {
+			// TODO fix memory leak of list elements
+			free(return_spool->sdev_list);
+		}
+		free(return_spool);
+	}
+
+	return rc;
+
 }
 
 int stratis_spool_destroy(spool_t *spool) {
 	int rc = STRATIS_OK;
+
+	the_spool_list->list = g_list_remove(the_spool_list->list, spool);
+
+	if (spool->svolume_list != NULL) {
+		// TODO destroy volume list
+	}
+
+	if (spool->sdev_list != NULL) {
+		// TODO destroy dev list
+	}
+
+	free(spool);
 
 	return rc;
 }
@@ -98,21 +134,13 @@ int stratis_spool_get_id(spool_t *spool) {
 }
 
 int stratis_spool_get_list(spool_list_t **spool_list) {
-	int rc = STRATIS_OK;
 
-	spool_list_t *return_spool_list;
+	if (spool_list == NULL || *spool_list == NULL)
+	    	return STRATIS_NULL;
 
-	return_spool_list = malloc(sizeof(spool_list_t));
+	*spool_list = the_spool_list;
 
-    if (return_spool_list == NULL)
-    	return STRATIS_MALLOC;
-
-	// TODO fix - don't return pointer to main list
-	return_spool_list->list = stratis_pools;
-
-	*spool_list = return_spool_list;
-
-	return rc;
+	return STRATIS_OK;
 }
 
 int stratis_spool_get_volume_list(spool_t *spool,
@@ -152,7 +180,7 @@ int stratis_spool_add_volume(spool_t *spool, svolume_t *volume) {
 	return rc;
 }
 
-int stratis_spool_add_dev(spool_t *spool, sdev_t *sdev) {
+int stratis_spool_add_dev(spool_t *spool, char *sdev) {
 	int rc = STRATIS_OK;
 
     if (spool == NULL || sdev == NULL)
@@ -163,7 +191,7 @@ int stratis_spool_add_dev(spool_t *spool, sdev_t *sdev) {
 	return rc;
 }
 
-int stratis_spool_remove_dev(spool_t *spool,  sdev_t *sdev) {
+int stratis_spool_remove_dev(spool_t *spool,  char *sdev) {
 	int rc = STRATIS_OK;
 
 	return rc;
@@ -181,6 +209,32 @@ int stratis_spool_list_nth(spool_list_t *spool_list,
     *spool = g_list_nth_data(spool_list->list, element);
 
     return rc;
+}
+
+int spool_compare (gconstpointer a, gconstpointer b)
+{
+	char *name = (char *)b;
+	spool_t *spool = (spool_t *)a;
+
+    return strcmp (name, spool->name);
+}
+
+int stratis_spool_list_find(spool_list_t *spool_list,
+				spool_t **spool,
+				char *name) {
+	GList *l;
+	if (spool == NULL || spool_list == NULL)
+		return STRATIS_NULL;
+
+	l =  g_list_find_custom(spool_list->list, name, spool_compare);
+
+	*spool = g_list_nth_data (l, 0);
+
+	if (*spool == NULL)
+		return STRATIS_NOTFOUND;
+
+	return STRATIS_OK;
+
 }
 
 int stratis_spool_list_size(spool_list_t *spool_list, int *list_size) {
@@ -258,7 +312,13 @@ char *stratis_svolume_get_mount_point(svolume_t *svolume) {
 	return svolume->mount_point;
 }
 
-int stratis_svolume_list(svolume_list_t **svolume_list) {
+int stratis_svolume_list_create(svolume_list_t **svolume_list) {
+	int rc = STRATIS_OK;
+
+	return rc;
+}
+
+int stratis_svolume_list_destroy(svolume_list_t *svolume_list) {
 	int rc = STRATIS_OK;
 
 	return rc;
@@ -304,56 +364,6 @@ int stratis_svolume_list_devs(spool_t *spool, sdev_list_t **disk_list) {
 }
 
 /*
- * Devices
- */
-
-/*
- * Question, do we want to have a representation of a device or
- * should we just pass the name of the device?
- */
-int stratis_sdev_create(sdev_t **sdev,
-			char *name, stratis_dev_t type) {
-	int rc = STRATIS_OK;
-	sdev_t *return_sdev;
-
-	return_sdev = malloc(sizeof(sdev_t));
-
-    if (return_sdev == NULL)
-    	return STRATIS_MALLOC;
-
-    strncpy(return_sdev->name, name, MAX_STRATIS_NAME_LEN);
-    return_sdev->id = dev_id++;
-    return_sdev->type = type;
-
-    *sdev = return_sdev;
-
-out:
-	return rc;
-}
-
-int stratis_sdev_destroy(sdev_t *sdev) {
-	int rc = STRATIS_OK;
-
-	return rc;
-}
-
-char *stratis_sdev_get_name(sdev_t *sdev) {
-	if (sdev == NULL) {
-		return NULL;
-	}
-
-	return sdev->name;
-}
-int stratis_sdev_get_id(sdev_t *sdev) {
-	if (sdev == NULL) {
-		return -1;
-	}
-
-	return sdev->id;
-}
-
-
-/*
  * Device Lists
  */
 int stratis_sdev_list_create(sdev_list_t **sdev_list) {
@@ -376,7 +386,7 @@ int stratis_sdev_list_destroy(sdev_list_t *sdev_list) {
 	return rc;
 }
 
-int stratis_sdev_list_add(sdev_list_t **sdev_list, sdev_t *sdev) {
+int stratis_sdev_list_add(sdev_list_t **sdev_list, char *sdev) {
 	int rc = STRATIS_OK;
 
 	if (sdev_list == NULL || *sdev_list == NULL || sdev == NULL)
@@ -387,7 +397,7 @@ int stratis_sdev_list_add(sdev_list_t **sdev_list, sdev_t *sdev) {
 	return rc;
 }
 
-int stratis_sdev_list_remove(sdev_list_t **sdev_list, sdev_t *sdev) {
+int stratis_sdev_list_remove(sdev_list_t **sdev_list, char *sdev) {
 	int rc = STRATIS_OK;
 
 	return rc;
@@ -408,7 +418,7 @@ int stratis_sdev_list_size(sdev_list_t *sdev_list, int *list_size) {
 }
 
 int stratis_sdev_list_nth(sdev_list_t *sdev_list,
-				sdev_t **sdev,
+				char **sdev,
 				int element) {
 
 	int rc = STRATIS_OK;
@@ -419,118 +429,4 @@ int stratis_sdev_list_nth(sdev_list_t *sdev_list,
     *sdev = g_list_nth_data(sdev_list->list, element);
 
     return rc;
-}
-
-static int util_create_disk_list(sdev_list_t **dev_list) {
-	int rc = EXIT_SUCCESS;
-	int i;
-	sdev_t *sdev;
-	int size;
-	stratis_dev_t type;
-	char name[MAX_STRATIS_NAME_LEN];
-
-	rc = stratis_sdev_list_create(dev_list);
-
-	if (rc != STRATIS_OK) {
-		FAIL(rc, out, "stratis_sdev_list_create(): rc != 0\n");
-	}
-
-	for (i = 0; i < TEST_DEV_COUNT; i++) {
-
-		if (i % 5 == 0)
-			type = STRATIS_DEV_TYPE_REGULAR;
-		else
-			type = STRATIS_DEV_TYPE_CACHE;
-	    snprintf(name, MAX_STRATIS_NAME_LEN, "/dev/sdev%d", i);
-
-		rc = stratis_sdev_create(&sdev, name, type);
-
-		if (rc != STRATIS_OK) {
-			FAIL(rc, out, "stratis_sdev_create(): rc != 0\n");
-		}
-
-		rc = stratis_sdev_list_add(dev_list, sdev);
-
-		if (rc != STRATIS_OK) {
-			FAIL(rc, out, "stratis_sdev_list_add(): rc != 0\n");
-		}
-	}
-
-	rc = stratis_sdev_list_size(*dev_list, &size);
-
-	if (size != TEST_DEV_COUNT){
-		FAIL(rc, out, "list size incorrect : size != TEST_DEV_COUNT\n");
-	}
-
-out:
-	return rc;
-}
-
-int populate_simulator_test_data() {
-	int rc = EXIT_SUCCESS;
-	sdev_list_t *dev_list;
-	spool_t *spool;
-	svolume_t *svolume;
-	sdev_t *sdev;
-	char spool_name[256], svolume_name[256], mount_point[256], sdev_name[256];
-	struct stratis_ctx *ctx = NULL;
-	int i, j, k;
-
-	rc = stratis_context_new(&ctx);
-
-	if (rc != STRATIS_OK) {
-		FAIL(rc, out, "stratis_context_new(): rc != 0\n");
-	}
-
-	for (i = 0; i < TEST_POOL_COUNT; i++) {
-		rc = util_create_disk_list(&dev_list);
-
-		if (rc != STRATIS_OK) {
-			FAIL(rc, out, "util_create_disk_list(): rc != 0\n");
-		}
-
-		snprintf(spool_name, 256, "stratis_pool%d", i);
-
-		rc = stratis_spool_create(&spool,
-				spool_name,
-				dev_list,
-				STRATIS_VOLUME_RAID_TYPE_RAID4);
-
-		if (rc != STRATIS_OK) {
-			FAIL(rc, out, "stratis_spool_create(): rc != 0\n");
-		}
-
-		for (j = 0; j < TEST_VOLUME_COUNT; j++) {
-			snprintf(svolume_name, 256, "stratis_volume%d", i);
-			snprintf(mount_point, 256,"/dev/abc%d", i);
-			rc = stratis_svolume_create(&svolume, spool, svolume_name, mount_point);
-
-			if (rc != STRATIS_OK) {
-				FAIL(rc, out, "stratis_svolume_create(): rc != 0\n");
-			}
-
-
-		}
-
-		for (j = 0; j < TEST_DEV_COUNT; j++) {
-			snprintf(sdev_name, 256, "stratis_dev%d", i);
-
-			rc = stratis_sdev_create(&sdev, sdev_name, STRATIS_DEV_TYPE_REGULAR);
-
-			if (rc != STRATIS_OK) {
-				FAIL(rc, out, "stratis_sdev_create(): rc != 0\n");
-			}
-
-			rc =  stratis_spool_add_dev(spool, sdev);
-
-			if (rc != STRATIS_OK) {
-				FAIL(rc, out, "stratis_spool_add_dev(): rc != 0\n");
-			}
-		}
-
-	}
-
-out:
-	return rc;
-
 }

@@ -26,7 +26,6 @@
 #include <limits.h>
 #include <string.h>
 #include <syslog.h>
-#include <libdmmp/libdmmp.h>
 #include <systemd/sd-bus.h>
 
 #include "libstratis.h"
@@ -181,10 +180,15 @@ static int list_pools(sd_bus_message *message, void *userdata, sd_bus_error *err
 
 		rc = sd_bus_message_append(reply, "(ss)", spool->name, "spool state");
  	}
-
     rc = sd_bus_message_close_container(reply);
+
     if (rc < 0)
-            return rc;
+    	goto out;
+
+ 	rc = sd_bus_message_append(reply, "is", rc, stratis_get_user_message(rc));
+
+    if (rc < 0)
+    	goto out;
 
     return sd_bus_send(NULL, reply, NULL);
 
@@ -193,8 +197,68 @@ out:
 
 }
 
-static int list_volumes(sd_bus_message *message, void *userdata, sd_bus_error *error) {
+static int list_pool_devs(sd_bus_message *message, void *userdata, sd_bus_error *error) {
+	sdev_list_t *sdev_list;
+	spool_t *spool = (spool_t *) userdata;
+	char *sdev = NULL;
 	sd_bus_message *reply = NULL;
+	int dev_list_size = 0;
+	int rc, i;
+
+    rc = sd_bus_message_new_method_return(message, &reply);
+    if (rc < 0)
+            return rc;
+
+    rc = sd_bus_message_open_container(reply, 'a', "(ss)");
+     if (rc < 0)
+             goto out;
+
+ 	rc = stratis_spool_get_dev_list(spool, &sdev_list);
+ 	if (rc != STRATIS_OK) {
+ 		fprintf(stderr, "Failed stratis_svolume_get_list()\n");
+ 		goto out;
+ 	}
+
+ 	rc =  stratis_sdev_list_size(sdev_list, &dev_list_size);
+ 	if (rc != STRATIS_OK) {
+ 		fprintf(stderr, "Failed stratis_svolume_get_list()\n");
+ 		goto out;
+ 	}
+
+ 	for (i = 0; i < dev_list_size; i++) {
+ 		 ;
+		if (rc < 0)
+			goto out;
+
+		rc = stratis_sdev_list_nth(sdev_list, &sdev, i);
+
+		if (rc != STRATIS_OK) {
+			fprintf(stderr, "Failed stratis_volume_get_list()\n");
+			goto out;
+		}
+
+		rc = sd_bus_message_append(reply, "(ss)", sdev, "ONLINE");
+
+	    if (rc < 0)
+	    	goto out;
+
+ 	}
+
+    rc = sd_bus_message_close_container(reply);
+    if (rc < 0)
+            return rc;
+
+ 	rc = sd_bus_message_append(reply, "is", rc, stratis_get_user_message(rc));
+    if (rc < 0)
+            return rc;
+
+out:
+    return sd_bus_send(NULL, reply, NULL);
+
+}
+
+static int list_volumes(sd_bus_message *message, void *userdata, sd_bus_error *error) {
+/*	sd_bus_message *reply = NULL;
  	svolume_list_t *svolume_list;
 	svolume_t *svolume;
     const char *pool;
@@ -202,7 +266,6 @@ static int list_volumes(sd_bus_message *message, void *userdata, sd_bus_error *e
 	int rc, i;
 	char *name;
 	spool_t *spool;
-	/*
 
     int r;
 
@@ -249,10 +312,10 @@ static int list_volumes(sd_bus_message *message, void *userdata, sd_bus_error *e
     if (rc < 0)
             return rc;
 
-    return sd_bus_send(NULL, reply, NULL); */
+    return sd_bus_send(NULL, reply, NULL);
 
-out:
-	return rc;
+out: */
+	return 0;
 }
 
 static int create_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
@@ -315,8 +378,8 @@ static int create_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
         	goto out;
 
 out:
-        return sd_bus_reply_method_return(m, "iss",
-        			r, spool->dbus_name, stratis_get_user_message(r));;
+        return sd_bus_reply_method_return(m, "sis",
+        			spool->dbus_name, r, stratis_get_user_message(r));;
 }
 
 static int destroy_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
@@ -341,8 +404,8 @@ static int destroy_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) 
 
 
 out:
-    return sd_bus_reply_method_return(m, "iss",
-    				r, dbus_name, stratis_get_user_message(r));
+    return sd_bus_reply_method_return(m, "sis",
+    				dbus_name, r, stratis_get_user_message(r));
 
 }
 static int create_volume(sd_bus_message *m, void *userdata, sd_bus_error *error) {
@@ -422,9 +485,9 @@ static const sd_bus_vtable stratis_manager_vtable[] = {
 	SD_BUS_VTABLE_START(0),
 	SD_BUS_PROPERTY("Version", "s", property_get_version, 0, SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_WRITABLE_PROPERTY("LogLevel", "s", property_get_log_level, property_set_log_level, 0, 0),
-	SD_BUS_METHOD("ListPools", NULL, "a(ss)", list_pools, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("CreatePool", "sasi", "iss", create_pool, 0),
-	SD_BUS_METHOD("DestroyPool", "s", "iss", destroy_pool, 0),
+	SD_BUS_METHOD("ListPools", NULL, "a(ss)is", list_pools, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("CreatePool", "sasi", "sis", create_pool, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("DestroyPool", "s", "sis", destroy_pool, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_VTABLE_END
 };
 
@@ -436,11 +499,12 @@ static const sd_bus_vtable spool_vtable[] = {
 			SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_WRITABLE_PROPERTY("Size", "u", NULL, NULL,
 				    offsetof(spool_t, size), 0),
-	SD_BUS_METHOD("CreateVolume", "s", "is", create_volume, 0),
-	SD_BUS_METHOD("DestroyVolume", "s", "is", destroy_volume, 0),
-	SD_BUS_METHOD("ListVolumes", "s", "ia(ss)", list_volumes, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("AddCache", "ss", "i", add_cache, 0),
-	SD_BUS_METHOD("RemoveCache", "ss", "i", remove_cache, 0),
+	SD_BUS_METHOD("CreateVolume", "s", "is", create_volume, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("DestroyVolume", "s", "is", destroy_volume, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("ListVolumes", NULL, "a(ss)is", list_volumes, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("ListDevs", NULL, "a(ss)is", list_pool_devs, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("AddCache", "ss", "is", add_cache, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("RemoveCache", "ss", "is", remove_cache, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_VTABLE_END
 };
 

@@ -155,7 +155,6 @@ char *stratis_svolume_get_mount_point(svolume_t *svolume);
 
 int stratis_svolume_list_create(svolume_list_t **svolume_list);
 int stratis_svolume_list_destroy(svolume_list_t *svolume_list);
-int stratis_svolume_list_get(svolume_list_t **svolume_list);
 int stratis_svolume_list_eligible_disks(sdev_list_t **disk_list);
 int stratis_svolume_list_devs(spool_t *spool, sdev_list_t **disk_list);
 int stratis_svolume_list_size(svolume_list_t *svolume_list, int *list_size);

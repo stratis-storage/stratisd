@@ -388,11 +388,14 @@ int stratis_sdev_list_destroy(sdev_list_t *sdev_list) {
 
 int stratis_sdev_list_add(sdev_list_t **sdev_list, char *sdev) {
 	int rc = STRATIS_OK;
+	char *list_copy = NULL;
 
 	if (sdev_list == NULL || *sdev_list == NULL || sdev == NULL)
 		return STRATIS_NULL;
 
-	(*sdev_list)->list =  g_list_append ((*sdev_list)->list, sdev);
+	list_copy = malloc(strlen(sdev));
+	strcpy(list_copy, sdev);
+	(*sdev_list)->list =  g_list_append ((*sdev_list)->list, list_copy);
 
 	return rc;
 }

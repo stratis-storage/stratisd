@@ -44,6 +44,7 @@
 #define VOLUME_NAME 		"Volume"
 #define VOLUME_ID	 		"VolumeId"
 #define VOLUME_MOUNT_POINT	"MountPoint"
+#define VOLUME_QUOTA		"Quota"
 
 
 /* Pool Property Definitions */

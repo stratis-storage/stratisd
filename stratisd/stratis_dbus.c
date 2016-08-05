@@ -34,53 +34,63 @@
 static sd_bus *bus = NULL;
 
 static int sync_spool(spool_t *spool);
+static int sync_volume(svolume_t *volume, spool_t *spool);
 
-
-static int find_spool(sd_bus_message *m, char **name, spool_t **spool) {
+static int find_spool(char *name, spool_t **spool) {
 	int r = STRATIS_OK;
 	spool_list_t *spool_list;
 
-    r = sd_bus_message_read(m, "s", name);
+	r = stratis_spool_get_list(&spool_list);
+	if (r != STRATIS_OK) {
+		r = STRATIS_NOTFOUND;
+		goto out;
+	}
 
-    if (r < 0) {
-    	r = STRATIS_BAD_PARAM;
-    	goto out;
-    }
-
- 	r = stratis_spool_get_list(&spool_list);
- 	if (r != STRATIS_OK) {
- 		r = STRATIS_NOTFOUND;
- 		goto out;
- 	}
-
-    r = stratis_spool_list_find(spool_list, spool, *name);
+	r = stratis_spool_list_find(spool_list, spool, name);
 
 out:
 	return r;
 }
 
+static int find_volume(char *name, spool_t *spool,
+			svolume_t **volume) {
+	int r = STRATIS_OK;
+	svolume_list_t *svolume_list;
+
+
+	r = stratis_spool_get_volume_list(spool, &svolume_list);
+
+	if (r != STRATIS_OK) {
+		r = STRATIS_NOTFOUND;
+		goto out;
+	}
+
+	r = stratis_svolume_list_find(svolume_list, volume, name);
+
+	out: return r;
+}
+
 static int get_svolume_property(sd_bus *bus, const char *path,
-		const char *interface, const char *property, sd_bus_message *reply,
-		void *userdata, sd_bus_error *error) {
+        const char *interface, const char *property, sd_bus_message *reply,
+        void *userdata, sd_bus_error *error) {
 
 	svolume_t *svolume = userdata;
 
 	if (strcmp(property, VOLUME_NAME) == 0)
-		return sd_bus_message_append(reply, "s", stratis_svolume_get_name(svolume));
+		return sd_bus_message_append(reply, "s",
+		        stratis_svolume_get_name(svolume));
 
 	if (strcmp(property, VOLUME_ID) == 0)
-		return sd_bus_message_append(reply, "u", stratis_svolume_get_id(svolume));
-
-	if (strcmp(property, VOLUME_MOUNT_POINT) == 0)
-		return sd_bus_message_append(reply, "s", stratis_svolume_get_mount_point(svolume));
+		return sd_bus_message_append(reply, "u",
+		        stratis_svolume_get_id(svolume));
 
 	// TODO deal with error
 	return -1;
 }
 
 static int get_spool_property(sd_bus *bus, const char *path,
-		const char *interface, const char *property, sd_bus_message *reply,
-		void *userdata, sd_bus_error *error) {
+        const char *interface, const char *property, sd_bus_message *reply,
+        void *userdata, sd_bus_error *error) {
 
 	spool_t *spool = userdata;
 
@@ -94,80 +104,68 @@ static int get_spool_property(sd_bus *bus, const char *path,
 	return -1;
 }
 
+static int property_get_version(sd_bus *bus, const char *path,
+        const char *interface, const char *property, sd_bus_message *reply,
+        void *userdata, sd_bus_error *error) {
 
-static int property_get_version(
-                sd_bus *bus,
-                const char *path,
-                const char *interface,
-                const char *property,
-                sd_bus_message *reply,
-                void *userdata,
-                sd_bus_error *error) {
-
-        return sd_bus_message_append(reply, "s", STRATIS_VERSION);
+	return sd_bus_message_append(reply, "s", STRATIS_VERSION);
 }
 
-static int property_get_log_level(
-                sd_bus *bus,
-                const char *path,
-                const char *interface,
-                const char *property,
-                sd_bus_message *reply,
-                void *userdata,
-                sd_bus_error *error) {
+static int property_get_log_level(sd_bus *bus, const char *path,
+        const char *interface, const char *property, sd_bus_message *reply,
+        void *userdata, sd_bus_error *error) {
 
-        return sd_bus_message_append(reply, "s", "LOGLEVELX");
+	return sd_bus_message_append(reply, "s", "LOGLEVELX");
 }
 
-static int property_set_log_level(
-                sd_bus *bus,
-                const char *path,
-                const char *interface,
-                const char *property,
-                sd_bus_message *value,
-                void *userdata,
-                sd_bus_error *error) {
+static int property_set_log_level(sd_bus *bus, const char *path,
+        const char *interface, const char *property, sd_bus_message *value,
+        void *userdata, sd_bus_error *error) {
 
-        const char *t;
-        int r;
+	const char *t;
+	int rc;
 
-        r = sd_bus_message_read(value, "s", &t);
-        if (r < 0)
-                return r;
+	rc = sd_bus_message_read(value, "s", &t);
+	if (rc < 0)
+		return rc;
 
-        /* TODO set log level here */
+	/* TODO set log level here */
 
-        return r;
+	return rc;
 }
 
-static int list_pools(sd_bus_message *message, void *userdata, sd_bus_error *error) {
+static int list_pools(sd_bus_message *message, void *userdata,
+        sd_bus_error *error) {
 	sd_bus_message *reply = NULL;
- 	spool_list_t *spool_list;
+	spool_list_t *spool_list;
 	spool_t *spool;
 	int spool_list_size = 0;
 	int rc, i;
 
-    rc = sd_bus_message_new_method_return(message, &reply);
-    if (rc < 0)
-            return rc;
+	rc = sd_bus_message_new_method_return(message, &reply);
+	if (rc < 0)
+		return rc;
 
-    rc = sd_bus_message_open_container(reply, 'a', "(ss)");
-     if (rc < 0)
-             goto out;
+	rc = sd_bus_message_open_container(reply, 'a', "(ss)");
+	if (rc < 0)
+		goto out;
 
- 	rc = stratis_spool_get_list(&spool_list);
- 	if (rc != STRATIS_OK) {
- 		fprintf(stderr, "Failed stratis_spool_get_list()\n");
- 		goto out;
- 	}
+	rc = stratis_spool_get_list(&spool_list);
+	if (rc != STRATIS_OK) {
+		fprintf(stderr, "Failed stratis_spool_get_list()\n");
+		goto out;
+	}
 
- 	rc =  stratis_spool_list_size(spool_list, &spool_list_size);
- 	if (rc != STRATIS_OK) {
- 		fprintf(stderr, "Failed stratis_spool_get_list()\n");
- 		goto out;
- 	}
- 	for (i = 0; i < spool_list_size; i++) {
- 		 ;
+	rc = stratis_spool_list_size(spool_list, &spool_list_size);
+	if (rc != STRATIS_OK) {
+
+		if (spool_list == NULL) {
+			rc = STRATIS_NO_POOLS;
+		}
+		goto out;
+	}
+	for (i = 0; i < spool_list_size; i++) {
+		;
 		if (rc < 0)
 			goto out;
 
@@ -179,25 +177,19 @@ static int list_pools(sd_bus_message *message, void *userdata, sd_bus_error *err
 		}
 
 		rc = sd_bus_message_append(reply, "(ss)", spool->name, "spool state");
- 	}
-    rc = sd_bus_message_close_container(reply);
-
-    if (rc < 0)
-    	goto out;
-
- 	rc = sd_bus_message_append(reply, "is", rc, stratis_get_user_message(rc));
-
-    if (rc < 0)
-    	goto out;
-
-    return sd_bus_send(NULL, reply, NULL);
+	}
 
 out:
-	return rc;
+	sd_bus_message_close_container(reply);
+
+	sd_bus_message_append(reply, "is", rc, stratis_get_user_message(rc));
+
+	return sd_bus_send(NULL, reply, NULL);
 
 }
 
-static int list_pool_devs(sd_bus_message *message, void *userdata, sd_bus_error *error) {
+static int list_pool_devs(sd_bus_message *message, void *userdata,
+        sd_bus_error *error) {
 	sdev_list_t *sdev_list;
 	spool_t *spool = (spool_t *) userdata;
 	char *sdev = NULL;
@@ -205,28 +197,28 @@ static int list_pool_devs(sd_bus_message *message, void *userdata, sd_bus_error 
 	int dev_list_size = 0;
 	int rc, i;
 
-    rc = sd_bus_message_new_method_return(message, &reply);
-    if (rc < 0)
-            return rc;
+	rc = sd_bus_message_new_method_return(message, &reply);
+	if (rc < 0)
+		return rc;
 
-    rc = sd_bus_message_open_container(reply, 'a', "(ss)");
-     if (rc < 0)
-             goto out;
+	rc = sd_bus_message_open_container(reply, 'a', "(ss)");
+	if (rc < 0)
+		goto out;
 
- 	rc = stratis_spool_get_dev_list(spool, &sdev_list);
- 	if (rc != STRATIS_OK) {
- 		fprintf(stderr, "Failed stratis_svolume_get_list()\n");
- 		goto out;
- 	}
+	rc = stratis_spool_get_dev_list(spool, &sdev_list);
+	if (rc != STRATIS_OK) {
+		fprintf(stderr, "Failed stratis_svolume_get_list()\n");
+		goto out;
+	}
 
- 	rc =  stratis_sdev_list_size(sdev_list, &dev_list_size);
- 	if (rc != STRATIS_OK) {
- 		fprintf(stderr, "Failed stratis_svolume_get_list()\n");
- 		goto out;
- 	}
+	rc = stratis_sdev_list_size(sdev_list, &dev_list_size);
+	if (rc != STRATIS_OK) {
+		fprintf(stderr, "Failed stratis_svolume_get_list()\n");
+		goto out;
+	}
 
- 	for (i = 0; i < dev_list_size; i++) {
- 		 ;
+	for (i = 0; i < dev_list_size; i++) {
+		;
 		if (rc < 0)
 			goto out;
 
@@ -237,251 +229,363 @@ static int list_pool_devs(sd_bus_message *message, void *userdata, sd_bus_error 
 			goto out;
 		}
 
-		rc = sd_bus_message_append(reply, "(ss)", sdev, "ONLINE");
+		rc = sd_bus_message_append(reply, "(ss)", sdev, "Online");
 
-	    if (rc < 0)
-	    	goto out;
-
- 	}
-
-    rc = sd_bus_message_close_container(reply);
-    if (rc < 0)
-            return rc;
-
- 	rc = sd_bus_message_append(reply, "is", rc, stratis_get_user_message(rc));
-    if (rc < 0)
-            return rc;
-
-out:
-    return sd_bus_send(NULL, reply, NULL);
-
-}
-
-static int list_volumes(sd_bus_message *message, void *userdata, sd_bus_error *error) {
-/*	sd_bus_message *reply = NULL;
- 	svolume_list_t *svolume_list;
-	svolume_t *svolume;
-    const char *pool;
-	int volume_list_size = 0;
-	int rc, i;
-	char *name;
-	spool_t *spool;
-
-    int r;
-
-    r = find_spool(name, &spool);
-
-    if (r != STRATIS_OK)
-    	goto out;
-
-    rc = sd_bus_message_new_method_return(message, &reply);
-    if (rc < 0)
-            return rc;
-
-    rc = sd_bus_message_open_container(reply, 'a', "(ss)");
-     if (rc < 0)
-             goto out;
-
- 	rc = stratis_svolume_get_list(&svolume_list);
- 	if (rc != STRATIS_OK) {
- 		fprintf(stderr, "Failed stratis_svolume_get_list()\n");
- 		goto out;
- 	}
-
- 	rc =  stratis_volume_list_size(svolume_list, &volume_list_size);
- 	if (rc != STRATIS_OK) {
- 		fprintf(stderr, "Failed stratis_svolume_get_list()\n");
- 		goto out;
- 	}
- 	for (i = 0; i < volume_list_size; i++) {
- 		 ;
 		if (rc < 0)
 			goto out;
 
-		rc = stratis_spool_list_nth(svolume_list, &svolume, i);
+	}
+
+	rc = sd_bus_message_close_container(reply);
+	if (rc < 0)
+		return rc;
+
+	rc = sd_bus_message_append(reply, "is", rc, stratis_get_user_message(rc));
+	if (rc < 0)
+		return rc;
+
+out:
+	return sd_bus_send(NULL, reply, NULL);
+
+}
+
+static int list_pool_volumes(sd_bus_message *message, void *userdata,
+        sd_bus_error *error) {
+	svolume_list_t *svolume_list;
+	spool_t *spool = (spool_t *) userdata;
+	svolume_t *volume = NULL;
+	sd_bus_message *reply = NULL;
+	int volume_list_size = 0;
+	int rc, i;
+
+	rc = sd_bus_message_new_method_return(message, &reply);
+
+	if (rc < 0) {
+		rc = STRATIS_BAD_PARAM;
+		goto out;
+	}
+
+	rc = sd_bus_message_open_container(reply, 'a', "(ss)");
+	if (rc < 0)
+		goto out;
+
+	rc = stratis_spool_get_volume_list(spool, &svolume_list);
+	if (rc != STRATIS_OK) {
+		fprintf(stderr, "Failed stratis_svolume_get_list()\n");
+		goto out;
+	}
+
+	rc = stratis_svolume_list_size(svolume_list, &volume_list_size);
+	if (rc != STRATIS_OK) {
+		fprintf(stderr, "Failed stratis_svolume_get_list()\n");
+		goto out;
+	}
+
+	for (i = 0; i < volume_list_size; i++) {
+		;
+		if (rc < 0)
+			goto out;
+
+		rc = stratis_svolume_list_nth(svolume_list, &volume, i);
 
 		if (rc != STRATIS_OK) {
 			fprintf(stderr, "Failed stratis_volume_get_list()\n");
 			goto out;
 		}
 
-		rc = sd_bus_message_append(reply, "(ss)", svolume->name, "svolume state");
- 	}
+		rc = sd_bus_message_append(reply, "(ss)", volume->name, "Mounted");
 
-    rc = sd_bus_message_close_container(reply);
-    if (rc < 0)
-            return rc;
+		if (rc < 0)
+			goto out;
 
-    return sd_bus_send(NULL, reply, NULL);
+	}
 
-out: */
-	return 0;
+	rc = sd_bus_message_close_container(reply);
+	if (rc < 0)
+		return rc;
+
+	rc = sd_bus_message_append(reply, "is", rc, stratis_get_user_message(rc));
+	if (rc < 0)
+		return rc;
+
+out:
+	return sd_bus_send(NULL, reply, NULL);
+
 }
 
 static int create_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
-        struct context *c = userdata;
-        char *name = NULL;
-        spool_t *spool;
-        sdev_list_t *sdev_list = NULL;
-        char *n = "pool ok";
-        int r;
-        int raid_type = STRATIS_VOLUME_RAID_TYPE_UNKNOWN;
-        char *sdev_name = NULL;
-        size_t length = 0;
+	struct context *c = userdata;
+	char *name = NULL;
+	spool_t *spool;
+	sdev_list_t *sdev_list = NULL;
+	char *n = "pool ok";
+	int rc;
+	int raid_type = STRATIS_VOLUME_RAID_TYPE_UNKNOWN;
+	char *sdev_name = NULL;
+	size_t length = 0;
 
-        r = find_spool(m, &name, &spool);
+	rc = sd_bus_message_read(m, "s", &name);
 
-        /*
-         * Make sure the object doesn't already exist.
-         */
-        if (r != STRATIS_NOTFOUND && r != STRATIS_NULL) {
-        	r = STRATIS_DUPLICATE_NAME;
-        	goto out;
-        }
+	if (rc < 0) {
+		rc = STRATIS_BAD_PARAM;
+		goto out;
+	}
 
-        r = stratis_sdev_list_create(&sdev_list);
+	rc = find_spool(name, &spool);
 
-        if (r != STRATIS_OK)
-                goto out;
+	/*
+	 * Make sure the object doesn't already exist.
+	 */
+	if (rc != STRATIS_NOTFOUND && rc != STRATIS_NULL) {
+		rc = STRATIS_DUPLICATE_NAME;
+		goto out;
+	}
 
-        r = sd_bus_message_enter_container(m, 'a', "s");
-        if (r < 0)
-                goto out;
+	rc = stratis_sdev_list_create(&sdev_list);
 
-        for (;;) {
-            r = sd_bus_message_read_basic(m, SD_BUS_TYPE_STRING, &sdev_name);
+	if (rc != STRATIS_OK)
+		goto out;
 
-            if (r < 0)
-                    goto out;
-                if (r == 0)
-                        break;
-            r = stratis_sdev_list_add(&sdev_list, sdev_name);
+	rc = sd_bus_message_enter_container(m, 'a', "s");
+	if (rc < 0)
+		goto out;
 
-        }
-        r = sd_bus_message_exit_container(m);
-        if (r < 0)
-        	goto out;
+	for (;;) {
+		rc = sd_bus_message_read_basic(m, SD_BUS_TYPE_STRING, &sdev_name);
 
-        r = sd_bus_message_read(m, "i", &raid_type);
-        if (r < 0)
-                goto out;
+		if (rc < 0)
+			goto out;
+		if (rc == 0)
+			break;
+		rc = stratis_sdev_list_add(&sdev_list, sdev_name);
 
-        // TODO free the sdev_list - have create make a copy
-        r = stratis_spool_create(&spool, name, sdev_list, raid_type);
+	}
+	rc = sd_bus_message_exit_container(m);
+	if (rc < 0)
+		goto out;
 
-        if (r < 0)
-        	goto out;
+	rc = sd_bus_message_read(m, "i", &raid_type);
+	if (rc < 0)
+		goto out;
 
-        r = sync_spool(spool);
+	// TODO free the sdev_list - have create make a copy
+	rc = stratis_spool_create(&spool, name, sdev_list, raid_type);
 
-        if (r < 0)
-        	goto out;
+	if (rc < 0)
+		goto out;
 
-out:
-        return sd_bus_reply_method_return(m, "sis",
-        			spool->dbus_name, r, stratis_get_user_message(r));;
+	rc = sync_spool(spool);
+
+	if (rc < 0)
+		goto out;
+
+	out: return sd_bus_reply_method_return(m, "sis", spool->dbus_name, rc,
+	        stratis_get_user_message(rc));;
 }
 
 static int destroy_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
-	int r = STRATIS_OK;
+	int rc = STRATIS_OK;
 	spool_t *spool = NULL;
 	char dbus_name[MAX_STRATIS_NAME_LEN] = "";
-    char *name = NULL;
+	char *name = NULL;
 
-    r = find_spool(m, &name, &spool);
+	rc = sd_bus_message_read(m, "s", &name);
 
-    if (r != STRATIS_OK)
-     	goto out;
+	if (rc < 0) {
+		rc = STRATIS_BAD_PARAM;
+		goto out;
+	}
 
-    strcpy(dbus_name, spool->dbus_name);
-    spool->slot = sd_bus_slot_unref(spool->slot);
-    r = sd_bus_emit_object_removed(bus, spool->dbus_name);
+	rc = find_spool(name, &spool);
 
-    if (r < 0)
-    	goto out;
+	if (rc != STRATIS_OK)
+		goto out;
 
-    r = stratis_spool_destroy(spool);
+	strcpy(dbus_name, spool->dbus_name);
+	spool->slot = sd_bus_slot_unref(spool->slot);
+	rc = sd_bus_emit_object_removed(bus, spool->dbus_name);
 
+	if (rc < 0)
+		goto out;
 
-out:
-    return sd_bus_reply_method_return(m, "sis",
-    				dbus_name, r, stratis_get_user_message(r));
+	rc = stratis_spool_destroy(spool);
+
+	out: return sd_bus_reply_method_return(m, "sis", dbus_name, rc,
+	        stratis_get_user_message(rc));
 
 }
 static int create_volume(sd_bus_message *m, void *userdata, sd_bus_error *error) {
-        struct context *c = userdata;
-        const char *s;
-        char *n = "";
-        int r;
+	spool_t *spool = userdata;
+	svolume_t *svolume;
+	char *volume_name = "", *mount_point = "", *quota = "";
+	char *n = "";
+	int rc;
 
-        r = sd_bus_message_read(m, "s", &s);
-        if (r < 0)
-                goto out;
+	rc = sd_bus_message_read(m, "sss", &volume_name, &mount_point, &quota);
 
-        printf("create_volume() called, got %s, returning %s", s, n);
+	if (rc < 0) {
+		rc = STRATIS_BAD_PARAM;
+		goto out;
+	}
 
-        return sd_bus_reply_method_return(m, "is", r, "/put/dbus/name/here");
+	rc = stratis_svolume_create(&svolume, spool,
+			volume_name, mount_point, quota);
 
-out:
-        return r;
+	if (rc != STRATIS_OK)
+		goto out;
+
+	sync_volume(svolume, spool);
+
+	return sd_bus_reply_method_return(m, "is", rc, svolume->dbus_name);
+
+	out: return rc;
+}
+static int set_mount_point_volume(sd_bus_message *m, void *userdata, sd_bus_error *error) {
+	int rc = STRATIS_OK;
+
+	return rc;
 }
 
-static int destroy_volume(sd_bus_message *m, void *userdata, sd_bus_error *error) {
-        struct context *c = userdata;
-        char dbus_name[MAX_STRATIS_NAME_LEN];
-        const char *s;
-        char *n = "";
-        int r;
+static int set_quota_volume(sd_bus_message *m, void *userdata, sd_bus_error *error) {
+	int rc = STRATIS_OK;
 
-        r = sd_bus_message_read(m, "s", &s);
-        if (r < 0)
-                goto out;
+	return rc;
+}
 
-        printf("destroy volume() called, got %s, returning %s", s, n);
+static int rename_volume(sd_bus_message *m, void *userdata, sd_bus_error *error) {
+	int rc = STRATIS_OK;
 
-        return sd_bus_reply_method_return(m, "is", r, n);
+	return rc;
+}
+
+
+
+static int destroy_volume(sd_bus_message *m, void *userdata,
+        sd_bus_error *error) {
+	spool_t *spool = userdata;
+	svolume_t *volume = NULL;
+	char dbus_name[MAX_STRATIS_NAME_LEN] = "";
+	char *name = NULL;
+	int rc;
+
+	rc = sd_bus_message_read(m, "s", &name);
+	if (rc < 0)
+		goto out;
+
+	rc = find_volume(name, spool, &volume);
+
+	if (rc != STRATIS_OK) {
+		rc = STRATIS_NOTFOUND;
+		goto out;
+	}
+	volume->slot = sd_bus_slot_unref(volume->slot);
+	rc = sd_bus_emit_object_removed(bus, volume->dbus_name);
+
+	if (rc < 0)
+		goto out;
+
+	strcpy(dbus_name, volume->dbus_name);
+	rc = stratis_svolume_destroy(volume);
 
 out:
-        return r;
+	return sd_bus_reply_method_return(m, "sis", dbus_name, rc,
+	        stratis_get_user_message(rc));
 }
 
 static int add_cache(sd_bus_message *m, void *userdata, sd_bus_error *error) {
-        struct context *c = userdata;
-        const char *s;
-        char *n = "";
-        int r;
+	struct context *c = userdata;
+	const char *s;
+	char *n = "";
+	int r;
 
-        r = sd_bus_message_read(m, "s", &s);
-        if (r < 0)
-                goto out;
+	r = sd_bus_message_read(m, "s", &s);
+	if (r < 0)
+		goto out;
 
-        printf("add cache() called, got %s, returning %s", s, n);
+	printf("add cache() called, got %s, returning %s", s, n);
 
-        return sd_bus_reply_method_return(m, "is", r, n);
+	return sd_bus_reply_method_return(m, "is", r, n);
 
-out:
-        return r;
+	out: return r;
 }
 
 static int remove_cache(sd_bus_message *m, void *userdata, sd_bus_error *error) {
-        struct context *c = userdata;
-        const char *s;
-        char *n = "";
-        int r;
+	struct context *c = userdata;
+	const char *s;
+	char *n = "";
+	int r;
 
-        r = sd_bus_message_read(m, "s", &s);
-        if (r < 0)
-                goto out;
+	r = sd_bus_message_read(m, "s", &s);
+	if (r < 0)
+		goto out;
 
-        printf("remove cache() called, got %s, returning %s", s, n);
+	printf("remove cache() called, got %s, returning %s", s, n);
 
-        return sd_bus_reply_method_return(m, "is", r, n);
+	return sd_bus_reply_method_return(m, "is", r, n);
 
 out:
-        return r;
+	return r;
 }
 
-static const sd_bus_vtable stratis_manager_vtable[] = {
+static int get_handler(sd_bus *bus, const char *path, const char *interface, const char *property, sd_bus_message *reply, void *userdata, sd_bus_error *error) {
+		svolume_t *c = userdata;
+        char *return_str;
+        int rc;
+
+    	if (rc < 0)
+    		goto out;
+
+    	if (strcmp(property, VOLUME_MOUNT_POINT ) == 0) {
+    		return_str = c->mount_point;
+    		goto out;
+    	}
+
+    	if (strcmp(property, VOLUME_QUOTA ) == 0) {
+    		return_str = c->quota;
+    		goto out;
+    	}
+
+    	if (strcmp(property, VOLUME_NAME ) == 0) {
+    		return_str = c->name;
+    		goto out;
+    	}
+out:
+		rc = sd_bus_message_append(reply, "s", return_str);
+        return 1;
+}
+
+
+static int set_handler(sd_bus *bus, const char *path, const char *interface,
+		const char *property, sd_bus_message *value, void *userdata,
+		sd_bus_error *error) {
+        svolume_t *c = userdata;
+        const char *s;
+        char *n;
+        int rc = 0;
+
+
+    	if (strcmp(property, VOLUME_MOUNT_POINT ) == 0) {
+    		strcpy(c->mount_point, property);
+    		return 0;
+    	}
+
+    	if (strcmp(property, VOLUME_QUOTA ) == 0) {
+    		strcpy(c->quota, property);
+    		return 0;
+    	}
+
+    	if (strcmp(property, VOLUME_NAME ) == 0) {
+    		strcpy(c->name, property);
+    		return 0;
+    	}
+
+out:
+		return rc;
+}
+
+
+static const sd_bus_vtable stratis_manager_vtable[] =
+        {
 	SD_BUS_VTABLE_START(0),
 	SD_BUS_PROPERTY("Version", "s", property_get_version, 0, SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_WRITABLE_PROPERTY("LogLevel", "s", property_get_log_level, property_set_log_level, 0, 0),
@@ -498,10 +602,12 @@ static const sd_bus_vtable spool_vtable[] = {
 	SD_BUS_PROPERTY(POOL_ID, "i", get_spool_property, 0,
 			SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_WRITABLE_PROPERTY("Size", "u", NULL, NULL,
-				    offsetof(spool_t, size), 0),
-	SD_BUS_METHOD("CreateVolume", "s", "is", create_volume, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("DestroyVolume", "s", "is", destroy_volume, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("ListVolumes", NULL, "a(ss)is", list_volumes, SD_BUS_VTABLE_UNPRIVILEGED),
+			offsetof(spool_t, size), 0),
+	SD_BUS_METHOD("CreateVolume", "sss", "is", create_volume, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("SetMountPoint", "s", "is", set_mount_point_volume, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("SetQuota", "s", "is", set_quota_volume, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("DestroyVolume", "s", "sis", destroy_volume, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("ListVolumes", NULL, "a(ss)is", list_pool_volumes, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("ListDevs", NULL, "a(ss)is", list_pool_devs, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("AddCache", "ss", "is", add_cache, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("RemoveCache", "ss", "is", remove_cache, SD_BUS_VTABLE_UNPRIVILEGED),
@@ -511,25 +617,38 @@ static const sd_bus_vtable spool_vtable[] = {
 static const sd_bus_vtable svolume_vtable[] = {
 	SD_BUS_VTABLE_START(0),
 	SD_BUS_PROPERTY(VOLUME_NAME, "s", get_svolume_property, 0,
-			SD_BUS_VTABLE_PROPERTY_CONST),
+				SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_PROPERTY(VOLUME_ID, "s", get_svolume_property, 0,
-			SD_BUS_VTABLE_PROPERTY_CONST),
-	SD_BUS_METHOD("Rename", "s", "is", create_volume, 0),
-    SD_BUS_WRITABLE_PROPERTY("AutomaticIntegerProperty", "u", NULL, NULL,
-    		offsetof(svolume_t, size), 0),
-	SD_BUS_WRITABLE_PROPERTY("AutomaticStringProperty", "s", NULL, NULL,
-		    offsetof(svolume_t, name), 0),
-	SD_BUS_WRITABLE_PROPERTY("AutomaticStringProperty", "s", NULL, NULL,
-			offsetof(svolume_t, mount_point), 0),
+				SD_BUS_VTABLE_PROPERTY_CONST),
+	SD_BUS_METHOD("Rename", "s", "is", rename_volume, 0),
+	SD_BUS_WRITABLE_PROPERTY(VOLUME_QUOTA, "s", get_handler, set_handler,
+				0, 0),
+	SD_BUS_WRITABLE_PROPERTY(VOLUME_MOUNT_POINT, "s", get_handler, set_handler,
+				0, 0),
 	SD_BUS_VTABLE_END
 };
 
+static int sync_volume(svolume_t *volume, spool_t *spool) {
+	int rc = STRATIS_OK;
 
+	snprintf(volume->dbus_name, 256, "%s/%s", spool->dbus_name,
+		        stratis_svolume_get_name(volume));
 
+	rc = sd_bus_add_object_vtable(bus, &(volume->slot), volume->dbus_name,
+			STRATIS_VOLUME_BASE_INTERFACE, svolume_vtable, volume);
+
+	if (rc < 0) {
+		fprintf(stderr, "Failed sd_bus_add_object_vtable for svolume : %s\n",
+		        strerror(rc));
+		goto out;
+	}
+
+out:
+	return rc;
+}
 
 static int sync_spool(spool_t *spool) {
-	int rc = EXIT_SUCCESS;
-	int dbus_rc;
+	int rc = STRATIS_OK;
 	int spool_list_size = 0, svolume_list_size = 0, sdev_list_size = 0;
 	char spool_name[256], svolume_name[256], sdev_name[256];
 	int i, j, k;
@@ -538,47 +657,18 @@ static int sync_spool(spool_t *spool) {
 	svolume_list_t *svolume_list;
 	spool_list_t *spool_list;
 
-
 	snprintf(spool->dbus_name, 256, "%s/%s", STRATIS_BASE_PATH,
-			stratis_spool_get_name(spool));
+	        stratis_spool_get_name(spool));
 
-	dbus_rc = sd_bus_add_object_vtable(bus,
-							&(spool->slot), spool->dbus_name,
-							STRATIS_POOL_BASE_INTERFACE,
-							spool_vtable, spool);
-	if (dbus_rc < 0) {
-		fprintf(stderr, "Failed sd_bus_add_object_vtable for spool: %s\n", strerror(dbus_rc));
+	rc = sd_bus_add_object_vtable(bus, &(spool->slot), spool->dbus_name,
+				STRATIS_POOL_BASE_INTERFACE, spool_vtable, spool);
+
+	if (rc < 0) {
+		fprintf(stderr, "Failed sd_bus_add_object_vtable for spool: %s\n",
+		        strerror(rc));
 		goto out;
 	}
 
-	rc = stratis_spool_get_volume_list(spool, &svolume_list);
-	if (rc != STRATIS_OK) {
-		fprintf(stderr, "Failed stratis_spool_get_list()\n");
-		goto out;
-	}
-	rc =  stratis_svolume_list_size(svolume_list, &svolume_list_size);
-	if (rc != STRATIS_OK) {
-		fprintf(stderr, "Failed stratis_spool_get_list()\n");
-		goto out;
-	}
-	for (j = 0; j < svolume_list_size; j++) {
-
-		rc = stratis_svolume_list_nth(svolume_list,
-				&svolume,
-				j);
-		if (rc != STRATIS_OK) {
-			fprintf(stderr, "Failed stratis_spool_get_list()\n");
-			goto out;
-		}
-		snprintf(svolume_name, 256, "%s/%s", STRATIS_BASE_PATH,
-				stratis_svolume_get_name(svolume));
-
-		dbus_rc = sd_bus_add_object_vtable(bus,
-								&(svolume->slot), svolume_name,
-								STRATIS_VOLUME_BASE_INTERFACE,
-								svolume_vtable, svolume);
-
-	}
 
 out:
 	return rc;
@@ -596,18 +686,20 @@ void * stratis_main_loop(void * ap) {
 	}
 
 	r = sd_bus_add_object_vtable(bus, &slot, STRATIS_BASE_PATH,
-					STRATIS_MANAGER_INTERFACE,
-					stratis_manager_vtable, NULL);
+	STRATIS_MANAGER_INTERFACE, stratis_manager_vtable, NULL);
 
 	if (r < 0) {
-		fprintf(stderr, "Failed sd_bus_add_object_vtable for stratis_manager_vtable: %s\n", strerror(-r));
+		fprintf(stderr,
+		        "Failed sd_bus_add_object_vtable for stratis_manager_vtable: %s\n",
+		        strerror(-r));
 		goto finish;
 	}
 
 	r = sd_bus_add_object_manager(bus, &slot, STRATIS_BASE_PATH);
 
 	if (r < 0) {
-		fprintf(stderr, "Failed to sd_bus_add_object_manager: %s\n", strerror(-r));
+		fprintf(stderr, "Failed to sd_bus_add_object_manager: %s\n",
+		        strerror(-r));
 		goto finish;
 	}
 
@@ -630,7 +722,7 @@ void * stratis_main_loop(void * ap) {
 			continue;
 
 		/* Wait for the next request to process */
-		r = sd_bus_wait(bus, (uint64_t) - 1);
+		r = sd_bus_wait(bus, (uint64_t) -1);
 		if (r < 0) {
 			fprintf(stderr, "Failed to wait on bus: %s\n", strerror(-r));
 			goto finish;

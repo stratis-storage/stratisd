@@ -21,7 +21,6 @@
 #ifndef _LIB_STRATIS_PRIVATE_H_
 #define _LIB_STRATIS_PRIVATE_H_
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -33,7 +32,8 @@ extern "C" {
 #include <stratis/libstratis.h>
 
 static inline void __attribute__((always_inline, format(printf, 2, 3)))
-stratis_log_null(struct stratis_ctx *ctx, const char *format, ...) {}
+stratis_log_null(struct stratis_ctx *ctx, const char *format, ...) {
+}
 
 #define stratis_log_cond(ctx, prio, arg...) \
   do { \
@@ -55,7 +55,6 @@ stratis_log_null(struct stratis_ctx *ctx, const char *format, ...) {}
 #  define err(ctx, arg...) stratis_log_null(ctx, ## arg)
 #endif
 
-
 #ifndef HAVE_SECURE_GETENV
 #  ifdef HAVE___SECURE_GETENV
 #    define secure_getenv __secure_getenv
@@ -66,11 +65,9 @@ stratis_log_null(struct stratis_ctx *ctx, const char *format, ...) {}
 
 #define STRATIS_EXPORT __attribute__ ((visibility("default")))
 
-void stratis_log(struct stratis_ctx *ctx,
-           int priority, const char *file, int line, const char *fn,
-           const char *format, ...)
-           __attribute__((format(printf, 6, 7)));
-
+void stratis_log(struct stratis_ctx *ctx, int priority, const char *file,
+        int line, const char *fn, const char *format, ...)
+                __attribute__((format(printf, 6, 7)));
 
 #ifdef __cplusplus
 } /* End of extern "C" */

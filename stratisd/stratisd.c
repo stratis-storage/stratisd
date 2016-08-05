@@ -34,12 +34,9 @@
 
 #define PORT 8888  // TODO change this
 
-int answer_to_connection (void *cls, struct MHD_Connection *connection, 
-                          const char *url, 
-                          const char *method, const char *version, 
-                          const char *upload_data, 
-                          size_t *upload_data_size, void **con_cls)
-{
+int answer_to_connection(void *cls, struct MHD_Connection *connection,
+        const char *url, const char *method, const char *version,
+        const char *upload_data, size_t *upload_data_size, void **con_cls) {
 
 	struct plugin *plugin = NULL;
 	const char *answer = NULL;
@@ -49,27 +46,26 @@ int answer_to_connection (void *cls, struct MHD_Connection *connection,
 	answer = "<html><body>Response from stratisd</body></html>";
 
 	response = MHD_create_response_from_buffer(strlen(answer), (void*) answer,
-			MHD_RESPMEM_PERSISTENT);
+	        MHD_RESPMEM_PERSISTENT);
 	ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
 	MHD_destroy_response(response);
 
 	return ret;
 }
 
-
 int main(int argc, char **argv) {
 
-    struct MHD_Daemon *daemon;
+	struct MHD_Daemon *daemon;
 
-    daemon = MHD_start_daemon (MHD_USE_SELECT_INTERNALLY, PORT, NULL, NULL, 
-                             &answer_to_connection, NULL, MHD_OPTION_END);
-    if (NULL == daemon) 
-    	printf("Failed to start HTTP daemon");
+	daemon = MHD_start_daemon(MHD_USE_SELECT_INTERNALLY, PORT, NULL, NULL,
+	        &answer_to_connection, NULL, MHD_OPTION_END);
+	if (NULL == daemon)
+		printf("Failed to start HTTP daemon");
 
-    stratis_main_loop(NULL);
+	stratis_main_loop(NULL);
 
-    MHD_stop_daemon (daemon);
+	MHD_stop_daemon(daemon);
 
-    printf("exiting...\n");
+	printf("exiting...\n");
 
 }

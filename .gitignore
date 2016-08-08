@@ -1,0 +1,9 @@
+# builds
+*.o
+*.so
+*.so.*
+bin/stratisd
+test/stratis_test
+
+# text editors
+*.swp

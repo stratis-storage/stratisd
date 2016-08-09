@@ -52,17 +52,21 @@ typedef enum {
 	STRATIS_DEV_TYPE_CACHE = 1,
 } stratis_dev_t;
 
+typedef struct scache_list {
+	GHashTable *table;
+} scache_table_t;
+
 typedef struct sdev_list {
-	GList *list;
-} sdev_list_t;
+	GHashTable *table;
+} sdev_table_t;
 
 typedef struct svolume_list {
-	GList *list;
-} svolume_list_t;
+	GHashTable *table;
+} svolume_table_t;
 
 typedef struct spool_list {
-	GList *list;
-} spool_list_t;
+	GHashTable *table;
+} spool_table_t;
 
 typedef struct spool {
 	int id;
@@ -70,8 +74,9 @@ typedef struct spool {
 	char name[MAX_STRATIS_NAME_LEN];
 	char dbus_name[MAX_STRATIS_NAME_LEN];
 	sd_bus_slot *slot;
-	sdev_list_t *sdev_list;
-	svolume_list_t *svolume_list;
+	sdev_table_t *sdev_table;
+	svolume_table_t *svolume_table;
+	scache_table_t *scache_table;
 } spool_t;
 
 typedef struct svolume {
@@ -86,15 +91,17 @@ typedef struct svolume {
 } svolume_t;
 
 /* Return codes */
-#define STRATIS_OK				0		/* Ok */
-#define STRATIS_ERROR			100
-#define STRATIS_NULL			101
-#define STRATIS_MALLOC			102
-#define STRATIS_NOTFOUND		103
-#define STRATIS_BAD_PARAM		104
-#define STRATIS_ALREADY_EXISTS	105
-#define STRATIS_DUPLICATE_NAME	106
-#define STRATIS_NO_POOLS		107
+#define STRATIS_OK					0		/* Ok */
+#define STRATIS_ERROR				100
+#define STRATIS_NULL				101
+#define STRATIS_MALLOC				102
+#define STRATIS_NOTFOUND			103
+#define STRATIS_POOL_NOTFOUND		104
+#define STRATIS_VOLUME_NOTFOUND		105
+#define STRATIS_BAD_PARAM			106
+#define STRATIS_ALREADY_EXISTS		107
+#define STRATIS_DUPLICATE_NAME		108
+#define STRATIS_NO_POOLS			109
 /*
  * typedef taken from LSM
  */
@@ -116,20 +123,24 @@ typedef enum {
  */
 
 int stratis_spool_create(spool_t **spool, const char *name,
-        sdev_list_t *disk_list, stratis_volume_raid_type raid_level);
+        sdev_table_t *disk_table, stratis_volume_raid_type raid_level);
 int stratis_spool_destroy(spool_t *spool);
+int stratis_spool_get(spool_t **spool, char *name);
 char *stratis_spool_get_name(spool_t *spool);
 int stratis_spool_get_id(spool_t *spool);
-int stratis_spool_get_list(spool_list_t **spool_list);
-int stratis_spool_add_devs(spool_t *spool, sdev_list_t *sdev_list);
+int stratis_spool_get_list(spool_table_t **spool_list);
+int stratis_spool_add_devs(spool_t *spool, sdev_table_t *sdev_table);
 int stratis_spool_remove_dev(spool_t *spool, char *sdev);
+int stratis_spool_get_dev_table(spool_t *spool, sdev_table_t **sdev_table);
+
+int stratis_spool_add_cache_devs(spool_t *spool, sdev_table_t *sdev_table);
+int stratis_spool_remove_cache_devs(spool_t *spool, char *sdev);
+int stratis_spool_get_cache_dev_table(spool_t *spool, sdev_table_t **sdev_table);
+
 int stratis_spool_get_volume_list(spool_t *spool,
-        svolume_list_t **svolume_list);
-int stratis_spool_get_dev_list(spool_t *spool, sdev_list_t **sdev_list);
-int stratis_spool_list_size(spool_list_t *spool_list, int *list_size);
-int stratis_spool_list_nth(spool_list_t *spool_list, spool_t **spool,
-        int element);
-int stratis_spool_list_find(spool_list_t *spool_list, spool_t **spool,
+        svolume_table_t **svolume_table);
+int stratis_spool_list_size(spool_table_t *spool_list, int *list_size);
+int stratis_spool_table_find(spool_table_t *spool_list, spool_t **spool,
         char *name);
 /*
  * Volumes
@@ -137,30 +148,29 @@ int stratis_spool_list_find(spool_list_t *spool_list, spool_t **spool,
 int stratis_svolume_create(svolume_t **svolume, spool_t *spool, char *name,
         char *mount_point, char *qutoa);
 int stratis_svolume_destroy(svolume_t *svolume);
+int stratis_svolume_get(svolume_t **svolume, char *poolname, char *volumename);
 char *stratis_svolume_get_name(svolume_t *svolume);
 int stratis_svolume_get_id(svolume_t *svolume);
 char *stratis_svolume_get_mount_point(svolume_t *svolume);
 
-int stratis_svolume_list_create(svolume_list_t **svolume_list);
-int stratis_svolume_list_destroy(svolume_list_t *svolume_list);
-int stratis_svolume_list_eligible_disks(sdev_list_t **disk_list);
-int stratis_svolume_list_devs(spool_t *spool, sdev_list_t **disk_list);
-int stratis_svolume_list_size(svolume_list_t *svolume_list, int *list_size);
-int stratis_svolume_list_nth(svolume_list_t *svolume_list, svolume_t **svolume,
-        int element);
-int stratis_svolume_list_find(svolume_list_t *svolume_list, svolume_t **svolume,
+int stratis_svolume_table_create(svolume_table_t *svolume_table);
+int stratis_svolume_table_destroy(svolume_table_t *svolume_table);
+int stratis_svolume_table_eligible_disks(sdev_table_t **disk_table);
+int stratis_svolume_table_devs(spool_t *spool, sdev_table_t **disk_table);
+int stratis_svolume_table_size(svolume_table_t *svolume_table, int *list_size);
+int stratis_svolume_table_find(svolume_table_t *svolume_table, svolume_t **svolume,
         char *name);
 
 /*
  * Device Lists
  */
 
-int stratis_sdev_list_create(sdev_list_t **sdev_list);
-int stratis_sdev_list_destroy(sdev_list_t *sdev_list);
-int stratis_sdev_list_add(sdev_list_t **sdev_list, char *sdev);
-int stratis_sdev_list_remove(sdev_list_t **sdev_list, char *sdev);
-int stratis_sdev_list_size(sdev_list_t *sdev_list, int *list_size);
-int stratis_sdev_list_nth(sdev_list_t *sdev_list, char **sdev, int element);
+int stratis_sdev_table_create(sdev_table_t **sdev_table);
+int stratis_sdev_table_destroy(sdev_table_t *sdev_table);
+int stratis_sdev_table_add(sdev_table_t *sdev_table, char *sdev);
+int stratis_sdev_table_remove(sdev_table_t **sdev_table, char *sdev);
+int stratis_sdev_table_size(sdev_table_t *sdev_table, int *list_size);
+
 
 /* Simulator */
 

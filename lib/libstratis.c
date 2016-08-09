@@ -269,6 +269,10 @@ STRATIS_EXPORT char * stratis_get_user_message(int stratis_code) {
 		return "malloc failed";
 	case STRATIS_NOTFOUND:
 		return "not found";
+	case STRATIS_POOL_NOTFOUND:
+		return "pool not found";
+	case STRATIS_VOLUME_NOTFOUND:
+		return "volume not found";
 	case STRATIS_BAD_PARAM:
 		return "bad parameter";
 	case STRATIS_ALREADY_EXISTS:

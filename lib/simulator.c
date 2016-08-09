@@ -23,17 +23,16 @@
 #include "libstratis.h"
 #include "stratis-common.h"
 
-spool_list_t *the_spool_list = NULL;
+spool_table_t *the_spool_table = NULL;
 
-static int pool_id = 0;
-static int volume_id = 0;
+static int dbus_id = 0;
 
 /*
  * Pools
  */
 
 int stratis_spool_create(spool_t **spool, const char *name,
-        sdev_list_t *disk_list, stratis_volume_raid_type raid_level) {
+        sdev_table_t *disk_list, stratis_volume_raid_type raid_level) {
 	int rc = STRATIS_OK;
 	spool_t *return_spool = NULL;
 
@@ -44,36 +43,44 @@ int stratis_spool_create(spool_t **spool, const char *name,
 		goto out;
 	}
 
-	return_spool->svolume_list = malloc(sizeof(svolume_list_t));
+	return_spool->svolume_table = malloc(sizeof(svolume_table_t));
 
-	if (return_spool->svolume_list == NULL) {
+	if (return_spool->svolume_table == NULL) {
 		rc = STRATIS_MALLOC;
 		goto out;
 	}
 
-	return_spool->sdev_list = malloc(sizeof(sdev_list_t));
+	return_spool->sdev_table = malloc(sizeof(sdev_table_t));
 
-	if (return_spool->sdev_list == NULL) {
+	if (return_spool->sdev_table == NULL) {
+		rc = STRATIS_MALLOC;
+		goto out;
+	}
+
+	return_spool->scache_table = malloc(sizeof(sdev_table_t));
+
+	if (return_spool->scache_table == NULL) {
 		rc = STRATIS_MALLOC;
 		goto out;
 	}
 
 	return_spool->slot = NULL;
-	return_spool->svolume_list->list = NULL;
-	return_spool->sdev_list->list = NULL;
-	return_spool->id = pool_id++;
+	return_spool->svolume_table->table = g_hash_table_new (g_str_hash, g_str_equal);
+	return_spool->scache_table->table = g_hash_table_new (g_str_hash, g_str_equal);
+	return_spool->sdev_table->table = g_hash_table_new (g_str_hash, g_str_equal);
+	return_spool->id = dbus_id++;
 	return_spool->size = 32767;
 	strncpy(return_spool->name, name, MAX_STRATIS_NAME_LEN);
 
 	/* TODO should we duplicate the disk_list? */
-	return_spool->sdev_list = disk_list;
+	return_spool->sdev_table = disk_list;
 
-	if (the_spool_list == NULL) {
-		the_spool_list = malloc(sizeof(spool_list_t));
-		the_spool_list->list = NULL;
+	if (the_spool_table == NULL) {
+		the_spool_table = malloc(sizeof(spool_table_t));
+		the_spool_table->table = g_hash_table_new (g_str_hash, g_str_equal);
 	}
 
-	the_spool_list->list = g_list_append(the_spool_list->list, return_spool);
+	g_hash_table_insert(the_spool_table->table, return_spool->name, return_spool);
 
 	*spool = return_spool;
 	return rc;
@@ -82,13 +89,13 @@ int stratis_spool_create(spool_t **spool, const char *name,
 
 	if (return_spool != NULL) {
 
-		if (return_spool->svolume_list != NULL) {
+		if (return_spool->svolume_table != NULL) {
 			// TODO fix memory leak of list elements
-			free(return_spool->svolume_list);
+			free(return_spool->svolume_table);
 		}
-		if (return_spool->sdev_list != NULL) {
+		if (return_spool->sdev_table != NULL) {
 			// TODO fix memory leak of list elements
-			free(return_spool->sdev_list);
+			free(return_spool->sdev_table);
 		}
 		free(return_spool);
 	}
@@ -100,28 +107,55 @@ int stratis_spool_create(spool_t **spool, const char *name,
 int stratis_spool_destroy(spool_t *spool) {
 	int rc = STRATIS_OK;
 
-	the_spool_list->list = g_list_remove(the_spool_list->list, spool);
+	if (spool == NULL) {
+		rc = STRATIS_NULL;
+		goto out;
+	}
+	gboolean found = g_hash_table_remove(the_spool_table->table, spool->name);
 
-	if (spool->svolume_list != NULL) {
+	if (found == FALSE) {
+		rc = STRATIS_NOTFOUND;
+		goto out;
+	}
+
+	if (spool->svolume_table != NULL) {
 		// TODO destroy volume list
 	}
 
-	if (spool->sdev_list != NULL) {
+	if (spool->sdev_table != NULL) {
 		// TODO destroy dev list
 	}
 
 	free(spool);
+out:
+	return rc;
+}
+
+int stratis_spool_get(spool_t **spool, char *name) {
+	int rc = STRATIS_OK;
+
+	if (spool == NULL || the_spool_table == NULL) {
+		return STRATIS_NULL;
+	}
+
+	*spool = g_hash_table_lookup(the_spool_table->table, name);
+
+	if (*spool == NULL)
+		rc = STRATIS_NOTFOUND;
 
 	return rc;
 }
 
 char *stratis_spool_get_name(spool_t *spool) {
+
 	if (spool == NULL) {
 		return NULL;
 	}
 
 	return spool->name;
 }
+
+
 int stratis_spool_get_id(spool_t *spool) {
 
 	if (spool == NULL) {
@@ -131,36 +165,36 @@ int stratis_spool_get_id(spool_t *spool) {
 	return spool->id;
 }
 
-int stratis_spool_get_list(spool_list_t **spool_list) {
+int stratis_spool_get_list(spool_table_t **spool_list) {
 
 	if (spool_list == NULL || *spool_list == NULL)
 		return STRATIS_NULL;
 
-	*spool_list = the_spool_list;
+	*spool_list = the_spool_table;
 
 	return STRATIS_OK;
 }
 
-int stratis_spool_get_volume_list(spool_t *spool, svolume_list_t **svolume_list) {
+int stratis_spool_get_volume_list(spool_t *spool, svolume_table_t **svolume_list) {
 
 	int rc = STRATIS_OK;
 
 	if (spool == NULL || svolume_list == NULL)
 		return STRATIS_NULL;
 
-	*svolume_list = spool->svolume_list;
+	*svolume_list = spool->svolume_table;
 
 	return rc;
 }
 
-int stratis_spool_get_dev_list(spool_t *spool, sdev_list_t **sdev_list) {
+int stratis_spool_get_dev_table(spool_t *spool, sdev_table_t **sdev_list) {
 
 	int rc = STRATIS_OK;
 
 	if (spool == NULL || sdev_list == NULL)
 		return STRATIS_NULL;
 
-	*sdev_list = spool->sdev_list;
+	*sdev_list = spool->sdev_table;
 
 	return rc;
 }
@@ -168,11 +202,10 @@ int stratis_spool_get_dev_list(spool_t *spool, sdev_list_t **sdev_list) {
 int stratis_spool_add_volume(spool_t *spool, svolume_t *volume) {
 	int rc = STRATIS_OK;
 
-	if (spool == NULL || volume == NULL)
+	if (spool == NULL || spool->svolume_table == NULL|| volume == NULL)
 		return STRATIS_NULL;
 
-	spool->svolume_list->list = g_list_append(spool->svolume_list->list,
-	        volume);
+	g_hash_table_insert(spool->svolume_table->table, volume->name, volume);
 
 	return rc;
 }
@@ -180,10 +213,10 @@ int stratis_spool_add_volume(spool_t *spool, svolume_t *volume) {
 int stratis_spool_add_dev(spool_t *spool, char *sdev) {
 	int rc = STRATIS_OK;
 
-	if (spool == NULL || sdev == NULL)
+	if (spool == NULL || sdev == NULL || spool->sdev_table == NULL)
 		return STRATIS_NULL;
 
-	spool->sdev_list->list = g_list_append(spool->sdev_list->list, sdev);
+	g_hash_table_insert(spool->sdev_table->table, sdev, sdev);
 
 	return rc;
 }
@@ -194,35 +227,38 @@ int stratis_spool_remove_dev(spool_t *spool, char *sdev) {
 	return rc;
 }
 
-int stratis_spool_list_nth(spool_list_t *spool_list, spool_t **spool,
-        int element) {
-
+int stratis_spool_add_cache_devs(spool_t *spool, sdev_table_t *sdev_table) {
 	int rc = STRATIS_OK;
 
-	if (spool_list == NULL || element < 0)
+	if (spool == NULL || sdev_table == NULL || spool->scache_table == NULL)
 		return STRATIS_NULL;
 
-	*spool = g_list_nth_data(spool_list->list, element);
+	// TODO make a copy
+	spool->scache_table->table = sdev_table->table;
 
 	return rc;
 }
 
-int spool_compare(gconstpointer a, gconstpointer b) {
-	char *name = (char *) b;
-	spool_t *spool = (spool_t *) a;
+int stratis_spool_remove_cache_devs(spool_t *spool, char *sdev) {
 
-	return strcmp(name, spool->name);
+}
+int stratis_spool_get_cache_dev_table(spool_t *spool, sdev_table_t **sdev_table) {
+
 }
 
-int stratis_spool_list_find(spool_list_t *spool_list, spool_t **spool,
+gboolean finder(gpointer key, gpointer value, gpointer user_data) {
+	spool_t *spool = value;
+
+	return strcmp(key, spool->name);
+}
+
+int stratis_spool_table_find(spool_table_t *spool_table, spool_t **spool,
         char *name) {
-	GList *l;
-	if (spool == NULL || spool_list == NULL)
+	GHashTable *l;
+	if (spool == NULL || spool_table == NULL)
 		return STRATIS_NULL;
 
-	l = g_list_find_custom(spool_list->list, name, spool_compare);
-
-	*spool = g_list_nth_data(l, 0);
+	*spool = g_hash_table_lookup(spool_table->table, name);
 
 	if (*spool == NULL)
 		return STRATIS_NOTFOUND;
@@ -231,16 +267,16 @@ int stratis_spool_list_find(spool_list_t *spool_list, spool_t **spool,
 
 }
 
-int stratis_spool_list_size(spool_list_t *spool_list, int *list_size) {
+int stratis_spool_list_size(spool_table_t *spool_list, int *list_size) {
 	int rc = STRATIS_OK;
 
 	if (spool_list == NULL || list_size == NULL)
 		return STRATIS_NULL;
 
-	if (spool_list->list == NULL)
+	if (spool_list->table == NULL)
 		*list_size = 0;
 	else
-		*list_size = g_list_length(spool_list->list);
+		*list_size = g_hash_table_size(spool_list->table);
 
 	return rc;
 }
@@ -262,7 +298,7 @@ int stratis_svolume_create(svolume_t **svolume, spool_t *spool, char *name,
 	strncpy(return_volume->name, name, MAX_STRATIS_NAME_LEN);
 	strncpy(return_volume->mount_point, mount_point, MAX_STRATIS_NAME_LEN);
 	strncpy(return_volume->quota, quota, MAX_STRATIS_NAME_LEN);
-	return_volume->id = volume_id++;
+	return_volume->id = dbus_id++;
 	return_volume->parent_spool = spool;
 	rc = stratis_spool_add_volume(spool, return_volume);
 
@@ -278,6 +314,26 @@ int stratis_svolume_destroy(svolume_t *svolume) {
 
 	return rc;
 }
+
+int stratis_svolume_get(svolume_t **svolume, char *poolname, char *volumename) {
+	int rc = STRATIS_OK;
+	spool_t *spool = NULL;
+
+	if (svolume == NULL || the_spool_table == NULL ||
+			poolname == NULL || volumename == NULL  ) {
+		return STRATIS_NULL;
+	}
+
+	spool = g_hash_table_lookup(the_spool_table->table, poolname);
+
+	if (spool == NULL || spool->svolume_table == NULL)
+			rc = STRATIS_NOTFOUND;
+
+	*svolume = g_hash_table_lookup(spool->svolume_table->table, volumename);
+
+	return rc;
+}
+
 char *stratis_svolume_get_name(svolume_t *svolume) {
 
 	if (svolume == NULL) {
@@ -312,16 +368,14 @@ int svolume_compare(gconstpointer a, gconstpointer b) {
 }
 
 
-int stratis_svolume_list_find(svolume_list_t *svolume_list, svolume_t **svolume,
+int stratis_svolume_table_find(svolume_table_t *svolume_table, svolume_t **svolume,
 	        char *name)
 {
-	GList *l;
-	if (svolume == NULL || svolume_list == NULL)
+	GHashTable *l;
+	if (svolume == NULL || svolume_table == NULL)
 		return STRATIS_NULL;
 
-	l = g_list_find_custom(svolume_list->list, name, svolume_compare);
-
-	*svolume = g_list_nth_data(l, 0);
+	*svolume = g_hash_table_lookup(svolume_table->table, name);
 
 	if (*svolume == NULL)
 		return STRATIS_NOTFOUND;
@@ -331,51 +385,39 @@ int stratis_svolume_list_find(svolume_list_t *svolume_list, svolume_t **svolume,
 }
 
 
-int stratis_svolume_list_create(svolume_list_t **svolume_list) {
+int stratis_svolume_table_create(svolume_table_t *svolume_table) {
 	int rc = STRATIS_OK;
 
 	return rc;
 }
 
-int stratis_svolume_list_destroy(svolume_list_t *svolume_list) {
+int stratis_svolume_table_destroy(svolume_table_t *svolume_table) {
 	int rc = STRATIS_OK;
 
 	return rc;
 }
 
-int stratis_svolume_list_size(svolume_list_t *svolume_list, int *list_size) {
+int stratis_svolume_table_size(svolume_table_t *svolume_table, int *list_size) {
 	int rc = STRATIS_OK;
 
-	if (svolume_list == NULL || list_size == NULL)
+	if (svolume_table == NULL || list_size == NULL)
 		return STRATIS_NULL;
 
-	if (svolume_list->list == NULL)
+	if (svolume_table->table == NULL)
 		*list_size = 0;
 	else
-		*list_size = g_list_length(svolume_list->list);
+		*list_size = g_hash_table_size(svolume_table->table);
 
 	return rc;
 }
 
-int stratis_svolume_list_nth(svolume_list_t *svolume_list, svolume_t **svolume,
-        int element) {
 
-	int rc = STRATIS_OK;
-
-	if (svolume_list == NULL || element < 0)
-		return STRATIS_NULL;
-
-	*svolume = g_list_nth_data(svolume_list->list, element);
-
-	return rc;
-}
-
-int stratis_svolume_list_eligible_disks(sdev_list_t **disk_list) {
+int stratis_svolume_table_eligible_disks(sdev_table_t **disk_table) {
 	int rc = STRATIS_OK;
 
 	return rc;
 }
-int stratis_svolume_list_devs(spool_t *spool, sdev_list_t **disk_list) {
+int stratis_svolume_table_devs(spool_t *spool, sdev_table_t **disk_table) {
 	int rc = STRATIS_OK;
 
 	return rc;
@@ -384,68 +426,59 @@ int stratis_svolume_list_devs(spool_t *spool, sdev_list_t **disk_list) {
 /*
  * Device Lists
  */
-int stratis_sdev_list_create(sdev_list_t **sdev_list) {
+int stratis_sdev_table_create(sdev_table_t **sdev_table) {
 	int rc = STRATIS_OK;
-	sdev_list_t *return_sdev_list;
+	sdev_table_t *return_sdev_list;
 
-	return_sdev_list = malloc(sizeof(sdev_list_t));
+	return_sdev_list = malloc(sizeof(sdev_table_t));
 	if (return_sdev_list == NULL)
 		return STRATIS_MALLOC;
 
-	return_sdev_list->list = NULL;
+	return_sdev_list->table = g_hash_table_new (g_str_hash, g_str_equal);
 
-	*sdev_list = return_sdev_list;
+	*sdev_table = return_sdev_list;
 	return rc;
 }
 
-int stratis_sdev_list_destroy(sdev_list_t *sdev_list) {
+int stratis_sdev_table_destroy(sdev_table_t *sdev_table) {
 	int rc = STRATIS_OK;
 
 	return rc;
 }
 
-int stratis_sdev_list_add(sdev_list_t **sdev_list, char *sdev) {
+int stratis_sdev_table_add(sdev_table_t *sdev_table, char *sdev) {
 	int rc = STRATIS_OK;
 	char *list_copy = NULL;
 
-	if (sdev_list == NULL || *sdev_list == NULL || sdev == NULL)
+	if (sdev_table == NULL ||  sdev == NULL)
 		return STRATIS_NULL;
 
 	list_copy = malloc(strlen(sdev));
 	strcpy(list_copy, sdev);
-	(*sdev_list)->list = g_list_append((*sdev_list)->list, list_copy);
+
+	g_hash_table_insert(sdev_table->table, list_copy, list_copy);
 
 	return rc;
 }
 
-int stratis_sdev_list_remove(sdev_list_t **sdev_list, char *sdev) {
+int stratis_sdev_table_remove(sdev_table_t **sdev_table, char *sdev) {
 	int rc = STRATIS_OK;
 
 	return rc;
 }
 
-int stratis_sdev_list_size(sdev_list_t *sdev_list, int *list_size) {
+int stratis_sdev_table_size(sdev_table_t *sdev_table, int *table_size) {
 	int rc = STRATIS_OK;
 
-	if (sdev_list == NULL || list_size == NULL)
+	if (sdev_table == NULL || table_size == NULL)
 		return STRATIS_NULL;
 
-	if (sdev_list->list == NULL)
-		*list_size = 0;
+	if (sdev_table->table == NULL)
+		*table_size = 0;
 	else
-		*list_size = g_list_length(sdev_list->list);
+		*table_size = g_hash_table_size(sdev_table->table);
+
 
 	return rc;
 }
 
-int stratis_sdev_list_nth(sdev_list_t *sdev_list, char **sdev, int element) {
-
-	int rc = STRATIS_OK;
-
-	if (sdev_list == NULL || element < 0)
-		return STRATIS_NULL;
-
-	*sdev = g_list_nth_data(sdev_list->list, element);
-
-	return rc;
-}

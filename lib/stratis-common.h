@@ -39,6 +39,7 @@
 #define STRATIS_POOL_BASE_INTERFACE "org.storage.stratis" STRATIS_VERSION ".pool"
 #define STRATIS_VOLUME_BASE_INTERFACE "org.storage.stratis" STRATIS_VERSION ".volume"
 #define STRATIS_DEV_BASE_INTERFACE "org.storage.stratis" STRATIS_VERSION ".dev"
+#define STRATIS_POOL_BASE_PATH STRATIS_BASE_PATH "/pool"
 
 /* Volume Property Definitions */
 #define VOLUME_NAME 		"Volume"

@@ -242,8 +242,15 @@ int stratis_spool_add_cache_devs(spool_t *spool, sdev_table_t *sdev_table) {
 int stratis_spool_remove_cache_devs(spool_t *spool, char *sdev) {
 
 }
-int stratis_spool_get_cache_dev_table(spool_t *spool, sdev_table_t **sdev_table) {
 
+int stratis_spool_get_cache_dev_table(spool_t *spool, sdev_table_t **sdev_table) {
+	if (spool == NULL || spool->sdev_table == NULL)
+		return STRATIS_NULL;
+
+	// TODO make copy
+	*sdev_table = spool->scache_table;
+
+	return STRATIS_OK;
 }
 
 gboolean finder(gpointer key, gpointer value, gpointer user_data) {

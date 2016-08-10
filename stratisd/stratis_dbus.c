@@ -455,9 +455,10 @@ static int create_volume(sd_bus_message *m, void *userdata, sd_bus_error *error)
 
 	sync_volume(svolume, spool);
 
-	return sd_bus_reply_method_return(m, "is", rc, svolume->dbus_name);
+	return sd_bus_reply_method_return(m, "sis", svolume->dbus_name, rc,stratis_get_user_message(rc));
 
-	out: return rc;
+out:
+	return rc;
 }
 static int set_mount_point_volume(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	int rc = STRATIS_OK;
@@ -514,13 +515,16 @@ out:
 static int add_cache(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	spool_t *spool = userdata;
 	char *cache_name;
-	char *n = "";
 	sdev_table_t *scache_table;
 	int rc;
 
 	rc = stratis_sdev_table_create(&scache_table);
 
+	if (rc != STRATIS_OK)
+		goto out;
+
 	rc = sd_bus_message_enter_container(m, 'a', "s");
+
 	if (rc < 0)
 		goto out;
 
@@ -535,9 +539,13 @@ static int add_cache(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 		rc = stratis_sdev_table_add(scache_table, cache_name);
 
 	}
-	stratis_spool_add_cache_devs(spool, scache_table);
 
-	rc = sd_bus_message_exit_container(m);
+	sd_bus_message_exit_container(m);
+
+	rc = stratis_spool_add_cache_devs(spool, scache_table);
+
+	if (rc != STRATIS_OK)
+		goto out;
 
 out:
 	return sd_bus_reply_method_return(m, "sis", spool->dbus_name, rc,
@@ -574,11 +582,11 @@ iterate_cache (gpointer key, gpointer value, gpointer user_data)
 
 static int list_cache_devs(sd_bus_message *message, void *userdata,
         sd_bus_error *error) {
-	svolume_table_t *svolume_list;
+	sdev_table_t *cache_list;
 	spool_t *spool = (spool_t *) userdata;
 	svolume_t *volume = NULL;
 	sd_bus_message *reply = NULL;
-	int volume_list_size = 0;
+	int cache_list_size = 0;
 	int rc, i;
 
 	rc = sd_bus_message_new_method_return(message, &reply);
@@ -592,13 +600,13 @@ static int list_cache_devs(sd_bus_message *message, void *userdata,
 	if (rc < 0)
 		goto out;
 
-	rc = stratis_spool_get_volume_list(spool, &svolume_list);
+	rc = stratis_spool_get_cache_dev_table(spool, &cache_list);
 	if (rc != STRATIS_OK) {
-		fprintf(stderr, "Failed stratis_svolume_get_list()\n");
+		fprintf(stderr, "Failed stratis_spool_get_cache_dev_table()\n");
 		goto out;
 	}
 
-	g_hash_table_foreach(svolume_list->table, iterate_cache, reply);
+	g_hash_table_foreach(cache_list->table, iterate_cache, reply);
 
 	rc = sd_bus_message_close_container(reply);
 	if (rc < 0)
@@ -676,8 +684,8 @@ static const sd_bus_vtable stratis_manager_vtable[] = {
 	SD_BUS_METHOD("ListPools", NULL, "a(ss)is", list_pools, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("CreatePool", "sasi", "sis", create_pool, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("DestroyPool", "s", "sis", destroy_pool, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("GetPoolObjectName", "s", "sis", get_pool_object, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("GetVolumeObjectName", "ss", "sis", get_volume_object, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("GetPoolObjectPath", "s", "sis", get_pool_object, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("GetVolumeObjectPath", "ss", "sis", get_volume_object, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_VTABLE_END
 };
 
@@ -689,14 +697,14 @@ static const sd_bus_vtable spool_vtable[] = {
 			SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_WRITABLE_PROPERTY("Size", "u", NULL, NULL,
 			offsetof(spool_t, size), 0),
-	SD_BUS_METHOD("CreateVolume", "sss", "is", create_volume, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("CreateVolume", "sss", "sis", create_volume, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("SetMountPoint", "s", "is", set_mount_point_volume, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("SetQuota", "s", "is", set_quota_volume, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("DestroyVolume", "s", "sis", destroy_volume, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("ListVolumes", NULL, "a(ss)is", list_pool_volumes, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("ListDevs", NULL, "a(ss)is", list_pool_devs, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("ListCache", NULL, "a(ss)is", list_cache_devs, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("AddCache", "ss", "is", add_cache, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("AddCache", "as", "sis", add_cache, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("RemoveCache", "ss", "is", remove_cache, SD_BUS_VTABLE_UNPRIVILEGED),
 //	SD_BUS_METHOD("DeviceLossImpact", "ss", "is", remove_cache, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_VTABLE_END

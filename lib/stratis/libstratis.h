@@ -90,6 +90,11 @@ typedef struct svolume {
 	sd_bus_slot *slot;
 } svolume_t;
 
+typedef struct sdev {
+	char name[MAX_STRATIS_NAME_LEN];
+	stratis_dev_t type;
+} sdev_t;
+
 /* Return codes */
 #define STRATIS_OK					0		/* Ok */
 #define STRATIS_ERROR				100

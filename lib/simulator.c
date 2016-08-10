@@ -243,12 +243,12 @@ int stratis_spool_remove_cache_devs(spool_t *spool, char *sdev) {
 
 }
 
-int stratis_spool_get_cache_dev_table(spool_t *spool, sdev_table_t **sdev_table) {
+int stratis_spool_get_cache_dev_table(spool_t *spool, scache_table_t **scache_table) {
 	if (spool == NULL || spool->sdev_table == NULL)
 		return STRATIS_NULL;
 
 	// TODO make copy
-	*sdev_table = spool->scache_table;
+	*scache_table = spool->scache_table;
 
 	return STRATIS_OK;
 }

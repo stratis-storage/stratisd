@@ -138,9 +138,9 @@ int stratis_spool_add_devs(spool_t *spool, sdev_table_t *sdev_table);
 int stratis_spool_remove_dev(spool_t *spool, char *sdev);
 int stratis_spool_get_dev_table(spool_t *spool, sdev_table_t **sdev_table);
 
-int stratis_spool_add_cache_devs(spool_t *spool, sdev_table_t *sdev_table);
+int stratis_spool_add_cache_devs(spool_t *spool, sdev_table_t *scache_table);
 int stratis_spool_remove_cache_devs(spool_t *spool, char *sdev);
-int stratis_spool_get_cache_dev_table(spool_t *spool, sdev_table_t **sdev_table);
+int stratis_spool_get_cache_dev_table(spool_t *spool, scache_table_t **scache_table);
 
 int stratis_spool_get_volume_list(spool_t *spool,
         svolume_table_t **svolume_table);
@@ -170,11 +170,11 @@ int stratis_svolume_table_find(svolume_table_t *svolume_table, svolume_t **svolu
  * Device Lists
  */
 
-int stratis_sdev_table_create(sdev_table_t **sdev_table);
-int stratis_sdev_table_destroy(sdev_table_t *sdev_table);
-int stratis_sdev_table_add(sdev_table_t *sdev_table, char *sdev);
-int stratis_sdev_table_remove(sdev_table_t **sdev_table, char *sdev);
-int stratis_sdev_table_size(sdev_table_t *sdev_table, int *list_size);
+int stratis_sdev_table_create(sdev_table_t **scache_table);
+int stratis_sdev_table_destroy(sdev_table_t *scache_table);
+int stratis_sdev_table_add(sdev_table_t *scache_table, char *sdev);
+int stratis_sdev_table_remove(sdev_table_t **scache_table, char *sdev);
+int stratis_sdev_table_size(sdev_table_t *scache_table, int *list_size);
 
 
 /* Simulator */

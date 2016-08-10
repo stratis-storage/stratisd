@@ -582,7 +582,7 @@ iterate_cache (gpointer key, gpointer value, gpointer user_data)
 
 static int list_cache_devs(sd_bus_message *message, void *userdata,
         sd_bus_error *error) {
-	sdev_table_t *cache_list;
+	scache_table_t *cache_list;
 	spool_t *spool = (spool_t *) userdata;
 	svolume_t *volume = NULL;
 	sd_bus_message *reply = NULL;

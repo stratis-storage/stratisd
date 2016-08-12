@@ -28,6 +28,46 @@ spool_table_t *the_spool_table = NULL;
 static int dbus_id = 0;
 
 /*
+ * Stratis
+ */
+
+
+int stratis_dev_get(sdev_t **sdev, char *name) {
+	GList *values;
+	int list_size, i;
+	int rc = STRATIS_OK;
+	spool_t *spool;
+
+	if (sdev == NULL) {
+		rc = STRATIS_MALLOC;
+		goto out;
+	}
+
+	values = g_hash_table_get_values(the_spool_table->table);
+	list_size = g_list_length(values);
+
+	for (i = 0; i < list_size; i++) {
+		spool = g_list_nth_data(values, i);
+
+		*sdev = g_hash_table_lookup(spool->sdev_table->table, name);
+
+		if (*sdev != NULL)
+			break;
+
+		*sdev = g_hash_table_lookup(spool->scache_table->table, name);
+
+		if (*sdev != NULL)
+			break;
+	}
+
+	g_list_free(values);
+
+	if (*sdev == NULL)
+		rc = STRATIS_NOTFOUND;
+out:
+	return rc;
+}
+/*
  * Pools
  */
 
@@ -187,14 +227,14 @@ int stratis_spool_get_volume_list(spool_t *spool, svolume_table_t **svolume_list
 	return rc;
 }
 
-int stratis_spool_get_dev_table(spool_t *spool, sdev_table_t **sdev_list) {
+int stratis_spool_get_dev_table(spool_t *spool, sdev_table_t **sdev_table) {
 
 	int rc = STRATIS_OK;
 
-	if (spool == NULL || sdev_list == NULL)
+	if (spool == NULL || sdev_table == NULL)
 		return STRATIS_NULL;
 
-	*sdev_list = spool->sdev_table;
+	*sdev_table = spool->sdev_table;
 
 	return rc;
 }
@@ -316,6 +356,7 @@ int stratis_svolume_create(svolume_t **svolume, spool_t *spool, char *name,
 
 	out: return rc;
 }
+
 int stratis_svolume_destroy(svolume_t *svolume) {
 	int rc = STRATIS_OK;
 
@@ -430,6 +471,47 @@ int stratis_svolume_table_devs(spool_t *spool, sdev_table_t **disk_table) {
 	return rc;
 }
 
+
+/*
+ * Devs
+ */
+int stratis_sdev_create(sdev_t **sdev, spool_t *spool,
+			char *name, stratis_dev_t type) {
+	int rc = STRATIS_OK;
+
+	sdev_t *return_sdev;
+
+	return_sdev = malloc(sizeof(sdev_t));
+	if (return_sdev == NULL)
+		return STRATIS_MALLOC;
+
+	strncpy(return_sdev->name, name, MAX_STRATIS_NAME_LEN);
+
+	return_sdev->id = dbus_id++;
+	return_sdev->parent_spool = spool;
+
+	*sdev = return_sdev;
+	return rc;
+}
+
+char *stratis_sdev_get_name(sdev_t *sdev) {
+
+	if (sdev == NULL) {
+		return NULL;
+	}
+
+	return sdev->name;
+}
+
+int stratis_sdev_get_id(sdev_t *sdev) {
+
+	if (sdev == NULL) {
+		return -1;
+	}
+
+	return sdev->id;
+}
+
 /*
  * Device Lists
  */
@@ -453,17 +535,14 @@ int stratis_sdev_table_destroy(sdev_table_t *sdev_table) {
 	return rc;
 }
 
-int stratis_sdev_table_add(sdev_table_t *sdev_table, char *sdev) {
+int stratis_sdev_table_add(sdev_table_t *sdev_table, sdev_t *sdev) {
 	int rc = STRATIS_OK;
 	char *list_copy = NULL;
 
 	if (sdev_table == NULL ||  sdev == NULL)
 		return STRATIS_NULL;
 
-	list_copy = malloc(strlen(sdev));
-	strcpy(list_copy, sdev);
-
-	g_hash_table_insert(sdev_table->table, list_copy, list_copy);
+	g_hash_table_insert(sdev_table->table, sdev->name, sdev);
 
 	return rc;
 }

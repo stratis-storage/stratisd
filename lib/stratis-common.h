@@ -56,6 +56,7 @@
 #define DEV_NAME 			"Dev"
 #define DEV_ID 				"DevId"
 #define DEV_TYPE 			"DevType"
+#define DEV_SIZE 			"DevSize"
 
 
 void * stratis_main_loop(void * ap);

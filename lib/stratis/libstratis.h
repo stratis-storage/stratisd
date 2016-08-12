@@ -52,19 +52,19 @@ typedef enum {
 	STRATIS_DEV_TYPE_CACHE = 1,
 } stratis_dev_t;
 
-typedef struct scache_list {
+typedef struct scache_table {
 	GHashTable *table;
 } scache_table_t;
 
-typedef struct sdev_list {
+typedef struct sdev_table {
 	GHashTable *table;
 } sdev_table_t;
 
-typedef struct svolume_list {
+typedef struct svolume_table {
 	GHashTable *table;
 } svolume_table_t;
 
-typedef struct spool_list {
+typedef struct spool_table {
 	GHashTable *table;
 } spool_table_t;
 
@@ -91,7 +91,12 @@ typedef struct svolume {
 } svolume_t;
 
 typedef struct sdev {
+	int id;
+	int size;
+	spool_t *parent_spool;
 	char name[MAX_STRATIS_NAME_LEN];
+	char dbus_name[MAX_STRATIS_NAME_LEN];
+	sd_bus_slot *slot;
 	stratis_dev_t type;
 } sdev_t;
 
@@ -107,6 +112,7 @@ typedef struct sdev {
 #define STRATIS_ALREADY_EXISTS		107
 #define STRATIS_DUPLICATE_NAME		108
 #define STRATIS_NO_POOLS			109
+#define STRATIS_LIST_FAILURE		110
 /*
  * typedef taken from LSM
  */
@@ -122,6 +128,14 @@ typedef enum {
 	/** Block-level striping with two distributed parities, aka, RAID-DP */
 	STRATIS_VOLUME_RAID_TYPE_RAID6 = 6,
 } stratis_volume_raid_type;
+
+
+/*
+ * Stratis
+ *
+ */
+
+int stratis_dev_get(sdev_t **sdev, char *name);
 
 /*
  * Pools
@@ -167,12 +181,20 @@ int stratis_svolume_table_find(svolume_table_t *svolume_table, svolume_t **svolu
         char *name);
 
 /*
+ * Devs
+ */
+
+int stratis_sdev_create(sdev_t **sdev, spool_t *spool,char *name,
+		stratis_dev_t type);
+char *stratis_sdev_get_name(sdev_t *sdev);
+int stratis_sdev_get_id(sdev_t *sdev);
+/*
  * Device Lists
  */
 
 int stratis_sdev_table_create(sdev_table_t **scache_table);
 int stratis_sdev_table_destroy(sdev_table_t *scache_table);
-int stratis_sdev_table_add(sdev_table_t *scache_table, char *sdev);
+int stratis_sdev_table_add(sdev_table_t *scache_table, sdev_t *sdev);
 int stratis_sdev_table_remove(sdev_table_t **scache_table, char *sdev);
 int stratis_sdev_table_size(sdev_table_t *scache_table, int *list_size);
 

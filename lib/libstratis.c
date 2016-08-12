@@ -281,6 +281,8 @@ STRATIS_EXPORT char * stratis_get_user_message(int stratis_code) {
 		return "duplicate name";
 	case STRATIS_NO_POOLS:
 		return "no pools";
+	case STRATIS_LIST_FAILURE:
+		return "list transaction failure";
 	}
 
 	return "unknown error";

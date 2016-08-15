@@ -152,6 +152,30 @@ static int property_set_log_level(sd_bus *bus, const char *path,
 	return rc;
 }
 
+static int get_error_codes(sd_bus_message *message, void *userdata,
+        sd_bus_error *error) {
+	sd_bus_message *reply = NULL;
+	int rc;
+
+	rc = sd_bus_message_new_method_return(message, &reply);
+	if (rc < 0)
+		return rc;
+
+	rc = sd_bus_message_open_container(reply, 'a', "(is)");
+	if (rc < 0)
+		goto out;
+
+	for (int i = STRATIS_OK; i < STRATIS_ERROR_MAX; i++) {
+		sd_bus_message_append(reply, "(is)", i, stratis_get_user_message(i));
+	}
+
+	sd_bus_message_close_container(reply);
+	return sd_bus_send(NULL, reply, NULL);
+
+out:
+	return rc;
+}
+
 static void
 iterate_spools (gpointer key, gpointer value, gpointer user_data)
 {
@@ -188,7 +212,7 @@ static int list_pools(sd_bus_message *message, void *userdata,
 	if (rc != STRATIS_OK) {
 
 		if (spool_list == NULL) {
-			rc = STRATIS_NO_POOLS;
+			rc = STRATIS_OK;
 		}
 		goto out;
 	}
@@ -942,6 +966,8 @@ static const sd_bus_vtable stratis_manager_vtable[] = {
 	SD_BUS_METHOD("GetPoolObjectPath", "s", "sis", get_pool_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetVolumeObjectPath", "ss", "sis", get_volume_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetDevObjectPath", "s", "sis", get_dev_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("GetErrorCodes", NULL, "a(is)", get_error_codes, SD_BUS_VTABLE_UNPRIVILEGED),
+
 	SD_BUS_VTABLE_END
 };
 

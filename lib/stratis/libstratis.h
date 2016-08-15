@@ -113,17 +113,18 @@ typedef struct scache {
 
 /* Return codes */
 #define STRATIS_OK					0		/* Ok */
-#define STRATIS_ERROR				100
-#define STRATIS_NULL				101
-#define STRATIS_MALLOC				102
-#define STRATIS_NOTFOUND			103
-#define STRATIS_POOL_NOTFOUND		104
-#define STRATIS_VOLUME_NOTFOUND		105
-#define STRATIS_BAD_PARAM			106
-#define STRATIS_ALREADY_EXISTS		107
-#define STRATIS_DUPLICATE_NAME		108
-#define STRATIS_NO_POOLS			109
-#define STRATIS_LIST_FAILURE		110
+#define STRATIS_ERROR				1
+#define STRATIS_NULL				2
+#define STRATIS_MALLOC				3
+#define STRATIS_NOTFOUND			4
+#define STRATIS_POOL_NOTFOUND		5
+#define STRATIS_VOLUME_NOTFOUND		6
+#define STRATIS_BAD_PARAM			7
+#define STRATIS_ALREADY_EXISTS		8
+#define STRATIS_DUPLICATE_NAME		9
+#define STRATIS_NO_POOLS			10
+#define STRATIS_LIST_FAILURE		11
+#define STRATIS_ERROR_MAX			10
 /*
  * typedef taken from LSM
  */

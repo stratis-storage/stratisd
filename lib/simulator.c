@@ -159,11 +159,15 @@ int stratis_spool_destroy(spool_t *spool) {
 	}
 
 	if (spool->svolume_table != NULL) {
-		// TODO destroy volume list
+		g_hash_table_remove_all(spool->svolume_table->table);
+	}
+
+	if (spool->scache_table != NULL) {
+		g_hash_table_remove_all(spool->scache_table->table);
 	}
 
 	if (spool->sdev_table != NULL) {
-		// TODO destroy dev list
+		g_hash_table_remove_all(spool->sdev_table->table);
 	}
 
 	free(spool);

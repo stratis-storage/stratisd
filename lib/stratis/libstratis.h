@@ -100,6 +100,17 @@ typedef struct sdev {
 	stratis_dev_t type;
 } sdev_t;
 
+typedef struct scache {
+	int id;
+	int size;
+	spool_t *parent_spool;
+	char name[MAX_STRATIS_NAME_LEN];
+	char dbus_name[MAX_STRATIS_NAME_LEN];
+	sd_bus_slot *slot;
+	stratis_dev_t type;
+} scache_t;
+
+
 /* Return codes */
 #define STRATIS_OK					0		/* Ok */
 #define STRATIS_ERROR				100

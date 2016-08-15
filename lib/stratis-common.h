@@ -39,6 +39,7 @@
 #define STRATIS_POOL_BASE_INTERFACE "org.storage.stratis" STRATIS_VERSION ".pool"
 #define STRATIS_VOLUME_BASE_INTERFACE "org.storage.stratis" STRATIS_VERSION ".volume"
 #define STRATIS_DEV_BASE_INTERFACE "org.storage.stratis" STRATIS_VERSION ".dev"
+#define STRATIS_CACHE_BASE_INTERFACE "org.storage.stratis" STRATIS_VERSION ".cache"
 #define STRATIS_POOL_BASE_PATH STRATIS_BASE_PATH "/pool"
 
 /* Volume Property Definitions */
@@ -57,6 +58,11 @@
 #define DEV_ID 				"DevId"
 #define DEV_TYPE 			"DevType"
 #define DEV_SIZE 			"DevSize"
+
+/* Cache Definitions */
+#define CACHE_NAME 			"Cache"
+#define CACHE_ID 				"CacheId"
+
 
 
 void * stratis_main_loop(void * ap);

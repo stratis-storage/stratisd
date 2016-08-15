@@ -1131,6 +1131,8 @@ void * stratis_main_loop(void * ap) {
 	int r;
 	sd_bus_slot *slot = NULL;
 
+	stratis_initialize();
+
 	r = sd_bus_open_user(&bus);
 
 	if (r < 0) {

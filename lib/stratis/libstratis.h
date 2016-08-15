@@ -43,6 +43,7 @@ void *stratis_get_userdata(struct stratis_ctx *ctx);
 void stratis_set_userdata(struct stratis_ctx *ctx, void *userdata);
 char * stratis_get_user_message(int stratis_code);
 char * stratis_get_code_token(int stratis_code);
+void stratis_initialize();
 
 #define MAX_STRATIS_NAME_LEN 256
 

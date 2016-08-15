@@ -303,6 +303,10 @@ STRATIS_EXPORT char * stratis_get_user_message(int stratis_code) {
 			return "pool not found";
 		case STRATIS_VOLUME_NOTFOUND:
 			return "volume not found";
+		case STRATIS_DEV_NOTFOUND:
+			return "dev not found";
+		case STRATIS_CACHE_NOTFOUND:
+			return "cache not found";
 		case STRATIS_BAD_PARAM:
 			return "bad parameter";
 		case STRATIS_ALREADY_EXISTS:

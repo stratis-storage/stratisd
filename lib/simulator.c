@@ -31,6 +31,14 @@ static int dbus_id = 0;
  * Stratis
  */
 
+void stratis_initialize() {
+
+	if (the_spool_table == NULL) {
+		the_spool_table = malloc(sizeof(spool_table_t));
+		the_spool_table->table = g_hash_table_new (g_str_hash, g_str_equal);
+	}
+
+}
 int stratis_cache_get(scache_t **scache, char *name) {
 	GList *values;
 	int list_size, i;
@@ -39,6 +47,11 @@ int stratis_cache_get(scache_t **scache, char *name) {
 
 	if (scache == NULL) {
 		rc = STRATIS_MALLOC;
+		goto out;
+	}
+
+	if (the_spool_table->table == NULL) {
+		rc = STRATIS_DEV_NOTFOUND;
 		goto out;
 	}
 
@@ -70,6 +83,11 @@ int stratis_dev_get(sdev_t **sdev, char *name) {
 
 	if (sdev == NULL) {
 		rc = STRATIS_MALLOC;
+		goto out;
+	}
+
+	if (the_spool_table->table == NULL) {
+		rc = STRATIS_DEV_NOTFOUND;
 		goto out;
 	}
 
@@ -139,11 +157,6 @@ int stratis_spool_create(spool_t **spool, const char *name,
 
 	/* TODO should we duplicate the disk_list? */
 	return_spool->sdev_table = disk_list;
-
-	if (the_spool_table == NULL) {
-		the_spool_table = malloc(sizeof(spool_table_t));
-		the_spool_table->table = g_hash_table_new (g_str_hash, g_str_equal);
-	}
 
 	g_hash_table_insert(the_spool_table->table, return_spool->name, return_spool);
 

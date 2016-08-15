@@ -255,34 +255,64 @@ STRATIS_EXPORT struct stratis_list_entry *stratis_thing_get_some_list_entry(
         struct stratis_thing *thing) {
 	return NULL;
 }
+STRATIS_EXPORT char * stratis_get_code_token(int stratis_code) {
+	switch (stratis_code) {
+		case STRATIS_OK:
+			return "STRATIS_OK";
+		case STRATIS_ERROR:
+			return "STRATIS_ERROR";
+		case STRATIS_NULL:
+			return "STRATIS_NULL";
+		case STRATIS_MALLOC:
+			return "STRATIS_MALLOC";
+		case STRATIS_NOTFOUND:
+			return "STRATIS_NOTFOUND";
+		case STRATIS_POOL_NOTFOUND:
+			return "STRATIS_POOL_NOTFOUND";
+		case STRATIS_VOLUME_NOTFOUND:
+			return "STRATIS_VOLUME_NOTFOUND";
+		case STRATIS_BAD_PARAM:
+			return "STRATIS_BAD_PARAM";
+		case STRATIS_ALREADY_EXISTS:
+			return "STRATIS_ALREADY_EXISTS";
+		case STRATIS_DUPLICATE_NAME:
+			return "STRATIS_DUPLICATE_NAME";
+		case STRATIS_NO_POOLS:
+			return "STRATIS_NO_POOLS";
+		case STRATIS_LIST_FAILURE:
+			return "STRATIS_LIST_FAILURE";
+	}
+
+	return "UNKNOWN_CODE";
+}
 
 STRATIS_EXPORT char * stratis_get_user_message(int stratis_code) {
 
 	switch (stratis_code) {
-	case STRATIS_OK:
-		return "ok";
-	case STRATIS_ERROR:
-		return "error";
-	case STRATIS_NULL:
-		return "NULL parameter";
-	case STRATIS_MALLOC:
-		return "malloc failed";
-	case STRATIS_NOTFOUND:
-		return "not found";
-	case STRATIS_POOL_NOTFOUND:
-		return "pool not found";
-	case STRATIS_VOLUME_NOTFOUND:
-		return "volume not found";
-	case STRATIS_BAD_PARAM:
-		return "bad parameter";
-	case STRATIS_ALREADY_EXISTS:
-		return "already exists";
-	case STRATIS_DUPLICATE_NAME:
-		return "duplicate name";
-	case STRATIS_NO_POOLS:
-		return "no pools";
-	case STRATIS_LIST_FAILURE:
-		return "list transaction failure";
+		case STRATIS_OK:
+			return "ok";
+		case STRATIS_ERROR:
+			return "error";
+		case STRATIS_NULL:
+			return "NULL parameter";
+		case STRATIS_MALLOC:
+			return "malloc failed";
+		case STRATIS_NOTFOUND:
+			return "not found";
+		case STRATIS_POOL_NOTFOUND:
+			return "pool not found";
+		case STRATIS_VOLUME_NOTFOUND:
+			return "volume not found";
+		case STRATIS_BAD_PARAM:
+			return "bad parameter";
+		case STRATIS_ALREADY_EXISTS:
+			return "already exists";
+		case STRATIS_DUPLICATE_NAME:
+			return "duplicate name";
+		case STRATIS_NO_POOLS:
+			return "no pools";
+		case STRATIS_LIST_FAILURE:
+			return "list transaction failure";
 	}
 
 	return "unknown error";

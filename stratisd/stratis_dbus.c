@@ -161,12 +161,12 @@ static int get_error_codes(sd_bus_message *message, void *userdata,
 	if (rc < 0)
 		return rc;
 
-	rc = sd_bus_message_open_container(reply, 'a', "(is)");
+	rc = sd_bus_message_open_container(reply, 'a', "(sis)");
 	if (rc < 0)
 		goto out;
 
 	for (int i = STRATIS_OK; i < STRATIS_ERROR_MAX; i++) {
-		sd_bus_message_append(reply, "(is)", i, stratis_get_user_message(i));
+		sd_bus_message_append(reply, "(sis)", stratis_get_code_token(i), i, stratis_get_user_message(i));
 	}
 
 	sd_bus_message_close_container(reply);
@@ -529,7 +529,7 @@ static int get_pool_object_path(sd_bus_message *m, void *userdata, sd_bus_error 
 	int rc = STRATIS_OK;
 	char *name = NULL;
 	spool_t *spool = NULL;
-	char *dbus_name = "";
+	char *dbus_name = NULL;
 
 	rc = sd_bus_message_read(m, "s", &name);
 
@@ -542,6 +542,8 @@ static int get_pool_object_path(sd_bus_message *m, void *userdata, sd_bus_error 
 
 	if (spool != NULL) {
 		dbus_name = spool->dbus_name;
+	} else {
+		rc = STRATIS_POOL_NOTFOUND;
 	}
 out:
 	return sd_bus_reply_method_return(m, "sis", dbus_name, rc,
@@ -566,6 +568,8 @@ static int get_volume_object_path(sd_bus_message *m, void *userdata, sd_bus_erro
 
 	if (svolume != NULL) {
 		dbus_name = svolume->dbus_name;
+	} else {
+		rc = STRATIS_VOLUME_NOTFOUND;
 	}
 out:
 	return sd_bus_reply_method_return(m, "sis", dbus_name, rc,
@@ -576,7 +580,7 @@ static int get_dev_object_path(sd_bus_message *m, void *userdata, sd_bus_error *
 	int rc = STRATIS_OK;
 	char *dev_name = NULL;
 	sdev_t *sdev = NULL;
-	char *dbus_name = "";
+	char *dbus_name = NULL;
 
 	rc = sd_bus_message_read(m, "s", &dev_name);
 
@@ -590,6 +594,33 @@ static int get_dev_object_path(sd_bus_message *m, void *userdata, sd_bus_error *
 
 	if (sdev != NULL) {
 		dbus_name = sdev->dbus_name;
+	} else {
+		rc = STRATIS_DEV_NOTFOUND;
+	}
+out:
+	return sd_bus_reply_method_return(m, "sis", dbus_name, rc,
+		        stratis_get_user_message(rc));
+}
+
+static int get_cache_object_path(sd_bus_message *m, void *userdata, sd_bus_error *error) {
+	int rc = STRATIS_OK;
+	char *cache_name = NULL;
+	scache_t *cache = NULL;
+	char *dbus_name = NULL;
+
+	rc = sd_bus_message_read(m, "s", &cache_name);
+
+	if (rc < 0) {
+		rc = STRATIS_BAD_PARAM;
+		goto out;
+	}
+
+	rc = stratis_cache_get(&cache, cache_name);
+
+	if (cache != NULL) {
+		dbus_name = cache->dbus_name;
+	} else {
+		rc = STRATIS_DEV_NOTFOUND;
 	}
 out:
 	return sd_bus_reply_method_return(m, "sis", dbus_name, rc,
@@ -966,7 +997,8 @@ static const sd_bus_vtable stratis_manager_vtable[] = {
 	SD_BUS_METHOD("GetPoolObjectPath", "s", "sis", get_pool_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetVolumeObjectPath", "ss", "sis", get_volume_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetDevObjectPath", "s", "sis", get_dev_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("GetErrorCodes", NULL, "a(is)", get_error_codes, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("GetCacheObjectPath", "s", "sis", get_cache_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("GetErrorCodes", NULL, "a(sis)", get_error_codes, SD_BUS_VTABLE_UNPRIVILEGED),
 
 	SD_BUS_VTABLE_END
 };

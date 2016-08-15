@@ -31,6 +31,36 @@ static int dbus_id = 0;
  * Stratis
  */
 
+int stratis_cache_get(scache_t **scache, char *name) {
+	GList *values;
+	int list_size, i;
+	int rc = STRATIS_OK;
+	spool_t *spool;
+
+	if (scache == NULL) {
+		rc = STRATIS_MALLOC;
+		goto out;
+	}
+
+	values = g_hash_table_get_values(the_spool_table->table);
+	list_size = g_list_length(values);
+
+	for (i = 0; i < list_size; i++) {
+		spool = g_list_nth_data(values, i);
+
+		*scache = g_hash_table_lookup(spool->scache_table->table, name);
+
+		if (*scache != NULL)
+			break;
+	}
+
+	g_list_free(values);
+
+	if (*scache == NULL)
+		rc = STRATIS_CACHE_NOTFOUND;
+out:
+	return rc;
+}
 
 int stratis_dev_get(sdev_t **sdev, char *name) {
 	GList *values;
@@ -53,17 +83,12 @@ int stratis_dev_get(sdev_t **sdev, char *name) {
 
 		if (*sdev != NULL)
 			break;
-
-		*sdev = g_hash_table_lookup(spool->scache_table->table, name);
-
-		if (*sdev != NULL)
-			break;
 	}
 
 	g_list_free(values);
 
 	if (*sdev == NULL)
-		rc = STRATIS_NOTFOUND;
+		rc = STRATIS_DEV_NOTFOUND;
 out:
 	return rc;
 }

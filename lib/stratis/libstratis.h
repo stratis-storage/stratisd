@@ -42,6 +42,7 @@ void stratis_set_log_priority(struct stratis_ctx *ctx, int priority);
 void *stratis_get_userdata(struct stratis_ctx *ctx);
 void stratis_set_userdata(struct stratis_ctx *ctx, void *userdata);
 char * stratis_get_user_message(int stratis_code);
+char * stratis_get_code_token(int stratis_code);
 
 #define MAX_STRATIS_NAME_LEN 256
 
@@ -119,12 +120,14 @@ typedef struct scache {
 #define STRATIS_NOTFOUND			4
 #define STRATIS_POOL_NOTFOUND		5
 #define STRATIS_VOLUME_NOTFOUND		6
-#define STRATIS_BAD_PARAM			7
-#define STRATIS_ALREADY_EXISTS		8
-#define STRATIS_DUPLICATE_NAME		9
-#define STRATIS_NO_POOLS			10
-#define STRATIS_LIST_FAILURE		11
-#define STRATIS_ERROR_MAX			10
+#define STRATIS_DEV_NOTFOUND		7
+#define STRATIS_CACHE_NOTFOUND		8
+#define STRATIS_BAD_PARAM			9
+#define STRATIS_ALREADY_EXISTS		10
+#define STRATIS_DUPLICATE_NAME		11
+#define STRATIS_NO_POOLS			12
+#define STRATIS_LIST_FAILURE		13
+#define STRATIS_ERROR_MAX			14
 /*
  * typedef taken from LSM
  */
@@ -139,6 +142,8 @@ typedef enum {
 	STRATIS_VOLUME_RAID_TYPE_RAID5 = 5,
 	/** Block-level striping with two distributed parities, aka, RAID-DP */
 	STRATIS_VOLUME_RAID_TYPE_RAID6 = 6,
+	/** Spare dev */
+	STRATIS_VOLUME_RAID_TYPE_SPARE = 7
 } stratis_volume_raid_type;
 
 
@@ -148,6 +153,7 @@ typedef enum {
  */
 
 int stratis_dev_get(sdev_t **sdev, char *name);
+int stratis_cache_get(scache_t **sdev, char *name);
 
 /*
  * Pools
@@ -211,8 +217,5 @@ int stratis_sdev_table_remove(sdev_table_t **scache_table, char *sdev);
 int stratis_sdev_table_size(sdev_table_t *scache_table, int *list_size);
 
 
-/* Simulator */
-
-int populate_simulator_test_data();
 
 #endif /* LIB_LIBSTRATIS_H_ */

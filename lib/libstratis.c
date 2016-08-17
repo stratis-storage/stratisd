@@ -255,6 +255,42 @@ STRATIS_EXPORT struct stratis_list_entry *stratis_thing_get_some_list_entry(
         struct stratis_thing *thing) {
 	return NULL;
 }
+
+STRATIS_EXPORT char * stratis_get_raid_token(int stratis_code) {
+	switch (stratis_code) {
+		case STRATIS_RAID_TYPE_UNKNOWN:
+			return "STRATIS_RAID_TYPE_UNKNOWN";
+		case STRATIS_RAID_TYPE_SINGLE:
+			return "STRATIS_RAID_TYPE_SINGLE";
+		case STRATIS_RAID_TYPE_RAID1:
+			return "STRATIS_RAID_TYPE_RAID1";
+		case STRATIS_RAID_TYPE_RAID5:
+			return "STRATIS_RAID_TYPE_RAID5";
+		case STRATIS_RAID_TYPE_RAID6:
+			return "STRATIS_RAID_TYPE_RAID6";
+		case STRATIS_RAID_TYPE_MAX:
+			return "STRATIS_RAID_TYPE_MAX";
+	}
+	return "STRATIS_RAID_TYPE_UNKNOWN";
+}
+
+STRATIS_EXPORT char * stratis_get_dev_type_token(int stratis_code) {
+	switch (stratis_code) {
+		case STRATIS_DEV_TYPE_UNKNOWN:
+			return "STRATIS_DEV_TYPE_UNKNOWN";
+		case STRATIS_DEV_TYPE_REGULAR:
+			return "STRATIS_DEV_TYPE_REGULAR";
+		case STRATIS_DEV_TYPE_CACHE:
+			return "STRATIS_DEV_TYPE_CACHE";
+		case STRATIS_DEV_TYPE_SPARE:
+			return "STRATIS_DEV_TYPE_SPARE";
+		case STRATIS_DEV_TYPE_MAX:
+			return "STRATIS_DEV_TYPE_MAX";
+	}
+
+	return "STRATIS_DEV_TYPE_UNKNOWN";
+}
+
 STRATIS_EXPORT char * stratis_get_code_token(int stratis_code) {
 	switch (stratis_code) {
 		case STRATIS_OK:
@@ -284,6 +320,41 @@ STRATIS_EXPORT char * stratis_get_code_token(int stratis_code) {
 	}
 
 	return "UNKNOWN_CODE";
+}
+
+STRATIS_EXPORT char * stratis_raid_user_message(int stratis_code) {
+	switch (stratis_code) {
+		case STRATIS_RAID_TYPE_UNKNOWN:
+			return "<unknown>";
+		case STRATIS_RAID_TYPE_SINGLE:
+			return "<single user description>";
+		case STRATIS_RAID_TYPE_RAID1:
+			return "<raid1 user description>";
+		case STRATIS_RAID_TYPE_RAID5:
+			return "<raid5 user description>";
+		case STRATIS_RAID_TYPE_RAID6:
+			return "<raid6 user description>";
+		case STRATIS_RAID_TYPE_MAX:
+			return "STRATIS_RAID_TYPE_MAX";
+	}
+	return "STRATIS_RAID_TYPE_UNKNOWN";
+}
+
+STRATIS_EXPORT char * stratis_get_dev_type_message(int stratis_code) {
+	switch (stratis_code) {
+		case STRATIS_DEV_TYPE_UNKNOWN:
+			return "<unknown type user description>";
+		case STRATIS_DEV_TYPE_REGULAR:
+			return "<dev user description>";
+		case STRATIS_DEV_TYPE_CACHE:
+			return "<cache user description>";
+		case STRATIS_DEV_TYPE_SPARE:
+			return "<spare user description>";
+		case STRATIS_DEV_TYPE_MAX:
+			return "STRATIS_DEV_TYPE_MAX";
+	}
+
+	return "STRATIS_DEV_TYPE_UNKNOWN";
 }
 
 STRATIS_EXPORT char * stratis_get_user_message(int stratis_code) {

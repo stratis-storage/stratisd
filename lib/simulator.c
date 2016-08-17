@@ -75,7 +75,7 @@ out:
 	return rc;
 }
 
-int stratis_dev_get(sdev_t **sdev, char *name) {
+int stratis_sdev_get(sdev_t **sdev, char *name) {
 	GList *values;
 	int list_size, i;
 	int rc = STRATIS_OK;
@@ -115,7 +115,7 @@ out:
  */
 
 int stratis_spool_create(spool_t **spool, const char *name,
-        sdev_table_t *disk_list, stratis_volume_raid_type raid_level) {
+        sdev_table_t *disk_list, int raid_level) {
 	int rc = STRATIS_OK;
 	spool_t *return_spool = NULL;
 
@@ -292,37 +292,79 @@ int stratis_spool_add_volume(spool_t *spool, svolume_t *volume) {
 	return rc;
 }
 
-int stratis_spool_add_dev(spool_t *spool, char *sdev) {
-	int rc = STRATIS_OK;
 
-	if (spool == NULL || sdev == NULL || spool->sdev_table == NULL)
-		return STRATIS_NULL;
+static void
+iterate_dev_add (gpointer key, gpointer value, gpointer user_data)
+{
+	GHashTable *table = user_data;
 
-	g_hash_table_insert(spool->sdev_table->table, sdev, sdev);
+	g_hash_table_insert(table, key, value);
 
-	return rc;
-}
-
-int stratis_spool_remove_dev(spool_t *spool, char *sdev) {
-	int rc = STRATIS_OK;
-
-	return rc;
 }
 
 int stratis_spool_add_cache_devs(spool_t *spool, sdev_table_t *sdev_table) {
 	int rc = STRATIS_OK;
 
-	if (spool == NULL || sdev_table == NULL || spool->scache_table == NULL)
+	if (spool == NULL || sdev_table == NULL
+				|| spool->scache_table == NULL || sdev_table == NULL)
 		return STRATIS_NULL;
 
-	// TODO make a copy
-	spool->scache_table->table = sdev_table->table;
+	g_hash_table_foreach(sdev_table->table, iterate_dev_add,
+			spool->sdev_table->table);
 
 	return rc;
 }
 
-int stratis_spool_remove_cache_devs(spool_t *spool, char *sdev) {
+int stratis_spool_add_devs(spool_t *spool, sdev_table_t *sdev_table) {
+	int rc = STRATIS_OK;
 
+	if (spool == NULL || sdev_table == NULL
+				|| spool->scache_table == NULL || sdev_table == NULL)
+		return STRATIS_NULL;
+
+	g_hash_table_foreach(sdev_table->table, iterate_dev_add,
+			spool->sdev_table->table);
+
+	return rc;
+}
+
+static void
+iterate_dev_remove (gpointer key, gpointer value, gpointer user_data)
+{
+	GHashTable *table = user_data;
+
+	g_hash_table_remove(table, key);
+
+}
+
+int stratis_spool_remove_cache_devs(spool_t *spool, sdev_table_t *scache_table) {
+
+	g_hash_table_foreach(scache_table->table, iterate_dev_remove,
+			spool->sdev_table->table);
+
+	return STRATIS_OK;
+}
+
+int stratis_spool_remove_devs(spool_t *spool, sdev_table_t *sdev_table) {
+
+	g_hash_table_foreach(sdev_table->table, iterate_dev_remove,
+			spool->sdev_table->table);
+
+	return STRATIS_OK;
+}
+
+int stratis_spool_remove_dev(spool_t *spool, char *name) {
+
+	int removed, rc;
+
+	removed = g_hash_table_remove(spool->sdev_table->table, name);
+
+	if (removed == TRUE) {
+		rc = STRATIS_OK;
+	} else {
+		rc = STRATIS_NOTFOUND;
+	}
+	return rc;
 }
 
 int stratis_spool_get_cache_dev_table(spool_t *spool, scache_table_t **scache_table) {
@@ -335,11 +377,6 @@ int stratis_spool_get_cache_dev_table(spool_t *spool, scache_table_t **scache_ta
 	return STRATIS_OK;
 }
 
-gboolean finder(gpointer key, gpointer value, gpointer user_data) {
-	spool_t *spool = value;
-
-	return strcmp(key, spool->name);
-}
 
 int stratis_spool_table_find(spool_table_t *spool_table, spool_t **spool,
         char *name) {
@@ -518,7 +555,7 @@ int stratis_svolume_table_devs(spool_t *spool, sdev_table_t **disk_table) {
  * Devs
  */
 int stratis_sdev_create(sdev_t **sdev, spool_t *spool,
-			char *name, stratis_dev_t type) {
+			char *name, int type) {
 	int rc = STRATIS_OK;
 
 	sdev_t *return_sdev;

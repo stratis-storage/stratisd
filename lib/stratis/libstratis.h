@@ -33,7 +33,9 @@
 struct stratis_ctx;
 struct stratis_ctx *stratis_ref(struct stratis_ctx *ctx);
 struct stratis_ctx *stratis_unref(struct stratis_ctx *ctx);
+
 int stratis_context_new(struct stratis_ctx **ctx);
+
 void stratis_set_log_fn(struct stratis_ctx *ctx,
         void (*log_fn)(struct stratis_ctx *ctx, int priority, const char *file,
                 int line, const char *fn, const char *format, va_list args));
@@ -43,16 +45,22 @@ void *stratis_get_userdata(struct stratis_ctx *ctx);
 void stratis_set_userdata(struct stratis_ctx *ctx, void *userdata);
 char * stratis_get_user_message(int stratis_code);
 char * stratis_get_code_token(int stratis_code);
+char * stratis_get_dev_type_message(int stratis_code);
+char * stratis_raid_user_message(int stratis_code);
+char * stratis_get_raid_token(int stratis_code);
+char * stratis_get_dev_type_token(int stratis_code);
+
 void stratis_initialize();
 
 #define MAX_STRATIS_NAME_LEN 256
 
-typedef enum {
+
 	/** Unknown */
-	STRATIS_DEV_TYPE_UNKNOWN = -1,
-	STRATIS_DEV_TYPE_REGULAR = 0,
-	STRATIS_DEV_TYPE_CACHE = 1,
-} stratis_dev_t;
+#define		STRATIS_DEV_TYPE_UNKNOWN	-1
+#define		STRATIS_DEV_TYPE_REGULAR	0
+#define 	STRATIS_DEV_TYPE_CACHE		1
+#define		STRATIS_DEV_TYPE_SPARE		2
+#define 	STRATIS_DEV_TYPE_MAX		3
 
 typedef struct scache_table {
 	GHashTable *table;
@@ -99,7 +107,7 @@ typedef struct sdev {
 	char name[MAX_STRATIS_NAME_LEN];
 	char dbus_name[MAX_STRATIS_NAME_LEN];
 	sd_bus_slot *slot;
-	stratis_dev_t type;
+	int type;
 } sdev_t;
 
 typedef struct scache {
@@ -109,7 +117,7 @@ typedef struct scache {
 	char name[MAX_STRATIS_NAME_LEN];
 	char dbus_name[MAX_STRATIS_NAME_LEN];
 	sd_bus_slot *slot;
-	stratis_dev_t type;
+	int type;
 } scache_t;
 
 
@@ -129,23 +137,18 @@ typedef struct scache {
 #define STRATIS_NO_POOLS			12
 #define STRATIS_LIST_FAILURE		13
 #define STRATIS_ERROR_MAX			14
-/*
- * typedef taken from LSM
- */
-typedef enum {
-	/** Unknown */
-	STRATIS_VOLUME_RAID_TYPE_UNKNOWN = -1,
+
+
+#define	STRATIS_RAID_TYPE_UNKNOWN	-1
 	/** Single */
-	STRATIS_VOLUME_RAID_TYPE_SINGLE = 0,
+#define	STRATIS_RAID_TYPE_SINGLE	0
 	/** Mirror between two disks. For 4 disks or more, they are RAID10.*/
-	STRATIS_VOLUME_RAID_TYPE_RAID1 = 1,
+#define	STRATIS_RAID_TYPE_RAID1		1
 	/** Block-level striping with distributed parity */
-	STRATIS_VOLUME_RAID_TYPE_RAID5 = 5,
+#define	STRATIS_RAID_TYPE_RAID5		2
 	/** Block-level striping with two distributed parities, aka, RAID-DP */
-	STRATIS_VOLUME_RAID_TYPE_RAID6 = 6,
-	/** Spare dev */
-	STRATIS_VOLUME_RAID_TYPE_SPARE = 7
-} stratis_volume_raid_type;
+#define	STRATIS_RAID_TYPE_RAID6		3
+#define STRATIS_RAID_TYPE_MAX		4
 
 
 /*
@@ -153,7 +156,7 @@ typedef enum {
  *
  */
 
-int stratis_dev_get(sdev_t **sdev, char *name);
+int stratis_sdev_get(sdev_t **sdev, char *name);
 int stratis_cache_get(scache_t **sdev, char *name);
 
 /*
@@ -161,18 +164,19 @@ int stratis_cache_get(scache_t **sdev, char *name);
  */
 
 int stratis_spool_create(spool_t **spool, const char *name,
-        sdev_table_t *disk_table, stratis_volume_raid_type raid_level);
+        sdev_table_t *disk_table, int raid_level);
 int stratis_spool_destroy(spool_t *spool);
 int stratis_spool_get(spool_t **spool, char *name);
 char *stratis_spool_get_name(spool_t *spool);
 int stratis_spool_get_id(spool_t *spool);
 int stratis_spool_get_list(spool_table_t **spool_list);
 int stratis_spool_add_devs(spool_t *spool, sdev_table_t *sdev_table);
-int stratis_spool_remove_dev(spool_t *spool, char *sdev);
+int stratis_spool_remove_devs(spool_t *spool, sdev_table_t *sdev_table);
+int stratis_spool_remove_dev(spool_t *spool, char *name);
 int stratis_spool_get_dev_table(spool_t *spool, sdev_table_t **sdev_table);
 
 int stratis_spool_add_cache_devs(spool_t *spool, sdev_table_t *scache_table);
-int stratis_spool_remove_cache_devs(spool_t *spool, char *sdev);
+int stratis_spool_remove_cache_devs(spool_t *spool, sdev_table_t *scache_table);
 int stratis_spool_get_cache_dev_table(spool_t *spool, scache_table_t **scache_table);
 
 int stratis_spool_get_volume_list(spool_t *spool,
@@ -204,18 +208,18 @@ int stratis_svolume_table_find(svolume_table_t *svolume_table, svolume_t **svolu
  */
 
 int stratis_sdev_create(sdev_t **sdev, spool_t *spool,char *name,
-		stratis_dev_t type);
+		int type);
 char *stratis_sdev_get_name(sdev_t *sdev);
 int stratis_sdev_get_id(sdev_t *sdev);
 /*
  * Device Lists
  */
 
-int stratis_sdev_table_create(sdev_table_t **scache_table);
-int stratis_sdev_table_destroy(sdev_table_t *scache_table);
-int stratis_sdev_table_add(sdev_table_t *scache_table, sdev_t *sdev);
-int stratis_sdev_table_remove(sdev_table_t **scache_table, char *sdev);
-int stratis_sdev_table_size(sdev_table_t *scache_table, int *list_size);
+int stratis_sdev_table_create(sdev_table_t **sdev_table);
+int stratis_sdev_table_destroy(sdev_table_t *sdev_table);
+int stratis_sdev_table_add(sdev_table_t *sdev_table, sdev_t *sdev);
+int stratis_sdev_table_remove(sdev_table_t **sdev_table, char *sdev);
+int stratis_sdev_table_size(sdev_table_t *sdev_table, int *list_size);
 
 
 

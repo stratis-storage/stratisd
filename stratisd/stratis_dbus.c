@@ -152,6 +152,53 @@ static int property_set_log_level(sd_bus *bus, const char *path,
 	return rc;
 }
 
+static int get_raid_levels(sd_bus_message *message, void *userdata,
+        sd_bus_error *error) {
+	sd_bus_message *reply = NULL;
+	int rc;
+
+	rc = sd_bus_message_new_method_return(message, &reply);
+	if (rc < 0)
+		return rc;
+
+	rc = sd_bus_message_open_container(reply, 'a', "(sis)");
+	if (rc < 0)
+		goto out;
+
+	for (int i = STRATIS_RAID_TYPE_SINGLE; i < STRATIS_RAID_TYPE_MAX; i++) {
+		sd_bus_message_append(reply, "(sis)", stratis_get_raid_token(i), i, stratis_raid_user_message(i));
+	}
+
+	sd_bus_message_close_container(reply);
+	return sd_bus_send(NULL, reply, NULL);
+
+out:
+	return rc;
+}
+static int get_dev_types(sd_bus_message *message, void *userdata,
+        sd_bus_error *error) {
+	sd_bus_message *reply = NULL;
+	int rc;
+
+	rc = sd_bus_message_new_method_return(message, &reply);
+	if (rc < 0)
+		return rc;
+
+	rc = sd_bus_message_open_container(reply, 'a', "(sis)");
+	if (rc < 0)
+		goto out;
+
+	for (int i = STRATIS_DEV_TYPE_REGULAR; i < STRATIS_DEV_TYPE_MAX; i++) {
+		sd_bus_message_append(reply, "(sis)", stratis_get_dev_type_token(i), i, stratis_get_dev_type_message(i));
+	}
+
+	sd_bus_message_close_container(reply);
+	return sd_bus_send(NULL, reply, NULL);
+
+out:
+	return rc;
+}
+
 static int get_error_codes(sd_bus_message *message, void *userdata,
         sd_bus_error *error) {
 	sd_bus_message *reply = NULL;
@@ -334,7 +381,7 @@ static int create_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	sdev_table_t *sdev_list = NULL;
 	sdev_t *sdev = NULL;
 	int rc;
-	int raid_type = STRATIS_VOLUME_RAID_TYPE_UNKNOWN;
+	int raid_type = STRATIS_RAID_TYPE_UNKNOWN;
 	char *sdev_name = NULL;
 	size_t length = 0;
 
@@ -590,7 +637,7 @@ static int get_dev_object_path(sd_bus_message *m, void *userdata, sd_bus_error *
 	}
 
 
-	rc = stratis_dev_get(&sdev, dev_name);
+	rc = stratis_sdev_get(&sdev, dev_name);
 
 	if (sdev != NULL) {
 		dbus_name = sdev->dbus_name;
@@ -797,6 +844,53 @@ out:
 
 }
 
+static int add_devs(sd_bus_message *m, void *userdata, sd_bus_error *error) {
+	spool_t *spool = userdata;
+	char *cache_name;
+	sdev_t *sdev = NULL;
+	sdev_table_t *sdev_table;
+	int rc;
+
+	rc = stratis_sdev_table_create(&sdev_table);
+
+	if (rc != STRATIS_OK)
+		goto out;
+
+	rc = sd_bus_message_enter_container(m, 'a', "s");
+
+	if (rc < 0)
+		goto out;
+
+	for (;;) {
+		rc = sd_bus_message_read_basic(m, SD_BUS_TYPE_STRING, &cache_name);
+
+		if (rc < 0)
+			goto out;
+		if (rc == 0)
+			break;
+
+		rc = stratis_sdev_create(&sdev, spool,
+				cache_name, STRATIS_DEV_TYPE_REGULAR);
+
+		if (rc != STRATIS_OK)
+			goto out;
+		rc = stratis_sdev_table_add(sdev_table, sdev);
+
+	}
+
+	sd_bus_message_exit_container(m);
+
+	rc = stratis_spool_add_devs(spool, sdev_table);
+
+	if (rc != STRATIS_OK)
+		goto out;
+
+out:
+	return sd_bus_reply_method_return(m, "sis", spool->dbus_name, rc,
+	        stratis_get_user_message(rc));
+
+}
+
 static int add_cache_devs(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	spool_t *spool = userdata;
 	char *cache_name;
@@ -844,22 +938,87 @@ out:
 
 }
 
-static int remove_dev(sd_bus_message *m, void *userdata, sd_bus_error *error) {
-	struct context *c = userdata;
+static int remove_devs(sd_bus_message *m, void *userdata, sd_bus_error *error) {
+	spool_t *spool = userdata;
+	char *dev_name = NULL;
 	const char *s;
 	char *n = "";
-	int r;
+	sd_bus_message *reply = NULL;
+	char dbus_name[MAX_STRATIS_NAME_LEN] = "";
+	sdev_t *sdev;
+	int rc;
+	int stratis_rc = STRATIS_OK;
+	int failure = FALSE;
 
-	r = sd_bus_message_read(m, "s", &s);
-	if (r < 0)
+
+	rc = sd_bus_message_enter_container(m, 'a', "s");
+	if (rc < 0)
 		goto out;
 
-	printf("remove_dev() called, got %s, returning %s", s, n);
+	rc = sd_bus_message_new_method_return(m, &reply);
 
-	return sd_bus_reply_method_return(m, "is", r, n);
+	if (rc < 0) {
+		rc = STRATIS_BAD_PARAM;
+		goto out;
+	}
 
+	rc = sd_bus_message_open_container(reply, 'a', "(sis)");
+
+	if (rc < 0)
+		goto out;
+
+
+	for (;;) {
+		rc = sd_bus_message_read_basic(m, SD_BUS_TYPE_STRING, &dev_name);
+
+		if (rc < 0)
+			goto out;
+		if (rc == 0)
+			break;
+
+		rc = stratis_sdev_get(&sdev, dev_name);
+
+		spool = sdev->parent_spool;
+
+		if (rc != STRATIS_OK) {
+			failure = TRUE;
+			stratis_rc = rc;
+		} else {
+
+			strcpy(dbus_name, sdev->dbus_name);
+			unref_sdev(sdev);
+
+
+			rc = stratis_spool_remove_dev(spool, dev_name);
+
+			if (rc != STRATIS_OK) {
+				failure = TRUE;
+				stratis_rc = rc;
+			}
+		}
+
+		rc = sd_bus_message_append(reply, "(sis)", dbus_name, rc, stratis_get_user_message(rc));
+
+		if (rc < 0)
+			goto out;
+
+	}
+
+	rc = sd_bus_message_close_container(reply);
+	if (rc < 0)
+		goto out;
+
+	rc = sd_bus_message_exit_container(m);
+	if (rc < 0)
+		goto out;
+
+	rc = sd_bus_message_append(reply, "is", stratis_rc, stratis_get_user_message(stratis_rc));
+	if (rc < 0)
+		goto out;
+
+	return sd_bus_send(NULL, reply, NULL);
 out:
-	return r;
+	return rc;
 }
 
 static int remove_cache(sd_bus_message *m, void *userdata, sd_bus_error *error) {
@@ -999,6 +1158,8 @@ static const sd_bus_vtable stratis_manager_vtable[] = {
 	SD_BUS_METHOD("GetDevObjectPath", "s", "sis", get_dev_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetCacheObjectPath", "s", "sis", get_cache_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetErrorCodes", NULL, "a(sis)", get_error_codes, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("GetRaidLevels", NULL, "a(sis)", get_raid_levels, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("GetDevTypes", NULL, "a(sis)", get_dev_types, SD_BUS_VTABLE_UNPRIVILEGED),
 
 	SD_BUS_VTABLE_END
 };
@@ -1019,8 +1180,9 @@ static const sd_bus_vtable spool_vtable[] = {
 	SD_BUS_METHOD("ListDevs", NULL, "asis", list_pool_devs, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("ListCacheDevs", NULL, "asis", list_cache_devs, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("AddCacheDevs", "as", "sis", add_cache_devs, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("RemoveCacheDevs", "as", "is", remove_cache, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("RemoveDevs", "as", "is", remove_dev, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("RemoveCacheDevs", "as", "a(sis)is", remove_cache, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("AddDevs", "as", "sis", add_devs, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("RemoveDevs", "as", "a(sis)is", remove_devs, SD_BUS_VTABLE_UNPRIVILEGED),
 //	SD_BUS_METHOD("DeviceLossImpact", "ss", "is", remove_cache, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_VTABLE_END
 };

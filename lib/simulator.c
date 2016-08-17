@@ -310,7 +310,7 @@ int stratis_spool_add_cache_devs(spool_t *spool, sdev_table_t *sdev_table) {
 		return STRATIS_NULL;
 
 	g_hash_table_foreach(sdev_table->table, iterate_dev_add,
-			spool->sdev_table->table);
+			spool->scache_table->table);
 
 	return rc;
 }
@@ -319,7 +319,7 @@ int stratis_spool_add_devs(spool_t *spool, sdev_table_t *sdev_table) {
 	int rc = STRATIS_OK;
 
 	if (spool == NULL || sdev_table == NULL
-				|| spool->scache_table == NULL || sdev_table == NULL)
+				|| spool->sdev_table == NULL || sdev_table == NULL)
 		return STRATIS_NULL;
 
 	g_hash_table_foreach(sdev_table->table, iterate_dev_add,

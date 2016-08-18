@@ -470,6 +470,23 @@ char *stratis_svolume_get_name(svolume_t *svolume) {
 	return svolume->name;
 }
 
+int stratis_svolume_rename(svolume_t *svolume, char *name) {
+
+	if (svolume == NULL || name == NULL)
+		return STRATIS_NULL;
+
+	g_hash_table_remove(svolume->parent_spool->svolume_table->table,
+			svolume->name);
+
+	strncpy(svolume->name, name, MAX_STRATIS_NAME_LEN);
+	svolume->name[MAX_STRATIS_NAME_LEN] = '\0';
+
+	g_hash_table_insert(svolume->parent_spool->svolume_table->table,
+			svolume->name, svolume);
+
+	return STRATIS_OK;
+}
+
 int stratis_svolume_get_id(svolume_t *svolume) {
 
 	if (svolume == NULL) {

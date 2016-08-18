@@ -191,7 +191,8 @@ int stratis_svolume_create(svolume_t **svolume, spool_t *spool, char *name,
         char *mount_point, char *qutoa);
 int stratis_svolume_destroy(svolume_t *svolume);
 int stratis_svolume_get(svolume_t **svolume, char *poolname, char *volumename);
-char *stratis_svolume_get_name(svolume_t *svolume);
+char * stratis_svolume_get_name(svolume_t *svolume);
+int stratis_svolume_rename(svolume_t *svolume, char *name);
 int stratis_svolume_get_id(svolume_t *svolume);
 char *stratis_svolume_get_mount_point(svolume_t *svolume);
 

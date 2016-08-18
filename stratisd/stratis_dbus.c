@@ -572,8 +572,11 @@ static int destroy_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) 
 
 	rc = find_spool(name, &spool);
 
-	if (rc != STRATIS_OK)
+	if (rc != STRATIS_OK) {
+        if (rc == STRATIS_NOTFOUND)
+            rc = STRATIS_POOL_NOTFOUND;
 		goto out;
+    }
 
 	strcpy(dbus_name, spool->dbus_name);
 

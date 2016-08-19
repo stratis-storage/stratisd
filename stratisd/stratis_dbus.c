@@ -831,7 +831,10 @@ static int destroy_volumes(sd_bus_message *m, void *userdata,
 
 		rc = find_volume(volume_name, spool, &volume);
 
-		if (rc != STRATIS_OK) {
+        if (rc == STRATIS_NOTFOUND) {
+            continue;
+        }
+        else if (rc != STRATIS_OK) {
 			failure = TRUE;
 			stratis_rc = rc;
 		} else {

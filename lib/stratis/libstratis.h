@@ -43,6 +43,7 @@ int stratis_get_log_priority(struct stratis_ctx *ctx);
 void stratis_set_log_priority(struct stratis_ctx *ctx, int priority);
 void *stratis_get_userdata(struct stratis_ctx *ctx);
 void stratis_set_userdata(struct stratis_ctx *ctx, void *userdata);
+
 char * stratis_get_user_message(int stratis_code);
 char * stratis_get_code_token(int stratis_code);
 char * stratis_get_dev_type_message(int stratis_code);
@@ -193,6 +194,8 @@ int stratis_svolume_destroy(svolume_t *svolume);
 int stratis_svolume_get(svolume_t **svolume, char *poolname, char *volumename);
 char * stratis_svolume_get_name(svolume_t *svolume);
 int stratis_svolume_rename(svolume_t *svolume, char *name);
+int stratis_svolume_set_quota(svolume_t *svolume, char *quota);
+int stratis_svolume_set_mount_point(svolume_t *svolume, char *mount_point);
 int stratis_svolume_get_id(svolume_t *svolume);
 char *stratis_svolume_get_mount_point(svolume_t *svolume);
 
@@ -212,6 +215,16 @@ int stratis_sdev_create(sdev_t **sdev, spool_t *spool,char *name,
 		int type);
 char *stratis_sdev_get_name(sdev_t *sdev);
 int stratis_sdev_get_id(sdev_t *sdev);
+
+/*
+ * Cache
+ */
+
+int stratis_scache_create(scache_t **scache, spool_t *spool,char *name,
+		int type);
+char *stratis_scache_get_name(scache_t *scache);
+int stratis_scache_get_id(scache_t *scache);
+
 /*
  * Device Lists
  */

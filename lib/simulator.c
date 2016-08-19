@@ -362,7 +362,7 @@ int stratis_spool_remove_dev(spool_t *spool, char *name) {
 	if (removed == TRUE) {
 		rc = STRATIS_OK;
 	} else {
-		rc = STRATIS_NOTFOUND;
+		rc = STRATIS_DEV_NOTFOUND;
 	}
 	return rc;
 }
@@ -437,8 +437,21 @@ int stratis_svolume_create(svolume_t **svolume, spool_t *spool, char *name,
 }
 
 int stratis_svolume_destroy(svolume_t *svolume) {
-	int rc = STRATIS_OK;
+	int removed, rc;
 
+	if (svolume == NULL || svolume->parent_spool == NULL ||
+			svolume->parent_spool->svolume_table == NULL) {
+		return STRATIS_NULL;
+	}
+
+	removed = g_hash_table_remove(svolume->parent_spool->svolume_table->table,
+			svolume->name);
+
+	if (removed == TRUE) {
+		rc = STRATIS_OK;
+	} else {
+		rc = STRATIS_VOLUME_NOTFOUND;
+	}
 	return rc;
 }
 
@@ -468,6 +481,27 @@ char *stratis_svolume_get_name(svolume_t *svolume) {
 	}
 
 	return svolume->name;
+}
+int stratis_svolume_set_quota(svolume_t *svolume, char *quota) {
+
+	if (svolume == NULL || quota == NULL)
+		return STRATIS_NULL;
+
+	strncpy(svolume->quota, quota, MAX_STRATIS_NAME_LEN);
+	svolume->quota[MAX_STRATIS_NAME_LEN] = '\0';
+
+	return STRATIS_OK;
+}
+
+int stratis_svolume_set_mount_point(svolume_t *svolume, char *mount_point) {
+
+	if (svolume == NULL || mount_point == NULL)
+		return STRATIS_NULL;
+
+	strncpy(svolume->mount_point, mount_point, MAX_STRATIS_NAME_LEN);
+	svolume->mount_point[MAX_STRATIS_NAME_LEN] = '\0';
+
+	return STRATIS_OK;
 }
 
 int stratis_svolume_rename(svolume_t *svolume, char *name) {
@@ -556,30 +590,22 @@ int stratis_svolume_table_size(svolume_table_t *svolume_table, int *list_size) {
 }
 
 
-int stratis_svolume_table_eligible_disks(sdev_table_t **disk_table) {
-	int rc = STRATIS_OK;
-
-	return rc;
-}
-int stratis_svolume_table_devs(spool_t *spool, sdev_table_t **disk_table) {
-	int rc = STRATIS_OK;
-
-	return rc;
-}
-
-
 /*
  * Devs
  */
 int stratis_sdev_create(sdev_t **sdev, spool_t *spool,
 			char *name, int type) {
 	int rc = STRATIS_OK;
-
 	sdev_t *return_sdev;
 
+	if (sdev == NULL || name == NULL) {
+		rc = STRATIS_NULL;
+		goto out;
+	}
 	return_sdev = malloc(sizeof(sdev_t));
-	if (return_sdev == NULL)
-		return STRATIS_MALLOC;
+	if (return_sdev == NULL) {
+		rc = STRATIS_MALLOC;
+	}
 
 	strncpy(return_sdev->name, name, MAX_STRATIS_NAME_LEN);
 
@@ -587,8 +613,11 @@ int stratis_sdev_create(sdev_t **sdev, spool_t *spool,
 	return_sdev->parent_spool = spool;
 
 	*sdev = return_sdev;
+out:
 	return rc;
 }
+
+
 
 char *stratis_sdev_get_name(sdev_t *sdev) {
 
@@ -608,6 +637,49 @@ int stratis_sdev_get_id(sdev_t *sdev) {
 	return sdev->id;
 }
 
+/*
+ * Cache
+ */
+
+int stratis_scache_create(scache_t **scache, spool_t *spool,char *name, int type) {
+	scache_t *return_scache;
+	int rc = STRATIS_OK;
+
+	if (scache == NULL || name == NULL) {
+		rc = STRATIS_NULL;
+		goto out;
+	}
+	return_scache = malloc(sizeof(scache_t));
+	if (return_scache == NULL) {
+		rc = STRATIS_MALLOC;
+	}
+
+	strncpy(return_scache->name, name, MAX_STRATIS_NAME_LEN);
+
+	return_scache->id = dbus_id++;
+	return_scache->parent_spool = spool;
+
+	*scache = return_scache;
+out:
+	return rc;
+}
+
+char *stratis_scache_get_name(scache_t *scache) {
+
+	if (scache == NULL) {
+		return NULL;
+	}
+
+	return scache->name;
+}
+
+int stratis_scache_get_id(scache_t *scache) {
+	if (scache == NULL) {
+		return -1;
+	}
+
+	return scache->id;
+}
 /*
  * Device Lists
  */

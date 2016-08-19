@@ -765,8 +765,21 @@ static int set_mount_point_volume(sd_bus_message *m, void *userdata, sd_bus_erro
 
 static int set_quota_volume(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	int rc = STRATIS_OK;
+	svolume_t *svolume = userdata;
+	char *quota = NULL;
 
-	return rc;
+	rc = sd_bus_message_read(m, "s", &quota);
+
+	if (rc < 0) {
+		rc = STRATIS_BAD_PARAM;
+		goto out;
+	}
+
+	rc = stratis_svolume_set_quota(svolume, quota);
+
+out:
+	return sd_bus_reply_method_return(m, "sis", svolume->dbus_name, rc,
+			        stratis_get_user_message(rc));
 }
 
 static int rename_volume(sd_bus_message *m, void *userdata, sd_bus_error *error) {
@@ -1352,6 +1365,21 @@ iterate_sdevs_vtable (gpointer key, gpointer value, gpointer user_data)
 
 }
 
+static void
+iterate_scache_vtable (gpointer key, gpointer value, gpointer user_data)
+{
+	scache_t *scache = value;
+	char *sdev_cache = key;
+
+	snprintf(scache->dbus_name, 256, "%s/%d", STRATIS_BASE_PATH,
+	        stratis_scache_get_id(scache));
+
+	sd_bus_add_object_vtable(bus, &(scache->slot), scache->dbus_name,
+			STRATIS_CACHE_BASE_INTERFACE, sdev_vtable, scache);
+
+}
+
+
 
 static int sync_spool(spool_t *spool) {
 	int rc = STRATIS_OK;
@@ -1359,6 +1387,7 @@ static int sync_spool(spool_t *spool) {
 	char spool_name[256];
 	spool_table_t *spool_list;
 	sdev_table_t *sdev_table;
+	scache_table_t *scache_table;
 
 	snprintf(spool->dbus_name, 256, "%s/%d", STRATIS_BASE_PATH,
 	        stratis_spool_get_id(spool));
@@ -1378,8 +1407,17 @@ static int sync_spool(spool_t *spool) {
 		fprintf(stderr, "Failed stratis_svolume_get_list()\n");
 		goto out;
 	}
-	stratis_sdev_table_size(sdev_table, &table_size);
+
 	g_hash_table_foreach(sdev_table->table, iterate_sdevs_vtable, sdev_table);
+
+	rc = stratis_spool_get_cache_dev_table(spool, &scache_table);
+
+	if (rc != STRATIS_OK) {
+		fprintf(stderr, "Failed stratis_svolume_get_list()\n");
+		goto out;
+	}
+
+	g_hash_table_foreach(sdev_table->table, iterate_scache_vtable, scache_table);
 
 out:
 	return rc;

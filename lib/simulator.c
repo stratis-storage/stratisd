@@ -293,39 +293,47 @@ int stratis_spool_add_volume(spool_t *spool, svolume_t *volume) {
 }
 
 
-static void
-iterate_dev_add (gpointer key, gpointer value, gpointer user_data)
-{
-	GHashTable *table = user_data;
-
-	g_hash_table_insert(table, key, value);
-
-}
-
-int stratis_spool_add_cache_devs(spool_t *spool, sdev_table_t *sdev_table) {
-	int rc = STRATIS_OK;
-
-	if (spool == NULL || sdev_table == NULL
-				|| spool->scache_table == NULL || sdev_table == NULL)
+int stratis_spool_add_dev(spool_t *spool, sdev_t *sdev) {
+	int inserted = FALSE;
+	sdev_t *ptr;
+	if (spool == NULL || sdev == NULL || spool->scache_table == NULL)
 		return STRATIS_NULL;
 
-	g_hash_table_foreach(sdev_table->table, iterate_dev_add,
-			spool->scache_table->table);
+	if (strlen(sdev->name) == 0)
+		return STRATIS_NULL_NAME;
 
-	return rc;
+	ptr =  g_hash_table_lookup(spool->sdev_table->table, sdev->name);
+	if (ptr != NULL)
+		return STRATIS_ALREADY_EXISTS;
+
+	inserted =  g_hash_table_insert(spool->sdev_table->table, sdev->name, sdev);
+
+	if (inserted == FALSE)
+		return STRATIS_ALREADY_EXISTS;
+	else
+		return STRATIS_OK;
 }
 
-int stratis_spool_add_devs(spool_t *spool, sdev_table_t *sdev_table) {
-	int rc = STRATIS_OK;
+int stratis_spool_add_cache(spool_t *spool, scache_t *scache) {
+	int inserted = FALSE;
+	scache_t *ptr;
 
-	if (spool == NULL || sdev_table == NULL
-				|| spool->sdev_table == NULL || sdev_table == NULL)
+	if (spool == NULL || scache == NULL || spool->sdev_table == NULL)
 		return STRATIS_NULL;
 
-	g_hash_table_foreach(sdev_table->table, iterate_dev_add,
-			spool->sdev_table->table);
+	if (strlen(scache->name) == 0)
+		return STRATIS_NULL_NAME;
 
-	return rc;
+	ptr =  g_hash_table_lookup(spool->scache_table->table, scache->name);
+	if (ptr != NULL)
+		return STRATIS_ALREADY_EXISTS;
+
+	inserted = g_hash_table_insert(spool->scache_table->table, scache->name, scache);
+
+	if (inserted == FALSE)
+		return STRATIS_ERROR;
+	else
+		return STRATIS_OK;
 }
 
 static void

@@ -35,6 +35,9 @@ static sd_bus *bus = NULL;
 
 static int sync_spool(spool_t *spool);
 static int sync_volume(svolume_t *volume, spool_t *spool);
+static int sync_sdev(sdev_t *sdev);
+static int sync_scache(scache_t *scache);
+
 
 static int find_spool(char *name, spool_t **spool) {
 	int r = STRATIS_OK;
@@ -706,10 +709,8 @@ static int create_volumes(sd_bus_message *m, void *userdata, sd_bus_error *error
 
 	rc = sd_bus_message_new_method_return(m, &reply);
 
-	if (rc < 0) {
-		rc = STRATIS_BAD_PARAM;
+	if (rc < 0)
 		goto out;
-	}
 
 	rc = sd_bus_message_open_container(reply, 'a', "(sis)");
 
@@ -893,17 +894,26 @@ out:
 
 static int add_devs(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	spool_t *spool = userdata;
+	sd_bus_message *reply = NULL;
 	char *cache_name;
 	sdev_t *sdev = NULL;
-	sdev_table_t *sdev_table;
 	int rc;
-
-	rc = stratis_sdev_table_create(&sdev_table);
+	int stratis_rc = STRATIS_OK;
 
 	if (rc != STRATIS_OK)
 		goto out;
 
 	rc = sd_bus_message_enter_container(m, 'a', "s");
+
+	if (rc < 0)
+		goto out;
+
+	rc = sd_bus_message_new_method_return(m, &reply);
+
+	if (rc < 0)
+		goto out;
+
+	rc = sd_bus_message_open_container(reply, 'a', "(sis)");
 
 	if (rc < 0)
 		goto out;
@@ -921,36 +931,60 @@ static int add_devs(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 
 		if (rc != STRATIS_OK)
 			goto out;
-		rc = stratis_sdev_table_add(sdev_table, sdev);
+
+		rc = stratis_spool_add_dev(spool, sdev);
+
+		if (rc != STRATIS_OK) {
+			stratis_rc = STRATIS_LIST_FAILURE;
+		}
+
+		sync_sdev(sdev);
+
+		sd_bus_message_append(reply, "(sis)", sdev->dbus_name, rc, stratis_get_user_message(rc));
+
+		if (rc < 0)
+			goto out;
+
 
 	}
 
-	sd_bus_message_exit_container(m);
-
-	rc = stratis_spool_add_devs(spool, sdev_table);
-
-	if (rc != STRATIS_OK)
+	rc = sd_bus_message_close_container(reply);
+	if (rc < 0)
 		goto out;
 
-out:
-	return sd_bus_reply_method_return(m, "sis", spool->dbus_name, rc,
-	        stratis_get_user_message(rc));
+	rc = sd_bus_message_exit_container(m);
+	if (rc < 0)
+		goto out;
 
+	rc = sd_bus_message_append(reply, "is", stratis_rc, stratis_get_user_message(stratis_rc));
+	if (rc < 0)
+		goto out;
+
+	return sd_bus_send(NULL, reply, NULL);
+
+out:
+	return rc;
 }
 
 static int add_cache_devs(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	spool_t *spool = userdata;
+	sd_bus_message *reply = NULL;
 	char *cache_name;
-	sdev_t *sdev = NULL;
-	sdev_table_t *scache_table;
+	scache_t *scache = NULL;
 	int rc;
-
-	rc = stratis_sdev_table_create(&scache_table);
-
-	if (rc != STRATIS_OK)
-		goto out;
+	int stratis_rc = STRATIS_OK;
 
 	rc = sd_bus_message_enter_container(m, 'a', "s");
+
+	if (rc < 0)
+		goto out;
+
+	rc = sd_bus_message_new_method_return(m, &reply);
+
+	if (rc < 0)
+		goto out;
+
+	rc = sd_bus_message_open_container(reply, 'a', "(sis)");
 
 	if (rc < 0)
 		goto out;
@@ -963,25 +997,43 @@ static int add_cache_devs(sd_bus_message *m, void *userdata, sd_bus_error *error
 		if (rc == 0)
 			break;
 
-		rc = stratis_sdev_create(&sdev, spool,
-				cache_name, STRATIS_DEV_TYPE_REGULAR);
+		rc = stratis_scache_create(&scache, spool,
+				cache_name, STRATIS_DEV_TYPE_CACHE);
 
 		if (rc != STRATIS_OK)
 			goto out;
-		rc = stratis_sdev_table_add(scache_table, sdev);
+
+		rc = stratis_spool_add_cache(spool, scache);
+
+		if (rc != STRATIS_OK) {
+			stratis_rc = STRATIS_LIST_FAILURE;
+		}
+
+		sync_scache(scache);
+
+		sd_bus_message_append(reply, "(sis)", scache->dbus_name, rc, stratis_get_user_message(rc));
+
+		if (rc < 0)
+			goto out;
 
 	}
 
-	sd_bus_message_exit_container(m);
-
-	rc = stratis_spool_add_cache_devs(spool, scache_table);
-
-	if (rc != STRATIS_OK)
+	rc = sd_bus_message_close_container(reply);
+	if (rc < 0)
 		goto out;
 
+	rc = sd_bus_message_exit_container(m);
+	if (rc < 0)
+		goto out;
+
+	rc = sd_bus_message_append(reply, "is", stratis_rc, stratis_get_user_message(stratis_rc));
+	if (rc < 0)
+		goto out;
+
+	return sd_bus_send(NULL, reply, NULL);
+
 out:
-	return sd_bus_reply_method_return(m, "sis", spool->dbus_name, rc,
-	        stratis_get_user_message(rc));
+	return rc;
 
 }
 
@@ -1286,9 +1338,9 @@ static const sd_bus_vtable spool_vtable[] = {
 	SD_BUS_METHOD("ListVolumes", NULL, "asis", list_pool_volumes, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("ListDevs", NULL, "asis", list_pool_devs, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("ListCacheDevs", NULL, "asis", list_cache_devs, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("AddCacheDevs", "as", "sis", add_cache_devs, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("AddCacheDevs", "as", "a(sis)is", add_cache_devs, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("RemoveCacheDevs", "asi", "a(sis)is", remove_cache_devs, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("AddDevs", "as", "sis", add_devs, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("AddDevs", "as", "a(sis)is", add_devs, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("RemoveDevs", "asi", "a(sis)is", remove_devs, SD_BUS_VTABLE_UNPRIVILEGED),
 //	SD_BUS_METHOD("DeviceLossImpact", "ss", "is", remove_cache, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_VTABLE_END
@@ -1351,17 +1403,31 @@ out:
 	return rc;
 }
 
+static int sync_scache(scache_t *scache) {
+
+	snprintf(scache->dbus_name, 256, "%s/%d", STRATIS_BASE_PATH,
+			stratis_scache_get_id(scache));
+
+	return sd_bus_add_object_vtable(bus, &(scache->slot), scache->dbus_name,
+			STRATIS_CACHE_BASE_INTERFACE, scache_vtable, scache);
+}
+
+static int sync_sdev(sdev_t *sdev) {
+
+	snprintf(sdev->dbus_name, 256, "%s/%d", STRATIS_BASE_PATH,
+			stratis_sdev_get_id(sdev));
+
+	return sd_bus_add_object_vtable(bus, &(sdev->slot), sdev->dbus_name,
+			STRATIS_CACHE_BASE_INTERFACE, scache_vtable, sdev);
+}
+
 static void
 iterate_sdevs_vtable (gpointer key, gpointer value, gpointer user_data)
 {
 	sdev_t *sdev = value;
 	char *sdev_name = key;
 
-	snprintf(sdev->dbus_name, 256, "%s/%d", STRATIS_BASE_PATH,
-	        stratis_sdev_get_id(sdev));
-
-	sd_bus_add_object_vtable(bus, &(sdev->slot), sdev->dbus_name,
-			STRATIS_DEV_BASE_INTERFACE, sdev_vtable, sdev);
+	sync_sdev(sdev);
 
 }
 
@@ -1371,15 +1437,9 @@ iterate_scache_vtable (gpointer key, gpointer value, gpointer user_data)
 	scache_t *scache = value;
 	char *sdev_cache = key;
 
-	snprintf(scache->dbus_name, 256, "%s/%d", STRATIS_BASE_PATH,
-	        stratis_scache_get_id(scache));
-
-	sd_bus_add_object_vtable(bus, &(scache->slot), scache->dbus_name,
-			STRATIS_CACHE_BASE_INTERFACE, sdev_vtable, scache);
+	sync_scache(scache);
 
 }
-
-
 
 static int sync_spool(spool_t *spool) {
 	int rc = STRATIS_OK;

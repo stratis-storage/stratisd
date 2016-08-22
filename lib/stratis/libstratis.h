@@ -135,9 +135,10 @@ typedef struct scache {
 #define STRATIS_BAD_PARAM			9
 #define STRATIS_ALREADY_EXISTS		10
 #define STRATIS_DUPLICATE_NAME		11
-#define STRATIS_NO_POOLS			12
-#define STRATIS_LIST_FAILURE		13
-#define STRATIS_ERROR_MAX			14
+#define STRATIS_NULL_NAME			12
+#define STRATIS_NO_POOLS			13
+#define STRATIS_LIST_FAILURE		14
+#define STRATIS_ERROR_MAX			15
 
 
 #define	STRATIS_RAID_TYPE_UNKNOWN	-1
@@ -171,12 +172,12 @@ int stratis_spool_get(spool_t **spool, char *name);
 char *stratis_spool_get_name(spool_t *spool);
 int stratis_spool_get_id(spool_t *spool);
 int stratis_spool_get_list(spool_table_t **spool_list);
-int stratis_spool_add_devs(spool_t *spool, sdev_table_t *sdev_table);
+int stratis_spool_add_dev(spool_t *spool,  sdev_t *sdev);
 int stratis_spool_remove_devs(spool_t *spool, sdev_table_t *sdev_table);
 int stratis_spool_remove_dev(spool_t *spool, char *name);
 int stratis_spool_get_dev_table(spool_t *spool, sdev_table_t **sdev_table);
 
-int stratis_spool_add_cache_devs(spool_t *spool, sdev_table_t *scache_table);
+int stratis_spool_add_cache(spool_t *spool, scache_t *scache);
 int stratis_spool_remove_cache_devs(spool_t *spool, sdev_table_t *scache_table);
 int stratis_spool_get_cache_dev_table(spool_t *spool, scache_table_t **scache_table);
 

@@ -38,12 +38,13 @@ static int sync_volume(svolume_t *volume, spool_t *spool);
 static int sync_sdev(sdev_t *sdev);
 static int sync_scache(scache_t *scache);
 
+struct stratis_ctx *ctx;
 
 static int find_spool(char *name, spool_t **spool) {
 	int r = STRATIS_OK;
 	spool_table_t *spool_list;
 
-	r = stratis_spool_get_list(&spool_list);
+	r = stratis_spool_get_list(ctx, &spool_list);
 	if (r != STRATIS_OK) {
 		r = STRATIS_NOTFOUND;
 		goto out;
@@ -252,7 +253,7 @@ static int list_pools(sd_bus_message *message, void *userdata,
 	if (rc < 0)
 		goto out;
 
-	rc = stratis_spool_get_list(&spool_list);
+	rc = stratis_spool_get_list(ctx, &spool_list);
 	if (rc != STRATIS_OK) {
 		fprintf(stderr, "Failed stratis_spool_get_list()\n");
 		goto out;
@@ -446,7 +447,7 @@ static int create_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 		goto out;
 
 	// TODO free the sdev_list - have create make a copy
-	rc = stratis_spool_create(&spool, name, sdev_list, raid_type);
+	rc = stratis_spool_create(ctx, &spool, name, sdev_list, raid_type);
 
 	if (rc < 0)
 		goto out;
@@ -585,7 +586,7 @@ static int destroy_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) 
 
 	unref_pool(spool);
 
-	rc = stratis_spool_destroy(spool);
+	rc = stratis_spool_destroy(ctx, spool);
 
 	out: return sd_bus_reply_method_return(m, "sis", dbus_name, rc,
 	        stratis_get_user_message(rc));
@@ -605,7 +606,7 @@ static int get_pool_object_path(sd_bus_message *m, void *userdata, sd_bus_error 
 		goto out;
 	}
 
-	rc = stratis_spool_get(&spool, name);
+	rc = stratis_spool_get(ctx, &spool, name);
 
 	if (spool != NULL) {
 		dbus_name = spool->dbus_name;
@@ -631,7 +632,7 @@ static int get_volume_object_path(sd_bus_message *m, void *userdata, sd_bus_erro
 		goto out;
 	}
 
-	rc = stratis_svolume_get(&svolume, poolname, volumename);
+	rc = stratis_svolume_get(ctx, &svolume, poolname, volumename);
 
 	if (svolume != NULL) {
 		dbus_name = svolume->dbus_name;
@@ -657,7 +658,7 @@ static int get_dev_object_path(sd_bus_message *m, void *userdata, sd_bus_error *
 	}
 
 
-	rc = stratis_sdev_get(&sdev, dev_name);
+	rc = stratis_sdev_get(ctx, &sdev, dev_name);
 
 	if (sdev != NULL) {
 		dbus_name = sdev->dbus_name;
@@ -682,7 +683,7 @@ static int get_cache_object_path(sd_bus_message *m, void *userdata, sd_bus_error
 		goto out;
 	}
 
-	rc = stratis_cache_get(&cache, cache_name);
+	rc = stratis_cache_get(ctx, &cache, cache_name);
 
 	if (cache != NULL) {
 		dbus_name = cache->dbus_name;
@@ -802,6 +803,43 @@ out:
 			        stratis_get_user_message(rc));
 }
 
+static int create_snapshot(sd_bus_message *m, void *userdata, sd_bus_error *error) {
+	int rc = STRATIS_OK;
+	svolume_t *svolume = userdata;
+	char *name = NULL;
+
+	rc = sd_bus_message_read(m, "s", &name);
+
+	if (rc < 0) {
+		rc = STRATIS_BAD_PARAM;
+		goto out;
+	}
+
+	rc = stratis_svolume_create_snapshot(svolume, name);
+
+out:
+	return sd_bus_reply_method_return(m, "sis", svolume->dbus_name, rc,
+			        stratis_get_user_message(rc));
+}
+
+static int destroy_snapshot(sd_bus_message *m, void *userdata, sd_bus_error *error) {
+	int rc = STRATIS_OK;
+	svolume_t *svolume = userdata;
+	char *name = NULL;
+
+	rc = sd_bus_message_read(m, "s", &name);
+
+	if (rc < 0) {
+		rc = STRATIS_BAD_PARAM;
+		goto out;
+	}
+
+	rc = stratis_svolume_destroy_snapshot(svolume, name);
+
+out:
+	return sd_bus_reply_method_return(m, "sis", svolume->dbus_name, rc,
+			        stratis_get_user_message(rc));
+}
 
 
 static int destroy_volumes(sd_bus_message *m, void *userdata,
@@ -898,13 +936,10 @@ out:
 static int add_devs(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	spool_t *spool = userdata;
 	sd_bus_message *reply = NULL;
-	char *cache_name;
+	char *dev_name;
 	sdev_t *sdev = NULL;
 	int rc;
 	int stratis_rc = STRATIS_OK;
-
-	if (rc != STRATIS_OK)
-		goto out;
 
 	rc = sd_bus_message_enter_container(m, 'a', "s");
 
@@ -922,7 +957,7 @@ static int add_devs(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 		goto out;
 
 	for (;;) {
-		rc = sd_bus_message_read_basic(m, SD_BUS_TYPE_STRING, &cache_name);
+		rc = sd_bus_message_read_basic(m, SD_BUS_TYPE_STRING, &dev_name);
 
 		if (rc < 0)
 			goto out;
@@ -930,7 +965,7 @@ static int add_devs(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 			break;
 
 		rc = stratis_sdev_create(&sdev, spool,
-				cache_name, STRATIS_DEV_TYPE_REGULAR);
+				dev_name, STRATIS_DEV_TYPE_REGULAR);
 
 		if (rc != STRATIS_OK)
 			goto out;
@@ -1077,7 +1112,7 @@ static int remove_devs(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 		if (rc == 0)
 			break;
 
-		rc = stratis_sdev_get(&sdev, dev_name);
+		rc = stratis_sdev_get(ctx, &sdev, dev_name);
 
 		if (rc != STRATIS_OK) {
 			failure = TRUE;
@@ -1160,7 +1195,7 @@ static int remove_cache_devs(sd_bus_message *m, void *userdata, sd_bus_error *er
 			break;
 
 
-		rc = stratis_cache_get(&sdev, dev_name);
+		rc = stratis_cache_get(ctx, &sdev, dev_name);
 
 		if (rc != STRATIS_OK) {
 			failure = TRUE;
@@ -1355,6 +1390,8 @@ static const sd_bus_vtable svolume_vtable[] = {
 				SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_PROPERTY(VOLUME_ID, "s", get_svolume_property, 0,
 				SD_BUS_VTABLE_PROPERTY_CONST),
+	SD_BUS_METHOD("CreateSnapshot", "ss", "sis", create_snapshot, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("DestroySnapshot", "ss", "sis", destroy_snapshot, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("Rename", "s", "sis", rename_volume, 0),
 	SD_BUS_METHOD("SetMountPoint", "s", "is", set_mount_point_volume, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("SetQuota", "s", "is", set_quota_volume, SD_BUS_VTABLE_UNPRIVILEGED),
@@ -1421,7 +1458,7 @@ static int sync_sdev(sdev_t *sdev) {
 			stratis_sdev_get_id(sdev));
 
 	return sd_bus_add_object_vtable(bus, &(sdev->slot), sdev->dbus_name,
-			STRATIS_CACHE_BASE_INTERFACE, scache_vtable, sdev);
+			STRATIS_CACHE_BASE_INTERFACE, sdev_vtable, sdev);
 }
 
 static void
@@ -1490,13 +1527,17 @@ void * stratis_main_loop(void * ap) {
 	int r;
 	sd_bus_slot *slot = NULL;
 
-	stratis_initialize();
+	r = stratis_context_new(&ctx);
+	if (r != STRATIS_OK) {
+		fprintf(stderr, "Failed stratis_context_new %s\n", stratis_get_user_message(r));
+		goto out;
+	}
 
 	r = sd_bus_open_user(&bus);
 
 	if (r < 0) {
 		fprintf(stderr, "Failed to connect to system bus: %s\n", strerror(-r));
-		goto finish;
+		goto out;
 	}
 
 	r = sd_bus_add_object_vtable(bus, &slot, STRATIS_BASE_PATH,
@@ -1506,7 +1547,7 @@ void * stratis_main_loop(void * ap) {
 		fprintf(stderr,
 		        "Failed sd_bus_add_object_vtable for stratis_manager_vtable: %s\n",
 		        strerror(-r));
-		goto finish;
+		goto out;
 	}
 
 	r = sd_bus_add_object_manager(bus, &slot, STRATIS_BASE_PATH);
@@ -1514,7 +1555,7 @@ void * stratis_main_loop(void * ap) {
 	if (r < 0) {
 		fprintf(stderr, "Failed to sd_bus_add_object_manager: %s\n",
 		        strerror(-r));
-		goto finish;
+		goto out;
 	}
 
 	/* Take a well-known service name so that clients can find us */
@@ -1522,7 +1563,7 @@ void * stratis_main_loop(void * ap) {
 
 	if (r < 0) {
 		fprintf(stderr, "Failed to acquire service name: %s\n", strerror(-r));
-		goto finish;
+		goto out;
 	}
 
 	for (;;) {
@@ -1530,7 +1571,7 @@ void * stratis_main_loop(void * ap) {
 		r = sd_bus_process(bus, NULL);
 		if (r < 0) {
 			fprintf(stderr, "Failed to process bus: %s\n", strerror(-r));
-			goto finish;
+			goto out;
 		}
 		if (r > 0) /* we processed a request, try to process another one, right-away */
 			continue;
@@ -1539,11 +1580,12 @@ void * stratis_main_loop(void * ap) {
 		r = sd_bus_wait(bus, (uint64_t) -1);
 		if (r < 0) {
 			fprintf(stderr, "Failed to wait on bus: %s\n", strerror(-r));
-			goto finish;
+			goto out;
 		}
 	}
 
-	finish: sd_bus_slot_unref(slot);
+out:
+	sd_bus_slot_unref(slot);
 	sd_bus_flush_close_unref(bus);
 
 	return NULL;

@@ -13,7 +13,7 @@ LIBDEPS =
 PKGFILE = libstratis.pc
 EXTRA_MAN_FILES = libstratis.h.3
 HEADERS = libstratis/libstratis.h
-OBJS = libstratis.o simulator.o
+OBJS = libstratis.o
 SHARED_FLAGS = -shared
 
 CFLAGS += -g -I./ -I./stratis/ $(shell pkg-config --cflags glib-2.0) -fPIC -D_GNU_SOURCE \

@@ -93,11 +93,12 @@ typedef struct svolume {
 	int id;
 	int size;
 	spool_t *parent_spool;
+	struct svolume *parent_volume;
+	svolume_table_t *snapshot_table;
 	char name[MAX_STRATIS_NAME_LEN];
 	char mount_point[MAX_STRATIS_NAME_LEN];
 	char quota[MAX_STRATIS_NAME_LEN];
 	char dbus_name[MAX_STRATIS_NAME_LEN];
-	svolume_table_t *snapshot_table;
 	sd_bus_slot *slot;
 } svolume_t;
 
@@ -120,6 +121,8 @@ typedef struct scache {
 	sd_bus_slot *slot;
 	int type;
 } scache_t;
+
+
 
 
 /* Return codes */
@@ -209,7 +212,8 @@ int stratis_svolume_table_devs(spool_t *spool, sdev_table_t **disk_table);
 int stratis_svolume_table_size(svolume_table_t *svolume_table, int *list_size);
 int stratis_svolume_table_find(svolume_table_t *svolume_table, svolume_t **svolume,
         char *name);
-int stratis_svolume_create_snapshot(svolume_t *svolume, char *name);
+int stratis_svolume_create_snapshot(svolume_t *svolume, spool_t *spool,
+			svolume_t **snapshot, char *name);
 int stratis_svolume_destroy_snapshot(svolume_t *svolume, char *name);
 
 

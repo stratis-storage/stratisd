@@ -805,7 +805,7 @@ out:
 
 static int create_snapshot(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	int rc = STRATIS_OK;
-	svolume_t *svolume = userdata;
+	svolume_t *parent_svolume = userdata, *snapshot;
 	char *name = NULL;
 
 	rc = sd_bus_message_read(m, "s", &name);
@@ -815,10 +815,16 @@ static int create_snapshot(sd_bus_message *m, void *userdata, sd_bus_error *erro
 		goto out;
 	}
 
-	rc = stratis_svolume_create_snapshot(svolume, name);
+	rc = stratis_svolume_create_snapshot(parent_svolume,
+			parent_svolume->parent_spool, &snapshot, name);
+
+	if (rc != STRATIS_OK)
+		goto out;
+
+	rc = sync_volume(snapshot, parent_svolume->parent_spool);
 
 out:
-	return sd_bus_reply_method_return(m, "sis", svolume->dbus_name, rc,
+	return sd_bus_reply_method_return(m, "sis", snapshot->dbus_name, rc,
 			        stratis_get_user_message(rc));
 }
 
@@ -1390,8 +1396,8 @@ static const sd_bus_vtable svolume_vtable[] = {
 				SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_PROPERTY(VOLUME_ID, "s", get_svolume_property, 0,
 				SD_BUS_VTABLE_PROPERTY_CONST),
-	SD_BUS_METHOD("CreateSnapshot", "ss", "sis", create_snapshot, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("DestroySnapshot", "ss", "sis", destroy_snapshot, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("CreateSnapshot", "s", "sis", create_snapshot, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("DestroySnapshot", "s", "sis", destroy_snapshot, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("Rename", "s", "sis", rename_volume, 0),
 	SD_BUS_METHOD("SetMountPoint", "s", "is", set_mount_point_volume, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("SetQuota", "s", "is", set_quota_volume, SD_BUS_VTABLE_UNPRIVILEGED),

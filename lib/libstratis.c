@@ -636,9 +636,17 @@ STRATIS_EXPORT int stratis_spool_get_dev_table(spool_t *spool, sdev_table_t **sd
 
 STRATIS_EXPORT int stratis_spool_add_volume(spool_t *spool, svolume_t *volume) {
 	int rc = STRATIS_OK;
+	svolume_t *ptr;
 
 	if (spool == NULL || spool->svolume_table == NULL|| volume == NULL)
 		return STRATIS_NULL;
+
+	if (strlen(volume->name) == 0)
+		return STRATIS_NULL_NAME;
+
+	ptr =  g_hash_table_lookup(spool->svolume_table->table, volume->name);
+	if (ptr != NULL)
+		return STRATIS_ALREADY_EXISTS;
 
 	g_hash_table_insert(spool->svolume_table->table, volume->name, volume);
 
@@ -782,11 +790,19 @@ STRATIS_EXPORT int stratis_svolume_create(svolume_t **svolume, spool_t *spool, c
 	if (return_volume == NULL)
 		return STRATIS_MALLOC;
 
+	rc = stratis_svolume_table_create(&(return_volume->snapshot_table));
+
+	if (rc != STRATIS_OK)
+		goto out;
+
 	strncpy(return_volume->name, name, MAX_STRATIS_NAME_LEN);
-	strncpy(return_volume->mount_point, mount_point, MAX_STRATIS_NAME_LEN);
-	strncpy(return_volume->quota, quota, MAX_STRATIS_NAME_LEN);
+	strncpy(return_volume->mount_point, (mount_point == NULL ? "" : mount_point), MAX_STRATIS_NAME_LEN);
+	strncpy(return_volume->quota, (quota == NULL ? "" : mount_point), MAX_STRATIS_NAME_LEN);
 	return_volume->id = dbus_id++;
 	return_volume->parent_spool = spool;
+
+
+	return_volume->dbus_name[0] = '\0';
 	rc = stratis_spool_add_volume(spool, return_volume);
 
 	if (rc != STRATIS_OK)
@@ -957,10 +973,31 @@ STRATIS_EXPORT int stratis_svolume_table_size(svolume_table_t *svolume_table, in
 	return rc;
 }
 
-STRATIS_EXPORT int stratis_svolume_create_snapshot(svolume_t *svolume, char *name) {
+STRATIS_EXPORT int stratis_svolume_create_snapshot(svolume_t *svolume,
+		spool_t *spool, svolume_t **snapshot, char *name) {
 	int rc = STRATIS_OK;
 
+	if (svolume == NULL || spool->svolume_table == NULL
+			|| svolume == NULL || spool->svolume_table->table == NULL
+			|| snapshot == NULL)
+		return STRATIS_NULL;
+
+	if (strlen(svolume->name) == 0)
+		return STRATIS_NULL_NAME;
+
+	*snapshot =  g_hash_table_lookup(spool->svolume_table->table, name);
+	if (*snapshot != NULL)
+		return STRATIS_ALREADY_EXISTS;
+
+
+	rc = stratis_svolume_create(snapshot, spool, name, NULL, NULL);
+	(*snapshot)->parent_volume = svolume;
+
+	g_hash_table_insert(spool->svolume_table->table, (*snapshot)->name, snapshot);
+	g_hash_table_insert(svolume->snapshot_table->table, (*snapshot)->name, snapshot);
+
 	return rc;
+
 }
 
 STRATIS_EXPORT int stratis_svolume_destroy_snapshot(svolume_t *svolume, char *name) {

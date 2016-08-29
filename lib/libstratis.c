@@ -843,8 +843,11 @@ STRATIS_EXPORT int stratis_svolume_get(struct stratis_ctx *ctx, svolume_t **svol
 
 	spool = g_hash_table_lookup(ctx->spool_table->table, poolname);
 
-	if (spool == NULL || spool->svolume_table == NULL)
-			rc = STRATIS_NOTFOUND;
+    if (spool == NULL)
+        return STRATIS_POOL_NOTFOUND;
+
+    if (spool->svolume_table == NULL)
+        return STRATIS_VOLUME_NOTFOUND;
 
 	*svolume = g_hash_table_lookup(spool->svolume_table->table, volumename);
 

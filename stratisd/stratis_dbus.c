@@ -633,6 +633,8 @@ static int get_volume_object_path(sd_bus_message *m, void *userdata, sd_bus_erro
 	}
 
 	rc = stratis_svolume_get(ctx, &svolume, poolname, volumename);
+    if (rc != STRATIS_OK)
+        goto out;
 
 	if (svolume != NULL) {
 		dbus_name = svolume->dbus_name;

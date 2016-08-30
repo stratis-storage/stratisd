@@ -1003,11 +1003,6 @@ STRATIS_EXPORT int stratis_svolume_create_snapshot(svolume_t *svolume,
 
 }
 
-STRATIS_EXPORT int stratis_svolume_destroy_snapshot(svolume_t *svolume, char *name) {
-	int rc = STRATIS_OK;
-
-	return rc;
-}
 
 /*
  * Devs

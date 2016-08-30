@@ -214,7 +214,6 @@ int stratis_svolume_table_find(svolume_table_t *svolume_table, svolume_t **svolu
         char *name);
 int stratis_svolume_create_snapshot(svolume_t *svolume, spool_t *spool,
 			svolume_t **snapshot, char *name);
-int stratis_svolume_destroy_snapshot(svolume_t *svolume, char *name);
 
 
 /*

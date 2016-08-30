@@ -94,7 +94,6 @@ typedef struct svolume {
 	int size;
 	spool_t *parent_spool;
 	struct svolume *parent_volume;
-	svolume_table_t *snapshot_table;
 	char name[MAX_STRATIS_NAME_LEN];
 	char mount_point[MAX_STRATIS_NAME_LEN];
 	char quota[MAX_STRATIS_NAME_LEN];

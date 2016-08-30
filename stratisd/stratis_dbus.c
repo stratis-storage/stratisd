@@ -34,15 +34,15 @@
 static sd_bus *bus = NULL;
 
 static int sync_spool(spool_t *spool);
-static int sync_volume(svolume_t *volume, spool_t *spool);
+static int sync_volume(svolume_t *volume);
 static int sync_sdev(sdev_t *sdev);
 static int sync_scache(scache_t *scache);
 
-struct stratis_ctx *ctx;
+struct stratis_ctx *ctx = NULL;
 
 static int find_spool(char *name, spool_t **spool) {
 	int r = STRATIS_OK;
-	spool_table_t *spool_list;
+	spool_table_t *spool_list = NULL;
 
 	r = stratis_spool_get_list(ctx, &spool_list);
 	if (r != STRATIS_OK) {
@@ -534,9 +534,6 @@ static int unref_pool(spool_t *spool) {
 	if (spool == NULL || spool->slot == NULL)
 		return STRATIS_NULL;
 
-	spool->slot = sd_bus_slot_unref(spool->slot);
-	rc = sd_bus_emit_object_removed(bus, spool->dbus_name);
-	spool->slot = NULL;
 
 	g_hash_table_foreach(spool->svolume_table->table,
 					iterate_svolumes_unref,
@@ -549,6 +546,10 @@ static int unref_pool(spool_t *spool) {
 	g_hash_table_foreach(spool->scache_table->table,
 					iterate_scache_unref,
 					NULL);
+
+	spool->slot = sd_bus_slot_unref(spool->slot);
+	rc = sd_bus_emit_object_removed(bus, spool->dbus_name);
+	spool->slot = NULL;
 
 	return rc;
 }
@@ -736,7 +737,7 @@ static int create_volumes(sd_bus_message *m, void *userdata, sd_bus_error *error
 			stratis_rc = STRATIS_LIST_FAILURE;
 		}
 
-		sync_volume(svolume, spool);
+		sync_volume(svolume);
 
 		sd_bus_message_append(reply, "(sis)", svolume->dbus_name, rc, stratis_get_user_message(rc));
 
@@ -823,7 +824,7 @@ static int create_snapshot(sd_bus_message *m, void *userdata, sd_bus_error *erro
 	if (rc != STRATIS_OK)
 		goto out;
 
-	rc = sync_volume(snapshot, parent_svolume->parent_spool);
+	rc = sync_volume(snapshot);
 
 out:
 	return sd_bus_reply_method_return(m, "sis", snapshot->dbus_name, rc,
@@ -1412,7 +1413,7 @@ static const sd_bus_vtable scache_vtable[] = {
 	SD_BUS_VTABLE_END
 };
 
-static int sync_volume(svolume_t *volume, spool_t *spool) {
+static int sync_volume(svolume_t *volume) {
 	int rc = STRATIS_OK;
 
 	snprintf(volume->dbus_name, 256, "%s/%d", STRATIS_BASE_PATH,

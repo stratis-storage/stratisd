@@ -602,7 +602,7 @@ STRATIS_EXPORT int stratis_spool_get_id(spool_t *spool) {
 
 STRATIS_EXPORT int stratis_spool_get_list(struct stratis_ctx *ctx, spool_table_t **spool_list) {
 
-	if (spool_list == NULL || *spool_list == NULL)
+	if (ctx == NULL || spool_list == NULL)
 		return STRATIS_NULL;
 
 	*spool_list = ctx->spool_table;
@@ -789,11 +789,6 @@ STRATIS_EXPORT int stratis_svolume_create(svolume_t **svolume, spool_t *spool, c
 
 	if (return_volume == NULL)
 		return STRATIS_MALLOC;
-
-	rc = stratis_svolume_table_create(&(return_volume->snapshot_table));
-
-	if (rc != STRATIS_OK)
-		goto out;
 
 	strncpy(return_volume->name, name, MAX_STRATIS_NAME_LEN);
 	strncpy(return_volume->mount_point, (mount_point == NULL ? "" : mount_point), MAX_STRATIS_NAME_LEN);
@@ -997,7 +992,6 @@ STRATIS_EXPORT int stratis_svolume_create_snapshot(svolume_t *svolume,
 	(*snapshot)->parent_volume = svolume;
 
 	g_hash_table_insert(spool->svolume_table->table, (*snapshot)->name, snapshot);
-	g_hash_table_insert(svolume->snapshot_table->table, (*snapshot)->name, snapshot);
 
 	return rc;
 

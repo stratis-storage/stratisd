@@ -829,14 +829,10 @@ static int destroy_volumes(sd_bus_message *m, void *userdata,
 	int rc;
 	int stratis_rc = STRATIS_OK;
 	int failure = FALSE;
-	int force_flag = FALSE;
 
 	rc = sd_bus_message_enter_container(m, 'a', "s");
 	if (rc < 0)
 		goto out;
-
-	rc = sd_bus_message_read(m, "i", &force_flag);
-
 
 	rc = sd_bus_message_new_method_return(m, &reply);
 
@@ -1349,7 +1345,7 @@ static const sd_bus_vtable spool_vtable[] = {
 	SD_BUS_WRITABLE_PROPERTY("Size", "u", NULL, NULL,
 			offsetof(spool_t, size), 0),
 	SD_BUS_METHOD("CreateVolumes", "a(sss)", "a(sis)is", create_volumes, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("DestroyVolumes", "asi", "a(sis)is", destroy_volumes, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("DestroyVolumes", "as", "a(sis)is", destroy_volumes, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("ListVolumes", NULL, "asis", list_pool_volumes, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("ListDevs", NULL, "asis", list_pool_devs, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("ListCacheDevs", NULL, "asis", list_cache_devs, SD_BUS_VTABLE_UNPRIVILEGED),

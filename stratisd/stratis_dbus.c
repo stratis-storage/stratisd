@@ -403,7 +403,7 @@ static int create_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	 * Make sure the object doesn't already exist.
 	 */
 	if (rc != STRATIS_NOTFOUND && rc != STRATIS_NULL) {
-		rc = STRATIS_DUPLICATE_NAME;
+		rc = STRATIS_ALREADY_EXISTS;
 		goto out;
 	}
 
@@ -721,15 +721,14 @@ static int create_volumes(sd_bus_message *m, void *userdata, sd_bus_error *error
 				volume_name, mount_point, quota);
 
 		if (rc != STRATIS_OK) {
-			stratis_rc = STRATIS_LIST_FAILURE;
+			stratis_rc = rc;
 			dbus_name = "";
 		} else {
 			dbus_name = svolume->dbus_name;
 			sync_volume(svolume);
 		}
 
-		sd_bus_message_append(reply, "(sis)", dbus_name, rc, stratis_get_user_message(rc));
-
+		rc = sd_bus_message_append(reply, "(sis)", dbus_name, rc, stratis_get_user_message(rc));
 		if (rc < 0)
 			goto out;
 	}
@@ -742,6 +741,9 @@ static int create_volumes(sd_bus_message *m, void *userdata, sd_bus_error *error
 	if (rc < 0)
 		goto out;
 
+    if (stratis_rc != STRATIS_OK) {
+        stratis_rc = STRATIS_LIST_FAILURE;
+    }
 	rc = sd_bus_message_append(reply, "is", stratis_rc, stratis_get_user_message(stratis_rc));
 	if (rc < 0)
 		goto out;

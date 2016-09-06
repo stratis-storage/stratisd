@@ -387,7 +387,6 @@ static int create_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	sdev_t *sdev = NULL;
 	int rc;
 	int raid_type = STRATIS_RAID_TYPE_UNKNOWN;
-	int force_flag;
 	char *sdev_name = NULL;
 	size_t length = 0;
 
@@ -439,10 +438,6 @@ static int create_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 		goto out;
 
 	rc = sd_bus_message_read(m, "i", &raid_type);
-	if (rc < 0)
-		goto out;
-
-	rc = sd_bus_message_read(m, "i", &force_flag);
 	if (rc < 0)
 		goto out;
 
@@ -1340,7 +1335,7 @@ static const sd_bus_vtable stratis_manager_vtable[] = {
 	SD_BUS_PROPERTY("Version", "s", property_get_version, 0, SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_PROPERTY("LogLevel", "s", property_get_log_level,  0, SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_METHOD("ListPools", NULL, "asis", list_pools, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("CreatePool", "sasii", "sis", create_pool, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("CreatePool", "sasi", "sis", create_pool, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("DestroyPool", "si", "sis", destroy_pool, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetPoolObjectPath", "s", "sis", get_pool_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetVolumeObjectPath", "ss", "sis", get_volume_object_path, SD_BUS_VTABLE_UNPRIVILEGED),

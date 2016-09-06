@@ -721,7 +721,7 @@ static int create_volumes(sd_bus_message *m, void *userdata, sd_bus_error *error
 				volume_name, mount_point, quota);
 
 		if (rc != STRATIS_OK) {
-			stratis_rc = STRATIS_LIST_FAILURE;
+			stratis_rc = rc;
 			dbus_name = "";
 		} else {
 			dbus_name = svolume->dbus_name;

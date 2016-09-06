@@ -728,8 +728,7 @@ static int create_volumes(sd_bus_message *m, void *userdata, sd_bus_error *error
 			sync_volume(svolume);
 		}
 
-		sd_bus_message_append(reply, "(sis)", dbus_name, rc, stratis_get_user_message(rc));
-
+		rc = sd_bus_message_append(reply, "(sis)", dbus_name, rc, stratis_get_user_message(rc));
 		if (rc < 0)
 			goto out;
 	}

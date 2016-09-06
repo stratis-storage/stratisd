@@ -690,7 +690,7 @@ static int create_volumes(sd_bus_message *m, void *userdata, sd_bus_error *error
 	spool_t *spool = userdata;
 	svolume_t *svolume;
 	char *volume_name = "", *mount_point = "", *quota = "";
-	char *n = "";
+	char *dbus_name = "";
 	int rc;
 	int stratis_rc = STRATIS_OK;
 
@@ -722,11 +722,13 @@ static int create_volumes(sd_bus_message *m, void *userdata, sd_bus_error *error
 
 		if (rc != STRATIS_OK) {
 			stratis_rc = STRATIS_LIST_FAILURE;
+			dbus_name = "";
+		} else {
+			dbus_name = svolume->dbus_name;
+			sync_volume(svolume);
 		}
 
-		sync_volume(svolume);
-
-		sd_bus_message_append(reply, "(sis)", svolume->dbus_name, rc, stratis_get_user_message(rc));
+		sd_bus_message_append(reply, "(sis)", dbus_name, rc, stratis_get_user_message(rc));
 
 		if (rc < 0)
 			goto out;

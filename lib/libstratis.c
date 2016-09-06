@@ -795,8 +795,6 @@ STRATIS_EXPORT int stratis_svolume_create(svolume_t **svolume, spool_t *spool, c
 	strncpy(return_volume->quota, (quota == NULL ? "" : mount_point), MAX_STRATIS_NAME_LEN);
 	return_volume->id = dbus_id++;
 	return_volume->parent_spool = spool;
-
-
 	return_volume->dbus_name[0] = '\0';
 	rc = stratis_spool_add_volume(spool, return_volume);
 

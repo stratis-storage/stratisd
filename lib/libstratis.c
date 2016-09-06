@@ -318,8 +318,6 @@ STRATIS_EXPORT char * stratis_get_code_token(int stratis_code) {
 			return "STRATIS_BAD_PARAM";
 		case STRATIS_ALREADY_EXISTS:
 			return "STRATIS_ALREADY_EXISTS";
-		case STRATIS_DUPLICATE_NAME:
-			return "STRATIS_DUPLICATE_NAME";
 		case STRATIS_NO_POOLS:
 			return "STRATIS_NO_POOLS";
 		case STRATIS_LIST_FAILURE:
@@ -389,8 +387,6 @@ STRATIS_EXPORT char * stratis_get_user_message(int stratis_code) {
 			return "bad parameter";
 		case STRATIS_ALREADY_EXISTS:
 			return "already exists";
-		case STRATIS_DUPLICATE_NAME:
-			return "duplicate name";
 		case STRATIS_NO_POOLS:
 			return "no pools";
 		case STRATIS_LIST_FAILURE:

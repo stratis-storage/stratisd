@@ -403,7 +403,7 @@ static int create_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	 * Make sure the object doesn't already exist.
 	 */
 	if (rc != STRATIS_NOTFOUND && rc != STRATIS_NULL) {
-		rc = STRATIS_DUPLICATE_NAME;
+		rc = STRATIS_ALREADY_EXISTS;
 		goto out;
 	}
 

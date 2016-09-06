@@ -387,7 +387,6 @@ static int create_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	sdev_t *sdev = NULL;
 	int rc;
 	int raid_type = STRATIS_RAID_TYPE_UNKNOWN;
-	int force_flag;
 	char *sdev_name = NULL;
 	size_t length = 0;
 
@@ -439,10 +438,6 @@ static int create_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 		goto out;
 
 	rc = sd_bus_message_read(m, "i", &raid_type);
-	if (rc < 0)
-		goto out;
-
-	rc = sd_bus_message_read(m, "i", &force_flag);
 	if (rc < 0)
 		goto out;
 
@@ -559,16 +554,8 @@ static int destroy_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) 
 	spool_t *spool = NULL;
 	char dbus_name[MAX_STRATIS_NAME_LEN] = "";
 	char *name = NULL;
-	int force_flag = FALSE;
 
 	rc = sd_bus_message_read(m, "s", &name);
-
-	if (rc < 0) {
-		rc = STRATIS_BAD_PARAM;
-		goto out;
-	}
-
-	rc = sd_bus_message_read(m, "i", &force_flag);
 
 	if (rc < 0) {
 		rc = STRATIS_BAD_PARAM;
@@ -842,14 +829,10 @@ static int destroy_volumes(sd_bus_message *m, void *userdata,
 	int rc;
 	int stratis_rc = STRATIS_OK;
 	int failure = FALSE;
-	int force_flag = FALSE;
 
 	rc = sd_bus_message_enter_container(m, 'a', "s");
 	if (rc < 0)
 		goto out;
-
-	rc = sd_bus_message_read(m, "i", &force_flag);
-
 
 	rc = sd_bus_message_new_method_return(m, &reply);
 
@@ -1340,8 +1323,8 @@ static const sd_bus_vtable stratis_manager_vtable[] = {
 	SD_BUS_PROPERTY("Version", "s", property_get_version, 0, SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_PROPERTY("LogLevel", "s", property_get_log_level,  0, SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_METHOD("ListPools", NULL, "asis", list_pools, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("CreatePool", "sasii", "sis", create_pool, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("DestroyPool", "si", "sis", destroy_pool, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("CreatePool", "sasi", "sis", create_pool, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("DestroyPool", "s", "sis", destroy_pool, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetPoolObjectPath", "s", "sis", get_pool_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetVolumeObjectPath", "ss", "sis", get_volume_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetDevObjectPath", "s", "sis", get_dev_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
@@ -1362,7 +1345,7 @@ static const sd_bus_vtable spool_vtable[] = {
 	SD_BUS_WRITABLE_PROPERTY("Size", "u", NULL, NULL,
 			offsetof(spool_t, size), 0),
 	SD_BUS_METHOD("CreateVolumes", "a(sss)", "a(sis)is", create_volumes, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("DestroyVolumes", "asi", "a(sis)is", destroy_volumes, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("DestroyVolumes", "as", "a(sis)is", destroy_volumes, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("ListVolumes", NULL, "asis", list_pool_volumes, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("ListDevs", NULL, "asis", list_pool_devs, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("ListCacheDevs", NULL, "asis", list_cache_devs, SD_BUS_VTABLE_UNPRIVILEGED),

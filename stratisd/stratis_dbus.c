@@ -741,6 +741,9 @@ static int create_volumes(sd_bus_message *m, void *userdata, sd_bus_error *error
 	if (rc < 0)
 		goto out;
 
+    if (stratis_rc != STRATIS_OK) {
+        stratis_rc = STRATIS_LIST_FAILURE;
+    }
 	rc = sd_bus_message_append(reply, "is", stratis_rc, stratis_get_user_message(stratis_rc));
 	if (rc < 0)
 		goto out;

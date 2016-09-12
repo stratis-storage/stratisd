@@ -1,9 +1,0 @@
-includedir=__INCLUDEDIR__
-libdir=__LIBDIR__
-
-Name: libstratis
-Version: __VERSION__
-Description: Stratis Management Library
-Requires:
-Libs: -L${libdir} -lstratis
-Cflags: -I${includedir}

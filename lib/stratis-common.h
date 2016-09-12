@@ -50,7 +50,7 @@
 
 
 /* Pool Property Definitions */
-#define POOL_NAME 			"SPool"
+#define POOL_NAME 			"PoolName"
 #define POOL_ID 			"SPoolId"
 
 /* Disk Property Definitions */

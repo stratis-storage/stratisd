@@ -389,6 +389,7 @@ static int create_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	int raid_type = STRATIS_RAID_TYPE_UNKNOWN;
 	char *sdev_name = NULL;
 	size_t length = 0;
+    char *dbus_name = "/";
 
 	rc = sd_bus_message_read(m, "s", &name);
 
@@ -452,8 +453,10 @@ static int create_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	if (rc < 0)
 		goto out;
 
+    dbus_name = spool->dbus_name;
+
 out:
-	return sd_bus_reply_method_return(m, "sis", spool->dbus_name, rc,
+	return sd_bus_reply_method_return(m, "ois", dbus_name, rc,
 	        stratis_get_user_message(rc));
 }
 
@@ -585,7 +588,7 @@ static int get_pool_object_path(sd_bus_message *m, void *userdata, sd_bus_error 
 	int rc = STRATIS_OK;
 	char *name = NULL;
 	spool_t *spool = NULL;
-	char *dbus_name = NULL;
+	char *dbus_name = "/";
 
 	rc = sd_bus_message_read(m, "s", &name);
 
@@ -602,7 +605,7 @@ static int get_pool_object_path(sd_bus_message *m, void *userdata, sd_bus_error 
 		rc = STRATIS_POOL_NOTFOUND;
 	}
 out:
-	return sd_bus_reply_method_return(m, "sis", dbus_name, rc,
+	return sd_bus_reply_method_return(m, "ois", dbus_name, rc,
 		        stratis_get_user_message(rc));
 }
 
@@ -611,7 +614,7 @@ static int get_volume_object_path(sd_bus_message *m, void *userdata, sd_bus_erro
 	int rc = STRATIS_OK;
 	char *volumename = NULL, *poolname = NULL;
 	svolume_t *svolume = NULL;
-	char *dbus_name = "";
+	char *dbus_name = "/";
 
 	rc = sd_bus_message_read(m, "ss", &poolname, &volumename);
 
@@ -630,7 +633,7 @@ static int get_volume_object_path(sd_bus_message *m, void *userdata, sd_bus_erro
 		rc = STRATIS_VOLUME_NOTFOUND;
 	}
 out:
-	return sd_bus_reply_method_return(m, "sis", dbus_name, rc,
+	return sd_bus_reply_method_return(m, "ois", dbus_name, rc,
 		        stratis_get_user_message(rc));
 }
 
@@ -664,7 +667,7 @@ static int get_cache_object_path(sd_bus_message *m, void *userdata, sd_bus_error
 	int rc = STRATIS_OK;
 	char *cache_name = NULL;
 	scache_t *cache = NULL;
-	char *dbus_name = NULL;
+	char *dbus_name = "/";
 
 	rc = sd_bus_message_read(m, "s", &cache_name);
 
@@ -681,7 +684,7 @@ static int get_cache_object_path(sd_bus_message *m, void *userdata, sd_bus_error
 		rc = STRATIS_DEV_NOTFOUND;
 	}
 out:
-	return sd_bus_reply_method_return(m, "sis", dbus_name, rc,
+	return sd_bus_reply_method_return(m, "ois", dbus_name, rc,
 		        stratis_get_user_message(rc));
 }
 
@@ -1327,12 +1330,12 @@ static const sd_bus_vtable stratis_manager_vtable[] = {
 	SD_BUS_PROPERTY("Version", "s", property_get_version, 0, SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_PROPERTY("LogLevel", "s", property_get_log_level,  0, SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_METHOD("ListPools", NULL, "asis", list_pools, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("CreatePool", "sasi", "sis", create_pool, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("CreatePool", "sasi", "ois", create_pool, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("DestroyPool", "s", "sis", destroy_pool, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("GetPoolObjectPath", "s", "sis", get_pool_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("GetVolumeObjectPath", "ss", "sis", get_volume_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("GetPoolObjectPath", "s", "ois", get_pool_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("GetVolumeObjectPath", "ss", "ois", get_volume_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetDevObjectPath", "s", "sis", get_dev_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("GetCacheObjectPath", "s", "sis", get_cache_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("GetCacheObjectPath", "s", "ois", get_cache_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetErrorCodes", NULL, "a(sis)", get_error_codes, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetRaidLevels", NULL, "a(sis)", get_raid_levels, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetDevTypes", NULL, "a(sis)", get_dev_types, SD_BUS_VTABLE_UNPRIVILEGED),

@@ -568,7 +568,7 @@ static int destroy_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) 
 
 	if (rc != STRATIS_OK) {
         if (rc == STRATIS_NOTFOUND)
-            rc = STRATIS_POOL_NOTFOUND;
+            rc = STRATIS_OK;
 		goto out;
     }
 

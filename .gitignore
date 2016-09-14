@@ -2,8 +2,10 @@
 *.o
 *.so
 *.so.*
-bin/stratisd
-test/stratis_test
-
 # text editors
 *.swp
+# misc
+target
+.project 
+.settings
+Cargo.lock

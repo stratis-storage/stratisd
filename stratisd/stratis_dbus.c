@@ -555,7 +555,6 @@ static int unref_pool(spool_t *spool) {
 static int destroy_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) {
 	int rc = STRATIS_OK;
 	spool_t *spool = NULL;
-	char dbus_name[MAX_STRATIS_NAME_LEN] = "";
 	char *name = NULL;
 
 	rc = sd_bus_message_read(m, "s", &name);
@@ -573,13 +572,11 @@ static int destroy_pool(sd_bus_message *m, void *userdata, sd_bus_error *error) 
 		goto out;
     }
 
-	strcpy(dbus_name, spool->dbus_name);
-
 	unref_pool(spool);
 
 	rc = stratis_spool_destroy(ctx, spool);
 
-	out: return sd_bus_reply_method_return(m, "sis", dbus_name, rc,
+	out: return sd_bus_reply_method_return(m, "is", rc,
 	        stratis_get_user_message(rc));
 
 }
@@ -1331,7 +1328,7 @@ static const sd_bus_vtable stratis_manager_vtable[] = {
 	SD_BUS_PROPERTY("LogLevel", "s", property_get_log_level,  0, SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_METHOD("ListPools", NULL, "asis", list_pools, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("CreatePool", "sasi", "ois", create_pool, SD_BUS_VTABLE_UNPRIVILEGED),
-	SD_BUS_METHOD("DestroyPool", "s", "sis", destroy_pool, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("DestroyPool", "s", "is", destroy_pool, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetPoolObjectPath", "s", "ois", get_pool_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetVolumeObjectPath", "ss", "ois", get_volume_object_path, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("GetDevObjectPath", "s", "sis", get_dev_object_path, SD_BUS_VTABLE_UNPRIVILEGED),

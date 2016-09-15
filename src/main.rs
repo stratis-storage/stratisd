@@ -43,6 +43,7 @@ mod dmdevice;
 mod util; 
 mod dbus_api;
 mod blockdev;
+mod filesystem;
 
 use std::io;
 use std::io::Write;

@@ -240,39 +240,54 @@ pub fn get_base_tree<'a>(c: &'a Connection) -> StratisResult<Tree<MethodFn<'a>>>
     let base_tree = f.tree();
 
     let listpools_method = f.method(LIST_POOLS, move |m, _, _| { listpools(m) })
-         .in_arg(("poolname", "s"))
-         .in_arg(("devlist", "as"))
-         .in_arg(("raidtype", "i"))
-         .out_arg(("object_name", "s"))
+         .out_arg(("pool_names", "as"))
          .out_arg(("return_code", "i"))
          .out_arg(("return_string", "s"));
         
     let createpool_method = f.method(CREATE_POOL, move |m, _, _| { createpool(m) })
-         .in_arg(("name", "s"));
+         .in_arg(("pool_name", "s"))
+         .in_arg(("dev_list", "as"))
+         .in_arg(("raid_type", "i"))
+         .out_arg(("object_path", "s"))
+         .out_arg(("return_code", "i"))
+         .out_arg(("return_string", "s"));
           
     let destroypool_method = f.method(DESTROY_POOL, move |m, _, _| { destroypool(m) })
-         .in_arg(("name", "s"));
+         .in_arg(("pool_name", "s"))         
+         .out_arg(("object_path", "s"))
+         .out_arg(("return_code", "i"))
+         .out_arg(("return_string", "s"));
          
     let getpoolobjectpath_method = f.method(GET_POOL_OBJECT_PATH, move |m, _, _| { getpoolobjectpath(m) })
-         .in_arg(("name", "s"));
+          .in_arg(("pool_name", "s"))         
+         .out_arg(("object_path", "s"))
+         .out_arg(("return_code", "i"))
+         .out_arg(("return_string", "s"));
          
     let getvolumeobjectpath_method = f.method(GET_VOLUME_OBJECT_PATH, move |m, _, _| { getvolumeobjectpath(m) })
-         .in_arg(("name", "s"));
+         .in_arg(("pool_name", "s"))
+         .in_arg(("volume_name", "s"))         
+         .out_arg(("object_path", "s"))
+         .out_arg(("return_code", "i"))
+         .out_arg(("return_string", "s"));
     
     let getdevobjectpath_method = f.method(GET_DEV_OBJECT_PATH, move |m, _, _| { getdevobjectpath(m) })
-         .in_arg(("name", "s"));
+         .in_arg(("dev_name", "s"))        
+         .out_arg(("object_path", "s"))
+         .out_arg(("return_code", "i"))
+         .out_arg(("return_string", "s"));
     
     let getcacheobjectpath_method = f.method(GET_CACHE_OBJECT_PATH, move |m, _, _| { getcacheobjectpath(m) })
-         .in_arg(("name", "s"));
+         .in_arg(("cache_dev_name", "s"))        
+         .out_arg(("object_path", "s"))
+         .out_arg(("return_code", "i"))
+         .out_arg(("return_string", "s"));
     
-    let geterrorcodes_method = f.method(GET_ERROR_CODES, move |m, _, _| { geterrorcodes(m) })
-         .in_arg(("name", "s"));
+    let geterrorcodes_method = f.method(GET_ERROR_CODES, move |m, _, _| { geterrorcodes(m) });
     
-    let getraidlevels_method = f.method(GET_RAID_LEVELS, move |m, _, _| { getraidlevels(m) })
-         .in_arg(("name", "s"));
+    let getraidlevels_method = f.method(GET_RAID_LEVELS, move |m, _, _| { getraidlevels(m) });
     
-    let getdevtypes_method = f.method(GET_DEV_TYPES, move |m, _, _| { getdevtypes(m) })
-         .in_arg(("name", "s"));
+    let getdevtypes_method = f.method(GET_DEV_TYPES, move |m, _, _| { getdevtypes(m) });
 
 
 

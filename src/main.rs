@@ -40,7 +40,7 @@ mod types;
 mod consts;
 mod stratis;
 mod dmdevice;
-mod util; 
+mod util;
 mod dbus_api;
 mod blockdev;
 mod filesystem;
@@ -407,7 +407,7 @@ fn dump_meta(args: &ArgMatches) -> StratisResult<()> {
 }
 
 fn dbus_server() -> StratisResult<()> {
-	
+
     let c = try!(Connection::Stratis_connect());
 
     // We can't change a tree from within the tree. So instead
@@ -454,8 +454,8 @@ fn write_err(err: StratisError) -> StratisResult<()> {
 }
 
 fn main() {
-	
-	let r = dbus_server();
+
+    let r = dbus_server();
 
     if let Err(r) = r {
         if let Err(e) = write_err(r) {

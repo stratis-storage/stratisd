@@ -6,9 +6,9 @@ pub const SECTOR_SIZE: u64 = 512;
 
 pub const  STRATIS_VERSION: &'static str = "1";
 pub const  MANAGER_NAME:  &'static str = "/Manager";
-pub const  STRATIS_BASE_PATH:  &'static str = "/org/storage/stratis";
+pub const  STRATIS_BASE_PATH:  &'static str = "/org/storage/stratis1";
 pub const  STRATIS_BASE_SERVICE:  &'static str = "org.storage.stratis1";
-pub const  STRATIS_BASE_MANAGER:  &'static str = STRATIS_BASE_PATH;
+pub const  STRATIS_BASE_MANAGER:  &'static str = "/org/storage/stratis1/Manager";
 pub const  STRATIS_MANAGER_INTERFACE: &'static str = "org.storage.stratis1.Manager";
 pub const  STRATIS_POOL_BASE_INTERFACE: &'static str = "org.storage.stratis1.pool";
 pub const  STRATIS_VOLUME_BASE_INTERFACE: &'static str = "org.storage.stratis1.volume";

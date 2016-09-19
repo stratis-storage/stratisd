@@ -44,154 +44,61 @@ impl<'a> DbusContext<'a> {
 }
 
 fn listpools(m: &Message) -> MethodResult {
-    let mut items = m.get_items();
-    if items.len() < 1 {
-        return Err(MethodErr::no_arg());
-    }
-
-    let name = try!(items.pop()
-        .ok_or_else(MethodErr::no_arg)
-        .and_then(|i| {
-            i.inner::<&str>()
-                .map_err(|_| MethodErr::invalid_arg(&i))
-                .map(|i| i.to_owned())
-        }));
-
-    println!("method called");
-
+	
+    m.method_return().append2("pool1", StratisErrorEnum::STRATIS_OK as i32);
+	m.method_return().append2("pool2", StratisErrorEnum::STRATIS_OK as i32);
+	m.method_return().append2("pool3", StratisErrorEnum::STRATIS_OK as i32);
+	m.method_return().append2("pool4", StratisErrorEnum::STRATIS_OK as i32);
+	m.method_return().append2("pool5", StratisErrorEnum::STRATIS_OK as i32);
     Ok(vec![m.method_return()])
 }
 
 fn createpool(m: &Message) -> MethodResult {
-    let mut items = m.get_items();
-    if items.len() < 1 {
-        return Err(MethodErr::no_arg());
-    }
 
-    let name = try!(items.pop()
-        .ok_or_else(MethodErr::no_arg)
-        .and_then(|i| {
-            i.inner::<&str>()
-                .map_err(|_| MethodErr::invalid_arg(&i))
-                .map(|i| i.to_owned())
-        }));
 
-    println!("method called");
-
-    Ok(vec![m.method_return()])
+    Ok(vec![m.method_return().append3("/dbus/pool/path", 0, "Ok")])
 }
 
 fn destroypool(m: &Message) -> MethodResult {
-    let mut items = m.get_items();
-    if items.len() < 1 {
-        return Err(MethodErr::no_arg());
-    }
-
-    let name = try!(items.pop()
-        .ok_or_else(MethodErr::no_arg)
-        .and_then(|i| {
-            i.inner::<&str>()
-                .map_err(|_| MethodErr::invalid_arg(&i))
-                .map(|i| i.to_owned())
-        }));
-
-    println!("method called");
-
-    Ok(vec![m.method_return()])
+	
+   Ok(vec![m.method_return().append3("/dbus/pool/path", 0, "Ok")])
 }
 
 fn getpoolobjectpath(m: &Message) -> MethodResult {
-    let mut items = m.get_items();
-    if items.len() < 1 {
-        return Err(MethodErr::no_arg());
-    }
-
-    let name = try!(items.pop()
-        .ok_or_else(MethodErr::no_arg)
-        .and_then(|i| {
-            i.inner::<&str>()
-                .map_err(|_| MethodErr::invalid_arg(&i))
-                .map(|i| i.to_owned())
-        }));
-
-    println!("method called");
-
-    Ok(vec![m.method_return()])
+	
+   Ok(vec![m.method_return().append3("/dbus/pool/path", 0, "Ok")])
 }
 
 fn getvolumeobjectpath(m: &Message) -> MethodResult {
-    let mut items = m.get_items();
-    if items.len() < 1 {
-        return Err(MethodErr::no_arg());
-    }
-
-    let name = try!(items.pop()
-        .ok_or_else(MethodErr::no_arg)
-        .and_then(|i| {
-            i.inner::<&str>()
-                .map_err(|_| MethodErr::invalid_arg(&i))
-                .map(|i| i.to_owned())
-        }));
-
-    println!("method called");
-
-    Ok(vec![m.method_return()])
+   Ok(vec![m.method_return().append3("/dbus/volume/path", 0, "Ok")])
 }
 
 fn getdevobjectpath(m: &Message) -> MethodResult {
-    let mut items = m.get_items();
-    if items.len() < 1 {
-        return Err(MethodErr::no_arg());
-    }
-
-    let name = try!(items.pop()
-        .ok_or_else(MethodErr::no_arg)
-        .and_then(|i| {
-            i.inner::<&str>()
-                .map_err(|_| MethodErr::invalid_arg(&i))
-                .map(|i| i.to_owned())
-        }));
-
-    println!("method called");
-
-    Ok(vec![m.method_return()])
+   Ok(vec![m.method_return().append3("/dbus/dev/path", 0, "Ok")])
 }
 
 fn getcacheobjectpath(m: &Message) -> MethodResult {
-    let mut items = m.get_items();
-    if items.len() < 1 {
-        return Err(MethodErr::no_arg());
-    }
-
-    let name = try!(items.pop()
-        .ok_or_else(MethodErr::no_arg)
-        .and_then(|i| {
-            i.inner::<&str>()
-                .map_err(|_| MethodErr::invalid_arg(&i))
-                .map(|i| i.to_owned())
-        }));
-
-    println!("method called");
-
-    Ok(vec![m.method_return()])
+   Ok(vec![m.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
 fn geterrorcodes(m: &Message) -> MethodResult {
-    let mut items = m.get_items();
-    if items.len() < 1 {
-        return Err(MethodErr::no_arg());
-    }
 
-    let name = try!(items.pop()
-        .ok_or_else(MethodErr::no_arg)
-        .and_then(|i| {
-            i.inner::<&str>()
-                .map_err(|_| MethodErr::invalid_arg(&i))
-                .map(|i| i.to_owned())
-        }));
-
-    println!("method called");
-
+    m.method_return().append2("STRATIS_OK", StratisErrorEnum::STRATIS_OK as i32);
+	m.method_return().append2("STRATIS_ERROR", StratisErrorEnum::STRATIS_ERROR as i32);
+	m.method_return().append2("STRATIS_NULL", StratisErrorEnum::STRATIS_NULL as i32);
+	m.method_return().append2("STRATIS_MALLOC", StratisErrorEnum::STRATIS_MALLOC as i32);
+	m.method_return().append2("STRATIS_NOTFOUND", StratisErrorEnum::STRATIS_NOTFOUND as i32);
+	m.method_return().append2("STRATIS_POOL_NOTFOUND", StratisErrorEnum::STRATIS_POOL_NOTFOUND as i32);
+	m.method_return().append2("STRATIS_VOLUME_NOTFOUND",StratisErrorEnum::STRATIS_VOLUME_NOTFOUND as i32 );
+	m.method_return().append2("STRATIS_DEV_NOTFOUND", StratisErrorEnum::STRATIS_DEV_NOTFOUND as i32);
+	m.method_return().append2("STRATIS_CACHE_NOTFOUND", StratisErrorEnum::STRATIS_CACHE_NOTFOUND as i32);
+	m.method_return().append2("STRATIS_BAD_PARAM", StratisErrorEnum::STRATIS_BAD_PARAM as i32);
+	m.method_return().append2("STRATIS_ALREADY_EXISTS", StratisErrorEnum::STRATIS_ALREADY_EXISTS as i32);
+	m.method_return().append2("STRATIS_NULL_NAME", StratisErrorEnum::STRATIS_NULL_NAME as i32);
+	m.method_return().append2("STRATIS_NO_POOLS", StratisErrorEnum::STRATIS_NO_POOLS as i32);
+	m.method_return().append2("STRATIS_LIST_FAILURE", StratisErrorEnum::STRATIS_LIST_FAILURE as i32);
+	m.method_return().append2("STRATIS_ERROR_MAX", StratisErrorEnum::STRATIS_ERROR_MAX as i32);
+	
     Ok(vec![m.method_return()])
 }
 
@@ -293,7 +200,7 @@ pub fn get_base_tree<'a>(c: &'a Connection) -> StratisResult<Tree<MethodFn<'a>>>
 
     let obj_path = f.object_path(STRATIS_BASE_PATH)
         .introspectable()
-        .add(f.interface(STRATIS_BASE_SERVICE)
+        .add(f.interface(STRATIS_MANAGER_INTERFACE)
             .add_m(listpools_method)
             .add_m(createpool_method)
             .add_m(destroypool_method)

@@ -30,7 +30,6 @@ pub const GET_DEV_TYPES: &'static str = "GetDevTypes";
 
 
 pub enum StratisErrorEnum {
-    STRATIS_OK,
     STRATIS_ERROR,
     STRATIS_NULL,
     STRATIS_MALLOC,
@@ -44,12 +43,10 @@ pub enum StratisErrorEnum {
     STRATIS_NULL_NAME,
     STRATIS_NO_POOLS,
     STRATIS_LIST_FAILURE,
-    STRATIS_ERROR_MAX,
 }
 
 
 pub enum StratisRaidType {
-    STRATIS_RAID_TYPE_UNKNOWN,
     /** Single */
     STRATIS_RAID_TYPE_SINGLE,
     /** Mirror between two disks. For 4 disks or more, they are RAID10.*/
@@ -58,5 +55,4 @@ pub enum StratisRaidType {
     STRATIS_RAID_TYPE_RAID5,
     /** Block-level striping with two distributed parities, aka, RAID-DP */
     STRATIS_RAID_TYPE_RAID6,
-    STRATIS_RAID_TYPE_MAX,
 }

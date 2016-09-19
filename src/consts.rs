@@ -30,29 +30,29 @@ pub const GET_DEV_TYPES: &'static str = "GetDevTypes";
 
 
 pub enum StratisErrorEnum {
-    STRATIS_ERROR,
-    STRATIS_NULL,
-    STRATIS_MALLOC,
-    STRATIS_NOTFOUND,
-    STRATIS_POOL_NOTFOUND,
-    STRATIS_VOLUME_NOTFOUND,
-    STRATIS_DEV_NOTFOUND,
-    STRATIS_CACHE_NOTFOUND,
-    STRATIS_BAD_PARAM,
-    STRATIS_ALREADY_EXISTS,
-    STRATIS_NULL_NAME,
-    STRATIS_NO_POOLS,
-    STRATIS_LIST_FAILURE,
+    Error,
+    Null,
+    Malloc,
+    Notfound,
+    PoolNotfound,
+    VolumeNotfound,
+    DevNotfound,
+    CacheNotfound,
+    BadParam,
+    AlreadyExists,
+    NullName,
+    NoPools,
+    ListFailure,
 }
 
 
 pub enum StratisRaidType {
     /** Single */
-    STRATIS_RAID_TYPE_SINGLE,
+    Single,
     /** Mirror between two disks. For 4 disks or more, they are RAID10.*/
-    STRATIS_RAID_TYPE_RAID1,
+    Raid1,
     /** Block-level striping with distributed parity */
-    STRATIS_RAID_TYPE_RAID5,
+    Raid5,
     /** Block-level striping with two distributed parities, aka, RAID-DP */
-    STRATIS_RAID_TYPE_RAID6,
+    Raid6,
 }

@@ -2,24 +2,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::error::Error;
 
 use dbus::{Connection, NameFlag};
-use dbus::tree::{Factory, Tree, Property, MethodFn, MethodErr, EmitsChangedSignal, Interface};
+use dbus::tree::{Factory, Tree, Property, MethodFn, MethodErr};
 use dbus::MessageItem;
 use dbus;
 use dbus::Message;
 use dbus::tree::MethodResult;
 
 use dbus_consts::*;
-use blockdev::{BlockMember, BlockDevs};
 
-
-use stratis::Stratis;
+//use stratis::Stratis;
 
 use types::{StratisResult, StratisError};
 
@@ -108,7 +102,7 @@ fn getraidlevels(m: &Message) -> MethodResult {
         return Err(MethodErr::no_arg());
     }
 
-    let name = try!(items.pop()
+    let _name = try!(items.pop()
         .ok_or_else(MethodErr::no_arg)
         .and_then(|i| {
             i.inner::<&str>()
@@ -127,7 +121,7 @@ fn getdevtypes(m: &Message) -> MethodResult {
         return Err(MethodErr::no_arg());
     }
 
-    let name = try!(items.pop()
+    let _name = try!(items.pop()
         .ok_or_else(MethodErr::no_arg)
         .and_then(|i| {
             i.inner::<&str>()

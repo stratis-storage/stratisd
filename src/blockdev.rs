@@ -2,31 +2,15 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::io::{Read, Write, ErrorKind, Seek, SeekFrom};
-use std::fs::{OpenOptions, read_dir};
-use std::path::{Path, PathBuf};
-use std::io;
-use std::rc::{Rc, Weak};
+use std::path::PathBuf;
+use std::rc::Rc;
 use std::cell::RefCell;
-use std::str::{FromStr, from_utf8};
-use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::error::Error;
-use std::cmp::min;
 
-use nix::sys::stat;
 use time::Timespec;
-use devicemapper::{DM, Device};
-use crc::crc32;
-use byteorder::{LittleEndian, ByteOrder};
-use uuid::Uuid;
-use bytesize::ByteSize;
+use devicemapper::Device;
 
-use types::{Sectors, SumSectors, SectorOffset, StratisResult, StratisError};
-use consts::*;
-use util::blkdev_size;
-use dmdevice::DmDevice;
-
+use types::{Sectors, SectorOffset};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MDA {
@@ -38,7 +22,7 @@ pub struct MDA {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlockDev {
-    pub Stratisdev_id: String,
+    pub stratisdev_id: String,
     pub dev: Device,
     pub id: String,
     pub path: PathBuf,

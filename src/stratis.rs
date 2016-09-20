@@ -1,9 +1,6 @@
 
 use dbus_api::DbusContext;
-use types::StratisResult;
-use std::borrow;
-use std::path::Path;
-use blockdev::{BlockMember, BlockDevs};
+use blockdev::BlockDevs;
 
 #[derive(Debug, Clone)]
 pub struct Stratis<'a> {

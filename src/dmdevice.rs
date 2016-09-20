@@ -3,15 +3,10 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::borrow::Borrow;
-use std::fs::OpenOptions;
-use std::io;
-use std::io::{Write, ErrorKind};
 
 use devicemapper::{DM, Device, DevId, DmFlags, DM_SUSPEND, TargetLine};
 
-use types::{StratisResult, StratisError};
-use util::blkdev_size;
-use consts::*;
+use types::StratisResult;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DmDevice {

@@ -2,13 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-
-
-#![allow(match_same_arms)] // we seem to have instances where same arms are good
-#![allow(if_not_else)]
-#![allow(similar_names)]
-#![allow(used_underscore_binding)]
-#![allow(collapsible_if)]
 #![allow(dead_code)] // only temporary, until more stuff is filled in
 
 extern crate devicemapper;
@@ -38,20 +31,18 @@ macro_rules! dbgp {
 
 mod types;
 mod consts;
+mod dbus_consts;
 mod stratis;
 mod dmdevice;
-mod util; 
+mod util;
 mod dbus_api;
 mod blockdev;
 mod filesystem;
 
-use std::io;
 use std::io::Write;
 use std::error::Error;
 use std::process::exit;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
-use std::cell::RefCell;
 use std::borrow::Cow;
 
 use bytesize::ByteSize;
@@ -60,9 +51,10 @@ use dbus::{ConnectionItem, MessageType};
 use time::{Timespec, Duration};
 
 use types::{StratisResult, StratisError, InternalError};
-use consts::{DBUS_TIMEOUT, SECTOR_SIZE};
-use stratis::Stratis;
-use clap::{App, Arg, SubCommand, ArgMatches};
+use dbus_consts::DBUS_TIMEOUT;
+use consts::SECTOR_SIZE;
+//use stratis::Stratis;
+use clap::ArgMatches;
 
 
 // We are given BlockDevs to start.
@@ -73,17 +65,17 @@ use clap::{App, Arg, SubCommand, ArgMatches};
 // From that, we allocate a ThinDev.
 
 trait StratisDbusConnection {
-    fn Stratis_connect() -> StratisResult<Connection>;
-    fn Stratis_paths(&self) -> StratisResult<Vec<String>>;
-    fn Stratis_path(&self, name: &str) -> StratisResult<String>;
+    fn stratis_connect() -> StratisResult<Connection>;
+    fn stratis_paths(&self) -> StratisResult<Vec<String>>;
+    fn stratis_path(&self, name: &str) -> StratisResult<String>;
 }
 
 impl StratisDbusConnection for Connection {
-    fn Stratis_connect() -> StratisResult<Connection> {
+    fn stratis_connect() -> StratisResult<Connection> {
         let c = try!(Connection::get_private(BusType::Session));
         Ok(c)
     }
-    fn Stratis_paths(&self) -> StratisResult<Vec<String>> {
+    fn stratis_paths(&self) -> StratisResult<Vec<String>> {
         let m = Message::new_method_call(
             "org.freedesktop.Stratis1",
             "/org/freedesktop/Stratisdevs",
@@ -92,22 +84,22 @@ impl StratisDbusConnection for Connection {
         let r = try!(self.send_with_reply_and_block(m, DBUS_TIMEOUT));
         let reply = r.get_items();
 
-        let mut Stratiss = Vec::new();
+        let mut pools = Vec::new();
         let array: &Vec<MessageItem> = FromMessageItem::from(&reply[0]).unwrap();
         for item in array {
             let (k, _) = FromMessageItem::from(item).unwrap();
             let kstr: &str = FromMessageItem::from(k).unwrap();
             if kstr != "/org/freedesktop/Stratisdevs" {
-                Stratiss.push(kstr.to_owned());
+                pools.push(kstr.to_owned());
             }
         }
-        Ok(Stratiss)
+        Ok(pools)
     }
 
-    fn Stratis_path(&self, name: &str) -> StratisResult<String> {
-        let Stratiss = try!(self.Stratis_paths());
+    fn stratis_path(&self, name: &str) -> StratisResult<String> {
+        let pools = try!(self.stratis_paths());
 
-        for fpath in &Stratiss {
+        for fpath in &pools {
             let p = Props::new(
                 self,
                 "org.freedesktop.Stratis1",
@@ -115,8 +107,8 @@ impl StratisDbusConnection for Connection {
                 "org.freedesktop.StratisDevice1",
                 DBUS_TIMEOUT);
             let item = p.get("Name").unwrap();
-            let Stratis_name: &str = FromMessageItem::from(&item).unwrap();
-            if name == Stratis_name {
+            let stratis_name: &str = FromMessageItem::from(&item).unwrap();
+            if name == stratis_name {
                 return Ok(fpath.to_owned());
             }
         }
@@ -127,10 +119,10 @@ impl StratisDbusConnection for Connection {
 }
 
 fn list(_args: &ArgMatches) -> StratisResult<()> {
-    let c = try!(Connection::Stratis_connect());
-    let Stratiss = try!(c.Stratis_paths());
+    let c = try!(Connection::stratis_connect());
+    let pools = try!(c.stratis_paths());
 
-    for fpath in &Stratiss {
+    for fpath in &pools {
         let p = Props::new(
             &c,
             "org.freedesktop.Stratis1",
@@ -145,11 +137,10 @@ fn list(_args: &ArgMatches) -> StratisResult<()> {
     Ok(())
 }
 
-#[allow(cyclomatic_complexity)]
 fn status(args: &ArgMatches) -> StratisResult<()> {
     let name = args.value_of("Stratisdevname").unwrap();
-    let c = try!(Connection::Stratis_connect());
-    let fpath = try!(c.Stratis_path(name));
+    let c = try!(Connection::stratis_connect());
+    let fpath = try!(c.stratis_path(name));
     let p = Props::new(
         &c,
         "org.freedesktop.Stratis1",
@@ -254,8 +245,8 @@ fn add(args: &ArgMatches) -> StratisResult<()> {
             }})
         .collect();
     let force = args.is_present("force");
-    let c = try!(Connection::Stratis_connect());
-    let fpath = try!(c.Stratis_path(name));
+    let c = try!(Connection::stratis_connect());
+    let fpath = try!(c.stratis_path(name));
 
     for path in dev_paths {
         let mut m = Message::new_method_call(
@@ -281,8 +272,8 @@ fn remove(args: &ArgMatches) -> StratisResult<()> {
         }
     };
     let wipe = args.is_present("wipe");
-    let c = try!(Connection::Stratis_connect());
-    let fpath = try!(c.Stratis_path(name));
+    let c = try!(Connection::stratis_connect());
+    let fpath = try!(c.stratis_path(name));
 
     let mut m = Message::new_method_call(
         "org.freedesktop.Stratis1",
@@ -308,7 +299,7 @@ fn create(args: &ArgMatches) -> StratisResult<()> {
         .collect();
     let force = args.is_present("force");
 
-    let c = try!(Connection::Stratis_connect());
+    let c = try!(Connection::stratis_connect());
 
     let mut m = Message::new_method_call(
         "org.freedesktop.Stratis1",
@@ -330,8 +321,8 @@ fn rename(args: &ArgMatches) -> StratisResult<()> {
     let old_name = args.value_of("Stratisdev_old_name").unwrap();
     let new_name = args.value_of("Stratisdev_new_name").unwrap();
 
-    let c = try!(Connection::Stratis_connect());
-    let fpath = try!(c.Stratis_path(old_name));
+    let c = try!(Connection::stratis_connect());
+    let fpath = try!(c.stratis_path(old_name));
 
     let mut m = Message::new_method_call(
         "org.freedesktop.Stratis1",
@@ -349,8 +340,8 @@ fn rename(args: &ArgMatches) -> StratisResult<()> {
 fn reshape(args: &ArgMatches) -> StratisResult<()> {
     let name = args.value_of("Stratisdev").unwrap();
 
-    let c = try!(Connection::Stratis_connect());
-    let fpath = try!(c.Stratis_path(name));
+    let c = try!(Connection::stratis_connect());
+    let fpath = try!(c.stratis_path(name));
 
     let m = Message::new_method_call(
         "org.freedesktop.Stratis1",
@@ -367,7 +358,7 @@ fn reshape(args: &ArgMatches) -> StratisResult<()> {
 fn destroy(args: &ArgMatches) -> StratisResult<()> {
     let name = args.value_of("Stratisdev").unwrap();
 
-    let c = try!(Connection::Stratis_connect());
+    let c = try!(Connection::stratis_connect());
 
     let mut m = Message::new_method_call(
         "org.freedesktop.Stratis1",
@@ -385,7 +376,7 @@ fn destroy(args: &ArgMatches) -> StratisResult<()> {
 fn teardown(args: &ArgMatches) -> StratisResult<()> {
     let name = args.value_of("Stratisdev").unwrap();
 
-    let c = try!(Connection::Stratis_connect());
+    let c = try!(Connection::stratis_connect());
 
     let mut m = Message::new_method_call(
         "org.freedesktop.Stratis1",
@@ -400,15 +391,9 @@ fn teardown(args: &ArgMatches) -> StratisResult<()> {
     Ok(())
 }
 
-fn dump_meta(args: &ArgMatches) -> StratisResult<()> {
-
-
-    Ok(())
-}
-
 fn dbus_server() -> StratisResult<()> {
-	
-    let c = try!(Connection::Stratis_connect());
+
+    let c = try!(Connection::stratis_connect());
 
     // We can't change a tree from within the tree. So instead
     // register two trees, one with Create and Destroy and another for
@@ -419,7 +404,7 @@ fn dbus_server() -> StratisResult<()> {
     // TODO: event loop needs to handle dbus and also dm events (or polling)
     // so we can extend/reshape/delay/whatever in a timely fashion
     let mut last_time = Timespec::new(0, 0);
-    for c_item in base_tree.run(&c, c.iter(1000)) {  }
+    for _ in base_tree.run(&c, c.iter(1000)) {  }
     println!("should never get here");
     for c_item in c.iter(10000) {
         if let ConnectionItem::MethodCall(ref msg) = c_item {
@@ -454,8 +439,8 @@ fn write_err(err: StratisError) -> StratisResult<()> {
 }
 
 fn main() {
-	
-	let r = dbus_server();
+
+    let r = dbus_server();
 
     if let Err(r) = r {
         if let Err(e) = write_err(r) {

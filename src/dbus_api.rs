@@ -15,9 +15,9 @@ use dbus;
 use dbus::Message;
 use dbus::tree::MethodResult;
 
+use dbus_consts::*;
 use blockdev::{BlockMember, BlockDevs};
 
-use consts::*;
 
 use stratis::Stratis;
 

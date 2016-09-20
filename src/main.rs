@@ -38,6 +38,7 @@ macro_rules! dbgp {
 
 mod types;
 mod consts;
+mod dbus_consts;
 mod stratis;
 mod dmdevice;
 mod util;
@@ -60,6 +61,8 @@ use dbus::{ConnectionItem, MessageType};
 use time::{Timespec, Duration};
 
 use types::{StratisResult, StratisError, InternalError};
+use dbus_consts::DBUS_TIMEOUT;
+use consts::SECTOR_SIZE;
 use consts::{DBUS_TIMEOUT, SECTOR_SIZE};
 use stratis::Stratis;
 use clap::{App, Arg, SubCommand, ArgMatches};

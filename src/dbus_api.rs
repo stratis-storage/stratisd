@@ -3,6 +3,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::sync::Arc;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use dbus::{Connection, NameFlag};
 use dbus::tree::{Factory, Tree, Property, MethodFn, MethodErr};
@@ -12,6 +14,7 @@ use dbus::Message;
 use dbus::tree::MethodResult;
 
 use dbus_consts::*;
+use engine::Engine;
 
 //use stratis::Stratis;
 
@@ -47,8 +50,10 @@ fn listpools(m: &Message) -> MethodResult {
     Ok(vec![m.method_return()])
 }
 
-fn createpool(m: &Message) -> MethodResult {
+fn createpool(m: &Message, engine: Rc<RefCell<Engine>>) -> MethodResult {
 
+    // create a pool but we don't know what its blockdevs are yet
+    let result = engine.borrow().create_pool("abcde", &[]);
 
     Ok(vec![m.method_return().append3("/dbus/pool/path", 0, "Ok")])
 }
@@ -133,7 +138,10 @@ fn getdevtypes(m: &Message) -> MethodResult {
 
     Ok(vec![m.method_return()])
 }
-pub fn get_base_tree<'a>(c: &'a Connection) -> StratisResult<Tree<MethodFn<'a>>> {
+pub fn get_base_tree<'a>(
+    c: &'a Connection,
+    engine: Rc<RefCell<Engine>>)
+    -> StratisResult<Tree<MethodFn<'a>>> {
     c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32).unwrap();
 
     let f = Factory::new_fn();
@@ -145,7 +153,7 @@ pub fn get_base_tree<'a>(c: &'a Connection) -> StratisResult<Tree<MethodFn<'a>>>
          .out_arg(("return_code", "i"))
          .out_arg(("return_string", "s"));
 
-    let createpool_method = f.method(CREATE_POOL, move |m, _, _| { createpool(m) })
+    let createpool_method = f.method(CREATE_POOL, move |m, _, _| { createpool(m, engine.clone()) })
          .in_arg(("pool_name", "s"))
          .in_arg(("dev_list", "as"))
          .in_arg(("raid_type", "i"))

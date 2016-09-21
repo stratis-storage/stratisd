@@ -38,6 +38,8 @@ mod util;
 mod dbus_api;
 mod blockdev;
 mod filesystem;
+mod engine;
+mod sim_engine;
 
 use std::io::Write;
 use std::error::Error;
@@ -55,7 +57,8 @@ use dbus_consts::DBUS_TIMEOUT;
 use consts::SECTOR_SIZE;
 //use stratis::Stratis;
 use clap::ArgMatches;
-
+use engine::Engine;
+use sim_engine::SimEngine;
 
 // We are given BlockDevs to start.
 // We allocate LinearDevs from each for the meta and data devices.
@@ -439,6 +442,9 @@ fn write_err(err: StratisError) -> StratisResult<()> {
 }
 
 fn main() {
+
+    let engine = SimEngine::new();
+    // TODO: add cmdline option to specify engine
 
     let r = dbus_server();
 

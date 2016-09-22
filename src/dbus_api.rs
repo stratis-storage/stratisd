@@ -11,7 +11,6 @@ use dbus::{Connection, NameFlag};
 use dbus::tree::{Factory, Tree, Property, MethodFn, MethodErr};
 use dbus::MessageItem;
 use dbus;
-use dbus::TypeSig;
 use dbus::Message;
 use dbus::tree::MethodResult;
 
@@ -88,29 +87,17 @@ fn geterrorcodes(m: &Message) -> MethodResult {
     let mut msg_vec = Vec::new();
 
     for error in StratisErrorEnum::iterator() {
-        //      m.method_return().append3(format!("{}", error),
-        // StratisErrorEnum::get_error_int(error),
-        // StratisErrorEnum::get_error_string(error));
-
-
-        // let v = MessageItem::Struct(vec![MessageItem::Int32(1),
-        // MessageItem::Str(format!("Hello")),
-        // MessageItem::Int32(3)]);
 
         let v = MessageItem::Struct(vec![MessageItem::Str(format!("{}", error)),
-                                     MessageItem::Int32(3),
+                                     MessageItem::Int32(StratisErrorEnum::get_error_int(error)),
                                      MessageItem::Str( String::from(StratisErrorEnum::get_error_string(error)))]);
 
 
         msg_vec.push(v);
 
     }
-    // let mut rv = m.method_return();
 
-    // rv.append(MessageItem::Array(msg_vec, Cow::Borrowed("(iii)")));
     let item = MessageItem::Array(msg_vec, Cow::Borrowed("(sis)"));
-
-    // Ok(vec![rv])
 
     Ok(vec![m.method_return().append1(item)])
 

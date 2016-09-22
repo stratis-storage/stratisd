@@ -38,12 +38,16 @@ mod util;
 mod dbus_api;
 mod blockdev;
 mod filesystem;
+mod engine;
+mod sim_engine;
 
 use std::io::Write;
 use std::error::Error;
 use std::process::exit;
 use std::path::{Path, PathBuf};
 use std::borrow::Cow;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use bytesize::ByteSize;
 use dbus::{Connection, BusType, Message, MessageItem, FromMessageItem, Props};
@@ -55,7 +59,8 @@ use dbus_consts::DBUS_TIMEOUT;
 use consts::SECTOR_SIZE;
 //use stratis::Stratis;
 use clap::ArgMatches;
-
+use engine::Engine;
+use sim_engine::SimEngine;
 
 // We are given BlockDevs to start.
 // We allocate LinearDevs from each for the meta and data devices.
@@ -391,7 +396,7 @@ fn teardown(args: &ArgMatches) -> StratisResult<()> {
     Ok(())
 }
 
-fn dbus_server() -> StratisResult<()> {
+fn dbus_server(engine: Rc<RefCell<Engine>>) -> StratisResult<()> {
 
     let c = try!(Connection::stratis_connect());
 
@@ -399,7 +404,7 @@ fn dbus_server() -> StratisResult<()> {
     // register two trees, one with Create and Destroy and another for
     // querying/changing active Stratisdevs/
 
-    let base_tree = try!(dbus_api::get_base_tree(&c));
+    let base_tree = try!(dbus_api::get_base_tree(&c, engine));
 
     // TODO: event loop needs to handle dbus and also dm events (or polling)
     // so we can extend/reshape/delay/whatever in a timely fashion
@@ -440,7 +445,10 @@ fn write_err(err: StratisError) -> StratisResult<()> {
 
 fn main() {
 
-    let r = dbus_server();
+    let engine = Rc::new(RefCell::new(SimEngine::new()));
+    // TODO: add cmdline option to specify engine
+
+    let r = dbus_server(engine);
 
     if let Err(r) = r {
         if let Err(e) = write_err(r) {

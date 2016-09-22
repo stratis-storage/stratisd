@@ -1,11 +1,14 @@
 
+use std::fmt;
+use std::slice::Iter;
+
 pub const DBUS_TIMEOUT: i32 = 20000; // millieconds
 
 pub const STRATIS_VERSION: &'static str = "1";
-pub const MANAGER_NAME:  &'static str = "/Manager";
-pub const STRATIS_BASE_PATH:  &'static str = "/org/storage/stratis1";
-pub const STRATIS_BASE_SERVICE:  &'static str = "org.storage.stratis1";
-pub const STRATIS_BASE_MANAGER:  &'static str = "/org/storage/stratis1/Manager";
+pub const MANAGER_NAME: &'static str = "/Manager";
+pub const STRATIS_BASE_PATH: &'static str = "/org/storage/stratis1";
+pub const STRATIS_BASE_SERVICE: &'static str = "org.storage.stratis1";
+pub const STRATIS_BASE_MANAGER: &'static str = "/org/storage/stratis1/Manager";
 pub const STRATIS_MANAGER_INTERFACE: &'static str = "org.storage.stratis1.Manager";
 pub const STRATIS_POOL_BASE_INTERFACE: &'static str = "org.storage.stratis1.pool";
 pub const STRATIS_VOLUME_BASE_INTERFACE: &'static str = "org.storage.stratis1.volume";
@@ -25,13 +28,12 @@ pub const GET_ERROR_CODES: &'static str = "GetErrorCodes";
 pub const GET_RAID_LEVELS: &'static str = "GetRaidLevels";
 pub const GET_DEV_TYPES: &'static str = "GetDevTypes";
 
-
+#[derive(Copy, Clone)]
 #[allow(non_camel_case_types)]
 pub enum StratisErrorEnum {
     STRATIS_OK,
     STRATIS_ERROR,
     STRATIS_NULL,
-    STRATIS_MALLOC,
     STRATIS_NOTFOUND,
     STRATIS_POOL_NOTFOUND,
     STRATIS_VOLUME_NOTFOUND,
@@ -42,9 +44,68 @@ pub enum StratisErrorEnum {
     STRATIS_NULL_NAME,
     STRATIS_NO_POOLS,
     STRATIS_LIST_FAILURE,
-    STRATIS_ERROR_MAX,
 }
 
+impl StratisErrorEnum {
+    pub fn iterator() -> Iter<'static, StratisErrorEnum> {
+        static DIRECTIONS: [StratisErrorEnum; 13] = [StratisErrorEnum::STRATIS_OK,
+                                                     StratisErrorEnum::STRATIS_ERROR,
+                                                     StratisErrorEnum::STRATIS_NULL,
+                                                     StratisErrorEnum::STRATIS_NOTFOUND,
+                                                     StratisErrorEnum::STRATIS_POOL_NOTFOUND,
+                                                     StratisErrorEnum::STRATIS_VOLUME_NOTFOUND,
+                                                     StratisErrorEnum::STRATIS_DEV_NOTFOUND,
+                                                     StratisErrorEnum::STRATIS_CACHE_NOTFOUND,
+                                                     StratisErrorEnum::STRATIS_BAD_PARAM,
+                                                     StratisErrorEnum::STRATIS_ALREADY_EXISTS,
+                                                     StratisErrorEnum::STRATIS_NULL_NAME,
+                                                     StratisErrorEnum::STRATIS_NO_POOLS,
+                                                     StratisErrorEnum::STRATIS_LIST_FAILURE];
+        DIRECTIONS.into_iter()
+    }
+
+    pub fn get_error_int(error: &StratisErrorEnum) -> i32 {
+        *error as i32
+    }
+
+    pub fn get_error_string(error: &StratisErrorEnum) -> &str {
+        match *error {
+            // TODO deal with internationalization/do this better
+            StratisErrorEnum::STRATIS_OK => "Ok",
+            StratisErrorEnum::STRATIS_ERROR => "A general error happened",
+            StratisErrorEnum::STRATIS_NULL => "Null parameter was supplied",
+            StratisErrorEnum::STRATIS_NOTFOUND => "Not found",
+            StratisErrorEnum::STRATIS_POOL_NOTFOUND => "Pool not found",
+            StratisErrorEnum::STRATIS_VOLUME_NOTFOUND => "Volume not found",
+            StratisErrorEnum::STRATIS_CACHE_NOTFOUND => "Cache not found",
+            StratisErrorEnum::STRATIS_BAD_PARAM => "Bad parameter",
+            StratisErrorEnum::STRATIS_DEV_NOTFOUND => "Dev not found",
+            StratisErrorEnum::STRATIS_ALREADY_EXISTS => "Already exists",
+            StratisErrorEnum::STRATIS_NULL_NAME => "Null name supplied",
+            StratisErrorEnum::STRATIS_NO_POOLS => "No pools",
+            StratisErrorEnum::STRATIS_LIST_FAILURE => "List operation failure.",
+        }
+    }
+}
+impl fmt::Display for StratisErrorEnum {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            StratisErrorEnum::STRATIS_OK => write!(f, "STRATIS_OK"),
+            StratisErrorEnum::STRATIS_ERROR => write!(f, "STRATIS_ERROR"),
+            StratisErrorEnum::STRATIS_NULL => write!(f, "STRATIS_NULL"),
+            StratisErrorEnum::STRATIS_NOTFOUND => write!(f, "STRATIS_NOTFOUND"),
+            StratisErrorEnum::STRATIS_POOL_NOTFOUND => write!(f, "STRATIS_POOL_NOTFOUND"),
+            StratisErrorEnum::STRATIS_VOLUME_NOTFOUND => write!(f, "STRATIS_VOLUME_NOTFOUND"),
+            StratisErrorEnum::STRATIS_CACHE_NOTFOUND => write!(f, "STRATIS_CACHE_NOTFOUND"),
+            StratisErrorEnum::STRATIS_BAD_PARAM => write!(f, "STRATIS_BAD_PARAM"),
+            StratisErrorEnum::STRATIS_DEV_NOTFOUND => write!(f, "STRATIS_DEV_NOTFOUND"),
+            StratisErrorEnum::STRATIS_ALREADY_EXISTS => write!(f, "STRATIS_ALREADY_EXISTS"),
+            StratisErrorEnum::STRATIS_NULL_NAME => write!(f, "STRATIS_NULL_NAME"),
+            StratisErrorEnum::STRATIS_NO_POOLS => write!(f, "STRATIS_NO_POOLS"),
+            StratisErrorEnum::STRATIS_LIST_FAILURE => write!(f, "STRATIS_LIST_FAILURE"),
+        }
+    }
+}
 
 #[allow(non_camel_case_types)]
 pub enum StratisRaidType {

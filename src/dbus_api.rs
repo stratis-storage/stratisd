@@ -5,18 +5,20 @@
 use std::sync::Arc;
 use std::rc::Rc;
 use std::cell::RefCell;
-
+use std::borrow::Cow;
+use std::string::String;
 use dbus::{Connection, NameFlag};
 use dbus::tree::{Factory, Tree, Property, MethodFn, MethodErr};
 use dbus::MessageItem;
 use dbus;
+use dbus::TypeSig;
 use dbus::Message;
 use dbus::tree::MethodResult;
 
 use dbus_consts::*;
 use engine::Engine;
 
-//use stratis::Stratis;
+// use stratis::Stratis;
 
 use types::{StratisResult, StratisError};
 
@@ -41,12 +43,12 @@ impl<'a> DbusContext<'a> {
 }
 
 fn listpools(m: &Message) -> MethodResult {
-	
+
     m.method_return().append2("pool1", StratisErrorEnum::STRATIS_OK as i32);
-	m.method_return().append2("pool2", StratisErrorEnum::STRATIS_OK as i32);
-	m.method_return().append2("pool3", StratisErrorEnum::STRATIS_OK as i32);
-	m.method_return().append2("pool4", StratisErrorEnum::STRATIS_OK as i32);
-	m.method_return().append2("pool5", StratisErrorEnum::STRATIS_OK as i32);
+    m.method_return().append2("pool2", StratisErrorEnum::STRATIS_OK as i32);
+    m.method_return().append2("pool3", StratisErrorEnum::STRATIS_OK as i32);
+    m.method_return().append2("pool4", StratisErrorEnum::STRATIS_OK as i32);
+    m.method_return().append2("pool5", StratisErrorEnum::STRATIS_OK as i32);
     Ok(vec![m.method_return()])
 }
 
@@ -59,47 +61,61 @@ fn createpool(m: &Message, engine: Rc<RefCell<Engine>>) -> MethodResult {
 }
 
 fn destroypool(m: &Message) -> MethodResult {
-	
-   Ok(vec![m.method_return().append3("/dbus/pool/path", 0, "Ok")])
+
+    Ok(vec![m.method_return().append3("/dbus/pool/path", 0, "Ok")])
 }
 
 fn getpoolobjectpath(m: &Message) -> MethodResult {
-	
-   Ok(vec![m.method_return().append3("/dbus/pool/path", 0, "Ok")])
+
+    Ok(vec![m.method_return().append3("/dbus/pool/path", 0, "Ok")])
 }
 
 fn getvolumeobjectpath(m: &Message) -> MethodResult {
-   Ok(vec![m.method_return().append3("/dbus/volume/path", 0, "Ok")])
+    Ok(vec![m.method_return().append3("/dbus/volume/path", 0, "Ok")])
 }
 
 fn getdevobjectpath(m: &Message) -> MethodResult {
-   Ok(vec![m.method_return().append3("/dbus/dev/path", 0, "Ok")])
+    Ok(vec![m.method_return().append3("/dbus/dev/path", 0, "Ok")])
 }
 
 fn getcacheobjectpath(m: &Message) -> MethodResult {
-   Ok(vec![m.method_return().append3("/dbus/cache/path", 0, "Ok")])
+    Ok(vec![m.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
+
 
 fn geterrorcodes(m: &Message) -> MethodResult {
 
-    m.method_return().append2("STRATIS_OK", StratisErrorEnum::STRATIS_OK as i32);
-	m.method_return().append2("STRATIS_ERROR", StratisErrorEnum::STRATIS_ERROR as i32);
-	m.method_return().append2("STRATIS_NULL", StratisErrorEnum::STRATIS_NULL as i32);
-	m.method_return().append2("STRATIS_MALLOC", StratisErrorEnum::STRATIS_MALLOC as i32);
-	m.method_return().append2("STRATIS_NOTFOUND", StratisErrorEnum::STRATIS_NOTFOUND as i32);
-	m.method_return().append2("STRATIS_POOL_NOTFOUND", StratisErrorEnum::STRATIS_POOL_NOTFOUND as i32);
-	m.method_return().append2("STRATIS_VOLUME_NOTFOUND",StratisErrorEnum::STRATIS_VOLUME_NOTFOUND as i32 );
-	m.method_return().append2("STRATIS_DEV_NOTFOUND", StratisErrorEnum::STRATIS_DEV_NOTFOUND as i32);
-	m.method_return().append2("STRATIS_CACHE_NOTFOUND", StratisErrorEnum::STRATIS_CACHE_NOTFOUND as i32);
-	m.method_return().append2("STRATIS_BAD_PARAM", StratisErrorEnum::STRATIS_BAD_PARAM as i32);
-	m.method_return().append2("STRATIS_ALREADY_EXISTS", StratisErrorEnum::STRATIS_ALREADY_EXISTS as i32);
-	m.method_return().append2("STRATIS_NULL_NAME", StratisErrorEnum::STRATIS_NULL_NAME as i32);
-	m.method_return().append2("STRATIS_NO_POOLS", StratisErrorEnum::STRATIS_NO_POOLS as i32);
-	m.method_return().append2("STRATIS_LIST_FAILURE", StratisErrorEnum::STRATIS_LIST_FAILURE as i32);
-	m.method_return().append2("STRATIS_ERROR_MAX", StratisErrorEnum::STRATIS_ERROR_MAX as i32);
-	
-    Ok(vec![m.method_return()])
+    let mut msg_vec = Vec::new();
+
+    for error in StratisErrorEnum::iterator() {
+        //      m.method_return().append3(format!("{}", error),
+        // StratisErrorEnum::get_error_int(error),
+        // StratisErrorEnum::get_error_string(error));
+
+
+        // let v = MessageItem::Struct(vec![MessageItem::Int32(1),
+        // MessageItem::Str(format!("Hello")),
+        // MessageItem::Int32(3)]);
+
+        let v = MessageItem::Struct(vec![MessageItem::Str(format!("{}", error)),
+                                     MessageItem::Int32(3),
+                                     MessageItem::Str( String::from(StratisErrorEnum::get_error_string(error)))]);
+
+
+        msg_vec.push(v);
+
+    }
+    // let mut rv = m.method_return();
+
+    // rv.append(MessageItem::Array(msg_vec, Cow::Borrowed("(iii)")));
+    let item = MessageItem::Array(msg_vec, Cow::Borrowed("(sis)"));
+
+    // Ok(vec![rv])
+
+    Ok(vec![m.method_return().append1(item)])
+
 }
+
 
 fn getraidlevels(m: &Message) -> MethodResult {
     let mut items = m.get_items();
@@ -138,65 +154,68 @@ fn getdevtypes(m: &Message) -> MethodResult {
 
     Ok(vec![m.method_return()])
 }
-pub fn get_base_tree<'a>(
-    c: &'a Connection,
-    engine: Rc<RefCell<Engine>>)
-    -> StratisResult<Tree<MethodFn<'a>>> {
+pub fn get_base_tree<'a>(c: &'a Connection,
+                         engine: Rc<RefCell<Engine>>)
+                         -> StratisResult<Tree<MethodFn<'a>>> {
     c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32).unwrap();
 
     let f = Factory::new_fn();
 
     let base_tree = f.tree();
 
-    let listpools_method = f.method(LIST_POOLS, move |m, _, _| { listpools(m) })
-         .out_arg(("pool_names", "as"))
-         .out_arg(("return_code", "i"))
-         .out_arg(("return_string", "s"));
+    let listpools_method = f.method(LIST_POOLS, move |m, _, _| listpools(m))
+        .out_arg(("pool_names", "as"))
+        .out_arg(("return_code", "i"))
+        .out_arg(("return_string", "s"));
 
-    let createpool_method = f.method(CREATE_POOL, move |m, _, _| { createpool(m, engine.clone()) })
-         .in_arg(("pool_name", "s"))
-         .in_arg(("dev_list", "as"))
-         .in_arg(("raid_type", "i"))
-         .out_arg(("object_path", "s"))
-         .out_arg(("return_code", "i"))
-         .out_arg(("return_string", "s"));
+    let createpool_method = f.method(CREATE_POOL, move |m, _, _| createpool(m, engine.clone()))
+        .in_arg(("pool_name", "s"))
+        .in_arg(("dev_list", "as"))
+        .in_arg(("raid_type", "i"))
+        .out_arg(("object_path", "s"))
+        .out_arg(("return_code", "i"))
+        .out_arg(("return_string", "s"));
 
-    let destroypool_method = f.method(DESTROY_POOL, move |m, _, _| { destroypool(m) })
-         .in_arg(("pool_name", "s"))
-         .out_arg(("object_path", "s"))
-         .out_arg(("return_code", "i"))
-         .out_arg(("return_string", "s"));
+    let destroypool_method = f.method(DESTROY_POOL, move |m, _, _| destroypool(m))
+        .in_arg(("pool_name", "s"))
+        .out_arg(("object_path", "s"))
+        .out_arg(("return_code", "i"))
+        .out_arg(("return_string", "s"));
 
-    let getpoolobjectpath_method = f.method(GET_POOL_OBJECT_PATH, move |m, _, _| { getpoolobjectpath(m) })
-          .in_arg(("pool_name", "s"))
-         .out_arg(("object_path", "s"))
-         .out_arg(("return_code", "i"))
-         .out_arg(("return_string", "s"));
+    let getpoolobjectpath_method =
+        f.method(GET_POOL_OBJECT_PATH, move |m, _, _| getpoolobjectpath(m))
+            .in_arg(("pool_name", "s"))
+            .out_arg(("object_path", "s"))
+            .out_arg(("return_code", "i"))
+            .out_arg(("return_string", "s"));
 
-    let getvolumeobjectpath_method = f.method(GET_VOLUME_OBJECT_PATH, move |m, _, _| { getvolumeobjectpath(m) })
-         .in_arg(("pool_name", "s"))
-         .in_arg(("volume_name", "s"))
-         .out_arg(("object_path", "s"))
-         .out_arg(("return_code", "i"))
-         .out_arg(("return_string", "s"));
+    let getvolumeobjectpath_method = f.method(GET_VOLUME_OBJECT_PATH,
+                move |m, _, _| getvolumeobjectpath(m))
+        .in_arg(("pool_name", "s"))
+        .in_arg(("volume_name", "s"))
+        .out_arg(("object_path", "s"))
+        .out_arg(("return_code", "i"))
+        .out_arg(("return_string", "s"));
 
-    let getdevobjectpath_method = f.method(GET_DEV_OBJECT_PATH, move |m, _, _| { getdevobjectpath(m) })
-         .in_arg(("dev_name", "s"))
-         .out_arg(("object_path", "s"))
-         .out_arg(("return_code", "i"))
-         .out_arg(("return_string", "s"));
+    let getdevobjectpath_method = f.method(GET_DEV_OBJECT_PATH, move |m, _, _| getdevobjectpath(m))
+        .in_arg(("dev_name", "s"))
+        .out_arg(("object_path", "s"))
+        .out_arg(("return_code", "i"))
+        .out_arg(("return_string", "s"));
 
-    let getcacheobjectpath_method = f.method(GET_CACHE_OBJECT_PATH, move |m, _, _| { getcacheobjectpath(m) })
-         .in_arg(("cache_dev_name", "s"))
-         .out_arg(("object_path", "s"))
-         .out_arg(("return_code", "i"))
-         .out_arg(("return_string", "s"));
+    let getcacheobjectpath_method =
+        f.method(GET_CACHE_OBJECT_PATH, move |m, _, _| getcacheobjectpath(m))
+            .in_arg(("cache_dev_name", "s"))
+            .out_arg(("object_path", "s"))
+            .out_arg(("return_code", "i"))
+            .out_arg(("return_string", "s"));
 
-    let geterrorcodes_method = f.method(GET_ERROR_CODES, move |m, _, _| { geterrorcodes(m) });
+    let geterrorcodes_method = f.method(GET_ERROR_CODES, move |m, _, _| geterrorcodes(m))
+        .out_arg(("error_codes", "a(sis)"));
 
-    let getraidlevels_method = f.method(GET_RAID_LEVELS, move |m, _, _| { getraidlevels(m) });
+    let getraidlevels_method = f.method(GET_RAID_LEVELS, move |m, _, _| getraidlevels(m));
 
-    let getdevtypes_method = f.method(GET_DEV_TYPES, move |m, _, _| { getdevtypes(m) });
+    let getdevtypes_method = f.method(GET_DEV_TYPES, move |m, _, _| getdevtypes(m));
 
 
 

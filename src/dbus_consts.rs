@@ -48,20 +48,20 @@ pub enum StratisErrorEnum {
 
 impl StratisErrorEnum {
     pub fn iterator() -> Iter<'static, StratisErrorEnum> {
-        static DIRECTIONS: [StratisErrorEnum; 13] = [StratisErrorEnum::STRATIS_OK,
-                                                     StratisErrorEnum::STRATIS_ERROR,
-                                                     StratisErrorEnum::STRATIS_NULL,
-                                                     StratisErrorEnum::STRATIS_NOTFOUND,
-                                                     StratisErrorEnum::STRATIS_POOL_NOTFOUND,
-                                                     StratisErrorEnum::STRATIS_VOLUME_NOTFOUND,
-                                                     StratisErrorEnum::STRATIS_DEV_NOTFOUND,
-                                                     StratisErrorEnum::STRATIS_CACHE_NOTFOUND,
-                                                     StratisErrorEnum::STRATIS_BAD_PARAM,
-                                                     StratisErrorEnum::STRATIS_ALREADY_EXISTS,
-                                                     StratisErrorEnum::STRATIS_NULL_NAME,
-                                                     StratisErrorEnum::STRATIS_NO_POOLS,
-                                                     StratisErrorEnum::STRATIS_LIST_FAILURE];
-        DIRECTIONS.into_iter()
+        static CODES: [StratisErrorEnum; 13] = [StratisErrorEnum::STRATIS_OK,
+                                                StratisErrorEnum::STRATIS_ERROR,
+                                                StratisErrorEnum::STRATIS_NULL,
+                                                StratisErrorEnum::STRATIS_NOTFOUND,
+                                                StratisErrorEnum::STRATIS_POOL_NOTFOUND,
+                                                StratisErrorEnum::STRATIS_VOLUME_NOTFOUND,
+                                                StratisErrorEnum::STRATIS_DEV_NOTFOUND,
+                                                StratisErrorEnum::STRATIS_CACHE_NOTFOUND,
+                                                StratisErrorEnum::STRATIS_BAD_PARAM,
+                                                StratisErrorEnum::STRATIS_ALREADY_EXISTS,
+                                                StratisErrorEnum::STRATIS_NULL_NAME,
+                                                StratisErrorEnum::STRATIS_NO_POOLS,
+                                                StratisErrorEnum::STRATIS_LIST_FAILURE];
+        CODES.into_iter()
     }
 
     pub fn get_error_int(error: &StratisErrorEnum) -> u16 {
@@ -106,7 +106,7 @@ impl fmt::Display for StratisErrorEnum {
         }
     }
 }
-
+#[derive(Copy, Clone)]
 #[allow(non_camel_case_types)]
 pub enum StratisRaidType {
     STRATIS_RAID_TYPE_UNKNOWN,
@@ -118,5 +118,47 @@ pub enum StratisRaidType {
     STRATIS_RAID_TYPE_RAID5,
     /** Block-level striping with two distributed parities, aka, RAID-DP */
     STRATIS_RAID_TYPE_RAID6,
-    STRATIS_RAID_TYPE_MAX,
+}
+
+impl StratisRaidType {
+    pub fn iterator() -> Iter<'static, StratisRaidType> {
+        static TYPES: [StratisRaidType; 5] = [StratisRaidType::STRATIS_RAID_TYPE_UNKNOWN,
+                                              StratisRaidType::STRATIS_RAID_TYPE_SINGLE,
+                                              StratisRaidType::STRATIS_RAID_TYPE_RAID1,
+                                              StratisRaidType::STRATIS_RAID_TYPE_RAID5,
+                                              StratisRaidType::STRATIS_RAID_TYPE_RAID6];
+        TYPES.into_iter()
+    }
+
+    pub fn get_error_int(error: &StratisRaidType) -> u16 {
+        *error as u16
+    }
+
+    pub fn get_error_string(error: &StratisRaidType) -> &str {
+        match *error {
+            // TODO deal with internationalization/do this better
+            StratisRaidType::STRATIS_RAID_TYPE_UNKNOWN => "Ok",
+            StratisRaidType::STRATIS_RAID_TYPE_SINGLE => "Single",
+            StratisRaidType::STRATIS_RAID_TYPE_RAID1 => {
+                "Mirror between two disks. For 4 disks or more, they are RAID10"
+            }
+            StratisRaidType::STRATIS_RAID_TYPE_RAID5 => {
+                "Block-level striping with distributed parity"
+            }
+            StratisRaidType::STRATIS_RAID_TYPE_RAID6 => {
+                "Block-level striping with two distributed parities, aka, RAID-DP"
+            }
+        }
+    }
+}
+impl fmt::Display for StratisRaidType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            StratisRaidType::STRATIS_RAID_TYPE_UNKNOWN => write!(f, "STRATIS_RAID_TYPE_UNKNOWN"),
+            StratisRaidType::STRATIS_RAID_TYPE_SINGLE => write!(f, "STRATIS_RAID_TYPE_SINGLE"),
+            StratisRaidType::STRATIS_RAID_TYPE_RAID1 => write!(f, "STRATIS_RAID_TYPE_RAID1"),
+            StratisRaidType::STRATIS_RAID_TYPE_RAID5 => write!(f, "STRATIS_RAID_TYPE_RAID5"),
+            StratisRaidType::STRATIS_RAID_TYPE_RAID6 => write!(f, "STRATIS_RAID_TYPE_RAID6"),
+        }
+    }
 }

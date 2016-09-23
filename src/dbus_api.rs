@@ -59,6 +59,9 @@ fn createpool(m: &Message, engine: Rc<RefCell<Engine>>) -> MethodResult {
         return Err(MethodErr::no_arg());
     }
 
+    // TODO: figure out why u16 doesn't work here.  The parameter is
+    // typed as 'q' when we create the method, but it fails if we
+    // try to read the argument as u16.
     let raid_level: i32 = try!(items.pop()
         .ok_or_else(MethodErr::no_arg)
         .and_then(|i| {
@@ -80,7 +83,8 @@ fn createpool(m: &Message, engine: Rc<RefCell<Engine>>) -> MethodResult {
                 .map(|i| i.to_owned())
         }));
 
-    // TODO figure out how to convert devs to &[]
+    // TODO: figure out how to convert devs to &[], or should
+    // we be using PathBuf like Foryo does?
     let result = engine.borrow().create_pool(&name, &[], raid_level);
 
     Ok(vec![m.method_return().append3("/dbus/newpool/path", 0, "Ok")])
@@ -118,7 +122,6 @@ fn geterrorcodes(m: &Message) -> MethodResult {
                          MessageItem::UInt16(StratisErrorEnum::get_error_int(error)),
                          MessageItem::Str(String::from(StratisErrorEnum::get_error_string(error)))];
 
-
         let item = MessageItem::Struct(entry);
 
         msg_vec.push(item);
@@ -134,9 +137,23 @@ fn geterrorcodes(m: &Message) -> MethodResult {
 
 fn getraidlevels(m: &Message) -> MethodResult {
 
-    println!("method called");
+    let mut msg_vec = Vec::new();
 
-    Ok(vec![m.method_return()])
+    for raid_type in StratisRaidType::iterator() {
+
+        let entry = vec![MessageItem::Str(format!("{}", raid_type)), 
+                 MessageItem::UInt16(StratisRaidType::get_error_int(raid_type)),
+                 MessageItem::Str(String::from(StratisRaidType::get_error_string(raid_type)))];
+
+        let item = MessageItem::Struct(entry);
+
+        msg_vec.push(item);
+
+    }
+
+    let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sqs)"));
+
+    Ok(vec![m.method_return().append1(item_array)])
 }
 
 fn getdevtypes(m: &Message) -> MethodResult {
@@ -157,6 +174,7 @@ fn getdevtypes(m: &Message) -> MethodResult {
 
     Ok(vec![m.method_return()])
 }
+
 pub fn get_base_tree<'a>(c: &'a Connection,
                          engine: Rc<RefCell<Engine>>)
                          -> StratisResult<Tree<MethodFn<'a>>> {

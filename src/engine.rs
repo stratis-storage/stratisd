@@ -7,6 +7,9 @@ pub trait Pool {
 }
 
 pub trait Engine {
-    fn create_pool(&self, name: &str, blockdev_paths: &[&str]) -> StratisResult<Box<Pool>>;
+    fn create_pool(&self,
+                   name: &str,
+                   blockdev_paths: &[&str],
+                   raid_level: i32)
+                   -> StratisResult<Box<Pool>>;
 }
-

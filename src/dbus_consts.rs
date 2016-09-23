@@ -64,8 +64,8 @@ impl StratisErrorEnum {
         DIRECTIONS.into_iter()
     }
 
-    pub fn get_error_int(error: &StratisErrorEnum) -> i32 {
-        *error as i32
+    pub fn get_error_int(error: &StratisErrorEnum) -> u16 {
+        *error as u16
     }
 
     pub fn get_error_string(error: &StratisErrorEnum) -> &str {

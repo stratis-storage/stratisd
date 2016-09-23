@@ -9,18 +9,20 @@ pub struct SimEngine {
 
 impl SimEngine {
     pub fn new() -> SimEngine {
-        SimEngine {
-        }
+        SimEngine {}
     }
 }
 
 impl Engine for SimEngine {
-    fn create_pool(&self, name: &str, blockdev_paths: &[&str]) -> StratisResult<Box<Pool>> {
+    fn create_pool(&self,
+                   name: &str,
+                   blockdev_paths: &[&str],
+                   raid_level: i32)
+                   -> StratisResult<Box<Pool>> {
         println!("sim: pool created");
 
         Ok(Box::new(SimPool::new()))
     }
-
 }
 
 struct SimPool {
@@ -29,9 +31,7 @@ struct SimPool {
 
 impl SimPool {
     fn new() -> SimPool {
-        SimPool {
-            tmp: 4,
-        }
+        SimPool { tmp: 4 }
     }
 }
 

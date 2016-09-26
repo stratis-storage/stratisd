@@ -117,9 +117,7 @@ fn geterrorcodes(m: &Message) -> MethodResult {
                          MessageItem::UInt16(StratisErrorEnum::get_error_int(error)),
                          MessageItem::Str(String::from(StratisErrorEnum::get_error_string(error)))];
 
-        let item = MessageItem::Struct(entry);
-
-        msg_vec.push(item);
+        msg_vec.push(MessageItem::Struct(entry));
 
     }
 

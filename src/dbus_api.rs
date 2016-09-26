@@ -4,8 +4,10 @@
 
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::slice::Iter;
 use std::string::String;
 use std::sync::Arc;
 
@@ -116,46 +118,27 @@ fn getcacheobjectpath(m: &Message) -> MethodResult {
     Ok(vec![m.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
+fn getlistitems<T: HasCodes + Display>(m: &Message, items: &Iter<T>) -> MethodResult {
 
-fn geterrorcodes(m: &Message) -> MethodResult {
     let mut msg_vec = Vec::new();
-
-    for error in StratisErrorEnum::iterator() {
-
-        let entry = vec![MessageItem::Str(format!("{}", error)),
-                         MessageItem::UInt16(StratisErrorEnum::get_error_int(error)),
-                         MessageItem::Str(String::from(StratisErrorEnum::get_error_string(error)))];
-
+    for item in items.as_slice() {
+        let entry = vec![MessageItem::Str(format!("{}", item)),
+                         MessageItem::UInt16(item.get_error_int()),
+                         MessageItem::Str(String::from(item.get_error_string()))];
         msg_vec.push(MessageItem::Struct(entry));
-
     }
 
     let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sqs)"));
-
     Ok(vec![m.method_return().append1(item_array)])
+}
 
+fn geterrorcodes(m: &Message) -> MethodResult {
+    getlistitems(m, &StratisErrorEnum::iterator())
 }
 
 
 fn getraidlevels(m: &Message) -> MethodResult {
-
-    let mut msg_vec = Vec::new();
-
-    for raid_type in StratisRaidType::iterator() {
-
-        let entry = vec![MessageItem::Str(format!("{}", raid_type)), 
-                 MessageItem::UInt16(StratisRaidType::get_error_int(raid_type)),
-                 MessageItem::Str(String::from(StratisRaidType::get_error_string(raid_type)))];
-
-        let item = MessageItem::Struct(entry);
-
-        msg_vec.push(item);
-
-    }
-
-    let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sqs)"));
-
-    Ok(vec![m.method_return().append1(item_array)])
+    getlistitems(m, &StratisRaidType::iterator())
 }
 
 fn getdevtypes(m: &Message) -> MethodResult {

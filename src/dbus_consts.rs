@@ -31,6 +31,13 @@ pub const GET_ERROR_CODES: &'static str = "GetErrorCodes";
 pub const GET_RAID_LEVELS: &'static str = "GetRaidLevels";
 pub const GET_DEV_TYPES: &'static str = "GetDevTypes";
 
+pub trait HasCodes {
+    /// Indicates that this enum can be converted to an int or described
+    /// with a string.
+    fn get_error_int(&self) -> u16;
+    fn get_error_string(&self) -> &str;
+}
+
 #[derive(Copy, Clone)]
 #[allow(non_camel_case_types)]
 pub enum StratisErrorEnum {
@@ -66,13 +73,16 @@ impl StratisErrorEnum {
                                                 StratisErrorEnum::STRATIS_LIST_FAILURE];
         CODES.into_iter()
     }
+}
 
-    pub fn get_error_int(error: &StratisErrorEnum) -> u16 {
-        *error as u16
+
+impl HasCodes for StratisErrorEnum {
+    fn get_error_int(&self) -> u16 {
+        *self as u16
     }
 
-    pub fn get_error_string(error: &StratisErrorEnum) -> &str {
-        match *error {
+    fn get_error_string(&self) -> &str {
+        match *self {
             // TODO deal with internationalization/do this better
             StratisErrorEnum::STRATIS_OK => "Ok",
             StratisErrorEnum::STRATIS_ERROR => "A general error happened",
@@ -134,13 +144,15 @@ impl StratisRaidType {
                                               StratisRaidType::STRATIS_RAID_TYPE_RAID6];
         TYPES.into_iter()
     }
+}
 
-    pub fn get_error_int(error: &StratisRaidType) -> u16 {
-        *error as u16
+impl HasCodes for StratisRaidType {
+    fn get_error_int(&self) -> u16 {
+        *self as u16
     }
 
-    pub fn get_error_string(error: &StratisRaidType) -> &str {
-        match *error {
+    fn get_error_string(&self) -> &str {
+        match *self {
             StratisRaidType::STRATIS_RAID_TYPE_UNKNOWN => "Ok",
             StratisRaidType::STRATIS_RAID_TYPE_SINGLE => "Single",
             StratisRaidType::STRATIS_RAID_TYPE_RAID1 => {

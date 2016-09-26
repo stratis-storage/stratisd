@@ -4,6 +4,7 @@
 *.so.*
 # text editors
 *.swp
+*.bk
 # misc
 target
 .project 

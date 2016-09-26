@@ -28,7 +28,4 @@ pub enum StratisState {
     ThinFailed,
 }
 
-impl<'a> Stratis<'a> {
-
-
-}
+impl<'a> Stratis<'a> {}

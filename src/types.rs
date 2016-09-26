@@ -14,7 +14,6 @@ use dbus;
 
 pub type StratisResult<T> = Result<T, StratisError>;
 
-//
 // Use distinct 'newtype' types for sectors and sector offsets for type safety.
 // When needed, these can still be derefed to u64.
 // Derive a bunch of stuff so we can do ops on them.
@@ -29,7 +28,7 @@ custom_derive! {
 
 // `SumSectors` can be discarded once `std::iter::Sum` is stable.
 pub trait SumSectors: Iterator
-where Sectors: Add<Self::Item, Output=Sectors>
+    where Sectors: Add<Self::Item, Output = Sectors>
 {
     fn sum_sectors(self) -> Sectors
         where Self: Sized
@@ -38,10 +37,7 @@ where Sectors: Add<Self::Item, Output=Sectors>
     }
 }
 
-impl<T: Iterator> SumSectors for T
-where Sectors: Add<T::Item, Output=Sectors>
-{
-}
+impl<T: Iterator> SumSectors for T where Sectors: Add<T::Item, Output = Sectors> {}
 
 
 custom_derive! {
@@ -64,7 +60,6 @@ custom_derive! {
 }
 
 
-//
 // An error type for errors generated within Stratis
 //
 #[derive(Debug, Clone)]
@@ -99,8 +94,9 @@ impl fmt::Display for StratisError {
             StratisError::Stratis(ref err) => write!(f, "Stratis error: {}", err.0),
             StratisError::Io(ref err) => write!(f, "IO error: {}", err),
             StratisError::Nix(ref err) => write!(f, "Nix error: {}", err.errno().desc()),
-            StratisError::Dbus(ref err) => write!(
-                f, "Dbus error: {}", err.message().unwrap_or("Unknown")),
+            StratisError::Dbus(ref err) => {
+                write!(f, "Dbus error: {}", err.message().unwrap_or("Unknown"))
+            }
             StratisError::Term(ref err) => write!(f, "Term error: {}", err),
         }
     }

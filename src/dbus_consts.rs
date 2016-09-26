@@ -141,7 +141,6 @@ impl StratisRaidType {
 
     pub fn get_error_string(error: &StratisRaidType) -> &str {
         match *error {
-            // TODO deal with internationalization/do this better
             StratisRaidType::STRATIS_RAID_TYPE_UNKNOWN => "Ok",
             StratisRaidType::STRATIS_RAID_TYPE_SINGLE => "Single",
             StratisRaidType::STRATIS_RAID_TYPE_RAID1 => {

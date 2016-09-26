@@ -57,7 +57,7 @@ use time::{Timespec, Duration};
 use types::{StratisResult, StratisError, InternalError};
 use dbus_consts::DBUS_TIMEOUT;
 use consts::SECTOR_SIZE;
-//use stratis::Stratis;
+
 use clap::ArgMatches;
 use engine::Engine;
 use sim_engine::SimEngine;

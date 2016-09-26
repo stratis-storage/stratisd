@@ -90,6 +90,7 @@ impl StratisErrorEnum {
         }
     }
 }
+
 impl fmt::Display for StratisErrorEnum {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -109,6 +110,7 @@ impl fmt::Display for StratisErrorEnum {
         }
     }
 }
+
 #[derive(Copy, Clone)]
 #[allow(non_camel_case_types)]
 pub enum StratisRaidType {
@@ -154,6 +156,7 @@ impl StratisRaidType {
         }
     }
 }
+
 impl fmt::Display for StratisRaidType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {

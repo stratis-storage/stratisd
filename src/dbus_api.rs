@@ -2,20 +2,29 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::Arc;
-use std::rc::Rc;
-use std::cell::RefCell;
 use std::borrow::Cow;
-use std::string::String;
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
-use dbus::{Connection, NameFlag};
-use dbus::tree::{Factory, Tree, Property, MethodFn, MethodErr};
-use dbus::MessageItem;
+use std::rc::Rc;
+use std::string::String;
+use std::sync::Arc;
+
 use dbus;
+
+use dbus::Connection;
 use dbus::Message;
+use dbus::MessageItem;
+use dbus::NameFlag;
+
+use dbus::tree::Factory;
+use dbus::tree::MethodErr;
+use dbus::tree::MethodFn;
 use dbus::tree::MethodResult;
+use dbus::tree::Property;
+use dbus::tree::Tree;
 
 use dbus_consts::*;
+
 use engine::Engine;
 
 use types::{StratisResult, StratisError};

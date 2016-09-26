@@ -14,6 +14,6 @@ pub trait Engine {
     fn create_pool(&self,
                    name: &str,
                    blockdev_paths: &[&str],
-                   raid_level: i32)
+                   raid_level: u16)
                    -> StratisResult<Box<Pool>>;
 }

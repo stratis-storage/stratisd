@@ -18,8 +18,6 @@ use dbus::tree::MethodResult;
 use dbus_consts::*;
 use engine::Engine;
 
-// use stratis::Stratis;
-
 use types::{StratisResult, StratisError};
 
 #[derive(Debug, Clone)]
@@ -59,10 +57,7 @@ fn createpool(m: &Message, engine: Rc<RefCell<Engine>>) -> MethodResult {
         return Err(MethodErr::no_arg());
     }
 
-    // TODO: figure out why u16 doesn't work here.  The parameter is
-    // typed as 'q' when we create the method, but it fails if we
-    // try to read the argument as u16.
-    let raid_level: i32 = try!(items.pop()
+    let raid_level: u16 = try!(items.pop()
         .ok_or_else(MethodErr::no_arg)
         .and_then(|i| {
             i.inner()
@@ -122,9 +117,7 @@ fn geterrorcodes(m: &Message) -> MethodResult {
                          MessageItem::UInt16(StratisErrorEnum::get_error_int(error)),
                          MessageItem::Str(String::from(StratisErrorEnum::get_error_string(error)))];
 
-        let item = MessageItem::Struct(entry);
-
-        msg_vec.push(item);
+        msg_vec.push(MessageItem::Struct(entry));
 
     }
 
@@ -192,7 +185,7 @@ pub fn get_base_tree<'a>(c: &'a Connection,
     let createpool_method = f.method(CREATE_POOL, move |m, _, _| createpool(m, engine.clone()))
         .in_arg(("pool_name", "s"))
         .in_arg(("dev_list", "as"))
-        .in_arg(("raid_type", "i"))
+        .in_arg(("raid_type", "q"))
         .out_arg(("object_path", "s"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

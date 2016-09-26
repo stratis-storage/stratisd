@@ -18,8 +18,6 @@ use dbus::tree::MethodResult;
 use dbus_consts::*;
 use engine::Engine;
 
-// use stratis::Stratis;
-
 use types::{StratisResult, StratisError};
 
 #[derive(Debug, Clone)]

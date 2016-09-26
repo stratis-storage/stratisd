@@ -28,9 +28,7 @@ pub struct BlockDev {
     pub path: PathBuf,
     pub sectors: Sectors,
     pub mdaa: MDA,
-    pub mdab: MDA,
-    // Key is meta_dev dm name
-
+    pub mdab: MDA, // Key is meta_dev dm name
 }
 
 #[derive(Debug, Clone)]
@@ -47,25 +45,9 @@ impl BlockMember {
 }
 
 
-impl BlockDev {
-
-
-
-
-
-
-
-}
+impl BlockDev {}
 
 #[derive(Debug, Clone)]
 pub struct BlockDevs(pub BTreeMap<String, BlockMember>);
 
-impl BlockDevs {
-
-
-
-}
-
-
-
-
+impl BlockDevs {}

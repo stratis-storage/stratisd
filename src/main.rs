@@ -41,6 +41,7 @@ mod dmdevice;
 mod util;
 mod dbus_api;
 mod blockdev;
+mod pool;
 mod filesystem;
 mod engine;
 mod sim_engine;

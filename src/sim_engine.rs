@@ -3,8 +3,9 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use types::StratisResult;
-use engine::{Engine, Pool};
+use engine::Engine;
 use std::path::PathBuf;
+use pool::{Pool, StratisPool};
 
 pub struct SimEngine {
 
@@ -21,8 +22,9 @@ impl Engine for SimEngine {
                    name: &str,
                    blockdev_paths: &[PathBuf],
                    raid_level: u16)
-                   -> StratisResult<Box<Pool>> {
-        println!("sim: pool created");
+                   -> StratisResult<Box<StratisPool>> {
+
+        // let pool = Pool::new_pool(name, blockdev_paths, raid_level);
 
         Ok(Box::new(SimPool::new()))
     }
@@ -45,7 +47,7 @@ impl SimPool {
     }
 }
 
-impl Pool for SimPool {
+impl StratisPool for SimPool {
     fn add_blockdev(&mut self, path: &str) -> StratisResult<()> {
         println!("sim: pool::add_blockdev");
         Ok(())

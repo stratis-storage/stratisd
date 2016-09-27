@@ -15,17 +15,17 @@ pub struct DmDevice {
 }
 
 impl DmDevice {
-    pub fn new<T1, T2>(dm: &DM, name: &str, table: &[(u64, u64, T1, T2)])
-                  -> StratisResult<DmDevice>
+    pub fn new<T1, T2>(dm: &DM, name: &str, table: &[(u64, u64, T1, T2)]) -> StratisResult<DmDevice>
         where T1: Borrow<str>,
-              T2: Borrow<str>, {
+              T2: Borrow<str>
+    {
         let id = &DevId::Name(name);
 
         let di = match dm.device_status(id) {
             Ok(di) => {
                 dbgp!("Found {}", name);
                 di
-            },
+            }
             Err(_) => {
                 try!(dm.device_create(&name, None, DmFlags::empty()));
                 let di = try!(dm.table_load(id, table));
@@ -46,10 +46,10 @@ impl DmDevice {
         format!("{}:{}", self.dev.major, self.dev.minor)
     }
 
-    pub fn reload<T1, T2>(&self, dm: &DM, table: &[(u64, u64, T1, T2)])
-                          -> StratisResult<()>
+    pub fn reload<T1, T2>(&self, dm: &DM, table: &[(u64, u64, T1, T2)]) -> StratisResult<()>
         where T1: Borrow<str>,
-              T2: Borrow<str>, {
+              T2: Borrow<str>
+    {
         let id = &DevId::Name(&self.dm_name);
 
         try!(dm.table_load(id, table));
@@ -71,10 +71,10 @@ impl DmDevice {
         Ok(())
     }
 
-    pub fn table_load<T1, T2>(&self, dm: &DM, table: &[(u64, u64, T1, T2)])
-                              -> StratisResult<()>
+    pub fn table_load<T1, T2>(&self, dm: &DM, table: &[(u64, u64, T1, T2)]) -> StratisResult<()>
         where T1: Borrow<str>,
-              T2: Borrow<str>, {
+              T2: Borrow<str>
+    {
         try!(dm.table_load(&DevId::Name(&self.dm_name), table));
 
         Ok(())
@@ -94,8 +94,7 @@ impl DmDevice {
     }
 
     pub fn table_status(&self, dm: &DM) -> StratisResult<Vec<TargetLine>> {
-        let (_, status) = try!(
-            dm.table_status(&DevId::Name(&self.dm_name), DmFlags::empty()));
+        let (_, status) = try!(dm.table_status(&DevId::Name(&self.dm_name), DmFlags::empty()));
 
         Ok(status)
     }

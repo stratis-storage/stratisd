@@ -2,22 +2,31 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::Arc;
-use std::rc::Rc;
-use std::cell::RefCell;
 use std::borrow::Cow;
+use std::cell::RefCell;
+use std::fmt::Display;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+use std::slice::Iter;
 use std::string::String;
-use dbus::{Connection, NameFlag};
-use dbus::tree::{Factory, Tree, Property, MethodFn, MethodErr};
-use dbus::MessageItem;
+use std::sync::Arc;
+
 use dbus;
+use dbus::Connection;
 use dbus::Message;
+use dbus::MessageItem;
+use dbus::NameFlag;
+
+use dbus::tree::Factory;
+use dbus::tree::MethodErr;
+use dbus::tree::MethodFn;
 use dbus::tree::MethodResult;
+use dbus::tree::Property;
+use dbus::tree::Tree;
 
 use dbus_consts::*;
-use engine::Engine;
 
-// use stratis::Stratis;
+use engine::Engine;
 
 use types::{StratisResult, StratisError};
 
@@ -53,10 +62,7 @@ fn createpool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
         return Err(MethodErr::no_arg());
     }
 
-    // TODO: figure out why u16 doesn't work here.  The parameter is
-    // typed as 'q' when we create the method, but it fails if we
-    // try to read the argument as u16.
-    let raid_level: i32 = try!(items.pop()
+    let raid_level: u16 = try!(items.pop()
         .ok_or_else(MethodErr::no_arg)
         .and_then(|i| {
             i.inner()
@@ -122,52 +128,27 @@ fn getcacheobjectpath(m: &Message) -> MethodResult {
     Ok(vec![m.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
+fn getlistitems<T: HasCodes + Display>(m: &Message, items: &Iter<T>) -> MethodResult {
 
-fn geterrorcodes(m: &Message) -> MethodResult {
     let mut msg_vec = Vec::new();
-
-    for error in StratisErrorEnum::iterator() {
-
-        let entry = vec![MessageItem::Str(format!("{}", error)),
-                         MessageItem::UInt16(StratisErrorEnum::get_error_int(error)),
-                         MessageItem::Str(String::from(StratisErrorEnum::get_error_string(error)))];
-
-        let item = MessageItem::Struct(entry);
-
-        msg_vec.push(item);
-
+    for item in items.as_slice() {
+        let entry = vec![MessageItem::Str(format!("{}", item)),
+                         MessageItem::UInt16(item.get_error_int()),
+                         MessageItem::Str(String::from(item.get_error_string()))];
+        msg_vec.push(MessageItem::Struct(entry));
     }
 
     let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sqs)"));
-
     Ok(vec![m.method_return().append1(item_array)])
+}
 
+fn geterrorcodes(m: &Message) -> MethodResult {
+    getlistitems(m, &StratisErrorEnum::iterator())
 }
 
 
 fn getraidlevels(m: &Message) -> MethodResult {
-
-    let mut msg_vec = Vec::new();
-
-    for raid_type in StratisRaidType::iterator() {
-
-        let error_type = MessageItem::Str(format!("{}", raid_type));
-        let error_string =
-            MessageItem::Str(String::from(StratisRaidType::get_error_string(raid_type)));
-
-        let error_int = MessageItem::UInt16(StratisRaidType::get_error_int(raid_type));
-
-        let entry = vec![error_type, error_int, error_string];
-
-        let item = MessageItem::Struct(entry);
-
-        msg_vec.push(item);
-
-    }
-
-    let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sqs)"));
-
-    Ok(vec![m.method_return().append1(item_array)])
+    getlistitems(m, &StratisRaidType::iterator())
 }
 
 fn getdevtypes(m: &Message) -> MethodResult {
@@ -203,7 +184,7 @@ pub fn get_base_tree<'a>(c: &'a Connection,
     let createpool_method = f.method(CREATE_POOL, move |m, _, _| createpool(m, &engine_clone))
         .in_arg(("pool_name", "s"))
         .in_arg(("dev_list", "as"))
-        .in_arg(("raid_type", "i"))
+        .in_arg(("raid_type", "q"))
         .out_arg(("object_path", "s"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

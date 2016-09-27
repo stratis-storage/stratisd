@@ -9,6 +9,7 @@ use std::rc::Rc;
 use std::slice::Iter;
 use std::string::String;
 use std::sync::Arc;
+use std::collections::BTreeMap;
 
 use dbus;
 use dbus::Connection;
@@ -82,8 +83,6 @@ fn createpool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
                 .map(|i| i.to_owned())
         }));
 
-    // TODO: figure out how to convert devs to &[], or should
-    // we be using PathBuf like Foryo does?
     let result = engine.borrow().create_pool(&name, &[], raid_level);
 
     Ok(vec![m.method_return().append3("/dbus/newpool/path", 0, "Ok")])

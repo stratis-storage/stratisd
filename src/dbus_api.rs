@@ -5,7 +5,6 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::fmt::Display;
-use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::slice::Iter;
 use std::string::String;

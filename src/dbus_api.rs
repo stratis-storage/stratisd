@@ -7,7 +7,6 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::borrow::Cow;
 use std::string::String;
-use std::path::{Path, PathBuf};
 use dbus::{Connection, NameFlag};
 use dbus::tree::{Factory, Tree, Property, MethodFn, MethodErr};
 use dbus::MessageItem;
@@ -42,17 +41,12 @@ impl<'a> DbusContext<'a> {
     }
 }
 
-fn listpools(m: &Message) -> MethodResult {
+fn listpools(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
-    m.method_return().append2("pool1", StratisErrorEnum::STRATIS_OK as i32);
-    m.method_return().append2("pool2", StratisErrorEnum::STRATIS_OK as i32);
-    m.method_return().append2("pool3", StratisErrorEnum::STRATIS_OK as i32);
-    m.method_return().append2("pool4", StratisErrorEnum::STRATIS_OK as i32);
-    m.method_return().append2("pool5", StratisErrorEnum::STRATIS_OK as i32);
     Ok(vec![m.method_return()])
 }
 
-fn createpool(m: &Message, engine: Rc<RefCell<Engine>>) -> MethodResult {
+fn createpool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
     let mut items = m.get_items();
     if items.len() < 1 {
@@ -90,7 +84,23 @@ fn createpool(m: &Message, engine: Rc<RefCell<Engine>>) -> MethodResult {
     Ok(vec![m.method_return().append3("/dbus/newpool/path", 0, "Ok")])
 }
 
-fn destroypool(m: &Message) -> MethodResult {
+fn destroypool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
+
+    let mut items = m.get_items();
+    if items.len() < 1 {
+        return Err(MethodErr::no_arg());
+    }
+
+    // Get the name of the pool from the parameters
+    let name = try!(items.pop()
+        .ok_or_else(MethodErr::no_arg)
+        .and_then(|i| {
+            i.inner::<&str>()
+                .map_err(|_| MethodErr::invalid_arg(&i))
+                .map(|i| i.to_owned())
+        }));
+
+    let result = engine.borrow().destroy_pool(&name);
 
     Ok(vec![m.method_return().append3("/dbus/pool/path", 0, "Ok")])
 }
@@ -141,9 +151,13 @@ fn getraidlevels(m: &Message) -> MethodResult {
 
     for raid_type in StratisRaidType::iterator() {
 
-        let entry = vec![MessageItem::Str(format!("{}", raid_type)), 
-                 MessageItem::UInt16(StratisRaidType::get_error_int(raid_type)),
-                 MessageItem::Str(String::from(StratisRaidType::get_error_string(raid_type)))];
+        let error_type = MessageItem::Str(format!("{}", raid_type));
+        let error_string =
+            MessageItem::Str(String::from(StratisRaidType::get_error_string(raid_type)));
+
+        let error_int = MessageItem::UInt16(StratisRaidType::get_error_int(raid_type));
+
+        let entry = vec![error_type, error_int, error_string];
 
         let item = MessageItem::Struct(entry);
 
@@ -184,12 +198,9 @@ pub fn get_base_tree<'a>(c: &'a Connection,
 
     let base_tree = f.tree();
 
-    let listpools_method = f.method(LIST_POOLS, move |m, _, _| listpools(m))
-        .out_arg(("pool_names", "as"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
+    let engine_clone = engine.clone();
 
-    let createpool_method = f.method(CREATE_POOL, move |m, _, _| createpool(m, engine.clone()))
+    let createpool_method = f.method(CREATE_POOL, move |m, _, _| createpool(m, &engine_clone))
         .in_arg(("pool_name", "s"))
         .in_arg(("dev_list", "as"))
         .in_arg(("raid_type", "i"))
@@ -197,9 +208,18 @@ pub fn get_base_tree<'a>(c: &'a Connection,
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let destroypool_method = f.method(DESTROY_POOL, move |m, _, _| destroypool(m))
+    let engine_clone = engine.clone();
+
+    let destroypool_method = f.method(DESTROY_POOL, move |m, _, _| destroypool(m, &engine_clone))
         .in_arg(("pool_name", "s"))
         .out_arg(("object_path", "o"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
+
+    let engine_clone = engine.clone();
+
+    let listpools_method = f.method(LIST_POOLS, move |m, _, _| listpools(m, &engine_clone))
+        .out_arg(("pool_names", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

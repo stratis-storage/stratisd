@@ -23,6 +23,13 @@ impl Engine for SimEngine {
 
         Ok(Box::new(SimPool::new()))
     }
+    fn destroy_pool(&self, name: &str) -> StratisResult<()> {
+        Ok(())
+    }
+
+    fn list_pools(&self) -> StratisResult<()> {
+        Ok(())
+    }
 }
 
 struct SimPool {

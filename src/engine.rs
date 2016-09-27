@@ -12,4 +12,7 @@ pub trait Engine {
                    blockdev_paths: &[&str],
                    raid_level: i32)
                    -> StratisResult<Box<Pool>>;
+
+    fn destroy_pool(&self, name: &str) -> StratisResult<()>;
+    fn list_pools(&self) -> StratisResult<()>;
 }

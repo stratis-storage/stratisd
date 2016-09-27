@@ -133,10 +133,9 @@ fn get_list_items<T: HasCodes + Display>(m: &Message, items: &Iter<T>) -> Method
 
     let mut msg_vec = Vec::new();
     for item in items.as_slice() {
-        let entry = vec![MessageItem::Str(format!("{}", item)),
+        msg_vec.push(MessageItem::Struct(vec![MessageItem::Str(format!("{}", item)),
                          MessageItem::UInt16(item.get_error_int()),
-                         MessageItem::Str(String::from(item.get_error_string()))];
-        msg_vec.push(MessageItem::Struct(entry));
+                         MessageItem::Str(String::from(item.get_error_string()))]));
     }
 
     let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sqs)"));

@@ -5,12 +5,11 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::fmt::Display;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::slice::Iter;
 use std::string::String;
 use std::sync::Arc;
-use std::collections::BTreeMap;
 
 use dbus;
 use dbus::Connection;
@@ -28,7 +27,6 @@ use dbus::tree::Tree;
 use dbus_consts::*;
 
 use engine::Engine;
-
 use types::{StratisResult, StratisError};
 
 #[derive(Debug, Clone)]
@@ -84,7 +82,11 @@ fn createpool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
                 .map(|i| i.to_owned())
         }));
 
-    let result = engine.borrow().create_pool(&name, &[], raid_level);
+    let blockdevs = devs.into_iter()
+        .map(|x| PathBuf::from(x.inner::<&str>().unwrap()))
+        .collect::<Vec<_>>();
+
+    let result = engine.borrow().create_pool(&name, &blockdevs, raid_level);
 
     Ok(vec![m.method_return().append3("/dbus/newpool/path", 0, "Ok")])
 }

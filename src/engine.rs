@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use types::StratisResult;
+use std::path::PathBuf;
 
 pub trait Pool {
     fn add_blockdev(&mut self, path: &str) -> StratisResult<()>;
@@ -13,7 +14,7 @@ pub trait Pool {
 pub trait Engine {
     fn create_pool(&self,
                    name: &str,
-                   blockdev_paths: &[&str],
+                   blockdev_paths: &[PathBuf],
                    raid_level: u16)
                    -> StratisResult<Box<Pool>>;
 

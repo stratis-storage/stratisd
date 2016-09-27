@@ -4,7 +4,7 @@
 
 use types::StratisResult;
 use engine::{Engine, Pool};
-
+use std::path::PathBuf;
 
 pub struct SimEngine {
 
@@ -19,7 +19,7 @@ impl SimEngine {
 impl Engine for SimEngine {
     fn create_pool(&self,
                    name: &str,
-                   blockdev_paths: &[&str],
+                   blockdev_paths: &[PathBuf],
                    raid_level: u16)
                    -> StratisResult<Box<Pool>> {
         println!("sim: pool created");

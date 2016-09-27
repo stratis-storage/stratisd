@@ -34,7 +34,7 @@ impl BlockDev {
 
         let bd = BlockDev {
             stratisdev_id: blocksdev_id.to_owned(),
-            id: Uuid::new_v4().to_simple_string(),
+            id: Uuid::new_v4().to_simple_string().to_owned(),
             path: path.to_owned(),
         };
 
@@ -45,4 +45,21 @@ impl BlockDev {
 #[derive(Debug, Clone)]
 pub struct BlockDevs(pub BTreeMap<String, BlockMember>);
 
-impl BlockDevs {}
+impl BlockDevs {
+    pub fn new(blockdev_paths: &[PathBuf]) -> StratisResult<BlockDevs> {
+        let mut block_devs = BlockDevs(BTreeMap::new());
+
+        let stratis_id = Uuid::new_v4().to_simple_string();
+
+        for path in blockdev_paths {
+
+            let result = BlockDev::new(&stratis_id, path);
+            let bd = result.unwrap();
+
+            block_devs.0.insert(bd.id.clone(),
+                                BlockMember::Present(Rc::new(RefCell::new(bd))));
+        }
+
+        Ok(block_devs)
+    }
+}

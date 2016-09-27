@@ -4,19 +4,15 @@
 
 use types::StratisResult;
 use std::path::PathBuf;
+use pool::StratisPool;
 
-pub trait Pool {
-    fn add_blockdev(&mut self, path: &str) -> StratisResult<()>;
-    fn add_cachedev(&mut self, path: &str) -> StratisResult<()>;
-    fn destroy(&mut self) -> StratisResult<()>;
-}
 
 pub trait Engine {
     fn create_pool(&self,
                    name: &str,
                    blockdev_paths: &[PathBuf],
                    raid_level: u16)
-                   -> StratisResult<Box<Pool>>;
+                   -> StratisResult<Box<StratisPool>>;
 
     fn destroy_pool(&self, name: &str) -> StratisResult<()>;
     fn list_pools(&self) -> StratisResult<()>;

@@ -5,6 +5,7 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::fmt::Display;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::slice::Iter;
 use std::string::String;
@@ -26,7 +27,6 @@ use dbus::tree::Tree;
 use dbus_consts::*;
 
 use engine::Engine;
-
 use types::{StratisResult, StratisError};
 
 #[derive(Debug, Clone)]
@@ -49,12 +49,12 @@ impl<'a> DbusContext<'a> {
     }
 }
 
-fn listpools(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
+fn list_pools(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
     Ok(vec![m.method_return()])
 }
 
-fn createpool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
+fn create_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
     let mut items = m.get_items();
     if items.len() < 1 {
@@ -82,14 +82,16 @@ fn createpool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
                 .map(|i| i.to_owned())
         }));
 
-    // TODO: figure out how to convert devs to &[], or should
-    // we be using PathBuf like Foryo does?
-    let result = engine.borrow().create_pool(&name, &[], raid_level);
+    let blockdevs = devs.into_iter()
+        .map(|x| PathBuf::from(x.inner::<&str>().unwrap()))
+        .collect::<Vec<_>>();
+
+    let result = engine.borrow().create_pool(&name, &blockdevs, raid_level);
 
     Ok(vec![m.method_return().append3("/dbus/newpool/path", 0, "Ok")])
 }
 
-fn destroypool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
+fn destroy_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
     let mut items = m.get_items();
     if items.len() < 1 {
@@ -110,24 +112,24 @@ fn destroypool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
     Ok(vec![m.method_return().append3("/dbus/pool/path", 0, "Ok")])
 }
 
-fn getpoolobjectpath(m: &Message) -> MethodResult {
+fn get_pool_object_path(m: &Message) -> MethodResult {
 
     Ok(vec![m.method_return().append3("/dbus/pool/path", 0, "Ok")])
 }
 
-fn getvolumeobjectpath(m: &Message) -> MethodResult {
+fn get_volume_object_path(m: &Message) -> MethodResult {
     Ok(vec![m.method_return().append3("/dbus/volume/path", 0, "Ok")])
 }
 
-fn getdevobjectpath(m: &Message) -> MethodResult {
+fn get_dev_object_path(m: &Message) -> MethodResult {
     Ok(vec![m.method_return().append3("/dbus/dev/path", 0, "Ok")])
 }
 
-fn getcacheobjectpath(m: &Message) -> MethodResult {
+fn get_cache_object_path(m: &Message) -> MethodResult {
     Ok(vec![m.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
-fn getlistitems<T: HasCodes + Display>(m: &Message, items: &Iter<T>) -> MethodResult {
+fn get_list_items<T: HasCodes + Display>(m: &Message, items: &Iter<T>) -> MethodResult {
 
     let mut msg_vec = Vec::new();
     for item in items.as_slice() {
@@ -141,16 +143,16 @@ fn getlistitems<T: HasCodes + Display>(m: &Message, items: &Iter<T>) -> MethodRe
     Ok(vec![m.method_return().append1(item_array)])
 }
 
-fn geterrorcodes(m: &Message) -> MethodResult {
-    getlistitems(m, &StratisErrorEnum::iterator())
+fn get_error_codes(m: &Message) -> MethodResult {
+    get_list_items(m, &StratisErrorEnum::iterator())
 }
 
 
-fn getraidlevels(m: &Message) -> MethodResult {
-    getlistitems(m, &StratisRaidType::iterator())
+fn get_raid_levels(m: &Message) -> MethodResult {
+    get_list_items(m, &StratisRaidType::iterator())
 }
 
-fn getdevtypes(m: &Message) -> MethodResult {
+fn get_dev_types(m: &Message) -> MethodResult {
     let mut items = m.get_items();
     if items.len() < 1 {
         return Err(MethodErr::no_arg());
@@ -180,7 +182,7 @@ pub fn get_base_tree<'a>(c: &'a Connection,
 
     let engine_clone = engine.clone();
 
-    let createpool_method = f.method(CREATE_POOL, move |m, _, _| createpool(m, &engine_clone))
+    let createpool_method = f.method(CREATE_POOL, move |m, _, _| create_pool(m, &engine_clone))
         .in_arg(("pool_name", "s"))
         .in_arg(("dev_list", "as"))
         .in_arg(("raid_type", "q"))
@@ -190,7 +192,7 @@ pub fn get_base_tree<'a>(c: &'a Connection,
 
     let engine_clone = engine.clone();
 
-    let destroypool_method = f.method(DESTROY_POOL, move |m, _, _| destroypool(m, &engine_clone))
+    let destroypool_method = f.method(DESTROY_POOL, move |m, _, _| destroy_pool(m, &engine_clone))
         .in_arg(("pool_name", "s"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
@@ -198,46 +200,47 @@ pub fn get_base_tree<'a>(c: &'a Connection,
 
     let engine_clone = engine.clone();
 
-    let listpools_method = f.method(LIST_POOLS, move |m, _, _| listpools(m, &engine_clone))
+    let listpools_method = f.method(LIST_POOLS, move |m, _, _| list_pools(m, &engine_clone))
         .out_arg(("pool_names", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
     let getpoolobjectpath_method =
-        f.method(GET_POOL_OBJECT_PATH, move |m, _, _| getpoolobjectpath(m))
+        f.method(GET_POOL_OBJECT_PATH, move |m, _, _| get_pool_object_path(m))
             .in_arg(("pool_name", "s"))
             .out_arg(("object_path", "o"))
             .out_arg(("return_code", "q"))
             .out_arg(("return_string", "s"));
 
     let getvolumeobjectpath_method = f.method(GET_VOLUME_OBJECT_PATH,
-                move |m, _, _| getvolumeobjectpath(m))
+                move |m, _, _| get_volume_object_path(m))
         .in_arg(("pool_name", "s"))
         .in_arg(("volume_name", "s"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let getdevobjectpath_method = f.method(GET_DEV_OBJECT_PATH, move |m, _, _| getdevobjectpath(m))
-        .in_arg(("dev_name", "s"))
-        .out_arg(("object_path", "o"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let getcacheobjectpath_method =
-        f.method(GET_CACHE_OBJECT_PATH, move |m, _, _| getcacheobjectpath(m))
-            .in_arg(("cache_dev_name", "s"))
+    let getdevobjectpath_method =
+        f.method(GET_DEV_OBJECT_PATH, move |m, _, _| get_dev_object_path(m))
+            .in_arg(("dev_name", "s"))
             .out_arg(("object_path", "o"))
             .out_arg(("return_code", "q"))
             .out_arg(("return_string", "s"));
 
-    let geterrorcodes_method = f.method(GET_ERROR_CODES, move |m, _, _| geterrorcodes(m))
+    let getcacheobjectpath_method = f.method(GET_CACHE_OBJECT_PATH,
+                move |m, _, _| get_cache_object_path(m))
+        .in_arg(("cache_dev_name", "s"))
+        .out_arg(("object_path", "o"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
+
+    let geterrorcodes_method = f.method(GET_ERROR_CODES, move |m, _, _| get_error_codes(m))
         .out_arg(("error_codes", "a(sqs)"));
 
-    let getraidlevels_method = f.method(GET_RAID_LEVELS, move |m, _, _| getraidlevels(m))
+    let getraidlevels_method = f.method(GET_RAID_LEVELS, move |m, _, _| get_raid_levels(m))
         .out_arg(("error_codes", "a(sqs)"));
 
-    let getdevtypes_method = f.method(GET_DEV_TYPES, move |m, _, _| getdevtypes(m));
+    let getdevtypes_method = f.method(GET_DEV_TYPES, move |m, _, _| get_dev_types(m));
 
 
     let obj_path = f.object_path(STRATIS_BASE_PATH)

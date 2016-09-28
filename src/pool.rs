@@ -3,11 +3,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
-use std::sync::Arc;
 use std::cell::Cell;
 use std::path::PathBuf;
-
-use dbus::{tree, Path};
 
 use types::StratisResult;
 use blockdev::BlockDevs;
@@ -21,27 +18,25 @@ pub trait StratisPool {
 #[derive(Debug)]
 pub struct Pool {
     pub name: String,
-    pub path: Path<'static>,
     pub block_devs: BlockDevs,
-    pub index: i32,
+    pub raid_level: u16,
     pub online: Cell<bool>,
     pub checking: Cell<bool>,
 }
 
-
 impl Pool {
-    // pub fn new_pool(name: &str, blockdev_paths: &[PathBuf], raid_level: u16) -> Pool {
-    //
-    // let block_devs = BlockDevs::new(blockdev_paths);
-    //
-    // Pool {
-    // name: name.to_owned(),
-    // block_devs: block_devs.to_owned(),
-    // TODO use a constant for object path
-    // path: format!("/org/storage/stratis/{}", index).into(),
-    // index: index,
-    // online: Cell::new(index % 2 == 0),
-    // checking: Cell::new(false),
-    // }
-    // }
+    pub fn new_pool(name: &str, blockdev_paths: &[PathBuf], raid_level: u16) -> Pool {
+
+        let status = BlockDevs::new(blockdev_paths);
+
+        let block_devs = status.unwrap();
+
+        Pool {
+            name: name.to_owned(),
+            block_devs: block_devs.to_owned(),
+            raid_level: raid_level,
+            online: Cell::new(true),
+            checking: Cell::new(false),
+        }
+    }
 }

@@ -131,12 +131,14 @@ fn get_cache_object_path(m: &Message) -> MethodResult {
 
 fn get_list_items<T: HasCodes + Display>(m: &Message, items: &Iter<T>) -> MethodResult {
 
-    let mut msg_vec = Vec::new();
-    for item in items.as_slice() {
-        msg_vec.push(MessageItem::Struct(vec![MessageItem::Str(format!("{}", item)),
-                         MessageItem::UInt16(item.get_error_int()),
-                         MessageItem::Str(String::from(item.get_error_string()))]));
-    }
+    let msg_vec = items.as_slice()
+        .into_iter()
+        .map(|item| {
+            MessageItem::Struct(vec![MessageItem::Str(format!("{}", item)),
+                                     MessageItem::UInt16(item.get_error_int()),
+                                     MessageItem::Str(format!("{}", item.get_error_string()))])
+        })
+        .collect::<Vec<MessageItem>>();
 
     let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sqs)"));
     Ok(vec![m.method_return().append1(item_array)])

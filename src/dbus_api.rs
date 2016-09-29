@@ -91,23 +91,12 @@ fn create_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
 fn destroy_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
-    let mut items = m.get_items();
-    if items.len() < 1 {
-        return Err(MethodErr::no_arg());
-    }
-
-    // Get the name of the pool from the parameters
-    let name = try!(items.pop()
-        .ok_or_else(MethodErr::no_arg)
-        .and_then(|i| {
-            i.inner::<&str>()
-                .map_err(|_| MethodErr::invalid_arg(&i))
-                .map(|i| i.to_owned())
-        }));
-
+    let name = try!(m.get1::<String>().ok_or_else(MethodErr::no_arg));
     let result = engine.borrow().destroy_pool(&name);
+    let msg_vec = vec![MessageItem::UInt16(0), MessageItem::Str(format!("{}", "Ok"))];
+    let msg = MessageItem::Struct(msg_vec);
+    Ok(vec![m.method_return().append1(msg)])
 
-    Ok(vec![m.method_return().append3("/dbus/pool/path", 0, "Ok")])
 }
 
 fn get_pool_object_path(m: &Message) -> MethodResult {
@@ -193,7 +182,6 @@ pub fn get_base_tree<'a>(c: &'a Connection,
 
     let destroypool_method = f.method(DESTROY_POOL, move |m, _, _| destroy_pool(m, &engine_clone))
         .in_arg(("pool_name", "s"))
-        .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

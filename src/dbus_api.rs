@@ -7,8 +7,6 @@ use std::cell::RefCell;
 use std::fmt::Display;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::slice::Iter;
-use std::string::String;
 use std::sync::Arc;
 
 use dbus;
@@ -129,10 +127,11 @@ fn get_cache_object_path(m: &Message) -> MethodResult {
     Ok(vec![m.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
-fn get_list_items<T: HasCodes + Display>(m: &Message, items: Iter<T>) -> MethodResult {
-
-    let msg_vec = items
-        .map(|item| {
+fn get_list_items<T, I>(m: &Message, iter: I) -> MethodResult
+    where T: HasCodes + Display,
+          I: Iterator<Item = T>
+{
+    let msg_vec = iter.map(|item| {
             MessageItem::Struct(vec![MessageItem::Str(format!("{}", item)),
                                      MessageItem::UInt16(item.get_error_int()),
                                      MessageItem::Str(format!("{}", item.get_error_string()))])
@@ -144,12 +143,12 @@ fn get_list_items<T: HasCodes + Display>(m: &Message, items: Iter<T>) -> MethodR
 }
 
 fn get_error_codes(m: &Message) -> MethodResult {
-    get_list_items(m, StratisErrorEnum::iterator())
+    get_list_items(m, StratisErrorEnum::iter_variants())
 }
 
 
 fn get_raid_levels(m: &Message) -> MethodResult {
-    get_list_items(m, StratisRaidType::iterator())
+    get_list_items(m, StratisRaidType::iter_variants())
 }
 
 fn get_dev_types(m: &Message) -> MethodResult {

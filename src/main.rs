@@ -21,6 +21,8 @@ extern crate term;
 extern crate custom_derive;
 #[macro_use]
 extern crate newtype_derive;
+#[macro_use]
+extern crate enum_derive;
 
 pub static mut debug: bool = false;
 

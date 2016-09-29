@@ -92,8 +92,14 @@ fn create_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 fn destroy_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
     let name = try!(m.get1::<String>().ok_or_else(MethodErr::no_arg));
+
     let result = engine.borrow().destroy_pool(&name);
-    let msg_vec = vec![MessageItem::UInt16(0), MessageItem::Str(format!("{}", "Ok"))];
+
+    let msg_vec = match result {
+        Ok(_) => vec![MessageItem::UInt16(0), MessageItem::Str(format!("{}", "Ok"))],
+        Err(err) => vec![MessageItem::UInt16(0), MessageItem::Str(format!("{}", "Ok"))],
+    };
+
     let msg = MessageItem::Struct(msg_vec);
     Ok(vec![m.method_return().append1(msg)])
 

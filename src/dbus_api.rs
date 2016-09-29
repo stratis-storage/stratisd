@@ -95,13 +95,20 @@ fn destroy_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
     let result = engine.borrow().destroy_pool(&name);
 
-    let msg_vec = match result {
-        Ok(_) => vec![MessageItem::UInt16(0), MessageItem::Str(format!("{}", "Ok"))],
-        Err(err) => vec![MessageItem::UInt16(0), MessageItem::Str(format!("{}", "Ok"))],
+    let message = m.method_return();
+
+    let msg = match result {
+        Ok(_) => {
+            message.append2(MessageItem::UInt16(0),
+                            MessageItem::Str(format!("{}", "Ok")))
+        }
+        Err(err) => {
+            message.append2(MessageItem::UInt16(0),
+                            MessageItem::Str(format!("{}", "Ok")))
+        }
     };
 
-    let msg = MessageItem::Struct(msg_vec);
-    Ok(vec![m.method_return().append1(msg)])
+    Ok(vec![msg])
 
 }
 

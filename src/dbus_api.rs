@@ -129,10 +129,9 @@ fn get_cache_object_path(m: &Message) -> MethodResult {
     Ok(vec![m.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
-fn get_list_items<T: HasCodes + Display>(m: &Message, items: &Iter<T>) -> MethodResult {
+fn get_list_items<T: HasCodes + Display>(m: &Message, items: Iter<T>) -> MethodResult {
 
-    let msg_vec = items.as_slice()
-        .into_iter()
+    let msg_vec = items
         .map(|item| {
             MessageItem::Struct(vec![MessageItem::Str(format!("{}", item)),
                                      MessageItem::UInt16(item.get_error_int()),
@@ -145,12 +144,12 @@ fn get_list_items<T: HasCodes + Display>(m: &Message, items: &Iter<T>) -> Method
 }
 
 fn get_error_codes(m: &Message) -> MethodResult {
-    get_list_items(m, &StratisErrorEnum::iterator())
+    get_list_items(m, StratisErrorEnum::iterator())
 }
 
 
 fn get_raid_levels(m: &Message) -> MethodResult {
-    get_list_items(m, &StratisRaidType::iterator())
+    get_list_items(m, StratisRaidType::iterator())
 }
 
 fn get_dev_types(m: &Message) -> MethodResult {

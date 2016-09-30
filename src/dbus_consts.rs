@@ -103,7 +103,7 @@ impl HasCodes for StratisRaidType {
 
     fn get_error_string(&self) -> &str {
         match *self {
-            StratisRaidType::STRATIS_RAID_TYPE_UNKNOWN => "Ok",
+            StratisRaidType::STRATIS_RAID_TYPE_UNKNOWN => "Unknown",
             StratisRaidType::STRATIS_RAID_TYPE_SINGLE => "Single",
             StratisRaidType::STRATIS_RAID_TYPE_RAID1 => "Mirrored",
             StratisRaidType::STRATIS_RAID_TYPE_RAID5 => {

@@ -109,14 +109,12 @@ impl HasCodes for StratisRaidType {
         match *self {
             StratisRaidType::STRATIS_RAID_TYPE_UNKNOWN => "Ok",
             StratisRaidType::STRATIS_RAID_TYPE_SINGLE => "Single",
-            StratisRaidType::STRATIS_RAID_TYPE_RAID1 => {
-                "Mirror between two disks. For 4 disks or more, they are RAID10"
-            }
+            StratisRaidType::STRATIS_RAID_TYPE_RAID1 => "Mirrored",
             StratisRaidType::STRATIS_RAID_TYPE_RAID5 => {
                 "Block-level striping with distributed parity"
             }
             StratisRaidType::STRATIS_RAID_TYPE_RAID6 => {
-                "Block-level striping with two distributed parities, aka, RAID-DP"
+                "Block-level striping with two distributed parities"
             }
         }
     }

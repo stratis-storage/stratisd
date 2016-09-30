@@ -2,9 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::fmt;
-use std::slice::Iter;
-
 pub const DBUS_TIMEOUT: i32 = 20000; // millieconds
 
 pub const STRATIS_VERSION: &'static str = "1";
@@ -38,43 +35,27 @@ pub trait HasCodes {
     fn get_error_string(&self) -> &str;
 }
 
-#[derive(Copy, Clone)]
-#[allow(non_camel_case_types)]
-pub enum StratisErrorEnum {
-    STRATIS_OK,
-    STRATIS_ERROR,
-    STRATIS_NULL,
-    STRATIS_NOTFOUND,
-    STRATIS_POOL_NOTFOUND,
-    STRATIS_VOLUME_NOTFOUND,
-    STRATIS_DEV_NOTFOUND,
-    STRATIS_CACHE_NOTFOUND,
-    STRATIS_BAD_PARAM,
-    STRATIS_ALREADY_EXISTS,
-    STRATIS_NULL_NAME,
-    STRATIS_NO_POOLS,
-    STRATIS_LIST_FAILURE,
-}
-
-impl StratisErrorEnum {
-    pub fn iterator() -> Iter<'static, StratisErrorEnum> {
-        static CODES: [StratisErrorEnum; 13] = [StratisErrorEnum::STRATIS_OK,
-                                                StratisErrorEnum::STRATIS_ERROR,
-                                                StratisErrorEnum::STRATIS_NULL,
-                                                StratisErrorEnum::STRATIS_NOTFOUND,
-                                                StratisErrorEnum::STRATIS_POOL_NOTFOUND,
-                                                StratisErrorEnum::STRATIS_VOLUME_NOTFOUND,
-                                                StratisErrorEnum::STRATIS_DEV_NOTFOUND,
-                                                StratisErrorEnum::STRATIS_CACHE_NOTFOUND,
-                                                StratisErrorEnum::STRATIS_BAD_PARAM,
-                                                StratisErrorEnum::STRATIS_ALREADY_EXISTS,
-                                                StratisErrorEnum::STRATIS_NULL_NAME,
-                                                StratisErrorEnum::STRATIS_NO_POOLS,
-                                                StratisErrorEnum::STRATIS_LIST_FAILURE];
-        CODES.into_iter()
+custom_derive! {
+    #[derive(Copy, Clone, EnumDisplay,
+             IterVariants(StratisDBusErrorVariants),
+             IterVariantNames(StratisDBusErrorVariantNames))]
+    #[allow(non_camel_case_types)]
+    pub enum StratisErrorEnum {
+        STRATIS_OK,
+        STRATIS_ERROR,
+        STRATIS_NULL,
+        STRATIS_NOTFOUND,
+        STRATIS_POOL_NOTFOUND,
+        STRATIS_VOLUME_NOTFOUND,
+        STRATIS_DEV_NOTFOUND,
+        STRATIS_CACHE_NOTFOUND,
+        STRATIS_BAD_PARAM,
+        STRATIS_ALREADY_EXISTS,
+        STRATIS_NULL_NAME,
+        STRATIS_NO_POOLS,
+        STRATIS_LIST_FAILURE,
     }
 }
-
 
 impl HasCodes for StratisErrorEnum {
     fn get_error_int(&self) -> u16 {
@@ -101,48 +82,17 @@ impl HasCodes for StratisErrorEnum {
     }
 }
 
-impl fmt::Display for StratisErrorEnum {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            StratisErrorEnum::STRATIS_OK => write!(f, "STRATIS_OK"),
-            StratisErrorEnum::STRATIS_ERROR => write!(f, "STRATIS_ERROR"),
-            StratisErrorEnum::STRATIS_NULL => write!(f, "STRATIS_NULL"),
-            StratisErrorEnum::STRATIS_NOTFOUND => write!(f, "STRATIS_NOTFOUND"),
-            StratisErrorEnum::STRATIS_POOL_NOTFOUND => write!(f, "STRATIS_POOL_NOTFOUND"),
-            StratisErrorEnum::STRATIS_VOLUME_NOTFOUND => write!(f, "STRATIS_VOLUME_NOTFOUND"),
-            StratisErrorEnum::STRATIS_CACHE_NOTFOUND => write!(f, "STRATIS_CACHE_NOTFOUND"),
-            StratisErrorEnum::STRATIS_BAD_PARAM => write!(f, "STRATIS_BAD_PARAM"),
-            StratisErrorEnum::STRATIS_DEV_NOTFOUND => write!(f, "STRATIS_DEV_NOTFOUND"),
-            StratisErrorEnum::STRATIS_ALREADY_EXISTS => write!(f, "STRATIS_ALREADY_EXISTS"),
-            StratisErrorEnum::STRATIS_NULL_NAME => write!(f, "STRATIS_NULL_NAME"),
-            StratisErrorEnum::STRATIS_NO_POOLS => write!(f, "STRATIS_NO_POOLS"),
-            StratisErrorEnum::STRATIS_LIST_FAILURE => write!(f, "STRATIS_LIST_FAILURE"),
-        }
-    }
-}
-
-#[derive(Copy, Clone)]
-#[allow(non_camel_case_types)]
-pub enum StratisRaidType {
-    STRATIS_RAID_TYPE_UNKNOWN,
-    /** Single */
-    STRATIS_RAID_TYPE_SINGLE,
-    /** Mirror between two disks. For 4 disks or more, they are RAID10.*/
-    STRATIS_RAID_TYPE_RAID1,
-    /** Block-level striping with distributed parity */
-    STRATIS_RAID_TYPE_RAID5,
-    /** Block-level striping with two distributed parities, aka, RAID-DP */
-    STRATIS_RAID_TYPE_RAID6,
-}
-
-impl StratisRaidType {
-    pub fn iterator() -> Iter<'static, StratisRaidType> {
-        static TYPES: [StratisRaidType; 5] = [StratisRaidType::STRATIS_RAID_TYPE_UNKNOWN,
-                                              StratisRaidType::STRATIS_RAID_TYPE_SINGLE,
-                                              StratisRaidType::STRATIS_RAID_TYPE_RAID1,
-                                              StratisRaidType::STRATIS_RAID_TYPE_RAID5,
-                                              StratisRaidType::STRATIS_RAID_TYPE_RAID6];
-        TYPES.into_iter()
+custom_derive! {
+    #[derive(Copy, Clone, EnumDisplay,
+             IterVariants(StratisDBusRaidTypeVariants),
+             IterVariantNames(StratisDBusRaidTypeVariantNames))]
+    #[allow(non_camel_case_types)]
+    pub enum StratisRaidType {
+        STRATIS_RAID_TYPE_UNKNOWN,
+        STRATIS_RAID_TYPE_SINGLE,
+        STRATIS_RAID_TYPE_RAID1,
+        STRATIS_RAID_TYPE_RAID5,
+        STRATIS_RAID_TYPE_RAID6,
     }
 }
 
@@ -153,29 +103,15 @@ impl HasCodes for StratisRaidType {
 
     fn get_error_string(&self) -> &str {
         match *self {
-            StratisRaidType::STRATIS_RAID_TYPE_UNKNOWN => "Ok",
+            StratisRaidType::STRATIS_RAID_TYPE_UNKNOWN => "Unknown",
             StratisRaidType::STRATIS_RAID_TYPE_SINGLE => "Single",
-            StratisRaidType::STRATIS_RAID_TYPE_RAID1 => {
-                "Mirror between two disks. For 4 disks or more, they are RAID10"
-            }
+            StratisRaidType::STRATIS_RAID_TYPE_RAID1 => "Mirrored",
             StratisRaidType::STRATIS_RAID_TYPE_RAID5 => {
                 "Block-level striping with distributed parity"
             }
             StratisRaidType::STRATIS_RAID_TYPE_RAID6 => {
-                "Block-level striping with two distributed parities, aka, RAID-DP"
+                "Block-level striping with two distributed parities"
             }
-        }
-    }
-}
-
-impl fmt::Display for StratisRaidType {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            StratisRaidType::STRATIS_RAID_TYPE_UNKNOWN => write!(f, "STRATIS_RAID_TYPE_UNKNOWN"),
-            StratisRaidType::STRATIS_RAID_TYPE_SINGLE => write!(f, "STRATIS_RAID_TYPE_SINGLE"),
-            StratisRaidType::STRATIS_RAID_TYPE_RAID1 => write!(f, "STRATIS_RAID_TYPE_RAID1"),
-            StratisRaidType::STRATIS_RAID_TYPE_RAID5 => write!(f, "STRATIS_RAID_TYPE_RAID5"),
-            StratisRaidType::STRATIS_RAID_TYPE_RAID6 => write!(f, "STRATIS_RAID_TYPE_RAID6"),
         }
     }
 }

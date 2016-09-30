@@ -89,13 +89,9 @@ custom_derive! {
     #[allow(non_camel_case_types)]
     pub enum StratisRaidType {
         STRATIS_RAID_TYPE_UNKNOWN,
-        /** Single */
         STRATIS_RAID_TYPE_SINGLE,
-        /** Mirror between two disks. For 4 disks or more, they are RAID10.*/
         STRATIS_RAID_TYPE_RAID1,
-        /** Block-level striping with distributed parity */
         STRATIS_RAID_TYPE_RAID5,
-        /** Block-level striping with two distributed parities, aka, RAID-DP */
         STRATIS_RAID_TYPE_RAID6,
     }
 }

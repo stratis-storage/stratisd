@@ -108,7 +108,7 @@ fn create_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
 fn destroy_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
-    let name = try!(m.get1::<String>().ok_or_else(MethodErr::no_arg));
+    let name: String = try!(m.get1().ok_or_else(MethodErr::no_arg));
 
     let result = engine.borrow_mut().destroy_pool(&name);
 

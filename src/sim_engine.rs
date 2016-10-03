@@ -2,55 +2,83 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::cell::RefCell;
 use std::path::PathBuf;
-
+use std::collections::BTreeMap;
 use types::StratisResult;
 use engine::Engine;
-use pool::{Pool, StratisPool};
+use pool::StratisPool;
+use blockdev::BlockDevs;
+
 
 pub struct SimEngine {
-    pub pools: RefCell<Vec<Pool>>,
+    pub pools: BTreeMap<String, Box<StratisPool>>,
 }
 
 impl SimEngine {
     pub fn new() -> SimEngine {
-        SimEngine { pools: RefCell::new(Vec::new()) }
-    }
-    pub fn add(&self, pool: Pool) {
-        self.pools.borrow_mut().push(pool);
+        SimEngine { pools: BTreeMap::new() }
     }
 }
 
 impl Engine for SimEngine {
-    fn create_pool(&self,
+    fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[PathBuf],
                    raid_level: u16)
-                   -> StratisResult<Box<StratisPool>> {
+                   -> StratisResult<()> {
 
-        let pool = Pool::new_pool(name, blockdev_paths, raid_level);
+        let pool = SimPool::new_pool(name, blockdev_paths, raid_level);
 
-        self.add(pool);
+        self.pools.insert(name.to_owned(), pool);
 
-        Ok(Box::new(SimPool::new()))
-    }
-    fn destroy_pool(&self, name: &str) -> StratisResult<()> {
         Ok(())
     }
 
-    fn list_pools(&self) -> StratisResult<()> {
+    fn destroy_pool(&mut self, name: &str) -> StratisResult<()> {
+
+        let deleted_pool = self.pools.remove(name);
+
+        // TODO deal with not found
         Ok(())
+    }
+
+    fn list_pools(&self) -> StratisResult<BTreeMap<String, Box<StratisPool>>> {
+
+        let mut stratis_pools = BTreeMap::new();
+
+        for (name, pool) in &self.pools {
+
+            stratis_pools.insert(name.clone(), pool.copy());
+        }
+
+        Ok(stratis_pools)
     }
 }
 
-struct SimPool {
-    tmp: u32,
+pub struct SimPool {
+    pub name: String,
+    pub block_devs: BlockDevs,
+    pub raid_level: u16,
+    pub online: bool,
+    pub checking: bool,
 }
 
 impl SimPool {
-    fn new() -> SimPool {
-        SimPool { tmp: 4 }
+    pub fn new_pool(name: &str, blockdev_paths: &[PathBuf], raid_level: u16) -> Box<StratisPool> {
+
+        let status = BlockDevs::new(blockdev_paths);
+
+        let block_devs = status.unwrap();
+
+        let new_pool = SimPool {
+            name: name.to_owned(),
+            block_devs: block_devs.to_owned(),
+            raid_level: raid_level,
+            online: true,
+            checking: false,
+        };
+
+        Box::new(new_pool)
     }
 }
 
@@ -68,5 +96,19 @@ impl StratisPool for SimPool {
     fn destroy(&mut self) -> StratisResult<()> {
         println!("sim: pool::destroy");
         Ok(())
+    }
+
+    fn get_name(&mut self) -> String {
+        self.name.clone()
+    }
+    fn copy(&self) -> Box<StratisPool> {
+        let pool_copy = SimPool {
+            name: self.name.clone(),
+            block_devs: self.block_devs.clone(),
+            raid_level: self.raid_level.clone(),
+            online: true,
+            checking: false,
+        };
+        Box::new(pool_copy)
     }
 }

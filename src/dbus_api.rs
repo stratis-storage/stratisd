@@ -25,6 +25,7 @@ use dbus::tree::Tree;
 use dbus_consts::*;
 
 use engine::Engine;
+use pool::StratisPool;
 use types::{StratisResult, StratisError};
 
 #[derive(Debug, Clone)]
@@ -49,7 +50,23 @@ impl<'a> DbusContext<'a> {
 
 fn list_pools(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
-    Ok(vec![m.method_return()])
+    let result = engine.borrow().list_pools();
+
+    let mut msg_vec = Vec::new();
+
+    // TODO: deal with failure
+    let pool_tree = result.unwrap();
+
+    for (name, pool) in pool_tree {
+        let entry = vec![MessageItem::Str(format!("{}", name)),
+                         MessageItem::UInt16(0),
+                         MessageItem::Str(String::from("Ok"))];
+        msg_vec.push(MessageItem::Struct(entry));
+    }
+
+    let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sqs)"));
+
+    Ok(vec![m.method_return().append1(item_array)])
 }
 
 fn create_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
@@ -84,7 +101,7 @@ fn create_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
         .map(|x| PathBuf::from(x.inner::<&str>().unwrap()))
         .collect::<Vec<_>>();
 
-    let result = engine.borrow().create_pool(&name, &blockdevs, raid_level);
+    let result = engine.borrow_mut().create_pool(&name, &blockdevs, raid_level);
 
     Ok(vec![m.method_return().append3("/dbus/newpool/path", 0, "Ok")])
 }
@@ -93,7 +110,7 @@ fn destroy_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
     let name = try!(m.get1::<String>().ok_or_else(MethodErr::no_arg));
 
-    let result = engine.borrow().destroy_pool(&name);
+    let result = engine.borrow_mut().destroy_pool(&name);
 
     let message = m.method_return();
 

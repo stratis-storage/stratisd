@@ -25,7 +25,6 @@ use dbus::tree::Tree;
 use dbus_consts::*;
 
 use engine::Engine;
-use pool::StratisPool;
 use types::{StratisResult, StratisError};
 
 #[derive(Debug, Clone)]
@@ -108,7 +107,9 @@ fn create_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
 fn destroy_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
-    let name: String = try!(m.get1().ok_or_else(MethodErr::no_arg));
+    let item: MessageItem = try!(m.get1().ok_or_else(MethodErr::no_arg));
+
+    let name: &String = try!(item.inner().map_err(|_| MethodErr::invalid_arg(&item)));
 
     let result = engine.borrow_mut().destroy_pool(&name);
 

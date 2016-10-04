@@ -70,31 +70,16 @@ fn list_pools(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
 fn create_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
-    let mut items = m.get_items();
-    if items.len() < 1 {
-        return Err(MethodErr::no_arg());
-    }
+    let message: (Option<MessageItem>, Option<MessageItem>, Option<MessageItem>) = m.get3();
 
-    let raid_level: u16 = try!(items.pop()
-        .ok_or_else(MethodErr::no_arg)
-        .and_then(|i| {
-            i.inner()
-                .map_err(|_| MethodErr::invalid_arg(&i))
-        }));
+    let item0: MessageItem = try!(message.0.ok_or_else(MethodErr::no_arg));
+    let name: &String = try!(item0.inner().map_err(|_| MethodErr::invalid_arg(&item0)));
 
-    let devs = match try!(items.pop().ok_or_else(MethodErr::no_arg)) {
-        MessageItem::Array(x, _) => x,
-        x => return Err(MethodErr::invalid_arg(&x)),
-    };
+    let item1: MessageItem = try!(message.1.ok_or_else(MethodErr::no_arg));
+    let devs: &Vec<MessageItem> = try!(item1.inner().map_err(|_| MethodErr::invalid_arg(&item1)));
 
-    // Get the name of the pool from the parameters
-    let name = try!(items.pop()
-        .ok_or_else(MethodErr::no_arg)
-        .and_then(|i| {
-            i.inner::<&str>()
-                .map_err(|_| MethodErr::invalid_arg(&i))
-                .map(|i| i.to_owned())
-        }));
+    let item2: MessageItem = try!(message.2.ok_or_else(MethodErr::no_arg));
+    let raid_level: u16 = try!(item2.inner().map_err(|_| MethodErr::invalid_arg(&item2)));
 
     let blockdevs = devs.into_iter()
         .map(|x| PathBuf::from(x.inner::<&str>().unwrap()))

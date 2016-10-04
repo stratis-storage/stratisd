@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::path::PathBuf;
+use std::path::Path;
 use std::collections::BTreeMap;
 use types::StratisResult;
 use engine::Engine;
@@ -23,7 +23,7 @@ impl SimEngine {
 impl Engine for SimEngine {
     fn create_pool(&mut self,
                    name: &str,
-                   blockdev_paths: &[PathBuf],
+                   blockdev_paths: &[&Path],
                    raid_level: u16)
                    -> StratisResult<()> {
 
@@ -63,7 +63,7 @@ pub struct SimPool {
 }
 
 impl SimPool {
-    pub fn new_pool(name: &str, blockdev_paths: &[PathBuf], raid_level: u16) -> Box<StratisPool> {
+    pub fn new_pool(name: &str, blockdev_paths: &[&Path], raid_level: u16) -> Box<StratisPool> {
 
         let status = BlockDevs::new(blockdev_paths);
 

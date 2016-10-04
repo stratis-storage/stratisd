@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
-use std::path::PathBuf;
+use std::path::Path;
 
 use types::StratisResult;
 use blockdev::BlockDevs;
@@ -26,7 +26,7 @@ pub struct Pool {
 }
 
 impl Pool {
-    pub fn new_pool(name: &str, blockdev_paths: &[PathBuf], raid_level: u16) -> Box<StratisPool> {
+    pub fn new_pool(name: &str, blockdev_paths: &[&Path], raid_level: u16) -> Box<StratisPool> {
 
         let status = BlockDevs::new(blockdev_paths);
 

@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::cell::RefCell;
-use std::path::PathBuf;
+use std::path::Path;
 use std::collections::HashMap;
 use std::collections::BTreeMap;
 
@@ -14,7 +14,7 @@ use pool::{Pool, StratisPool};
 pub trait Engine {
     fn create_pool(&mut self,
                    name: &str,
-                   blockdev_paths: &[PathBuf],
+                   blockdev_paths: &[&Path],
                    raid_level: u16)
                    -> StratisResult<()>;
 

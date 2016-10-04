@@ -5,7 +5,7 @@
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::fmt::Display;
-use std::path::PathBuf;
+use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -97,8 +97,8 @@ fn create_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
                 .map(|i| i.to_owned())
         }));
 
-    let blockdevs = devs.into_iter()
-        .map(|x| PathBuf::from(x.inner::<&str>().unwrap()))
+    let blockdevs = devs.iter()
+        .map(|x| Path::new(x.inner::<&str>().unwrap()))
         .collect::<Vec<_>>();
 
     let result = engine.borrow_mut().create_pool(&name, &blockdevs, raid_level);

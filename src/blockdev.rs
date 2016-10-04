@@ -46,7 +46,7 @@ impl BlockDev {
 pub struct BlockDevs(pub BTreeMap<String, BlockMember>);
 
 impl BlockDevs {
-    pub fn new(blockdev_paths: &[PathBuf]) -> StratisResult<BlockDevs> {
+    pub fn new(blockdev_paths: &[&Path]) -> StratisResult<BlockDevs> {
         let mut block_devs = BlockDevs(BTreeMap::new());
 
         let stratis_id = Uuid::new_v4().to_simple_string();

@@ -25,7 +25,6 @@ use dbus::tree::Tree;
 use dbus_consts::*;
 
 use engine::Engine;
-use pool::StratisPool;
 use types::{StratisResult, StratisError};
 
 #[derive(Debug, Clone)]

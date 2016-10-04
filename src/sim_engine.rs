@@ -38,7 +38,6 @@ impl Engine for SimEngine {
 
         let deleted_pool = self.pools.remove(name);
 
-        // TODO deal with not found
         Ok(())
     }
 

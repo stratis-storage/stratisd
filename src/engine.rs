@@ -2,13 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::cell::RefCell;
-use std::path::Path;
-use std::collections::HashMap;
-use std::collections::BTreeMap;
 
+use std::path::Path;
+use std::collections::BTreeMap;
 use types::StratisResult;
-use pool::{Pool, StratisPool};
+use pool::StratisPool;
 
 
 pub trait Engine {

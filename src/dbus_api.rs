@@ -8,6 +8,7 @@ use std::fmt::Display;
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::io::ErrorKind;
 
 use dbus;
 use dbus::Connection;
@@ -44,6 +45,18 @@ impl<'a> DbusContext<'a> {
             Err(()) => Err(StratisError::Dbus(dbus::Error::new_custom(
                 "UpdateError", "Could not update property with value"))),
         }
+    }
+}
+
+fn internal_to_dbus_err(err: &StratisError) -> StratisErrorEnum {
+    match *err {
+        StratisError::Stratis(_) => StratisErrorEnum::STRATIS_ERROR,
+        StratisError::Io(ref err) => match err.kind() {
+            ErrorKind::NotFound => StratisErrorEnum::STRATIS_NOTFOUND,
+            ErrorKind::AlreadyExists => StratisErrorEnum::STRATIS_ALREADY_EXISTS,
+            _ => StratisErrorEnum::STRATIS_ERROR,
+        },
+        _ => StratisErrorEnum::STRATIS_ERROR,
     }
 }
 
@@ -85,9 +98,14 @@ fn create_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
         .map(|x| Path::new(x.inner::<&str>().unwrap()))
         .collect::<Vec<_>>();
 
-    let result = engine.borrow_mut().create_pool(&name, &blockdevs, raid_level);
-
-    Ok(vec![m.method_return().append3("/dbus/newpool/path", 0, "Ok")])
+    match engine.borrow_mut().create_pool(&name, &blockdevs, raid_level) {
+        Ok(_) => Ok(vec![m.method_return().append3("/dbus/newpool/path", 0, "Ok")]),
+        Err(x) => {
+            let dbus_err = internal_to_dbus_err(&x);
+            Ok(vec![m.method_return().append3("", dbus_err.get_error_int()
+                                              , dbus_err.get_error_string())])
+        }
+    }
 }
 
 fn destroy_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {

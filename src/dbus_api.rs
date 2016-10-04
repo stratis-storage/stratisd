@@ -190,7 +190,7 @@ pub fn get_base_tree<'a>(c: &'a Connection,
         .in_arg(("pool_name", "s"))
         .in_arg(("dev_list", "as"))
         .in_arg(("raid_type", "q"))
-        .out_arg(("object_path", "s"))
+        .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

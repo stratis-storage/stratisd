@@ -129,24 +129,6 @@ impl StratisDbusConnection for Connection {
     }
 }
 
-fn list(_args: &ArgMatches) -> StratisResult<()> {
-    let c = try!(Connection::stratis_connect());
-    let pools = try!(c.stratis_paths());
-
-    for fpath in &pools {
-        let p = Props::new(&c,
-                           "org.freedesktop.Stratis1",
-                           fpath,
-                           "org.freedesktop.StratisDevice1",
-                           DBUS_TIMEOUT);
-        let item = try!(p.get("Name"));
-        let name: &str = FromMessageItem::from(&item).unwrap();
-        println!("{}", name);
-    }
-
-    Ok(())
-}
-
 fn status(args: &ArgMatches) -> StratisResult<()> {
     let name = args.value_of("Stratisdevname").unwrap();
     let c = try!(Connection::stratis_connect());
@@ -261,165 +243,7 @@ fn status(args: &ArgMatches) -> StratisResult<()> {
     Ok(())
 }
 
-fn add(args: &ArgMatches) -> StratisResult<()> {
-    let name = args.value_of("Stratisdevname").unwrap();
-    let dev_paths: Vec<_> = args.values_of("devices")
-        .unwrap()
-        .into_iter()
-        .map(|dev| {
-            if Path::new(dev).is_absolute() {
-                PathBuf::from(dev)
-            } else {
-                PathBuf::from(format!("/dev/{}", dev))
-            }
-        })
-        .collect();
-    let force = args.is_present("force");
-    let c = try!(Connection::stratis_connect());
-    let fpath = try!(c.stratis_path(name));
 
-    for path in dev_paths {
-        let mut m = Message::new_method_call("org.freedesktop.Stratis1",
-                                             &fpath,
-                                             "org.freedesktop.StratisDevice1",
-                                             "AddBlockDevice")
-            .unwrap();
-        m.append_items(&[path.to_string_lossy().into_owned().into(), force.into()]);
-        try!(c.send_with_reply_and_block(m, DBUS_TIMEOUT));
-    }
-
-    Ok(())
-}
-
-fn remove(args: &ArgMatches) -> StratisResult<()> {
-    let name = args.value_of("Stratisdevname").unwrap();
-    let bd_path = {
-        let dev = args.value_of("blockdev").unwrap();
-        if Path::new(dev).is_absolute() {
-            PathBuf::from(dev)
-        } else {
-            PathBuf::from(format!("/dev/{}", dev))
-        }
-    };
-    let wipe = args.is_present("wipe");
-    let c = try!(Connection::stratis_connect());
-    let fpath = try!(c.stratis_path(name));
-
-    let mut m = Message::new_method_call("org.freedesktop.Stratis1",
-                                         &fpath,
-                                         "org.freedesktop.StratisDevice1",
-                                         "RemoveBlockDevice")
-        .unwrap();
-    m.append_items(&[bd_path.to_string_lossy().into_owned().into(), wipe.into()]);
-    try!(c.send_with_reply_and_block(m, DBUS_TIMEOUT));
-
-    Ok(())
-}
-
-fn create(args: &ArgMatches) -> StratisResult<()> {
-    let name = args.value_of("Stratisdevname").unwrap();
-    let dev_paths: Vec<_> = args.values_of("devices")
-        .unwrap()
-        .into_iter()
-        .map(|dev| {
-            if Path::new(dev).is_absolute() {
-                PathBuf::from(dev)
-            } else {
-                PathBuf::from(format!("/dev/{}", dev))
-            }
-        })
-        .map(|pb| pb.to_string_lossy().into_owned().into())
-        .collect();
-    let force = args.is_present("force");
-
-    let c = try!(Connection::stratis_connect());
-
-    let mut m = Message::new_method_call("org.freedesktop.Stratis1",
-                                         "/org/freedesktop/Stratis",
-                                         "org.freedesktop.StratisService1",
-                                         "Create")
-        .unwrap();
-    m.append_items(&[name.into(), MessageItem::new_array(dev_paths).unwrap(), force.into()]);
-    try!(c.send_with_reply_and_block(m, DBUS_TIMEOUT));
-
-    dbgp!("Stratisdev {} created", name);
-
-    Ok(())
-}
-
-fn rename(args: &ArgMatches) -> StratisResult<()> {
-    let old_name = args.value_of("Stratisdev_old_name").unwrap();
-    let new_name = args.value_of("Stratisdev_new_name").unwrap();
-
-    let c = try!(Connection::stratis_connect());
-    let fpath = try!(c.stratis_path(old_name));
-
-    let mut m = Message::new_method_call("org.freedesktop.Stratis1",
-                                         &fpath,
-                                         "org.freedesktop.StratisDevice1",
-                                         "SetName")
-        .unwrap();
-    m.append_items(&[new_name.into()]);
-    try!(c.send_with_reply_and_block(m, DBUS_TIMEOUT));
-
-    dbgp!("Stratisdev name {} changed to {}", old_name, new_name);
-
-    Ok(())
-}
-
-fn reshape(args: &ArgMatches) -> StratisResult<()> {
-    let name = args.value_of("Stratisdev").unwrap();
-
-    let c = try!(Connection::stratis_connect());
-    let fpath = try!(c.stratis_path(name));
-
-    let m = Message::new_method_call("org.freedesktop.Stratis1",
-                                     &fpath,
-                                     "org.freedesktop.StratisDevice1",
-                                     "Reshape")
-        .unwrap();
-    try!(c.send_with_reply_and_block(m, DBUS_TIMEOUT));
-
-    dbgp!("Stratisdev {} starting reshape", name);
-
-    Ok(())
-}
-
-fn destroy(args: &ArgMatches) -> StratisResult<()> {
-    let name = args.value_of("Stratisdev").unwrap();
-
-    let c = try!(Connection::stratis_connect());
-
-    let mut m = Message::new_method_call("org.freedesktop.Stratis1",
-                                         "/org/freedesktop/Stratis",
-                                         "org.freedesktop.StratisService1",
-                                         "Destroy")
-        .unwrap();
-    m.append_items(&[name.into()]);
-    try!(c.send_with_reply_and_block(m, DBUS_TIMEOUT));
-
-    dbgp!("Stratisdev {} destroyed", name);
-
-    Ok(())
-}
-
-fn teardown(args: &ArgMatches) -> StratisResult<()> {
-    let name = args.value_of("Stratisdev").unwrap();
-
-    let c = try!(Connection::stratis_connect());
-
-    let mut m = Message::new_method_call("org.freedesktop.Stratis1",
-                                         "/org/freedesktop/Stratis",
-                                         "org.freedesktop.StratisService1",
-                                         "Teardown")
-        .unwrap();
-    m.append_items(&[name.into()]);
-    try!(c.send_with_reply_and_block(m, DBUS_TIMEOUT));
-
-    dbgp!("Stratisdev {} torn down", name);
-
-    Ok(())
-}
 
 fn dbus_server(engine: Rc<RefCell<Engine>>) -> StratisResult<()> {
 
@@ -473,6 +297,7 @@ fn main() {
 
     let engine = Rc::new(RefCell::new(SimEngine::new()));
     // TODO: add cmdline option to specify engine
+    //  let context = Rc::new(RefCell::new(Context::new()));
 
     let r = dbus_server(engine);
 

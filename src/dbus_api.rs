@@ -7,19 +7,16 @@ use std::cell::RefCell;
 use std::fmt::Display;
 use std::path::Path;
 use std::rc::Rc;
-use std::sync::Arc;
-
-use dbus;
+use std::collections::BTreeMap;
 use dbus::Connection;
+use dbus::BusType;
 use dbus::Message;
 use dbus::MessageItem;
 use dbus::NameFlag;
-
 use dbus::tree::Factory;
 use dbus::tree::MethodErr;
 use dbus::tree::MethodFn;
 use dbus::tree::MethodResult;
-use dbus::tree::Property;
 use dbus::tree::Tree;
 
 use dbus_consts::*;
@@ -28,26 +25,27 @@ use engine::Engine;
 use types::{StratisResult, StratisError};
 
 #[derive(Debug, Clone)]
-pub struct DbusContext<'a> {
-    name_prop: Arc<Property<MethodFn<'a>>>,
-    pub remaining_prop: Arc<Property<MethodFn<'a>>>,
-    pub total_prop: Arc<Property<MethodFn<'a>>>,
-    pub status_prop: Arc<Property<MethodFn<'a>>>,
-    pub running_status_prop: Arc<Property<MethodFn<'a>>>,
-    pub block_devices_prop: Arc<Property<MethodFn<'a>>>,
+pub struct DbusContext {
+    pub next_index: i32,
+    pub pools: BTreeMap<String, String>,
 }
 
-impl<'a> DbusContext<'a> {
-    pub fn update_one(prop: &Arc<Property<MethodFn<'a>>>, m: MessageItem) -> StratisResult<()> {
-        match prop.set_value(m) {
-            Ok(_) => Ok(()), // TODO: return signals
-            Err(()) => Err(StratisError::Dbus(dbus::Error::new_custom(
-                "UpdateError", "Could not update property with value"))),
+impl DbusContext {
+    pub fn new() -> DbusContext {
+        DbusContext {
+            next_index: 0,
+            pools: BTreeMap::new(),
         }
+    }
+    pub fn get_next_id(&mut self) {
+        self.next_index += 1;
     }
 }
 
-fn list_pools(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
+fn list_pools(m: &Message,
+              dbus_context: &Rc<RefCell<DbusContext>>,
+              engine: &Rc<RefCell<Engine>>)
+              -> MethodResult {
 
     let result = engine.borrow().list_pools();
 
@@ -68,7 +66,10 @@ fn list_pools(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
     Ok(vec![m.method_return().append1(item_array)])
 }
 
-fn create_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
+fn create_pool(m: &Message,
+               dbus_context: &Rc<RefCell<DbusContext>>,
+               engine: &Rc<RefCell<Engine>>)
+               -> MethodResult {
 
     let message: (Option<MessageItem>, Option<MessageItem>, Option<MessageItem>) = m.get3();
 
@@ -90,7 +91,10 @@ fn create_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
     Ok(vec![m.method_return().append3("/dbus/newpool/path", 0, "Ok")])
 }
 
-fn destroy_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
+fn destroy_pool(m: &Message,
+                dbus_context: &Rc<RefCell<DbusContext>>,
+                engine: &Rc<RefCell<Engine>>)
+                -> MethodResult {
 
     let item: MessageItem = try!(m.get1().ok_or_else(MethodErr::no_arg));
 
@@ -115,20 +119,20 @@ fn destroy_pool(m: &Message, engine: &Rc<RefCell<Engine>>) -> MethodResult {
 
 }
 
-fn get_pool_object_path(m: &Message) -> MethodResult {
+fn get_pool_object_path(m: &Message, dbus_context: &Rc<RefCell<DbusContext>>) -> MethodResult {
 
     Ok(vec![m.method_return().append3("/dbus/pool/path", 0, "Ok")])
 }
 
-fn get_volume_object_path(m: &Message) -> MethodResult {
+fn get_volume_object_path(m: &Message, dbus_context: &Rc<RefCell<DbusContext>>) -> MethodResult {
     Ok(vec![m.method_return().append3("/dbus/volume/path", 0, "Ok")])
 }
 
-fn get_dev_object_path(m: &Message) -> MethodResult {
+fn get_dev_object_path(m: &Message, dbus_context: &Rc<RefCell<DbusContext>>) -> MethodResult {
     Ok(vec![m.method_return().append3("/dbus/dev/path", 0, "Ok")])
 }
 
-fn get_cache_object_path(m: &Message) -> MethodResult {
+fn get_cache_object_path(m: &Message, dbus_context: &Rc<RefCell<DbusContext>>) -> MethodResult {
     Ok(vec![m.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
@@ -175,18 +179,19 @@ fn get_dev_types(m: &Message) -> MethodResult {
     Ok(vec![m.method_return()])
 }
 
-pub fn get_base_tree<'a>(c: &'a Connection,
+pub fn get_base_tree<'a>(dbus_context: Rc<RefCell<DbusContext>>,
                          engine: Rc<RefCell<Engine>>)
                          -> StratisResult<Tree<MethodFn<'a>>> {
-    c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32).unwrap();
 
     let f = Factory::new_fn();
 
     let base_tree = f.tree();
 
+    let dbus_context_clone = dbus_context.clone();
     let engine_clone = engine.clone();
 
-    let createpool_method = f.method(CREATE_POOL, move |m, _, _| create_pool(m, &engine_clone))
+    let createpool_method = f.method(CREATE_POOL,
+                move |m, _, _| create_pool(m, &dbus_context_clone, &engine_clone))
         .in_arg(("pool_name", "s"))
         .in_arg(("dev_list", "as"))
         .in_arg(("raid_type", "q"))
@@ -195,43 +200,55 @@ pub fn get_base_tree<'a>(c: &'a Connection,
         .out_arg(("return_string", "s"));
 
     let engine_clone = engine.clone();
+    let dbus_context_clone = dbus_context.clone();
 
-    let destroypool_method = f.method(DESTROY_POOL, move |m, _, _| destroy_pool(m, &engine_clone))
+    let destroypool_method = f.method(DESTROY_POOL,
+                move |m, _, _| destroy_pool(m, &dbus_context_clone, &engine_clone))
         .in_arg(("pool_name", "s"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
     let engine_clone = engine.clone();
+    let dbus_context_clone = dbus_context.clone();
 
-    let listpools_method = f.method(LIST_POOLS, move |m, _, _| list_pools(m, &engine_clone))
+    let listpools_method = f.method(LIST_POOLS,
+                move |m, _, _| list_pools(m, &dbus_context_clone, &engine_clone))
         .out_arg(("pool_names", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let getpoolobjectpath_method =
-        f.method(GET_POOL_OBJECT_PATH, move |m, _, _| get_pool_object_path(m))
-            .in_arg(("pool_name", "s"))
-            .out_arg(("object_path", "o"))
-            .out_arg(("return_code", "q"))
-            .out_arg(("return_string", "s"));
+    let dbus_context_clone = dbus_context.clone();
+
+    let getpoolobjectpath_method = f.method(GET_POOL_OBJECT_PATH,
+                move |m, _, _| get_pool_object_path(m, &dbus_context_clone))
+        .in_arg(("pool_name", "s"))
+        .out_arg(("object_path", "o"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
+
+    let dbus_context_clone = dbus_context.clone();
 
     let getvolumeobjectpath_method = f.method(GET_VOLUME_OBJECT_PATH,
-                move |m, _, _| get_volume_object_path(m))
+                move |m, _, _| get_volume_object_path(m, &dbus_context_clone))
         .in_arg(("pool_name", "s"))
         .in_arg(("volume_name", "s"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let getdevobjectpath_method =
-        f.method(GET_DEV_OBJECT_PATH, move |m, _, _| get_dev_object_path(m))
-            .in_arg(("dev_name", "s"))
-            .out_arg(("object_path", "o"))
-            .out_arg(("return_code", "q"))
-            .out_arg(("return_string", "s"));
+    let dbus_context_clone = dbus_context.clone();
+
+    let getdevobjectpath_method = f.method(GET_DEV_OBJECT_PATH,
+                move |m, _, _| get_dev_object_path(m, &dbus_context_clone))
+        .in_arg(("dev_name", "s"))
+        .out_arg(("object_path", "o"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
+
+    let dbus_context_clone = dbus_context.clone();
 
     let getcacheobjectpath_method = f.method(GET_CACHE_OBJECT_PATH,
-                move |m, _, _| get_cache_object_path(m))
+                move |m, _, _| get_cache_object_path(m, &dbus_context_clone))
         .in_arg(("cache_dev_name", "s"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
@@ -262,7 +279,22 @@ pub fn get_base_tree<'a>(c: &'a Connection,
 
 
     let base_tree = base_tree.add(obj_path);
-    try!(base_tree.set_registered(c, true));
 
     Ok(base_tree)
+}
+
+pub fn run(engine: Rc<RefCell<Engine>>) -> StratisResult<()> {
+    let dbus_context = Rc::new(RefCell::new(DbusContext::new()));
+    let tree = get_base_tree(dbus_context, engine).unwrap();
+
+    // Setup DBus connection
+    let c = try!(Connection::get_private(BusType::Session));
+    c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32).unwrap();
+    try!(tree.set_registered(&c, true));
+
+    // ...and serve incoming requests.
+    for _ in tree.run(&c, c.iter(1000)) {
+    }
+
+    Ok(())
 }

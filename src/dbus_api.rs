@@ -8,7 +8,6 @@ use std::fmt::Display;
 use std::path::Path;
 use std::rc::Rc;
 use std::io::ErrorKind;
-
 use std::collections::BTreeMap;
 use dbus::Connection;
 use dbus::BusType;

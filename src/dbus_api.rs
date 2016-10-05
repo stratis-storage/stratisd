@@ -93,13 +93,14 @@ fn create_pool(m: &Message,
 
     let item1: MessageItem = try!(message.1.ok_or_else(MethodErr::no_arg));
     let devs: &Vec<MessageItem> = try!(item1.inner().map_err(|_| MethodErr::invalid_arg(&item1)));
+    let mut devstrings = devs.iter().map(|x| x.inner::<&String>());
+    if devstrings.any(|x| x.is_err()) {
+        return Err(MethodErr::invalid_arg(&item1));
+    }
+    let blockdevs = devstrings.map(|x| Path::new(x.unwrap())).collect::<Vec<&Path>>();
 
     let item2: MessageItem = try!(message.2.ok_or_else(MethodErr::no_arg));
     let raid_level: u16 = try!(item2.inner().map_err(|_| MethodErr::invalid_arg(&item2)));
-
-    let blockdevs = devs.iter()
-        .map(|x| Path::new(x.inner::<&str>().unwrap()))
-        .collect::<Vec<_>>();
 
     match engine.borrow_mut().create_pool(&name, &blockdevs, raid_level) {
         Ok(_) => Ok(vec![m.method_return().append3("/dbus/newpool/path", 0, "Ok")]),

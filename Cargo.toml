@@ -5,7 +5,7 @@ authors = ["Todd Gill <tgill@redhat.com>", "Andy Grover <agrover@redhat.com>"]
 
 
 [dependencies]
-dbus = "0.3"
+dbus = "0.4"
 clap = "1"
 nix = "0"
 devicemapper = "0.4.0"

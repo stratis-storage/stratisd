@@ -16,6 +16,7 @@ extern crate time;
 extern crate bytesize;
 extern crate dbus;
 extern crate term;
+extern crate rand;
 
 #[macro_use]
 extern crate custom_derive;

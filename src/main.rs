@@ -59,12 +59,6 @@ use types::{StratisResult, StratisError};
 use engine::Engine;
 use sim_engine::SimEngine;
 
-fn dbus_server(engine: Rc<RefCell<Engine>>) -> StratisResult<()> {
-
-    let result = dbus_api::run(engine);
-
-    result
-}
 
 fn write_err(err: StratisError) -> StratisResult<()> {
     let mut out = term::stderr().expect("could not get stderr");
@@ -81,7 +75,7 @@ fn main() {
     // TODO: add cmdline option to specify engine
     //  let context = Rc::new(RefCell::new(Context::new()));
 
-    let r = dbus_server(engine);
+    let r = dbus_api::run(engine);
 
     if let Err(r) = r {
         if let Err(e) = write_err(r) {

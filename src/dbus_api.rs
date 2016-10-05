@@ -30,7 +30,9 @@ use dbus::ConnectionItem;
 use dbus_consts::*;
 
 use engine::Engine;
-use types::{StratisResult, StratisError};
+use engine::EngineError;
+
+use types::StratisResult;
 
 #[derive(Debug)]
 pub enum DeferredAction {
@@ -72,10 +74,10 @@ impl DataType for TData {
     type Signal = ();
 }
 
-fn internal_to_dbus_err(err: &StratisError) -> ErrorEnum {
+fn internal_to_dbus_err(err: &EngineError) -> ErrorEnum {
     match *err {
-        StratisError::Stratis(_) => ErrorEnum::ERROR,
-        StratisError::Io(ref err) => {
+        EngineError::Stratis(_) => ErrorEnum::ERROR,
+        EngineError::Io(ref err) => {
             match err.kind() {
                 ErrorKind::NotFound => ErrorEnum::NOTFOUND,
                 ErrorKind::AlreadyExists => ErrorEnum::ALREADY_EXISTS,

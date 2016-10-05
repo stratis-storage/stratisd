@@ -2,12 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use blockdev::BlockDevs;
+
+use engine::Engine;
+
+use pool::StratisPool;
+
 use std::path::Path;
 use std::collections::BTreeMap;
+
 use types::StratisResult;
-use engine::Engine;
-use pool::StratisPool;
-use blockdev::BlockDevs;
+
 
 
 pub struct SimEngine {

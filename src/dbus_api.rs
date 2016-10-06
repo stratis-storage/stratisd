@@ -193,12 +193,12 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let dbus_context = m.path.get_data();
     let ref mut engine = dbus_context.borrow_mut().engine;
-    let message: (Option<MessageItem>, Option<MessageItem>, Option<MessageItem>) = m.msg.get3();
+    let (message0, message1, message2) = m.msg.get3();
 
-    let item0: MessageItem = try!(message.0.ok_or_else(MethodErr::no_arg));
+    let item0: MessageItem = try!(message0.ok_or_else(MethodErr::no_arg));
     let name: &String = try!(item0.inner().map_err(|_| MethodErr::invalid_arg(&item0)));
 
-    let item1: MessageItem = try!(message.1.ok_or_else(MethodErr::no_arg));
+    let item1: MessageItem = try!(message1.ok_or_else(MethodErr::no_arg));
     let devs: &Vec<MessageItem> = try!(item1.inner().map_err(|_| MethodErr::invalid_arg(&item1)));
     let mut devstrings = devs.iter().map(|x| x.inner::<&String>());
     if devstrings.any(|x| x.is_err()) {
@@ -206,7 +206,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     }
     let blockdevs = devstrings.map(|x| Path::new(x.unwrap())).collect::<Vec<&Path>>();
 
-    let item2: MessageItem = try!(message.2.ok_or_else(MethodErr::no_arg));
+    let item2: MessageItem = try!(message2.ok_or_else(MethodErr::no_arg));
     let raid_level: u16 = try!(item2.inner().map_err(|_| MethodErr::invalid_arg(&item2)));
 
     let result = engine.borrow_mut().create_pool(name, &blockdevs, raid_level);

@@ -200,11 +200,13 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let item1: MessageItem = try!(message1.ok_or_else(MethodErr::no_arg));
     let devs: &Vec<MessageItem> = try!(item1.inner().map_err(|_| MethodErr::invalid_arg(&item1)));
-    let mut devstrings = devs.iter().map(|x| x.inner::<&String>());
-    if devstrings.any(|x| x.is_err()) {
+
+    let devstrings = devs.iter().map(|x| x.inner::<&String>());
+    let (oks, errs): (Vec<_>, Vec<_>) = devstrings.partition(|x| x.is_ok());
+    if !errs.is_empty() {
         return Err(MethodErr::invalid_arg(&item1));
     }
-    let blockdevs = devstrings.map(|x| Path::new(x.unwrap())).collect::<Vec<&Path>>();
+    let blockdevs = oks.into_iter().map(|x| Path::new(x.unwrap())).collect::<Vec<&Path>>();
 
     let item2: MessageItem = try!(message2.ok_or_else(MethodErr::no_arg));
     let raid_level: u16 = try!(item2.inner().map_err(|_| MethodErr::invalid_arg(&item2)));

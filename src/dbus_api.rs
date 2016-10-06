@@ -216,13 +216,20 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             // let dbus_contex_clone = dbus_context.clone();
             // let object_path = create_dbus_pool(dbus_contex_clone);
 
-            Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
-        }
-        Err(x) => {
-            let dbus_err = internal_to_dbus_err(&x);
+            let code = StratisErrorEnum::STRATIS_OK;
             Ok(vec![m.msg
                         .method_return()
-                        .append3("", dbus_err.get_error_int(), dbus_err.get_error_string())])
+                        .append3(MessageItem::ObjectPath("/dbus/newpool/path".into()),
+                                 MessageItem::UInt16(code.get_error_int()),
+                                 MessageItem::Str(code.get_error_string().into()))])
+        }
+        Err(x) => {
+            let code = internal_to_dbus_err(&x);
+            Ok(vec![m.msg
+                        .method_return()
+                        .append3(MessageItem::ObjectPath("/".into()),
+                                 MessageItem::UInt16(code.get_error_int()),
+                                 MessageItem::Str(code.get_error_string().into()))])
         }
     }
 }

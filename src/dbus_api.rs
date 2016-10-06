@@ -33,7 +33,7 @@ use types::{StratisResult, StratisError};
 
 #[derive(Clone)]
 pub struct DbusContext {
-    pub next_index: i32,
+    pub next_index: u64,
     pub pools: BTreeMap<String, String>,
     pub engine: Rc<RefCell<Engine>>,
 }

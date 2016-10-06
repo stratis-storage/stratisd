@@ -204,21 +204,6 @@ fn get_raid_levels(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 }
 
 fn get_dev_types(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let mut items = m.msg.get_items();
-    if items.len() < 1 {
-        return Err(MethodErr::no_arg());
-    }
-
-    let _name = try!(items.pop()
-        .ok_or_else(MethodErr::no_arg)
-        .and_then(|i| {
-            i.inner::<&str>()
-                .map_err(|_| MethodErr::invalid_arg(&i))
-                .map(|i| i.to_owned())
-        }));
-
-    println!("method called");
-
     Ok(vec![m.msg.method_return()])
 }
 

@@ -213,10 +213,10 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     match result {
         Ok(_) => {
-            let dbus_contex_clone = dbus_context.clone();
+            // let dbus_contex_clone = dbus_context.clone();
+            // let object_path = create_dbus_pool(dbus_contex_clone);
 
-            let object_path = create_dbus_pool(dbus_contex_clone);
-            Ok(vec![m.msg.method_return().append3(object_path.get_name(), 0, "Ok")])
+            Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
         }
         Err(x) => {
             let dbus_err = internal_to_dbus_err(&x);

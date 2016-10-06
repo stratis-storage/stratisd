@@ -16,7 +16,7 @@ pub const STRATIS_DEV_BASE_INTERFACE: &'static str = "org.storage.stratis1.dev";
 pub const STRATIS_CACHE_BASE_INTERFACE: &'static str = "org.storage.stratis1.cache";
 pub const STRATIS_POOL_BASE_PATH: &'static str = "/org/storage/stratis/pool";
 
-
+// Manager Methods
 pub const LIST_POOLS: &'static str = "ListPools";
 pub const CREATE_POOL: &'static str = "CreatePool";
 pub const DESTROY_POOL: &'static str = "DestroyPool";
@@ -27,6 +27,17 @@ pub const GET_CACHE_OBJECT_PATH: &'static str = "GetCacheObjectPath";
 pub const GET_ERROR_CODES: &'static str = "GetErrorCodes";
 pub const GET_RAID_LEVELS: &'static str = "GetRaidLevels";
 pub const GET_DEV_TYPES: &'static str = "GetDevTypes";
+
+// Pool Methods
+pub const CREATE_VOLUMES: &'static str = "CreateVolumes";
+pub const DESTROY_VOLUMES: &'static str = "DestroyVolumes";
+pub const LIST_VOLUMES: &'static str = "ListVolumes";
+pub const LIST_DEVS: &'static str = "ListDevs";
+pub const LIST_CACHE_DEVS: &'static str = "ListCacheDevs";
+pub const ADD_CACHE_DEVS: &'static str = "AddCacheDevs";
+pub const REMOVE_CACHE_DEVS: &'static str = "RemoveCacheDevs";
+pub const ADD_DEVS: &'static str = "AddDevs";
+pub const REMOVE_DEVS: &'static str = "RemoveDevs";
 
 pub trait HasCodes {
     /// Indicates that this enum can be converted to an int or described

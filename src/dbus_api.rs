@@ -22,9 +22,12 @@ use dbus::tree::MTFn;
 use dbus::tree::MethodResult;
 use dbus::tree::MethodInfo;
 use dbus::tree::Tree;
+use dbus::tree::ObjectPath;
+use dbus::tree::Interface;
 
 use dbus_consts::*;
 
+use pool::Pool;
 use engine::Engine;
 use types::{StratisResult, StratisError};
 
@@ -50,8 +53,9 @@ impl DbusContext {
             engine: engine.clone(),
         }
     }
-    pub fn get_next_id(&mut self) {
+    pub fn get_next_id(&mut self) -> String {
         self.next_index += 1;
+        self.next_index.to_string()
     }
 }
 
@@ -102,11 +106,93 @@ fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![m.msg.method_return().append1(item_array)])
 }
 
+
+fn create_volumes(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+
+    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+}
+
+fn destroy_volumes(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+}
+
+fn list_volumes(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+}
+
+fn list_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+}
+
+fn list_cache(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+}
+
+fn list_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+}
+
+fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+}
+
+fn remove_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+}
+
+fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+}
+
+fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+}
+
+fn create_dbus_pool(dbus_context: Rc<RefCell<DbusContext>>) -> ObjectPath<MTFn<TData>, TData> {
+
+    let f = Factory::new_fn();
+
+    let create_volumes_method = f.method(CREATE_VOLUMES, (), create_volumes);
+
+    let destroy_volumes_method = f.method(DESTROY_VOLUMES, (), destroy_volumes);
+
+    let list_volumes_method = f.method(LIST_VOLUMES, (), list_volumes);
+
+    let list_devs_method = f.method(LIST_DEVS, (), list_devs);
+
+    let list_cache_devs_method = f.method(LIST_CACHE_DEVS, (), list_cache_devs);
+
+    let add_cache_devs_method = f.method(ADD_CACHE_DEVS, (), add_cache_devs);
+
+    let remove_cache_devs_method = f.method(REMOVE_CACHE_DEVS, (), remove_cache_devs);
+
+    let add_devs_method = f.method(ADD_DEVS, (), add_devs);
+
+    let remove_devs_method = f.method(REMOVE_DEVS, (), remove_devs);
+
+    let object_name = format!("{}/{}",
+                              STRATIS_BASE_PATH,
+                              dbus_context.borrow_mut().get_next_id().to_string());
+
+    f.object_path(object_name, dbus_context)
+        .introspectable()
+        .add(f.interface(STRATIS_MANAGER_INTERFACE, ())
+            .add_m(create_volumes_method)
+            .add_m(destroy_volumes_method)
+            .add_m(list_volumes_method)
+            .add_m(list_devs_method)
+            .add_m(list_cache_devs_method)
+            .add_m(add_cache_devs_method)
+            .add_m(remove_cache_devs_method)
+            .add_m(add_devs_method)
+            .add_m(remove_devs_method))
+
+}
+
 fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let dbus_context = m.path.get_data();
     let ref mut engine = dbus_context.borrow_mut().engine;
-
     let message: (Option<MessageItem>, Option<MessageItem>, Option<MessageItem>) = m.msg.get3();
 
     let item0: MessageItem = try!(message.0.ok_or_else(MethodErr::no_arg));
@@ -124,8 +210,14 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let raid_level: u16 = try!(item2.inner().map_err(|_| MethodErr::invalid_arg(&item2)));
 
     let result = engine.borrow_mut().create_pool(name, &blockdevs, raid_level);
+
     match result {
-        Ok(_) => Ok(vec![m.msg.method_return().append3("/dbus/newpool/path", 0, "Ok")]),
+        Ok(_) => {
+            let dbus_contex_clone = dbus_context.clone();
+
+            let object_path = create_dbus_pool(dbus_contex_clone);
+            Ok(vec![m.msg.method_return().append3(object_path.get_name(), 0, "Ok")])
+        }
         Err(x) => {
             let dbus_err = internal_to_dbus_err(&x);
             Ok(vec![m.msg

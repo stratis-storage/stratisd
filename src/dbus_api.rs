@@ -11,6 +11,7 @@ use std::io::ErrorKind;
 use std::collections::BTreeMap;
 use std::fmt;
 
+use dbus;
 use dbus::Connection;
 use dbus::BusType;
 use dbus::MessageItem;
@@ -148,7 +149,7 @@ fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
-fn create_dbus_pool(dbus_context: Rc<RefCell<DbusContext>>) -> MessageItem {
+fn create_dbus_pool<'a>(dbus_context: Rc<RefCell<DbusContext>>) -> dbus::Path<'a> {
 
     let f = Factory::new_fn();
     let tree = f.tree();
@@ -188,10 +189,9 @@ fn create_dbus_pool(dbus_context: Rc<RefCell<DbusContext>>) -> MessageItem {
             .add_m(add_devs_method)
             .add_m(remove_devs_method));
 
-    let path = MessageItem::ObjectPath(object_path.get_name().to_owned());
+    let path = object_path.get_name().to_owned();
     tree.add(object_path);
     path
-
 }
 
 fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -223,12 +223,12 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     match result {
         Ok(_) => {
-            let dbus_contex_clone = dbus_context.clone();
-            let object_path_message_item = create_dbus_pool(dbus_contex_clone);
+            let dbus_context_clone = dbus_context.clone();
+            let object_path: dbus::Path = create_dbus_pool(dbus_context_clone);
             let code = StratisErrorEnum::STRATIS_OK;
             Ok(vec![m.msg
                         .method_return()
-                        .append3(object_path_message_item,
+                        .append3(MessageItem::ObjectPath(object_path),
                                  MessageItem::UInt16(code.get_error_int()),
                                  MessageItem::Str(code.get_error_string().into()))])
         }

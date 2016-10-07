@@ -261,15 +261,16 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(_) => {
-            message.append2(MessageItem::UInt16(0),
-                            MessageItem::Str(format!("{}", "Ok")))
+            let code = StratisErrorEnum::STRATIS_OK;
+            message.append2(MessageItem::UInt16(code.get_error_int()),
+                            MessageItem::Str(code.get_error_string().into()))
         }
         Err(err) => {
-            message.append2(MessageItem::UInt16(0),
-                            MessageItem::Str(format!("{}", "Ok")))
+            let code = internal_to_dbus_err(&err);
+            message.append2(MessageItem::UInt16(code.get_error_int()),
+                            MessageItem::Str(code.get_error_string().into()))
         }
     };
-
     Ok(vec![msg])
 }
 

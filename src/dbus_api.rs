@@ -148,9 +148,10 @@ fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
-fn create_dbus_pool(dbus_context: Rc<RefCell<DbusContext>>) -> ObjectPath<MTFn<TData>, TData> {
+fn create_dbus_pool(dbus_context: Rc<RefCell<DbusContext>>) -> MessageItem {
 
     let f = Factory::new_fn();
+    let tree = f.tree();
 
     let create_volumes_method = f.method(CREATE_VOLUMES, (), create_volumes);
 
@@ -174,7 +175,7 @@ fn create_dbus_pool(dbus_context: Rc<RefCell<DbusContext>>) -> ObjectPath<MTFn<T
                               STRATIS_BASE_PATH,
                               dbus_context.borrow_mut().get_next_id().to_string());
 
-    f.object_path(object_name, dbus_context)
+    let object_path = f.object_path(object_name, dbus_context)
         .introspectable()
         .add(f.interface(STRATIS_MANAGER_INTERFACE, ())
             .add_m(create_volumes_method)
@@ -185,14 +186,17 @@ fn create_dbus_pool(dbus_context: Rc<RefCell<DbusContext>>) -> ObjectPath<MTFn<T
             .add_m(add_cache_devs_method)
             .add_m(remove_cache_devs_method)
             .add_m(add_devs_method)
-            .add_m(remove_devs_method))
+            .add_m(remove_devs_method));
+
+    let path = MessageItem::ObjectPath(object_path.get_name().to_owned());
+    tree.add(object_path);
+    path
 
 }
 
 fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let dbus_context = m.path.get_data();
-    let ref mut engine = dbus_context.borrow_mut().engine;
     let (message0, message1, message2) = m.msg.get3();
 
     let item0: MessageItem = try!(message0.ok_or_else(MethodErr::no_arg));
@@ -211,17 +215,20 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let item2: MessageItem = try!(message2.ok_or_else(MethodErr::no_arg));
     let raid_level: u16 = try!(item2.inner().map_err(|_| MethodErr::invalid_arg(&item2)));
 
-    let result = engine.borrow_mut().create_pool(name, &blockdevs, raid_level);
+    let result = {
+        let ref mut engine = dbus_context.borrow_mut().engine;
+        let result = engine.borrow_mut().create_pool(name, &blockdevs, raid_level);
+        result
+    };
 
     match result {
         Ok(_) => {
-            // let dbus_contex_clone = dbus_context.clone();
-            // let object_path = create_dbus_pool(dbus_contex_clone);
-
+            let dbus_contex_clone = dbus_context.clone();
+            let object_path_message_item = create_dbus_pool(dbus_contex_clone);
             let code = StratisErrorEnum::STRATIS_OK;
             Ok(vec![m.msg
                         .method_return()
-                        .append3(MessageItem::ObjectPath("/dbus/newpool/path".into()),
+                        .append3(object_path_message_item,
                                  MessageItem::UInt16(code.get_error_int()),
                                  MessageItem::Str(code.get_error_string().into()))])
         }

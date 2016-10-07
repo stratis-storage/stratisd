@@ -41,7 +41,7 @@ impl Engine for SimEngine {
 
     fn destroy_pool(&mut self, name: &str) -> StratisResult<()> {
 
-        let deleted_pool = self.pools.remove(name);
+        self.pools.remove(name);
 
         Ok(())
     }

@@ -85,23 +85,19 @@ fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let dbus_context = m.path.get_data();
     let ref engine = dbus_context.borrow().engine;
+
     let result = engine.borrow().list_pools();
 
-    let mut msg_vec = Vec::new();
-
-    // TODO: deal with failure
     let pool_tree = result.unwrap();
 
-    for (name, pool) in pool_tree {
-        let entry = vec![MessageItem::Str(format!("{}", name)),
-                         MessageItem::UInt16(0),
-                         MessageItem::Str(String::from("Ok"))];
-        msg_vec.push(MessageItem::Struct(entry));
-    }
+    let msg_vec = pool_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
+    let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("s"));
 
-    let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sqs)"));
+    let code = StratisErrorEnum::STRATIS_OK;
 
-    Ok(vec![m.msg.method_return().append1(item_array)])
+    Ok(vec![m.msg.method_return().append3(item_array,
+                                          MessageItem::UInt16(code.get_error_int()),
+                                          MessageItem::Str(code.get_error_string().into()))])
 }
 
 

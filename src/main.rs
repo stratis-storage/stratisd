@@ -56,7 +56,6 @@ use std::cell::RefCell;
 
 use types::{StratisResult, StratisError};
 
-use engine::Engine;
 use sim_engine::SimEngine;
 
 

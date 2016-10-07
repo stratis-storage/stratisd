@@ -23,12 +23,9 @@ use dbus::tree::MTFn;
 use dbus::tree::MethodResult;
 use dbus::tree::MethodInfo;
 use dbus::tree::Tree;
-use dbus::tree::ObjectPath;
-use dbus::tree::Interface;
 
 use dbus_consts::*;
 
-use pool::Pool;
 use engine::Engine;
 use types::{StratisResult, StratisError};
 

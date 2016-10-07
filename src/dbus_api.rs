@@ -53,9 +53,9 @@ impl DbusContext {
             engine: engine.clone(),
         }
     }
-    pub fn get_next_id(&mut self) -> String {
+    pub fn get_next_id(&mut self) -> u64 {
         self.next_index += 1;
-        self.next_index.to_string()
+        self.next_index
     }
 }
 

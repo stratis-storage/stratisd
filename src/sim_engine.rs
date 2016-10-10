@@ -10,6 +10,7 @@ use pool::StratisPool;
 
 use std::path::Path;
 use std::collections::BTreeMap;
+use std::iter::FromIterator;
 
 use types::StratisResult;
 
@@ -48,14 +49,8 @@ impl Engine for SimEngine {
 
     fn list_pools(&self) -> StratisResult<BTreeMap<String, Box<StratisPool>>> {
 
-        let mut stratis_pools = BTreeMap::new();
+        Ok(BTreeMap::from_iter(self.pools.iter().map(|x| (x.0.clone(), x.1.copy()))))
 
-        for (name, pool) in &self.pools {
-
-            stratis_pools.insert(name.clone(), pool.copy());
-        }
-
-        Ok(stratis_pools)
     }
 }
 

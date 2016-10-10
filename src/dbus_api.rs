@@ -11,6 +11,7 @@ use std::io::ErrorKind;
 use std::collections::BTreeMap;
 use std::fmt;
 
+use dbus;
 use dbus::Connection;
 use dbus::BusType;
 use dbus::MessageItem;
@@ -22,12 +23,9 @@ use dbus::tree::MTFn;
 use dbus::tree::MethodResult;
 use dbus::tree::MethodInfo;
 use dbus::tree::Tree;
-use dbus::tree::ObjectPath;
-use dbus::tree::Interface;
 
 use dbus_consts::*;
 
-use pool::Pool;
 use engine::Engine;
 use types::{StratisResult, StratisError};
 
@@ -53,9 +51,9 @@ impl DbusContext {
             engine: engine.clone(),
         }
     }
-    pub fn get_next_id(&mut self) -> String {
+    pub fn get_next_id(&mut self) -> u64 {
         self.next_index += 1;
-        self.next_index.to_string()
+        self.next_index
     }
 }
 
@@ -83,27 +81,32 @@ fn internal_to_dbus_err(err: &StratisError) -> StratisErrorEnum {
     }
 }
 
+fn code_to_message_items(code: StratisErrorEnum) -> (MessageItem, MessageItem) {
+    (MessageItem::UInt16(code.get_error_int()), MessageItem::Str(code.get_error_string().into()))
+}
+
 fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let dbus_context = m.path.get_data();
     let ref engine = dbus_context.borrow().engine;
     let result = engine.borrow().list_pools();
 
-    let mut msg_vec = Vec::new();
+    let return_message = m.msg.method_return();
 
-    // TODO: deal with failure
-    let pool_tree = result.unwrap();
-
-    for (name, pool) in pool_tree {
-        let entry = vec![MessageItem::Str(format!("{}", name)),
-                         MessageItem::UInt16(0),
-                         MessageItem::Str(String::from("Ok"))];
-        msg_vec.push(MessageItem::Struct(entry));
-    }
-
-    let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sqs)"));
-
-    Ok(vec![m.msg.method_return().append1(item_array)])
+    let msg = match result {
+        Ok(pool_tree) => {
+            let msg_vec =
+                pool_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
+            let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("s"));
+            let (rc, rs) = code_to_message_items(StratisErrorEnum::STRATIS_OK);
+            return_message.append3(item_array, rc, rs)
+        }
+        Err(x) => {
+            let (rc, rs) = code_to_message_items(internal_to_dbus_err(&x));
+            return_message.append3(MessageItem::ObjectPath("/".into()), rc, rs)
+        }
+    };
+    Ok(vec![msg])
 }
 
 
@@ -148,7 +151,7 @@ fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
-fn create_dbus_pool(dbus_context: Rc<RefCell<DbusContext>>) -> MessageItem {
+fn create_dbus_pool<'a>(dbus_context: Rc<RefCell<DbusContext>>) -> dbus::Path<'a> {
 
     let f = Factory::new_fn();
     let tree = f.tree();
@@ -188,15 +191,13 @@ fn create_dbus_pool(dbus_context: Rc<RefCell<DbusContext>>) -> MessageItem {
             .add_m(add_devs_method)
             .add_m(remove_devs_method));
 
-    let path = MessageItem::ObjectPath(object_path.get_name().to_owned());
+    let path = object_path.get_name().to_owned();
     tree.add(object_path);
     path
-
 }
 
 fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
-    let dbus_context = m.path.get_data();
     let (message0, message1, message2) = m.msg.get3();
 
     let item0: MessageItem = try!(message0.ok_or_else(MethodErr::no_arg));
@@ -215,58 +216,53 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let item2: MessageItem = try!(message2.ok_or_else(MethodErr::no_arg));
     let raid_level: u16 = try!(item2.inner().map_err(|_| MethodErr::invalid_arg(&item2)));
 
+    let dbus_context = m.path.get_data();
     let result = {
         let ref mut engine = dbus_context.borrow_mut().engine;
         let result = engine.borrow_mut().create_pool(name, &blockdevs, raid_level);
         result
     };
 
-    match result {
+    let return_message = m.msg.method_return();
+
+    let msg = match result {
         Ok(_) => {
-            let dbus_contex_clone = dbus_context.clone();
-            let object_path_message_item = create_dbus_pool(dbus_contex_clone);
-            let code = StratisErrorEnum::STRATIS_OK;
-            Ok(vec![m.msg
-                        .method_return()
-                        .append3(object_path_message_item,
-                                 MessageItem::UInt16(code.get_error_int()),
-                                 MessageItem::Str(code.get_error_string().into()))])
+            let dbus_context_clone = dbus_context.clone();
+            let object_path: dbus::Path = create_dbus_pool(dbus_context_clone);
+            let (rc, rs) = code_to_message_items(StratisErrorEnum::STRATIS_OK);
+            return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
         }
         Err(x) => {
-            let code = internal_to_dbus_err(&x);
-            Ok(vec![m.msg
-                        .method_return()
-                        .append3(MessageItem::ObjectPath("/".into()),
-                                 MessageItem::UInt16(code.get_error_int()),
-                                 MessageItem::Str(code.get_error_string().into()))])
+            let (rc, rs) = code_to_message_items(internal_to_dbus_err(&x));
+            return_message.append3(MessageItem::ObjectPath("/".into()), rc, rs)
         }
-    }
+    };
+    Ok(vec![msg])
 }
 
 fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
-    let dbus_context = m.path.get_data();
-    let ref engine = dbus_context.borrow().engine;
+    let message = m.msg.get1();
 
-    let item: MessageItem = try!(m.msg.get1().ok_or_else(MethodErr::no_arg));
-
+    let item: MessageItem = try!(message.ok_or_else(MethodErr::no_arg));
     let name: &String = try!(item.inner().map_err(|_| MethodErr::invalid_arg(&item)));
 
+    let dbus_context = m.path.get_data();
+    let ref engine = dbus_context.borrow().engine;
     let result = engine.borrow_mut().destroy_pool(&name);
 
-    let message = m.msg.method_return();
+    let return_message = m.msg.method_return();
 
     let msg = match result {
         Ok(_) => {
-            message.append2(MessageItem::UInt16(0),
-                            MessageItem::Str(format!("{}", "Ok")))
+            let (rc, rs) = code_to_message_items(StratisErrorEnum::STRATIS_OK);
+            return_message.append2(rc, rs)
         }
         Err(err) => {
-            message.append2(MessageItem::UInt16(0),
-                            MessageItem::Str(format!("{}", "Ok")))
+            let (rc, rs) = code_to_message_items(internal_to_dbus_err(&err));
+            return_message.append2(rc, rs)
         }
     };
-
     Ok(vec![msg])
 }
 

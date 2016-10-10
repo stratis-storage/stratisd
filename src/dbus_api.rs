@@ -88,16 +88,26 @@ fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let result = engine.borrow().list_pools();
 
-    let pool_tree = result.unwrap();
+    let return_message = m.msg.method_return();
 
-    let msg_vec = pool_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
-    let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("s"));
-
-    let code = StratisErrorEnum::STRATIS_OK;
-
-    Ok(vec![m.msg.method_return().append3(item_array,
-                                          MessageItem::UInt16(code.get_error_int()),
-                                          MessageItem::Str(code.get_error_string().into()))])
+    let msg = match result {
+        Ok(pool_tree) => {
+            let msg_vec =
+                pool_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
+            let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("s"));
+            let code = StratisErrorEnum::STRATIS_OK;
+            return_message.append3(item_array,
+                                   MessageItem::UInt16(code.get_error_int()),
+                                   MessageItem::Str(code.get_error_string().into()))
+        }
+        Err(x) => {
+            let code = internal_to_dbus_err(&x);
+            return_message.append3(MessageItem::ObjectPath("/".into()),
+                                   MessageItem::UInt16(code.get_error_int()),
+                                   MessageItem::Str(code.get_error_string().into()))
+        }
+    };
+    Ok(vec![msg])
 }
 
 

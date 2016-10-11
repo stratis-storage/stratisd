@@ -14,8 +14,10 @@ use std::fmt;
 use dbus;
 use dbus::Connection;
 use dbus::BusType;
+use dbus::Message;
 use dbus::MessageItem;
 use dbus::NameFlag;
+use dbus::arg::Array;
 use dbus::tree::Factory;
 use dbus::tree::DataType;
 use dbus::tree::MethodErr;
@@ -197,24 +199,19 @@ fn create_dbus_pool<'a>(dbus_context: Rc<RefCell<DbusContext>>) -> dbus::Path<'a
 }
 
 fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
 
-    let (message0, message1, message2) = m.msg.get3();
+    if iter.arg_type() == 0 { return Err(MethodErr::no_arg()) }
+    let name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
 
-    let item0: MessageItem = try!(message0.ok_or_else(MethodErr::no_arg));
-    let name: &String = try!(item0.inner().map_err(|_| MethodErr::invalid_arg(&item0)));
+    if iter.arg_type() == 0 { return Err(MethodErr::no_arg()) }
+    let devs: Array<&str, _> = try!(iter.read::<Array<&str, _>>().map_err(|_| MethodErr::invalid_arg(&1)));
 
-    let item1: MessageItem = try!(message1.ok_or_else(MethodErr::no_arg));
-    let devs: &Vec<MessageItem> = try!(item1.inner().map_err(|_| MethodErr::invalid_arg(&item1)));
+    if iter.arg_type() == 0 { return Err(MethodErr::no_arg()) }
+    let raid_level: u16 = try!(iter.read::<u16>().map_err(|_| MethodErr::invalid_arg(&2)));
 
-    let devstrings = devs.iter().map(|x| x.inner::<&String>());
-    let (oks, errs): (Vec<_>, Vec<_>) = devstrings.partition(|x| x.is_ok());
-    if !errs.is_empty() {
-        return Err(MethodErr::invalid_arg(&item1));
-    }
-    let blockdevs = oks.into_iter().map(|x| Path::new(x.unwrap())).collect::<Vec<&Path>>();
-
-    let item2: MessageItem = try!(message2.ok_or_else(MethodErr::no_arg));
-    let raid_level: u16 = try!(item2.inner().map_err(|_| MethodErr::invalid_arg(&item2)));
+    let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
     let dbus_context = m.path.get_data();
     let result = {
@@ -223,7 +220,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         result
     };
 
-    let return_message = m.msg.method_return();
+    let return_message = message.method_return();
 
     let msg = match result {
         Ok(_) => {
@@ -242,16 +239,16 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
 fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
-    let message = m.msg.get1();
-
-    let item: MessageItem = try!(message.ok_or_else(MethodErr::no_arg));
-    let name: &String = try!(item.inner().map_err(|_| MethodErr::invalid_arg(&item)));
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+    if iter.arg_type() == 0 { return Err(MethodErr::no_arg()) }
+    let name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
 
     let dbus_context = m.path.get_data();
     let ref engine = dbus_context.borrow().engine;
     let result = engine.borrow_mut().destroy_pool(&name);
 
-    let return_message = m.msg.method_return();
+    let return_message = message.method_return();
 
     let msg = match result {
         Ok(_) => {

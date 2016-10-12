@@ -16,6 +16,8 @@ pub const STRATIS_DEV_BASE_INTERFACE: &'static str = "org.storage.stratis1.dev";
 pub const STRATIS_CACHE_BASE_INTERFACE: &'static str = "org.storage.stratis1.cache";
 pub const STRATIS_POOL_BASE_PATH: &'static str = "/org/storage/stratis/pool";
 
+pub const DEFAULT_OBJECT_PATH: &'static str = "/";
+
 // Manager Methods
 pub const LIST_POOLS: &'static str = "ListPools";
 pub const CREATE_POOL: &'static str = "CreatePool";

@@ -3,12 +3,13 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
+use std::fmt::Debug;
 use std::path::Path;
 
 use types::StratisResult;
 use blockdev::BlockDevs;
 
-pub trait StratisPool {
+pub trait StratisPool: Debug {
     fn add_blockdev(&mut self, path: &str) -> StratisResult<()>;
     fn add_cachedev(&mut self, path: &str) -> StratisResult<()>;
     fn destroy(&mut self) -> StratisResult<()>;
@@ -16,7 +17,7 @@ pub trait StratisPool {
     fn copy(&self) -> Box<StratisPool>;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Pool {
     pub name: String,
     pub block_devs: BlockDevs,

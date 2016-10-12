@@ -16,6 +16,7 @@ use types::StratisResult;
 
 
 
+#[derive(Debug)]
 pub struct SimEngine {
     pub pools: BTreeMap<String, Box<StratisPool>>,
 }
@@ -54,6 +55,7 @@ impl Engine for SimEngine {
     }
 }
 
+#[derive(Debug)]
 pub struct SimPool {
     pub name: String,
     pub block_devs: BlockDevs,

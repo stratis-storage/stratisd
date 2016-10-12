@@ -9,7 +9,6 @@ use std::path::Path;
 use std::rc::Rc;
 use std::io::ErrorKind;
 use std::collections::BTreeMap;
-use std::fmt;
 
 use dbus;
 use dbus::Connection;
@@ -29,19 +28,13 @@ use dbus_consts::*;
 use engine::Engine;
 use types::{StratisResult, StratisError};
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct DbusContext {
     pub next_index: u64,
     pub pools: BTreeMap<String, String>,
     pub engine: Rc<RefCell<Engine>>,
 }
 
-// engine doesn't impl Debug, so we can't derive
-impl fmt::Debug for DbusContext {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{DBusContext {:?}, {:?}}}", self.next_index, self.pools)
-    }
-}
 
 impl DbusContext {
     pub fn new(engine: &Rc<RefCell<Engine>>) -> DbusContext {

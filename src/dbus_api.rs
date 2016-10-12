@@ -13,8 +13,10 @@ use std::collections::BTreeMap;
 use dbus;
 use dbus::Connection;
 use dbus::BusType;
+use dbus::Message;
 use dbus::MessageItem;
 use dbus::NameFlag;
+use dbus::arg::Array;
 use dbus::tree::Factory;
 use dbus::tree::DataType;
 use dbus::tree::MethodErr;
@@ -78,6 +80,10 @@ fn code_to_message_items(code: StratisErrorEnum) -> (MessageItem, MessageItem) {
     (MessageItem::UInt16(code.get_error_int()), MessageItem::Str(code.get_error_string().into()))
 }
 
+fn default_object_path<'a>() -> dbus::Path<'a> {
+    dbus::Path::new(DEFAULT_OBJECT_PATH).unwrap()
+}
+
 fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let dbus_context = m.path.get_data();
@@ -90,13 +96,14 @@ fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(pool_tree) => {
             let msg_vec =
                 pool_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
-            let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("s"));
+            let item_array = MessageItem::Array(msg_vec, "s".into());
             let (rc, rs) = code_to_message_items(StratisErrorEnum::STRATIS_OK);
             return_message.append3(item_array, rc, rs)
         }
         Err(x) => {
+            let item_array = MessageItem::Array(vec![], "s".into());
             let (rc, rs) = code_to_message_items(internal_to_dbus_err(&x));
-            return_message.append3(MessageItem::ObjectPath("/".into()), rc, rs)
+            return_message.append3(item_array, rc, rs)
         }
     };
     Ok(vec![msg])
@@ -190,24 +197,19 @@ fn create_dbus_pool<'a>(dbus_context: Rc<RefCell<DbusContext>>) -> dbus::Path<'a
 }
 
 fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
 
-    let (message0, message1, message2) = m.msg.get3();
+    if iter.arg_type() == 0 { return Err(MethodErr::no_arg()) }
+    let name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
 
-    let item0: MessageItem = try!(message0.ok_or_else(MethodErr::no_arg));
-    let name: &String = try!(item0.inner().map_err(|_| MethodErr::invalid_arg(&item0)));
+    if iter.arg_type() == 0 { return Err(MethodErr::no_arg()) }
+    let raid_level: u16 = try!(iter.read::<u16>().map_err(|_| MethodErr::invalid_arg(&1)));
 
-    let item1: MessageItem = try!(message1.ok_or_else(MethodErr::no_arg));
-    let devs: &Vec<MessageItem> = try!(item1.inner().map_err(|_| MethodErr::invalid_arg(&item1)));
+    if iter.arg_type() == 0 { return Err(MethodErr::no_arg()) }
+    let devs: Array<&str, _> = try!(iter.read::<Array<&str, _>>().map_err(|_| MethodErr::invalid_arg(&2)));
 
-    let devstrings = devs.iter().map(|x| x.inner::<&String>());
-    let (oks, errs): (Vec<_>, Vec<_>) = devstrings.partition(|x| x.is_ok());
-    if !errs.is_empty() {
-        return Err(MethodErr::invalid_arg(&item1));
-    }
-    let blockdevs = oks.into_iter().map(|x| Path::new(x.unwrap())).collect::<Vec<&Path>>();
-
-    let item2: MessageItem = try!(message2.ok_or_else(MethodErr::no_arg));
-    let raid_level: u16 = try!(item2.inner().map_err(|_| MethodErr::invalid_arg(&item2)));
+    let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
     let dbus_context = m.path.get_data();
     let result = {
@@ -216,7 +218,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         result
     };
 
-    let return_message = m.msg.method_return();
+    let return_message = message.method_return();
 
     let msg = match result {
         Ok(_) => {
@@ -226,8 +228,9 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
         }
         Err(x) => {
+            let object_path: dbus::Path = default_object_path();
             let (rc, rs) = code_to_message_items(internal_to_dbus_err(&x));
-            return_message.append3(MessageItem::ObjectPath("/".into()), rc, rs)
+            return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
         }
     };
     Ok(vec![msg])
@@ -235,16 +238,16 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
 fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
-    let message = m.msg.get1();
-
-    let item: MessageItem = try!(message.ok_or_else(MethodErr::no_arg));
-    let name: &String = try!(item.inner().map_err(|_| MethodErr::invalid_arg(&item)));
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+    if iter.arg_type() == 0 { return Err(MethodErr::no_arg()) }
+    let name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
 
     let dbus_context = m.path.get_data();
     let ref engine = dbus_context.borrow().engine;
     let result = engine.borrow_mut().destroy_pool(&name);
 
-    let return_message = m.msg.method_return();
+    let return_message = message.method_return();
 
     let msg = match result {
         Ok(_) => {
@@ -313,8 +316,8 @@ fn get_base_tree<'a>(dbus_context: Rc<RefCell<DbusContext>>)
 
     let createpool_method = f.method(CREATE_POOL, (), create_pool)
         .in_arg(("pool_name", "s"))
-        .in_arg(("dev_list", "as"))
         .in_arg(("raid_type", "q"))
+        .in_arg(("dev_list", "as"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

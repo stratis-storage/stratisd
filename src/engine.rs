@@ -3,13 +3,14 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
+use std::fmt::Debug;
 use std::path::Path;
 use std::collections::BTreeMap;
 use types::StratisResult;
 use pool::StratisPool;
 
 
-pub trait Engine {
+pub trait Engine: Debug {
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],

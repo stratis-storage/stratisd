@@ -99,13 +99,14 @@ fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(pool_tree) => {
             let msg_vec =
                 pool_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
-            let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("s"));
+            let item_array = MessageItem::Array(msg_vec, "s".into());
             let (rc, rs) = code_to_message_items(StratisErrorEnum::STRATIS_OK);
             return_message.append3(item_array, rc, rs)
         }
         Err(x) => {
+            let item_array = MessageItem::Array(vec![], "s".into());
             let (rc, rs) = code_to_message_items(internal_to_dbus_err(&x));
-            return_message.append3(MessageItem::ObjectPath("/".into()), rc, rs)
+            return_message.append3(item_array, rc, rs)
         }
     };
     Ok(vec![msg])

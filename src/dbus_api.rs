@@ -87,6 +87,10 @@ fn code_to_message_items(code: StratisErrorEnum) -> (MessageItem, MessageItem) {
     (MessageItem::UInt16(code.get_error_int()), MessageItem::Str(code.get_error_string().into()))
 }
 
+fn default_object_path<'a>() -> dbus::Path<'a> {
+    dbus::Path::new(DEFAULT_OBJECT_PATH).unwrap()
+}
+
 fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let dbus_context = m.path.get_data();
@@ -231,8 +235,9 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
         }
         Err(x) => {
+            let object_path: dbus::Path = default_object_path();
             let (rc, rs) = code_to_message_items(internal_to_dbus_err(&x));
-            return_message.append3(MessageItem::ObjectPath("/".into()), rc, rs)
+            return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
         }
     };
     Ok(vec![msg])

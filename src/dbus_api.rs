@@ -206,10 +206,10 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
 
     if iter.arg_type() == 0 { return Err(MethodErr::no_arg()) }
-    let devs: Array<&str, _> = try!(iter.read::<Array<&str, _>>().map_err(|_| MethodErr::invalid_arg(&1)));
+    let raid_level: u16 = try!(iter.read::<u16>().map_err(|_| MethodErr::invalid_arg(&1)));
 
     if iter.arg_type() == 0 { return Err(MethodErr::no_arg()) }
-    let raid_level: u16 = try!(iter.read::<u16>().map_err(|_| MethodErr::invalid_arg(&2)));
+    let devs: Array<&str, _> = try!(iter.read::<Array<&str, _>>().map_err(|_| MethodErr::invalid_arg(&2)));
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
@@ -317,8 +317,8 @@ fn get_base_tree<'a>(dbus_context: Rc<RefCell<DbusContext>>)
 
     let createpool_method = f.method(CREATE_POOL, (), create_pool)
         .in_arg(("pool_name", "s"))
-        .in_arg(("dev_list", "as"))
         .in_arg(("raid_type", "q"))
+        .in_arg(("dev_list", "as"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

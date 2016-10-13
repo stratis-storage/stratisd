@@ -3,9 +3,10 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::path::Path;
-use std::collections::BTreeMap;
+
 use types::StratisResult;
 
 

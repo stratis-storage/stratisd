@@ -77,7 +77,6 @@ impl HasCodes for StratisErrorEnum {
 
     fn get_error_string(&self) -> &str {
         match *self {
-            // TODO deal with internationalization/do this better
             StratisErrorEnum::STRATIS_OK => "Ok",
             StratisErrorEnum::STRATIS_ERROR => "A general error happened",
             StratisErrorEnum::STRATIS_NULL => "Null parameter was supplied",

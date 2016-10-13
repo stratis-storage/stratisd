@@ -59,10 +59,13 @@ custom_derive! {
 
         ALREADY_EXISTS,
         BAD_PARAM,
+        BUSY,
         CACHE_NOTFOUND,
         DEV_NOTFOUND,
         FILESYSTEM_NOTFOUND,
+        IO_ERROR,
         LIST_FAILURE,
+        NIX_ERROR,
         NO_POOLS,
         NOTFOUND,
         NULL,
@@ -91,6 +94,9 @@ impl HasCodes for ErrorEnum {
             ErrorEnum::NULL_NAME => "Null name supplied",
             ErrorEnum::NO_POOLS => "No pools",
             ErrorEnum::LIST_FAILURE => "List operation failure.",
+            ErrorEnum::IO_ERROR => "IO error during operation.",
+            ErrorEnum::NIX_ERROR => "System error during operation.",
+            ErrorEnum::BUSY => "Operation can not be performed at this time",
         }
     }
 }

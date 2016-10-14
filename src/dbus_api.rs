@@ -24,17 +24,26 @@ use dbus::tree::MTFn;
 use dbus::tree::MethodResult;
 use dbus::tree::MethodInfo;
 use dbus::tree::Tree;
+use dbus::tree::ObjectPath;
+use dbus::ConnectionItem;
 
 use dbus_consts::*;
 
 use engine::Engine;
 use types::{StratisResult, StratisError};
 
-#[derive(Clone,Debug)]
+#[derive(Debug)]
+pub enum DeferredAction {
+    Add(ObjectPath<MTFn<TData>, TData>),
+    Remove(ObjectPath<MTFn<TData>, TData>),
+}
+
+#[derive(Debug)]
 pub struct DbusContext {
     pub next_index: u64,
     pub pools: BTreeMap<String, String>,
     pub engine: Rc<RefCell<Engine>>,
+    pub action_list: Vec<DeferredAction>,
 }
 
 
@@ -44,6 +53,7 @@ impl DbusContext {
             next_index: 0,
             pools: BTreeMap::new(),
             engine: engine.clone(),
+            action_list: Vec::new(),
         }
     }
     pub fn get_next_id(&mut self) -> u64 {
@@ -53,7 +63,7 @@ impl DbusContext {
 }
 
 #[derive(Copy, Clone, Default, Debug)]
-struct TData;
+pub struct TData;
 impl DataType for TData {
     type ObjectPath = Rc<RefCell<DbusContext>>;
     type Property = ();
@@ -154,7 +164,6 @@ fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 fn create_dbus_pool<'a>(dbus_context: Rc<RefCell<DbusContext>>) -> dbus::Path<'a> {
 
     let f = Factory::new_fn();
-    let tree = f.tree();
 
     let create_volumes_method = f.method(CREATE_VOLUMES, (), create_volumes);
 
@@ -178,7 +187,7 @@ fn create_dbus_pool<'a>(dbus_context: Rc<RefCell<DbusContext>>) -> dbus::Path<'a
                               STRATIS_BASE_PATH,
                               dbus_context.borrow_mut().get_next_id().to_string());
 
-    let object_path = f.object_path(object_name, dbus_context)
+    let object_path = f.object_path(object_name, dbus_context.clone())
         .introspectable()
         .add(f.interface(STRATIS_MANAGER_INTERFACE, ())
             .add_m(create_volumes_method)
@@ -192,7 +201,7 @@ fn create_dbus_pool<'a>(dbus_context: Rc<RefCell<DbusContext>>) -> dbus::Path<'a
             .add_m(remove_devs_method));
 
     let path = object_path.get_name().to_owned();
-    tree.add(object_path);
+    dbus_context.borrow_mut().action_list.push(DeferredAction::Add(object_path));
     path
 }
 
@@ -200,14 +209,21 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    if iter.arg_type() == 0 { return Err(MethodErr::no_arg()) }
+    if iter.arg_type() == 0 {
+        return Err(MethodErr::no_arg());
+    }
     let name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
 
-    if iter.arg_type() == 0 { return Err(MethodErr::no_arg()) }
+    if iter.arg_type() == 0 {
+        return Err(MethodErr::no_arg());
+    }
     let raid_level: u16 = try!(iter.read::<u16>().map_err(|_| MethodErr::invalid_arg(&1)));
 
-    if iter.arg_type() == 0 { return Err(MethodErr::no_arg()) }
-    let devs: Array<&str, _> = try!(iter.read::<Array<&str, _>>().map_err(|_| MethodErr::invalid_arg(&2)));
+    if iter.arg_type() == 0 {
+        return Err(MethodErr::no_arg());
+    }
+    let devs: Array<&str, _> = try!(iter.read::<Array<&str, _>>()
+        .map_err(|_| MethodErr::invalid_arg(&2)));
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
@@ -240,7 +256,9 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
-    if iter.arg_type() == 0 { return Err(MethodErr::no_arg()) }
+    if iter.arg_type() == 0 {
+        return Err(MethodErr::no_arg());
+    }
     let name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
 
     let dbus_context = m.path.get_data();
@@ -387,7 +405,7 @@ fn get_base_tree<'a>(dbus_context: Rc<RefCell<DbusContext>>)
 
 pub fn run(engine: Rc<RefCell<Engine>>) -> StratisResult<()> {
     let dbus_context = Rc::new(RefCell::new(DbusContext::new(&engine)));
-    let tree = get_base_tree(dbus_context.clone()).unwrap();
+    let mut tree = get_base_tree(dbus_context.clone()).unwrap();
 
     // Setup DBus connection
     let c = try!(Connection::get_private(BusType::Session));
@@ -395,8 +413,29 @@ pub fn run(engine: Rc<RefCell<Engine>>) -> StratisResult<()> {
     try!(tree.set_registered(&c, true));
 
     // ...and serve incoming requests.
-    for _ in tree.run(&c, c.iter(1000)) {
+    for c_item in c.iter(10000) {
+        if let ConnectionItem::MethodCall(ref msg) = c_item {
+            if let Some(v) = tree.handle(&msg) {
+                // Probably the wisest is to ignore any send errors here -
+                // maybe the remote has disconnected during our processing.
+                for m in v {
+                    let _ = c.send(m);
+                }
+            }
+            let mut cxt = dbus_context.borrow_mut();
+            for action in cxt.action_list.drain(..) {
+                match action {
+                    DeferredAction::Add(path) => {
+                        try!(c.register_object_path(path.get_name()));
+                        tree.insert(path);
+                    }
+                    DeferredAction::Remove(path) => {
+                        tree.remove(path.get_name());
+                        c.unregister_object_path(path.get_name());
+                    }
+                }
+            }
+        }
     }
-
     Ok(())
 }

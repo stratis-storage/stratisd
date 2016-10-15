@@ -6,7 +6,7 @@ use blockdev::BlockDevs;
 
 use engine::Engine;
 
-use pool::StratisPool;
+use engine::Pool;
 
 use std::path::Path;
 use std::collections::BTreeMap;
@@ -18,7 +18,7 @@ use types::StratisResult;
 
 #[derive(Debug)]
 pub struct SimEngine {
-    pub pools: BTreeMap<String, Box<StratisPool>>,
+    pub pools: BTreeMap<String, Box<Pool>>,
 }
 
 impl SimEngine {
@@ -48,7 +48,7 @@ impl Engine for SimEngine {
         Ok(())
     }
 
-    fn list_pools(&self) -> StratisResult<BTreeMap<String, Box<StratisPool>>> {
+    fn list_pools(&self) -> StratisResult<BTreeMap<String, Box<Pool>>> {
 
         Ok(BTreeMap::from_iter(self.pools.iter().map(|x| (x.0.clone(), x.1.copy()))))
 
@@ -65,7 +65,7 @@ pub struct SimPool {
 }
 
 impl SimPool {
-    pub fn new_pool(name: &str, blockdev_paths: &[&Path], raid_level: u16) -> Box<StratisPool> {
+    pub fn new_pool(name: &str, blockdev_paths: &[&Path], raid_level: u16) -> Box<Pool> {
 
         let status = BlockDevs::new(blockdev_paths);
 
@@ -83,7 +83,7 @@ impl SimPool {
     }
 }
 
-impl StratisPool for SimPool {
+impl Pool for SimPool {
     fn add_blockdev(&mut self, path: &str) -> StratisResult<()> {
         println!("sim: pool::add_blockdev");
         Ok(())
@@ -102,7 +102,7 @@ impl StratisPool for SimPool {
     fn get_name(&mut self) -> String {
         self.name.clone()
     }
-    fn copy(&self) -> Box<StratisPool> {
+    fn copy(&self) -> Box<Pool> {
         let pool_copy = SimPool {
             name: self.name.clone(),
             block_devs: self.block_devs.clone(),

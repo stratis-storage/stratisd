@@ -7,8 +7,15 @@ use std::fmt::Debug;
 use std::path::Path;
 use std::collections::BTreeMap;
 use types::StratisResult;
-use pool::StratisPool;
 
+
+pub trait Pool: Debug {
+    fn add_blockdev(&mut self, path: &str) -> StratisResult<()>;
+    fn add_cachedev(&mut self, path: &str) -> StratisResult<()>;
+    fn destroy(&mut self) -> StratisResult<()>;
+    fn get_name(&mut self) -> String;
+    fn copy(&self) -> Box<Pool>;
+}
 
 pub trait Engine: Debug {
     fn create_pool(&mut self,
@@ -18,5 +25,5 @@ pub trait Engine: Debug {
                    -> StratisResult<()>;
 
     fn destroy_pool(&mut self, name: &str) -> StratisResult<()>;
-    fn list_pools(&self) -> StratisResult<BTreeMap<String, Box<StratisPool>>>;
+    fn list_pools(&self) -> StratisResult<BTreeMap<String, Box<Pool>>>;
 }

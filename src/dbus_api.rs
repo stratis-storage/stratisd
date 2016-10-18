@@ -120,16 +120,16 @@ fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 }
 
 
-fn create_volumes(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
-fn destroy_volumes(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
-fn list_volumes(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
@@ -165,11 +165,11 @@ fn create_dbus_pool<'a>(dbus_context: Rc<RefCell<DbusContext>>) -> dbus::Path<'a
 
     let f = Factory::new_fn();
 
-    let create_volumes_method = f.method(CREATE_VOLUMES, (), create_volumes);
+    let create_filesystems_method = f.method(CREATE_FILESYSTEMS, (), create_filesystems);
 
-    let destroy_volumes_method = f.method(DESTROY_VOLUMES, (), destroy_volumes);
+    let destroy_filesystems_method = f.method(DESTROY_FILESYSTEMS, (), destroy_filesystems);
 
-    let list_volumes_method = f.method(LIST_VOLUMES, (), list_volumes);
+    let list_filesystems_method = f.method(LIST_FILESYSTEMS, (), list_filesystems);
 
     let list_devs_method = f.method(LIST_DEVS, (), list_devs);
 
@@ -190,9 +190,9 @@ fn create_dbus_pool<'a>(dbus_context: Rc<RefCell<DbusContext>>) -> dbus::Path<'a
     let object_path = f.object_path(object_name, dbus_context.clone())
         .introspectable()
         .add(f.interface(STRATIS_MANAGER_INTERFACE, ())
-            .add_m(create_volumes_method)
-            .add_m(destroy_volumes_method)
-            .add_m(list_volumes_method)
+            .add_m(create_filesystems_method)
+            .add_m(destroy_filesystems_method)
+            .add_m(list_filesystems_method)
             .add_m(list_devs_method)
             .add_m(list_cache_devs_method)
             .add_m(add_cache_devs_method)
@@ -285,8 +285,8 @@ fn get_pool_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![m.msg.method_return().append3("/dbus/pool/path", 0, "Ok")])
 }
 
-fn get_volume_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    Ok(vec![m.msg.method_return().append3("/dbus/volume/path", 0, "Ok")])
+fn get_filesystem_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    Ok(vec![m.msg.method_return().append3("/dbus/filesystem/path", 0, "Ok")])
 }
 
 fn get_dev_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -356,12 +356,13 @@ fn get_base_tree<'a>(dbus_context: Rc<RefCell<DbusContext>>)
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let getvolumeobjectpath_method = f.method(GET_VOLUME_OBJECT_PATH, (), get_volume_object_path)
-        .in_arg(("pool_name", "s"))
-        .in_arg(("volume_name", "s"))
-        .out_arg(("object_path", "o"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
+    let getfilesystemobjectpath_method =
+        f.method(GET_FILESYSTEM_OBJECT_PATH, (), get_filesystem_object_path)
+            .in_arg(("pool_name", "s"))
+            .in_arg(("filesystem_name", "s"))
+            .out_arg(("object_path", "o"))
+            .out_arg(("return_code", "q"))
+            .out_arg(("return_string", "s"));
 
     let getdevobjectpath_method = f.method(GET_DEV_OBJECT_PATH, (), get_dev_object_path)
         .in_arg(("dev_name", "s"))
@@ -390,7 +391,7 @@ fn get_base_tree<'a>(dbus_context: Rc<RefCell<DbusContext>>)
             .add_m(createpool_method)
             .add_m(destroypool_method)
             .add_m(getpoolobjectpath_method)
-            .add_m(getvolumeobjectpath_method)
+            .add_m(getfilesystemobjectpath_method)
             .add_m(getdevobjectpath_method)
             .add_m(getcacheobjectpath_method)
             .add_m(geterrorcodes_method)

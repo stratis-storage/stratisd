@@ -11,7 +11,7 @@ pub const STRATIS_BASE_SERVICE: &'static str = "org.storage.stratis1";
 pub const STRATIS_BASE_MANAGER: &'static str = "/org/storage/stratis1/Manager";
 pub const STRATIS_MANAGER_INTERFACE: &'static str = "org.storage.stratis1.Manager";
 pub const STRATIS_POOL_BASE_INTERFACE: &'static str = "org.storage.stratis1.pool";
-pub const STRATIS_VOLUME_BASE_INTERFACE: &'static str = "org.storage.stratis1.volume";
+pub const STRATIS_FILESYSTEM_BASE_INTERFACE: &'static str = "org.storage.stratis1.filesystem";
 pub const STRATIS_DEV_BASE_INTERFACE: &'static str = "org.storage.stratis1.dev";
 pub const STRATIS_CACHE_BASE_INTERFACE: &'static str = "org.storage.stratis1.cache";
 pub const STRATIS_POOL_BASE_PATH: &'static str = "/org/storage/stratis/pool";
@@ -23,7 +23,7 @@ pub const LIST_POOLS: &'static str = "ListPools";
 pub const CREATE_POOL: &'static str = "CreatePool";
 pub const DESTROY_POOL: &'static str = "DestroyPool";
 pub const GET_POOL_OBJECT_PATH: &'static str = "GetPoolObjectPath";
-pub const GET_VOLUME_OBJECT_PATH: &'static str = "GetVolumeObjectPath";
+pub const GET_FILESYSTEM_OBJECT_PATH: &'static str = "GetFilesystemObjectPath";
 pub const GET_DEV_OBJECT_PATH: &'static str = "GetDevObjectPath";
 pub const GET_CACHE_OBJECT_PATH: &'static str = "GetCacheObjectPath";
 pub const GET_ERROR_CODES: &'static str = "GetErrorCodes";
@@ -31,9 +31,9 @@ pub const GET_RAID_LEVELS: &'static str = "GetRaidLevels";
 pub const GET_DEV_TYPES: &'static str = "GetDevTypes";
 
 // Pool Methods
-pub const CREATE_VOLUMES: &'static str = "CreateVolumes";
-pub const DESTROY_VOLUMES: &'static str = "DestroyVolumes";
-pub const LIST_VOLUMES: &'static str = "ListVolumes";
+pub const CREATE_FILESYSTEMS: &'static str = "CreateFilesystems";
+pub const DESTROY_FILESYSTEMS: &'static str = "DestroyFilesystems";
+pub const LIST_FILESYSTEMS: &'static str = "ListFilesystems";
 pub const LIST_DEVS: &'static str = "ListDevs";
 pub const LIST_CACHE_DEVS: &'static str = "ListCacheDevs";
 pub const ADD_CACHE_DEVS: &'static str = "AddCacheDevs";
@@ -59,7 +59,7 @@ custom_derive! {
         STRATIS_NULL,
         STRATIS_NOTFOUND,
         STRATIS_POOL_NOTFOUND,
-        STRATIS_VOLUME_NOTFOUND,
+        STRATIS_FILESYSTEM_NOTFOUND,
         STRATIS_DEV_NOTFOUND,
         STRATIS_CACHE_NOTFOUND,
         STRATIS_BAD_PARAM,
@@ -82,7 +82,7 @@ impl HasCodes for StratisErrorEnum {
             StratisErrorEnum::STRATIS_NULL => "Null parameter was supplied",
             StratisErrorEnum::STRATIS_NOTFOUND => "Not found",
             StratisErrorEnum::STRATIS_POOL_NOTFOUND => "Pool not found",
-            StratisErrorEnum::STRATIS_VOLUME_NOTFOUND => "Volume not found",
+            StratisErrorEnum::STRATIS_FILESYSTEM_NOTFOUND => "Filesystem not found",
             StratisErrorEnum::STRATIS_CACHE_NOTFOUND => "Cache not found",
             StratisErrorEnum::STRATIS_BAD_PARAM => "Bad parameter",
             StratisErrorEnum::STRATIS_DEV_NOTFOUND => "Dev not found",

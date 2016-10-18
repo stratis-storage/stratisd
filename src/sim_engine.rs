@@ -84,12 +84,12 @@ impl SimPool {
 }
 
 impl Pool for SimPool {
-    fn add_blockdev(&mut self, path: &str) -> StratisResult<()> {
+    fn add_blockdev(&mut self, _path: &str) -> StratisResult<()> {
         println!("sim: pool::add_blockdev");
         Ok(())
     }
 
-    fn add_cachedev(&mut self, path: &str) -> StratisResult<()> {
+    fn add_cachedev(&mut self, _path: &str) -> StratisResult<()> {
         println!("sim: pool::add_cachedev");
         Ok(())
     }

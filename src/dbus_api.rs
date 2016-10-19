@@ -7,7 +7,6 @@ use std::cell::RefCell;
 use std::fmt::Display;
 use std::path::Path;
 use std::rc::Rc;
-use std::io::ErrorKind;
 use std::collections::BTreeMap;
 
 use dbus;
@@ -29,8 +28,11 @@ use dbus::ConnectionItem;
 
 use dbus_consts::*;
 
+use engine;
 use engine::Engine;
-use types::{StratisResult, StratisError};
+use engine::EngineError;
+
+use types::StratisResult;
 
 #[derive(Debug)]
 pub enum DeferredAction {
@@ -72,22 +74,43 @@ impl DataType for TData {
     type Signal = ();
 }
 
-fn internal_to_dbus_err(err: &StratisError) -> ErrorEnum {
+/// Translates an engine ErrorEnum to a dbus ErrorEnum.
+fn engine_to_dbus_enum(err: &engine::ErrorEnum) -> (ErrorEnum, String) {
     match *err {
-        StratisError::Stratis(_) => ErrorEnum::ERROR,
-        StratisError::Io(ref err) => {
-            match err.kind() {
-                ErrorKind::NotFound => ErrorEnum::NOTFOUND,
-                ErrorKind::AlreadyExists => ErrorEnum::ALREADY_EXISTS,
-                _ => ErrorEnum::ERROR,
-            }
+        engine::ErrorEnum::Ok => (ErrorEnum::OK, err.get_error_string()),
+        engine::ErrorEnum::Error(_) => (ErrorEnum::ERROR, err.get_error_string()),
+        engine::ErrorEnum::AlreadyExists(_) => {
+            (ErrorEnum::ALREADY_EXISTS, err.get_error_string())
         }
-        _ => ErrorEnum::ERROR,
+        engine::ErrorEnum::Busy(_) => (ErrorEnum::BUSY, err.get_error_string()),
     }
 }
 
-fn code_to_message_items(code: ErrorEnum) -> (MessageItem, MessageItem) {
-    (MessageItem::UInt16(code.get_error_int()), MessageItem::Str(code.get_error_string().into()))
+/// Translates an engine error to a dbus error.
+fn engine_to_dbus_err(err: &EngineError) -> (ErrorEnum, String) {
+    match *err {
+        EngineError::Stratis(ref e) => engine_to_dbus_enum(e),
+        EngineError::Io(_) => {
+            let error = ErrorEnum::IO_ERROR;
+            (error, error.get_error_string().into())
+        }
+        EngineError::Nix(_) => {
+            let error = ErrorEnum::NIX_ERROR;
+            (error, error.get_error_string().into())
+        }
+    }
+}
+
+/// Convenience function to convert a return code and a string to
+/// appropriately typed MessageItems.
+fn code_to_message_items(code: ErrorEnum, mes: String) -> (MessageItem, MessageItem) {
+    (MessageItem::UInt16(code.get_error_int()), MessageItem::Str(mes))
+}
+
+/// Convenience function to directly yield MessageItems for OK code and message.
+fn ok_message_items() -> (MessageItem, MessageItem) {
+    let code = ErrorEnum::OK;
+    code_to_message_items(code, code.get_error_string().into())
 }
 
 fn default_object_path<'a>() -> dbus::Path<'a> {
@@ -107,12 +130,13 @@ fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let msg_vec =
                 pool_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
             let item_array = MessageItem::Array(msg_vec, "s".into());
-            let (rc, rs) = code_to_message_items(ErrorEnum::OK);
+            let (rc, rs) = ok_message_items();
             return_message.append3(item_array, rc, rs)
         }
         Err(x) => {
             let item_array = MessageItem::Array(vec![], "s".into());
-            let (rc, rs) = code_to_message_items(internal_to_dbus_err(&x));
+            let (rc, rs) = engine_to_dbus_err(&x);
+            let (rc, rs) = code_to_message_items(rc, rs);
             return_message.append3(item_array, rc, rs)
         }
     };
@@ -240,12 +264,13 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(_) => {
             let dbus_context_clone = dbus_context.clone();
             let object_path: dbus::Path = create_dbus_pool(dbus_context_clone);
-            let (rc, rs) = code_to_message_items(ErrorEnum::OK);
+            let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
         }
         Err(x) => {
             let object_path: dbus::Path = default_object_path();
-            let (rc, rs) = code_to_message_items(internal_to_dbus_err(&x));
+            let (rc, rs) = engine_to_dbus_err(&x);
+            let (rc, rs) = code_to_message_items(rc, rs);
             return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
         }
     };
@@ -269,11 +294,12 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(_) => {
-            let (rc, rs) = code_to_message_items(ErrorEnum::OK);
+            let (rc, rs) = ok_message_items();
             return_message.append2(rc, rs)
         }
         Err(err) => {
-            let (rc, rs) = code_to_message_items(internal_to_dbus_err(&err));
+            let (rc, rs) = engine_to_dbus_err(&err);
+            let (rc, rs) = code_to_message_items(rc, rs);
             return_message.append2(rc, rs)
         }
     };

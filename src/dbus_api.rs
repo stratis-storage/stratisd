@@ -189,23 +189,56 @@ fn create_dbus_pool<'a>(dbus_context: Rc<RefCell<DbusContext>>) -> dbus::Path<'a
 
     let f = Factory::new_fn();
 
-    let create_filesystems_method = f.method(CREATE_FILESYSTEMS, (), create_filesystems);
+    let create_filesystems_method = f.method(CREATE_FILESYSTEMS, (), create_filesystems)
+        .in_arg(("volumes", "a(sss)"))
+        .out_arg(("results", "a(oqs)"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let destroy_filesystems_method = f.method(DESTROY_FILESYSTEMS, (), destroy_filesystems);
+    let destroy_filesystems_method = f.method(DESTROY_FILESYSTEMS, (), destroy_filesystems)
+        .in_arg(("volumes", "a(sqs)"))
+        .out_arg(("results", "a(oqs)"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let list_filesystems_method = f.method(LIST_FILESYSTEMS, (), list_filesystems);
+    let list_filesystems_method = f.method(LIST_FILESYSTEMS, (), list_filesystems)
+        .out_arg(("volumes", "as"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let list_devs_method = f.method(LIST_DEVS, (), list_devs);
+    let list_cache_devs_method = f.method(LIST_CACHE_DEVS, (), list_cache_devs)
+        .out_arg(("cache_devs", "as"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let list_cache_devs_method = f.method(LIST_CACHE_DEVS, (), list_cache_devs);
+    let add_cache_devs_method = f.method(ADD_CACHE_DEVS, (), add_cache_devs)
+        .in_arg(("cache_devs", "as"))
+        .out_arg(("results", "a(oqs)"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let add_cache_devs_method = f.method(ADD_CACHE_DEVS, (), add_cache_devs);
+    let remove_cache_devs_method = f.method(REMOVE_CACHE_DEVS, (), remove_cache_devs)
+        .in_arg(("cache_devs", "as"))
+        .out_arg(("results", "a(oqs)"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let remove_cache_devs_method = f.method(REMOVE_CACHE_DEVS, (), remove_cache_devs);
+    let list_devs_method = f.method(LIST_DEVS, (), list_devs)
+        .out_arg(("devs", "as"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let add_devs_method = f.method(ADD_DEVS, (), add_devs);
+    let add_devs_method = f.method(ADD_DEVS, (), add_devs)
+        .in_arg(("cache_devs", "as"))
+        .out_arg(("results", "a(oqs)"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let remove_devs_method = f.method(REMOVE_DEVS, (), remove_devs);
+    let remove_devs_method = f.method(REMOVE_DEVS, (), remove_devs)
+        .in_arg(("devs", "as"))
+        .out_arg(("results", "a(oqs)"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
     let object_name = format!("{}/{}",
                               STRATIS_BASE_PATH,

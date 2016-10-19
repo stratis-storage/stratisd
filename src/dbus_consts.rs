@@ -53,43 +53,44 @@ custom_derive! {
              IterVariants(StratisDBusErrorVariants),
              IterVariantNames(StratisDBusErrorVariantNames))]
     #[allow(non_camel_case_types)]
-    pub enum StratisErrorEnum {
-        STRATIS_OK,
-        STRATIS_ERROR,
-        STRATIS_NULL,
-        STRATIS_NOTFOUND,
-        STRATIS_POOL_NOTFOUND,
-        STRATIS_FILESYSTEM_NOTFOUND,
-        STRATIS_DEV_NOTFOUND,
-        STRATIS_CACHE_NOTFOUND,
-        STRATIS_BAD_PARAM,
-        STRATIS_ALREADY_EXISTS,
-        STRATIS_NULL_NAME,
-        STRATIS_NO_POOLS,
-        STRATIS_LIST_FAILURE,
+    pub enum ErrorEnum {
+        OK,
+        ERROR,
+
+        ALREADY_EXISTS,
+        BAD_PARAM,
+        CACHE_NOTFOUND,
+        DEV_NOTFOUND,
+        FILESYSTEM_NOTFOUND,
+        LIST_FAILURE,
+        NO_POOLS,
+        NOTFOUND,
+        NULL,
+        NULL_NAME,
+        POOL_NOTFOUND,
     }
 }
 
-impl HasCodes for StratisErrorEnum {
+impl HasCodes for ErrorEnum {
     fn get_error_int(&self) -> u16 {
         *self as u16
     }
 
     fn get_error_string(&self) -> &str {
         match *self {
-            StratisErrorEnum::STRATIS_OK => "Ok",
-            StratisErrorEnum::STRATIS_ERROR => "A general error happened",
-            StratisErrorEnum::STRATIS_NULL => "Null parameter was supplied",
-            StratisErrorEnum::STRATIS_NOTFOUND => "Not found",
-            StratisErrorEnum::STRATIS_POOL_NOTFOUND => "Pool not found",
-            StratisErrorEnum::STRATIS_FILESYSTEM_NOTFOUND => "Filesystem not found",
-            StratisErrorEnum::STRATIS_CACHE_NOTFOUND => "Cache not found",
-            StratisErrorEnum::STRATIS_BAD_PARAM => "Bad parameter",
-            StratisErrorEnum::STRATIS_DEV_NOTFOUND => "Dev not found",
-            StratisErrorEnum::STRATIS_ALREADY_EXISTS => "Already exists",
-            StratisErrorEnum::STRATIS_NULL_NAME => "Null name supplied",
-            StratisErrorEnum::STRATIS_NO_POOLS => "No pools",
-            StratisErrorEnum::STRATIS_LIST_FAILURE => "List operation failure.",
+            ErrorEnum::OK => "Ok",
+            ErrorEnum::ERROR => "A general error happened",
+            ErrorEnum::NULL => "Null parameter was supplied",
+            ErrorEnum::NOTFOUND => "Not found",
+            ErrorEnum::POOL_NOTFOUND => "Pool not found",
+            ErrorEnum::FILESYSTEM_NOTFOUND => "Filesystem not found",
+            ErrorEnum::CACHE_NOTFOUND => "Cache not found",
+            ErrorEnum::BAD_PARAM => "Bad parameter",
+            ErrorEnum::DEV_NOTFOUND => "Dev not found",
+            ErrorEnum::ALREADY_EXISTS => "Already exists",
+            ErrorEnum::NULL_NAME => "Null name supplied",
+            ErrorEnum::NO_POOLS => "No pools",
+            ErrorEnum::LIST_FAILURE => "List operation failure.",
         }
     }
 }
@@ -99,31 +100,27 @@ custom_derive! {
              IterVariants(StratisDBusRaidTypeVariants),
              IterVariantNames(StratisDBusRaidTypeVariantNames))]
     #[allow(non_camel_case_types)]
-    pub enum StratisRaidType {
-        STRATIS_RAID_TYPE_UNKNOWN,
-        STRATIS_RAID_TYPE_SINGLE,
-        STRATIS_RAID_TYPE_RAID1,
-        STRATIS_RAID_TYPE_RAID5,
-        STRATIS_RAID_TYPE_RAID6,
+    pub enum RaidType {
+        RAID_TYPE_UNKNOWN,
+        RAID_TYPE_SINGLE,
+        RAID_TYPE_RAID1,
+        RAID_TYPE_RAID5,
+        RAID_TYPE_RAID6,
     }
 }
 
-impl HasCodes for StratisRaidType {
+impl HasCodes for RaidType {
     fn get_error_int(&self) -> u16 {
         *self as u16
     }
 
     fn get_error_string(&self) -> &str {
         match *self {
-            StratisRaidType::STRATIS_RAID_TYPE_UNKNOWN => "Unknown",
-            StratisRaidType::STRATIS_RAID_TYPE_SINGLE => "Single",
-            StratisRaidType::STRATIS_RAID_TYPE_RAID1 => "Mirrored",
-            StratisRaidType::STRATIS_RAID_TYPE_RAID5 => {
-                "Block-level striping with distributed parity"
-            }
-            StratisRaidType::STRATIS_RAID_TYPE_RAID6 => {
-                "Block-level striping with two distributed parities"
-            }
+            RaidType::RAID_TYPE_UNKNOWN => "Unknown",
+            RaidType::RAID_TYPE_SINGLE => "Single",
+            RaidType::RAID_TYPE_RAID1 => "Mirrored",
+            RaidType::RAID_TYPE_RAID5 => "Block-level striping with distributed parity",
+            RaidType::RAID_TYPE_RAID6 => "Block-level striping with two distributed parities",
         }
     }
 }

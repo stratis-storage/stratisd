@@ -79,9 +79,7 @@ fn engine_to_dbus_enum(err: &engine::ErrorEnum) -> (ErrorEnum, String) {
     match *err {
         engine::ErrorEnum::Ok => (ErrorEnum::OK, err.get_error_string()),
         engine::ErrorEnum::Error(_) => (ErrorEnum::ERROR, err.get_error_string()),
-        engine::ErrorEnum::AlreadyExists(_) => {
-            (ErrorEnum::ALREADY_EXISTS, err.get_error_string())
-        }
+        engine::ErrorEnum::AlreadyExists(_) => (ErrorEnum::ALREADY_EXISTS, err.get_error_string()),
         engine::ErrorEnum::Busy(_) => (ErrorEnum::BUSY, err.get_error_string()),
     }
 }
@@ -185,7 +183,7 @@ fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
-fn create_dbus_pool<'a>(dbus_context: Rc<RefCell<DbusContext>>) -> dbus::Path<'a> {
+fn create_dbus_pool<'a>(dbus_context: &Rc<RefCell<DbusContext>>) -> dbus::Path<'a> {
 
     let f = Factory::new_fn();
 
@@ -295,8 +293,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(_) => {
-            let dbus_context_clone = dbus_context.clone();
-            let object_path: dbus::Path = create_dbus_pool(dbus_context_clone);
+            let object_path: dbus::Path = create_dbus_pool(&dbus_context);
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
         }

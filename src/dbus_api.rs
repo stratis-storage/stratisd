@@ -74,15 +74,15 @@ impl DataType for TData {
 
 fn internal_to_dbus_err(err: &StratisError) -> ErrorEnum {
     match *err {
-        StratisError::Stratis(_) => ErrorEnum::STRATIS_ERROR,
+        StratisError::Stratis(_) => ErrorEnum::ERROR,
         StratisError::Io(ref err) => {
             match err.kind() {
-                ErrorKind::NotFound => ErrorEnum::STRATIS_NOTFOUND,
-                ErrorKind::AlreadyExists => ErrorEnum::STRATIS_ALREADY_EXISTS,
-                _ => ErrorEnum::STRATIS_ERROR,
+                ErrorKind::NotFound => ErrorEnum::NOTFOUND,
+                ErrorKind::AlreadyExists => ErrorEnum::ALREADY_EXISTS,
+                _ => ErrorEnum::ERROR,
             }
         }
-        _ => ErrorEnum::STRATIS_ERROR,
+        _ => ErrorEnum::ERROR,
     }
 }
 
@@ -107,7 +107,7 @@ fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let msg_vec =
                 pool_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
             let item_array = MessageItem::Array(msg_vec, "s".into());
-            let (rc, rs) = code_to_message_items(ErrorEnum::STRATIS_OK);
+            let (rc, rs) = code_to_message_items(ErrorEnum::OK);
             return_message.append3(item_array, rc, rs)
         }
         Err(x) => {
@@ -240,7 +240,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(_) => {
             let dbus_context_clone = dbus_context.clone();
             let object_path: dbus::Path = create_dbus_pool(dbus_context_clone);
-            let (rc, rs) = code_to_message_items(ErrorEnum::STRATIS_OK);
+            let (rc, rs) = code_to_message_items(ErrorEnum::OK);
             return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
         }
         Err(x) => {
@@ -269,7 +269,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(_) => {
-            let (rc, rs) = code_to_message_items(ErrorEnum::STRATIS_OK);
+            let (rc, rs) = code_to_message_items(ErrorEnum::OK);
             return_message.append2(rc, rs)
         }
         Err(err) => {

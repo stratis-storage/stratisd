@@ -74,6 +74,7 @@ impl DataType for TData {
     type Signal = ();
 }
 
+/// Translates an engine ErrorEnum to a dbus ErrorEnum.
 fn engine_to_dbus_enum(err: &engine::ErrorEnum) -> (ErrorEnum, String) {
     match *err {
         engine::ErrorEnum::Ok => (ErrorEnum::OK, err.get_error_string()),
@@ -85,6 +86,7 @@ fn engine_to_dbus_enum(err: &engine::ErrorEnum) -> (ErrorEnum, String) {
     }
 }
 
+/// Translates an engine error to a dbus error.
 fn engine_to_dbus_err(err: &EngineError) -> (ErrorEnum, String) {
     match *err {
         EngineError::Stratis(ref e) => engine_to_dbus_enum(e),
@@ -99,10 +101,13 @@ fn engine_to_dbus_err(err: &EngineError) -> (ErrorEnum, String) {
     }
 }
 
+/// Convenience function to convert a return code and a string to
+/// appropriately typed MessageItems.
 fn code_to_message_items(code: ErrorEnum, mes: String) -> (MessageItem, MessageItem) {
     (MessageItem::UInt16(code.get_error_int()), MessageItem::Str(mes))
 }
 
+/// Convenience function to directly yield MessageItems for OK code and message.
 fn ok_message_items() -> (MessageItem, MessageItem) {
     let code = ErrorEnum::OK;
     code_to_message_items(code, code.get_error_string().into())

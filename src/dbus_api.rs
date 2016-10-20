@@ -79,9 +79,7 @@ fn engine_to_dbus_enum(err: &engine::ErrorEnum) -> (ErrorEnum, String) {
     match *err {
         engine::ErrorEnum::Ok => (ErrorEnum::OK, err.get_error_string()),
         engine::ErrorEnum::Error(_) => (ErrorEnum::ERROR, err.get_error_string()),
-        engine::ErrorEnum::AlreadyExists(_) => {
-            (ErrorEnum::ALREADY_EXISTS, err.get_error_string())
-        }
+        engine::ErrorEnum::AlreadyExists(_) => (ErrorEnum::ALREADY_EXISTS, err.get_error_string()),
         engine::ErrorEnum::Busy(_) => (ErrorEnum::BUSY, err.get_error_string()),
     }
 }
@@ -185,27 +183,60 @@ fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
-fn create_dbus_pool<'a>(dbus_context: Rc<RefCell<DbusContext>>) -> dbus::Path<'a> {
+fn create_dbus_pool<'a>(dbus_context: &Rc<RefCell<DbusContext>>) -> dbus::Path<'a> {
 
     let f = Factory::new_fn();
 
-    let create_filesystems_method = f.method(CREATE_FILESYSTEMS, (), create_filesystems);
+    let create_filesystems_method = f.method(CREATE_FILESYSTEMS, (), create_filesystems)
+        .in_arg(("volumes", "a(sss)"))
+        .out_arg(("results", "a(oqs)"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let destroy_filesystems_method = f.method(DESTROY_FILESYSTEMS, (), destroy_filesystems);
+    let destroy_filesystems_method = f.method(DESTROY_FILESYSTEMS, (), destroy_filesystems)
+        .in_arg(("volumes", "a(sqs)"))
+        .out_arg(("results", "a(qs)"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let list_filesystems_method = f.method(LIST_FILESYSTEMS, (), list_filesystems);
+    let list_filesystems_method = f.method(LIST_FILESYSTEMS, (), list_filesystems)
+        .out_arg(("volumes", "as"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let list_devs_method = f.method(LIST_DEVS, (), list_devs);
+    let list_cache_devs_method = f.method(LIST_CACHE_DEVS, (), list_cache_devs)
+        .out_arg(("cache_devs", "as"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let list_cache_devs_method = f.method(LIST_CACHE_DEVS, (), list_cache_devs);
+    let add_cache_devs_method = f.method(ADD_CACHE_DEVS, (), add_cache_devs)
+        .in_arg(("cache_devs", "as"))
+        .out_arg(("results", "a(oqs)"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let add_cache_devs_method = f.method(ADD_CACHE_DEVS, (), add_cache_devs);
+    let remove_cache_devs_method = f.method(REMOVE_CACHE_DEVS, (), remove_cache_devs)
+        .in_arg(("cache_devs", "as"))
+        .out_arg(("results", "a(qs)"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let remove_cache_devs_method = f.method(REMOVE_CACHE_DEVS, (), remove_cache_devs);
+    let list_devs_method = f.method(LIST_DEVS, (), list_devs)
+        .out_arg(("devs", "as"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let add_devs_method = f.method(ADD_DEVS, (), add_devs);
+    let add_devs_method = f.method(ADD_DEVS, (), add_devs)
+        .in_arg(("cache_devs", "as"))
+        .out_arg(("results", "a(oqs)"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
-    let remove_devs_method = f.method(REMOVE_DEVS, (), remove_devs);
+    let remove_devs_method = f.method(REMOVE_DEVS, (), remove_devs)
+        .in_arg(("devs", "as"))
+        .out_arg(("results", "a(qs)"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
     let object_name = format!("{}/{}",
                               STRATIS_BASE_PATH,
@@ -213,7 +244,7 @@ fn create_dbus_pool<'a>(dbus_context: Rc<RefCell<DbusContext>>) -> dbus::Path<'a
 
     let object_path = f.object_path(object_name, dbus_context.clone())
         .introspectable()
-        .add(f.interface(STRATIS_MANAGER_INTERFACE, ())
+        .add(f.interface(STRATIS_POOL_BASE_INTERFACE, ())
             .add_m(create_filesystems_method)
             .add_m(destroy_filesystems_method)
             .add_m(list_filesystems_method)
@@ -262,8 +293,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(_) => {
-            let dbus_context_clone = dbus_context.clone();
-            let object_path: dbus::Path = create_dbus_pool(dbus_context_clone);
+            let object_path: dbus::Path = create_dbus_pool(&dbus_context);
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
         }

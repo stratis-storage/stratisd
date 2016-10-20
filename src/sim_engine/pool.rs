@@ -2,34 +2,31 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use blockdev::BlockDevs;
+use std::vec::Vec;
 
 use engine::EngineResult;
-
 use engine::Pool;
 
-use std::path::Path;
+use super::blockdev::SimDev;
 
 
 #[derive(Debug)]
 pub struct SimPool {
     pub name: String,
-    pub block_devs: BlockDevs,
+    pub block_devs: Vec<Box<SimDev>>,
     pub raid_level: u16,
     pub online: bool,
     pub checking: bool,
 }
 
 impl SimPool {
-    pub fn new_pool(name: &str, blockdev_paths: &[&Path], raid_level: u16) -> Box<Pool> {
+    pub fn new_pool(name: &str, blockdevs: &[Box<SimDev>], raid_level: u16) -> Box<Pool> {
 
-        let status = BlockDevs::new(blockdev_paths);
-
-        let block_devs = status.unwrap();
-
+        let mut vec = Vec::new();
+        vec.extend_from_slice(blockdevs);
         let new_pool = SimPool {
             name: name.to_owned(),
-            block_devs: block_devs.to_owned(),
+            block_devs: vec,
             raid_level: raid_level,
             online: true,
             checking: false,

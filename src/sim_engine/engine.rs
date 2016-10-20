@@ -89,6 +89,15 @@ impl Engine for SimEngine {
 
         Ok(())
     }
+    fn get_pool(&mut self, name: &str) -> EngineResult<&mut Box<Pool>> {
+
+        let return_pool = match self.pools.get_mut(name) {
+            Some(pool) => pool,
+            None => return Err(EngineError::Stratis(ErrorEnum::NotFound(name.into()))),
+        };
+
+        Ok(return_pool)
+    }
 
     fn list_pools(&self) -> EngineResult<BTreeMap<String, Box<Pool>>> {
 

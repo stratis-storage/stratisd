@@ -41,6 +41,12 @@ pub const REMOVE_CACHE_DEVS: &'static str = "RemoveCacheDevs";
 pub const ADD_DEVS: &'static str = "AddDevs";
 pub const REMOVE_DEVS: &'static str = "RemoveDevs";
 
+// Filesystem Methods
+pub const CREATE_SNAPSHOT: &'static str = "CreateSnapshot";
+pub const RENAME: &'static str = "Rename";
+pub const SET_MOUNTPOINT: &'static str = "SetMountpoint";
+pub const SET_QUOTA: &'static str = "SetQuota";
+
 pub trait HasCodes {
     /// Indicates that this enum can be converted to an int or described
     /// with a string.

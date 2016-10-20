@@ -8,6 +8,7 @@ use std::fmt::Display;
 use std::path::Path;
 use std::rc::Rc;
 use std::collections::BTreeMap;
+use std::vec::Vec;
 
 use dbus;
 use dbus::Connection;
@@ -81,6 +82,7 @@ fn engine_to_dbus_enum(err: &engine::ErrorEnum) -> (ErrorEnum, String) {
         engine::ErrorEnum::Error(_) => (ErrorEnum::ERROR, err.get_error_string()),
         engine::ErrorEnum::AlreadyExists(_) => (ErrorEnum::ALREADY_EXISTS, err.get_error_string()),
         engine::ErrorEnum::Busy(_) => (ErrorEnum::BUSY, err.get_error_string()),
+        engine::ErrorEnum::NotFound(_) => (ErrorEnum::NOTFOUND, err.get_error_string()),
     }
 }
 
@@ -141,10 +143,114 @@ fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
+fn create_dbus_filesystem<'a>(dbus_context: &Rc<RefCell<DbusContext>>) -> dbus::Path<'a> {
+
+    let f = Factory::new_fn();
+
+    let create_snapshot_method = f.method(CREATE_SNAPSHOT, (), create_filesystems)
+        .in_arg(("name", "s"))
+        .out_arg(("object_path", "o"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
+
+    let rename_method = f.method(RENAME, (), destroy_filesystems)
+        .in_arg(("name", "s"))
+        .out_arg(("object_path", "o"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
+
+    let set_mountpoint_method = f.method(SET_MOUNTPOINT, (), list_filesystems)
+        .out_arg(("object_path", "o"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
+
+    let set_quota_method = f.method(SET_QUOTA, (), list_cache_devs)
+        .out_arg(("quota", "s"))
+        .out_arg(("object_path", "o"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
+
+
+    let object_name = format!("{}/{}",
+                              STRATIS_BASE_PATH,
+                              dbus_context.borrow_mut().get_next_id().to_string());
+
+    let object_path = f.object_path(object_name, dbus_context.clone())
+        .introspectable()
+        .add(f.interface(STRATIS_FILESYSTEM_BASE_INTERFACE, ())
+            .add_m(create_snapshot_method)
+            .add_m(rename_method)
+            .add_m(set_mountpoint_method)
+            .add_m(set_quota_method));
+
+    let path = object_path.get_name().to_owned();
+    dbus_context.borrow_mut().action_list.push(DeferredAction::Add(object_path));
+    path
+}
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
 
-    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+    if iter.arg_type() == 0 {
+        return Err(MethodErr::no_arg());
+    }
+
+    let filesystems: Array<(&str, &str, &str), _> = try!(iter.read::<Array<(&str, &str, &str), _>>()
+        .map_err(|_| MethodErr::invalid_arg(&0)));
+
+    let dbus_context = m.path.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+
+    println!("Object Path {}", object_path);
+
+    let ref pools = dbus_context.borrow_mut().pools;
+    println!("Pools len = {}", pools.len());
+
+    let pool_name = match pools.get(&object_path.clone().to_string()) {
+        Some(pool) => pool,
+        None => return Err(MethodErr::invalid_arg(&0)),
+    };
+
+    let ref mut engine = dbus_context.borrow_mut().engine;
+    let mut b_engine = engine.borrow_mut();
+    let ref mut pool = match b_engine.get_pool(pool_name) {
+        Ok(result) => result,
+        Err(x) => {
+            let (rc, rs) = engine_to_dbus_err(&x);
+            let (rc, rs) = code_to_message_items(rc, rs);
+            let entry = MessageItem::Struct(vec!["o".into(), "q".into(), "s".into()]);
+            return Ok(vec![return_message.append3(entry, rc, rs)]);
+        }
+    };
+
+    let mut vec = Vec::new();
+
+    for (i, new_filesystem) in filesystems.enumerate() {
+        let result = pool.create_filesystem(new_filesystem.0, new_filesystem.1, new_filesystem.2);
+
+        let msg = match result {
+            Ok(_) => {
+                let object_path: dbus::Path = create_dbus_filesystem(&dbus_context);
+                let (rc, rs) = ok_message_items();
+                let entry = MessageItem::Struct(vec![MessageItem::ObjectPath(object_path), rc, rs]);
+                vec.push(entry);
+
+            }
+            Err(x) => {
+                let object_path: dbus::Path = default_object_path();
+                let (rc, rs) = engine_to_dbus_err(&x);
+                let (rc, rs) = code_to_message_items(rc, rs);
+                let entry = MessageItem::Struct(vec![MessageItem::ObjectPath(object_path), rc, rs]);
+                vec.push(entry);
+            }
+        };
+    }
+
+    let (rc, rs) = ok_message_items();
+
+    Ok(vec![return_message.append3(MessageItem::Struct(vec), rc, rs)])
 }
 
 fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -295,6 +401,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(_) => {
             let object_path: dbus::Path = create_dbus_pool(&dbus_context);
             let (rc, rs) = ok_message_items();
+            dbus_context.borrow_mut().pools.insert(object_path.to_string(), String::from(name));
             return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
         }
         Err(x) => {

@@ -55,7 +55,7 @@ use std::cell::RefCell;
 
 use types::{StratisResult, StratisError};
 
-use sim_engine::SimEngine;
+use sim_engine::engine::SimEngine;
 
 
 fn write_err(err: StratisError) -> StratisResult<()> {

@@ -2,8 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use blockdev::BlockDevs;
-
 use engine::Engine;
 use engine::EngineError;
 use engine::EngineResult;
@@ -20,6 +18,9 @@ use std::fmt;
 use std::path::Path;
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
+
+use super::blockdev::SimDev;
+use super::pool::SimPool;
 
 
 
@@ -54,20 +55,22 @@ impl Engine for SimEngine {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
 
-        let bad_blockdev_path = if self.rng.gen_weighted_bool(8) {
-            self.rng.choose(blockdev_paths)
+        let devs: Vec<Box<SimDev>> = blockdev_paths.iter().map(|x| SimDev::new_dev(x)).collect();
+
+        let bad_dev = if self.rng.gen_weighted_bool(8) {
+            self.rng.choose(devs.as_slice())
         } else {
             None
         };
-        match bad_blockdev_path {
-            Some(x) => {
-                let path_as_str = x.to_str().unwrap_or("unstringable path");
+        match bad_dev {
+            Some(d) => {
+                let path_as_str = d.name.to_str().unwrap_or("unstringable path");
                 return Err(EngineError::Stratis(ErrorEnum::Busy(path_as_str.into())));
             }
             None => {}
         }
 
-        let pool = SimPool::new_pool(name, blockdev_paths, raid_level);
+        let pool = SimPool::new_pool(name, devs.as_slice(), raid_level);
 
         if self.rng.gen_weighted_bool(8) {
             return Err(EngineError::Stratis(ErrorEnum::Error("X".into())));
@@ -91,64 +94,5 @@ impl Engine for SimEngine {
 
         Ok(BTreeMap::from_iter(self.pools.iter().map(|x| (x.0.clone(), x.1.copy()))))
 
-    }
-}
-
-#[derive(Debug)]
-pub struct SimPool {
-    pub name: String,
-    pub block_devs: BlockDevs,
-    pub raid_level: u16,
-    pub online: bool,
-    pub checking: bool,
-}
-
-impl SimPool {
-    pub fn new_pool(name: &str, blockdev_paths: &[&Path], raid_level: u16) -> Box<Pool> {
-
-        let status = BlockDevs::new(blockdev_paths);
-
-        let block_devs = status.unwrap();
-
-        let new_pool = SimPool {
-            name: name.to_owned(),
-            block_devs: block_devs.to_owned(),
-            raid_level: raid_level,
-            online: true,
-            checking: false,
-        };
-
-        Box::new(new_pool)
-    }
-}
-
-impl Pool for SimPool {
-    fn add_blockdev(&mut self, _path: &str) -> EngineResult<()> {
-        println!("sim: pool::add_blockdev");
-        Ok(())
-    }
-
-    fn add_cachedev(&mut self, _path: &str) -> EngineResult<()> {
-        println!("sim: pool::add_cachedev");
-        Ok(())
-    }
-
-    fn destroy(&mut self) -> EngineResult<()> {
-        println!("sim: pool::destroy");
-        Ok(())
-    }
-
-    fn get_name(&mut self) -> String {
-        self.name.clone()
-    }
-    fn copy(&self) -> Box<Pool> {
-        let pool_copy = SimPool {
-            name: self.name.clone(),
-            block_devs: self.block_devs.clone(),
-            raid_level: self.raid_level.clone(),
-            online: true,
-            checking: false,
-        };
-        Box::new(pool_copy)
     }
 }

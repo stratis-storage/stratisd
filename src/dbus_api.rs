@@ -195,7 +195,7 @@ fn create_dbus_pool<'a>(dbus_context: &Rc<RefCell<DbusContext>>) -> dbus::Path<'
 
     let destroy_filesystems_method = f.method(DESTROY_FILESYSTEMS, (), destroy_filesystems)
         .in_arg(("volumes", "a(sqs)"))
-        .out_arg(("results", "a(oqs)"))
+        .out_arg(("results", "a(qs)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
@@ -217,7 +217,7 @@ fn create_dbus_pool<'a>(dbus_context: &Rc<RefCell<DbusContext>>) -> dbus::Path<'
 
     let remove_cache_devs_method = f.method(REMOVE_CACHE_DEVS, (), remove_cache_devs)
         .in_arg(("cache_devs", "as"))
-        .out_arg(("results", "a(oqs)"))
+        .out_arg(("results", "a(qs)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
@@ -234,7 +234,7 @@ fn create_dbus_pool<'a>(dbus_context: &Rc<RefCell<DbusContext>>) -> dbus::Path<'
 
     let remove_devs_method = f.method(REMOVE_DEVS, (), remove_devs)
         .in_arg(("devs", "as"))
-        .out_arg(("results", "a(oqs)"))
+        .out_arg(("results", "a(qs)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
@@ -244,7 +244,7 @@ fn create_dbus_pool<'a>(dbus_context: &Rc<RefCell<DbusContext>>) -> dbus::Path<'
 
     let object_path = f.object_path(object_name, dbus_context.clone())
         .introspectable()
-        .add(f.interface(STRATIS_MANAGER_INTERFACE, ())
+        .add(f.interface(STRATIS_POOL_BASE_INTERFACE, ())
             .add_m(create_filesystems_method)
             .add_m(destroy_filesystems_method)
             .add_m(list_filesystems_method)

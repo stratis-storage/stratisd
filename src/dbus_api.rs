@@ -203,13 +203,15 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-
+    let mut vec = Vec::new();
 
     let pool_name = match dbus_context.pools.borrow_mut().get(&object_path.to_string()) {
         Some(pool) => pool.clone(),
         None => {
-            return Err(MethodErr::invalid_arg(&format!("object path not found {}",
-                                                       object_path.to_string())))
+            let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
+                                                 ErrorEnum::INTERNAL_ERROR.get_error_string().into());
+	       return Ok(vec![return_message.append3(MessageItem::Array(vec, 
+	       			Cow::Borrowed("(oqs)")), rc, rs)])
         }
     };
 
@@ -219,14 +221,13 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Err(x) => {
             let (rc, rs) = engine_to_dbus_err(&x);
             let (rc, rs) = code_to_message_items(rc, rs);
-            let entry = MessageItem::Struct(vec![MessageItem::ObjectPath(object_path.to_owned()),
-                                                 MessageItem::UInt16(0),
-                                                 MessageItem::Str("".to_string())]);
+
+            let entry = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
             return Ok(vec![return_message.append3(entry, rc, rs)]);
         }
     };
 
-    let mut vec = Vec::new();
+    let ref mut list_rc = ErrorEnum::OK;
 
     for new_filesystem in filesystems.next() {
         let result = pool.create_filesystem(new_filesystem.0, new_filesystem.1, new_filesystem.2);
@@ -240,6 +241,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
             }
             Err(x) => {
+                *list_rc = ErrorEnum::LIST_FAILURE;
                 let object_path: dbus::Path = default_object_path();
                 let (rc, rs) = engine_to_dbus_err(&x);
                 let (rc, rs) = code_to_message_items(rc, rs);
@@ -249,9 +251,10 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         };
     }
 
-    let (rc, rs) = ok_message_items();
+    let (rc, rs) = code_to_message_items(*list_rc, list_rc.get_error_string().into());
 
-    Ok(vec![return_message.append3(MessageItem::Struct(vec), rc, rs)])
+    Ok(vec![return_message.append3(MessageItem::Array(vec, Cow::Borrowed("(oqs)")), rc, rs)])
+
 }
 
 fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {

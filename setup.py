@@ -35,8 +35,8 @@ setuptools.setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
         ],
     install_requires = [
-       'dbus-signature-pyparsing',
-       'dbus-python'
+       'dbus-python',
+       'into-dbus-python'
     ],
     package_dir={"": "src"},
     packages=setuptools.find_packages("src"),

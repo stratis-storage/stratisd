@@ -147,24 +147,24 @@ fn create_dbus_filesystem<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
 
     let f = Factory::new_fn();
 
-    let create_snapshot_method = f.method(CREATE_SNAPSHOT, (), create_filesystems)
+    let create_snapshot_method = f.method(CREATE_SNAPSHOT, (), create_snapshot)
         .in_arg(("name", "s"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let rename_method = f.method(RENAME, (), destroy_filesystems)
+    let rename_method = f.method(RENAME, (), rename_filesystem)
         .in_arg(("name", "s"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let set_mountpoint_method = f.method(SET_MOUNTPOINT, (), list_filesystems)
+    let set_mountpoint_method = f.method(SET_MOUNTPOINT, (), set_filesystem_mountpoint)
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let set_quota_method = f.method(SET_QUOTA, (), list_cache_devs)
+    let set_quota_method = f.method(SET_QUOTA, (), set_filesystem_quota)
         .out_arg(("quota", "s"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
@@ -203,15 +203,16 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let mut vec = Vec::new();
 
     let pool_name = match dbus_context.pools.borrow_mut().get(&object_path.to_string()) {
         Some(pool) => pool.clone(),
         None => {
             let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
-                                                 ErrorEnum::INTERNAL_ERROR.get_error_string().into());
-	       return Ok(vec![return_message.append3(MessageItem::Array(vec, 
-	       			Cow::Borrowed("(oqs)")), rc, rs)])
+                                                 ErrorEnum::INTERNAL_ERROR.get_error_string()
+                                                     .into());
+            let message =
+                return_message.append3(MessageItem::Array(vec![], Cow::Borrowed("(oqs)")), rc, rs);
+            return Ok(vec![message]);
         }
     };
 
@@ -228,6 +229,8 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     };
 
     let ref mut list_rc = ErrorEnum::OK;
+
+    let mut vec = Vec::new();
 
     for new_filesystem in filesystems.next() {
         let result = pool.create_filesystem(new_filesystem.0, new_filesystem.1, new_filesystem.2);
@@ -255,6 +258,22 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     Ok(vec![return_message.append3(MessageItem::Array(vec, Cow::Borrowed("(oqs)")), rc, rs)])
 
+}
+
+fn create_snapshot(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+}
+
+fn set_filesystem_quota(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+}
+
+fn set_filesystem_mountpoint(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+}
+
+fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
 }
 
 fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {

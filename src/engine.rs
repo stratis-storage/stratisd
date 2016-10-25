@@ -18,6 +18,7 @@ pub enum ErrorEnum {
 
     AlreadyExists(String),
     Busy(String),
+    NotFound(String),
 }
 
 impl ErrorEnum {
@@ -27,6 +28,7 @@ impl ErrorEnum {
             ErrorEnum::Error(ref x) => format!("{}", x),
             ErrorEnum::AlreadyExists(ref x) => format!("{} already exists", x),
             ErrorEnum::Busy(ref x) => format!("{} is busy", x),
+            ErrorEnum::NotFound(ref x) => format!("{} is not found", x),
         }
     }
 }
@@ -41,6 +43,11 @@ pub enum EngineError {
 pub type EngineResult<T> = Result<T, EngineError>;
 
 pub trait Pool: Debug {
+    fn create_filesystem(&mut self,
+                         filesystem_name: &str,
+                         mount_point: &str,
+                         size: u64)
+                         -> EngineResult<()>;
     fn add_blockdev(&mut self, path: &str) -> EngineResult<()>;
     fn add_cachedev(&mut self, path: &str) -> EngineResult<()>;
     fn destroy(&mut self) -> EngineResult<()>;
@@ -54,7 +61,7 @@ pub trait Engine: Debug {
                    blockdev_paths: &[&Path],
                    raid_level: u16)
                    -> EngineResult<()>;
-
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()>;
+    fn get_pool(&mut self, name: &str) -> EngineResult<&mut Box<Pool>>;
     fn list_pools(&self) -> EngineResult<BTreeMap<String, Box<Pool>>>;
 }

@@ -41,6 +41,12 @@ pub const REMOVE_CACHE_DEVS: &'static str = "RemoveCacheDevs";
 pub const ADD_DEVS: &'static str = "AddDevs";
 pub const REMOVE_DEVS: &'static str = "RemoveDevs";
 
+// Filesystem Methods
+pub const CREATE_SNAPSHOT: &'static str = "CreateSnapshot";
+pub const RENAME: &'static str = "Rename";
+pub const SET_MOUNTPOINT: &'static str = "SetMountpoint";
+pub const SET_QUOTA: &'static str = "SetQuota";
+
 pub trait HasCodes {
     /// Indicates that this enum can be converted to an int or described
     /// with a string.
@@ -65,6 +71,7 @@ custom_derive! {
         FILESYSTEM_NOTFOUND,
         IO_ERROR,
         LIST_FAILURE,
+        INTERNAL_ERROR,
         NIX_ERROR,
         NO_POOLS,
         NOTFOUND,
@@ -94,6 +101,7 @@ impl HasCodes for ErrorEnum {
             ErrorEnum::NULL_NAME => "Null name supplied",
             ErrorEnum::NO_POOLS => "No pools",
             ErrorEnum::LIST_FAILURE => "List operation failure.",
+            ErrorEnum::INTERNAL_ERROR => "Internal error",
             ErrorEnum::IO_ERROR => "IO error during operation.",
             ErrorEnum::NIX_ERROR => "System error during operation.",
             ErrorEnum::BUSY => "Operation can not be performed at this time",

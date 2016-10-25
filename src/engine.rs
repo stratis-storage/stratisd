@@ -46,7 +46,7 @@ pub trait Pool: Debug {
     fn create_filesystem(&mut self,
                          filesystem_name: &str,
                          mount_point: &str,
-                         size: &str)
+                         size: u64)
                          -> EngineResult<()>;
     fn add_blockdev(&mut self, path: &str) -> EngineResult<()>;
     fn add_cachedev(&mut self, path: &str) -> EngineResult<()>;

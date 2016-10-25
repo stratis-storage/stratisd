@@ -74,9 +74,9 @@ impl Pool for SimPool {
         Box::new(pool_copy)
     }
     fn create_filesystem(&mut self,
-                         filesystem_name: &str,
-                         mount_point: &str,
-                         size: &str)
+                         _filesystem_name: &str,
+                         _mount_point: &str,
+                         _size: u64)
                          -> EngineResult<()> {
         Ok(())
     }

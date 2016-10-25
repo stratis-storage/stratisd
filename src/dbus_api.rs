@@ -196,19 +196,21 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         return Err(MethodErr::no_arg());
     }
 
-    let mut filesystems: Array<(&str, &str, &str), _> =
-        try!(iter.read::<Array<(&str, &str, &str), _>>()
+    let mut filesystems: Array<(&str, &str, u64), _> =
+        try!(iter.read::<Array<(&str, &str, u64), _>>()
             .map_err(|_| MethodErr::invalid_arg(&0)));
 
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
 
-    println!("Object Path {}", object_path);
 
     let pool_name = match dbus_context.pools.borrow_mut().get(&object_path.to_string()) {
         Some(pool) => pool.clone(),
-        None => return Err(MethodErr::invalid_arg(&0)),
+        None => {
+            return Err(MethodErr::invalid_arg(&format!("object path not found {}",
+                                                       object_path.to_string())))
+        }
     };
 
     let mut b_engine = dbus_context.engine.borrow_mut();
@@ -217,7 +219,9 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Err(x) => {
             let (rc, rs) = engine_to_dbus_err(&x);
             let (rc, rs) = code_to_message_items(rc, rs);
-            let entry = MessageItem::Struct(vec!["o".into(), "q".into(), "s".into()]);
+            let entry = MessageItem::Struct(vec![MessageItem::ObjectPath(object_path.to_owned()),
+                                                 MessageItem::UInt16(0),
+                                                 MessageItem::Str("".to_string())]);
             return Ok(vec![return_message.append3(entry, rc, rs)]);
         }
     };
@@ -291,7 +295,7 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
     let create_filesystems_method = f.method(CREATE_FILESYSTEMS, (), create_filesystems)
-        .in_arg(("volumes", "a(sss)"))
+        .in_arg(("volumes", "a(sst)"))
         .out_arg(("results", "a(oqs)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

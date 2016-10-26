@@ -62,6 +62,7 @@ impl Pool for SimPool {
     fn get_name(&mut self) -> String {
         self.name.clone()
     }
+
     fn copy(&self) -> Box<Pool> {
         let pool_copy = SimPool {
             name: self.name.clone(),
@@ -73,6 +74,7 @@ impl Pool for SimPool {
         };
         Box::new(pool_copy)
     }
+
     fn create_filesystem(&mut self,
                          _filesystem_name: &str,
                          _mount_point: &str,

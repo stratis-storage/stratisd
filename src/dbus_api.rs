@@ -240,6 +240,9 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         match result {
             Ok(_) => {
                 let object_path: dbus::Path = create_dbus_filesystem(dbus_context.clone());
+                dbus_context.filesystems.borrow_mut().insert(object_path.to_string(),
+                                                             ((&pool_name).clone(),
+                                                              String::from(name)));
                 let (rc, rs) = ok_message_items();
                 let entry = MessageItem::Struct(vec![MessageItem::ObjectPath(object_path), rc, rs]);
                 vec.push(entry);

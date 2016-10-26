@@ -47,15 +47,17 @@ pub struct DbusContext {
     pub pools: Rc<RefCell<BTreeMap<String, String>>>,
     pub engine: Rc<RefCell<Engine>>,
     pub action_list: Rc<RefCell<Vec<DeferredAction>>>,
+    pub filesystems: Rc<RefCell<BTreeMap<String, (String, String)>>>,
 }
 
 impl DbusContext {
     pub fn new(engine: &Rc<RefCell<Engine>>) -> DbusContext {
         DbusContext {
+            action_list: Rc::new(RefCell::new(Vec::new())),
+            engine: engine.clone(),
+            filesystems: Rc::new(RefCell::new(BTreeMap::new())),
             next_index: Rc::new(RefCell::new(0)),
             pools: Rc::new(RefCell::new(BTreeMap::new())),
-            engine: engine.clone(),
-            action_list: Rc::new(RefCell::new(Vec::new())),
         }
     }
     pub fn get_next_id(&mut self) -> u64 {

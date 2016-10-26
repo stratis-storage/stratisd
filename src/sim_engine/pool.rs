@@ -81,10 +81,11 @@ impl Pool for SimPool {
     }
 
     fn create_filesystem(&mut self,
-                         _filesystem_name: &str,
+                         filesystem_name: &str,
                          _mount_point: &str,
                          _size: u64)
                          -> EngineResult<()> {
+        self.filesystems.insert(filesystem_name.to_owned(), SimFilesystem::new_filesystem());
         Ok(())
     }
 }

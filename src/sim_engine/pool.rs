@@ -12,7 +12,12 @@ use super::blockdev::SimDev;
 
 #[derive(Debug, Clone)]
 pub struct SimFilesystem {
-    pub name: String,
+}
+
+impl SimFilesystem {
+    pub fn new_filesystem() -> Box<SimFilesystem> {
+        Box::new(SimFilesystem {})
+    }
 }
 
 #[derive(Debug)]

@@ -25,10 +25,11 @@ class Interface(abc.ABC):
     Parent class for an interface hierarchy.
     """
 
-    _METHODS = abc.abstractproperty(doc="map from method name to data")
-    _XFORMERS = abc.abstractproperty(doc="map from signature to xformer")
-    _INTERFACE_NAME = abc.abstractproperty(doc="interface name")
     _PROPERTIES_INTERFACE_NAME = 'org.freedesktop.DBus.Properties'
+    _XFORMERS = dict()
+
+    _INTERFACE_NAME = abc.abstractproperty(doc="interface name")
+    _METHODS = abc.abstractproperty(doc="map from method name to data")
 
     @classmethod
     def callMethod(cls, proxy_object, method_name, *args):
@@ -70,3 +71,24 @@ class Interface(abc.ABC):
            name,
            dbus_interface=cls._PROPERTIES_INTERFACE_NAME
         )
+
+
+class Manager(Interface):
+    """
+    Manager interface.
+    """
+
+    _INTERFACE_NAME = 'org.storage.stratis1.Manager'
+
+    _METHODS = {
+        "CreatePool" : "sqas",
+        "DestroyPool" : "s",
+        "GetCacheObjectPath" : "s",
+        "GetDevObjectPath" : "s",
+        "GetDevTypes" : "",
+        "GetErrorCodes" : "",
+        "GetFilesystemObjectPath" : "ss",
+        "GetPoolObjectPath" : "s",
+        "GetRaidLevels" : "",
+        "ListPools" : "",
+    }

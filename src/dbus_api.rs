@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::path::Path;
@@ -43,7 +44,7 @@ pub enum DeferredAction {
 
 #[derive(Debug, Clone)]
 pub struct DbusContext {
-    pub next_index: Rc<RefCell<u64>>,
+    pub next_index: Rc<Cell<u64>>,
     pub pools: Rc<RefCell<BTreeMap<String, String>>>,
     pub engine: Rc<RefCell<Engine>>,
     pub action_list: Rc<RefCell<Vec<DeferredAction>>>,
@@ -56,14 +57,13 @@ impl DbusContext {
             action_list: Rc::new(RefCell::new(Vec::new())),
             engine: engine.clone(),
             filesystems: Rc::new(RefCell::new(BTreeMap::new())),
-            next_index: Rc::new(RefCell::new(0)),
+            next_index: Rc::new(Cell::new(0)),
             pools: Rc::new(RefCell::new(BTreeMap::new())),
         }
     }
     pub fn get_next_id(&mut self) -> u64 {
-        let mut val = self.next_index.borrow_mut();
-        *val = *val + 1;
-        *val
+        self.next_index.set(self.next_index.get() + 1);
+        self.next_index.get()
     }
 }
 

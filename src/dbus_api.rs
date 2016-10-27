@@ -197,9 +197,8 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         return Err(MethodErr::no_arg());
     }
 
-    let mut filesystems: Array<(&str, &str, u64), _> =
-        try!(iter.read::<Array<(&str, &str, u64), _>>()
-            .map_err(|_| MethodErr::invalid_arg(&0)));
+    let filesystems: Array<(&str, &str, u64), _> = try!(iter.read::<Array<(&str, &str, u64), _>>()
+        .map_err(|_| MethodErr::invalid_arg(&0)));
 
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
@@ -233,7 +232,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let mut vec = Vec::new();
 
-    for (name, mountpoint, size) in filesystems.next() {
+    for (name, mountpoint, size) in filesystems {
         let result = pool.create_filesystem(name, mountpoint, size);
 
         match result {
@@ -323,6 +322,7 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(filesystem_tree) => {
+            println!("filesystems size = {}", filesystem_tree.len());
             let msg_vec =
                 filesystem_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
             let item_array = MessageItem::Array(msg_vec, "s".into());

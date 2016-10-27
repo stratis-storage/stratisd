@@ -75,10 +75,11 @@ impl Pool for SimPool {
 
     fn create_filesystem(&mut self,
                          filesystem_name: &str,
-                         _mount_point: &str,
-                         _size: u64)
+                         mount_point: &str,
+                         size: u64)
                          -> EngineResult<()> {
-        self.filesystems.insert(filesystem_name.to_owned(), SimFilesystem::new_filesystem());
+        self.filesystems.insert(filesystem_name.to_owned(),
+                                SimFilesystem::new_filesystem(filesystem_name, mount_point, size));
         Ok(())
     }
     fn list_filesystems(&self) -> EngineResult<BTreeMap<String, Box<Filesystem>>> {

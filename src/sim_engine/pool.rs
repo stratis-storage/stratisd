@@ -12,7 +12,12 @@ use super::blockdev::SimDev;
 
 #[derive(Debug, Clone)]
 pub struct SimFilesystem {
-    pub name: String,
+}
+
+impl SimFilesystem {
+    pub fn new_filesystem() -> Box<SimFilesystem> {
+        Box::new(SimFilesystem {})
+    }
 }
 
 #[derive(Debug)]
@@ -62,6 +67,7 @@ impl Pool for SimPool {
     fn get_name(&mut self) -> String {
         self.name.clone()
     }
+
     fn copy(&self) -> Box<Pool> {
         let pool_copy = SimPool {
             name: self.name.clone(),
@@ -73,11 +79,13 @@ impl Pool for SimPool {
         };
         Box::new(pool_copy)
     }
+
     fn create_filesystem(&mut self,
-                         _filesystem_name: &str,
+                         filesystem_name: &str,
                          _mount_point: &str,
                          _size: u64)
                          -> EngineResult<()> {
+        self.filesystems.insert(filesystem_name.to_owned(), SimFilesystem::new_filesystem());
         Ok(())
     }
 }

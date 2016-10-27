@@ -92,4 +92,4 @@ class ServiceR(ServiceABC):
         self._stratisd.terminate()
 
 
-Service = ServiceC
+Service = ServiceR

@@ -92,3 +92,23 @@ class Manager(Interface):
         "GetRaidLevels" : "",
         "ListPools" : "",
     }
+
+
+class Pool(Interface):
+    """
+    Pool interface.
+    """
+
+    _INTERFACE_NAME = 'org.storage.stratis1.pool'
+
+    _METHODS = {
+       "AddCacheDevs": "as",
+       "AddDevs": "as",
+       "CreateVolumes": "a(sss)",
+       "DestroyVolumes": "as",
+       "ListCacheDevs": "",
+       "ListDevs": "",
+       "ListVolumes": "",
+       "RemoveCacheDevs": "asi",
+       "RemoveDevs": "asi"
+    }

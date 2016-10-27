@@ -19,6 +19,7 @@ Top-level classes and methods.
 from ._connection import get_object
 
 from ._implementation import Manager
+from ._implementation import Pool
 
 from ._stratisd_constants import StratisdErrorsGen
 from ._stratisd_constants import StratisdRaidGen

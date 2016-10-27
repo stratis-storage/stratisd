@@ -98,7 +98,7 @@ class StratisdConstantsGen(abc.ABC):
         :return: class with class attributes for stratisd constants
         :rtype: type
         """
-        values = getattr(Manager(get_object(TOP_OBJECT)), cls._METHODNAME)()
+        values = Manager.callMethod(get_object(TOP_OBJECT), cls._METHODNAME)
         return StratisdConstants.get_class(cls._CLASSNAME, values)
 
 

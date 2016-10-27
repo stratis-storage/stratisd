@@ -3,4 +3,5 @@ pub use self::pool::SimPool;
 
 mod blockdev;
 mod engine;
+mod filesystem;
 mod pool;

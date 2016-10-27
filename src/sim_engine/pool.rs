@@ -3,22 +3,15 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::collections::BTreeMap;
+use std::iter::FromIterator;
 use std::vec::Vec;
 
 use engine::EngineResult;
+use engine::Filesystem;
 use engine::Pool;
 
 use super::blockdev::SimDev;
-
-#[derive(Debug, Clone)]
-pub struct SimFilesystem {
-}
-
-impl SimFilesystem {
-    pub fn new_filesystem() -> Box<SimFilesystem> {
-        Box::new(SimFilesystem {})
-    }
-}
+use super::filesystem::SimFilesystem;
 
 #[derive(Debug)]
 pub struct SimPool {
@@ -87,5 +80,8 @@ impl Pool for SimPool {
                          -> EngineResult<()> {
         self.filesystems.insert(filesystem_name.to_owned(), SimFilesystem::new_filesystem());
         Ok(())
+    }
+    fn list_filesystems(&self) -> EngineResult<BTreeMap<String, Box<Filesystem>>> {
+        Ok(BTreeMap::from_iter(self.filesystems.iter().map(|x| (x.0.clone(), x.1.copy()))))
     }
 }

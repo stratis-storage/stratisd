@@ -13,12 +13,8 @@
 # limitations under the License.
 
 """
-Top-level classes and methods.
+General constants.
 """
 
-from ._connection import get_object
-
-from ._implementation import Manager
-
-from ._stratisd_constants import StratisdErrorsGen
-from ._stratisd_constants import StratisdRaidGen
+SERVICE = 'org.storage.stratis1'
+TOP_OBJECT = '/org/storage/stratis1'

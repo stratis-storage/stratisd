@@ -18,6 +18,8 @@ Miscellaneous helpful methods.
 
 import dbus
 
+from ._constants import SERVICE
+
 
 class Bus(object):
     """
@@ -45,4 +47,4 @@ def get_object(object_path):
     :returns: the proxy object corresponding to the object path
     :rtype: ProxyObject
     """
-    return Bus.get_bus().get_object("org.storage.stratis1", object_path)
+    return Bus.get_bus().get_object(SERVICE, object_path)

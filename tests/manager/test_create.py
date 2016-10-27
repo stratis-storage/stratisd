@@ -61,22 +61,22 @@ class Create2TestCase(unittest.TestCase):
            self._proxy,
            "CreatePool",
            self._POOLNAME,
-           [d.device_node for d in _device_list(_DEVICES, 1)],
-           0
+           0,
+           [d.device_node for d in _device_list(_DEVICES, 1)]
         )
 
     def testCreate1(self):
         """
         Type of result should always be correct.
 
-        If rc is STRATIS_OK, then pool must exist.
+        If rc is OK, then pool must exist.
         """
         (result, rc, message) = Manager.callMethod(
            self._proxy,
            "CreatePool",
            self._POOLNAME,
-           [d.device_node for d in _device_list(_DEVICES, 1)],
-           0
+           0,
+           [d.device_node for d in _device_list(_DEVICES, 1)]
         )
         self.assertIsInstance(result, str)
         self.assertIsInstance(rc, int)
@@ -88,12 +88,12 @@ class Create2TestCase(unittest.TestCase):
            self._POOLNAME
         )
 
-        ok = StratisdErrorsGen.get_object().STRATIS_OK
+        ok = StratisdErrorsGen.get_object().OK
         if rc == ok:
             self.assertEqual(pool, result)
             self.assertEqual(rc1, ok)
         else:
-            expected = StratisdErrorsGen.get_object().STRATIS_POOL_NOTFOUND
+            expected = StratisdErrorsGen.get_object().POOL_NOTFOUND
             self.assertEqual(rc1, expected)
 
 
@@ -115,8 +115,8 @@ class Create3TestCase(unittest.TestCase):
            self._proxy,
            "CreatePool",
            self._POOLNAME,
-           [d.device_node for d in _device_list(_DEVICES, 1)],
-           0
+           0,
+           [d.device_node for d in _device_list(_DEVICES, 1)]
         )
 
     def tearDown(self):
@@ -133,10 +133,10 @@ class Create3TestCase(unittest.TestCase):
            self._proxy,
            "CreatePool",
            self._POOLNAME,
-           [d.device_node for d in _device_list(_DEVICES, 1)],
-           0
+           0,
+           [d.device_node for d in _device_list(_DEVICES, 1)]
         )
-        expected_rc = StratisdErrorsGen.get_object().STRATIS_ALREADY_EXISTS
+        expected_rc = StratisdErrorsGen.get_object().ALREADY_EXISTS
         self.assertEqual(rc, expected_rc)
         self.assertIsInstance(result, str)
         self.assertIsInstance(rc, int)
@@ -148,4 +148,4 @@ class Create3TestCase(unittest.TestCase):
            self._POOLNAME
         )
 
-        self.assertEqual(rc1, StratisdErrorsGen.get_object().STRATIS_OK)
+        self.assertEqual(rc1, StratisdErrorsGen.get_object().OK)

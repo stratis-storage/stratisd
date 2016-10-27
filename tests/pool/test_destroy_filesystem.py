@@ -52,8 +52,8 @@ class DestroyFSTestCase(unittest.TestCase):
            self._proxy,
            "CreatePool",
            self._POOLNAME,
-           self._devs,
-           0
+           0,
+           self._devs
         )
         self._pool_object = get_object(result)
 
@@ -70,17 +70,17 @@ class DestroyFSTestCase(unittest.TestCase):
         number of volumes.
         """
         (result, rc, message) = \
-           Pool.callMethod(self._pool_object, "DestroyVolumes", [])
+           Pool.callMethod(self._pool_object, "DestroyFilesystems", [])
         self.assertIsInstance(result, list)
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
         self.assertEqual(len(result), 0)
-        self.assertEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
 
         (result, rc, message) = \
-           Pool.callMethod(self._pool_object, "ListVolumes")
-        self.assertEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+           Pool.callMethod(self._pool_object, "ListFilesystems")
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertEqual(len(result), 0)
 
     def testDestroyOne(self):
@@ -90,17 +90,17 @@ class DestroyFSTestCase(unittest.TestCase):
         """
 
         (result, rc, message) = \
-           Pool.callMethod(self._pool_object, "DestroyVolumes", ['name'])
+           Pool.callMethod(self._pool_object, "DestroyFilesystems", ['name'])
         self.assertIsInstance(result, list)
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
         self.assertEqual(len(result), 0)
-        self.assertEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
 
         (result, rc, message) = \
-           Pool.callMethod(self._pool_object, "ListVolumes")
-        self.assertEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+           Pool.callMethod(self._pool_object, "ListFilesystems")
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertEqual(len(result), 0)
 
 
@@ -118,21 +118,21 @@ class DestroyFSTestCase1(unittest.TestCase):
         """
         self._service = Service()
         self._service.setUp()
-        time.sleep(1)
+        time.sleep(2)
         self._proxy = get_object(TOP_OBJECT)
         self._devs = [d.device_node for d in _device_list(_DEVICES, 1)]
         (result, _, _) = Manager.callMethod(
            self._proxy,
            "CreatePool",
            self._POOLNAME,
-           self._devs,
-           0
+           0,
+           self._devs
         )
         self._pool_object = get_object(result)
         Pool.callMethod(
            self._pool_object,
-           "CreateVolumes",
-           [(self._VOLNAME, '', '')]
+           "CreateFilesystems",
+           [(self._VOLNAME, '', 0)]
         )
 
     def tearDown(self):
@@ -147,12 +147,12 @@ class DestroyFSTestCase1(unittest.TestCase):
         should always succeed.
         """
         (result, rc, message) = \
-           Pool.callMethod(self._pool_object, "DestroyVolumes", [self._VOLNAME])
+           Pool.callMethod(self._pool_object, "DestroyFilesystems", [self._VOLNAME])
         self.assertIsInstance(result, list)
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
-        self.assertEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertEqual(len(result), 1)
 
         (result, rc, message) = result[0]
@@ -160,9 +160,9 @@ class DestroyFSTestCase1(unittest.TestCase):
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
-        self.assertEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
 
         (result, rc, message) = \
-           Pool.callMethod(self._pool_object, "ListVolumes")
-        self.assertEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+           Pool.callMethod(self._pool_object, "ListFilesystems")
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertEqual(len(result), 0)

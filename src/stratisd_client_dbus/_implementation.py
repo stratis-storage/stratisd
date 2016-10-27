@@ -81,13 +81,13 @@ class Manager(Interface):
     _INTERFACE_NAME = 'org.storage.stratis1.Manager'
 
     _METHODS = {
-        "CreatePool" : "sasq",
+        "CreatePool" : "sqas",
         "DestroyPool" : "s",
         "GetCacheObjectPath" : "s",
         "GetDevObjectPath" : "s",
         "GetDevTypes" : "",
         "GetErrorCodes" : "",
-        "GetVolumeObjectPath" : "ss",
+        "GetFilesystemObjectPath" : "ss",
         "GetPoolObjectPath" : "s",
         "GetRaidLevels" : "",
         "ListPools" : "",
@@ -104,11 +104,11 @@ class Pool(Interface):
     _METHODS = {
        "AddCacheDevs": "as",
        "AddDevs": "as",
-       "CreateVolumes": "a(sss)",
-       "DestroyVolumes": "as",
+       "CreateFilesystems": "a(sst)",
+       "DestroyFilesystems": "as",
        "ListCacheDevs": "",
        "ListDevs": "",
-       "ListVolumes": "",
+       "ListFilesystems": "",
        "RemoveCacheDevs": "asi",
        "RemoveDevs": "asi"
     }

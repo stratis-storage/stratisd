@@ -61,7 +61,7 @@ class ListTestCase(unittest.TestCase):
         self.assertIsInstance(message, str)
 
         self.assertEqual(result, [])
-        self.assertEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
 
 
 class List2TestCase(unittest.TestCase):
@@ -82,8 +82,8 @@ class List2TestCase(unittest.TestCase):
            self._proxy,
            "CreatePool",
            self._POOLNAME,
-           [d.device_node for d in _device_list(_DEVICES, 1)],
-           0
+           0,
+           [d.device_node for d in _device_list(_DEVICES, 1)]
         )
 
     def tearDown(self):
@@ -105,4 +105,4 @@ class List2TestCase(unittest.TestCase):
         self.assertEqual(len(result), 1)
 
         self.assertIsInstance(result[0], str)
-        self.assertEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)

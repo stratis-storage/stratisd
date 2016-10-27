@@ -52,8 +52,8 @@ class ListTestCase(unittest.TestCase):
            self._proxy,
            "CreatePool",
            self._POOLNAME,
-           self._devs,
-           0
+           0,
+           self._devs
         )
         self._pool_object = get_object(result)
 
@@ -74,4 +74,4 @@ class ListTestCase(unittest.TestCase):
         self.assertIsInstance(message, str)
 
         self.assertEqual(len(result), len(self._devs))
-        self.assertEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)

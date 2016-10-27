@@ -64,7 +64,7 @@ class Destroy1TestCase(unittest.TestCase):
            "DestroyPool",
            self._POOLNAME
         )
-        self.assertEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
@@ -74,7 +74,7 @@ class Destroy1TestCase(unittest.TestCase):
            self._POOLNAME
         )
 
-        expected_rc = StratisdErrorsGen.get_object().STRATIS_POOL_NOTFOUND
+        expected_rc = StratisdErrorsGen.get_object().POOL_NOTFOUND
         self.assertEqual(rc1, expected_rc)
 
 
@@ -96,8 +96,8 @@ class Destroy2TestCase(unittest.TestCase):
            self._proxy,
            "CreatePool",
            self._POOLNAME,
-           [d.device_node for d in _device_list(_DEVICES, 1)],
-           0
+           0,
+           [d.device_node for d in _device_list(_DEVICES, 1)]
         )
 
     def tearDown(self):
@@ -115,7 +115,7 @@ class Destroy2TestCase(unittest.TestCase):
            "DestroyPool",
            self._POOLNAME
         )
-        self.assertEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
@@ -125,7 +125,7 @@ class Destroy2TestCase(unittest.TestCase):
            self._POOLNAME
         )
 
-        expected_rc = StratisdErrorsGen.get_object().STRATIS_POOL_NOTFOUND
+        expected_rc = StratisdErrorsGen.get_object().POOL_NOTFOUND
         self.assertEqual(rc1, expected_rc)
 
 
@@ -150,13 +150,13 @@ class Destroy3TestCase(unittest.TestCase):
            self._proxy,
            "CreatePool",
            self._POOLNAME,
-           [d.device_node for d in _device_list(_DEVICES, 1)],
-           0
+           0,
+           [d.device_node for d in _device_list(_DEVICES, 1)]
         )
         (_, _, _) = Pool.callMethod(
            get_object(poolpath),
-           "CreateVolumes",
-           [(self._VOLNAME, '', '')]
+           "CreateFilesystems",
+           [(self._VOLNAME, '', 0)]
         )
 
     def tearDown(self):
@@ -175,6 +175,6 @@ class Destroy3TestCase(unittest.TestCase):
            "DestroyPool",
            self._POOLNAME
         )
-        self.assertNotEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+        self.assertNotEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)

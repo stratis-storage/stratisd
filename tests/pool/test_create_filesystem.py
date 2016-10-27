@@ -53,8 +53,8 @@ class CreateFSTestCase(unittest.TestCase):
            self._proxy,
            "CreatePool",
            self._POOLNAME,
-           self._devs,
-           0
+           0,
+           self._devs
         )
         self._pool_object = get_object(result)
 
@@ -71,17 +71,17 @@ class CreateFSTestCase(unittest.TestCase):
         number of volumes.
         """
         (result, rc, message) = \
-           Pool.callMethod(self._pool_object, "CreateVolumes", [])
+           Pool.callMethod(self._pool_object, "CreateFilesystems", [])
         self.assertIsInstance(result, list)
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
         self.assertEqual(len(result), 0)
-        self.assertEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
 
         (result, rc, message) = \
-           Pool.callMethod(self._pool_object, "ListVolumes")
-        self.assertEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+           Pool.callMethod(self._pool_object, "ListFilesystems")
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertEqual(len(result), 0)
 
 
@@ -106,14 +106,14 @@ class CreateFSTestCase1(unittest.TestCase):
            self._proxy,
            "CreatePool",
            self._POOLNAME,
-           self._devs,
-           0
+           0,
+           self._devs
         )
         self._pool_object = get_object(result)
         Pool.callMethod(
            self._pool_object,
-           "CreateVolumes",
-           [(self._VOLNAME, '', '')]
+           "CreateFilesystems",
+           [(self._VOLNAME, '', 0)]
         )
 
     def tearDown(self):
@@ -130,14 +130,14 @@ class CreateFSTestCase1(unittest.TestCase):
         """
         (result, rc, message) = Pool.callMethod(
            self._pool_object,
-           "CreateVolumes",
-           [(self._VOLNAME, "", "")]
+           "CreateFilesystems",
+           [(self._VOLNAME, "", 0)]
         )
         self.assertIsInstance(result, list)
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
-        expected_rc = StratisdErrorsGen.get_object().STRATIS_LIST_FAILURE
+        expected_rc = StratisdErrorsGen.get_object().LIST_FAILURE
         self.assertEqual(rc, expected_rc)
         self.assertEqual(len(result), 1)
 
@@ -146,10 +146,10 @@ class CreateFSTestCase1(unittest.TestCase):
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
-        expected_rc = StratisdErrorsGen.get_object().STRATIS_ALREADY_EXISTS
+        expected_rc = StratisdErrorsGen.get_object().ALREADY_EXISTS
         self.assertEqual(rc, expected_rc)
 
         (result, rc, message) = \
-           Pool.callMethod(self._pool_object, "ListVolumes")
-        self.assertEqual(rc, StratisdErrorsGen.get_object().STRATIS_OK)
+           Pool.callMethod(self._pool_object, "ListFilesystems")
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertEqual(len(result), 1)

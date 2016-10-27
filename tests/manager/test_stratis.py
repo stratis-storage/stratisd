@@ -46,6 +46,7 @@ class StratisTestCase(unittest.TestCase):
         """
         self._service.tearDown()
 
+    @unittest.skip("Unimplemented")
     def testStratisVersion(self):
         """
         Getting version should just succeed.
@@ -53,6 +54,7 @@ class StratisTestCase(unittest.TestCase):
         result = Manager.getProperty(get_object(TOP_OBJECT), "Version")
         self.assertIsInstance(result, str)
 
+    @unittest.skip("Unimplemented")
     @unittest.expectedFailure
     def testStratisLogLevel(self):
         """
@@ -61,6 +63,7 @@ class StratisTestCase(unittest.TestCase):
         result = Manager.getProperty(get_object(TOP_OBJECT), "LogLevel")
         self.assertIsInstance(result, int)
 
+    @unittest.skip("Unimplemented")
     def testStratisLogLevel1(self):
         """
         Getting log level property does get a value.

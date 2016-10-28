@@ -55,7 +55,6 @@ pub trait Pool: Debug {
     fn add_blockdev(&mut self, path: &str) -> EngineResult<()>;
     fn add_cachedev(&mut self, path: &str) -> EngineResult<()>;
     fn destroy(&mut self) -> EngineResult<()>;
-    fn get_name(&mut self) -> String;
     fn list_filesystems(&self) -> EngineResult<BTreeMap<String, Box<Filesystem>>>;
     fn copy(&self) -> Box<Pool>;
 }

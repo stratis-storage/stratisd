@@ -15,7 +15,6 @@ use super::filesystem::SimFilesystem;
 
 #[derive(Debug)]
 pub struct SimPool {
-    pub name: String,
     pub block_devs: Vec<Box<SimDev>>,
     pub filesystems: BTreeMap<String, Box<SimFilesystem>>,
     pub raid_level: u16,
@@ -24,12 +23,11 @@ pub struct SimPool {
 }
 
 impl SimPool {
-    pub fn new_pool(name: &str, blockdevs: &[Box<SimDev>], raid_level: u16) -> Box<Pool> {
+    pub fn new_pool(blockdevs: &[Box<SimDev>], raid_level: u16) -> Box<Pool> {
 
         let mut vec = Vec::new();
         vec.extend_from_slice(blockdevs);
         let new_pool = SimPool {
-            name: name.to_owned(),
             block_devs: vec,
             filesystems: BTreeMap::new(),
             raid_level: raid_level,
@@ -57,13 +55,8 @@ impl Pool for SimPool {
         Ok(())
     }
 
-    fn get_name(&mut self) -> String {
-        self.name.clone()
-    }
-
     fn copy(&self) -> Box<Pool> {
         let pool_copy = SimPool {
-            name: self.name.clone(),
             block_devs: self.block_devs.clone(),
             filesystems: self.filesystems.clone(),
             raid_level: self.raid_level.clone(),
@@ -79,7 +72,7 @@ impl Pool for SimPool {
                          size: u64)
                          -> EngineResult<()> {
         self.filesystems.insert(filesystem_name.to_owned(),
-                                SimFilesystem::new_filesystem(filesystem_name, mount_point, size));
+                                SimFilesystem::new_filesystem(mount_point, size));
         Ok(())
     }
     fn list_filesystems(&self) -> EngineResult<BTreeMap<String, Box<Filesystem>>> {

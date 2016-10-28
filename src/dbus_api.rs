@@ -119,9 +119,9 @@ fn default_object_path<'a>() -> dbus::Path<'a> {
 }
 
 fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-
     let dbus_context = m.path.get_data();
     let ref engine = dbus_context.engine;
+
     let result = engine.borrow().list_pools();
 
     let return_message = m.msg.method_return();
@@ -192,10 +192,6 @@ fn create_dbus_filesystem<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
-
-    if iter.arg_type() == 0 {
-        return Err(MethodErr::no_arg());
-    }
 
     let filesystems: Array<(&str, &str, u64), _> = try!(iter.read::<Array<(&str, &str, u64), _>>()
         .map_err(|_| MethodErr::invalid_arg(&0)));
@@ -285,11 +281,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
 fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
-    let mut iter = message.iter_init();
 
-    if iter.arg_type() != 0 {
-        return Err(MethodErr::invalid_arg(&0));
-    }
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
@@ -322,7 +314,6 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(filesystem_tree) => {
-            println!("filesystems size = {}", filesystem_tree.len());
             let msg_vec =
                 filesystem_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
             let item_array = MessageItem::Array(msg_vec, "s".into());
@@ -623,6 +614,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
 
     let obj_path = f.object_path(STRATIS_BASE_PATH, dbus_context)
         .introspectable()
+        .object_manager()
         .add(f.interface(STRATIS_MANAGER_INTERFACE, ())
             .add_m(list_pools_method)
             .add_m(create_pool_method)
@@ -634,7 +626,6 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
             .add_m(get_error_codes_method)
             .add_m(get_raid_levels_method)
             .add_m(get_dev_types_method));
-
 
     let base_tree = base_tree.add(obj_path);
 

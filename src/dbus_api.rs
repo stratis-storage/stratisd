@@ -447,19 +447,19 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
     let create_filesystems_method = f.method(CREATE_FILESYSTEMS, (), create_filesystems)
-        .in_arg(("volumes", "a(sst)"))
+        .in_arg(("filesystems", "a(sst)"))
         .out_arg(("results", "a(oqs)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
     let destroy_filesystems_method = f.method(DESTROY_FILESYSTEMS, (), destroy_filesystems)
-        .in_arg(("volumes", "a(sqs)"))
+        .in_arg(("filesystems", "a(sqs)"))
         .out_arg(("results", "a(qs)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
     let list_filesystems_method = f.method(LIST_FILESYSTEMS, (), list_filesystems)
-        .out_arg(("volumes", "as"))
+        .out_arg(("filesystems", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

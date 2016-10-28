@@ -3,26 +3,18 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::collections::BTreeMap;
+use std::iter::FromIterator;
 use std::vec::Vec;
 
 use engine::EngineResult;
+use engine::Filesystem;
 use engine::Pool;
 
 use super::blockdev::SimDev;
-
-#[derive(Debug, Clone)]
-pub struct SimFilesystem {
-}
-
-impl SimFilesystem {
-    pub fn new_filesystem() -> Box<SimFilesystem> {
-        Box::new(SimFilesystem {})
-    }
-}
+use super::filesystem::SimFilesystem;
 
 #[derive(Debug)]
 pub struct SimPool {
-    pub name: String,
     pub block_devs: Vec<Box<SimDev>>,
     pub filesystems: BTreeMap<String, Box<SimFilesystem>>,
     pub raid_level: u16,
@@ -31,12 +23,11 @@ pub struct SimPool {
 }
 
 impl SimPool {
-    pub fn new_pool(name: &str, blockdevs: &[Box<SimDev>], raid_level: u16) -> Box<Pool> {
+    pub fn new_pool(blockdevs: &[Box<SimDev>], raid_level: u16) -> Box<Pool> {
 
         let mut vec = Vec::new();
         vec.extend_from_slice(blockdevs);
         let new_pool = SimPool {
-            name: name.to_owned(),
             block_devs: vec,
             filesystems: BTreeMap::new(),
             raid_level: raid_level,
@@ -64,13 +55,8 @@ impl Pool for SimPool {
         Ok(())
     }
 
-    fn get_name(&mut self) -> String {
-        self.name.clone()
-    }
-
     fn copy(&self) -> Box<Pool> {
         let pool_copy = SimPool {
-            name: self.name.clone(),
             block_devs: self.block_devs.clone(),
             filesystems: self.filesystems.clone(),
             raid_level: self.raid_level.clone(),
@@ -82,10 +68,14 @@ impl Pool for SimPool {
 
     fn create_filesystem(&mut self,
                          filesystem_name: &str,
-                         _mount_point: &str,
-                         _size: u64)
+                         mount_point: &str,
+                         size: u64)
                          -> EngineResult<()> {
-        self.filesystems.insert(filesystem_name.to_owned(), SimFilesystem::new_filesystem());
+        self.filesystems.insert(filesystem_name.to_owned(),
+                                SimFilesystem::new_filesystem(mount_point, size));
         Ok(())
+    }
+    fn list_filesystems(&self) -> EngineResult<BTreeMap<String, Box<Filesystem>>> {
+        Ok(BTreeMap::from_iter(self.filesystems.iter().map(|x| (x.0.clone(), x.1.copy()))))
     }
 }

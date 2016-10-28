@@ -70,7 +70,7 @@ impl Engine for SimEngine {
             None => {}
         }
 
-        let pool = SimPool::new_pool(name, devs.as_slice(), raid_level);
+        let pool = SimPool::new_pool(devs.as_slice(), raid_level);
 
         if self.rng.gen_weighted_bool(8) {
             return Err(EngineError::Stratis(ErrorEnum::Error("X".into())));

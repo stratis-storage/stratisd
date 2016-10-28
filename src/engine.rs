@@ -42,6 +42,10 @@ pub enum EngineError {
 
 pub type EngineResult<T> = Result<T, EngineError>;
 
+pub trait Filesystem: Debug {
+    fn copy(&self) -> Box<Filesystem>;
+}
+
 pub trait Pool: Debug {
     fn create_filesystem(&mut self,
                          filesystem_name: &str,
@@ -51,7 +55,7 @@ pub trait Pool: Debug {
     fn add_blockdev(&mut self, path: &str) -> EngineResult<()>;
     fn add_cachedev(&mut self, path: &str) -> EngineResult<()>;
     fn destroy(&mut self) -> EngineResult<()>;
-    fn get_name(&mut self) -> String;
+    fn list_filesystems(&self) -> EngineResult<BTreeMap<String, Box<Filesystem>>>;
     fn copy(&self) -> Box<Pool>;
 }
 

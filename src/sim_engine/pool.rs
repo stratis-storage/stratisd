@@ -4,6 +4,7 @@
 
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
+use std::path::Path;
 use std::vec::Vec;
 
 use engine::EngineResult;
@@ -40,12 +41,12 @@ impl SimPool {
 }
 
 impl Pool for SimPool {
-    fn add_blockdev(&mut self, _path: &str) -> EngineResult<()> {
+    fn add_blockdev(&mut self, _path: &Path) -> EngineResult<()> {
         println!("sim: pool::add_blockdev");
         Ok(())
     }
 
-    fn add_cachedev(&mut self, _path: &str) -> EngineResult<()> {
+    fn add_cachedev(&mut self, _path: &Path) -> EngineResult<()> {
         println!("sim: pool::add_cachedev");
         Ok(())
     }

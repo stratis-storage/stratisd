@@ -33,6 +33,7 @@ use dbus_consts::*;
 use engine;
 use engine::Engine;
 use engine::EngineError;
+
 use types::StratisResult;
 
 #[derive(Debug)]
@@ -78,6 +79,22 @@ impl DataType for TData {
     type Interface = ();
     type Method = ();
     type Signal = ();
+}
+
+/// Get name for pool from object path
+fn object_path_to_pool_name(dbus_context: &DbusContext,
+                            path: &String)
+                            -> Result<String, (MessageItem, MessageItem)> {
+    let pool_name = match dbus_context.pools.borrow().get(path) {
+        Some(pool) => pool.clone(),
+        None => {
+            let items = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
+                                              ErrorEnum::INTERNAL_ERROR.get_error_string()
+                                                  .into());
+            return Err(items);
+        }
+    };
+    Ok(pool_name)
 }
 
 /// Translates an engine ErrorEnum to a dbus ErrorEnum.
@@ -203,16 +220,12 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
+    let default_return = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
 
-    let pool_name = match dbus_context.pools.borrow_mut().get(&object_path.to_string()) {
-        Some(pool) => pool.clone(),
-        None => {
-            let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
-                                                 ErrorEnum::INTERNAL_ERROR.get_error_string()
-                                                     .into());
-            let message =
-                return_message.append3(MessageItem::Array(vec![], Cow::Borrowed("(oqs)")), rc, rs);
-            return Ok(vec![message]);
+    let pool_name = match object_path_to_pool_name(dbus_context, &object_path.to_string()) {
+        Ok(pool) => pool,
+        Err((rc, rs)) => {
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
 
@@ -222,9 +235,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Err(x) => {
             let (rc, rs) = engine_to_dbus_err(&x);
             let (rc, rs) = code_to_message_items(rc, rs);
-
-            let entry = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
-            return Ok(vec![return_message.append3(entry, rc, rs)]);
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
 
@@ -289,16 +300,12 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
+    let default_return = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
 
-    let pool_name = match dbus_context.pools.borrow_mut().get(&object_path.to_string()) {
-        Some(pool) => pool.clone(),
-        None => {
-            let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
-                                                 ErrorEnum::INTERNAL_ERROR.get_error_string()
-                                                     .into());
-            let message =
-                return_message.append3(MessageItem::Array(vec![], Cow::Borrowed("(oqs)")), rc, rs);
-            return Ok(vec![message]);
+    let pool_name = match object_path_to_pool_name(dbus_context, &object_path.to_string()) {
+        Ok(pool) => pool,
+        Err((rc, rs)) => {
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
 
@@ -308,9 +315,7 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Err(x) => {
             let (rc, rs) = engine_to_dbus_err(&x);
             let (rc, rs) = code_to_message_items(rc, rs);
-
-            let entry = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
-            return Ok(vec![return_message.append3(entry, rc, rs)]);
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
 
@@ -379,16 +384,12 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
+    let default_return = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
 
-    let pool_name = match dbus_context.pools.borrow_mut().get(&object_path.to_string()) {
-        Some(pool) => pool.clone(),
-        None => {
-            let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
-                                                 ErrorEnum::INTERNAL_ERROR.get_error_string()
-                                                     .into());
-            let message =
-                return_message.append3(MessageItem::Array(vec![], Cow::Borrowed("(oqs)")), rc, rs);
-            return Ok(vec![message]);
+    let pool_name = match object_path_to_pool_name(dbus_context, &object_path.to_string()) {
+        Ok(pool) => pool,
+        Err((rc, rs)) => {
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
 
@@ -398,9 +399,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Err(x) => {
             let (rc, rs) = engine_to_dbus_err(&x);
             let (rc, rs) = code_to_message_items(rc, rs);
-
-            let entry = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
-            return Ok(vec![return_message.append3(entry, rc, rs)]);
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
 
@@ -464,16 +463,12 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
+    let default_return = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
 
-    let pool_name = match dbus_context.pools.borrow_mut().get(&object_path.to_string()) {
-        Some(pool) => pool.clone(),
-        None => {
-            let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
-                                                 ErrorEnum::INTERNAL_ERROR.get_error_string()
-                                                     .into());
-            let message =
-                return_message.append3(MessageItem::Array(vec![], Cow::Borrowed("(oqs)")), rc, rs);
-            return Ok(vec![message]);
+    let pool_name = match object_path_to_pool_name(dbus_context, &object_path.to_string()) {
+        Ok(pool) => pool,
+        Err((rc, rs)) => {
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
 
@@ -483,9 +478,7 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Err(x) => {
             let (rc, rs) = engine_to_dbus_err(&x);
             let (rc, rs) = code_to_message_items(rc, rs);
-
-            let entry = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
-            return Ok(vec![return_message.append3(entry, rc, rs)]);
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
 

@@ -2,13 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use bidir_map::BidirMap;
+
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::path::Path;
 use std::rc::Rc;
-use std::collections::BTreeMap;
 use std::vec::Vec;
 
 use dbus;
@@ -44,12 +45,12 @@ pub enum DeferredAction {
 #[derive(Debug, Clone)]
 pub struct DbusContext {
     pub next_index: Rc<Cell<u64>>,
-    pub pools: Rc<RefCell<BTreeMap<String, String>>>,
+    pub pools: Rc<RefCell<BidirMap<String, String>>>,
     pub engine: Rc<RefCell<Engine>>,
     pub action_list: Rc<RefCell<Vec<DeferredAction>>>,
-    pub filesystems: Rc<RefCell<BTreeMap<String, (String, String)>>>,
-    pub block_devs: Rc<RefCell<BTreeMap<String, (String, String)>>>,
-    pub cache_devs: Rc<RefCell<BTreeMap<String, (String, String)>>>,
+    pub filesystems: Rc<RefCell<BidirMap<String, (String, String)>>>,
+    pub block_devs: Rc<RefCell<BidirMap<String, (String, String)>>>,
+    pub cache_devs: Rc<RefCell<BidirMap<String, (String, String)>>>,
 }
 
 impl DbusContext {
@@ -57,11 +58,11 @@ impl DbusContext {
         DbusContext {
             action_list: Rc::new(RefCell::new(Vec::new())),
             engine: engine.clone(),
-            filesystems: Rc::new(RefCell::new(BTreeMap::new())),
-            block_devs: Rc::new(RefCell::new(BTreeMap::new())),
-            cache_devs: Rc::new(RefCell::new(BTreeMap::new())),
+            filesystems: Rc::new(RefCell::new(BidirMap::new())),
+            block_devs: Rc::new(RefCell::new(BidirMap::new())),
+            cache_devs: Rc::new(RefCell::new(BidirMap::new())),
             next_index: Rc::new(Cell::new(0)),
-            pools: Rc::new(RefCell::new(BTreeMap::new())),
+            pools: Rc::new(RefCell::new(BidirMap::new())),
         }
     }
     pub fn get_next_id(&mut self) -> u64 {
@@ -204,7 +205,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let object_path = m.path.get_name();
     let return_message = message.method_return();
 
-    let pool_name = match dbus_context.pools.borrow_mut().get(&object_path.to_string()) {
+    let pool_name = match dbus_context.pools.borrow_mut().get_by_first(&object_path.to_string()) {
         Some(pool) => pool.clone(),
         None => {
             let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
@@ -290,7 +291,7 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let object_path = m.path.get_name();
     let return_message = message.method_return();
 
-    let pool_name = match dbus_context.pools.borrow_mut().get(&object_path.to_string()) {
+    let pool_name = match dbus_context.pools.borrow_mut().get_by_first(&object_path.to_string()) {
         Some(pool) => pool.clone(),
         None => {
             let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
@@ -380,7 +381,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let object_path = m.path.get_name();
     let return_message = message.method_return();
 
-    let pool_name = match dbus_context.pools.borrow_mut().get(&object_path.to_string()) {
+    let pool_name = match dbus_context.pools.borrow_mut().get_by_first(&object_path.to_string()) {
         Some(pool) => pool.clone(),
         None => {
             let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
@@ -465,7 +466,7 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let object_path = m.path.get_name();
     let return_message = message.method_return();
 
-    let pool_name = match dbus_context.pools.borrow_mut().get(&object_path.to_string()) {
+    let pool_name = match dbus_context.pools.borrow_mut().get_by_first(&object_path.to_string()) {
         Some(pool) => pool.clone(),
         None => {
             let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,

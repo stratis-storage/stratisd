@@ -2,6 +2,7 @@
 name = "stratisd"
 version = "0.1.0"
 dependencies = [
+ "bidir-map 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 0.3.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytesize 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 1.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -21,6 +22,11 @@ dependencies = [
 [[package]]
 name = "ansi_term"
 version = "0.7.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "bidir-map"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]

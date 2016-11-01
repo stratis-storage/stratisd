@@ -97,6 +97,18 @@ fn object_path_to_pool_name(dbus_context: &DbusContext,
     Ok(pool_name)
 }
 
+/// Macro for early return with an Ok dbus message on a dbus internal error
+macro_rules! dbus_try {
+    ( $val:expr; $default:expr; $message:expr ) => {
+        match $val {
+            Ok(v) => v,
+            Err((rc, rs)) => {
+                return Ok(vec![$message.append3($default, rc, rs)]);
+            }
+        };
+    }
+}
+
 /// Translates an engine ErrorEnum to a dbus ErrorEnum.
 fn engine_to_dbus_enum(err: &engine::ErrorEnum) -> (ErrorEnum, String) {
     match *err {

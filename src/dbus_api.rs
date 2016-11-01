@@ -234,12 +234,9 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
 
-    let pool_name = match object_path_to_pool_name(dbus_context, &object_path.to_string()) {
-        Ok(pool) => pool,
-        Err((rc, rs)) => {
-            return Ok(vec![return_message.append3(default_return, rc, rs)]);
-        }
-    };
+    let pool_name = dbus_try!(
+        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
     let ref mut pool = match b_engine.get_pool(&pool_name) {
@@ -314,12 +311,9 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
 
-    let pool_name = match object_path_to_pool_name(dbus_context, &object_path.to_string()) {
-        Ok(pool) => pool,
-        Err((rc, rs)) => {
-            return Ok(vec![return_message.append3(default_return, rc, rs)]);
-        }
-    };
+    let pool_name = dbus_try!(
+        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
     let ref mut pool = match b_engine.get_pool(&pool_name) {
@@ -398,12 +392,9 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
 
-    let pool_name = match object_path_to_pool_name(dbus_context, &object_path.to_string()) {
-        Ok(pool) => pool,
-        Err((rc, rs)) => {
-            return Ok(vec![return_message.append3(default_return, rc, rs)]);
-        }
-    };
+    let pool_name = dbus_try!(
+        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
     let ref mut pool = match b_engine.get_pool(&pool_name) {
@@ -477,12 +468,9 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
 
-    let pool_name = match object_path_to_pool_name(dbus_context, &object_path.to_string()) {
-        Ok(pool) => pool,
-        Err((rc, rs)) => {
-            return Ok(vec![return_message.append3(default_return, rc, rs)]);
-        }
-    };
+    let pool_name = dbus_try!(
+        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
     let ref mut pool = match b_engine.get_pool(&pool_name) {

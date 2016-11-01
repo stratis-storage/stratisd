@@ -17,6 +17,7 @@ impl SimFilesystem {
         })
     }
 }
+
 impl Filesystem for SimFilesystem {
     fn copy(&self) -> Box<Filesystem> {
         let filesystem_copy = SimFilesystem {
@@ -24,5 +25,13 @@ impl Filesystem for SimFilesystem {
             size: self.size,
         };
         Box::new(filesystem_copy)
+    }
+
+    fn eq(&self, other: &Filesystem) -> bool {
+        self.get_id() == other.get_id()
+    }
+
+    fn get_id(&self) -> String {
+        self.mount_point.clone()
     }
 }

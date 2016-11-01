@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use bidir_map::BidirMap;
+
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
 use std::path::Path;
@@ -42,12 +44,18 @@ impl SimPool {
 
 impl Pool for SimPool {
     fn add_blockdev(&mut self, _path: &Path) -> EngineResult<()> {
-        println!("sim: pool::add_blockdev");
+        Ok(())
+    }
+
+    fn remove_blockdev(&mut self, _path: &Path) -> EngineResult<()> {
         Ok(())
     }
 
     fn add_cachedev(&mut self, _path: &Path) -> EngineResult<()> {
-        println!("sim: pool::add_cachedev");
+        Ok(())
+    }
+
+    fn remove_cachedev(&mut self, _path: &Path) -> EngineResult<()> {
         Ok(())
     }
 
@@ -76,7 +84,7 @@ impl Pool for SimPool {
                                 SimFilesystem::new_filesystem(mount_point, size));
         Ok(())
     }
-    fn list_filesystems(&self) -> EngineResult<BTreeMap<String, Box<Filesystem>>> {
-        Ok(BTreeMap::from_iter(self.filesystems.iter().map(|x| (x.0.clone(), x.1.copy()))))
+    fn list_filesystems(&self) -> EngineResult<BidirMap<String, Box<Filesystem>>> {
+        Ok(BidirMap::from_iter(self.filesystems.iter().map(|x| (x.0.clone(), x.1.copy()))))
     }
 }

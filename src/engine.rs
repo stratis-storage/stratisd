@@ -2,6 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use bidir_map::BidirMap;
+
+use core::cmp::PartialEq;
 
 use std::collections::BTreeMap;
 use std::fmt::Debug;
@@ -43,7 +46,15 @@ pub enum EngineError {
 pub type EngineResult<T> = Result<T, EngineError>;
 
 pub trait Filesystem: Debug {
+    fn get_id(&self) -> String;
     fn copy(&self) -> Box<Filesystem>;
+    fn eq(&self, other: &Filesystem) -> bool;
+}
+
+impl PartialEq for Filesystem {
+    fn eq(&self, other: &Filesystem) -> bool {
+        self.eq(other)
+    }
 }
 
 pub trait Pool: Debug {
@@ -53,9 +64,11 @@ pub trait Pool: Debug {
                          size: u64)
                          -> EngineResult<()>;
     fn add_blockdev(&mut self, path: &Path) -> EngineResult<()>;
+    fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;
     fn add_cachedev(&mut self, path: &Path) -> EngineResult<()>;
+    fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()>;
     fn destroy(&mut self) -> EngineResult<()>;
-    fn list_filesystems(&self) -> EngineResult<BTreeMap<String, Box<Filesystem>>>;
+    fn list_filesystems(&self) -> EngineResult<BidirMap<String, Box<Filesystem>>>;
     fn copy(&self) -> Box<Pool>;
 }
 

@@ -89,8 +89,7 @@ fn object_path_to_pool_name(dbus_context: &DbusContext,
         Some(pool) => pool.clone(),
         None => {
             let items = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
-                                              ErrorEnum::INTERNAL_ERROR.get_error_string()
-                                                  .into());
+                                              format!("no pool for object path {}", path));
             return Err(items);
         }
     };

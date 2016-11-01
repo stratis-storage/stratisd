@@ -33,6 +33,7 @@ use dbus_consts::*;
 use engine;
 use engine::Engine;
 use engine::EngineError;
+
 use types::StratisResult;
 
 #[derive(Debug)]
@@ -78,6 +79,47 @@ impl DataType for TData {
     type Interface = ();
     type Method = ();
     type Signal = ();
+}
+
+/// Get name for pool from object path
+fn object_path_to_pool_name(dbus_context: &DbusContext,
+                            path: &String)
+                            -> Result<String, (MessageItem, MessageItem)> {
+    let pool_name = match dbus_context.pools.borrow().get(path) {
+        Some(pool) => pool.clone(),
+        None => {
+            let items = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
+                                              format!("no pool for object path {}", path));
+            return Err(items);
+        }
+    };
+    Ok(pool_name)
+}
+
+/// Macro for early return with an Ok dbus message on a dbus internal error
+macro_rules! dbus_try {
+    ( $val:expr; $default:expr; $message:expr ) => {
+        match $val {
+            Ok(v) => v,
+            Err((rc, rs)) => {
+                return Ok(vec![$message.append3($default, rc, rs)]);
+            }
+        };
+    }
+}
+
+/// Macro for early return with an Ok dbus message on an engine error
+macro_rules! engine_try {
+    ( $val:expr; $default:expr; $message:expr ) => {
+        match $val {
+            Ok(result) => result,
+            Err(x) => {
+                let (rc, rs) = engine_to_dbus_err(&x);
+                let (rc, rs) = code_to_message_items(rc, rs);
+                return Ok(vec![$message.append3($default, rc, rs)]);
+            }
+        }
+    }
 }
 
 /// Translates an engine ErrorEnum to a dbus ErrorEnum.
@@ -129,17 +171,18 @@ fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let result = engine.borrow().list_pools();
 
     let return_message = m.msg.method_return();
+    let return_sig = "s";
 
     let msg = match result {
         Ok(pool_tree) => {
             let msg_vec =
                 pool_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
-            let item_array = MessageItem::Array(msg_vec, "s".into());
+            let item_array = MessageItem::Array(msg_vec, return_sig.into());
             let (rc, rs) = ok_message_items();
             return_message.append3(item_array, rc, rs)
         }
         Err(x) => {
-            let item_array = MessageItem::Array(vec![], "s".into());
+            let item_array = MessageItem::Array(vec![], return_sig.into());
             let (rc, rs) = engine_to_dbus_err(&x);
             let (rc, rs) = code_to_message_items(rc, rs);
             return_message.append3(item_array, rc, rs)
@@ -203,30 +246,17 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
+    let return_sig = "(oqs)";
+    let default_return = MessageItem::Array(vec![], return_sig.into());
 
-    let pool_name = match dbus_context.pools.borrow_mut().get(&object_path.to_string()) {
-        Some(pool) => pool.clone(),
-        None => {
-            let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
-                                                 ErrorEnum::INTERNAL_ERROR.get_error_string()
-                                                     .into());
-            let message =
-                return_message.append3(MessageItem::Array(vec![], Cow::Borrowed("(oqs)")), rc, rs);
-            return Ok(vec![message]);
-        }
-    };
+    let pool_name = dbus_try!(
+        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = match b_engine.get_pool(&pool_name) {
-        Ok(result) => result,
-        Err(x) => {
-            let (rc, rs) = engine_to_dbus_err(&x);
-            let (rc, rs) = code_to_message_items(rc, rs);
-
-            let entry = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
-            return Ok(vec![return_message.append3(entry, rc, rs)]);
-        }
-    };
+    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
+                                   default_return;
+                                   return_message);
 
     let ref mut list_rc = ErrorEnum::OK;
 
@@ -259,7 +289,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let (rc, rs) = code_to_message_items(*list_rc, list_rc.get_error_string().into());
 
-    Ok(vec![return_message.append3(MessageItem::Array(vec, Cow::Borrowed("(oqs)")), rc, rs)])
+    Ok(vec![return_message.append3(MessageItem::Array(vec, return_sig.into()), rc, rs)])
 
 }
 
@@ -289,30 +319,17 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
+    let return_sig = "s";
+    let default_return = MessageItem::Array(vec![], return_sig.into());
 
-    let pool_name = match dbus_context.pools.borrow_mut().get(&object_path.to_string()) {
-        Some(pool) => pool.clone(),
-        None => {
-            let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
-                                                 ErrorEnum::INTERNAL_ERROR.get_error_string()
-                                                     .into());
-            let message =
-                return_message.append3(MessageItem::Array(vec![], Cow::Borrowed("(oqs)")), rc, rs);
-            return Ok(vec![message]);
-        }
-    };
+    let pool_name = dbus_try!(
+        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = match b_engine.get_pool(&pool_name) {
-        Ok(result) => result,
-        Err(x) => {
-            let (rc, rs) = engine_to_dbus_err(&x);
-            let (rc, rs) = code_to_message_items(rc, rs);
-
-            let entry = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
-            return Ok(vec![return_message.append3(entry, rc, rs)]);
-        }
-    };
+    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
+                                   default_return;
+                                   return_message);
 
     let result = pool.list_filesystems();
 
@@ -320,12 +337,12 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(filesystem_tree) => {
             let msg_vec =
                 filesystem_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
-            let item_array = MessageItem::Array(msg_vec, "s".into());
+            let item_array = MessageItem::Array(msg_vec, return_sig.into());
             let (rc, rs) = ok_message_items();
             return_message.append3(item_array, rc, rs)
         }
         Err(x) => {
-            let item_array = MessageItem::Array(vec![], "s".into());
+            let item_array = MessageItem::Array(vec![], return_sig.into());
             let (rc, rs) = engine_to_dbus_err(&x);
             let (rc, rs) = code_to_message_items(rc, rs);
             return_message.append3(item_array, rc, rs)
@@ -379,30 +396,17 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
+    let return_sig = "(oqs)";
+    let default_return = MessageItem::Array(vec![], return_sig.into());
 
-    let pool_name = match dbus_context.pools.borrow_mut().get(&object_path.to_string()) {
-        Some(pool) => pool.clone(),
-        None => {
-            let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
-                                                 ErrorEnum::INTERNAL_ERROR.get_error_string()
-                                                     .into());
-            let message =
-                return_message.append3(MessageItem::Array(vec![], Cow::Borrowed("(oqs)")), rc, rs);
-            return Ok(vec![message]);
-        }
-    };
+    let pool_name = dbus_try!(
+        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = match b_engine.get_pool(&pool_name) {
-        Ok(result) => result,
-        Err(x) => {
-            let (rc, rs) = engine_to_dbus_err(&x);
-            let (rc, rs) = code_to_message_items(rc, rs);
-
-            let entry = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
-            return Ok(vec![return_message.append3(entry, rc, rs)]);
-        }
-    };
+    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
+                                   default_return;
+                                   return_message);
 
     let ref mut list_rc = ErrorEnum::OK;
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
@@ -433,7 +437,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     }
     let (rc, rs) = code_to_message_items(*list_rc, list_rc.get_error_string().into());
 
-    Ok(vec![return_message.append3(MessageItem::Array(vec, Cow::Borrowed("(oqs)")), rc, rs)])
+    Ok(vec![return_message.append3(MessageItem::Array(vec, return_sig.into()), rc, rs)])
 }
 
 fn create_dbus_cachedev<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
@@ -464,30 +468,17 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
+    let return_sig = "(oqs)";
+    let default_return = MessageItem::Array(vec![], return_sig.into());
 
-    let pool_name = match dbus_context.pools.borrow_mut().get(&object_path.to_string()) {
-        Some(pool) => pool.clone(),
-        None => {
-            let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
-                                                 ErrorEnum::INTERNAL_ERROR.get_error_string()
-                                                     .into());
-            let message =
-                return_message.append3(MessageItem::Array(vec![], Cow::Borrowed("(oqs)")), rc, rs);
-            return Ok(vec![message]);
-        }
-    };
+    let pool_name = dbus_try!(
+        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = match b_engine.get_pool(&pool_name) {
-        Ok(result) => result,
-        Err(x) => {
-            let (rc, rs) = engine_to_dbus_err(&x);
-            let (rc, rs) = code_to_message_items(rc, rs);
-
-            let entry = MessageItem::Array(vec![], Cow::Borrowed("(oqs)"));
-            return Ok(vec![return_message.append3(entry, rc, rs)]);
-        }
-    };
+    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
+                                   default_return;
+                                   return_message);
 
     let ref mut list_rc = ErrorEnum::OK;
     let blockdevs = cache_devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
@@ -518,7 +509,7 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     }
     let (rc, rs) = code_to_message_items(*list_rc, list_rc.get_error_string().into());
 
-    Ok(vec![return_message.append3(MessageItem::Array(vec, Cow::Borrowed("(oqs)")), rc, rs)])
+    Ok(vec![return_message.append3(MessageItem::Array(vec, return_sig.into()));
 }
 fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])

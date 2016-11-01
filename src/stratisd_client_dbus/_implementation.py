@@ -17,6 +17,7 @@ Classes to implement dbus interface.
 """
 
 import abc
+import dbus
 
 from into_dbus_python import xformer
 
@@ -25,7 +26,6 @@ class Interface(abc.ABC):
     Parent class for an interface hierarchy.
     """
 
-    _PROPERTIES_INTERFACE_NAME = 'org.freedesktop.DBus.Properties'
     _XFORMERS = dict()
 
     _INTERFACE_NAME = abc.abstractproperty(doc="interface name")
@@ -69,7 +69,7 @@ class Interface(abc.ABC):
         return proxy_object.Get(
            cls._INTERFACE_NAME,
            name,
-           dbus_interface=cls._PROPERTIES_INTERFACE_NAME
+           dbus_interface=dbus.PROPERTIES_IFACE
         )
 
 

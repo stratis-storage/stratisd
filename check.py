@@ -16,6 +16,7 @@ arg_map = {
       "--reports=no",
       "--disable=I",
       "--disable=bad-continuation",
+      "--disable=duplicate-code",
       "--disable=invalid-name",
       "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'"
    ]

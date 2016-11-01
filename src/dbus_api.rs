@@ -2,13 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use bidir_map::BidirMap;
+
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::fmt::Display;
 use std::path::Path;
 use std::rc::Rc;
-use std::collections::BTreeMap;
 use std::vec::Vec;
 
 use dbus;
@@ -45,12 +46,12 @@ pub enum DeferredAction {
 #[derive(Debug, Clone)]
 pub struct DbusContext {
     pub next_index: Rc<Cell<u64>>,
-    pub pools: Rc<RefCell<BTreeMap<String, String>>>,
+    pub pools: Rc<RefCell<BidirMap<String, String>>>,
     pub engine: Rc<RefCell<Engine>>,
     pub action_list: Rc<RefCell<Vec<DeferredAction>>>,
-    pub filesystems: Rc<RefCell<BTreeMap<String, (String, String)>>>,
-    pub block_devs: Rc<RefCell<BTreeMap<String, (String, String)>>>,
-    pub cache_devs: Rc<RefCell<BTreeMap<String, (String, String)>>>,
+    pub filesystems: Rc<RefCell<BidirMap<String, (String, String)>>>,
+    pub block_devs: Rc<RefCell<BidirMap<String, (String, String)>>>,
+    pub cache_devs: Rc<RefCell<BidirMap<String, (String, String)>>>,
 }
 
 impl DbusContext {
@@ -58,11 +59,11 @@ impl DbusContext {
         DbusContext {
             action_list: Rc::new(RefCell::new(Vec::new())),
             engine: engine.clone(),
-            filesystems: Rc::new(RefCell::new(BTreeMap::new())),
-            block_devs: Rc::new(RefCell::new(BTreeMap::new())),
-            cache_devs: Rc::new(RefCell::new(BTreeMap::new())),
+            filesystems: Rc::new(RefCell::new(BidirMap::new())),
+            block_devs: Rc::new(RefCell::new(BidirMap::new())),
+            cache_devs: Rc::new(RefCell::new(BidirMap::new())),
             next_index: Rc::new(Cell::new(0)),
-            pools: Rc::new(RefCell::new(BTreeMap::new())),
+            pools: Rc::new(RefCell::new(BidirMap::new())),
         }
     }
     pub fn get_next_id(&mut self) -> u64 {
@@ -85,7 +86,7 @@ impl DataType for TData {
 fn object_path_to_pool_name(dbus_context: &DbusContext,
                             path: &String)
                             -> Result<String, (MessageItem, MessageItem)> {
-    let pool_name = match dbus_context.pools.borrow().get(path) {
+    let pool_name = match dbus_context.pools.borrow().get_by_first(path) {
         Some(pool) => pool.clone(),
         None => {
             let items = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
@@ -379,7 +380,7 @@ fn create_dbus_blockdev<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
     let object_path = f.object_path(object_name, dbus_context.clone())
         .introspectable()
         .add(f.interface(STRATIS_DEV_BASE_INTERFACE, ())
-            .add_p(f.property::<i32, _>("Size", ())));
+            .add_p(f.property::<u64, _>("Size", ())));
 
     let path = object_path.get_name().to_owned();
     dbus_context.action_list.borrow_mut().push(DeferredAction::Add(object_path));
@@ -451,7 +452,7 @@ fn create_dbus_cachedev<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
     let object_path = f.object_path(object_name, dbus_context.clone())
         .introspectable()
         .add(f.interface(STRATIS_CACHE_BASE_INTERFACE, ())
-            .add_p(f.property::<i32, _>("Size", ())));
+            .add_p(f.property::<u64, _>("Size", ())));
 
     let path = object_path.get_name().to_owned();
     dbus_context.action_list.borrow_mut().push(DeferredAction::Add(object_path));
@@ -509,7 +510,7 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     }
     let (rc, rs) = code_to_message_items(*list_rc, list_rc.get_error_string().into());
 
-    Ok(vec![return_message.append3(MessageItem::Array(vec, return_sig.into()));
+    Ok(vec![return_message.append3(MessageItem::Array(vec, return_sig.into()), rc, rs)])
 }
 fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])

@@ -253,14 +253,9 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = match b_engine.get_pool(&pool_name) {
-        Ok(result) => result,
-        Err(x) => {
-            let (rc, rs) = engine_to_dbus_err(&x);
-            let (rc, rs) = code_to_message_items(rc, rs);
-            return Ok(vec![return_message.append3(default_return, rc, rs)]);
-        }
-    };
+    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
+                                   default_return;
+                                   return_message);
 
     let ref mut list_rc = ErrorEnum::OK;
 
@@ -330,14 +325,9 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = match b_engine.get_pool(&pool_name) {
-        Ok(result) => result,
-        Err(x) => {
-            let (rc, rs) = engine_to_dbus_err(&x);
-            let (rc, rs) = code_to_message_items(rc, rs);
-            return Ok(vec![return_message.append3(default_return, rc, rs)]);
-        }
-    };
+    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
+                                   default_return;
+                                   return_message);
 
     let result = pool.list_filesystems();
 
@@ -411,14 +401,9 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = match b_engine.get_pool(&pool_name) {
-        Ok(result) => result,
-        Err(x) => {
-            let (rc, rs) = engine_to_dbus_err(&x);
-            let (rc, rs) = code_to_message_items(rc, rs);
-            return Ok(vec![return_message.append3(default_return, rc, rs)]);
-        }
-    };
+    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
+                                   default_return;
+                                   return_message);
 
     let ref mut list_rc = ErrorEnum::OK;
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
@@ -487,14 +472,9 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = match b_engine.get_pool(&pool_name) {
-        Ok(result) => result,
-        Err(x) => {
-            let (rc, rs) = engine_to_dbus_err(&x);
-            let (rc, rs) = code_to_message_items(rc, rs);
-            return Ok(vec![return_message.append3(default_return, rc, rs)]);
-        }
-    };
+    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
+                                   default_return;
+                                   return_message);
 
     let ref mut list_rc = ErrorEnum::OK;
     let blockdevs = cache_devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();

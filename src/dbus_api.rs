@@ -109,6 +109,20 @@ macro_rules! dbus_try {
     }
 }
 
+/// Macro for early return with an Ok dbus message on an engine error
+macro_rules! engine_try {
+    ( $val:expr; $default:expr; $message:expr ) => {
+        match $val {
+            Ok(result) => result,
+            Err(x) => {
+                let (rc, rs) = engine_to_dbus_err(&x);
+                let (rc, rs) = code_to_message_items(rc, rs);
+                return Ok(vec![$message.append3($default, rc, rs)]);
+            }
+        }
+    }
+}
+
 /// Translates an engine ErrorEnum to a dbus ErrorEnum.
 fn engine_to_dbus_enum(err: &engine::ErrorEnum) -> (ErrorEnum, String) {
     match *err {

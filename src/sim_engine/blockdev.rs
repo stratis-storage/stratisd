@@ -4,6 +4,8 @@
 
 use std::fmt;
 
+use engine::Dev;
+
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -26,14 +28,30 @@ pub struct SimDev {
     pub state: State,
 }
 
-/// Implement Debug for SimDev explicitly as ThreadRng does not derive it.
-/// See: https://github.com/rust-lang-nursery/rand/issues/118
 impl fmt::Debug for SimDev {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{{SimDev {:?} {:?}", self.name, self.state)
     }
 }
 
+impl Dev for SimDev {
+    fn copy(&self) -> Box<Dev> {
+        let simdev_copy = SimDev {
+            name: self.name.clone(),
+            rng: self.rng.clone(),
+            state: self.state.clone(),
+        };
+        Box::new(simdev_copy)
+    }
+    fn get_id(&self) -> String {
+        let id = self.name.to_str();
+
+        match id {
+            Some(x) => return String::from(x),
+            None => return String::from("Conversion Failure"),
+        }
+    }
+}
 
 impl SimDev {
     /// Generates a new device from any path.

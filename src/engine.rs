@@ -10,7 +10,6 @@ use std::path::Path;
 
 use nix;
 
-
 #[derive(Debug)]
 pub enum ErrorEnum {
     Ok,
@@ -42,6 +41,16 @@ pub enum EngineError {
 
 pub type EngineResult<T> = Result<T, EngineError>;
 
+pub trait Dev: Debug {
+    fn copy(&self) -> Box<Dev>;
+    fn get_id(&self) -> String;
+}
+
+pub trait Cache: Debug {
+    fn copy(&self) -> Box<Cache>;
+    fn get_id(&self) -> String;
+}
+
 pub trait Filesystem: Debug {
     fn copy(&self) -> Box<Filesystem>;
 }
@@ -56,6 +65,8 @@ pub trait Pool: Debug {
     fn add_cachedev(&mut self, path: &Path) -> EngineResult<()>;
     fn destroy(&mut self) -> EngineResult<()>;
     fn list_filesystems(&self) -> EngineResult<BTreeMap<String, Box<Filesystem>>>;
+    fn list_blockdevs(&self) -> EngineResult<Vec<Box<Dev>>>;
+    fn list_cachedevs(&self) -> EngineResult<Vec<Box<Cache>>>;
     fn copy(&self) -> Box<Pool>;
 }
 

@@ -172,7 +172,10 @@ class GetVolumeTestCase(unittest.TestCase):
 
     def testNonExistingPool(self):
         """
-        An exception is raised if the pool does not exist.
+        If the pool does not exist, the filesystem is not found.
+
+        Given our implementation, it is impossible to distinguish whether that
+        is because the filesystem is not found or because the pool is not found.
         """
         (result, rc, message) = Manager.callMethod(
            self._proxy,
@@ -180,7 +183,7 @@ class GetVolumeTestCase(unittest.TestCase):
            'notapool',
            'noname'
         )
-        expected_rc = StratisdErrorsGen.get_object().POOL_NOTFOUND
+        expected_rc = StratisdErrorsGen.get_object().FILESYSTEM_NOTFOUND
         self.assertEqual(rc, expected_rc)
         self.assertIsInstance(result, str)
         self.assertIsInstance(rc, int)

@@ -82,6 +82,26 @@ impl DataType for TData {
     type Signal = ();
 }
 
+/// Get object path from filesystem name
+fn fs_name_to_object_path(dbus_context: &DbusContext,
+                          pool_name: &String,
+                          name: &String)
+                          -> Result<String, (MessageItem, MessageItem)> {
+    let object_path =
+        match dbus_context.filesystems.borrow().get_by_second(&(pool_name.clone(), name.clone())) {
+            Some(pool) => pool.clone(),
+            None => {
+                let items = code_to_message_items(ErrorEnum::FILESYSTEM_NOTFOUND,
+                                                  format!("no object path for filesystem {} \
+                                                           belonging to pool {}",
+                                                          name,
+                                                          pool_name));
+                return Err(items);
+            }
+        };
+    Ok(object_path)
+}
+
 /// Get object path from pool name
 fn pool_name_to_object_path(dbus_context: &DbusContext,
                             name: &String)

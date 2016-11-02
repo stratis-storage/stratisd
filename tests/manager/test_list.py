@@ -102,7 +102,7 @@ class List2TestCase(unittest.TestCase):
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
-        self.assertEqual(len(result), 1)
-
-        self.assertIsInstance(result[0], str)
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
+
+        self.assertEqual(len(result), 1)
+        self.assertIsInstance(result[0], str)

@@ -682,8 +682,22 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 }
 
 fn get_pool_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+    if iter.arg_type() == 0 {
+        return Err(MethodErr::no_arg());
+    }
+    let name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
 
-    Ok(vec![m.msg.method_return().append3("/dbus/pool/path", 0, "Ok")])
+    let dbus_context = m.path.get_data();
+    let return_message = message.method_return();
+    let default_return = MessageItem::ObjectPath(default_object_path());
+    let result = pool_name_to_object_path(dbus_context, &name.to_string());
+    let object_path = dbus_try!(result; default_return; return_message);
+
+    let path = dbus::Path::new(object_path).unwrap();
+    let (rc, rs) = ok_message_items();
+    Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
 }
 
 fn get_filesystem_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {

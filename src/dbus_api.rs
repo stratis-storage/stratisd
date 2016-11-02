@@ -82,6 +82,21 @@ impl DataType for TData {
     type Signal = ();
 }
 
+/// Get object path from pool name
+fn pool_name_to_object_path(dbus_context: &DbusContext,
+                            name: &String)
+                            -> Result<String, (MessageItem, MessageItem)> {
+    let object_path = match dbus_context.pools.borrow().get_by_second(name) {
+        Some(pool) => pool.clone(),
+        None => {
+            let items = code_to_message_items(ErrorEnum::POOL_NOTFOUND,
+                                              format!("no object path for pool name {}", name));
+            return Err(items);
+        }
+    };
+    Ok(object_path)
+}
+
 /// Get name for pool from object path
 fn object_path_to_pool_name(dbus_context: &DbusContext,
                             path: &String)

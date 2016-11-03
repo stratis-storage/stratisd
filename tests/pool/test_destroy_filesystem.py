@@ -63,6 +63,7 @@ class DestroyFSTestCase(unittest.TestCase):
         """
         self._service.tearDown()
 
+    @unittest.skip('unimplemented')
     def testDestroyNone(self):
         """
         Test calling with no actual volume specification. An empty volume
@@ -83,6 +84,7 @@ class DestroyFSTestCase(unittest.TestCase):
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertEqual(len(result), 0)
 
+    @unittest.skip("Unimplemented")
     def testDestroyOne(self):
         """
         Test calling with a non-existant volume name. This should succeed,
@@ -141,6 +143,7 @@ class DestroyFSTestCase1(unittest.TestCase):
         """
         self._service.tearDown()
 
+    @unittest.skip("Unimplemented.")
     def testDestroy(self):
         """
         Test calling by specifying the volume name. Assume that destruction

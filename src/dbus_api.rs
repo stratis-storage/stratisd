@@ -82,6 +82,54 @@ impl DataType for TData {
     type Signal = ();
 }
 
+/// Get object path from filesystem name
+fn fs_name_to_object_path(dbus_context: &DbusContext,
+                          pool_name: &String,
+                          name: &String)
+                          -> Result<String, (MessageItem, MessageItem)> {
+    let object_path =
+        match dbus_context.filesystems.borrow().get_by_second(&(pool_name.clone(), name.clone())) {
+            Some(pool) => pool.clone(),
+            None => {
+                let items = code_to_message_items(ErrorEnum::FILESYSTEM_NOTFOUND,
+                                                  format!("no object path for filesystem {} \
+                                                           belonging to pool {}",
+                                                          name,
+                                                          pool_name));
+                return Err(items);
+            }
+        };
+    Ok(object_path)
+}
+
+/// Get object path from pool name
+fn pool_name_to_object_path(dbus_context: &DbusContext,
+                            name: &String)
+                            -> Result<String, (MessageItem, MessageItem)> {
+    let object_path = match dbus_context.pools.borrow().get_by_second(name) {
+        Some(pool) => pool.clone(),
+        None => {
+            let items = code_to_message_items(ErrorEnum::POOL_NOTFOUND,
+                                              format!("no object path for pool name {}", name));
+            return Err(items);
+        }
+    };
+    Ok(object_path)
+}
+
+/// Convert a string from a object path/name map to an object path
+fn string_to_object_path<'a>(path: String) -> Result<dbus::Path<'a>, (MessageItem, MessageItem)> {
+    let object_path = match dbus::Path::new(path) {
+        Ok(p) => p,
+        Err(s) => {
+            let items = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
+                                              format!("malformed object path {} in table", s));
+            return Err(items);
+        }
+    };
+    Ok(object_path)
+}
+
 /// Get name for pool from object path
 fn object_path_to_pool_name(dbus_context: &DbusContext,
                             path: &String)
@@ -731,12 +779,48 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 }
 
 fn get_pool_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+    if iter.arg_type() == 0 {
+        return Err(MethodErr::no_arg());
+    }
+    let name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
 
-    Ok(vec![m.msg.method_return().append3("/dbus/pool/path", 0, "Ok")])
+    let dbus_context = m.path.get_data();
+    let return_message = message.method_return();
+    let default_return = MessageItem::ObjectPath(default_object_path());
+    let result = pool_name_to_object_path(dbus_context, &name.to_string());
+    let object_path = dbus_try!(result; default_return; return_message);
+    let path =
+        dbus_try!(string_to_object_path(object_path.clone()); default_return; return_message);
+    let (rc, rs) = ok_message_items();
+    Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
 }
 
 fn get_filesystem_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    Ok(vec![m.msg.method_return().append3("/dbus/filesystem/path", 0, "Ok")])
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+
+    if iter.arg_type() == 0 {
+        return Err(MethodErr::no_arg());
+    }
+    let pool_name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
+
+    if iter.arg_type() == 0 {
+        return Err(MethodErr::no_arg());
+    }
+    let name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
+
+    let dbus_context = m.path.get_data();
+    let return_message = message.method_return();
+    let default_return = MessageItem::ObjectPath(default_object_path());
+    let result = fs_name_to_object_path(dbus_context, &pool_name.to_string(), &name.to_string());
+    let object_path = dbus_try!(result; default_return; return_message);
+
+    let path =
+        dbus_try!(string_to_object_path(object_path.clone()); default_return; return_message);
+    let (rc, rs) = ok_message_items();
+    Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
 }
 
 fn get_dev_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {

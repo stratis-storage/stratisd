@@ -115,7 +115,6 @@ class Destroy2TestCase(unittest.TestCase):
            "DestroyPool",
            self._POOLNAME
         )
-        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
@@ -125,7 +124,11 @@ class Destroy2TestCase(unittest.TestCase):
            self._POOLNAME
         )
 
-        expected_rc = StratisdErrorsGen.get_object().POOL_NOTFOUND
+        if rc is StratisdErrorsGen.get_object().OK:
+            expected_rc = StratisdErrorsGen.get_object().POOL_NOTFOUND
+        else:
+            expected_rc = StratisdErrorsGen.get_object().OK
+
         self.assertEqual(rc1, expected_rc)
 
 

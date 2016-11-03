@@ -51,8 +51,8 @@ pub struct DbusContext {
     pub engine: Rc<RefCell<Engine>>,
     pub action_list: Rc<RefCell<Vec<DeferredAction>>>,
     pub filesystems: Rc<RefCell<BidirMap<String, (String, String)>>>,
-    pub block_devs: Rc<RefCell<BidirMap<String, (String, String)>>>,
-    pub cache_devs: Rc<RefCell<BidirMap<String, (String, String)>>>,
+    pub block_devs: Rc<RefCell<BidirMap<String, String>>>,
+    pub cache_devs: Rc<RefCell<BidirMap<String, String>>>,
 }
 
 impl DbusContext {
@@ -542,9 +542,9 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         match result {
             Ok(_) => {
                 let object_path: dbus::Path = create_dbus_blockdev(dbus_context.clone());
-                dbus_context.block_devs.borrow_mut().insert(object_path.to_string(),
-                                                            ((&pool_name).clone(),
-                                                             String::from(dev.to_str().unwrap())));
+                dbus_context.block_devs
+                    .borrow_mut()
+                    .insert(object_path.to_string(), String::from(dev.to_str().unwrap()));
                 let (rc, rs) = ok_message_items();
                 let entry = MessageItem::Struct(vec![MessageItem::ObjectPath(object_path), rc, rs]);
                 vec.push(entry);
@@ -614,9 +614,9 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         match result {
             Ok(_) => {
                 let object_path: dbus::Path = create_dbus_cachedev(dbus_context.clone());
-                dbus_context.cache_devs.borrow_mut().insert(object_path.to_string(),
-                                                            ((&pool_name).clone(),
-                                                             String::from(dev.to_str().unwrap())));
+                dbus_context.cache_devs
+                    .borrow_mut()
+                    .insert(object_path.to_string(), String::from(dev.to_str().unwrap()));
                 let (rc, rs) = ok_message_items();
                 let entry = MessageItem::Struct(vec![MessageItem::ObjectPath(object_path), rc, rs]);
                 vec.push(entry);
@@ -737,6 +737,14 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let object_path: dbus::Path = create_dbus_pool(dbus_context.clone());
             let (rc, rs) = ok_message_items();
             dbus_context.pools.borrow_mut().insert(object_path.to_string(), String::from(name));
+            dbus_context.pools.borrow_mut().insert(object_path.to_string(), String::from(name));
+            for dev in blockdevs {
+                let dev_object_path: dbus::Path = create_dbus_blockdev(dbus_context.clone());
+                dbus_context.block_devs
+                    .borrow_mut()
+                    .insert(dev_object_path.to_string(),
+                            String::from(dev.to_str().unwrap()));
+            }
             return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
         }
         Err(x) => {

@@ -7,16 +7,20 @@ use std::iter::FromIterator;
 use std::path::Path;
 use std::vec::Vec;
 
+use engine::Cache;
+use engine::Dev;
 use engine::EngineResult;
 use engine::Filesystem;
 use engine::Pool;
 
 use super::blockdev::SimDev;
+use super::cache::SimCacheDev;
 use super::filesystem::SimFilesystem;
 
 #[derive(Debug)]
 pub struct SimPool {
     pub block_devs: Vec<Box<SimDev>>,
+    pub cache_devs: Vec<Box<SimCacheDev>>,
     pub filesystems: BTreeMap<String, Box<SimFilesystem>>,
     pub raid_level: u16,
     pub online: bool,
@@ -31,6 +35,7 @@ impl SimPool {
         let new_pool = SimPool {
             block_devs: vec,
             filesystems: BTreeMap::new(),
+            cache_devs: Vec::new(),
             raid_level: raid_level,
             online: true,
             checking: false,
@@ -41,13 +46,13 @@ impl SimPool {
 }
 
 impl Pool for SimPool {
-    fn add_blockdev(&mut self, _path: &Path) -> EngineResult<()> {
-        println!("sim: pool::add_blockdev");
+    fn add_blockdev(&mut self, path: &Path) -> EngineResult<()> {
+        self.block_devs.push(SimDev::new_dev(path));
         Ok(())
     }
 
-    fn add_cachedev(&mut self, _path: &Path) -> EngineResult<()> {
-        println!("sim: pool::add_cachedev");
+    fn add_cachedev(&mut self, path: &Path) -> EngineResult<()> {
+        self.cache_devs.push(SimCacheDev::new_cache(path));
         Ok(())
     }
 
@@ -59,6 +64,7 @@ impl Pool for SimPool {
     fn copy(&self) -> Box<Pool> {
         let pool_copy = SimPool {
             block_devs: self.block_devs.clone(),
+            cache_devs: self.cache_devs.clone(),
             filesystems: self.filesystems.clone(),
             raid_level: self.raid_level.clone(),
             online: true,
@@ -76,7 +82,16 @@ impl Pool for SimPool {
                                 SimFilesystem::new_filesystem(mount_point, size));
         Ok(())
     }
+
     fn list_filesystems(&self) -> EngineResult<BTreeMap<String, Box<Filesystem>>> {
         Ok(BTreeMap::from_iter(self.filesystems.iter().map(|x| (x.0.clone(), x.1.copy()))))
+    }
+
+    fn list_blockdevs(&self) -> EngineResult<Vec<Box<Dev>>> {
+        Ok(Vec::from_iter(self.block_devs.iter().map(|x| (x.copy()))))
+    }
+
+    fn list_cachedevs(&self) -> EngineResult<Vec<Box<Cache>>> {
+        Ok(Vec::from_iter(self.cache_devs.iter().map(|x| (x.copy()))))
     }
 }

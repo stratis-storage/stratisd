@@ -4,47 +4,69 @@
 
 use std::fmt;
 
-use engine::Dev;
-
 use std::path::Path;
 use std::path::PathBuf;
+
+use engine::Cache;
 
 use rand::Rng;
 use rand::ThreadRng;
 use rand::thread_rng;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-/// A list of very basic states a SimDev can be in.
-pub enum State {
+/// A list of very basic states a SimCacheDev can be in.
+pub enum CacheState {
     OK,
     FAILED,
 }
 
 #[derive(Clone)]
-/// A simulated device.
-pub struct SimDev {
+/// A simulated cache device.
+pub struct SimCacheDev {
     pub name: PathBuf,
     rng: ThreadRng,
-    pub state: State,
+    pub state: CacheState,
 }
 
 /// Implement Debug for SimDev explicitly as ThreadRng does not derive it.
 /// See: https://github.com/rust-lang-nursery/rand/issues/118
-impl fmt::Debug for SimDev {
+impl fmt::Debug for SimCacheDev {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{{SimDev {:?} {:?}", self.name, self.state)
     }
 }
 
-impl Dev for SimDev {
-    fn copy(&self) -> Box<Dev> {
-        let simdev_copy = SimDev {
+impl SimCacheDev {
+    /// Generates a new cache device from a path.
+    pub fn new_cache(name: &Path) -> Box<SimCacheDev> {
+        Box::new(SimCacheDev {
+            name: name.to_owned(),
+            rng: thread_rng(),
+            state: CacheState::OK,
+        })
+    }
+    pub fn update(&mut self) {
+        if self.rng.gen_weighted_bool(8) {
+            self.state = CacheState::FAILED;
+        }
+    }
+
+    /// Checks usability of a SimCacheDev
+    pub fn usable(&self) -> bool {
+        self.state == CacheState::OK
+    }
+}
+
+impl Cache for SimCacheDev {
+    fn copy(&self) -> Box<Cache> {
+        let cache_copy = SimCacheDev {
             name: self.name.clone(),
             rng: self.rng.clone(),
             state: self.state.clone(),
         };
-        Box::new(simdev_copy)
+        Box::new(cache_copy)
     }
+
     fn get_id(&self) -> String {
         let id = self.name.to_str();
 
@@ -52,28 +74,5 @@ impl Dev for SimDev {
             Some(x) => return String::from(x),
             None => return String::from("Conversion Failure"),
         }
-    }
-}
-
-impl SimDev {
-    /// Generates a new device from any path.
-    pub fn new_dev(name: &Path) -> Box<SimDev> {
-        Box::new(SimDev {
-            name: name.to_owned(),
-            rng: thread_rng(),
-            state: State::OK,
-        })
-    }
-
-    /// Function that causes self to progress probabilistically to a new state.
-    pub fn update(&mut self) {
-        if self.rng.gen_weighted_bool(8) {
-            self.state = State::FAILED;
-        }
-    }
-
-    /// Checks usability of a SimDev
-    pub fn usable(&self) -> bool {
-        self.state == State::OK
     }
 }

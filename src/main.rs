@@ -41,10 +41,7 @@ mod types;
 mod consts;
 mod dbus_consts;
 mod stratis;
-mod dmdevice;
 mod dbus_api;
-mod blockdev;
-mod filesystem;
 mod engine;
 mod sim_engine;
 

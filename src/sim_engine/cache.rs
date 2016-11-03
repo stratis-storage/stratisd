@@ -76,8 +76,6 @@ impl Cache for SimCacheDev {
         }
     }
     fn eq(&self, other: &Path) -> bool {
-        self.get_id() ==
-        String::from(other.to_str()
-            .unwrap())
+        self.get_id() == String::from(other.to_str().unwrap())
     }
 }

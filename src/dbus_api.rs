@@ -117,6 +117,19 @@ fn pool_name_to_object_path(dbus_context: &DbusContext,
     Ok(object_path)
 }
 
+/// Convert a string from a object path/name map to an object path
+fn string_to_object_path<'a>(path: String) -> Result<dbus::Path<'a>, (MessageItem, MessageItem)> {
+    let object_path = match dbus::Path::new(path) {
+        Ok(p) => p,
+        Err(s) => {
+            let items = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
+                                              format!("malformed object path {} in table", s));
+            return Err(items);
+        }
+    };
+    Ok(object_path)
+}
+
 /// Get name for pool from object path
 fn object_path_to_pool_name(dbus_context: &DbusContext,
                             path: &String)
@@ -714,8 +727,8 @@ fn get_pool_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::ObjectPath(default_object_path());
     let result = pool_name_to_object_path(dbus_context, &name.to_string());
     let object_path = dbus_try!(result; default_return; return_message);
-
-    let path = dbus::Path::new(object_path).unwrap();
+    let path =
+        dbus_try!(string_to_object_path(object_path.clone()); default_return; return_message);
     let (rc, rs) = ok_message_items();
     Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
 }
@@ -740,7 +753,8 @@ fn get_filesystem_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResul
     let result = fs_name_to_object_path(dbus_context, &pool_name.to_string(), &name.to_string());
     let object_path = dbus_try!(result; default_return; return_message);
 
-    let path = dbus::Path::new(object_path).unwrap();
+    let path =
+        dbus_try!(string_to_object_path(object_path.clone()); default_return; return_message);
     let (rc, rs) = ok_message_items();
     Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
 }

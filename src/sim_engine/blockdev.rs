@@ -53,6 +53,11 @@ impl Dev for SimDev {
             None => return String::from("Conversion Failure"),
         }
     }
+    fn eq(&self, other: &Path) -> bool {
+        self.get_id() ==
+        String::from(other.to_str()
+            .unwrap())
+    }
 }
 
 impl SimDev {

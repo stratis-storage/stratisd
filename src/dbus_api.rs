@@ -41,7 +41,7 @@ use types::StratisResult;
 #[derive(Debug)]
 pub enum DeferredAction {
     Add(ObjectPath<MTFn<TData>, TData>),
-    Remove(ObjectPath<MTFn<TData>, TData>),
+    Remove(String),
 }
 
 #[derive(Debug, Clone)]
@@ -223,6 +223,10 @@ fn ok_message_items() -> (MessageItem, MessageItem) {
 
 fn default_object_path<'a>() -> dbus::Path<'a> {
     dbus::Path::new(DEFAULT_OBJECT_PATH).unwrap()
+}
+
+fn remove_dbus_object_path(dbus_context: &DbusContext, path: String) {
+    dbus_context.action_list.borrow_mut().push(DeferredAction::Remove(path));
 }
 
 fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -490,7 +494,65 @@ fn list_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 }
 
 fn remove_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+
+    let devs: Array<(&str), _> = try!(iter.read::<Array<(&str), _>>()
+        .map_err(|_| MethodErr::invalid_arg(&0)));
+
+    let dbus_context = m.path.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let return_sig = "(qs)";
+    let default_return = MessageItem::Array(vec![], return_sig.into());
+
+    let pool_name = dbus_try!(
+        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        default_return; return_message);
+
+    let mut b_engine = dbus_context.engine.borrow_mut();
+    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
+                                   default_return;
+                                   return_message);
+
+    let ref mut list_rc = ErrorEnum::OK;
+    let mut vec = Vec::new();
+    let to_remove_devs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
+
+    for dev in to_remove_devs {
+        let result = pool.remove_cachedev(dev);
+        match result {
+            Ok(_) => {
+                let cache_devs_map = dbus_context.cache_devs.borrow_mut();
+                if let Some(remove_object_path) =
+                       cache_devs_map.get_by_second(&String::from(dev.to_str()
+                    .unwrap())) {
+                    remove_dbus_object_path(dbus_context, remove_object_path.clone());
+                    let (rc, rs) = ok_message_items();
+                    let entry = MessageItem::Struct(vec![rc, rs]);
+                    vec.push(entry);
+                } else {
+                    let (rc, rs) =
+                        code_to_message_items(ErrorEnum::INTERNAL_ERROR,
+                                              ErrorEnum::INTERNAL_ERROR.get_error_string()
+                                                  .into());
+                    let entry = MessageItem::Struct(vec![rc, rs]);
+                    vec.push(entry);
+                }
+            }
+            Err(x) => {
+                *list_rc = ErrorEnum::LIST_FAILURE;
+                let (rc, rs) = engine_to_dbus_err(&x);
+                let (rc, rs) = code_to_message_items(rc, rs);
+                let entry = MessageItem::Struct(vec![rc, rs]);
+                vec.push(entry);
+            }
+        };
+    }
+    let (rc, rs) = code_to_message_items(*list_rc, list_rc.get_error_string().into());
+
+    Ok(vec![return_message.append3(MessageItem::Array(vec, return_sig.into()), rc, rs)])
+
 }
 
 fn create_dbus_blockdev<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
@@ -637,7 +699,64 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![return_message.append3(MessageItem::Array(vec, return_sig.into()), rc, rs)])
 }
 fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+
+    let devs: Array<(&str), _> = try!(iter.read::<Array<(&str), _>>()
+        .map_err(|_| MethodErr::invalid_arg(&0)));
+
+    let dbus_context = m.path.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let return_sig = "(qs)";
+    let default_return = MessageItem::Array(vec![], return_sig.into());
+
+    let pool_name = dbus_try!(
+        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        default_return; return_message);
+
+    let mut b_engine = dbus_context.engine.borrow_mut();
+    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
+                                   default_return;
+                                   return_message);
+
+    let ref mut list_rc = ErrorEnum::OK;
+    let mut vec = Vec::new();
+    let to_remove_devs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
+
+    for dev in to_remove_devs {
+        let result = pool.remove_blockdev(dev);
+        match result {
+            Ok(_) => {
+                let block_devs_map = dbus_context.block_devs.borrow_mut();
+                if let Some(remove_object_path) =
+                       block_devs_map.get_by_second(&String::from(dev.to_str()
+                    .unwrap())) {
+                    remove_dbus_object_path(dbus_context, remove_object_path.clone());
+                    let (rc, rs) = ok_message_items();
+                    let entry = MessageItem::Struct(vec![rc, rs]);
+                    vec.push(entry);
+                } else {
+                    let (rc, rs) =
+                        code_to_message_items(ErrorEnum::INTERNAL_ERROR,
+                                              ErrorEnum::INTERNAL_ERROR.get_error_string()
+                                                  .into());
+                    let entry = MessageItem::Struct(vec![rc, rs]);
+                    vec.push(entry);
+                }
+            }
+            Err(x) => {
+                *list_rc = ErrorEnum::LIST_FAILURE;
+                let (rc, rs) = engine_to_dbus_err(&x);
+                let (rc, rs) = code_to_message_items(rc, rs);
+                let entry = MessageItem::Struct(vec![rc, rs]);
+                vec.push(entry);
+            }
+        };
+    }
+    let (rc, rs) = code_to_message_items(*list_rc, list_rc.get_error_string().into());
+
+    Ok(vec![return_message.append3(MessageItem::Array(vec, return_sig.into()), rc, rs)])
 }
 
 fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
@@ -961,8 +1080,10 @@ pub fn run(engine: Rc<RefCell<Engine>>) -> StratisResult<()> {
                         tree.insert(path);
                     }
                     DeferredAction::Remove(path) => {
-                        tree.remove(path.get_name());
-                        c.unregister_object_path(path.get_name());
+                        let object_path: dbus::Path<'static> = dbus::Path::new(path.clone())
+                            .unwrap();
+                        tree.remove(&object_path);
+                        c.unregister_object_path(&path);
                     }
                 }
             }

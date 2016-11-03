@@ -25,4 +25,11 @@ impl Filesystem for SimFilesystem {
         };
         Box::new(filesystem_copy)
     }
+    fn get_id(&self) -> String {
+        self.mount_point.clone()
+    }
+
+    fn eq(&self, other: &Filesystem) -> bool {
+        self.get_id() == other.get_id()
+    }
 }

@@ -28,6 +28,8 @@ pub struct SimDev {
     pub state: State,
 }
 
+/// Implement Debug for SimDev explicitly as ThreadRng does not derive it.
+/// See: https://github.com/rust-lang-nursery/rand/issues/118
 impl fmt::Debug for SimDev {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{{SimDev {:?} {:?}", self.name, self.state)

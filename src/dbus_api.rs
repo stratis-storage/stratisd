@@ -343,10 +343,9 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return_message.append3(item_array, rc, rs)
         }
         Err(x) => {
-            let item_array = MessageItem::Array(vec![], return_sig.into());
             let (rc, rs) = engine_to_dbus_err(&x);
             let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append3(item_array, rc, rs)
+            return_message.append3(default_return, rc, rs)
         }
     };
 
@@ -383,10 +382,9 @@ fn list_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return_message.append3(item_array, rc, rs)
         }
         Err(x) => {
-            let item_array = MessageItem::Array(vec![], return_sig.into());
             let (rc, rs) = engine_to_dbus_err(&x);
             let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append3(item_array, rc, rs)
+            return_message.append3(default_return, rc, rs)
         }
     };
 
@@ -422,10 +420,9 @@ fn list_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return_message.append3(item_array, rc, rs)
         }
         Err(x) => {
-            let item_array = MessageItem::Array(vec![], return_sig.into());
             let (rc, rs) = engine_to_dbus_err(&x);
             let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append3(item_array, rc, rs)
+            return_message.append3(default_return, rc, rs)
         }
     };
 
@@ -594,7 +591,7 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_string", "s"));
 
     let destroy_filesystems_method = f.method(DESTROY_FILESYSTEMS, (), destroy_filesystems)
-        .in_arg(("filesystems", "a(sqs)"))
+        .in_arg(("filesystems", "a(s)"))
         .out_arg(("results", "a(qs)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

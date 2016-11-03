@@ -19,6 +19,7 @@ use dbus::Message;
 use dbus::MessageItem;
 use dbus::NameFlag;
 use dbus::arg::Array;
+use dbus::arg::Iter;
 use dbus::tree::Factory;
 use dbus::tree::DataType;
 use dbus::tree::MethodErr;
@@ -80,6 +81,17 @@ impl DataType for TData {
     type Interface = ();
     type Method = ();
     type Signal = ();
+}
+
+/// Get the next argument off the bus
+fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr>
+    where T: dbus::arg::Get<'a> + dbus::arg::Arg
+{
+    if iter.arg_type() == 0 {
+        return Err(MethodErr::no_arg());
+    };
+    let value: T = try!(iter.read::<T>().map_err(|_| MethodErr::invalid_arg(&loc)));
+    Ok(value)
 }
 
 /// Get object path from filesystem name
@@ -709,21 +721,9 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    if iter.arg_type() == 0 {
-        return Err(MethodErr::no_arg());
-    }
-    let name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
-
-    if iter.arg_type() == 0 {
-        return Err(MethodErr::no_arg());
-    }
-    let raid_level: u16 = try!(iter.read::<u16>().map_err(|_| MethodErr::invalid_arg(&1)));
-
-    if iter.arg_type() == 0 {
-        return Err(MethodErr::no_arg());
-    }
-    let devs: Array<&str, _> = try!(iter.read::<Array<&str, _>>()
-        .map_err(|_| MethodErr::invalid_arg(&2)));
+    let name: &str = try!(get_next_arg(&mut iter, 0));
+    let raid_level: u16 = try!(get_next_arg(&mut iter, 1));
+    let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 2));
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
@@ -753,10 +753,8 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
-    if iter.arg_type() == 0 {
-        return Err(MethodErr::no_arg());
-    }
-    let name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
+
+    let name: &str = try!(get_next_arg(&mut iter, 0));
 
     let dbus_context = m.path.get_data();
     let ref engine = dbus_context.engine;
@@ -781,10 +779,8 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 fn get_pool_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
-    if iter.arg_type() == 0 {
-        return Err(MethodErr::no_arg());
-    }
-    let name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
+
+    let name: &str = try!(get_next_arg(&mut iter, 0));
 
     let dbus_context = m.path.get_data();
     let return_message = message.method_return();
@@ -801,15 +797,8 @@ fn get_filesystem_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResul
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    if iter.arg_type() == 0 {
-        return Err(MethodErr::no_arg());
-    }
-    let pool_name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
-
-    if iter.arg_type() == 0 {
-        return Err(MethodErr::no_arg());
-    }
-    let name: &str = try!(iter.read::<&str>().map_err(|_| MethodErr::invalid_arg(&0)));
+    let pool_name: &str = try!(get_next_arg(&mut iter, 0));
+    let name: &str = try!(get_next_arg(&mut iter, 1));
 
     let dbus_context = m.path.get_data();
     let return_message = message.method_return();

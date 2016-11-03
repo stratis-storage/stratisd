@@ -323,6 +323,7 @@ class GetCacheTestCase(unittest.TestCase):
         """
         self._service.tearDown()
 
+    @unittest.skip("unimplemented")
     @unittest.expectedFailure
     def testNonExistingPool(self):
         """
@@ -337,6 +338,7 @@ class GetCacheTestCase(unittest.TestCase):
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
+    @unittest.skip("Unimplemented")
     def testNonExistingPool1(self):
         """
         Returns an error code, just the wrong one.
@@ -378,6 +380,7 @@ class GetCache1TestCase(unittest.TestCase):
         """
         self._service.tearDown()
 
+    @unittest.skip("unimplemented")
     @unittest.expectedFailure
     def testException(self):
         """
@@ -393,6 +396,7 @@ class GetCache1TestCase(unittest.TestCase):
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
+    @unittest.skip("unimplemented")
     def testException1(self):
         """
         An error is returned if the pool does not exist.
@@ -407,6 +411,7 @@ class GetCache1TestCase(unittest.TestCase):
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
+    @unittest.skip("unimplemented")
     @unittest.expectedFailure
     def testExecution(self):
         """

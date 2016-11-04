@@ -44,13 +44,13 @@ pub type EngineResult<T> = Result<T, EngineError>;
 pub trait Dev: Debug {
     fn copy(&self) -> Box<Dev>;
     fn get_id(&self) -> String;
-    fn eq(&self, other: &Path) -> bool;
+    fn has_same(&self, other: &Path) -> bool;
 }
 
 pub trait Cache: Debug {
     fn copy(&self) -> Box<Cache>;
     fn get_id(&self) -> String;
-    fn eq(&self, other: &Path) -> bool;
+    fn has_same(&self, other: &Path) -> bool;
 }
 
 pub trait Filesystem: Debug {

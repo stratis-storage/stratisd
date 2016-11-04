@@ -102,7 +102,7 @@ impl Pool for SimPool {
         Ok(Vec::from_iter(self.cache_devs.iter().map(|x| (x.copy()))))
     }
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()> {
-        let index = self.block_devs.iter().position(|x| x.eq(path));
+        let index = self.block_devs.iter().position(|x| x.has_same(path));
         match index {
             Some(index) => {
                 self.block_devs.remove(index);
@@ -117,7 +117,7 @@ impl Pool for SimPool {
     }
 
     fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()> {
-        let index = self.cache_devs.iter().position(|x| x.eq(path));
+        let index = self.cache_devs.iter().position(|x| x.has_same(path));
 
         match index {
             Some(index) => {

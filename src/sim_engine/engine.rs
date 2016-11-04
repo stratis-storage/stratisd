@@ -17,6 +17,7 @@ use std::fmt;
 
 use std::path::Path;
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 use std::iter::FromIterator;
 
 use super::blockdev::SimDev;
@@ -51,9 +52,14 @@ impl Engine for SimEngine {
                    raid_level: u16)
                    -> EngineResult<()> {
 
-        if self.pools.contains_key(name) {
-            return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
-        }
+        let str_name = name.to_owned();
+        let entry = self.pools.entry(str_name);
+        match entry {
+            Entry::Occupied(_) => {
+                return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
+            },
+            _ => { }
+        };
 
         let devs: Vec<Box<SimDev>> = blockdev_paths.iter().map(|x| SimDev::new_dev(x)).collect();
 
@@ -76,7 +82,7 @@ impl Engine for SimEngine {
             return Err(EngineError::Stratis(ErrorEnum::Error("X".into())));
         }
 
-        self.pools.insert(name.to_owned(), pool);
+        entry.or_insert(pool);
         Ok(())
     }
 

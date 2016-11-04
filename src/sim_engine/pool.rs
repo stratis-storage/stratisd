@@ -101,4 +101,34 @@ impl Pool for SimPool {
     fn list_cachedevs(&self) -> EngineResult<Vec<Box<Cache>>> {
         Ok(Vec::from_iter(self.cache_devs.iter().map(|x| (x.copy()))))
     }
+    fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()> {
+        let index = self.block_devs.iter().position(|x| x.has_same(path));
+        match index {
+            Some(index) => {
+                self.block_devs.remove(index);
+                return Ok(());
+            }
+            None => {
+                return Err(EngineError::Stratis(ErrorEnum::NotFound(String::from(path.to_str()
+                    .unwrap()))))
+            }
+        }
+        Ok(())
+    }
+
+    fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()> {
+        let index = self.cache_devs.iter().position(|x| x.has_same(path));
+
+        match index {
+            Some(index) => {
+                self.cache_devs.remove(index);
+                return Ok(());
+            }
+            None => {
+                return Err(EngineError::Stratis(ErrorEnum::NotFound(String::from(path.to_str()
+                    .unwrap()))))
+            }
+        }
+        Ok(())
+    }
 }

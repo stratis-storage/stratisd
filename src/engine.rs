@@ -44,15 +44,19 @@ pub type EngineResult<T> = Result<T, EngineError>;
 pub trait Dev: Debug {
     fn copy(&self) -> Box<Dev>;
     fn get_id(&self) -> String;
+    fn has_same(&self, other: &Path) -> bool;
 }
 
 pub trait Cache: Debug {
     fn copy(&self) -> Box<Cache>;
     fn get_id(&self) -> String;
+    fn has_same(&self, other: &Path) -> bool;
 }
 
 pub trait Filesystem: Debug {
     fn copy(&self) -> Box<Filesystem>;
+    fn get_id(&self) -> String;
+    fn eq(&self, other: &Filesystem) -> bool;
 }
 
 pub trait Pool: Debug {
@@ -63,6 +67,8 @@ pub trait Pool: Debug {
                          -> EngineResult<()>;
     fn add_blockdev(&mut self, path: &Path) -> EngineResult<()>;
     fn add_cachedev(&mut self, path: &Path) -> EngineResult<()>;
+    fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;
+    fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()>;
     fn destroy(&mut self) -> EngineResult<()>;
     fn list_filesystems(&self) -> EngineResult<BTreeMap<String, Box<Filesystem>>>;
     fn list_blockdevs(&self) -> EngineResult<Vec<Box<Dev>>>;

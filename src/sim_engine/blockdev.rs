@@ -36,6 +36,12 @@ impl fmt::Debug for SimDev {
     }
 }
 
+impl fmt::Display for SimDev {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{}", self.get_id())
+    }
+}
+
 impl Dev for SimDev {
     fn copy(&self) -> Box<Dev> {
         let simdev_copy = SimDev {
@@ -45,6 +51,7 @@ impl Dev for SimDev {
         };
         Box::new(simdev_copy)
     }
+
     fn get_id(&self) -> String {
         let id = self.name.to_str();
 
@@ -52,6 +59,10 @@ impl Dev for SimDev {
             Some(x) => return String::from(x),
             None => return String::from("Conversion Failure"),
         }
+    }
+
+    fn has_same(&self, other: &Path) -> bool {
+        self.get_id() == String::from(other.to_str().unwrap())
     }
 }
 

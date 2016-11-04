@@ -75,4 +75,7 @@ impl Cache for SimCacheDev {
             None => return String::from("Conversion Failure"),
         }
     }
+    fn has_same(&self, other: &Path) -> bool {
+        self.name == other
+    }
 }

@@ -58,7 +58,7 @@ impl Pool for SimPool {
         Ok(())
     }
 
-    fn destroy(&mut self) -> EngineResult<()> {
+    fn destroy_filesystem(&mut self, filesystem: &String) -> EngineResult<()> {
         println!("sim: pool::destroy");
         Ok(())
     }

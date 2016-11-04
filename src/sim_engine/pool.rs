@@ -9,7 +9,9 @@ use std::vec::Vec;
 
 use engine::Cache;
 use engine::Dev;
+use engine::EngineError;
 use engine::EngineResult;
+use engine::ErrorEnum;
 use engine::Filesystem;
 use engine::Pool;
 
@@ -78,6 +80,11 @@ impl Pool for SimPool {
                          mount_point: &str,
                          size: u64)
                          -> EngineResult<()> {
+
+        if self.filesystems.contains_key(filesystem_name) {
+            return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(filesystem_name.into())));
+        }
+
         self.filesystems.insert(filesystem_name.to_owned(),
                                 SimFilesystem::new_filesystem(mount_point, size));
         Ok(())

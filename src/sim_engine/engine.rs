@@ -47,15 +47,17 @@ impl Engine for SimEngine {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
 
-        let devs: Vec<Box<SimDev>> =
+        let mut devs: Vec<Box<SimDev>> =
             blockdev_paths.iter().map(|x| SimDev::new_dev(self.rdm.clone(), x)).collect();
 
-        match self.rdm.borrow_mut().get_bad_item(&devs) {
-            Some(d) => {
-                let path_as_str = d.name.to_str().unwrap_or("unstringable path");
-                return Err(EngineError::Stratis(ErrorEnum::Busy(path_as_str.into())));
-            }
-            None => {}
+        for dev in devs.iter_mut() {
+            dev.update();
+        }
+
+        let bad_devs: Vec<&Box<SimDev>> = devs.iter().filter(|dev| !dev.usable()).collect();
+
+        if !bad_devs.is_empty() {
+            return Err(EngineError::Stratis(ErrorEnum::Busy("some devices are unusable".into())));
         }
 
         let pool = SimPool::new_pool(self.rdm.clone(), devs.as_slice(), raid_level);

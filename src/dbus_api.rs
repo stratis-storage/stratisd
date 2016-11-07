@@ -305,10 +305,9 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let filesystems: Array<(&str, &str, u64), _> = try!(iter.read::<Array<(&str, &str, u64), _>>()
-        .map_err(|_| MethodErr::invalid_arg(&0)));
-
+    let filesystems: Array<(&str, &str, u64), _> = try!(get_next_arg(&mut iter, 0));
     let dbus_context = m.path.get_data();
+
     let object_path = m.path.get_name();
     let return_message = message.method_return();
     let return_sig = "(oqs)";
@@ -573,8 +572,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let devs: Array<&str, _> = try!(iter.read::<Array<&str, _>>()
-        .map_err(|_| MethodErr::invalid_arg(&0)));
+    let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 0));
 
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
@@ -644,8 +642,7 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let cache_devs: Array<&str, _> = try!(iter.read::<Array<&str, _>>()
-        .map_err(|_| MethodErr::invalid_arg(&0)));
+    let cache_devs: Array<&str, _> = try!(get_next_arg(&mut iter, 0));
 
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
@@ -697,8 +694,7 @@ fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let devs: Array<(&str), _> = try!(iter.read::<Array<(&str), _>>()
-        .map_err(|_| MethodErr::invalid_arg(&0)));
+    let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 0));
 
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();

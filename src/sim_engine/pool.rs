@@ -28,8 +28,6 @@ pub struct SimPool {
     pub cache_devs: Vec<Box<SimCacheDev>>,
     pub filesystems: BTreeMap<String, Box<SimFilesystem>>,
     pub raid_level: u16,
-    pub online: bool,
-    pub checking: bool,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
@@ -46,8 +44,6 @@ impl SimPool {
             filesystems: BTreeMap::new(),
             cache_devs: Vec::new(),
             raid_level: raid_level,
-            online: true,
-            checking: false,
             rdm: rdm,
         };
 
@@ -77,8 +73,6 @@ impl Pool for SimPool {
             cache_devs: self.cache_devs.clone(),
             filesystems: self.filesystems.clone(),
             raid_level: self.raid_level.clone(),
-            online: true,
-            checking: false,
             rdm: self.rdm.clone(),
         };
         Box::new(pool_copy)

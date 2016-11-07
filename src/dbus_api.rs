@@ -1023,6 +1023,31 @@ fn get_dev_types(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![m.msg.method_return()])
 }
 
+fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message = m.msg;
+    let mut iter = message.iter_init();
+
+    let denominator: u32 = try!(get_next_arg(&mut iter, 0));
+
+    let dbus_context = m.path.get_data();
+    let result = dbus_context.engine.borrow_mut().configure_simulator(denominator);
+
+    let return_message = message.method_return();
+
+    let msg = match result {
+        Ok(_) => {
+            let (rc, rs) = ok_message_items();
+            return_message.append2(rc, rs)
+        },
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err(&err);
+            let (rc, rs) = code_to_message_items(rc, rs);
+            return_message.append2(rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}
+
 fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData>, TData>> {
 
     let f = Factory::new_fn();
@@ -1081,6 +1106,11 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
 
     let get_dev_types_method = f.method(GET_DEV_TYPES, (), get_dev_types);
 
+    let configure_simulator_method = f.method(CONFIGURE_SIMULATOR, (), configure_simulator)
+        .in_arg(("denominator", "u"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
+
     let obj_path = f.object_path(STRATIS_BASE_PATH, dbus_context)
         .introspectable()
         .object_manager()
@@ -1094,7 +1124,8 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
             .add_m(get_cache_object_path_method)
             .add_m(get_error_codes_method)
             .add_m(get_raid_levels_method)
-            .add_m(get_dev_types_method));
+            .add_m(get_dev_types_method)
+            .add_m(configure_simulator_method));
 
     let base_tree = base_tree.add(obj_path);
 

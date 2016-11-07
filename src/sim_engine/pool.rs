@@ -2,9 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
 use std::path::Path;
+use std::rc::Rc;
 use std::vec::Vec;
 
 use engine::Cache;
@@ -18,6 +20,7 @@ use engine::Pool;
 use super::blockdev::SimDev;
 use super::cache::SimCacheDev;
 use super::filesystem::SimFilesystem;
+use super::randomization::Randomizer;
 
 #[derive(Debug)]
 pub struct SimPool {
@@ -27,10 +30,14 @@ pub struct SimPool {
     pub raid_level: u16,
     pub online: bool,
     pub checking: bool,
+    rdm: Rc<RefCell<Randomizer>>,
 }
 
 impl SimPool {
-    pub fn new_pool(blockdevs: &[Box<SimDev>], raid_level: u16) -> Box<Pool> {
+    pub fn new_pool(rdm: Rc<RefCell<Randomizer>>,
+                    blockdevs: &[Box<SimDev>],
+                    raid_level: u16)
+                    -> Box<Pool> {
 
         let mut vec = Vec::new();
         vec.extend_from_slice(blockdevs);
@@ -41,6 +48,7 @@ impl SimPool {
             raid_level: raid_level,
             online: true,
             checking: false,
+            rdm: rdm,
         };
 
         Box::new(new_pool)
@@ -49,12 +57,12 @@ impl SimPool {
 
 impl Pool for SimPool {
     fn add_blockdev(&mut self, path: &Path) -> EngineResult<()> {
-        self.block_devs.push(SimDev::new_dev(path));
+        self.block_devs.push(SimDev::new_dev(self.rdm.clone(), path));
         Ok(())
     }
 
     fn add_cachedev(&mut self, path: &Path) -> EngineResult<()> {
-        self.cache_devs.push(SimCacheDev::new_cache(path));
+        self.cache_devs.push(SimCacheDev::new_cache(self.rdm.clone(), path));
         Ok(())
     }
 
@@ -71,6 +79,7 @@ impl Pool for SimPool {
             raid_level: self.raid_level.clone(),
             online: true,
             checking: false,
+            rdm: self.rdm.clone(),
         };
         Box::new(pool_copy)
     }

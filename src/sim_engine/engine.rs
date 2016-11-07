@@ -94,4 +94,9 @@ impl Engine for SimEngine {
         Ok(BTreeMap::from_iter(self.pools.iter().map(|x| (x.0.clone(), x.1.copy()))))
 
     }
+
+    fn configure_simulator(&mut self, denominator: u32) -> EngineResult<()> {
+        self.rdm.borrow_mut().set_probability(denominator);
+        Ok(())
+    }
 }

@@ -81,6 +81,7 @@ class Manager(Interface):
     _INTERFACE_NAME = 'org.storage.stratis1.Manager'
 
     _METHODS = {
+        "ConfigureSimulator" : "u",
         "CreatePool" : "sqas",
         "DestroyPool" : "s",
         "GetCacheObjectPath" : "s",

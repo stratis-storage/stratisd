@@ -9,37 +9,29 @@ use engine::ErrorEnum;
 
 use engine::Pool;
 
-use rand::Rng;
-use rand::ThreadRng;
-use rand::thread_rng;
-
-use std::fmt;
-
+use std::cell::RefCell;
 use std::path::Path;
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
+use std::rc::Rc;
 
 use super::blockdev::SimDev;
 use super::pool::SimPool;
+use super::randomization::Randomizer;
 
 
 
+#[derive(Debug)]
 pub struct SimEngine {
     pub pools: BTreeMap<String, Box<Pool>>,
-    rng: ThreadRng,
-}
-
-impl fmt::Debug for SimEngine {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{SimEngine {:?}", self.pools)
-    }
+    rdm: Rc<RefCell<Randomizer>>
 }
 
 impl SimEngine {
     pub fn new() -> SimEngine {
         SimEngine {
             pools: BTreeMap::new(),
-            rng: thread_rng(),
+            rdm: Rc::new(RefCell::new(Randomizer::new())),
         }
     }
 }
@@ -57,12 +49,7 @@ impl Engine for SimEngine {
 
         let devs: Vec<Box<SimDev>> = blockdev_paths.iter().map(|x| SimDev::new_dev(x)).collect();
 
-        let bad_dev = if self.rng.gen_weighted_bool(8) {
-            self.rng.choose(devs.as_slice())
-        } else {
-            None
-        };
-        match bad_dev {
+        match self.rdm.borrow_mut().get_bad_item(&devs) {
             Some(d) => {
                 let path_as_str = d.name.to_str().unwrap_or("unstringable path");
                 return Err(EngineError::Stratis(ErrorEnum::Busy(path_as_str.into())));
@@ -72,7 +59,7 @@ impl Engine for SimEngine {
 
         let pool = SimPool::new_pool(devs.as_slice(), raid_level);
 
-        if self.rng.gen_weighted_bool(8) {
+        if self.rdm.borrow_mut().throw_die() {
             return Err(EngineError::Stratis(ErrorEnum::Error("X".into())));
         }
 
@@ -81,7 +68,7 @@ impl Engine for SimEngine {
     }
 
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()> {
-        if self.rng.gen_weighted_bool(8) {
+        if self.rdm.borrow_mut().throw_die() {
             return Err(EngineError::Stratis(ErrorEnum::Busy("X".into())));
         }
 

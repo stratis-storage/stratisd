@@ -85,4 +85,8 @@ pub trait Engine: Debug {
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()>;
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Box<Pool>>;
     fn list_pools(&self) -> EngineResult<BTreeMap<String, Box<Pool>>>;
+
+    /// Configure the simulator, for the real engine, this is a null op.
+    /// denominator: the probably of failure is 1/denominator.
+    fn configure_simulator(&mut self, denominator: u32) -> EngineResult<()>;
 }

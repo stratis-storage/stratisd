@@ -6,12 +6,12 @@ use std::fmt;
 
 use engine::Dev;
 
+use std::cell::RefCell;
 use std::path::Path;
 use std::path::PathBuf;
+use std::rc::Rc;
 
-use rand::Rng;
-use rand::ThreadRng;
-use rand::thread_rng;
+use super::randomization::Randomizer;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// A list of very basic states a SimDev can be in.
@@ -20,20 +20,12 @@ pub enum State {
     FAILED,
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 /// A simulated device.
 pub struct SimDev {
     pub name: PathBuf,
-    rng: ThreadRng,
+    rdm: Rc<RefCell<Randomizer>>,
     pub state: State,
-}
-
-/// Implement Debug for SimDev explicitly as ThreadRng does not derive it.
-/// See: https://github.com/rust-lang-nursery/rand/issues/118
-impl fmt::Debug for SimDev {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{SimDev {:?} {:?}", self.name, self.state)
-    }
 }
 
 impl fmt::Display for SimDev {
@@ -46,7 +38,7 @@ impl Dev for SimDev {
     fn copy(&self) -> Box<Dev> {
         let simdev_copy = SimDev {
             name: self.name.clone(),
-            rng: self.rng.clone(),
+            rdm: self.rdm.clone(),
             state: self.state.clone(),
         };
         Box::new(simdev_copy)
@@ -68,17 +60,17 @@ impl Dev for SimDev {
 
 impl SimDev {
     /// Generates a new device from any path.
-    pub fn new_dev(name: &Path) -> Box<SimDev> {
+    pub fn new_dev(rdm: Rc<RefCell<Randomizer>>, name: &Path) -> Box<SimDev> {
         Box::new(SimDev {
             name: name.to_owned(),
-            rng: thread_rng(),
+            rdm: rdm,
             state: State::OK,
         })
     }
 
     /// Function that causes self to progress probabilistically to a new state.
     pub fn update(&mut self) {
-        if self.rng.gen_weighted_bool(8) {
+        if self.rdm.borrow_mut().throw_die() {
             self.state = State::FAILED;
         }
     }

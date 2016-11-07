@@ -24,7 +24,7 @@ use super::randomization::Randomizer;
 #[derive(Debug)]
 pub struct SimEngine {
     pub pools: BTreeMap<String, Box<Pool>>,
-    rdm: Rc<RefCell<Randomizer>>
+    rdm: Rc<RefCell<Randomizer>>,
 }
 
 impl SimEngine {
@@ -47,7 +47,8 @@ impl Engine for SimEngine {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
 
-        let devs: Vec<Box<SimDev>> = blockdev_paths.iter().map(|x| SimDev::new_dev(x)).collect();
+        let devs: Vec<Box<SimDev>> =
+            blockdev_paths.iter().map(|x| SimDev::new_dev(self.rdm.clone(), x)).collect();
 
         match self.rdm.borrow_mut().get_bad_item(&devs) {
             Some(d) => {
@@ -57,7 +58,7 @@ impl Engine for SimEngine {
             None => {}
         }
 
-        let pool = SimPool::new_pool(devs.as_slice(), raid_level);
+        let pool = SimPool::new_pool(self.rdm.clone(), devs.as_slice(), raid_level);
 
         if self.rdm.borrow_mut().throw_die() {
             return Err(EngineError::Stratis(ErrorEnum::Error("X".into())));

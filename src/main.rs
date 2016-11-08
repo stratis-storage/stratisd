@@ -48,8 +48,6 @@ mod sim_engine;
 use std::io::Write;
 use std::error::Error;
 use std::process::exit;
-use std::rc::Rc;
-use std::cell::RefCell;
 
 use types::{StratisResult, StratisError};
 
@@ -80,7 +78,7 @@ fn main() {
         unsafe { debug = true }
     };
 
-    let engine = Rc::new(RefCell::new(SimEngine::new()));
+    let engine = Box::new(SimEngine::new());
     // TODO: add cmdline option to specify engine
     //  let context = Rc::new(RefCell::new(Context::new()));
 

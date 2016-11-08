@@ -383,19 +383,26 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let return_sig = "s";
+    let return_sig = "(qs)";
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
-    let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, &object_path.to_string());
-        default_return; return_message);
-
-    let pool_name_copy = String::from(pool_name.clone());
+    let pool_name = match object_path_to_pool_name(dbus_context, &object_path.to_string()) {
+        Ok(v) => v,
+        Err((rc, rs)) => {
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
+        }
+    };
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
-                                   default_return;
-                                   return_message);
+    let ref mut pool = match b_engine.get_pool(&pool_name) {
+        Ok(result) => result,
+        Err(x) => {
+            let (rc, rs) = engine_to_dbus_err(&x);
+            let (rc, rs) = code_to_message_items(rc, rs);
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
+        }
+    };
+
     let ref mut list_rc = ErrorEnum::OK;
     let mut vec = Vec::new();
 
@@ -404,21 +411,11 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         let result = pool.destroy_filesystem(&filesystem_name);
         match result {
             Ok(_) => {
-                let filesystems_map = dbus_context.filesystems.borrow_mut();
-                if let Some(remove_object_path) =
-                       filesystems_map.get_by_second(&(pool_name_copy, filesystem_name)) {
-                    remove_dbus_object_path(dbus_context, remove_object_path.clone());
-                    let (rc, rs) = ok_message_items();
-                    let entry = MessageItem::Struct(vec![rc, rs]);
-                    vec.push(entry);
-                } else {
-                    let (rc, rs) =
-                        code_to_message_items(ErrorEnum::INTERNAL_ERROR,
-                                              ErrorEnum::INTERNAL_ERROR.get_error_string()
-                                                  .into());
-                    let entry = MessageItem::Struct(vec![rc, rs]);
-                    vec.push(entry);
-                }
+                let result = fs_name_to_object_path(dbus_context,
+                                                    &pool_name.to_string(),
+                                                    &filesystem_name.to_string());
+                let object_path = dbus_try!(result; default_return; return_message);
+                remove_dbus_object_path(dbus_context, object_path.clone());
             }
             Err(x) => {
                 *list_rc = ErrorEnum::LIST_FAILURE;
@@ -1038,7 +1035,7 @@ fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(_) => {
             let (rc, rs) = ok_message_items();
             return_message.append2(rc, rs)
-        },
+        }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err(&err);
             let (rc, rs) = code_to_message_items(rc, rs);

@@ -67,8 +67,12 @@ impl Pool for SimPool {
     }
 
     fn destroy_filesystem(&mut self, filesystem: &String) -> EngineResult<()> {
-        println!("sim: pool::destroy");
-        Ok(())
+        match self.filesystems.remove(filesystem) {
+            Some(_fs) => {
+                return Ok(());
+            }
+            None => return Err(EngineError::Stratis(ErrorEnum::NotFound(String::from(filesystem.to_string())))),
+        }
     }
 
     fn copy(&self) -> Box<Pool> {

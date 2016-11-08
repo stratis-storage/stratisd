@@ -1,0 +1,21 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+
+use types::Sectors;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockDevSave {
+    pub path: PathBuf,
+    pub sectors: Sectors,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StratSave {
+    pub name: String,
+    pub id: String,
+    pub block_devs: BTreeMap<String, BlockDevSave>,
+}

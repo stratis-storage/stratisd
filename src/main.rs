@@ -45,6 +45,7 @@ mod stratis;
 mod dbus_api;
 mod engine;
 mod sim_engine;
+mod strat_engine;
 
 use std::io::Write;
 use std::error::Error;

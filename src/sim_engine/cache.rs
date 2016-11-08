@@ -28,12 +28,12 @@ pub struct SimCacheDev {
 
 impl SimCacheDev {
     /// Generates a new cache device from a path.
-    pub fn new_cache(rdm: Rc<RefCell<Randomizer>>, name: &Path) -> Box<SimCacheDev> {
-        Box::new(SimCacheDev {
+    pub fn new_cache(rdm: Rc<RefCell<Randomizer>>, name: &Path) -> SimCacheDev {
+        SimCacheDev {
             name: name.to_owned(),
             rdm: rdm,
             state: CacheState::OK,
-        })
+        }
     }
     pub fn update(&mut self) {
         if self.rdm.borrow_mut().throw_die() {

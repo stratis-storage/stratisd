@@ -10,11 +10,11 @@ pub struct SimFilesystem {
     pub size: u64,
 }
 impl SimFilesystem {
-    pub fn new_filesystem(mount_point: &str, size: u64) -> Box<SimFilesystem> {
-        Box::new(SimFilesystem {
+    pub fn new_filesystem(mount_point: &str, size: u64) -> SimFilesystem {
+        SimFilesystem {
             mount_point: mount_point.to_owned(),
             size: size,
-        })
+        }
     }
 }
 impl Filesystem for SimFilesystem {

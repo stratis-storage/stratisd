@@ -24,18 +24,18 @@ use super::randomization::Randomizer;
 
 #[derive(Debug)]
 pub struct SimPool {
-    pub block_devs: Vec<Box<SimDev>>,
-    pub cache_devs: Vec<Box<SimCacheDev>>,
-    pub filesystems: BTreeMap<String, Box<SimFilesystem>>,
+    pub block_devs: Vec<SimDev>,
+    pub cache_devs: Vec<SimCacheDev>,
+    pub filesystems: BTreeMap<String, SimFilesystem>,
     pub raid_level: u16,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
 impl SimPool {
     pub fn new_pool(rdm: Rc<RefCell<Randomizer>>,
-                    blockdevs: &[Box<SimDev>],
+                    blockdevs: &[SimDev],
                     raid_level: u16)
-                    -> Box<Pool> {
+                    -> SimPool {
 
         let mut vec = Vec::new();
         vec.extend_from_slice(blockdevs);
@@ -47,7 +47,7 @@ impl SimPool {
             rdm: rdm,
         };
 
-        Box::new(new_pool)
+        new_pool
     }
 }
 

@@ -83,7 +83,7 @@ pub trait Engine: Debug {
                    raid_level: u16)
                    -> EngineResult<()>;
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()>;
-    fn get_pool(&mut self, name: &str) -> EngineResult<&mut Box<Pool>>;
+    fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool>;
     fn list_pools(&self) -> EngineResult<BTreeMap<String, Box<Pool>>>;
 
     /// Configure the simulator, for the real engine, this is a null op.

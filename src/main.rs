@@ -53,6 +53,7 @@ use std::cell::RefCell;
 
 use types::{StratisResult, StratisError};
 
+use clap::{App, Arg};
 use sim_engine::SimEngine;
 
 
@@ -66,6 +67,18 @@ fn write_err(err: StratisError) -> StratisResult<()> {
 }
 
 fn main() {
+    let matches = App::new("stratis")
+        .version(&crate_version!())
+        .about("Stratis storage management")
+        .arg(Arg::with_name("debug")
+            .short("d")
+            .long("debug")
+            .help("Print additional output for debugging"))
+        .get_matches();
+
+    if matches.is_present("debug") {
+        unsafe { debug = true }
+    };
 
     let engine = Rc::new(RefCell::new(SimEngine::new()));
     // TODO: add cmdline option to specify engine

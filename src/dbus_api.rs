@@ -233,13 +233,11 @@ fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let ref engine = dbus_context.engine;
 
-    let result = engine.borrow().list_pools();
-
     let return_message = m.msg.method_return();
     let return_sig = "s";
 
-    let msg = match result {
-        Ok(pool_tree) => {
+    let msg = match engine.borrow().list_pools() {
+        Ok(ref pool_tree) => {
             let msg_vec =
                 pool_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
             let item_array = MessageItem::Array(msg_vec, return_sig.into());

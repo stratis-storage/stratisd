@@ -89,9 +89,9 @@ impl Engine for SimEngine {
         Ok(return_pool)
     }
 
-    fn list_pools(&self) -> EngineResult<BTreeMap<String, Box<Pool>>> {
+    fn list_pools(&self) -> EngineResult<BTreeMap<String, &Pool>> {
 
-        Ok(BTreeMap::from_iter(self.pools.iter().map(|x| (x.0.clone(), x.1.copy()))))
+        Ok(BTreeMap::from_iter(self.pools.iter().map(|x| (x.0.clone(), x.1 as &Pool))))
 
     }
 

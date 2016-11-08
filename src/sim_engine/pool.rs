@@ -102,11 +102,11 @@ impl Pool for SimPool {
     }
 
     fn list_blockdevs(&self) -> EngineResult<Vec<Box<Dev>>> {
-        Ok(Vec::from_iter(self.block_devs.iter().map(|x| (x.copy()))))
+        Ok(Vec::from_iter(self.block_devs.iter().map(|x| x.copy())))
     }
 
     fn list_cachedevs(&self) -> EngineResult<Vec<Box<Cache>>> {
-        Ok(Vec::from_iter(self.cache_devs.iter().map(|x| (x.copy()))))
+        Ok(Vec::from_iter(self.cache_devs.iter().map(|x| x.copy())))
     }
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()> {
         let index = self.block_devs.iter().position(|x| x.has_same(path));

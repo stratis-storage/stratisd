@@ -54,7 +54,10 @@ use std::process::exit;
 use types::{StratisResult, StratisError};
 
 use clap::{App, Arg};
+
+use engine::Engine;
 use sim_engine::SimEngine;
+use strat_engine::StratEngine;
 
 
 fn write_err(err: StratisError) -> StratisResult<()> {
@@ -74,15 +77,24 @@ fn main() {
             .short("d")
             .long("debug")
             .help("Print additional output for debugging"))
+        .arg(Arg::with_name("sim")
+            .long("sim")
+            .help("Use simulator engine"))
         .get_matches();
 
     if matches.is_present("debug") {
         unsafe { debug = true }
     };
 
-    let engine = Box::new(SimEngine::new());
-    // TODO: add cmdline option to specify engine
-    //  let context = Rc::new(RefCell::new(Context::new()));
+    let engine: Box<Engine> = {
+        if matches.is_present("sim") {
+            dbgp!("Using SimEngine");
+            Box::new(SimEngine::new())
+        } else {
+            dbgp!("Using StratEngine");
+            Box::new(StratEngine::new())
+        }
+    };
 
     let r = dbus_api::run(engine);
 

@@ -236,7 +236,7 @@ fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = m.msg.method_return();
     let return_sig = "s";
 
-    let msg = match engine.borrow().list_pools() {
+    let msg = match engine.borrow().pools() {
         Ok(ref pool_tree) => {
             let msg_vec =
                 pool_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
@@ -438,7 +438,7 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                    default_return;
                                    return_message);
 
-    let result = pool.list_filesystems();
+    let result = pool.filesystems();
 
     let msg = match result {
         Ok(filesystem_tree) => {
@@ -476,7 +476,7 @@ fn list_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                    default_return;
                                    return_message);
 
-    let result = pool.list_blockdevs();
+    let result = pool.blockdevs();
 
     let msg = match result {
         Ok(blockdev_list) => {
@@ -515,7 +515,7 @@ fn list_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                    default_return;
                                    return_message);
 
-    let result = pool.list_cachedevs();
+    let result = pool.cachedevs();
 
     let msg = match result {
         Ok(cachdev_list) => {

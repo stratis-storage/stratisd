@@ -398,13 +398,10 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut vec = Vec::new();
 
     for filesystem in filesystems {
-        let filesystem_name = String::from(filesystem);
-        let result = pool.destroy_filesystem(&filesystem_name);
+        let result = pool.destroy_filesystem(&filesystem);
         match result {
             Ok(_) => {
-                let result = fs_name_to_object_path(dbus_context,
-                                                    &pool_name.to_string(),
-                                                    &filesystem_name.to_string());
+                let result = fs_name_to_object_path(dbus_context, &pool_name, &filesystem);
                 let object_path = dbus_try!(result; default_return; return_message);
                 remove_dbus_object_path(dbus_context, object_path.clone());
                 let (rc, rs) = ok_message_items();

@@ -69,7 +69,7 @@ pub trait Pool: Debug {
     fn add_cachedev(&mut self, path: &Path) -> EngineResult<()>;
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;
     fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()>;
-    fn destroy_filesystem(&mut self, filesystem: &String) -> EngineResult<()>;
+    fn destroy_filesystem(&mut self, filesystem: &str) -> EngineResult<()>;
     fn list_filesystems(&self) -> EngineResult<BTreeMap<String, Box<Filesystem>>>;
     fn list_blockdevs(&self) -> EngineResult<Vec<Box<Dev>>>;
     fn list_cachedevs(&self) -> EngineResult<Vec<Box<Cache>>>;

@@ -62,12 +62,12 @@ impl Pool for SimPool {
         Ok(())
     }
 
-    fn destroy_filesystem(&mut self, filesystem: &String) -> EngineResult<()> {
+    fn destroy_filesystem(&mut self, filesystem: &str) -> EngineResult<()> {
         match self.filesystems.remove(filesystem) {
-            Some(_fs) => {
+            Some(_) => {
                 return Ok(());
             }
-            None => return Err(EngineError::Stratis(ErrorEnum::NotFound(String::from(filesystem.to_string())))),
+            None => return Err(EngineError::Stratis(ErrorEnum::NotFound(filesystem.into()))),
         }
     }
 

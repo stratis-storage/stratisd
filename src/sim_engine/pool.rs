@@ -35,7 +35,7 @@ impl SimPool {
     pub fn new_pool(rdm: Rc<RefCell<Randomizer>>,
                     blockdevs: &[Box<SimDev>],
                     raid_level: u16)
-                    -> Box<Pool> {
+                    -> Box<SimPool> {
 
         let mut vec = Vec::new();
         vec.extend_from_slice(blockdevs);

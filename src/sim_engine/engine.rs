@@ -23,7 +23,7 @@ use super::randomization::Randomizer;
 
 #[derive(Debug)]
 pub struct SimEngine {
-    pub pools: BTreeMap<String, Box<Pool>>,
+    pub pools: BTreeMap<String, Box<SimPool>>,
     rdm: Rc<RefCell<Randomizer>>,
 }
 

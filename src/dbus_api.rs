@@ -236,7 +236,7 @@ fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = m.msg.method_return();
     let return_sig = "s";
 
-    let msg = match engine.borrow().pools() {
+    let msg = match engine.borrow_mut().pools() {
         Ok(ref pool_tree) => {
             let msg_vec =
                 pool_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();

@@ -86,16 +86,18 @@ impl Pool for SimPool {
         Ok(())
     }
 
-    fn filesystems(&self) -> EngineResult<BTreeMap<&str, &Filesystem>> {
-        Ok(BTreeMap::from_iter(self.filesystems.iter().map(|x| (x.0 as &str, x.1 as &Filesystem))))
+    fn filesystems(&mut self) -> EngineResult<BTreeMap<&str, &mut Filesystem>> {
+        Ok(BTreeMap::from_iter(self.filesystems
+            .iter_mut()
+            .map(|x| (x.0 as &str, x.1 as &mut Filesystem))))
     }
 
-    fn blockdevs(&self) -> EngineResult<Vec<&Dev>> {
-        Ok(Vec::from_iter(self.block_devs.iter().map(|x| x as &Dev)))
+    fn blockdevs(&mut self) -> EngineResult<Vec<&mut Dev>> {
+        Ok(Vec::from_iter(self.block_devs.iter_mut().map(|x| x as &mut Dev)))
     }
 
-    fn cachedevs(&self) -> EngineResult<Vec<&Cache>> {
-        Ok(Vec::from_iter(self.cache_devs.iter().map(|x| x as &Cache)))
+    fn cachedevs(&mut self) -> EngineResult<Vec<&mut Cache>> {
+        Ok(Vec::from_iter(self.cache_devs.iter_mut().map(|x| x as &mut Cache)))
     }
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()> {
         let index = self.block_devs.iter().position(|x| x.has_same(path));

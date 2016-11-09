@@ -96,11 +96,11 @@ fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr>
 
 /// Get object path from filesystem name
 fn fs_name_to_object_path(dbus_context: &DbusContext,
-                          pool_name: &String,
-                          name: &String)
+                          pool_name: &str,
+                          name: &str)
                           -> Result<String, (MessageItem, MessageItem)> {
     let object_path =
-        match dbus_context.filesystems.borrow().get_by_second(&(pool_name.clone(), name.clone())) {
+        match dbus_context.filesystems.borrow().get_by_second(&(pool_name.into(), name.into())) {
             Some(pool) => pool.clone(),
             None => {
                 let items = code_to_message_items(ErrorEnum::FILESYSTEM_NOTFOUND,
@@ -116,7 +116,7 @@ fn fs_name_to_object_path(dbus_context: &DbusContext,
 
 /// Get object path from pool name
 fn pool_name_to_object_path(dbus_context: &DbusContext,
-                            name: &String)
+                            name: &str)
                             -> Result<String, (MessageItem, MessageItem)> {
     let object_path = match dbus_context.pools.borrow().get_by_second(name) {
         Some(pool) => pool.clone(),
@@ -144,7 +144,7 @@ fn string_to_object_path<'a>(path: String) -> Result<dbus::Path<'a>, (MessageIte
 
 /// Get name for pool from object path
 fn object_path_to_pool_name(dbus_context: &DbusContext,
-                            path: &String)
+                            path: &str)
                             -> Result<String, (MessageItem, MessageItem)> {
     let pool_name = match dbus_context.pools.borrow().get_by_first(path) {
         Some(pool) => pool.clone(),
@@ -314,7 +314,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        object_path_to_pool_name(dbus_context, object_path);
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
@@ -386,7 +386,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        object_path_to_pool_name(dbus_context, object_path);
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
@@ -398,13 +398,10 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut vec = Vec::new();
 
     for filesystem in filesystems {
-        let filesystem_name = String::from(filesystem);
-        let result = pool.destroy_filesystem(&filesystem_name);
+        let result = pool.destroy_filesystem(&filesystem);
         match result {
             Ok(_) => {
-                let result = fs_name_to_object_path(dbus_context,
-                                                    &pool_name.to_string(),
-                                                    &filesystem_name.to_string());
+                let result = fs_name_to_object_path(dbus_context, &pool_name, &filesystem);
                 let object_path = dbus_try!(result; default_return; return_message);
                 remove_dbus_object_path(dbus_context, object_path.clone());
                 let (rc, rs) = ok_message_items();
@@ -435,7 +432,7 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        object_path_to_pool_name(dbus_context, object_path);
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
@@ -473,7 +470,7 @@ fn list_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        object_path_to_pool_name(dbus_context, object_path);
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
@@ -512,7 +509,7 @@ fn list_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        object_path_to_pool_name(dbus_context, object_path);
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
@@ -553,7 +550,7 @@ fn remove_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        object_path_to_pool_name(dbus_context, object_path);
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
@@ -629,7 +626,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        object_path_to_pool_name(dbus_context, object_path);
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
@@ -699,7 +696,7 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        object_path_to_pool_name(dbus_context, object_path);
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
@@ -751,7 +748,7 @@ fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, &object_path.to_string());
+        object_path_to_pool_name(dbus_context, object_path);
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
@@ -948,7 +945,7 @@ fn get_pool_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let return_message = message.method_return();
     let default_return = MessageItem::ObjectPath(default_object_path());
-    let result = pool_name_to_object_path(dbus_context, &name.to_string());
+    let result = pool_name_to_object_path(dbus_context, name);
     let object_path = dbus_try!(result; default_return; return_message);
     let path =
         dbus_try!(string_to_object_path(object_path.clone()); default_return; return_message);
@@ -966,7 +963,7 @@ fn get_filesystem_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResul
     let dbus_context = m.path.get_data();
     let return_message = message.method_return();
     let default_return = MessageItem::ObjectPath(default_object_path());
-    let result = fs_name_to_object_path(dbus_context, &pool_name.to_string(), &name.to_string());
+    let result = fs_name_to_object_path(dbus_context, pool_name, name);
     let object_path = dbus_try!(result; default_return; return_message);
 
     let path =

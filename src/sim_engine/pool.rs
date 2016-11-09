@@ -62,12 +62,12 @@ impl Pool for SimPool {
         Ok(())
     }
 
-    fn destroy_filesystem(&mut self, filesystem: &String) -> EngineResult<()> {
+    fn destroy_filesystem(&mut self, filesystem: &str) -> EngineResult<()> {
         match self.filesystems.remove(filesystem) {
-            Some(_fs) => {
+            Some(_) => {
                 return Ok(());
             }
-            None => return Err(EngineError::Stratis(ErrorEnum::NotFound(String::from(filesystem.to_string())))),
+            None => return Err(EngineError::Stratis(ErrorEnum::NotFound(filesystem.into()))),
         }
     }
 
@@ -102,11 +102,11 @@ impl Pool for SimPool {
     }
 
     fn list_blockdevs(&self) -> EngineResult<Vec<Box<Dev>>> {
-        Ok(Vec::from_iter(self.block_devs.iter().map(|x| (x.copy()))))
+        Ok(Vec::from_iter(self.block_devs.iter().map(|x| x.copy())))
     }
 
     fn list_cachedevs(&self) -> EngineResult<Vec<Box<Cache>>> {
-        Ok(Vec::from_iter(self.cache_devs.iter().map(|x| (x.copy()))))
+        Ok(Vec::from_iter(self.cache_devs.iter().map(|x| x.copy())))
     }
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()> {
         let index = self.block_devs.iter().position(|x| x.has_same(path));

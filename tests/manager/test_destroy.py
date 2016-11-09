@@ -171,7 +171,6 @@ class Destroy3TestCase(unittest.TestCase):
         """
         self._service.tearDown()
 
-    @unittest.expectedFailure
     def testExecution(self):
         """
         This should fail since it has a filesystem on it.
@@ -181,6 +180,6 @@ class Destroy3TestCase(unittest.TestCase):
            "DestroyPool",
            self._POOLNAME
         )
-        self.assertNotEqual(rc, StratisdErrorsGen.get_object().OK)
+        self.assertEqual(rc, StratisdErrorsGen.get_object().BUSY)
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)

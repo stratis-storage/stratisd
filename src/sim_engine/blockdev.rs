@@ -35,15 +35,6 @@ impl fmt::Display for SimDev {
 }
 
 impl Dev for SimDev {
-    fn copy(&self) -> Box<Dev> {
-        let simdev_copy = SimDev {
-            name: self.name.clone(),
-            rdm: self.rdm.clone(),
-            state: self.state.clone(),
-        };
-        Box::new(simdev_copy)
-    }
-
     fn get_id(&self) -> String {
         let id = self.name.to_str();
 

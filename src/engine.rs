@@ -42,19 +42,16 @@ pub enum EngineError {
 pub type EngineResult<T> = Result<T, EngineError>;
 
 pub trait Dev: Debug {
-    fn copy(&self) -> Box<Dev>;
     fn get_id(&self) -> String;
     fn has_same(&self, other: &Path) -> bool;
 }
 
 pub trait Cache: Debug {
-    fn copy(&self) -> Box<Cache>;
     fn get_id(&self) -> String;
     fn has_same(&self, other: &Path) -> bool;
 }
 
 pub trait Filesystem: Debug {
-    fn copy(&self) -> Box<Filesystem>;
     fn get_id(&self) -> String;
     fn eq(&self, other: &Filesystem) -> bool;
 }
@@ -73,7 +70,6 @@ pub trait Pool: Debug {
     fn list_filesystems(&self) -> EngineResult<BTreeMap<String, &Filesystem>>;
     fn list_blockdevs(&self) -> EngineResult<Vec<&Dev>>;
     fn list_cachedevs(&self) -> EngineResult<Vec<&Cache>>;
-    fn copy(&self) -> Box<Pool>;
 }
 
 pub trait Engine: Debug {

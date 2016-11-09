@@ -71,17 +71,6 @@ impl Pool for SimPool {
         }
     }
 
-    fn copy(&self) -> Box<Pool> {
-        let pool_copy = SimPool {
-            block_devs: self.block_devs.clone(),
-            cache_devs: self.cache_devs.clone(),
-            filesystems: self.filesystems.clone(),
-            raid_level: self.raid_level.clone(),
-            rdm: self.rdm.clone(),
-        };
-        Box::new(pool_copy)
-    }
-
     fn create_filesystem(&mut self,
                          filesystem_name: &str,
                          mount_point: &str,

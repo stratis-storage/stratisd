@@ -56,6 +56,7 @@ class DestroyFSTestCase(unittest.TestCase):
            self._devs
         )
         self._pool_object = get_object(result)
+        (_, _) = Manager.callMethod(self._proxy, "ConfigureSimulator", 8)
 
     def tearDown(self):
         """
@@ -136,6 +137,7 @@ class DestroyFSTestCase1(unittest.TestCase):
            "CreateFilesystems",
            [(self._VOLNAME, '', 0)]
         )
+        (_, _) = Manager.callMethod(self._proxy, "ConfigureSimulator", 8)
 
     def tearDown(self):
         """

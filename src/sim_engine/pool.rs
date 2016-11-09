@@ -86,8 +86,8 @@ impl Pool for SimPool {
         Ok(())
     }
 
-    fn filesystems(&self) -> EngineResult<BTreeMap<String, &Filesystem>> {
-        Ok(BTreeMap::from_iter(self.filesystems.iter().map(|x| (x.0.clone(), x.1 as &Filesystem))))
+    fn filesystems(&self) -> EngineResult<BTreeMap<&str, &Filesystem>> {
+        Ok(BTreeMap::from_iter(self.filesystems.iter().map(|x| (x.0 as &str, x.1 as &Filesystem))))
     }
 
     fn blockdevs(&self) -> EngineResult<Vec<&Dev>> {

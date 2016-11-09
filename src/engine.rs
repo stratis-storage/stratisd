@@ -67,7 +67,7 @@ pub trait Pool: Debug {
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;
     fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()>;
     fn destroy_filesystem(&mut self, filesystem: &str) -> EngineResult<()>;
-    fn filesystems(&self) -> EngineResult<BTreeMap<String, &Filesystem>>;
+    fn filesystems(&self) -> EngineResult<BTreeMap<&str, &Filesystem>>;
     fn blockdevs(&self) -> EngineResult<Vec<&Dev>>;
     fn cachedevs(&self) -> EngineResult<Vec<&Cache>>;
 }
@@ -80,7 +80,7 @@ pub trait Engine: Debug {
                    -> EngineResult<()>;
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()>;
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool>;
-    fn pools(&self) -> EngineResult<BTreeMap<String, &Pool>>;
+    fn pools(&self) -> EngineResult<BTreeMap<&str, &Pool>>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.

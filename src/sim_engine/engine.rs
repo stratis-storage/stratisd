@@ -89,9 +89,9 @@ impl Engine for SimEngine {
         Ok(return_pool)
     }
 
-    fn pools(&mut self) -> EngineResult<BTreeMap<&str, &mut Pool>> {
+    fn pools(&mut self) -> BTreeMap<&str, &mut Pool> {
 
-        Ok(BTreeMap::from_iter(self.pools.iter_mut().map(|x| (x.0 as &str, x.1 as &mut Pool))))
+        BTreeMap::from_iter(self.pools.iter_mut().map(|x| (x.0 as &str, x.1 as &mut Pool)))
 
     }
 

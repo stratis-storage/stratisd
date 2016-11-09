@@ -231,26 +231,13 @@ fn remove_dbus_object_path(dbus_context: &DbusContext, path: String) {
 
 fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
-    let ref engine = dbus_context.engine;
+    let mut engine = dbus_context.engine.borrow_mut();
 
-    let return_message = m.msg.method_return();
-    let return_sig = "s";
-
-    let msg = match engine.borrow_mut().pools() {
-        Ok(ref pool_tree) => {
-            let msg_vec =
-                pool_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
-            let item_array = MessageItem::Array(msg_vec, return_sig.into());
-            let (rc, rs) = ok_message_items();
-            return_message.append3(item_array, rc, rs)
-        }
-        Err(x) => {
-            let item_array = MessageItem::Array(vec![], return_sig.into());
-            let (rc, rs) = engine_to_dbus_err(&x);
-            let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append3(item_array, rc, rs)
-        }
-    };
+    let result = engine.pools();
+    let msg_vec = result.keys().map(|key| MessageItem::Str((*key).into())).collect();
+    let item_array = MessageItem::Array(msg_vec, "s".into());
+    let (rc, rs) = ok_message_items();
+    let msg = m.msg.method_return().append3(item_array, rc, rs);
     Ok(vec![msg])
 }
 
@@ -439,22 +426,10 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                    return_message);
 
     let result = pool.filesystems();
-
-    let msg = match result {
-        Ok(filesystem_tree) => {
-            let msg_vec =
-                filesystem_tree.keys().map(|key| MessageItem::Str(format!("{}", key))).collect();
-            let item_array = MessageItem::Array(msg_vec, return_sig.into());
-            let (rc, rs) = ok_message_items();
-            return_message.append3(item_array, rc, rs)
-        }
-        Err(x) => {
-            let (rc, rs) = engine_to_dbus_err(&x);
-            let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append3(default_return, rc, rs)
-        }
-    };
-
+    let msg_vec = result.keys().map(|key| MessageItem::Str((*key).into())).collect();
+    let item_array = MessageItem::Array(msg_vec, return_sig.into());
+    let (rc, rs) = ok_message_items();
+    let msg = return_message.append3(item_array, rc, rs);
     Ok(vec![msg])
 }
 
@@ -477,23 +452,10 @@ fn list_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                    return_message);
 
     let result = pool.blockdevs();
-
-    let msg = match result {
-        Ok(blockdev_list) => {
-            let msg_vec =
-                blockdev_list.iter().map(|x| MessageItem::Str(format!("{}", x.get_id()))).collect();
-
-            let item_array = MessageItem::Array(msg_vec, return_sig.into());
-            let (rc, rs) = ok_message_items();
-            return_message.append3(item_array, rc, rs)
-        }
-        Err(x) => {
-            let (rc, rs) = engine_to_dbus_err(&x);
-            let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append3(default_return, rc, rs)
-        }
-    };
-
+    let msg_vec = result.iter().map(|x| MessageItem::Str(x.get_id().into())).collect();
+    let item_array = MessageItem::Array(msg_vec, return_sig.into());
+    let (rc, rs) = ok_message_items();
+    let msg = return_message.append3(item_array, rc, rs);
     Ok(vec![msg])
 }
 
@@ -516,22 +478,10 @@ fn list_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                    return_message);
 
     let result = pool.cachedevs();
-
-    let msg = match result {
-        Ok(cachdev_list) => {
-            let msg_vec =
-                cachdev_list.iter().map(|x| MessageItem::Str(format!("{}", x.get_id()))).collect();
-            let item_array = MessageItem::Array(msg_vec, return_sig.into());
-            let (rc, rs) = ok_message_items();
-            return_message.append3(item_array, rc, rs)
-        }
-        Err(x) => {
-            let (rc, rs) = engine_to_dbus_err(&x);
-            let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append3(default_return, rc, rs)
-        }
-    };
-
+    let msg_vec = result.iter().map(|x| MessageItem::Str(x.get_id().into())).collect();
+    let item_array = MessageItem::Array(msg_vec, return_sig.into());
+    let (rc, rs) = ok_message_items();
+    let msg = return_message.append3(item_array, rc, rs);
     Ok(vec![msg])
 }
 

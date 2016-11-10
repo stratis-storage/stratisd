@@ -35,15 +35,6 @@ impl fmt::Display for SimDev {
 }
 
 impl Dev for SimDev {
-    fn copy(&self) -> Box<Dev> {
-        let simdev_copy = SimDev {
-            name: self.name.clone(),
-            rdm: self.rdm.clone(),
-            state: self.state.clone(),
-        };
-        Box::new(simdev_copy)
-    }
-
     fn get_id(&self) -> String {
         let id = self.name.to_str();
 
@@ -60,12 +51,12 @@ impl Dev for SimDev {
 
 impl SimDev {
     /// Generates a new device from any path.
-    pub fn new_dev(rdm: Rc<RefCell<Randomizer>>, name: &Path) -> Box<SimDev> {
-        Box::new(SimDev {
+    pub fn new_dev(rdm: Rc<RefCell<Randomizer>>, name: &Path) -> SimDev {
+        SimDev {
             name: name.to_owned(),
             rdm: rdm,
             state: State::OK,
-        })
+        }
     }
 
     /// Function that causes self to progress probabilistically to a new state.

@@ -42,19 +42,16 @@ pub enum EngineError {
 pub type EngineResult<T> = Result<T, EngineError>;
 
 pub trait Dev: Debug {
-    fn copy(&self) -> Box<Dev>;
     fn get_id(&self) -> String;
     fn has_same(&self, other: &Path) -> bool;
 }
 
 pub trait Cache: Debug {
-    fn copy(&self) -> Box<Cache>;
     fn get_id(&self) -> String;
     fn has_same(&self, other: &Path) -> bool;
 }
 
 pub trait Filesystem: Debug {
-    fn copy(&self) -> Box<Filesystem>;
     fn get_id(&self) -> String;
     fn eq(&self, other: &Filesystem) -> bool;
 }
@@ -70,10 +67,9 @@ pub trait Pool: Debug {
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;
     fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()>;
     fn destroy_filesystem(&mut self, filesystem: &str) -> EngineResult<()>;
-    fn list_filesystems(&self) -> EngineResult<BTreeMap<String, Box<Filesystem>>>;
-    fn list_blockdevs(&self) -> EngineResult<Vec<Box<Dev>>>;
-    fn list_cachedevs(&self) -> EngineResult<Vec<Box<Cache>>>;
-    fn copy(&self) -> Box<Pool>;
+    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem>;
+    fn blockdevs(&mut self) -> Vec<&mut Dev>;
+    fn cachedevs(&mut self) -> Vec<&mut Cache>;
 }
 
 pub trait Engine: Debug {
@@ -83,8 +79,8 @@ pub trait Engine: Debug {
                    raid_level: u16)
                    -> EngineResult<()>;
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()>;
-    fn get_pool(&mut self, name: &str) -> EngineResult<&mut Box<Pool>>;
-    fn list_pools(&self) -> EngineResult<BTreeMap<String, Box<Pool>>>;
+    fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool>;
+    fn pools(&mut self) -> BTreeMap<&str, &mut Pool>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.

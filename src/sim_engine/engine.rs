@@ -23,7 +23,7 @@ use super::randomization::Randomizer;
 
 #[derive(Debug)]
 pub struct SimEngine {
-    pub pools: BTreeMap<String, Box<Pool>>,
+    pub pools: BTreeMap<String, SimPool>,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
@@ -47,14 +47,14 @@ impl Engine for SimEngine {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
 
-        let mut devs: Vec<Box<SimDev>> =
+        let mut devs: Vec<SimDev> =
             blockdev_paths.iter().map(|x| SimDev::new_dev(self.rdm.clone(), x)).collect();
 
         for dev in devs.iter_mut() {
             dev.update();
         }
 
-        let bad_devs: Vec<&Box<SimDev>> = devs.iter().filter(|dev| !dev.usable()).collect();
+        let bad_devs: Vec<&SimDev> = devs.iter().filter(|dev| !dev.usable()).collect();
 
         if !bad_devs.is_empty() {
             return Err(EngineError::Stratis(ErrorEnum::Busy("some devices are unusable".into())));
@@ -79,7 +79,7 @@ impl Engine for SimEngine {
 
         Ok(())
     }
-    fn get_pool(&mut self, name: &str) -> EngineResult<&mut Box<Pool>> {
+    fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool> {
 
         let return_pool = match self.pools.get_mut(name) {
             Some(pool) => pool,
@@ -89,9 +89,9 @@ impl Engine for SimEngine {
         Ok(return_pool)
     }
 
-    fn list_pools(&self) -> EngineResult<BTreeMap<String, Box<Pool>>> {
+    fn pools(&mut self) -> BTreeMap<&str, &mut Pool> {
 
-        Ok(BTreeMap::from_iter(self.pools.iter().map(|x| (x.0.clone(), x.1.copy()))))
+        BTreeMap::from_iter(self.pools.iter_mut().map(|x| (x.0 as &str, x.1 as &mut Pool)))
 
     }
 

@@ -24,18 +24,18 @@ use super::randomization::Randomizer;
 
 #[derive(Debug)]
 pub struct SimPool {
-    pub block_devs: Vec<Box<SimDev>>,
-    pub cache_devs: Vec<Box<SimCacheDev>>,
-    pub filesystems: BTreeMap<String, Box<SimFilesystem>>,
+    pub block_devs: Vec<SimDev>,
+    pub cache_devs: Vec<SimCacheDev>,
+    pub filesystems: BTreeMap<String, SimFilesystem>,
     pub raid_level: u16,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
 impl SimPool {
     pub fn new_pool(rdm: Rc<RefCell<Randomizer>>,
-                    blockdevs: &[Box<SimDev>],
+                    blockdevs: &[SimDev],
                     raid_level: u16)
-                    -> Box<Pool> {
+                    -> SimPool {
 
         let mut vec = Vec::new();
         vec.extend_from_slice(blockdevs);
@@ -47,7 +47,7 @@ impl SimPool {
             rdm: rdm,
         };
 
-        Box::new(new_pool)
+        new_pool
     }
 }
 
@@ -71,17 +71,6 @@ impl Pool for SimPool {
         }
     }
 
-    fn copy(&self) -> Box<Pool> {
-        let pool_copy = SimPool {
-            block_devs: self.block_devs.clone(),
-            cache_devs: self.cache_devs.clone(),
-            filesystems: self.filesystems.clone(),
-            raid_level: self.raid_level.clone(),
-            rdm: self.rdm.clone(),
-        };
-        Box::new(pool_copy)
-    }
-
     fn create_filesystem(&mut self,
                          filesystem_name: &str,
                          mount_point: &str,
@@ -97,16 +86,18 @@ impl Pool for SimPool {
         Ok(())
     }
 
-    fn list_filesystems(&self) -> EngineResult<BTreeMap<String, Box<Filesystem>>> {
-        Ok(BTreeMap::from_iter(self.filesystems.iter().map(|x| (x.0.clone(), x.1.copy()))))
+    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem> {
+        BTreeMap::from_iter(self.filesystems
+            .iter_mut()
+            .map(|x| (x.0 as &str, x.1 as &mut Filesystem)))
     }
 
-    fn list_blockdevs(&self) -> EngineResult<Vec<Box<Dev>>> {
-        Ok(Vec::from_iter(self.block_devs.iter().map(|x| x.copy())))
+    fn blockdevs(&mut self) -> Vec<&mut Dev> {
+        Vec::from_iter(self.block_devs.iter_mut().map(|x| x as &mut Dev))
     }
 
-    fn list_cachedevs(&self) -> EngineResult<Vec<Box<Cache>>> {
-        Ok(Vec::from_iter(self.cache_devs.iter().map(|x| x.copy())))
+    fn cachedevs(&mut self) -> Vec<&mut Cache> {
+        Vec::from_iter(self.cache_devs.iter_mut().map(|x| x as &mut Cache))
     }
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()> {
         let index = self.block_devs.iter().position(|x| x.has_same(path));

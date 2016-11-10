@@ -64,7 +64,6 @@ class DestroyFSTestCase(unittest.TestCase):
         """
         self._service.tearDown()
 
-    @unittest.skip('unimplemented')
     def testDestroyNone(self):
         """
         Test calling with no actual volume specification. An empty volume
@@ -85,20 +84,18 @@ class DestroyFSTestCase(unittest.TestCase):
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertEqual(len(result), 0)
 
-    @unittest.skip("Unimplemented")
     def testDestroyOne(self):
         """
         Test calling with a non-existant volume name. This should succeed,
         because at the end the volume is not there.
         """
-
         (result, rc, message) = \
            Pool.callMethod(self._pool_object, "DestroyFilesystems", ['name'])
         self.assertIsInstance(result, list)
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
-        self.assertEqual(len(result), 0)
+        self.assertEqual(len(result), 1)
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
 
         (result, rc, message) = \
@@ -145,7 +142,6 @@ class DestroyFSTestCase1(unittest.TestCase):
         """
         self._service.tearDown()
 
-    @unittest.skip("Unimplemented.")
     def testDestroy(self):
         """
         Test calling by specifying the volume name. Assume that destruction
@@ -157,11 +153,11 @@ class DestroyFSTestCase1(unittest.TestCase):
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 
-        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertEqual(len(result), 1)
 
-        (result, rc, message) = result[0]
-        self.assertIsInstance(result, str)
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
+
+        (rc, message) = result[0]
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
 

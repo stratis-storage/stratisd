@@ -56,6 +56,18 @@ pub trait Filesystem: Debug {
     fn eq(&self, other: &Filesystem) -> bool;
 }
 
+impl From<io::Error> for EngineError {
+    fn from(err: io::Error) -> EngineError {
+        EngineError::Io(err)
+    }
+}
+
+impl From<nix::Error> for EngineError {
+    fn from(err: nix::Error) -> EngineError {
+        EngineError::Nix(err)
+    }
+}
+
 pub trait Pool: Debug {
     fn create_filesystem(&mut self,
                          filesystem_name: &str,

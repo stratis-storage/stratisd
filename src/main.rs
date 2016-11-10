@@ -18,6 +18,7 @@ extern crate bytesize;
 extern crate dbus;
 extern crate term;
 extern crate rand;
+extern crate serde;
 
 #[macro_use]
 extern crate custom_derive;
@@ -44,16 +45,19 @@ mod stratis;
 mod dbus_api;
 mod engine;
 mod sim_engine;
+mod strat_engine;
 
 use std::io::Write;
 use std::error::Error;
 use std::process::exit;
-use std::rc::Rc;
-use std::cell::RefCell;
 
 use types::{StratisResult, StratisError};
 
+use clap::{App, Arg};
+
+use engine::Engine;
 use sim_engine::SimEngine;
+use strat_engine::StratEngine;
 
 
 fn write_err(err: StratisError) -> StratisResult<()> {
@@ -66,10 +70,30 @@ fn write_err(err: StratisError) -> StratisResult<()> {
 }
 
 fn main() {
+    let matches = App::new("stratis")
+        .version(&crate_version!())
+        .about("Stratis storage management")
+        .arg(Arg::with_name("debug")
+            .long("debug")
+            .help("Print additional output for debugging"))
+        .arg(Arg::with_name("sim")
+            .long("sim")
+            .help("Use simulator engine"))
+        .get_matches();
 
-    let engine = Rc::new(RefCell::new(SimEngine::new()));
-    // TODO: add cmdline option to specify engine
-    //  let context = Rc::new(RefCell::new(Context::new()));
+    if matches.is_present("debug") {
+        unsafe { debug = true }
+    };
+
+    let engine: Box<Engine> = {
+        if matches.is_present("sim") {
+            dbgp!("Using SimEngine");
+            Box::new(SimEngine::new())
+        } else {
+            dbgp!("Using StratEngine");
+            Box::new(StratEngine::new())
+        }
+    };
 
     let r = dbus_api::run(engine);
 

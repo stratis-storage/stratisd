@@ -48,7 +48,7 @@ pub enum DeferredAction {
 pub struct DbusContext {
     pub next_index: Rc<Cell<u64>>,
     pub pools: Rc<RefCell<BidirMap<String, String>>>,
-    pub engine: Rc<RefCell<Engine>>,
+    pub engine: Rc<RefCell<Box<Engine>>>,
     pub action_list: Rc<RefCell<Vec<DeferredAction>>>,
     pub filesystems: Rc<RefCell<BidirMap<String, (String, String)>>>,
     pub block_devs: Rc<RefCell<BidirMap<String, String>>>,
@@ -56,7 +56,7 @@ pub struct DbusContext {
 }
 
 impl DbusContext {
-    pub fn new(engine: &Rc<RefCell<Engine>>) -> DbusContext {
+    pub fn new(engine: Rc<RefCell<Box<Engine>>>) -> DbusContext {
         DbusContext {
             action_list: Rc::new(RefCell::new(Vec::new())),
             engine: engine.clone(),
@@ -1065,8 +1065,8 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
     Ok(base_tree)
 }
 
-pub fn run(engine: Rc<RefCell<Engine>>) -> StratisResult<()> {
-    let dbus_context = DbusContext::new(&engine);
+pub fn run(engine: Box<Engine>) -> StratisResult<()> {
+    let dbus_context = DbusContext::new(Rc::new(RefCell::new(engine)));
     let mut tree = get_base_tree(dbus_context.clone()).unwrap();
 
     // Setup DBus connection

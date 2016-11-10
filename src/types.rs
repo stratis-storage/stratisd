@@ -11,6 +11,7 @@ use std::ops::Add;
 use nix;
 use term;
 use dbus;
+use serde;
 
 pub type StratisResult<T> = Result<T, StratisError>;
 
@@ -39,6 +40,22 @@ pub trait SumSectors: Iterator
 
 impl<T: Iterator> SumSectors for T where Sectors: Add<T::Item, Output = Sectors> {}
 
+impl serde::Serialize for Sectors {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: serde::Serializer
+    {
+        serializer.serialize_u64(**self)
+    }
+}
+
+impl serde::Deserialize for Sectors {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Sectors, D::Error>
+        where D: serde::de::Deserializer
+    {
+        let val = try!(serde::Deserialize::deserialize(deserializer));
+        Ok(Sectors(val))
+    }
+}
 
 custom_derive! {
     #[derive(NewtypeFrom, NewtypeAdd, NewtypeSub, NewtypeDeref,

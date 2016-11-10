@@ -8,8 +8,9 @@ use std::path::{Path, PathBuf};
 use std::io;
 use std::str::{FromStr, from_utf8};
 use std::cmp::Ordering;
+use std::fs;
+use std::os::unix::fs::FileTypeExt;
 
-use nix::sys::stat;
 use time::Timespec;
 use devicemapper::Device;
 use crc::crc32;
@@ -54,9 +55,9 @@ impl BlockDev {
                mda_size: Sectors,
                force: bool)
                -> EngineResult<BlockDev> {
-        let pstat = try!(stat::stat(path));
+        let metadata = try!(fs::metadata(path));
 
-        if pstat.st_mode & 0x6000 != 0x6000 {
+        if !metadata.file_type().is_block_device() {
             return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
                                                       format!("{} is not a block device",
                                                               path.display()))));
@@ -79,7 +80,6 @@ impl BlockDev {
 
         let dev = try!(Device::from_str(&path.to_string_lossy()));
 
-        // map_err so we can improve the error message
         let mut f = try!(OpenOptions::new()
             .read(true)
             .open(path)
@@ -141,7 +141,6 @@ impl BlockDev {
     pub fn setup(path: &Path) -> EngineResult<BlockDev> {
         let dev = try!(Device::from_str(&path.to_string_lossy()));
 
-        // map_err so we can improve the error message
         let mut f = try!(OpenOptions::new()
             .read(true)
             .open(path)
@@ -211,7 +210,7 @@ impl BlockDev {
                 crc: LittleEndian::read_u32(&buf[112..116]),
                 offset: SectorOffset(*mda_size / 2),
             },
-            mda_sectors: Sectors(LittleEndian::read_u32(&buf[160..164]) as u64),
+            mda_sectors: mda_size,
             reserved_sectors: Sectors(LittleEndian::read_u32(&buf[164..168]) as u64),
         })
     }

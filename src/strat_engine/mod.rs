@@ -8,10 +8,10 @@ mod pool;
 mod util;
 mod consts;
 
-mod serialize {
-    include!(concat!(env!("OUT_DIR"), "/serialize.rs"));
+mod serde_structs {
+    include!(concat!(env!("OUT_DIR"), "/serde_structs.rs"));
 }
 
 pub use self::engine::StratEngine;
 pub use self::pool::StratPool;
-pub use self::serialize::BlockDevSave;
+pub use self::serde_structs::BlockDevSave;

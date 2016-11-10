@@ -2,7 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::fmt;
 use std::path::Path;
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
@@ -18,15 +17,9 @@ use super::blockdev::BlockDev;
 use super::pool::StratPool;
 
 
-
+#[derive(Debug)]
 pub struct StratEngine {
     pub pools: BTreeMap<String, Box<Pool>>,
-}
-
-impl fmt::Debug for StratEngine {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{StratEngine {:?}}}", self.pools)
-    }
 }
 
 impl StratEngine {

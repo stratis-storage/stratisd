@@ -7,12 +7,6 @@ use std::os::unix::prelude::AsRawFd;
 
 use engine::{EngineResult, EngineError};
 
-pub fn align_to(num: u64, align_to: u64) -> u64 {
-    let agn = align_to - 1;
-
-    (num + agn) & !agn
-}
-
 ioctl!(read blkgetsize64 with 0x12, 114; u64);
 
 pub fn blkdev_size(file: &File) -> EngineResult<u64> {
@@ -22,10 +16,4 @@ pub fn blkdev_size(file: &File) -> EngineResult<u64> {
         Err(x) => Err(EngineError::Nix(x)),
         Ok(_) => Ok(val),
     }
-}
-
-pub fn short_id(id: &str) -> String {
-    let mut shortstr = id.to_owned();
-    shortstr.truncate(8);
-    shortstr
 }

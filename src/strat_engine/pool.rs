@@ -31,8 +31,6 @@ pub struct StratPool {
     pub block_devs: Vec<BlockDev>,
     pub filesystems: BTreeMap<String, Box<StratFilesystem>>,
     pub raid_level: u16,
-    pub online: bool,
-    pub checking: bool,
 }
 
 impl StratPool {
@@ -44,8 +42,6 @@ impl StratPool {
             block_devs: blockdevs.to_owned(),
             filesystems: BTreeMap::new(),
             raid_level: raid_level,
-            online: true,
-            checking: false,
         })
     }
 }
@@ -66,13 +62,11 @@ impl Pool for StratPool {
     }
 
     fn add_cachedev(&mut self, _path: &Path) -> EngineResult<()> {
-        println!("sim: pool::add_cachedev");
-        Ok(())
+        unimplemented!()
     }
 
     fn destroy(&mut self) -> EngineResult<()> {
-        println!("sim: pool::destroy");
-        Ok(())
+        unimplemented!()
     }
 
     fn copy(&self) -> Box<Pool> {
@@ -83,8 +77,6 @@ impl Pool for StratPool {
             block_devs: self.block_devs.clone(),
             filesystems: self.filesystems.clone(),
             raid_level: self.raid_level.clone(),
-            online: true,
-            checking: false,
         };
         Box::new(pool_copy)
     }

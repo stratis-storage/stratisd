@@ -74,7 +74,6 @@ fn main() {
         .version(&crate_version!())
         .about("Stratis storage management")
         .arg(Arg::with_name("debug")
-            .short("d")
             .long("debug")
             .help("Print additional output for debugging"))
         .arg(Arg::with_name("sim")

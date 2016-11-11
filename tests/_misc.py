@@ -82,7 +82,7 @@ class ServiceR(ServiceABC):
 
     def setUp(self):
         self._stratisd = subprocess.Popen(
-           os.path.join(_STRATISD_RUST, 'target/debug/stratisd')
+           [os.path.join(_STRATISD_RUST, 'target/debug/stratisd'), '--sim']
         )
 
 

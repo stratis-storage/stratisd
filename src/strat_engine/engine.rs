@@ -43,20 +43,8 @@ impl Engine for StratEngine {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
 
-        let mut devs = Vec::new();
-        for path in blockdev_paths {
-            match BlockDev::new(name, path, MIN_MDA_SIZE, true) {
-                Ok(bd) => devs.push(bd),
-                Err(e) => {
-                    for mut dev in devs {
-                        let _dontcare = dev.wipe_sigblock();
-                    }
-                    return Err(e);
-                }
-            }
-        }
-
-        let pool = StratPool::new(name, &devs, raid_level);
+        let bds = try!(BlockDev::initialize(name, blockdev_paths, MIN_MDA_SIZE, true));
+        let pool = StratPool::new(name, &bds, raid_level);
 
         self.pools.insert(name.to_owned(), pool);
         Ok(())

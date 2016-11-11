@@ -38,7 +38,7 @@ pub struct MDA {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlockDev {
-    pub stratis_id: String,
+    pub pool_id: String,
     pub dev: Device,
     pub id: String,
     pub path: PathBuf,
@@ -50,92 +50,112 @@ pub struct BlockDev {
 }
 
 impl BlockDev {
-    pub fn new(stratis_id: &str,
-               path: &Path,
-               mda_size: Sectors,
-               force: bool)
-               -> EngineResult<BlockDev> {
-        let metadata = try!(fs::metadata(path));
-
-        if !metadata.file_type().is_block_device() {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("{} is not a block device",
-                                                              path.display()))));
-        }
+    /// Initialize multiple blockdevs at once. This allows all of them
+    /// to be checked for usability before writing to any of them.
+    pub fn initialize(pool_id: &str,
+                      paths: &[&Path],
+                      mda_size: Sectors,
+                      force: bool)
+                      -> EngineResult<Vec<BlockDev>> {
 
         if *mda_size % 2 != 0 {
             return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("{} mda size is not an even \
+                                                      format!("mda size {} is not an even \
                                                                number",
-                                                              path.display()))));
+                                                              *mda_size))));
         }
 
         if mda_size < MIN_MDA_SIZE {
             return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("{} mda size is less than \
+                                                      format!("mda size {} is less than \
                                                                minimum ({})",
-                                                              path.display(),
+                                                              *mda_size,
                                                               *MIN_MDA_SIZE))));
         }
 
-        let dev = try!(Device::from_str(&path.to_string_lossy()));
+        let dev_info = try!(BlockDev::dev_info(paths, force));
 
-        let mut f = try!(OpenOptions::new()
-            .read(true)
-            .open(path)
-            .map_err(|_| {
-                io::Error::new(ErrorKind::PermissionDenied,
-                               format!("Could not open {}", path.display()))
-            }));
+        let mut bds = Vec::new();
+        for (path, &(dev, dev_size)) in paths.iter().zip(dev_info.iter()) {
 
-        if !force {
-            let mut buf = [0u8; 4096];
-            try!(f.read(&mut buf));
+            let mut bd = BlockDev {
+                pool_id: pool_id.to_owned(),
+                id: Uuid::new_v4().to_simple_string(),
+                dev: dev,
+                path: path.to_path_buf(),
+                sectors: Sectors(dev_size / SECTOR_SIZE),
+                mdaa: MDA {
+                    last_updated: Timespec::new(0, 0),
+                    used: 0,
+                    length: (*mda_size / 2 * SECTOR_SIZE) as u32,
+                    crc: 0,
+                    offset: SectorOffset(0),
+                },
+                mdab: MDA {
+                    last_updated: Timespec::new(0, 0),
+                    used: 0,
+                    length: (*mda_size / 2 * SECTOR_SIZE) as u32,
+                    crc: 0,
+                    offset: SectorOffset(*mda_size / 2),
+                },
+                mda_sectors: mda_size,
+                reserved_sectors: MDA_RESERVED_SIZE,
+            };
 
-            if buf.iter().any(|x| *x != 0) {
+            try!(bd.write_sigblock());
+            bds.push(bd);
+        }
+        Ok(bds)
+    }
+
+    /// Gets device and device sizes, and returns an error if devices
+    /// cannot be used by Stratis.
+    fn dev_info(paths: &[&Path], force: bool) -> EngineResult<Vec<(Device, u64)>> {
+        let mut dev_infos = Vec::new();
+        for path in paths {
+            let metadata = try!(fs::metadata(path));
+
+            if !metadata.file_type().is_block_device() {
                 return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                          format!("First 4K of {} is not \
-                                                                   zeroed, need to use --force",
+                                                          format!("{} is not a block device",
                                                                   path.display()))));
             }
+
+            let dev = try!(Device::from_str(&path.to_string_lossy()));
+
+            let mut f = try!(OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(path)
+                .map_err(|_| {
+                    io::Error::new(ErrorKind::PermissionDenied,
+                                   format!("Could not open {}", path.display()))
+                }));
+
+            if !force {
+                let mut buf = [0u8; 4096];
+                try!(f.read(&mut buf));
+
+                if buf.iter().any(|x| *x != 0) {
+                    return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
+                                                              format!("First 4K of {} is not \
+                                                                       zeroed, and not forced",
+                                                                      path.display()))));
+                }
+            }
+
+            let dev_size = try!(blkdev_size(&f));
+            if dev_size < MIN_DEV_SIZE {
+                return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
+                                                          format!("{} too small, {} minimum",
+                                                                  path.display(),
+                                                                  ByteSize::b(MIN_DEV_SIZE as usize)
+                                                                  .to_string(true)))));
+            }
+            dev_infos.push((dev, dev_size));
         }
 
-        let dev_size = try!(blkdev_size(&f));
-        if dev_size < MIN_DEV_SIZE {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("{} too small, {} minimum",
-                                                             path.display(),
-                                                             ByteSize::b(MIN_DEV_SIZE as usize)
-                                                                 .to_string(true)))));
-        }
-
-        let mut bd = BlockDev {
-            stratis_id: stratis_id.to_owned(),
-            id: Uuid::new_v4().to_simple_string(),
-            dev: dev,
-            path: path.to_owned(),
-            sectors: Sectors(dev_size / SECTOR_SIZE),
-            mdaa: MDA {
-                last_updated: Timespec::new(0, 0),
-                used: 0,
-                length: (*mda_size / 2 * SECTOR_SIZE) as u32,
-                crc: 0,
-                offset: SectorOffset(0),
-            },
-            mdab: MDA {
-                last_updated: Timespec::new(0, 0),
-                used: 0,
-                length: (*mda_size / 2 * SECTOR_SIZE) as u32,
-                crc: 0,
-                offset: SectorOffset(*mda_size / 2),
-            },
-            mda_sectors: mda_size,
-            reserved_sectors: MDA_RESERVED_SIZE,
-        };
-
-        try!(bd.write_sigblock());
-
-        Ok(bd)
+        Ok(dev_infos)
     }
 
     pub fn setup(path: &Path) -> EngineResult<BlockDev> {
@@ -189,7 +209,7 @@ impl BlockDev {
         }
 
         Ok(BlockDev {
-            stratis_id: stratis_id.to_owned(),
+            pool_id: stratis_id.to_owned(),
             id: id.to_owned(),
             dev: dev,
             path: path.to_owned(),
@@ -310,7 +330,7 @@ impl BlockDev {
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.sectors);
         // no flags yet
-        buf[32..64].clone_from_slice(self.stratis_id.as_bytes());
+        buf[32..64].clone_from_slice(self.pool_id.as_bytes());
         buf[64..96].clone_from_slice(self.id.as_bytes());
 
         LittleEndian::write_u64(&mut buf[64..72], self.mdaa.last_updated.sec as u64);

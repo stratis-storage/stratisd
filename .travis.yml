@@ -1,0 +1,11 @@
+sudo: false
+
+os: linux
+
+language: rust
+rust: stable
+
+branches:
+    only: master
+
+script: make check

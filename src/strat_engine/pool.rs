@@ -34,15 +34,15 @@ pub struct StratPool {
 }
 
 impl StratPool {
-    pub fn new(name: &str, blockdevs: &[BlockDev], raid_level: u16) -> Box<Pool> {
-        Box::new(StratPool {
+    pub fn new(name: &str, blockdevs: &[BlockDev], raid_level: u16) -> StratPool {
+        StratPool {
             name: name.to_owned(),
             uuid: Uuid::new_v4().to_simple_string(),
             cache_devs: Vec::new(),
             block_devs: blockdevs.to_owned(),
             filesystems: BTreeMap::new(),
             raid_level: raid_level,
-        })
+        }
     }
 }
 
@@ -65,23 +65,11 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn destroy(&mut self) -> EngineResult<()> {
+    fn destroy_filesystem(&mut self, _filesystem: &str) -> EngineResult<()> {
         unimplemented!()
     }
 
-    fn copy(&self) -> Box<Pool> {
-        let pool_copy = StratPool {
-            name: self.name.clone(),
-            uuid: self.uuid.clone(),
-            cache_devs: self.cache_devs.clone(),
-            block_devs: self.block_devs.clone(),
-            filesystems: self.filesystems.clone(),
-            raid_level: self.raid_level.clone(),
-        };
-        Box::new(pool_copy)
-    }
-
-    fn list_filesystems(&self) -> EngineResult<BTreeMap<String, Box<Filesystem>>> {
+    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem> {
         unimplemented!()
     }
 
@@ -93,11 +81,11 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn list_blockdevs(&self) -> EngineResult<Vec<Box<Dev>>> {
+    fn blockdevs(&mut self) -> Vec<&mut Dev> {
         unimplemented!()
     }
 
-    fn list_cachedevs(&self) -> EngineResult<Vec<Box<Cache>>> {
+    fn cachedevs(&mut self) -> Vec<&mut Cache> {
         unimplemented!()
     }
 }

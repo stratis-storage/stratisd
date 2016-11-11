@@ -19,7 +19,7 @@ use super::pool::StratPool;
 
 #[derive(Debug)]
 pub struct StratEngine {
-    pub pools: BTreeMap<String, Box<Pool>>,
+    pub pools: BTreeMap<String, StratPool>,
 }
 
 impl StratEngine {
@@ -67,19 +67,15 @@ impl Engine for StratEngine {
 
         Ok(())
     }
-    fn get_pool(&mut self, name: &str) -> EngineResult<&mut Box<Pool>> {
 
-        let return_pool = match self.pools.get_mut(name) {
-            Some(pool) => pool,
-            None => return Err(EngineError::Stratis(ErrorEnum::NotFound(name.into()))),
-        };
-
-        Ok(return_pool)
+    fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool> {
+        match self.pools.get_mut(name) {
+            Some(pool) => Ok(pool),
+            None => Err(EngineError::Stratis(ErrorEnum::NotFound(name.into()))),
+        }
     }
 
-    fn list_pools(&self) -> EngineResult<BTreeMap<String, Box<Pool>>> {
-
-        Ok(BTreeMap::from_iter(self.pools.iter().map(|x| (x.0.clone(), x.1.copy()))))
-
+    fn pools(&mut self) -> BTreeMap<&str, &mut Pool> {
+        BTreeMap::from_iter(self.pools.iter_mut().map(|x| (x.0 as &str, x.1 as &mut Pool)))
     }
 }

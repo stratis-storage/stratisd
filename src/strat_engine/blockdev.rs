@@ -8,8 +8,6 @@ use std::path::{Path, PathBuf};
 use std::io;
 use std::str::{FromStr, from_utf8};
 use std::cmp::Ordering;
-use std::fs;
-use std::os::unix::fs::FileTypeExt;
 
 use time::Timespec;
 use devicemapper::Device;
@@ -113,14 +111,6 @@ impl BlockDev {
     fn dev_info(paths: &[&Path], force: bool) -> EngineResult<Vec<(Device, u64)>> {
         let mut dev_infos = Vec::new();
         for path in paths {
-            let metadata = try!(fs::metadata(path));
-
-            if !metadata.file_type().is_block_device() {
-                return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                          format!("{} is not a block device",
-                                                                  path.display()))));
-            }
-
             let dev = try!(Device::from_str(&path.to_string_lossy()));
 
             let mut f = try!(OpenOptions::new()

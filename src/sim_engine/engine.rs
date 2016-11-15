@@ -12,6 +12,7 @@ use engine::Pool;
 use std::cell::RefCell;
 use std::path::Path;
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 use std::iter::FromIterator;
 use std::rc::Rc;
 
@@ -71,12 +72,19 @@ impl Engine for SimEngine {
     }
 
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()> {
+        let entry = match self.pools.entry(name.into()) {
+            Entry::Vacant(_) => return Ok(()),
+            Entry::Occupied(entry) => entry,
+        };
+        if !entry.get().filesystems.is_empty() {
+            return Err(EngineError::Stratis(ErrorEnum::Busy("filesystems remaining on pool"
+                .into())));
+        };
         if self.rdm.borrow_mut().throw_die() {
-            return Err(EngineError::Stratis(ErrorEnum::Busy("X".into())));
-        }
-
-        self.pools.remove(name);
-
+            return Err(EngineError::Stratis(ErrorEnum::Busy("could not free devices in pool"
+                .into())));
+        };
+        entry.remove();
         Ok(())
     }
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool> {

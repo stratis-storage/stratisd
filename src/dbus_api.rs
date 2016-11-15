@@ -751,7 +751,7 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_string", "s"));
 
     let destroy_filesystems_method = f.method(DESTROY_FILESYSTEMS, (), destroy_filesystems)
-        .in_arg(("filesystems", "a(s)"))
+        .in_arg(("filesystems", "as"))
         .out_arg(("results", "a(qs)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

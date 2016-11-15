@@ -6,6 +6,8 @@ use std::path::Path;
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
 
+use uuid::Uuid;
+
 use engine::Engine;
 use engine::EngineError;
 use engine::EngineResult;
@@ -43,8 +45,9 @@ impl Engine for StratEngine {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
 
-        let bds = try!(BlockDev::initialize(name, blockdev_paths, MIN_MDA_SIZE, true));
-        let pool = StratPool::new(name, &bds, raid_level);
+        let pool_uuid = Uuid::new_v4();
+        let bds = try!(BlockDev::initialize(&pool_uuid, blockdev_paths, MIN_MDA_SIZE, true));
+        let pool = StratPool::new(name, pool_uuid, &bds, raid_level);
 
         self.pools.insert(name.to_owned(), pool);
         Ok(())

@@ -26,7 +26,7 @@ pub struct StratFilesystem {
 #[derive(Debug)]
 pub struct StratPool {
     pub name: String,
-    pub uuid: String,
+    pub uuid: Uuid,
     pub cache_devs: Vec<BlockDev>,
     pub block_devs: Vec<BlockDev>,
     pub filesystems: BTreeMap<String, Box<StratFilesystem>>,
@@ -34,10 +34,10 @@ pub struct StratPool {
 }
 
 impl StratPool {
-    pub fn new(name: &str, blockdevs: &[BlockDev], raid_level: u16) -> StratPool {
+    pub fn new(name: &str, uuid: Uuid, blockdevs: &[BlockDev], raid_level: u16) -> StratPool {
         StratPool {
             name: name.to_owned(),
-            uuid: Uuid::new_v4().simple().to_string(),
+            uuid: uuid,
             cache_devs: Vec::new(),
             block_devs: blockdevs.to_owned(),
             filesystems: BTreeMap::new(),

@@ -36,9 +36,9 @@ pub struct MDA {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlockDev {
-    pub pool_id: String,
+    pub pool_uuid: Uuid,
     pub dev: Device,
-    pub id: String,
+    pub dev_uuid: Uuid,
     pub path: PathBuf,
     pub sectors: Sectors,
     pub mdaa: MDA,
@@ -50,7 +50,7 @@ pub struct BlockDev {
 impl BlockDev {
     /// Initialize multiple blockdevs at once. This allows all of them
     /// to be checked for usability before writing to any of them.
-    pub fn initialize(pool_id: &str,
+    pub fn initialize(pool_uuid: &Uuid,
                       paths: &[&Path],
                       mda_size: Sectors,
                       force: bool)
@@ -77,8 +77,8 @@ impl BlockDev {
         for (path, &(dev, dev_size)) in paths.iter().zip(dev_info.iter()) {
 
             let mut bd = BlockDev {
-                pool_id: pool_id.to_owned(),
-                id: Uuid::new_v4().simple().to_string(),
+                pool_uuid: pool_uuid.to_owned(),
+                dev_uuid: Uuid::new_v4(),
                 dev: dev,
                 path: path.to_path_buf(),
                 sectors: Sectors(dev_size / SECTOR_SIZE),
@@ -178,8 +178,10 @@ impl BlockDev {
             // TODO: Try to read end-of-disk copy
         }
 
-        let stratis_id = from_utf8(&buf[32..64]).unwrap();
-        let id = from_utf8(&buf[64..96]).unwrap();
+        let pool_id = try!(Uuid::parse_str(from_utf8(&buf[32..64]).unwrap())
+            .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "invalid pool uid")));
+        let dev_id = try!(Uuid::parse_str(from_utf8(&buf[64..96]).unwrap())
+            .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "invalid dev uuid")));
 
         let mda_size = Sectors(LittleEndian::read_u32(&buf[160..164]) as u64);
 
@@ -199,8 +201,8 @@ impl BlockDev {
         }
 
         Ok(BlockDev {
-            pool_id: stratis_id.to_owned(),
-            id: id.to_owned(),
+            pool_uuid: pool_id,
+            dev_uuid: dev_id,
             dev: dev,
             path: path.to_owned(),
             sectors: Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE),
@@ -320,8 +322,8 @@ impl BlockDev {
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.sectors);
         // no flags yet
-        buf[32..64].clone_from_slice(self.pool_id.as_bytes());
-        buf[64..96].clone_from_slice(self.id.as_bytes());
+        buf[32..64].clone_from_slice(self.pool_uuid.simple().to_string().as_bytes());
+        buf[64..96].clone_from_slice(self.dev_uuid.simple().to_string().as_bytes());
 
         LittleEndian::write_u64(&mut buf[64..72], self.mdaa.last_updated.sec as u64);
         LittleEndian::write_u32(&mut buf[72..76], self.mdaa.last_updated.nsec as u32);

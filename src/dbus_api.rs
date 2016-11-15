@@ -157,7 +157,7 @@ fn object_path_to_pool_name(dbus_context: &DbusContext,
     Ok(pool_name)
 }
 
-/// Macro for early return with an Ok dbus message on a dbus internal error
+/// Macros for early return with an Ok dbus message on a dbus error
 macro_rules! dbus_try {
     ( $val:expr; $default:expr; $message:expr ) => {
         match $val {
@@ -169,7 +169,18 @@ macro_rules! dbus_try {
     }
 }
 
-/// Macro for early return with an Ok dbus message on an engine error
+macro_rules! dbus_try_0 {
+    ( $val:expr; $message:expr ) => {
+        match $val {
+            Ok(v) => v,
+            Err((rc, rs)) => {
+                return Ok(vec![$message.append2(rc, rs)]);
+            }
+        };
+    }
+}
+
+/// Macros for early return with an Ok dbus message on an engine error
 macro_rules! engine_try {
     ( $val:expr; $default:expr; $message:expr ) => {
         match $val {
@@ -178,6 +189,19 @@ macro_rules! engine_try {
                 let (rc, rs) = engine_to_dbus_err(&x);
                 let (rc, rs) = code_to_message_items(rc, rs);
                 return Ok(vec![$message.append3($default, rc, rs)]);
+            }
+        }
+    }
+}
+
+macro_rules! engine_try_0 {
+    ( $val:expr; $message:expr ) => {
+        match $val {
+            Ok(result) => result,
+            Err(x) => {
+                let (rc, rs) = engine_to_dbus_err(&x);
+                let (rc, rs) = code_to_message_items(rc, rs);
+                return Ok(vec![$message.append2(rc, rs)]);
             }
         }
     }

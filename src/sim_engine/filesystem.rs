@@ -3,26 +3,46 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use engine::Filesystem;
+use engine::EngineResult;
+
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct SimFilesystem {
+    pub uuid: Uuid,
+    pub name: String,
     pub mount_point: String,
     pub size: u64,
 }
 impl SimFilesystem {
-    pub fn new_filesystem(mount_point: &str, size: u64) -> SimFilesystem {
+    pub fn new_filesystem(name: &str, mount_point: &str, size: u64) -> SimFilesystem {
         SimFilesystem {
+            name: name.to_owned(),
+            uuid: Uuid::new_v4(),
             mount_point: mount_point.to_owned(),
             size: size,
         }
     }
 }
 impl Filesystem for SimFilesystem {
-    fn get_id(&self) -> String {
-        self.mount_point.clone()
+    fn get_id(&self) -> Uuid {
+        self.uuid.clone()
     }
 
     fn eq(&self, other: &Filesystem) -> bool {
         self.get_id() == other.get_id()
+    }
+
+    fn get_name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn has_same(&self, other: &str) -> bool {
+        self.get_name() == other
+    }
+
+    fn rename(&mut self, new_name: &str) -> EngineResult<()> {
+        self.name = String::from(new_name);
+        Ok(())
     }
 }

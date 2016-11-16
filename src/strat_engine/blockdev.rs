@@ -78,7 +78,7 @@ impl BlockDev {
 
             let mut bd = BlockDev {
                 pool_id: pool_id.to_owned(),
-                id: Uuid::new_v4().to_simple_string(),
+                id: Uuid::new_v4().simple().to_string(),
                 dev: dev,
                 path: path.to_path_buf(),
                 sectors: Sectors(dev_size / SECTOR_SIZE),

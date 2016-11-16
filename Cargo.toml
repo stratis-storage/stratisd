@@ -14,7 +14,6 @@ nix = "0"
 devicemapper = "0.4.0"
 crc = "1"
 byteorder = "0.3.13"
-uuid = "0.1.18"
 time = "0.1"
 bytesize = "0.1.1"
 newtype_derive = "0.1"
@@ -24,3 +23,7 @@ term = "0.4"
 rand = "0.3"
 bidir-map = "0.3"
 serde = "0"
+
+[dependencies.uuid]
+version = "0.3.1"
+features = ["v4"]

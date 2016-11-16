@@ -2,13 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::io;
 use std::path::Path;
 
 use nix;
+
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum ErrorEnum {
@@ -52,8 +53,11 @@ pub trait Cache: Debug {
 }
 
 pub trait Filesystem: Debug {
-    fn get_id(&self) -> String;
+    fn get_id(&self) -> Uuid;
     fn eq(&self, other: &Filesystem) -> bool;
+    fn get_name(&self) -> String;
+    fn has_same(&self, other: &str) -> bool;
+    fn rename(&mut self, new_name: &str) -> EngineResult<()>;
 }
 
 impl From<io::Error> for EngineError {
@@ -69,19 +73,17 @@ impl From<nix::Error> for EngineError {
 }
 
 pub trait Pool: Debug {
-    fn create_filesystem(&mut self,
-                         filesystem_name: &str,
-                         mount_point: &str,
-                         size: u64)
-                         -> EngineResult<()>;
+    fn create_filesystem(&mut self, name: &str, mount_point: &str, size: u64) -> EngineResult<()>;
     fn add_blockdev(&mut self, path: &Path) -> EngineResult<()>;
     fn add_cachedev(&mut self, path: &Path) -> EngineResult<()>;
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;
     fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()>;
-    fn destroy_filesystem(&mut self, filesystem: &str) -> EngineResult<()>;
-    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem>;
+    fn filesystems(&mut self) -> BTreeMap<&Uuid, &mut Filesystem>;
     fn blockdevs(&mut self) -> Vec<&mut Dev>;
     fn cachedevs(&mut self) -> Vec<&mut Cache>;
+    fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()>;
+    fn get_filesystem(&mut self, id: &Uuid) -> EngineResult<&mut Filesystem>;
+    fn get_filesystem_id(&mut self, name: &str) -> EngineResult<Uuid>;
 }
 
 pub trait Engine: Debug {

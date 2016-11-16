@@ -21,15 +21,28 @@ import dbus
 
 from into_dbus_python import xformer
 
+def _xformers(key_to_sig):
+    """
+    Get a map from keys to functions from a map of names to signatures.
+
+    :param key_to_sig: a map from keys to signatures
+    :type key_to_sig: dict of object * str
+    :returns: a map from keys to functions
+    :rtype: dict of object * xformation function
+    """
+    sig_to_xformers = dict((sig, xformer(sig)) for sig in key_to_sig.values())
+    return dict((method, sig_to_xformers[sig]) for \
+       (method, sig) in key_to_sig.items())
+
+
 class Interface(abc.ABC):
     """
     Parent class for an interface hierarchy.
     """
 
-    _XFORMERS = dict()
-
     _INTERFACE_NAME = abc.abstractproperty(doc="interface name")
-    _METHODS = abc.abstractproperty(doc="map from method name to data")
+    _INPUT_SIGS = abc.abstractproperty(doc="map from method name to data")
+    _XFORMERS = abc.abstractproperty(doc="map from method name to xformer")
 
     @classmethod
     def callMethod(cls, proxy_object, method_name, *args):
@@ -46,12 +59,7 @@ class Interface(abc.ABC):
         This method intentionally permits lower-level exceptions to be
         propagated.
         """
-        input_signature = cls._METHODS[method_name]
-
-        if input_signature not in cls._XFORMERS:
-            cls._XFORMERS[input_signature] = xformer(input_signature)
-        xformed_args = cls._XFORMERS[input_signature](args)
-
+        xformed_args = cls._XFORMERS[method_name](args)
         dbus_method = getattr(proxy_object, method_name)
         return dbus_method(*xformed_args, dbus_interface=cls._INTERFACE_NAME)
 
@@ -80,7 +88,7 @@ class Manager(Interface):
 
     _INTERFACE_NAME = 'org.storage.stratis1.Manager'
 
-    _METHODS = {
+    _INPUT_SIGS = {
         "ConfigureSimulator" : "u",
         "CreatePool" : "sqas",
         "DestroyPool" : "s",
@@ -93,6 +101,7 @@ class Manager(Interface):
         "GetRaidLevels" : "",
         "ListPools" : "",
     }
+    _XFORMERS = _xformers(_INPUT_SIGS)
 
 
 class Pool(Interface):
@@ -102,7 +111,7 @@ class Pool(Interface):
 
     _INTERFACE_NAME = 'org.storage.stratis1.pool'
 
-    _METHODS = {
+    _INPUT_SIGS = {
        "AddCacheDevs": "as",
        "AddDevs": "as",
        "CreateFilesystems": "a(sst)",
@@ -113,3 +122,4 @@ class Pool(Interface):
        "RemoveCacheDevs": "asi",
        "RemoveDevs": "asi"
     }
+    _XFORMERS = _xformers(_INPUT_SIGS)

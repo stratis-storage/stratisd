@@ -56,7 +56,9 @@ impl Pool for StratPool {
     }
 
     fn add_blockdev(&mut self, path: &Path) -> EngineResult<()> {
-        let bd = try!(BlockDev::new(&self.uuid, Path::new(path), MIN_MDA_SIZE, true));
+        let bd = try!(BlockDev::initialize(&self.uuid, &[path], MIN_MDA_SIZE, true))
+            .pop()
+            .unwrap();
         self.block_devs.push(bd);
         Ok(())
     }

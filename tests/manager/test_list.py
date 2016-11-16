@@ -30,6 +30,7 @@ from .._constants import _DEVICES
 from .._misc import _device_list
 from .._misc import Service
 
+_MN = Manager.MethodNames
 
 class ListTestCase(unittest.TestCase):
     """
@@ -44,7 +45,7 @@ class ListTestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        (_, _) = Manager.callMethod(self._proxy, "ConfigureSimulator", 8)
+        (_, _) = Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)
 
     def tearDown(self):
         """
@@ -56,7 +57,7 @@ class ListTestCase(unittest.TestCase):
         """
         List should just succeed.
         """
-        (result, rc, message) = Manager.callMethod(self._proxy, "ListPools")
+        (result, rc, message) = Manager.callMethod(self._proxy, _MN.ListPools)
         self.assertIsInstance(result, list)
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)
@@ -81,12 +82,12 @@ class List2TestCase(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         Manager.callMethod(
            self._proxy,
-           "CreatePool",
+           _MN.CreatePool,
            self._POOLNAME,
            0,
            [d.device_node for d in _device_list(_DEVICES, 1)]
         )
-        (_, _) = Manager.callMethod(self._proxy, "ConfigureSimulator", 8)
+        (_, _) = Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)
 
     def tearDown(self):
         """
@@ -98,7 +99,7 @@ class List2TestCase(unittest.TestCase):
         """
         List should just succeed.
         """
-        (result, rc, message) = Manager.callMethod(self._proxy, "ListPools")
+        (result, rc, message) = Manager.callMethod(self._proxy, _MN.ListPools)
 
         self.assertIsInstance(result, list)
         self.assertIsInstance(rc, int)

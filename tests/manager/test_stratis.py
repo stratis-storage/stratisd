@@ -26,6 +26,8 @@ from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import Service
 
+_MN = Manager.MethodNames
+
 
 class StratisTestCase(unittest.TestCase):
     """
@@ -40,7 +42,7 @@ class StratisTestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        (_, _) = Manager.callMethod(self._proxy, "ConfigureSimulator", 8)
+        (_, _) = Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)
 
     def tearDown(self):
         """
@@ -53,5 +55,6 @@ class StratisTestCase(unittest.TestCase):
         """
         Getting version should just succeed.
         """
-        result = Manager.getProperty(get_object(TOP_OBJECT), "Version")
+        # pylint: disable=no-member
+        result = Manager.getProperty(get_object(TOP_OBJECT), _MN.Version)
         self.assertIsInstance(result, str)

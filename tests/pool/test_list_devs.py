@@ -31,6 +31,9 @@ from .._constants import _DEVICES
 from .._misc import _device_list
 from .._misc import Service
 
+_MN = Manager.MethodNames
+_PN = Pool.MethodNames
+
 
 class ListTestCase(unittest.TestCase):
     """
@@ -50,13 +53,13 @@ class ListTestCase(unittest.TestCase):
         self._devs = [d.device_node for d in _device_list(_DEVICES, 1)]
         (result, _, _) = Manager.callMethod(
            self._proxy,
-           "CreatePool",
+           _MN.CreatePool,
            self._POOLNAME,
            0,
            self._devs
         )
         self._pool_object = get_object(result)
-        (_, _) = Manager.callMethod(self._proxy, "ConfigureSimulator", 8)
+        (_, _) = Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)
 
     def tearDown(self):
         """
@@ -69,7 +72,7 @@ class ListTestCase(unittest.TestCase):
         List should succeed and contain the same number of entries as
         devices in pool.
         """
-        (result, rc, message) = Pool.callMethod(self._pool_object, "ListDevs")
+        (result, rc, message) = Pool.callMethod(self._pool_object, _PN.ListDevs)
         self.assertIsInstance(result, list)
         self.assertIsInstance(rc, int)
         self.assertIsInstance(message, str)

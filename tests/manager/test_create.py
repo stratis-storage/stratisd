@@ -30,6 +30,7 @@ from .._constants import _DEVICES
 from .._misc import _device_list
 from .._misc import Service
 
+_MN = Manager.MethodNames
 
 class Create2TestCase(unittest.TestCase):
     """
@@ -45,7 +46,7 @@ class Create2TestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        (_, _) = Manager.callMethod(self._proxy, "ConfigureSimulator", 8)
+        (_, _) = Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)
 
     def tearDown(self):
         """
@@ -61,7 +62,7 @@ class Create2TestCase(unittest.TestCase):
         """
         (result, rc, message) = Manager.callMethod(
            self._proxy,
-           "CreatePool",
+           _MN.CreatePool,
            self._POOLNAME,
            0,
            [d.device_node for d in _device_list(_DEVICES, 1)]
@@ -72,7 +73,7 @@ class Create2TestCase(unittest.TestCase):
 
         (pool, rc1, _) = Manager.callMethod(
            self._proxy,
-           "GetPoolObjectPath",
+           _MN.GetPoolObjectPath,
            self._POOLNAME
         )
 
@@ -101,12 +102,12 @@ class Create3TestCase(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         Manager.callMethod(
            self._proxy,
-           "CreatePool",
+           _MN.CreatePool,
            self._POOLNAME,
            0,
            [d.device_node for d in _device_list(_DEVICES, 1)]
         )
-        (_, _) = Manager.callMethod(self._proxy, "ConfigureSimulator", 8)
+        (_, _) = Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)
 
     def tearDown(self):
         """
@@ -120,7 +121,7 @@ class Create3TestCase(unittest.TestCase):
         """
         (result, rc, message) = Manager.callMethod(
            self._proxy,
-           "CreatePool",
+           _MN.CreatePool,
            self._POOLNAME,
            0,
            [d.device_node for d in _device_list(_DEVICES, 1)]
@@ -133,7 +134,7 @@ class Create3TestCase(unittest.TestCase):
 
         (_, rc1, _) = Manager.callMethod(
            self._proxy,
-           "GetPoolObjectPath",
+           _MN.GetPoolObjectPath,
            self._POOLNAME
         )
 

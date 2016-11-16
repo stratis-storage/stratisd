@@ -41,7 +41,8 @@ impl Engine for SimEngine {
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
-                   raid_level: u16)
+                   raid_level: u16,
+                   _force: bool)
                    -> EngineResult<()> {
 
         if self.pools.contains_key(name) {

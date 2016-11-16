@@ -921,7 +921,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
     let dbus_context = m.path.get_data();
-    let result = dbus_context.engine.borrow_mut().create_pool(name, &blockdevs, raid_level);
+    let result = dbus_context.engine.borrow_mut().create_pool(name, &blockdevs, raid_level, true);
 
     let return_message = message.method_return();
 

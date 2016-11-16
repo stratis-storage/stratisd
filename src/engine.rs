@@ -90,7 +90,8 @@ pub trait Engine: Debug {
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
-                   raid_level: u16)
+                   raid_level: u16,
+                   force: bool)
                    -> EngineResult<()>;
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()>;
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool>;

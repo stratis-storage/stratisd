@@ -40,7 +40,8 @@ impl Engine for StratEngine {
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
-                   raid_level: u16)
+                   raid_level: u16,
+                   force: bool)
                    -> EngineResult<()> {
 
         if self.pools.contains_key(name) {
@@ -70,7 +71,7 @@ impl Engine for StratEngine {
             }
         }
 
-        let pool = try!(StratPool::new(name, devices, raid_level, true));
+        let pool = try!(StratPool::new(name, devices, raid_level, force));
 
         self.pools.insert(name.to_owned(), pool);
         Ok(())

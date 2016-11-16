@@ -40,9 +40,13 @@ pub struct StratPool {
 }
 
 impl StratPool {
-    pub fn new(name: &str, devices: BTreeSet<Device>, raid_level: u16) -> EngineResult<StratPool> {
+    pub fn new(name: &str,
+               devices: BTreeSet<Device>,
+               raid_level: u16,
+               force: bool)
+               -> EngineResult<StratPool> {
         let pool_uuid = Uuid::new_v4();
-        let bds = try!(BlockDev::initialize(&pool_uuid, devices, MIN_MDA_SIZE, true));
+        let bds = try!(BlockDev::initialize(&pool_uuid, devices, MIN_MDA_SIZE, force));
 
         Ok(StratPool {
             name: name.to_owned(),

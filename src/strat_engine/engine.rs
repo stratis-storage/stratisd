@@ -70,7 +70,7 @@ impl Engine for StratEngine {
             }
         }
 
-        let pool = try!(StratPool::new(name, devices, raid_level));
+        let pool = try!(StratPool::new(name, devices, raid_level, true));
 
         self.pools.insert(name.to_owned(), pool);
         Ok(())

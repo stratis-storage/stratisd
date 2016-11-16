@@ -37,7 +37,7 @@ impl StratPool {
     pub fn new(name: &str, blockdevs: &[BlockDev], raid_level: u16) -> StratPool {
         StratPool {
             name: name.to_owned(),
-            uuid: Uuid::new_v4().to_simple_string(),
+            uuid: Uuid::new_v4().simple().to_string(),
             cache_devs: Vec::new(),
             block_devs: blockdevs.to_owned(),
             filesystems: BTreeMap::new(),
@@ -71,7 +71,7 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem> {
+    fn filesystems(&mut self) -> BTreeMap<&Uuid, &mut Filesystem> {
         unimplemented!()
     }
 
@@ -88,6 +88,14 @@ impl Pool for StratPool {
     }
 
     fn cachedevs(&mut self) -> Vec<&mut Cache> {
+        unimplemented!()
+    }
+
+    fn get_filesystem(&mut self, _id: &Uuid) -> EngineResult<&mut Filesystem> {
+        unimplemented!()
+    }
+
+    fn get_filesystem_id(&mut self, _name: &str) -> EngineResult<Uuid> {
         unimplemented!()
     }
 }

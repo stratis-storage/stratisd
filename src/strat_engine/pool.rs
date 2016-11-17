@@ -3,12 +3,18 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::vec::Vec;
 use std::path::Path;
+use std::str::FromStr;
+use std::iter::FromIterator;
+use std::io;
+use std::io::ErrorKind;
 
 use uuid::Uuid;
+use devicemapper::Device;
 
-use engine::EngineResult;
+use engine::{EngineResult, EngineError};
 use engine::Pool;
 use engine::Filesystem;
 use engine::Dev;
@@ -28,21 +34,24 @@ pub struct StratPool {
     pub name: String,
     pub pool_uuid: Uuid,
     pub cache_devs: Vec<BlockDev>,
-    pub block_devs: Vec<BlockDev>,
+    pub block_devs: BTreeMap<Uuid, BlockDev>,
     pub filesystems: BTreeMap<String, Box<StratFilesystem>>,
     pub raid_level: u16,
 }
 
 impl StratPool {
-    pub fn new(name: &str, uuid: Uuid, blockdevs: &[BlockDev], raid_level: u16) -> StratPool {
-        StratPool {
+    pub fn new(name: &str, devices: BTreeSet<Device>, raid_level: u16) -> EngineResult<StratPool> {
+        let pool_uuid = Uuid::new_v4();
+        let bds = try!(BlockDev::initialize(&pool_uuid, devices, MIN_MDA_SIZE, true));
+
+        Ok(StratPool {
             name: name.to_owned(),
-            pool_uuid: uuid,
+            pool_uuid: pool_uuid,
             cache_devs: Vec::new(),
-            block_devs: blockdevs.to_owned(),
+            block_devs: bds,
             filesystems: BTreeMap::new(),
             raid_level: raid_level,
-        }
+        })
     }
 }
 
@@ -56,10 +65,24 @@ impl Pool for StratPool {
     }
 
     fn add_blockdev(&mut self, path: &Path) -> EngineResult<()> {
-        let bd = try!(BlockDev::initialize(&self.pool_uuid, &[path], MIN_MDA_SIZE, true))
-            .pop()
+        let dev = try!(Device::from_str(&path.to_string_lossy()));
+        let dev_set = BTreeSet::from_iter([dev].iter().map(|x| *x));
+
+        for (_, bd) in &self.block_devs {
+            if dev_set.contains(&bd.dev) {
+                return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
+                                                          format!("blockdev {} already used \
+                                                                   in pool {}",
+                                                                  bd.dstr(),
+                                                                  self.name))));
+            }
+        }
+
+        let (uuid, bd) = try!(BlockDev::initialize(&self.pool_uuid, dev_set, MIN_MDA_SIZE, true))
+            .into_iter()
+            .next()
             .unwrap();
-        self.block_devs.push(bd);
+        self.block_devs.insert(uuid, bd);
         Ok(())
     }
 

@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 use std::io;
 use std::str::{FromStr, from_utf8};
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use time::Timespec;
 use devicemapper::Device;
@@ -51,10 +53,10 @@ impl BlockDev {
     /// Initialize multiple blockdevs at once. This allows all of them
     /// to be checked for usability before writing to any of them.
     pub fn initialize(pool_uuid: &Uuid,
-                      paths: &[&Path],
+                      devices: BTreeSet<Device>,
                       mda_size: Sectors,
                       force: bool)
-                      -> EngineResult<Vec<BlockDev>> {
+                      -> EngineResult<BTreeMap<Uuid, BlockDev>> {
 
         if *mda_size % 2 != 0 {
             return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
@@ -71,16 +73,16 @@ impl BlockDev {
                                                               *MIN_MDA_SIZE))));
         }
 
-        let dev_info = try!(BlockDev::dev_info(paths, force));
+        let dev_info = try!(BlockDev::dev_info(&devices, force));
 
-        let mut bds = Vec::new();
-        for (path, &(dev, dev_size)) in paths.iter().zip(dev_info.iter()) {
+        let mut bds = BTreeMap::new();
+        for (dev, (path, dev_size)) in devices.into_iter().zip(dev_info.into_iter()) {
 
             let mut bd = BlockDev {
                 pool_uuid: pool_uuid.to_owned(),
                 dev_uuid: Uuid::new_v4(),
                 dev: dev,
-                path: path.to_path_buf(),
+                path: path,
                 sectors: Sectors(dev_size / SECTOR_SIZE),
                 mdaa: MDA {
                     last_updated: Timespec::new(0, 0),
@@ -101,22 +103,24 @@ impl BlockDev {
             };
 
             try!(bd.write_sigblock());
-            bds.push(bd);
+            bds.insert(bd.dev_uuid.clone(), bd);
         }
         Ok(bds)
     }
 
     /// Gets device and device sizes, and returns an error if devices
     /// cannot be used by Stratis.
-    fn dev_info(paths: &[&Path], force: bool) -> EngineResult<Vec<(Device, u64)>> {
+    fn dev_info(devices: &BTreeSet<Device>, force: bool) -> EngineResult<Vec<(PathBuf, u64)>> {
         let mut dev_infos = Vec::new();
-        for path in paths {
-            let dev = try!(Device::from_str(&path.to_string_lossy()));
-
+        for dev in devices {
+            let path = try!(dev.path().ok_or_else(|| {
+                io::Error::new(ErrorKind::InvalidInput,
+                               format!("could not get path from dev {}", dev.dstr()))
+            }));
             let mut f = try!(OpenOptions::new()
                 .read(true)
                 .write(true)
-                .open(path)
+                .open(&path)
                 .map_err(|_| {
                     io::Error::new(ErrorKind::PermissionDenied,
                                    format!("Could not open {}", path.display()))
@@ -142,7 +146,7 @@ impl BlockDev {
                                                                   ByteSize::b(MIN_DEV_SIZE as usize)
                                                                   .to_string(true)))));
             }
-            dev_infos.push((dev, dev_size));
+            dev_infos.push((path, dev_size));
         }
 
         Ok(dev_infos)

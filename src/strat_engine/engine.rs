@@ -4,9 +4,13 @@
 
 use std::path::Path;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::str::FromStr;
 use std::iter::FromIterator;
+use std::io;
+use std::io::ErrorKind;
 
-use uuid::Uuid;
+use devicemapper::Device;
 
 use engine::Engine;
 use engine::EngineError;
@@ -14,8 +18,6 @@ use engine::EngineResult;
 use engine::ErrorEnum;
 use engine::Pool;
 
-use super::consts::*;
-use super::blockdev::BlockDev;
 use super::pool::StratPool;
 
 
@@ -45,9 +47,30 @@ impl Engine for StratEngine {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
 
-        let pool_uuid = Uuid::new_v4();
-        let bds = try!(BlockDev::initialize(&pool_uuid, blockdev_paths, MIN_MDA_SIZE, true));
-        let pool = StratPool::new(name, pool_uuid, &bds, raid_level);
+        let mut devices = BTreeSet::new();
+        for path in blockdev_paths {
+            let dev = try!(Device::from_str(&path.to_string_lossy()));
+            devices.insert(dev);
+        }
+
+        if devices.len() != blockdev_paths.len() {
+            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
+                                                      "duplicate blockdevs")));
+        }
+
+        for (_, pool) in &self.pools {
+            for (_, bd) in &pool.block_devs {
+                if devices.contains(&bd.dev) {
+                    return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
+                                                              format!("blockdev {} already \
+                                                                       used in pool {}",
+                                                                      bd.dstr(),
+                                                                      pool.name))));
+                }
+            }
+        }
+
+        let pool = try!(StratPool::new(name, devices, raid_level));
 
         self.pools.insert(name.to_owned(), pool);
         Ok(())

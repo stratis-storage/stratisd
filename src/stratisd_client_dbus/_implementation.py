@@ -43,7 +43,10 @@ class Interface(abc.ABC):
     """
 
     _INTERFACE_NAME = abc.abstractproperty(doc="interface name")
-    _INPUT_SIGS = abc.abstractproperty(doc="map from method name to data")
+    _INPUT_SIGS = \
+       abc.abstractproperty(doc="map from method name to input signatures")
+    _OUTPUT_SIGS = \
+       abc.abstractproperty(doc="map from method name to output signatures")
     _XFORMERS = abc.abstractproperty(doc="map from method name to xformer")
     _PROPERTY_NAMES = abc.abstractproperty(doc="list of property names")
 
@@ -126,6 +129,19 @@ class Manager(Interface):
         MethodNames.GetRaidLevels : "",
         MethodNames.ListPools : "",
     }
+    _OUTPUT_SIGS = {
+        MethodNames.ConfigureSimulator : "qs",
+        MethodNames.CreatePool : "oqs",
+        MethodNames.DestroyPool : "qs",
+        MethodNames.GetCacheObjectPath : "oqs",
+        MethodNames.GetDevObjectPath : "oqs",
+        MethodNames.GetDevTypes : "",
+        MethodNames.GetErrorCodes : "a(sqs)",
+        MethodNames.GetFilesystemObjectPath : "oqs",
+        MethodNames.GetPoolObjectPath : "oqs",
+        MethodNames.GetRaidLevels : "a(sqs)",
+        MethodNames.ListPools : "asqs",
+    }
     _XFORMERS = _xformers(_INPUT_SIGS)
 
 
@@ -166,5 +182,16 @@ class Pool(Interface):
        MethodNames.ListFilesystems: "",
        MethodNames.RemoveCacheDevs: "asi",
        MethodNames.RemoveDevs: "asi"
+    }
+    _OUTPUT_SIGS = {
+       MethodNames.AddCacheDevs: "a(oqs)qs",
+       MethodNames.AddDevs: "a(oqs)qs",
+       MethodNames.CreateFilesystems: "a(oqs)qs",
+       MethodNames.DestroyFilesystems: "a(qs)qs",
+       MethodNames.ListCacheDevs: "asqs",
+       MethodNames.ListDevs: "asqs",
+       MethodNames.ListFilesystems: "asqs",
+       MethodNames.RemoveCacheDevs: "a(qs)qs",
+       MethodNames.RemoveDevs: "a(qs)qs"
     }
     _XFORMERS = _xformers(_INPUT_SIGS)

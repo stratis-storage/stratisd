@@ -34,6 +34,7 @@ class KeysTestCase(unittest.TestCase):
         methods = frozenset(Manager.MethodNames)
         # pylint: disable=protected-access
         self.assertEqual(methods, frozenset(Manager._INPUT_SIGS.keys()))
+        self.assertEqual(methods, frozenset(Manager._OUTPUT_SIGS.keys()))
         self.assertEqual(methods, frozenset(Manager._XFORMERS.keys()))
 
     def testPool(self):
@@ -43,4 +44,5 @@ class KeysTestCase(unittest.TestCase):
         methods = frozenset(Pool.MethodNames)
         # pylint: disable=protected-access
         self.assertEqual(methods, frozenset(Pool._INPUT_SIGS.keys()))
+        self.assertEqual(methods, frozenset(Pool._OUTPUT_SIGS.keys()))
         self.assertEqual(methods, frozenset(Pool._XFORMERS.keys()))

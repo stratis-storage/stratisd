@@ -404,4 +404,11 @@ impl BlockDev {
     pub fn dstr(&self) -> String {
         self.dev.dstr()
     }
+
+    /// List the available-for-upper-layer-use range in this blockdev.
+    pub fn avail_range(&self) -> (SectorOffset, Sectors) {
+        let start = SectorOffset(*BDA_STATIC_HDR_SIZE + *self.mda_sectors + *self.reserved_sectors);
+        let length = Sectors(*self.sectors - *start - *BDA_STATIC_HDR_SIZE - *self.mda_sectors);
+        (start, length)
+    }
 }

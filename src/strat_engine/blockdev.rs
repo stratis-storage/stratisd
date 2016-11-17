@@ -38,9 +38,7 @@ pub struct MDA {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlockDev {
-    pub pool_uuid: Uuid,
     pub dev: Device,
-    pub dev_uuid: Uuid,
     pub path: PathBuf,
     pub sectors: Sectors,
     pub mdaa: MDA,
@@ -79,8 +77,6 @@ impl BlockDev {
         for (dev, (path, dev_size)) in devices.into_iter().zip(dev_info.into_iter()) {
 
             let mut bd = BlockDev {
-                pool_uuid: pool_uuid.to_owned(),
-                dev_uuid: Uuid::new_v4(),
                 dev: dev,
                 path: path,
                 sectors: Sectors(dev_size / SECTOR_SIZE),
@@ -102,8 +98,9 @@ impl BlockDev {
                 reserved_sectors: MDA_RESERVED_SIZE,
             };
 
-            try!(bd.write_sigblock());
-            bds.insert(bd.dev_uuid.clone(), bd);
+            let dev_uuid = Uuid::new_v4();
+            try!(bd.write_sigblock(pool_uuid, &dev_uuid));
+            bds.insert(dev_uuid, bd);
         }
         Ok(bds)
     }
@@ -152,7 +149,9 @@ impl BlockDev {
         Ok(dev_infos)
     }
 
-    pub fn setup(path: &Path) -> EngineResult<BlockDev> {
+    /// If a Path refers to a valid Stratis blockdev, return its
+    /// parent uuid, its blockdev uuid, and the Blockdev.
+    pub fn setup(path: &Path) -> EngineResult<(Uuid, Uuid, BlockDev)> {
         let dev = try!(Device::from_str(&path.to_string_lossy()));
 
         let mut f = try!(OpenOptions::new()
@@ -204,9 +203,9 @@ impl BlockDev {
                                                               *MIN_MDA_SIZE))));
         }
 
-        Ok(BlockDev {
-            pool_uuid: pool_id,
-            dev_uuid: dev_id,
+        Ok((pool_id,
+            dev_id,
+            BlockDev {
             dev: dev,
             path: path.to_owned(),
             sectors: Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE),
@@ -228,7 +227,7 @@ impl BlockDev {
             },
             mda_sectors: mda_size,
             reserved_sectors: Sectors(LittleEndian::read_u32(&buf[164..168]) as u64),
-        })
+        }))
     }
 
     pub fn to_save(&self) -> BlockDevSave {
@@ -238,16 +237,28 @@ impl BlockDev {
         }
     }
 
-    pub fn find_all() -> EngineResult<Vec<BlockDev>> {
-        Ok(try!(read_dir("/dev"))
-            .into_iter()
-            .filter_map(|dir_e| if dir_e.is_ok() {
-                Some(dir_e.unwrap().path())
-            } else {
-                None
-            })
-            .filter_map(|path| BlockDev::setup(&path).ok())
-            .collect::<Vec<_>>())
+    /// Find all Stratis Blockdevs.
+    ///
+    /// Returns a map of pool uuids to maps of blockdev uuids to blockdevs.
+    pub fn find_all() -> EngineResult<BTreeMap<Uuid, BTreeMap<Uuid, BlockDev>>> {
+        let mut pool_map = BTreeMap::new();
+        for dir_e in try!(read_dir("/dev")) {
+            let path = match dir_e {
+                Ok(d) => d.path(),
+                Err(_) => continue,
+            };
+
+            match BlockDev::setup(&path) {
+                Ok((pool_uuid, dev_uuid, blockdev)) => {
+                    pool_map.entry(pool_uuid)
+                        .or_insert_with(BTreeMap::new)
+                        .insert(dev_uuid, blockdev);
+                }
+                Err(_) => continue,
+            };
+        }
+
+        Ok(pool_map)
     }
 
     /// Size of the BDA copy at the beginning of the blockdev
@@ -321,13 +332,13 @@ impl BlockDev {
         Ok(())
     }
 
-    fn write_sigblock(&mut self) -> EngineResult<()> {
+    fn write_sigblock(&mut self, pool_uuid: &Uuid, dev_uuid: &Uuid) -> EngineResult<()> {
         let mut buf = [0u8; SECTOR_SIZE as usize];
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.sectors);
         // no flags yet
-        buf[32..64].clone_from_slice(self.pool_uuid.simple().to_string().as_bytes());
-        buf[64..96].clone_from_slice(self.dev_uuid.simple().to_string().as_bytes());
+        buf[32..64].clone_from_slice(pool_uuid.simple().to_string().as_bytes());
+        buf[64..96].clone_from_slice(dev_uuid.simple().to_string().as_bytes());
 
         LittleEndian::write_u64(&mut buf[64..72], self.mdaa.last_updated.sec as u64);
         LittleEndian::write_u32(&mut buf[72..76], self.mdaa.last_updated.nsec as u32);
@@ -374,9 +385,14 @@ impl BlockDev {
         Ok(())
     }
 
-    pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
+    pub fn save_state(&mut self,
+                      time: &Timespec,
+                      metadata: &[u8],
+                      pool_uuid: &Uuid,
+                      dev_uuid: &Uuid)
+                      -> EngineResult<()> {
         try!(self.write_mdax(time, metadata));
-        try!(self.write_sigblock());
+        try!(self.write_sigblock(pool_uuid, dev_uuid));
 
         Ok(())
     }

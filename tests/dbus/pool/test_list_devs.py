@@ -59,7 +59,7 @@ class ListTestCase(unittest.TestCase):
            self._devs
         )
         self._pool_object = get_object(result)
-        (_, _) = Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)
+        Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)
 
     def tearDown(self):
         """

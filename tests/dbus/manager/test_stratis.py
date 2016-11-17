@@ -42,7 +42,7 @@ class StratisTestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        (_, _) = Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)
+        Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)
 
     def tearDown(self):
         """

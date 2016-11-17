@@ -262,7 +262,7 @@ class GetVolume2TestCase(unittest.TestCase):
            0,
            [d.device_node for d in _device_list(_DEVICES, 1)]
         )
-        (_, _, _) = Pool.callMethod(
+        Pool.callMethod(
            get_object(poolpath),
            _PN.CreateFilesystems,
            [(self._VOLNAME, '', 0)]

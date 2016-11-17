@@ -383,6 +383,6 @@ impl BlockDev {
 
     /// Get the "x:y" device string for this blockdev
     pub fn dstr(&self) -> String {
-        format!("{}:{}", self.dev.major, self.dev.minor)
+        self.dev.dstr()
     }
 }

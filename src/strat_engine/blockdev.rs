@@ -27,6 +27,9 @@ use super::util::blkdev_size;
 
 pub use super::BlockDevSave;
 
+type PoolUuid = Uuid;
+type DevUuid = Uuid;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MDA {
     pub last_updated: Timespec,
@@ -50,11 +53,11 @@ pub struct BlockDev {
 impl BlockDev {
     /// Initialize multiple blockdevs at once. This allows all of them
     /// to be checked for usability before writing to any of them.
-    pub fn initialize(pool_uuid: &Uuid,
+    pub fn initialize(pool_uuid: &PoolUuid,
                       devices: BTreeSet<Device>,
                       mda_size: Sectors,
                       force: bool)
-                      -> EngineResult<BTreeMap<Uuid, BlockDev>> {
+                      -> EngineResult<BTreeMap<DevUuid, BlockDev>> {
 
         if *mda_size % 2 != 0 {
             return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
@@ -151,7 +154,7 @@ impl BlockDev {
 
     /// If a Path refers to a valid Stratis blockdev, return its
     /// parent uuid, its blockdev uuid, and the Blockdev.
-    pub fn setup(path: &Path) -> EngineResult<(Uuid, Uuid, BlockDev)> {
+    pub fn setup(path: &Path) -> EngineResult<(PoolUuid, DevUuid, BlockDev)> {
         let dev = try!(Device::from_str(&path.to_string_lossy()));
 
         let mut f = try!(OpenOptions::new()
@@ -240,7 +243,7 @@ impl BlockDev {
     /// Find all Stratis Blockdevs.
     ///
     /// Returns a map of pool uuids to maps of blockdev uuids to blockdevs.
-    pub fn find_all() -> EngineResult<BTreeMap<Uuid, BTreeMap<Uuid, BlockDev>>> {
+    pub fn find_all() -> EngineResult<BTreeMap<PoolUuid, BTreeMap<DevUuid, BlockDev>>> {
         let mut pool_map = BTreeMap::new();
         for dir_e in try!(read_dir("/dev")) {
             let path = match dir_e {
@@ -332,7 +335,7 @@ impl BlockDev {
         Ok(())
     }
 
-    fn write_sigblock(&mut self, pool_uuid: &Uuid, dev_uuid: &Uuid) -> EngineResult<()> {
+    fn write_sigblock(&mut self, pool_uuid: &PoolUuid, dev_uuid: &DevUuid) -> EngineResult<()> {
         let mut buf = [0u8; SECTOR_SIZE as usize];
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.sectors);
@@ -388,8 +391,8 @@ impl BlockDev {
     pub fn save_state(&mut self,
                       time: &Timespec,
                       metadata: &[u8],
-                      pool_uuid: &Uuid,
-                      dev_uuid: &Uuid)
+                      pool_uuid: &PoolUuid,
+                      dev_uuid: &DevUuid)
                       -> EngineResult<()> {
         try!(self.write_mdax(time, metadata));
         try!(self.write_sigblock(pool_uuid, dev_uuid));

@@ -68,7 +68,7 @@ impl Pool for StratPool {
         Ok(())
     }
 
-    fn add_blockdev(&mut self, path: &Path) -> EngineResult<()> {
+    fn add_blockdev(&mut self, path: &Path, force: bool) -> EngineResult<()> {
         let dev = try!(Device::from_str(&path.to_string_lossy()));
         let dev_set = BTreeSet::from_iter([dev].iter().map(|x| *x));
 
@@ -82,7 +82,7 @@ impl Pool for StratPool {
             }
         }
 
-        let (uuid, bd) = try!(BlockDev::initialize(&self.pool_uuid, dev_set, MIN_MDA_SIZE, true))
+        let (uuid, bd) = try!(BlockDev::initialize(&self.pool_uuid, dev_set, MIN_MDA_SIZE, force))
             .into_iter()
             .next()
             .unwrap();

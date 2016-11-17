@@ -679,7 +679,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut vec = Vec::new();
 
     for dev in devs {
-        let result = pool.add_blockdev(Path::new(dev));
+        let result = pool.add_blockdev(Path::new(dev), true);
         match result {
             Ok(_) => {
                 let object_path: dbus::Path = create_dbus_blockdev(dbus_context.clone());

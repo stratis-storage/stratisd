@@ -54,7 +54,7 @@ impl SimPool {
 }
 
 impl Pool for SimPool {
-    fn add_blockdev(&mut self, path: &Path) -> EngineResult<()> {
+    fn add_blockdev(&mut self, path: &Path, _force: bool) -> EngineResult<()> {
         self.block_devs.push(SimDev::new_dev(self.rdm.clone(), path));
         Ok(())
     }

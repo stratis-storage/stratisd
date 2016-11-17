@@ -57,10 +57,7 @@ class ListTestCase(unittest.TestCase):
         """
         List should just succeed.
         """
-        (result, rc, message) = Manager.callMethod(self._proxy, _MN.ListPools)
-        self.assertIsInstance(result, list)
-        self.assertIsInstance(rc, int)
-        self.assertIsInstance(message, str)
+        (result, rc, _) = Manager.callMethod(self._proxy, _MN.ListPools)
 
         self.assertEqual(result, [])
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
@@ -99,13 +96,7 @@ class List2TestCase(unittest.TestCase):
         """
         List should just succeed.
         """
-        (result, rc, message) = Manager.callMethod(self._proxy, _MN.ListPools)
-
-        self.assertIsInstance(result, list)
-        self.assertIsInstance(rc, int)
-        self.assertIsInstance(message, str)
+        (result, rc, _) = Manager.callMethod(self._proxy, _MN.ListPools)
 
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
-
         self.assertEqual(len(result), 1)
-        self.assertIsInstance(result[0], str)

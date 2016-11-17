@@ -73,16 +73,13 @@ class CreateFSTestCase(unittest.TestCase):
         list should always succeed, and it should not increase the
         number of volumes.
         """
-        (result, rc, message) = \
+        (result, rc, _) = \
            Pool.callMethod(self._pool_object, _PN.CreateFilesystems, [])
-        self.assertIsInstance(result, list)
-        self.assertIsInstance(rc, int)
-        self.assertIsInstance(message, str)
 
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
 
-        (result, rc, message) = \
+        (result, rc, _) = \
            Pool.callMethod(self._pool_object, _PN.ListFilesystems)
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertEqual(len(result), 0)
@@ -132,28 +129,22 @@ class CreateFSTestCase1(unittest.TestCase):
         a volume with the given name, the creation of the new volume should
         fail, and no additional volume should be created.
         """
-        (result, rc, message) = Pool.callMethod(
+        (result, rc, _) = Pool.callMethod(
            self._pool_object,
            _PN.CreateFilesystems,
            [(self._VOLNAME, "", 0)]
         )
-        self.assertIsInstance(result, list)
-        self.assertIsInstance(rc, int)
-        self.assertIsInstance(message, str)
 
         expected_rc = StratisdErrorsGen.get_object().LIST_FAILURE
         self.assertEqual(rc, expected_rc)
         self.assertEqual(len(result), 1)
 
-        (result, rc, message) = result[0]
-        self.assertIsInstance(result, str)
-        self.assertIsInstance(rc, int)
-        self.assertIsInstance(message, str)
+        (result, rc, _) = result[0]
 
         expected_rc = StratisdErrorsGen.get_object().ALREADY_EXISTS
         self.assertEqual(rc, expected_rc)
 
-        (result, rc, message) = \
+        (result, rc, _) = \
            Pool.callMethod(self._pool_object, _PN.ListFilesystems)
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertEqual(len(result), 1)

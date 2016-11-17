@@ -56,5 +56,5 @@ class StratisTestCase(unittest.TestCase):
         Getting version should just succeed.
         """
         # pylint: disable=no-member
-        result = Manager.getProperty(get_object(TOP_OBJECT), _MN.Version)
-        self.assertIsInstance(result, str)
+        # pylint: disable=no-self-use
+        Manager.getProperty(get_object(TOP_OBJECT), _MN.Version)

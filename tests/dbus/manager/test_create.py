@@ -60,16 +60,13 @@ class Create2TestCase(unittest.TestCase):
 
         If rc is OK, then pool must exist.
         """
-        (result, rc, message) = Manager.callMethod(
+        (result, rc, _) = Manager.callMethod(
            self._proxy,
            _MN.CreatePool,
            self._POOLNAME,
            0,
            [d.device_node for d in _device_list(_DEVICES, 1)]
         )
-        self.assertIsInstance(result, str)
-        self.assertIsInstance(rc, int)
-        self.assertIsInstance(message, str)
 
         (pool, rc1, _) = Manager.callMethod(
            self._proxy,
@@ -119,7 +116,7 @@ class Create3TestCase(unittest.TestCase):
         """
         Create should fail trying to create new pool with same name as previous.
         """
-        (result, rc, message) = Manager.callMethod(
+        (_, rc, _) = Manager.callMethod(
            self._proxy,
            _MN.CreatePool,
            self._POOLNAME,
@@ -128,9 +125,6 @@ class Create3TestCase(unittest.TestCase):
         )
         expected_rc = StratisdErrorsGen.get_object().ALREADY_EXISTS
         self.assertEqual(rc, expected_rc)
-        self.assertIsInstance(result, str)
-        self.assertIsInstance(rc, int)
-        self.assertIsInstance(message, str)
 
         (_, rc1, _) = Manager.callMethod(
            self._proxy,

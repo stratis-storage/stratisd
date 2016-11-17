@@ -72,10 +72,7 @@ class ListTestCase(unittest.TestCase):
         List should succeed and contain the same number of entries as
         devices in pool.
         """
-        (result, rc, message) = Pool.callMethod(self._pool_object, _PN.ListDevs)
-        self.assertIsInstance(result, list)
-        self.assertIsInstance(rc, int)
-        self.assertIsInstance(message, str)
+        (result, rc, _) = Pool.callMethod(self._pool_object, _PN.ListDevs)
 
         self.assertEqual(len(result), len(self._devs))
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)

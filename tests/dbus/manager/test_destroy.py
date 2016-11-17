@@ -63,14 +63,9 @@ class Destroy1TestCase(unittest.TestCase):
         """
         Destroy should succeed.
         """
-        (rc, message) = Manager.callMethod(
-           self._proxy,
-           _MN.DestroyPool,
-           self._POOLNAME
-        )
+        (rc, _) = \
+           Manager.callMethod(self._proxy, _MN.DestroyPool, self._POOLNAME)
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
-        self.assertIsInstance(rc, int)
-        self.assertIsInstance(message, str)
 
         (_, rc1, _) = Manager.callMethod(
            self._proxy,
@@ -115,13 +110,8 @@ class Destroy2TestCase(unittest.TestCase):
         """
         The pool was just created, so must be destroyable.
         """
-        (rc, message) = Manager.callMethod(
-           self._proxy,
-           _MN.DestroyPool,
-           self._POOLNAME
-        )
-        self.assertIsInstance(rc, int)
-        self.assertIsInstance(message, str)
+        (rc, _) = \
+           Manager.callMethod(self._proxy, _MN.DestroyPool, self._POOLNAME)
 
         (_, rc1, _) = Manager.callMethod(
            self._proxy,
@@ -178,11 +168,6 @@ class Destroy3TestCase(unittest.TestCase):
         """
         This should fail since it has a filesystem on it.
         """
-        (rc, message) = Manager.callMethod(
-           self._proxy,
-           _MN.DestroyPool,
-           self._POOLNAME
-        )
+        (rc, _) = \
+           Manager.callMethod(self._proxy, _MN.DestroyPool, self._POOLNAME)
         self.assertEqual(rc, StratisdErrorsGen.get_object().BUSY)
-        self.assertIsInstance(rc, int)
-        self.assertIsInstance(message, str)

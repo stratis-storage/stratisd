@@ -26,7 +26,7 @@ pub struct StratFilesystem {
 #[derive(Debug)]
 pub struct StratPool {
     pub name: String,
-    pub uuid: Uuid,
+    pub pool_uuid: Uuid,
     pub cache_devs: Vec<BlockDev>,
     pub block_devs: Vec<BlockDev>,
     pub filesystems: BTreeMap<String, Box<StratFilesystem>>,
@@ -37,7 +37,7 @@ impl StratPool {
     pub fn new(name: &str, uuid: Uuid, blockdevs: &[BlockDev], raid_level: u16) -> StratPool {
         StratPool {
             name: name.to_owned(),
-            uuid: uuid,
+            pool_uuid: uuid,
             cache_devs: Vec::new(),
             block_devs: blockdevs.to_owned(),
             filesystems: BTreeMap::new(),
@@ -56,7 +56,7 @@ impl Pool for StratPool {
     }
 
     fn add_blockdev(&mut self, path: &Path) -> EngineResult<()> {
-        let bd = try!(BlockDev::initialize(&self.uuid, &[path], MIN_MDA_SIZE, true))
+        let bd = try!(BlockDev::initialize(&self.pool_uuid, &[path], MIN_MDA_SIZE, true))
             .pop()
             .unwrap();
         self.block_devs.push(bd);

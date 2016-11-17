@@ -27,6 +27,7 @@ from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._constants import _DEVICES
 
+from .._misc import checked_call
 from .._misc import _device_list
 from .._misc import Service
 
@@ -91,7 +92,7 @@ class GetPoolTestCase(unittest.TestCase):
         An error code is returned if the pool does not exist.
         """
         (_, rc, _) = \
-           Manager.callMethod(self._proxy, _MN.GetPoolObjectPath, "notapool")
+           checked_call(Manager, self._proxy, _MN.GetPoolObjectPath, "notapool")
         expected_rc = StratisdErrorsGen.get_object().POOL_NOTFOUND
         self.assertEqual(rc, expected_rc)
 
@@ -128,7 +129,8 @@ class GetPool1TestCase(unittest.TestCase):
         """
         Getting an existing pool should succeed.
         """
-        (result, rc, _) = Manager.callMethod(
+        (result, rc, _) = checked_call(
+           Manager,
            self._proxy,
            _MN.GetPoolObjectPath,
            self._POOLNAME
@@ -141,7 +143,7 @@ class GetPool1TestCase(unittest.TestCase):
         Getting a non-existing pool should fail.
         """
         (_, rc, _) = \
-           Manager.callMethod(self._proxy, _MN.GetPoolObjectPath, 'nopool')
+           checked_call(Manager, self._proxy, _MN.GetPoolObjectPath, 'nopool')
         expected_rc = StratisdErrorsGen.get_object().POOL_NOTFOUND
         self.assertEqual(rc, expected_rc)
 
@@ -173,7 +175,8 @@ class GetVolumeTestCase(unittest.TestCase):
         Given our implementation, it is impossible to distinguish whether that
         is because the filesystem is not found or because the pool is not found.
         """
-        (_, rc, _) = Manager.callMethod(
+        (_, rc, _) = checked_call(
+           Manager,
            self._proxy,
            _MN.GetFilesystemObjectPath,
            'notapool',
@@ -215,7 +218,8 @@ class GetVolume1TestCase(unittest.TestCase):
         """
         An exception is raised if the volume does not exist.
         """
-        (_, rc, _) = Manager.callMethod(
+        (_, rc, _) = checked_call(
+           Manager,
            self._proxy,
            _MN.GetFilesystemObjectPath,
            self._POOLNAME,
@@ -263,7 +267,8 @@ class GetVolume2TestCase(unittest.TestCase):
         """
         The volume should be discovered.
         """
-        (result, rc, _) = Manager.callMethod(
+        (result, rc, _) = checked_call(
+           Manager,
            self._proxy,
            _MN.GetFilesystemObjectPath,
            self._POOLNAME,
@@ -277,11 +282,12 @@ class GetVolume2TestCase(unittest.TestCase):
         """
         The volume does not exists.
         """
-        (_, rc, _) = Manager.callMethod(
-              self._proxy,
-              _MN.GetFilesystemObjectPath,
-              self._POOLNAME,
-              'noname'
+        (_, rc, _) = checked_call(
+           Manager,
+           self._proxy,
+           _MN.GetFilesystemObjectPath,
+           self._POOLNAME,
+           'noname'
         )
         expected_rc = StratisdErrorsGen.get_object().FILESYSTEM_NOTFOUND
         self.assertEqual(rc, expected_rc)
@@ -314,8 +320,12 @@ class GetCacheTestCase(unittest.TestCase):
         Currently, the error return code is DEV_NOTFOUND, it should
         be POOL_NOTFOUND
         """
-        (_, rc, _) = \
-           Manager.callMethod(self._proxy, _MN.GetCacheObjectPath, 'notapool')
+        (_, rc, _) = checked_call(
+           Manager,
+           self._proxy,
+           _MN.GetCacheObjectPath,
+           'notapool'
+        )
         expected_rc = StratisdErrorsGen.get_object().POOL_NOTFOUND
         self.assertEqual(rc, expected_rc)
 
@@ -324,8 +334,12 @@ class GetCacheTestCase(unittest.TestCase):
         """
         Returns an error code, just the wrong one.
         """
-        (_, rc, _) = \
-           Manager.callMethod(self._proxy, _MN.GetCacheObjectPath, 'notapool')
+        (_, rc, _) = checked_call(
+           Manager,
+           self._proxy,
+           _MN.GetCacheObjectPath,
+           'notapool'
+        )
         ok_rc = StratisdErrorsGen.get_object().OK
         self.assertNotEqual(rc, ok_rc)
 
@@ -366,8 +380,12 @@ class GetCache1TestCase(unittest.TestCase):
 
         Unfortunately, it is the wrong error.
         """
-        (_, rc, _) = \
-           Manager.callMethod(self._proxy, _MN.GetCacheObjectPath, 'notapool')
+        (_, rc, _) = checked_call(
+           Manager,
+           self._proxy,
+           _MN.GetCacheObjectPath,
+           'notapool'
+        )
         expected_rc = StratisdErrorsGen.get_object().POOL_NOTFOUND
         self.assertEqual(rc, expected_rc)
 
@@ -378,8 +396,12 @@ class GetCache1TestCase(unittest.TestCase):
 
         Aside from the error value, the results are correct.
         """
-        (_, rc, _) = \
-           Manager.callMethod(self._proxy, _MN.GetCacheObjectPath, 'notapool')
+        (_, rc, _) = checked_call(
+           Manager,
+           self._proxy,
+           _MN.GetCacheObjectPath,
+           'notapool'
+        )
         ok_rc = StratisdErrorsGen.get_object().OK
         self.assertNotEqual(rc, ok_rc)
 
@@ -391,7 +413,8 @@ class GetCache1TestCase(unittest.TestCase):
 
         But, for some reason, there is not.
         """
-        (result, rc, _) = Manager.callMethod(
+        (result, rc, _) = checked_call(
+           Manager,
            self._proxy,
            _MN.GetCacheObjectPath,
            self._POOLNAME

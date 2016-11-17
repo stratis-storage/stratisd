@@ -27,6 +27,7 @@ from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._constants import _DEVICES
 
+from .._misc import checked_call
 from .._misc import _device_list
 from .._misc import Service
 
@@ -57,7 +58,7 @@ class ListTestCase(unittest.TestCase):
         """
         List should just succeed.
         """
-        (result, rc, _) = Manager.callMethod(self._proxy, _MN.ListPools)
+        (result, rc, _) = checked_call(Manager, self._proxy, _MN.ListPools)
 
         self.assertEqual(result, [])
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
@@ -96,7 +97,7 @@ class List2TestCase(unittest.TestCase):
         """
         List should just succeed.
         """
-        (result, rc, _) = Manager.callMethod(self._proxy, _MN.ListPools)
+        (result, rc, _) = checked_call(Manager, self._proxy, _MN.ListPools)
 
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertEqual(len(result), 1)

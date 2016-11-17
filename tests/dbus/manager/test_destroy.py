@@ -28,6 +28,8 @@ from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._constants import _DEVICES
 
+
+from .._misc import checked_call
 from .._misc import _device_list
 from .._misc import Service
 
@@ -64,10 +66,11 @@ class Destroy1TestCase(unittest.TestCase):
         Destroy should succeed.
         """
         (rc, _) = \
-           Manager.callMethod(self._proxy, _MN.DestroyPool, self._POOLNAME)
+           checked_call(Manager, self._proxy, _MN.DestroyPool, self._POOLNAME)
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
 
-        (_, rc1, _) = Manager.callMethod(
+        (_, rc1, _) = checked_call(
+           Manager,
            self._proxy,
            _MN.GetPoolObjectPath,
            self._POOLNAME
@@ -111,9 +114,10 @@ class Destroy2TestCase(unittest.TestCase):
         The pool was just created, so must be destroyable.
         """
         (rc, _) = \
-           Manager.callMethod(self._proxy, _MN.DestroyPool, self._POOLNAME)
+           checked_call(Manager, self._proxy, _MN.DestroyPool, self._POOLNAME)
 
-        (_, rc1, _) = Manager.callMethod(
+        (_, rc1, _) = checked_call(
+           Manager,
            self._proxy,
            _MN.GetPoolObjectPath,
            self._POOLNAME
@@ -169,5 +173,5 @@ class Destroy3TestCase(unittest.TestCase):
         This should fail since it has a filesystem on it.
         """
         (rc, _) = \
-           Manager.callMethod(self._proxy, _MN.DestroyPool, self._POOLNAME)
+           checked_call(Manager, self._proxy, _MN.DestroyPool, self._POOLNAME)
         self.assertEqual(rc, StratisdErrorsGen.get_object().BUSY)

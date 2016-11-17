@@ -27,6 +27,7 @@ from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._constants import _DEVICES
 
+from .._misc import checked_call
 from .._misc import _device_list
 from .._misc import Service
 
@@ -60,7 +61,8 @@ class Create2TestCase(unittest.TestCase):
 
         If rc is OK, then pool must exist.
         """
-        (result, rc, _) = Manager.callMethod(
+        (result, rc, _) = checked_call(
+           Manager,
            self._proxy,
            _MN.CreatePool,
            self._POOLNAME,
@@ -68,7 +70,8 @@ class Create2TestCase(unittest.TestCase):
            [d.device_node for d in _device_list(_DEVICES, 1)]
         )
 
-        (pool, rc1, _) = Manager.callMethod(
+        (pool, rc1, _) = checked_call(
+           Manager,
            self._proxy,
            _MN.GetPoolObjectPath,
            self._POOLNAME
@@ -116,7 +119,8 @@ class Create3TestCase(unittest.TestCase):
         """
         Create should fail trying to create new pool with same name as previous.
         """
-        (_, rc, _) = Manager.callMethod(
+        (_, rc, _) = checked_call(
+           Manager,
            self._proxy,
            _MN.CreatePool,
            self._POOLNAME,
@@ -126,7 +130,8 @@ class Create3TestCase(unittest.TestCase):
         expected_rc = StratisdErrorsGen.get_object().ALREADY_EXISTS
         self.assertEqual(rc, expected_rc)
 
-        (_, rc1, _) = Manager.callMethod(
+        (_, rc1, _) = checked_call(
+           Manager,
            self._proxy,
            _MN.GetPoolObjectPath,
            self._POOLNAME

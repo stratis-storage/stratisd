@@ -15,3 +15,6 @@ test:
 .PHONY: upload-release
 upload-release:
 	python setup.py register sdist upload
+
+dbus-tests:
+	py.test-3 ./tests/dbus

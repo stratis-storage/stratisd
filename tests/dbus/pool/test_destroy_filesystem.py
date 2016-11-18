@@ -13,12 +13,11 @@
 # limitations under the License.
 
 """
-Test creating a filesystem in a pool.
+Test destroying a filesystem in a pool.
 """
 
 import time
 import unittest
-
 
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import Pool
@@ -32,8 +31,11 @@ from .._constants import _DEVICES
 from .._misc import _device_list
 from .._misc import Service
 
+_MN = Manager.MethodNames
+_PN = Pool.MethodNames
 
-class CreateFSTestCase(unittest.TestCase):
+
+class DestroyFSTestCase(unittest.TestCase):
     """
     Test with an empty pool.
     """
@@ -51,13 +53,13 @@ class CreateFSTestCase(unittest.TestCase):
         self._devs = [d.device_node for d in _device_list(_DEVICES, 1)]
         (result, _, _) = Manager.callMethod(
            self._proxy,
-           "CreatePool",
+           _MN.CreatePool,
            self._POOLNAME,
            0,
            self._devs
         )
         self._pool_object = get_object(result)
-        (_, _) = Manager.callMethod(self._proxy, "ConfigureSimulator", 8)
+        Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)
 
     def tearDown(self):
         """
@@ -65,28 +67,41 @@ class CreateFSTestCase(unittest.TestCase):
         """
         self._service.tearDown()
 
-    def testCreate(self):
+    def testDestroyNone(self):
         """
         Test calling with no actual volume specification. An empty volume
-        list should always succeed, and it should not increase the
+        list should always succeed, and it should not decrease the
         number of volumes.
         """
-        (result, rc, message) = \
-           Pool.callMethod(self._pool_object, "CreateFilesystems", [])
-        self.assertIsInstance(result, list)
-        self.assertIsInstance(rc, int)
-        self.assertIsInstance(message, str)
+        (result, rc, _) = \
+           Pool.callMethod(self._pool_object, _PN.DestroyFilesystems, [])
 
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
 
-        (result, rc, message) = \
-           Pool.callMethod(self._pool_object, "ListFilesystems")
+        (result, rc, _) = \
+           Pool.callMethod(self._pool_object, _PN.ListFilesystems)
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
+        self.assertEqual(len(result), 0)
+
+    def testDestroyOne(self):
+        """
+        Test calling with a non-existant volume name. This should succeed,
+        because at the end the volume is not there.
+        """
+        (result, rc, _) = \
+           Pool.callMethod(self._pool_object, _PN.DestroyFilesystems, ['name'])
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
+
+        (result, rc, _) = \
+           Pool.callMethod(self._pool_object, _PN.ListFilesystems)
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
         self.assertEqual(len(result), 0)
 
 
-class CreateFSTestCase1(unittest.TestCase):
+class DestroyFSTestCase1(unittest.TestCase):
     """
     Make a filesystem for the pool.
     """
@@ -100,12 +115,12 @@ class CreateFSTestCase1(unittest.TestCase):
         """
         self._service = Service()
         self._service.setUp()
-        time.sleep(1)
+        time.sleep(2)
         self._proxy = get_object(TOP_OBJECT)
         self._devs = [d.device_node for d in _device_list(_DEVICES, 1)]
         (result, _, _) = Manager.callMethod(
            self._proxy,
-           "CreatePool",
+           _MN.CreatePool,
            self._POOLNAME,
            0,
            self._devs
@@ -113,10 +128,10 @@ class CreateFSTestCase1(unittest.TestCase):
         self._pool_object = get_object(result)
         Pool.callMethod(
            self._pool_object,
-           "CreateFilesystems",
+           _PN.CreateFilesystems,
            [(self._VOLNAME, '', 0)]
         )
-        (_, _) = Manager.callMethod(self._proxy, "ConfigureSimulator", 8)
+        Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)
 
     def tearDown(self):
         """
@@ -124,34 +139,26 @@ class CreateFSTestCase1(unittest.TestCase):
         """
         self._service.tearDown()
 
-    def testCreate(self):
+    def testDestroy(self):
         """
-        Test calling by specifying a volume name. Because there is already
-        a volume with the given name, the creation of the new volume should
-        fail, and no additional volume should be created.
+        Test calling by specifying the volume name. Assume that destruction
+        should always succeed.
         """
-        (result, rc, message) = Pool.callMethod(
+        (result, rc, _) = Pool.callMethod(
            self._pool_object,
-           "CreateFilesystems",
-           [(self._VOLNAME, "", 0)]
+           _PN.DestroyFilesystems,
+           [self._VOLNAME]
         )
-        self.assertIsInstance(result, list)
-        self.assertIsInstance(rc, int)
-        self.assertIsInstance(message, str)
 
-        expected_rc = StratisdErrorsGen.get_object().LIST_FAILURE
-        self.assertEqual(rc, expected_rc)
         self.assertEqual(len(result), 1)
 
-        (result, rc, message) = result[0]
-        self.assertIsInstance(result, str)
-        self.assertIsInstance(rc, int)
-        self.assertIsInstance(message, str)
-
-        expected_rc = StratisdErrorsGen.get_object().ALREADY_EXISTS
-        self.assertEqual(rc, expected_rc)
-
-        (result, rc, message) = \
-           Pool.callMethod(self._pool_object, "ListFilesystems")
         self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
-        self.assertEqual(len(result), 1)
+
+        (rc, _) = result[0]
+
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
+
+        (result, rc, _) = \
+           Pool.callMethod(self._pool_object, _PN.ListFilesystems)
+        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
+        self.assertEqual(len(result), 0)

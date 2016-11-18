@@ -36,7 +36,7 @@ setuptools.setup(
         ],
     install_requires = [
        'dbus-python',
-       'into-dbus-python'
+       'into-dbus-python>=0.03'
     ],
     package_dir={"": "src"},
     packages=setuptools.find_packages("src"),

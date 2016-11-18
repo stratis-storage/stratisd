@@ -21,9 +21,30 @@ import os
 import random
 import subprocess
 
+from into_dbus_python import signature
+
 from ._constants import _STRATISD
 from ._constants import _STRATISD_EXECUTABLE
 from ._constants import _STRATISD_RUST
+
+
+def checked_call(klass, proxy, method, *args):
+    """
+    Call a method and check that the returned value has the expected signature.
+
+    :param type klass: the class representing the interface
+    :param object proxy: the proxy object
+    :param method: the method to invoke
+    :param args: the arguments to pass to the method
+    :returns: the result of the method
+    :raises ValueError: if the result type is incorrect
+    """
+    result = klass.callMethod(proxy, method, *args)
+    # pylint: disable=protected-access
+    if "".join(signature(x) for x in result) != klass._OUTPUT_SIGS[method]:
+        raise ValueError("result type does not match signature")
+    return result
+
 
 def _device_list(devices, minimum):
     """
@@ -54,6 +75,7 @@ class ServiceABC(abc.ABC):
         """
         Stop the stratisd simulator and daemon.
         """
+        # pylint: disable=no-member
         self._stratisd.terminate()
         self._stratisd.wait()
 
@@ -82,7 +104,7 @@ class ServiceR(ServiceABC):
 
     def setUp(self):
         self._stratisd = subprocess.Popen(
-           os.path.join(_STRATISD_RUST, 'target/debug/stratisd')
+           [os.path.join(_STRATISD_RUST, 'target/debug/stratisd'), '--sim']
         )
 
 

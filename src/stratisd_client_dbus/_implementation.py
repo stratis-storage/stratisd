@@ -17,27 +17,46 @@ Classes to implement dbus interface.
 """
 
 import abc
+import enum
+
 import dbus
 
 from into_dbus_python import xformer
+
+def _xformers(key_to_sig):
+    """
+    Get a map from keys to functions from a map of names to signatures.
+
+    :param key_to_sig: a map from keys to signatures
+    :type key_to_sig: dict of object * str
+    :returns: a map from keys to functions
+    :rtype: dict of object * xformation function
+    """
+    sig_to_xformers = dict((sig, xformer(sig)) for sig in key_to_sig.values())
+    return dict((method, sig_to_xformers[sig]) for \
+       (method, sig) in key_to_sig.items())
+
 
 class Interface(abc.ABC):
     """
     Parent class for an interface hierarchy.
     """
 
-    _XFORMERS = dict()
-
     _INTERFACE_NAME = abc.abstractproperty(doc="interface name")
-    _METHODS = abc.abstractproperty(doc="map from method name to data")
+    _INPUT_SIGS = \
+       abc.abstractproperty(doc="map from method name to input signatures")
+    _OUTPUT_SIGS = \
+       abc.abstractproperty(doc="map from method name to output signatures")
+    _XFORMERS = abc.abstractproperty(doc="map from method name to xformer")
+    _PROPERTY_NAMES = abc.abstractproperty(doc="list of property names")
 
     @classmethod
-    def callMethod(cls, proxy_object, method_name, *args):
+    def callMethod(cls, proxy_object, method, *args):
         """
         Call a dbus method on a proxy object.
 
         :param proxy_object: the proxy object to invoke the method on
-        :param method_name: a method name
+        :param method: a method name
         :param args: the arguments to pass to the dbus method
 
         :returns: the result of the call
@@ -46,13 +65,8 @@ class Interface(abc.ABC):
         This method intentionally permits lower-level exceptions to be
         propagated.
         """
-        input_signature = cls._METHODS[method_name]
-
-        if input_signature not in cls._XFORMERS:
-            cls._XFORMERS[input_signature] = xformer(input_signature)
-        xformed_args = cls._XFORMERS[input_signature](args)
-
-        dbus_method = getattr(proxy_object, method_name)
+        xformed_args = cls._XFORMERS[method](args)
+        dbus_method = getattr(proxy_object, method.name)
         return dbus_method(*xformed_args, dbus_interface=cls._INTERFACE_NAME)
 
     @classmethod
@@ -68,7 +82,7 @@ class Interface(abc.ABC):
         """
         return proxy_object.Get(
            cls._INTERFACE_NAME,
-           name,
+           name.name,
            dbus_interface=dbus.PROPERTIES_IFACE
         )
 
@@ -78,21 +92,57 @@ class Manager(Interface):
     Manager interface.
     """
 
+    class MethodNames(enum.Enum):
+        """
+        The method names of the manager interface.
+        """
+        ConfigureSimulator = "ConfigureSimulator"
+        CreatePool = "CreatePool"
+        DestroyPool = "DestroyPool"
+        GetCacheObjectPath = "GetCacheObjectPath"
+        GetDevObjectPath = "GetDevObjectPath"
+        GetDevTypes = "GetDevTypes"
+        GetErrorCodes = "GetErrorCodes"
+        GetFilesystemObjectPath = "GetFilesystemObjectPath"
+        GetPoolObjectPath = "GetPoolObjectPath"
+        GetRaidLevels = "GetRaidLevels"
+        ListPools = "ListPools"
+
+    class PropertyNames(enum.Enum):
+        """
+        Names of the properties of the manager interface.
+        """
+        pass
+
     _INTERFACE_NAME = 'org.storage.stratis1.Manager'
 
-    _METHODS = {
-        "ConfigureSimulator" : "u",
-        "CreatePool" : "sqas",
-        "DestroyPool" : "s",
-        "GetCacheObjectPath" : "s",
-        "GetDevObjectPath" : "s",
-        "GetDevTypes" : "",
-        "GetErrorCodes" : "",
-        "GetFilesystemObjectPath" : "ss",
-        "GetPoolObjectPath" : "s",
-        "GetRaidLevels" : "",
-        "ListPools" : "",
+    _INPUT_SIGS = {
+        MethodNames.ConfigureSimulator : "u",
+        MethodNames.CreatePool : "sqas",
+        MethodNames.DestroyPool : "s",
+        MethodNames.GetCacheObjectPath : "s",
+        MethodNames.GetDevObjectPath : "s",
+        MethodNames.GetDevTypes : "",
+        MethodNames.GetErrorCodes : "",
+        MethodNames.GetFilesystemObjectPath : "ss",
+        MethodNames.GetPoolObjectPath : "s",
+        MethodNames.GetRaidLevels : "",
+        MethodNames.ListPools : "",
     }
+    _OUTPUT_SIGS = {
+        MethodNames.ConfigureSimulator : "qs",
+        MethodNames.CreatePool : "oqs",
+        MethodNames.DestroyPool : "qs",
+        MethodNames.GetCacheObjectPath : "oqs",
+        MethodNames.GetDevObjectPath : "oqs",
+        MethodNames.GetDevTypes : "",
+        MethodNames.GetErrorCodes : "a(sqs)",
+        MethodNames.GetFilesystemObjectPath : "oqs",
+        MethodNames.GetPoolObjectPath : "oqs",
+        MethodNames.GetRaidLevels : "a(sqs)",
+        MethodNames.ListPools : "asqs",
+    }
+    _XFORMERS = _xformers(_INPUT_SIGS)
 
 
 class Pool(Interface):
@@ -100,16 +150,48 @@ class Pool(Interface):
     Pool interface.
     """
 
+    class MethodNames(enum.Enum):
+        """
+        Names of the methods of the Pool class.
+        """
+        AddCacheDevs = "AddCacheDevs"
+        AddDevs = "AddDevs"
+        CreateFilesystems = "CreateFilesystems"
+        DestroyFilesystems = "DestroyFilesystems"
+        ListCacheDevs = "ListCacheDevs"
+        ListDevs = "ListDevs"
+        ListFilesystems = "ListFilesystems"
+        RemoveCacheDevs = "RemoveCacheDevs"
+        RemoveDevs = "RemoveDevs"
+
+    class PropertyNames(enum.Enum):
+        """
+        Names of the properties of the manager interface.
+        """
+        pass
+
     _INTERFACE_NAME = 'org.storage.stratis1.pool'
 
-    _METHODS = {
-       "AddCacheDevs": "as",
-       "AddDevs": "as",
-       "CreateFilesystems": "a(sst)",
-       "DestroyFilesystems": "as",
-       "ListCacheDevs": "",
-       "ListDevs": "",
-       "ListFilesystems": "",
-       "RemoveCacheDevs": "asi",
-       "RemoveDevs": "asi"
+    _INPUT_SIGS = {
+       MethodNames.AddCacheDevs: "as",
+       MethodNames.AddDevs: "as",
+       MethodNames.CreateFilesystems: "a(sst)",
+       MethodNames.DestroyFilesystems: "as",
+       MethodNames.ListCacheDevs: "",
+       MethodNames.ListDevs: "",
+       MethodNames.ListFilesystems: "",
+       MethodNames.RemoveCacheDevs: "asi",
+       MethodNames.RemoveDevs: "asi"
     }
+    _OUTPUT_SIGS = {
+       MethodNames.AddCacheDevs: "a(oqs)qs",
+       MethodNames.AddDevs: "a(oqs)qs",
+       MethodNames.CreateFilesystems: "a(oqs)qs",
+       MethodNames.DestroyFilesystems: "a(qs)qs",
+       MethodNames.ListCacheDevs: "asqs",
+       MethodNames.ListDevs: "asqs",
+       MethodNames.ListFilesystems: "asqs",
+       MethodNames.RemoveCacheDevs: "a(qs)qs",
+       MethodNames.RemoveDevs: "a(qs)qs"
+    }
+    _XFORMERS = _xformers(_INPUT_SIGS)

@@ -43,7 +43,7 @@ impl Engine for SimEngine {
                    blockdev_paths: &[&Path],
                    raid_level: u16,
                    _force: bool)
-                   -> EngineResult<()> {
+                   -> EngineResult<usize> {
 
         if self.pools.contains_key(name) {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
@@ -68,8 +68,10 @@ impl Engine for SimEngine {
             return Err(EngineError::Stratis(ErrorEnum::Error("X".into())));
         }
 
+        let num_bdevs = pool.block_devs.len();
         self.pools.insert(name.to_owned(), pool);
-        Ok(())
+
+        Ok(num_bdevs)
     }
 
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()> {

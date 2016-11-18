@@ -42,7 +42,7 @@ impl Engine for StratEngine {
                    blockdev_paths: &[&Path],
                    raid_level: u16,
                    force: bool)
-                   -> EngineResult<()> {
+                   -> EngineResult<usize> {
 
         if self.pools.contains_key(name) {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
@@ -52,11 +52,6 @@ impl Engine for StratEngine {
         for path in blockdev_paths {
             let dev = try!(Device::from_str(&path.to_string_lossy()));
             devices.insert(dev);
-        }
-
-        if devices.len() != blockdev_paths.len() {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      "duplicate blockdevs")));
         }
 
         for (_, pool) in &self.pools {
@@ -72,9 +67,10 @@ impl Engine for StratEngine {
         }
 
         let pool = try!(StratPool::new(name, devices, raid_level, force));
+        let num_bdevs = pool.block_devs.len();
 
         self.pools.insert(name.to_owned(), pool);
-        Ok(())
+        Ok(num_bdevs)
     }
 
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()> {

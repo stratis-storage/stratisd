@@ -87,12 +87,13 @@ pub trait Pool: Debug {
 }
 
 pub trait Engine: Debug {
+    /// Create a Stratis pool. Returns the number of blockdevs the pool contains.
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
                    raid_level: u16,
                    force: bool)
-                   -> EngineResult<()>;
+                   -> EngineResult<usize>;
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()>;
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool>;
     fn pools(&mut self) -> BTreeMap<&str, &mut Pool>;

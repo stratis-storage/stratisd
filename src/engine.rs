@@ -74,7 +74,7 @@ impl From<nix::Error> for EngineError {
 
 pub trait Pool: Debug {
     fn create_filesystem(&mut self, name: &str, mount_point: &str, size: u64) -> EngineResult<()>;
-    fn add_blockdev(&mut self, path: &Path) -> EngineResult<()>;
+    fn add_blockdev(&mut self, path: &Path, force: bool) -> EngineResult<()>;
     fn add_cachedev(&mut self, path: &Path) -> EngineResult<()>;
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;
     fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()>;
@@ -87,11 +87,13 @@ pub trait Pool: Debug {
 }
 
 pub trait Engine: Debug {
+    /// Create a Stratis pool. Returns the number of blockdevs the pool contains.
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
-                   raid_level: u16)
-                   -> EngineResult<()>;
+                   raid_level: u16,
+                   force: bool)
+                   -> EngineResult<usize>;
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()>;
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool>;
     fn pools(&mut self) -> BTreeMap<&str, &mut Pool>;

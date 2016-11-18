@@ -659,6 +659,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut iter = message.iter_init();
 
     let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 0));
+    let force: bool = try!(get_next_arg(&mut iter, 1));
 
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
@@ -679,7 +680,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut vec = Vec::new();
 
     for dev in devs {
-        let result = pool.add_blockdev(Path::new(dev));
+        let result = pool.add_blockdev(Path::new(dev), force);
         match result {
             Ok(_) => {
                 let object_path: dbus::Path = create_dbus_blockdev(dbus_context.clone());
@@ -878,6 +879,7 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
 
     let add_devs_method = f.method(ADD_DEVS, (), add_devs)
         .in_arg(("devs", "as"))
+        .in_arg(("force", "b"))
         .out_arg(("results", "a(oqs)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
@@ -917,11 +919,12 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let name: &str = try!(get_next_arg(&mut iter, 0));
     let raid_level: u16 = try!(get_next_arg(&mut iter, 1));
     let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 2));
+    let force: bool = try!(get_next_arg(&mut iter, 3));
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
     let dbus_context = m.path.get_data();
-    let result = dbus_context.engine.borrow_mut().create_pool(name, &blockdevs, raid_level);
+    let result = dbus_context.engine.borrow_mut().create_pool(name, &blockdevs, raid_level, force);
 
     let return_message = message.method_return();
 
@@ -1084,6 +1087,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
         .in_arg(("pool_name", "s"))
         .in_arg(("raid_type", "q"))
         .in_arg(("dev_list", "as"))
+        .in_arg(("force", "b"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

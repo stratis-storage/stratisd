@@ -4,7 +4,13 @@
 
 use std::path::Path;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::str::FromStr;
 use std::iter::FromIterator;
+use std::io;
+use std::io::ErrorKind;
+
+use devicemapper::Device;
 
 use engine::Engine;
 use engine::EngineError;
@@ -12,8 +18,6 @@ use engine::EngineResult;
 use engine::ErrorEnum;
 use engine::Pool;
 
-use super::consts::*;
-use super::blockdev::BlockDev;
 use super::pool::StratPool;
 
 
@@ -36,18 +40,37 @@ impl Engine for StratEngine {
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
-                   raid_level: u16)
-                   -> EngineResult<()> {
+                   raid_level: u16,
+                   force: bool)
+                   -> EngineResult<usize> {
 
         if self.pools.contains_key(name) {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
 
-        let bds = try!(BlockDev::initialize(name, blockdev_paths, MIN_MDA_SIZE, true));
-        let pool = StratPool::new(name, &bds, raid_level);
+        let mut devices = BTreeSet::new();
+        for path in blockdev_paths {
+            let dev = try!(Device::from_str(&path.to_string_lossy()));
+            devices.insert(dev);
+        }
+
+        for (_, pool) in &self.pools {
+            for (_, bd) in &pool.block_devs {
+                if devices.contains(&bd.dev) {
+                    return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
+                                                              format!("blockdev {} already \
+                                                                       used in pool {}",
+                                                                      bd.dstr(),
+                                                                      pool.name))));
+                }
+            }
+        }
+
+        let pool = try!(StratPool::new(name, devices, raid_level, force));
+        let num_bdevs = pool.block_devs.len();
 
         self.pools.insert(name.to_owned(), pool);
-        Ok(())
+        Ok(num_bdevs)
     }
 
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()> {

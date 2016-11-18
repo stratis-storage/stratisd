@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 use std::io;
 use std::str::{FromStr, from_utf8};
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use time::Timespec;
 use devicemapper::Device;
@@ -25,6 +27,9 @@ use super::util::blkdev_size;
 
 pub use super::BlockDevSave;
 
+type PoolUuid = Uuid;
+type DevUuid = Uuid;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MDA {
     pub last_updated: Timespec,
@@ -36,9 +41,7 @@ pub struct MDA {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlockDev {
-    pub pool_id: String,
     pub dev: Device,
-    pub id: String,
     pub path: PathBuf,
     pub sectors: Sectors,
     pub mdaa: MDA,
@@ -50,11 +53,11 @@ pub struct BlockDev {
 impl BlockDev {
     /// Initialize multiple blockdevs at once. This allows all of them
     /// to be checked for usability before writing to any of them.
-    pub fn initialize(pool_id: &str,
-                      paths: &[&Path],
+    pub fn initialize(pool_uuid: &PoolUuid,
+                      devices: BTreeSet<Device>,
                       mda_size: Sectors,
                       force: bool)
-                      -> EngineResult<Vec<BlockDev>> {
+                      -> EngineResult<BTreeMap<DevUuid, BlockDev>> {
 
         if *mda_size % 2 != 0 {
             return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
@@ -71,16 +74,14 @@ impl BlockDev {
                                                               *MIN_MDA_SIZE))));
         }
 
-        let dev_info = try!(BlockDev::dev_info(paths, force));
+        let dev_info = try!(BlockDev::dev_info(&devices, force));
 
-        let mut bds = Vec::new();
-        for (path, &(dev, dev_size)) in paths.iter().zip(dev_info.iter()) {
+        let mut bds = BTreeMap::new();
+        for (dev, (path, dev_size)) in devices.into_iter().zip(dev_info.into_iter()) {
 
             let mut bd = BlockDev {
-                pool_id: pool_id.to_owned(),
-                id: Uuid::new_v4().simple().to_string(),
                 dev: dev,
-                path: path.to_path_buf(),
+                path: path,
                 sectors: Sectors(dev_size / SECTOR_SIZE),
                 mdaa: MDA {
                     last_updated: Timespec::new(0, 0),
@@ -100,23 +101,26 @@ impl BlockDev {
                 reserved_sectors: MDA_RESERVED_SIZE,
             };
 
-            try!(bd.write_sigblock());
-            bds.push(bd);
+            let dev_uuid = Uuid::new_v4();
+            try!(bd.write_sigblock(pool_uuid, &dev_uuid));
+            bds.insert(dev_uuid, bd);
         }
         Ok(bds)
     }
 
     /// Gets device and device sizes, and returns an error if devices
     /// cannot be used by Stratis.
-    fn dev_info(paths: &[&Path], force: bool) -> EngineResult<Vec<(Device, u64)>> {
+    fn dev_info(devices: &BTreeSet<Device>, force: bool) -> EngineResult<Vec<(PathBuf, u64)>> {
         let mut dev_infos = Vec::new();
-        for path in paths {
-            let dev = try!(Device::from_str(&path.to_string_lossy()));
-
+        for dev in devices {
+            let path = try!(dev.path().ok_or_else(|| {
+                io::Error::new(ErrorKind::InvalidInput,
+                               format!("could not get path from dev {}", dev.dstr()))
+            }));
             let mut f = try!(OpenOptions::new()
                 .read(true)
                 .write(true)
-                .open(path)
+                .open(&path)
                 .map_err(|_| {
                     io::Error::new(ErrorKind::PermissionDenied,
                                    format!("Could not open {}", path.display()))
@@ -142,13 +146,15 @@ impl BlockDev {
                                                                   ByteSize::b(MIN_DEV_SIZE as usize)
                                                                   .to_string(true)))));
             }
-            dev_infos.push((dev, dev_size));
+            dev_infos.push((path, dev_size));
         }
 
         Ok(dev_infos)
     }
 
-    pub fn setup(path: &Path) -> EngineResult<BlockDev> {
+    /// If a Path refers to a valid Stratis blockdev, return its
+    /// parent uuid, its blockdev uuid, and the Blockdev.
+    pub fn setup(path: &Path) -> EngineResult<(PoolUuid, DevUuid, BlockDev)> {
         let dev = try!(Device::from_str(&path.to_string_lossy()));
 
         let mut f = try!(OpenOptions::new()
@@ -178,8 +184,10 @@ impl BlockDev {
             // TODO: Try to read end-of-disk copy
         }
 
-        let stratis_id = from_utf8(&buf[32..64]).unwrap();
-        let id = from_utf8(&buf[64..96]).unwrap();
+        let pool_id = try!(Uuid::parse_str(from_utf8(&buf[32..64]).unwrap())
+            .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "invalid pool uid")));
+        let dev_id = try!(Uuid::parse_str(from_utf8(&buf[64..96]).unwrap())
+            .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "invalid dev uuid")));
 
         let mda_size = Sectors(LittleEndian::read_u32(&buf[160..164]) as u64);
 
@@ -198,9 +206,9 @@ impl BlockDev {
                                                               *MIN_MDA_SIZE))));
         }
 
-        Ok(BlockDev {
-            pool_id: stratis_id.to_owned(),
-            id: id.to_owned(),
+        Ok((pool_id,
+            dev_id,
+            BlockDev {
             dev: dev,
             path: path.to_owned(),
             sectors: Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE),
@@ -222,7 +230,7 @@ impl BlockDev {
             },
             mda_sectors: mda_size,
             reserved_sectors: Sectors(LittleEndian::read_u32(&buf[164..168]) as u64),
-        })
+        }))
     }
 
     pub fn to_save(&self) -> BlockDevSave {
@@ -232,16 +240,28 @@ impl BlockDev {
         }
     }
 
-    pub fn find_all() -> EngineResult<Vec<BlockDev>> {
-        Ok(try!(read_dir("/dev"))
-            .into_iter()
-            .filter_map(|dir_e| if dir_e.is_ok() {
-                Some(dir_e.unwrap().path())
-            } else {
-                None
-            })
-            .filter_map(|path| BlockDev::setup(&path).ok())
-            .collect::<Vec<_>>())
+    /// Find all Stratis Blockdevs.
+    ///
+    /// Returns a map of pool uuids to maps of blockdev uuids to blockdevs.
+    pub fn find_all() -> EngineResult<BTreeMap<PoolUuid, BTreeMap<DevUuid, BlockDev>>> {
+        let mut pool_map = BTreeMap::new();
+        for dir_e in try!(read_dir("/dev")) {
+            let path = match dir_e {
+                Ok(d) => d.path(),
+                Err(_) => continue,
+            };
+
+            match BlockDev::setup(&path) {
+                Ok((pool_uuid, dev_uuid, blockdev)) => {
+                    pool_map.entry(pool_uuid)
+                        .or_insert_with(BTreeMap::new)
+                        .insert(dev_uuid, blockdev);
+                }
+                Err(_) => continue,
+            };
+        }
+
+        Ok(pool_map)
     }
 
     /// Size of the BDA copy at the beginning of the blockdev
@@ -315,13 +335,13 @@ impl BlockDev {
         Ok(())
     }
 
-    fn write_sigblock(&mut self) -> EngineResult<()> {
+    fn write_sigblock(&mut self, pool_uuid: &PoolUuid, dev_uuid: &DevUuid) -> EngineResult<()> {
         let mut buf = [0u8; SECTOR_SIZE as usize];
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.sectors);
         // no flags yet
-        buf[32..64].clone_from_slice(self.pool_id.as_bytes());
-        buf[64..96].clone_from_slice(self.id.as_bytes());
+        buf[32..64].clone_from_slice(pool_uuid.simple().to_string().as_bytes());
+        buf[64..96].clone_from_slice(dev_uuid.simple().to_string().as_bytes());
 
         LittleEndian::write_u64(&mut buf[64..72], self.mdaa.last_updated.sec as u64);
         LittleEndian::write_u32(&mut buf[72..76], self.mdaa.last_updated.nsec as u32);
@@ -368,15 +388,27 @@ impl BlockDev {
         Ok(())
     }
 
-    pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
+    pub fn save_state(&mut self,
+                      time: &Timespec,
+                      metadata: &[u8],
+                      pool_uuid: &PoolUuid,
+                      dev_uuid: &DevUuid)
+                      -> EngineResult<()> {
         try!(self.write_mdax(time, metadata));
-        try!(self.write_sigblock());
+        try!(self.write_sigblock(pool_uuid, dev_uuid));
 
         Ok(())
     }
 
     /// Get the "x:y" device string for this blockdev
     pub fn dstr(&self) -> String {
-        format!("{}:{}", self.dev.major, self.dev.minor)
+        self.dev.dstr()
+    }
+
+    /// List the available-for-upper-layer-use range in this blockdev.
+    pub fn avail_range(&self) -> (SectorOffset, Sectors) {
+        let start = SectorOffset(*BDA_STATIC_HDR_SIZE + *self.mda_sectors + *self.reserved_sectors);
+        let length = Sectors(*self.sectors - *start - *BDA_STATIC_HDR_SIZE - *self.mda_sectors);
+        (start, length)
     }
 }

@@ -88,7 +88,7 @@ class StratisdConstantsGen(abc.ABC):
     # pylint: disable=too-few-public-methods
 
     _CLASSNAME = abc.abstractproperty(doc="the name of the class to construct")
-    _METHODNAME = abc.abstractproperty(doc="dbus method name")
+    _METHOD = abc.abstractproperty(doc="dbus method")
 
     @classmethod
     def get_object(cls):
@@ -98,7 +98,7 @@ class StratisdConstantsGen(abc.ABC):
         :return: class with class attributes for stratisd constants
         :rtype: type
         """
-        values = Manager.callMethod(get_object(TOP_OBJECT), cls._METHODNAME)
+        values = cls._METHOD(get_object(TOP_OBJECT))
         return StratisdConstants.get_class(cls._CLASSNAME, values)
 
 
@@ -109,7 +109,7 @@ class StratisdErrorsGen(StratisdConstantsGen):
     # pylint: disable=too-few-public-methods
 
     _CLASSNAME = 'StratisdErrors'
-    _METHODNAME = Manager.MethodNames.GetErrorCodes
+    _METHOD = Manager.GetErrorCodes
 
 class StratisdRaidGen(StratisdConstantsGen):
     """
@@ -118,4 +118,4 @@ class StratisdRaidGen(StratisdConstantsGen):
     # pylint: disable=too-few-public-methods
 
     _CLASSNAME = 'StratisdRaidLevels'
-    _METHODNAME = Manager.MethodNames.GetRaidLevels
+    _METHOD = Manager.GetRaidLevels

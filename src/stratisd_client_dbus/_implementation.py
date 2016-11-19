@@ -18,10 +18,12 @@ Classes to implement dbus interface.
 
 import abc
 import enum
+import types
 
 import dbus
 
 from into_dbus_python import xformer
+
 
 def _xformers(key_to_sig):
     """
@@ -32,65 +34,32 @@ def _xformers(key_to_sig):
     :returns: a map from keys to functions
     :rtype: dict of object * xformation function
     """
-    sig_to_xformers = dict((sig, xformer(sig)) for sig in key_to_sig.values())
-    return dict((method, sig_to_xformers[sig]) for \
-       (method, sig) in key_to_sig.items())
+    sig_to_xformers = \
+       dict((sig, xformer(sig)) for (_, sig) in key_to_sig.values())
+    return dict((method, (names, sig_to_xformers[sig])) for \
+       (method, (names, sig)) in key_to_sig.items())
 
 
-class Interface(abc.ABC):
+class InterfaceSpec(abc.ABC):
     """
     Parent class for an interface hierarchy.
     """
+    # pylint: disable=too-few-public-methods
 
-    _INTERFACE_NAME = abc.abstractproperty(doc="interface name")
-    _INPUT_SIGS = \
+    INTERFACE_NAME = abc.abstractproperty(doc="interface name")
+    INPUT_SIGS = \
        abc.abstractproperty(doc="map from method name to input signatures")
-    _OUTPUT_SIGS = \
+    OUTPUT_SIGS = \
        abc.abstractproperty(doc="map from method name to output signatures")
-    _XFORMERS = abc.abstractproperty(doc="map from method name to xformer")
-    _PROPERTY_NAMES = abc.abstractproperty(doc="list of property names")
-
-    @classmethod
-    def callMethod(cls, proxy_object, method, *args):
-        """
-        Call a dbus method on a proxy object.
-
-        :param proxy_object: the proxy object to invoke the method on
-        :param method: a method name
-        :param args: the arguments to pass to the dbus method
-
-        :returns: the result of the call
-        :rtype: object * int * str
-
-        This method intentionally permits lower-level exceptions to be
-        propagated.
-        """
-        xformed_args = cls._XFORMERS[method](args)
-        dbus_method = getattr(proxy_object, method.name)
-        return dbus_method(*xformed_args, dbus_interface=cls._INTERFACE_NAME)
-
-    @classmethod
-    def getProperty(cls, proxy_object, name):
-        """
-        Get a property with name 'name'.
-
-        :param proxy_object: the proxy object
-        :param str name: the name of the property
-
-        :returns: the value of the property
-        :rtype: object
-        """
-        return proxy_object.Get(
-           cls._INTERFACE_NAME,
-           name.name,
-           dbus_interface=dbus.PROPERTIES_IFACE
-        )
+    XFORMERS = abc.abstractproperty(doc="map from method name to xformer")
+    PROPERTY_NAMES = abc.abstractproperty(doc="list of property names")
 
 
-class Cache(Interface):
+class CacheSpec(InterfaceSpec):
     """
     Cache device interface.
     """
+    # pylint: disable=too-few-public-methods
 
     class MethodNames(enum.Enum):
         """
@@ -104,19 +73,20 @@ class Cache(Interface):
         """
         Size = "Size"
 
-    _INTERFACE_NAME = 'org.storage.stratis1.cache'
+    INTERFACE_NAME = 'org.storage.stratis1.cache'
 
-    _INPUT_SIGS = {
+    INPUT_SIGS = {
     }
-    _OUTPUT_SIGS = {
+    OUTPUT_SIGS = {
     }
-    _XFORMERS = _xformers(_INPUT_SIGS)
+    XFORMERS = _xformers(INPUT_SIGS)
 
 
-class Dev(Interface):
+class DevSpec(InterfaceSpec):
     """
     Blockdev interface.
     """
+    # pylint: disable=too-few-public-methods
 
     class MethodNames(enum.Enum):
         """
@@ -130,19 +100,20 @@ class Dev(Interface):
         """
         Size = "Size"
 
-    _INTERFACE_NAME = 'org.storage.stratis1.dev'
+    INTERFACE_NAME = 'org.storage.stratis1.dev'
 
-    _INPUT_SIGS = {
+    INPUT_SIGS = {
     }
-    _OUTPUT_SIGS = {
+    OUTPUT_SIGS = {
     }
-    _XFORMERS = _xformers(_INPUT_SIGS)
+    XFORMERS = _xformers(INPUT_SIGS)
 
 
-class Filesystem(Interface):
+class FilesystemSpec(InterfaceSpec):
     """
     Filesystem interface.
     """
+    # pylint: disable=too-few-public-methods
 
     class MethodNames(enum.Enum):
         """
@@ -159,27 +130,28 @@ class Filesystem(Interface):
         """
         pass
 
-    _INTERFACE_NAME = 'org.storage.stratis1.filesystem'
+    INTERFACE_NAME = 'org.storage.stratis1.filesystem'
 
-    _INPUT_SIGS = {
-       MethodNames.CreateSnapshot: "s",
-       MethodNames.Rename: "s",
-       MethodNames.SetMountpoint: "",
-       MethodNames.SetQuota: "s"
+    INPUT_SIGS = {
+       MethodNames.CreateSnapshot: (("name", ), "s"),
+       MethodNames.Rename: (("name", ), "s"),
+       MethodNames.SetMountpoint: ((), ""),
+       MethodNames.SetQuota: (("quota", ), "s")
     }
-    _OUTPUT_SIGS = {
+    OUTPUT_SIGS = {
        MethodNames.CreateSnapshot: "oqs",
        MethodNames.Rename: "oqs",
        MethodNames.SetMountpoint: "oqs",
        MethodNames.SetQuota: "oqs"
     }
-    _XFORMERS = _xformers(_INPUT_SIGS)
+    XFORMERS = _xformers(INPUT_SIGS)
 
 
-class Manager(Interface):
+class ManagerSpec(InterfaceSpec):
     """
     Manager interface.
     """
+    # pylint: disable=too-few-public-methods
 
     class MethodNames(enum.Enum):
         """
@@ -203,22 +175,24 @@ class Manager(Interface):
         """
         pass
 
-    _INTERFACE_NAME = 'org.storage.stratis1.Manager'
+    INTERFACE_NAME = 'org.storage.stratis1.Manager'
 
-    _INPUT_SIGS = {
-        MethodNames.ConfigureSimulator : "u",
-        MethodNames.CreatePool : "sqbas",
-        MethodNames.DestroyPool : "s",
-        MethodNames.GetCacheObjectPath : "s",
-        MethodNames.GetDevObjectPath : "s",
-        MethodNames.GetDevTypes : "",
-        MethodNames.GetErrorCodes : "",
-        MethodNames.GetFilesystemObjectPath : "ss",
-        MethodNames.GetPoolObjectPath : "s",
-        MethodNames.GetRaidLevels : "",
-        MethodNames.ListPools : "",
+    INPUT_SIGS = {
+        MethodNames.ConfigureSimulator : (("denominator", ), "u"),
+        MethodNames.CreatePool :
+           (("name", "redundancy", "force", "devices"), "sqbas"),
+        MethodNames.DestroyPool : (("name", ), "s"),
+        MethodNames.GetCacheObjectPath : (("name", ), "s"),
+        MethodNames.GetDevObjectPath : (("name", ), "s"),
+        MethodNames.GetDevTypes : ((), ""),
+        MethodNames.GetErrorCodes : ((), ""),
+        MethodNames.GetFilesystemObjectPath :
+           (("pool_name", "filesystem_name"), "ss"),
+        MethodNames.GetPoolObjectPath : (("name", ), "s"),
+        MethodNames.GetRaidLevels : ((), ""),
+        MethodNames.ListPools : ((), ""),
     }
-    _OUTPUT_SIGS = {
+    OUTPUT_SIGS = {
         MethodNames.ConfigureSimulator : "qs",
         MethodNames.CreatePool : "oqs",
         MethodNames.DestroyPool : "qs",
@@ -231,13 +205,14 @@ class Manager(Interface):
         MethodNames.GetRaidLevels : "a(sqs)",
         MethodNames.ListPools : "asqs",
     }
-    _XFORMERS = _xformers(_INPUT_SIGS)
+    XFORMERS = _xformers(INPUT_SIGS)
 
 
-class Pool(Interface):
+class PoolSpec(InterfaceSpec):
     """
     Pool interface.
     """
+    # pylint: disable=too-few-public-methods
 
     class MethodNames(enum.Enum):
         """
@@ -259,20 +234,20 @@ class Pool(Interface):
         """
         pass
 
-    _INTERFACE_NAME = 'org.storage.stratis1.pool'
+    INTERFACE_NAME = 'org.storage.stratis1.pool'
 
-    _INPUT_SIGS = {
-       MethodNames.AddCacheDevs: "as",
-       MethodNames.AddDevs: "as",
-       MethodNames.CreateFilesystems: "a(sst)",
-       MethodNames.DestroyFilesystems: "as",
-       MethodNames.ListCacheDevs: "",
-       MethodNames.ListDevs: "",
-       MethodNames.ListFilesystems: "",
-       MethodNames.RemoveCacheDevs: "as",
-       MethodNames.RemoveDevs: "as"
+    INPUT_SIGS = {
+       MethodNames.AddCacheDevs: (("devices", ), "as"),
+       MethodNames.AddDevs: (("devices", ), "as"),
+       MethodNames.CreateFilesystems: (("specs", ), "a(sst)"),
+       MethodNames.DestroyFilesystems: (("names", ), "as"),
+       MethodNames.ListCacheDevs: ((), ""),
+       MethodNames.ListDevs: ((), ""),
+       MethodNames.ListFilesystems: ((), ""),
+       MethodNames.RemoveCacheDevs: (("names", ), "as"),
+       MethodNames.RemoveDevs: (("names", ), "as")
     }
-    _OUTPUT_SIGS = {
+    OUTPUT_SIGS = {
        MethodNames.AddCacheDevs: "a(oqs)qs",
        MethodNames.AddDevs: "a(oqs)qs",
        MethodNames.CreateFilesystems: "a(oqs)qs",
@@ -283,4 +258,118 @@ class Pool(Interface):
        MethodNames.RemoveCacheDevs: "a(qs)qs",
        MethodNames.RemoveDevs: "a(qs)qs"
     }
-    _XFORMERS = _xformers(_INPUT_SIGS)
+    XFORMERS = _xformers(INPUT_SIGS)
+
+
+def _prop_builder(spec):
+    """
+    Returns a function that builds a property interface based on 'spec'.
+
+    :param spec: the interface specification
+    :type spec: type, a subtype of InterfaceSpec
+    """
+
+    def builder(namespace):
+        """
+        The property class's namespace.
+
+        :param namespace: the class's namespace
+        """
+
+        def build_property(prop):
+            """
+            Build a single property getter for this class.
+
+            :param prop: the property
+            """
+
+            def dbus_func(proxy_object):
+                """
+                The property getter.
+                """
+                return proxy_object.Get(
+                   spec.INTERFACE_NAME,
+                   prop.name,
+                   dbus_interface=dbus.PROPERTIES_IFACE
+                )
+
+            return dbus_func
+
+        for prop in spec.PropertyNames:
+            namespace[prop.name] = staticmethod(build_property(prop))
+
+    return builder
+
+
+def _iface_builder(spec):
+    """
+    Returns a function that builds a method interface based on 'spec'.
+
+    :param spec: the interface specification
+    :type spec: type, a subtype of InterfaceSpec
+    """
+
+    def builder(namespace):
+        """
+        Builds the class.
+
+        :param namespace: the class's namespace
+        """
+
+        def build_method(method):
+            """
+            Build a single method for this class.
+
+            :param method: the method
+            """
+            (names, func) = spec.XFORMERS[method]
+
+            def dbus_func(proxy_object, **kwargs):
+                """
+                The function method spec.
+                """
+                if frozenset(names) != frozenset(kwargs.keys()):
+                    raise ValueError("Bad keys")
+                args = \
+                   [v for (k, v) in \
+                   sorted(kwargs.items(), key=lambda x: names.index(x[0]))]
+                xformed_args = func(args)
+                dbus_method = getattr(proxy_object, method.name)
+                return dbus_method(
+                   *xformed_args,
+                   dbus_interface=spec.INTERFACE_NAME
+                )
+
+            return dbus_func
+
+        for method in spec.MethodNames:
+            namespace[method.name] = staticmethod(build_method(method))
+
+        namespace['Properties'] = \
+           types.new_class(
+              "Properties",
+              bases=(object,),
+              exec_body=_prop_builder(spec)
+           )
+
+    return builder
+
+
+Cache = types.new_class(
+   "Cache",
+   bases=(object,),
+   exec_body=_iface_builder(CacheSpec)
+)
+Dev = types.new_class("Dev", bases=(object,), exec_body=_iface_builder(DevSpec))
+Filesystem = types.new_class(
+   "Filesystem",
+   bases=(object,),
+   exec_body=_iface_builder(FilesystemSpec)
+)
+Manager = types.new_class(
+   "Manager",
+   bases=(object,),
+   exec_body=_iface_builder(ManagerSpec)
+)
+Pool = \
+   types.new_class("Pool", bases=(object,), exec_body=_iface_builder(PoolSpec))

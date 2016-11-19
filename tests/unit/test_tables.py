@@ -19,30 +19,64 @@ Test invariants on tables in implementation.
 
 import unittest
 
+from stratisd_client_dbus import Cache
+from stratisd_client_dbus import Dev
+from stratisd_client_dbus import Filesystem
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import Pool
+
+from stratisd_client_dbus._implementation import CacheSpec
+from stratisd_client_dbus._implementation import DevSpec
+from stratisd_client_dbus._implementation import FilesystemSpec
+from stratisd_client_dbus._implementation import ManagerSpec
+from stratisd_client_dbus._implementation import PoolSpec
+
+_GENERATED_CLASSES = (Cache, Dev, Filesystem, Manager, Pool)
+_SPEC_CLASSES = (CacheSpec, DevSpec, FilesystemSpec, ManagerSpec, PoolSpec)
 
 class KeysTestCase(unittest.TestCase):
     """
     Test that every map contains all the designated keys.
     """
 
-    def testManager(self):
+    def testSpecTables(self):
         """
-        Test that Manager's maps are correct.
+        Test that *Spec maps are correct.
         """
-        methods = frozenset(Manager.MethodNames)
-        # pylint: disable=protected-access
-        self.assertEqual(methods, frozenset(Manager._INPUT_SIGS.keys()))
-        self.assertEqual(methods, frozenset(Manager._OUTPUT_SIGS.keys()))
-        self.assertEqual(methods, frozenset(Manager._XFORMERS.keys()))
+        for klass in _SPEC_CLASSES:
+            methods = frozenset(klass.MethodNames)
+            self.assertEqual(methods, frozenset(klass.INPUT_SIGS.keys()))
+            self.assertEqual(methods, frozenset(klass.OUTPUT_SIGS.keys()))
+            self.assertEqual(methods, frozenset(klass.XFORMERS.keys()))
 
-    def testPool(self):
+
+class GeneratedClassTestCase(unittest.TestCase):
+    """
+    Test the structure of generated classes.
+    """
+
+    def testParts(self):
         """
-        Test that Pool's maps are correct.
+        Verify that every class has a Properties attribute.
         """
-        methods = frozenset(Pool.MethodNames)
-        # pylint: disable=protected-access
-        self.assertEqual(methods, frozenset(Pool._INPUT_SIGS.keys()))
-        self.assertEqual(methods, frozenset(Pool._OUTPUT_SIGS.keys()))
-        self.assertEqual(methods, frozenset(Pool._XFORMERS.keys()))
+        for klass in _GENERATED_CLASSES:
+            self.assertTrue(hasattr(klass, "Properties"))
+
+    def testProperties(self):
+        """
+        Verify that every class has the set of property names required by
+        corresponding spec.
+        """
+        for (spec, klass) in zip(_SPEC_CLASSES, _GENERATED_CLASSES):
+            properties = getattr(klass, "Properties")
+            for name in spec.PropertyNames:
+                self.assertTrue(hasattr(properties, name.name))
+
+    def testMethods(self):
+        """
+        Verify that every class has the set of method names required by the
+        corresponding spec.
+        """
+        for (spec, klass) in zip(_SPEC_CLASSES, _GENERATED_CLASSES):
+            for name in spec.MethodNames:
+                self.assertTrue(hasattr(klass, name.name))

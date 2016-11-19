@@ -25,14 +25,15 @@ from stratisd_client_dbus import get_object
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
+from stratisd_client_dbus._implementation import ManagerSpec
+
 from .._constants import _DEVICES
 
 from .._misc import checked_call
 from .._misc import _device_list
 from .._misc import Service
 
-_MN = Manager.MethodNames
-_PN = Pool.MethodNames
+_MN = ManagerSpec.MethodNames
 
 class GetObjectTestCase(unittest.TestCase):
     """
@@ -80,6 +81,7 @@ class GetPoolTestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
+        self._errors = StratisdErrorsGen.get_object()
 
     def tearDown(self):
         """
@@ -91,10 +93,11 @@ class GetPoolTestCase(unittest.TestCase):
         """
         An error code is returned if the pool does not exist.
         """
-        (_, rc, _) = \
-           checked_call(Manager, self._proxy, _MN.GetPoolObjectPath, "notapool")
-        expected_rc = StratisdErrorsGen.get_object().POOL_NOTFOUND
-        self.assertEqual(rc, expected_rc)
+        (_, rc, _) = checked_call(
+           Manager.GetPoolObjectPath(self._proxy, name="notapool"),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath]
+        )
+        self.assertEqual(rc, self._errors.POOL_NOTFOUND)
 
 
 class GetPool1TestCase(unittest.TestCase):
@@ -111,13 +114,13 @@ class GetPool1TestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        Manager.callMethod(
+        self._errors = StratisdErrorsGen.get_object()
+        Manager.CreatePool(
            self._proxy,
-           _MN.CreatePool,
-           self._POOLNAME,
-           0,
-           False,
-           [d.device_node for d in _device_list(_DEVICES, 1)]
+           name=self._POOLNAME,
+           redundancy=0,
+           force=False,
+           devices=[d.device_node for d in _device_list(_DEVICES, 1)]
         )
 
     def tearDown(self):
@@ -131,22 +134,21 @@ class GetPool1TestCase(unittest.TestCase):
         Getting an existing pool should succeed.
         """
         (result, rc, _) = checked_call(
-           Manager,
-           self._proxy,
-           _MN.GetPoolObjectPath,
-           self._POOLNAME
+           Manager.GetPoolObjectPath(self._proxy, name=self._POOLNAME),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath],
         )
-        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
+        self.assertEqual(rc, self._errors.OK)
         self.assertNotEqual(result, '')
 
     def testUnknownName(self):
         """
         Getting a non-existing pool should fail.
         """
-        (_, rc, _) = \
-           checked_call(Manager, self._proxy, _MN.GetPoolObjectPath, 'nopool')
-        expected_rc = StratisdErrorsGen.get_object().POOL_NOTFOUND
-        self.assertEqual(rc, expected_rc)
+        (_, rc, _) = checked_call(
+           Manager.GetPoolObjectPath(self._proxy, name='nopool'),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath],
+        )
+        self.assertEqual(rc, self._errors.POOL_NOTFOUND)
 
 
 class GetVolumeTestCase(unittest.TestCase):
@@ -162,6 +164,7 @@ class GetVolumeTestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
+        self._errors = StratisdErrorsGen.get_object()
 
     def tearDown(self):
         """
@@ -177,14 +180,14 @@ class GetVolumeTestCase(unittest.TestCase):
         is because the filesystem is not found or because the pool is not found.
         """
         (_, rc, _) = checked_call(
-           Manager,
-           self._proxy,
-           _MN.GetFilesystemObjectPath,
-           'notapool',
-           'noname'
+           Manager.GetFilesystemObjectPath(
+              self._proxy,
+              pool_name='notapool',
+              filesystem_name='noname'
+           ),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetFilesystemObjectPath],
         )
-        expected_rc = StratisdErrorsGen.get_object().FILESYSTEM_NOTFOUND
-        self.assertEqual(rc, expected_rc)
+        self.assertEqual(rc, self._errors.FILESYSTEM_NOTFOUND)
 
 
 class GetVolume1TestCase(unittest.TestCase):
@@ -201,13 +204,13 @@ class GetVolume1TestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        Manager.callMethod(
+        self._errors = StratisdErrorsGen.get_object()
+        Manager.CreatePool(
            self._proxy,
-           _MN.CreatePool,
-           self._POOLNAME,
-           0,
-           False,
-           [d.device_node for d in _device_list(_DEVICES, 1)]
+           name=self._POOLNAME,
+           redundancy=0,
+           force=False,
+           devices=[d.device_node for d in _device_list(_DEVICES, 1)]
         )
 
     def tearDown(self):
@@ -221,14 +224,14 @@ class GetVolume1TestCase(unittest.TestCase):
         An exception is raised if the volume does not exist.
         """
         (_, rc, _) = checked_call(
-           Manager,
-           self._proxy,
-           _MN.GetFilesystemObjectPath,
-           self._POOLNAME,
-           'noname'
+           Manager.GetFilesystemObjectPath(
+              self._proxy,
+              pool_name=self._POOLNAME,
+              filesystem_name='noname'
+           ),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetFilesystemObjectPath]
         )
-        expected_rc = StratisdErrorsGen.get_object().FILESYSTEM_NOTFOUND
-        self.assertEqual(rc, expected_rc)
+        self.assertEqual(rc, self._errors.FILESYSTEM_NOTFOUND)
 
 
 class GetVolume2TestCase(unittest.TestCase):
@@ -246,18 +249,17 @@ class GetVolume2TestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        (poolpath, _, _) = Manager.callMethod(
+        self._errors = StratisdErrorsGen.get_object()
+        (poolpath, _, _) = Manager.CreatePool(
            self._proxy,
-           _MN.CreatePool,
-           self._POOLNAME,
-           0,
-           False,
-           [d.device_node for d in _device_list(_DEVICES, 1)]
+           name=self._POOLNAME,
+           redundancy=0,
+           force=False,
+           devices=[d.device_node for d in _device_list(_DEVICES, 1)]
         )
-        Pool.callMethod(
+        Pool.CreateFilesystems(
            get_object(poolpath),
-           _PN.CreateFilesystems,
-           [(self._VOLNAME, '', 0)]
+           specs=[(self._VOLNAME, '', 0)]
         )
 
     def tearDown(self):
@@ -271,29 +273,29 @@ class GetVolume2TestCase(unittest.TestCase):
         The volume should be discovered.
         """
         (result, rc, _) = checked_call(
-           Manager,
-           self._proxy,
-           _MN.GetFilesystemObjectPath,
-           self._POOLNAME,
-           self._VOLNAME
+           Manager.GetFilesystemObjectPath(
+              self._proxy,
+              pool_name=self._POOLNAME,
+              filesystem_name=self._VOLNAME
+           ),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetFilesystemObjectPath]
         )
-        expected_rc = StratisdErrorsGen.get_object().OK
-        self.assertEqual(rc, expected_rc)
+        self.assertEqual(rc, self._errors.OK)
         self.assertNotEqual(result, "")
 
     def testNonExistingVolume(self):
         """
-        The volume does not exists.
+        The volume does not exist.
         """
         (_, rc, _) = checked_call(
-           Manager,
-           self._proxy,
-           _MN.GetFilesystemObjectPath,
-           self._POOLNAME,
-           'noname'
+           Manager.GetFilesystemObjectPath(
+              self._proxy,
+              pool_name=self._POOLNAME,
+              filesystem_name='noname'
+           ),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetFilesystemObjectPath]
         )
-        expected_rc = StratisdErrorsGen.get_object().FILESYSTEM_NOTFOUND
-        self.assertEqual(rc, expected_rc)
+        self.assertEqual(rc, self._errors.FILESYSTEM_NOTFOUND)
 
 
 class GetCacheTestCase(unittest.TestCase):
@@ -309,6 +311,7 @@ class GetCacheTestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
+        self._errors = StratisdErrorsGen.get_object()
 
     def tearDown(self):
         """
@@ -324,13 +327,10 @@ class GetCacheTestCase(unittest.TestCase):
         be POOL_NOTFOUND
         """
         (_, rc, _) = checked_call(
-           Manager,
-           self._proxy,
-           _MN.GetCacheObjectPath,
-           'notapool'
+           Manager.GetCacheObjectPath(self._proxy, pool_name='notapool'),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetCacheObjectPath]
         )
-        expected_rc = StratisdErrorsGen.get_object().POOL_NOTFOUND
-        self.assertEqual(rc, expected_rc)
+        self.assertEqual(rc, self._errors.POOL_NOTFOUND)
 
     @unittest.skip("Unimplemented")
     def testNonExistingPool1(self):
@@ -338,13 +338,10 @@ class GetCacheTestCase(unittest.TestCase):
         Returns an error code, just the wrong one.
         """
         (_, rc, _) = checked_call(
-           Manager,
-           self._proxy,
-           _MN.GetCacheObjectPath,
-           'notapool'
+           Manager.GetCacheObjectPath(self._proxy, pool_name='notapool'),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetCacheObjectPath]
         )
-        ok_rc = StratisdErrorsGen.get_object().OK
-        self.assertNotEqual(rc, ok_rc)
+        self.assertNotEqual(rc, self._errors.OK)
 
 
 class GetCache1TestCase(unittest.TestCase):
@@ -361,13 +358,13 @@ class GetCache1TestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        Manager.callMethod(
+        self._errors = StratisdErrorsGen.get_object()
+        Manager.CreatePool(
            self._proxy,
-           _MN.CreatePool,
-           self._POOLNAME,
-           0,
-           False,
-           [d.device_node for d in _device_list(_DEVICES, 1)]
+           name=self._POOLNAME,
+           redundancy=0,
+           force=False,
+           devices=[d.device_node for d in _device_list(_DEVICES, 1)]
         )
 
     def tearDown(self):
@@ -385,13 +382,10 @@ class GetCache1TestCase(unittest.TestCase):
         Unfortunately, it is the wrong error.
         """
         (_, rc, _) = checked_call(
-           Manager,
-           self._proxy,
-           _MN.GetCacheObjectPath,
-           'notapool'
+           Manager.GetCacheObjectPath(self._proxy, pool_name='notapool'),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetCacheObjectPath]
         )
-        expected_rc = StratisdErrorsGen.get_object().POOL_NOTFOUND
-        self.assertEqual(rc, expected_rc)
+        self.assertEqual(rc, self._errors.POOL_NOTFOUND)
 
     @unittest.skip("unimplemented")
     def testException1(self):
@@ -401,13 +395,10 @@ class GetCache1TestCase(unittest.TestCase):
         Aside from the error value, the results are correct.
         """
         (_, rc, _) = checked_call(
-           Manager,
-           self._proxy,
-           _MN.GetCacheObjectPath,
-           'notapool'
+           Manager.GetCacheObjectPath(self._proxy, pool_name='notapool'),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetCacheObjectPath]
         )
-        ok_rc = StratisdErrorsGen.get_object().OK
-        self.assertNotEqual(rc, ok_rc)
+        self.assertNotEqual(rc, self._errors.OK)
 
     @unittest.skip("unimplemented")
     @unittest.expectedFailure
@@ -418,11 +409,8 @@ class GetCache1TestCase(unittest.TestCase):
         But, for some reason, there is not.
         """
         (result, rc, _) = checked_call(
-           Manager,
-           self._proxy,
-           _MN.GetCacheObjectPath,
-           self._POOLNAME
+           Manager.GetCacheObjectPath(self._proxy, pool_name=self._POOLNAME),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetCacheObjectPath]
         )
-        expected_rc = StratisdErrorsGen.get_object().OK
-        self.assertEqual(rc, expected_rc)
+        self.assertEqual(rc, self._errors.OK)
         self.assertNotEqual(result, "")

@@ -87,6 +87,95 @@ class Interface(abc.ABC):
         )
 
 
+class Cache(Interface):
+    """
+    Cache device interface.
+    """
+
+    class MethodNames(enum.Enum):
+        """
+        Names of the methods of the dev interface.
+        """
+        pass
+
+    class PropertyNames(enum.Enum):
+        """
+        Names of the properties of the Filesystem interface.
+        """
+        Size = "Size"
+
+    _INTERFACE_NAME = 'org.storage.stratis1.cache'
+
+    _INPUT_SIGS = {
+    }
+    _OUTPUT_SIGS = {
+    }
+    _XFORMERS = _xformers(_INPUT_SIGS)
+
+
+class Dev(Interface):
+    """
+    Blockdev interface.
+    """
+
+    class MethodNames(enum.Enum):
+        """
+        Names of the methods of the dev interface.
+        """
+        pass
+
+    class PropertyNames(enum.Enum):
+        """
+        Names of the properties of the Filesystem interface.
+        """
+        Size = "Size"
+
+    _INTERFACE_NAME = 'org.storage.stratis1.dev'
+
+    _INPUT_SIGS = {
+    }
+    _OUTPUT_SIGS = {
+    }
+    _XFORMERS = _xformers(_INPUT_SIGS)
+
+
+class Filesystem(Interface):
+    """
+    Filesystem interface.
+    """
+
+    class MethodNames(enum.Enum):
+        """
+        Names of the methods of the Filesystem class.
+        """
+        CreateSnapshot = "CreateSnapshot"
+        Rename = "Rename"
+        SetMountpoint = "SetMountpoint"
+        SetQuota = "SetQuota"
+
+    class PropertyNames(enum.Enum):
+        """
+        Names of the properties of the Filesystem interface.
+        """
+        pass
+
+    _INTERFACE_NAME = 'org.storage.stratis1.filesystem'
+
+    _INPUT_SIGS = {
+       MethodNames.CreateSnapshot: "s",
+       MethodNames.Rename: "s",
+       MethodNames.SetMountpoint: "",
+       MethodNames.SetQuota: "s"
+    }
+    _OUTPUT_SIGS = {
+       MethodNames.CreateSnapshot: "oqs",
+       MethodNames.Rename: "oqs",
+       MethodNames.SetMountpoint: "oqs",
+       MethodNames.SetQuota: "oqs"
+    }
+    _XFORMERS = _xformers(_INPUT_SIGS)
+
+
 class Manager(Interface):
     """
     Manager interface.

@@ -18,5 +18,5 @@
     .. moduleauthor::  mulhern  <amulhern@redhat.com>
 """
 
-__version__ = '0.02'
+__version__ = '0.03'
 __version_info__ = tuple(int(x) for x in __version__.split('.'))

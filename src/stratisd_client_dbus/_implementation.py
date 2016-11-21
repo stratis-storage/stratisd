@@ -269,8 +269,8 @@ class Pool(Interface):
        MethodNames.ListCacheDevs: "",
        MethodNames.ListDevs: "",
        MethodNames.ListFilesystems: "",
-       MethodNames.RemoveCacheDevs: "asi",
-       MethodNames.RemoveDevs: "asi"
+       MethodNames.RemoveCacheDevs: "as",
+       MethodNames.RemoveDevs: "as"
     }
     _OUTPUT_SIGS = {
        MethodNames.AddCacheDevs: "a(oqs)qs",

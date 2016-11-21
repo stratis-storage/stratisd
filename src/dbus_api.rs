@@ -658,8 +658,8 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 0));
-    let force: bool = try!(get_next_arg(&mut iter, 1));
+    let force: bool = try!(get_next_arg(&mut iter, 0));
+    let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 1));
 
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
@@ -878,8 +878,8 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_string", "s"));
 
     let add_devs_method = f.method(ADD_DEVS, (), add_devs)
-        .in_arg(("devs", "as"))
         .in_arg(("force", "b"))
+        .in_arg(("devs", "as"))
         .out_arg(("results", "a(oqs)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
@@ -918,8 +918,8 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let name: &str = try!(get_next_arg(&mut iter, 0));
     let raid_level: u16 = try!(get_next_arg(&mut iter, 1));
-    let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 2));
-    let force: bool = try!(get_next_arg(&mut iter, 3));
+    let force: bool = try!(get_next_arg(&mut iter, 2));
+    let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 3));
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
@@ -931,8 +931,6 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match result {
         Ok(_) => {
             let object_path: dbus::Path = create_dbus_pool(dbus_context.clone());
-            let (rc, rs) = ok_message_items();
-            dbus_context.pools.borrow_mut().insert(object_path.to_string(), String::from(name));
             dbus_context.pools.borrow_mut().insert(object_path.to_string(), String::from(name));
             for dev in blockdevs {
                 let dev_object_path: dbus::Path = create_dbus_blockdev(dbus_context.clone());
@@ -941,6 +939,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                     .insert(dev_object_path.to_string(),
                             String::from(dev.to_str().unwrap()));
             }
+            let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
         }
         Err(x) => {
@@ -1086,8 +1085,8 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
     let create_pool_method = f.method(CREATE_POOL, (), create_pool)
         .in_arg(("pool_name", "s"))
         .in_arg(("raid_type", "q"))
-        .in_arg(("dev_list", "as"))
         .in_arg(("force", "b"))
+        .in_arg(("dev_list", "as"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

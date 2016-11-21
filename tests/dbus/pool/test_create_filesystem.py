@@ -56,6 +56,7 @@ class CreateFSTestCase(unittest.TestCase):
            _MN.CreatePool,
            self._POOLNAME,
            0,
+           False,
            self._devs
         )
         self._pool_object = get_object(result)
@@ -107,6 +108,7 @@ class CreateFSTestCase1(unittest.TestCase):
            _MN.CreatePool,
            self._POOLNAME,
            0,
+           False,
            self._devs
         )
         self._pool_object = get_object(result)

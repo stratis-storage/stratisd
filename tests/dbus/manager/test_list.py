@@ -83,6 +83,7 @@ class List2TestCase(unittest.TestCase):
            _MN.CreatePool,
            self._POOLNAME,
            0,
+           False,
            [d.device_node for d in _device_list(_DEVICES, 1)]
         )
         Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)

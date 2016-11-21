@@ -116,6 +116,7 @@ class GetPool1TestCase(unittest.TestCase):
            _MN.CreatePool,
            self._POOLNAME,
            0,
+           False,
            [d.device_node for d in _device_list(_DEVICES, 1)]
         )
 
@@ -205,6 +206,7 @@ class GetVolume1TestCase(unittest.TestCase):
            _MN.CreatePool,
            self._POOLNAME,
            0,
+           False,
            [d.device_node for d in _device_list(_DEVICES, 1)]
         )
 
@@ -249,6 +251,7 @@ class GetVolume2TestCase(unittest.TestCase):
            _MN.CreatePool,
            self._POOLNAME,
            0,
+           False,
            [d.device_node for d in _device_list(_DEVICES, 1)]
         )
         Pool.callMethod(
@@ -363,6 +366,7 @@ class GetCache1TestCase(unittest.TestCase):
            _MN.CreatePool,
            self._POOLNAME,
            0,
+           False,
            [d.device_node for d in _device_list(_DEVICES, 1)]
         )
 

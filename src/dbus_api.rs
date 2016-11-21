@@ -931,7 +931,6 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match result {
         Ok(_) => {
             let object_path: dbus::Path = create_dbus_pool(dbus_context.clone());
-            let (rc, rs) = ok_message_items();
             dbus_context.pools.borrow_mut().insert(object_path.to_string(), String::from(name));
             for dev in blockdevs {
                 let dev_object_path: dbus::Path = create_dbus_blockdev(dbus_context.clone());
@@ -940,6 +939,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                     .insert(dev_object_path.to_string(),
                             String::from(dev.to_str().unwrap()));
             }
+            let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
         }
         Err(x) => {

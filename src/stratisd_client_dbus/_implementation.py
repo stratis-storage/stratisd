@@ -207,7 +207,7 @@ class Manager(Interface):
 
     _INPUT_SIGS = {
         MethodNames.ConfigureSimulator : "u",
-        MethodNames.CreatePool : "sqas",
+        MethodNames.CreatePool : "sqbas",
         MethodNames.DestroyPool : "s",
         MethodNames.GetCacheObjectPath : "s",
         MethodNames.GetDevObjectPath : "s",

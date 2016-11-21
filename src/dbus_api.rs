@@ -933,7 +933,6 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let object_path: dbus::Path = create_dbus_pool(dbus_context.clone());
             let (rc, rs) = ok_message_items();
             dbus_context.pools.borrow_mut().insert(object_path.to_string(), String::from(name));
-            dbus_context.pools.borrow_mut().insert(object_path.to_string(), String::from(name));
             for dev in blockdevs {
                 let dev_object_path: dbus::Path = create_dbus_blockdev(dbus_context.clone());
                 dbus_context.block_devs

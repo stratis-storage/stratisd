@@ -209,28 +209,28 @@ impl BlockDev {
         Ok((pool_id,
             dev_id,
             BlockDev {
-            dev: dev,
-            path: path.to_owned(),
-            sectors: Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE),
-            mdaa: MDA {
-                last_updated: Timespec::new(LittleEndian::read_u64(&buf[64..72]) as i64,
-                                            LittleEndian::read_u32(&buf[72..76]) as i32),
-                used: LittleEndian::read_u32(&buf[76..80]),
-                length: (*mda_size / 2 * SECTOR_SIZE) as u32,
-                crc: LittleEndian::read_u32(&buf[80..84]),
-                offset: SectorOffset(0),
-            },
-            mdab: MDA {
-                last_updated: Timespec::new(LittleEndian::read_u64(&buf[96..104]) as i64,
-                                            LittleEndian::read_u32(&buf[104..108]) as i32),
-                used: LittleEndian::read_u32(&buf[108..112]),
-                length: (*mda_size / 2 * SECTOR_SIZE) as u32,
-                crc: LittleEndian::read_u32(&buf[112..116]),
-                offset: SectorOffset(*mda_size / 2),
-            },
-            mda_sectors: mda_size,
-            reserved_sectors: Sectors(LittleEndian::read_u32(&buf[164..168]) as u64),
-        }))
+                dev: dev,
+                path: path.to_owned(),
+                sectors: Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE),
+                mdaa: MDA {
+                    last_updated: Timespec::new(LittleEndian::read_u64(&buf[64..72]) as i64,
+                                                LittleEndian::read_u32(&buf[72..76]) as i32),
+                    used: LittleEndian::read_u32(&buf[76..80]),
+                    length: (*mda_size / 2 * SECTOR_SIZE) as u32,
+                    crc: LittleEndian::read_u32(&buf[80..84]),
+                    offset: SectorOffset(0),
+                },
+                mdab: MDA {
+                    last_updated: Timespec::new(LittleEndian::read_u64(&buf[96..104]) as i64,
+                                                LittleEndian::read_u32(&buf[104..108]) as i32),
+                    used: LittleEndian::read_u32(&buf[108..112]),
+                    length: (*mda_size / 2 * SECTOR_SIZE) as u32,
+                    crc: LittleEndian::read_u32(&buf[112..116]),
+                    offset: SectorOffset(*mda_size / 2),
+                },
+                mda_sectors: mda_size,
+                reserved_sectors: Sectors(LittleEndian::read_u32(&buf[164..168]) as u64),
+            }))
     }
 
     pub fn to_save(&self) -> BlockDevSave {

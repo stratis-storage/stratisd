@@ -77,13 +77,17 @@ class Create2TestCase(unittest.TestCase):
            self._POOLNAME
         )
 
+        (pools, _, _) = checked_call(Manager, self._proxy, _MN.ListPools)
+
         ok = StratisdErrorsGen.get_object().OK
         if rc == ok:
             self.assertEqual(pool, result)
             self.assertEqual(rc1, ok)
+            self.assertEqual(len(pools), 1)
         else:
             expected = StratisdErrorsGen.get_object().POOL_NOTFOUND
             self.assertEqual(rc1, expected)
+            self.assertEqual(len(pools), 0)
 
 
 class Create3TestCase(unittest.TestCase):
@@ -119,6 +123,8 @@ class Create3TestCase(unittest.TestCase):
         """
         Create should fail trying to create new pool with same name as previous.
         """
+        (pools1, _, _) = checked_call(Manager, self._proxy, _MN.ListPools)
+
         (_, rc, _) = checked_call(
            Manager,
            self._proxy,
@@ -137,4 +143,7 @@ class Create3TestCase(unittest.TestCase):
            self._POOLNAME
         )
 
+        (pools2, _, _) = checked_call(Manager, self._proxy, _MN.ListPools)
+
         self.assertEqual(rc1, StratisdErrorsGen.get_object().OK)
+        self.assertEqual(pools1, pools2)

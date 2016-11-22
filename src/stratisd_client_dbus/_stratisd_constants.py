@@ -31,20 +31,20 @@ class StratisdConstants(object):
     """
 
     @staticmethod
-    def parse_error_list(error_list):
+    def parse_list(constant_list):
         """
-        Parse the list of stratisd errors.
+        Parse the list of stratisd constants.
 
-        :param error_list: list of errors published by stratisd
-        :type error_list: Array of String * `a * String
+        :param constant_list: list of constants published by stratisd
+        :type constant_list: Array of String * `a * String
 
-        :returns: the values and the descriptions attached to the errors
+        :returns: the values and the descriptions attached to the constants
         :rtype: (dict of String * `a) * (dict of `a * String)
         """
 
         values = dict()
         descriptions = dict()
-        for (key, value, desc) in error_list:
+        for (key, value, desc) in constant_list:
             values[key] = value
             descriptions[value] = desc
         return (values, descriptions)
@@ -65,18 +65,18 @@ class StratisdConstants(object):
         return type(classname, (object,), values)
 
     @staticmethod
-    def get_class(classname, error_list):
+    def get_class(classname, constant_list):
         """
-        Get a class from ``error_list``.
+        Get a class from ``constant_list``.
 
         :param str classname: the name of the class to construct
-        :param error_list: list of errors published by stratisd
-        :type error_list: Array of String * `a * String
+        :param constant_list: list of constants published by stratisd
+        :type constant_list: Array of String * `a * String
 
-        :returns: the class which supports a mapping from error codes to ints
+        :returns: the class which supports a mapping from constant codes to ints
         :rtype: type
         """
-        (values, _) = StratisdConstants.parse_error_list(error_list)
+        (values, _) = StratisdConstants.parse_list(constant_list)
         return StratisdConstants.build_class(classname, values)
 
 
@@ -88,7 +88,7 @@ class StratisdConstantsGen(abc.ABC):
     # pylint: disable=too-few-public-methods
 
     _CLASSNAME = abc.abstractproperty(doc="the name of the class to construct")
-    _METHODNAME = abc.abstractproperty(doc="dbus method name")
+    _METHOD = abc.abstractproperty(doc="dbus method")
 
     @classmethod
     def get_object(cls):
@@ -98,7 +98,7 @@ class StratisdConstantsGen(abc.ABC):
         :return: class with class attributes for stratisd constants
         :rtype: type
         """
-        values = Manager.callMethod(get_object(TOP_OBJECT), cls._METHODNAME)
+        values = cls._METHOD(get_object(TOP_OBJECT))
         return StratisdConstants.get_class(cls._CLASSNAME, values)
 
 
@@ -109,7 +109,7 @@ class StratisdErrorsGen(StratisdConstantsGen):
     # pylint: disable=too-few-public-methods
 
     _CLASSNAME = 'StratisdErrors'
-    _METHODNAME = Manager.MethodNames.GetErrorCodes
+    _METHOD = Manager.GetErrorCodes
 
 class StratisdRaidGen(StratisdConstantsGen):
     """
@@ -118,4 +118,4 @@ class StratisdRaidGen(StratisdConstantsGen):
     # pylint: disable=too-few-public-methods
 
     _CLASSNAME = 'StratisdRaidLevels'
-    _METHODNAME = Manager.MethodNames.GetRaidLevels
+    _METHOD = Manager.GetRaidLevels

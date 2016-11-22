@@ -28,22 +28,18 @@ from ._constants import _STRATISD_EXECUTABLE
 from ._constants import _STRATISD_RUST
 
 
-def checked_call(klass, proxy, method, *args):
+def checked_call(value, sig):
     """
     Call a method and check that the returned value has the expected signature.
 
-    :param type klass: the class representing the interface
-    :param object proxy: the proxy object
-    :param method: the method to invoke
-    :param args: the arguments to pass to the method
-    :returns: the result of the method
+    :param value: the value to check, an iterable
+    :param str sig: the expected signature of the value
+    :returns: value, for convenience
     :raises ValueError: if the result type is incorrect
     """
-    result = klass.callMethod(proxy, method, *args)
-    # pylint: disable=protected-access
-    if "".join(signature(x) for x in result) != klass._OUTPUT_SIGS[method]:
+    if "".join(signature(x) for x in value) != sig:
         raise ValueError("result type does not match signature")
-    return result
+    return value
 
 
 def _device_list(devices, minimum):

@@ -24,6 +24,8 @@ from stratisd_client_dbus import Pool
 from stratisd_client_dbus import StratisdErrorsGen
 from stratisd_client_dbus import get_object
 
+from stratisd_client_dbus._implementation import ManagerSpec
+
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._constants import _DEVICES
@@ -34,8 +36,7 @@ from .._misc import _device_list
 from .._misc import Service
 
 
-_MN = Manager.MethodNames
-_PN = Pool.MethodNames
+_MN = ManagerSpec.MethodNames
 
 class Destroy1TestCase(unittest.TestCase):
     """
@@ -53,7 +54,8 @@ class Destroy1TestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)
+        self._errors = StratisdErrorsGen.get_object()
+        Manager.ConfigureSimulator(self._proxy, denominator=8)
 
     def tearDown(self):
         """
@@ -65,19 +67,18 @@ class Destroy1TestCase(unittest.TestCase):
         """
         Destroy should succeed.
         """
-        (rc, _) = \
-           checked_call(Manager, self._proxy, _MN.DestroyPool, self._POOLNAME)
-        self.assertEqual(rc, StratisdErrorsGen.get_object().OK)
+        (rc, _) = checked_call(
+           Manager.DestroyPool(self._proxy, name=self._POOLNAME),
+           ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
+        )
+        self.assertEqual(rc, self._errors.OK)
 
         (_, rc1, _) = checked_call(
-           Manager,
-           self._proxy,
-           _MN.GetPoolObjectPath,
-           self._POOLNAME
+           Manager.GetPoolObjectPath(self._proxy, name=self._POOLNAME),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath]
         )
 
-        expected_rc = StratisdErrorsGen.get_object().POOL_NOTFOUND
-        self.assertEqual(rc1, expected_rc)
+        self.assertEqual(rc1, self._errors.POOL_NOTFOUND)
 
 
 class Destroy2TestCase(unittest.TestCase):
@@ -94,14 +95,15 @@ class Destroy2TestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        Manager.callMethod(
+        self._errors = StratisdErrorsGen.get_object()
+        Manager.CreatePool(
            self._proxy,
-           _MN.CreatePool,
-           self._POOLNAME,
-           0,
-           [d.device_node for d in _device_list(_DEVICES, 1)]
+           name=self._POOLNAME,
+           redundancy=0,
+           force=False,
+           devices=[d.device_node for d in _device_list(_DEVICES, 1)]
         )
-        Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)
+        Manager.ConfigureSimulator(self._proxy, denominator=8)
 
     def tearDown(self):
         """
@@ -113,20 +115,20 @@ class Destroy2TestCase(unittest.TestCase):
         """
         The pool was just created, so must be destroyable.
         """
-        (rc, _) = \
-           checked_call(Manager, self._proxy, _MN.DestroyPool, self._POOLNAME)
-
-        (_, rc1, _) = checked_call(
-           Manager,
-           self._proxy,
-           _MN.GetPoolObjectPath,
-           self._POOLNAME
+        (rc, _) = checked_call(
+           Manager.DestroyPool(self._proxy, name=self._POOLNAME),
+           ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
         )
 
-        if rc is StratisdErrorsGen.get_object().OK:
-            expected_rc = StratisdErrorsGen.get_object().POOL_NOTFOUND
+        (_, rc1, _) = checked_call(
+           Manager.GetPoolObjectPath(self._proxy, name=self._POOLNAME),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath],
+        )
+
+        if rc is self._errors.OK:
+            expected_rc = self._errors.POOL_NOTFOUND
         else:
-            expected_rc = StratisdErrorsGen.get_object().OK
+            expected_rc = self._errors.OK
 
         self.assertEqual(rc1, expected_rc)
 
@@ -148,19 +150,19 @@ class Destroy3TestCase(unittest.TestCase):
 
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        (poolpath, _, _) = Manager.callMethod(
+        self._errors = StratisdErrorsGen.get_object()
+        (poolpath, _, _) = Manager.CreatePool(
            self._proxy,
-           _MN.CreatePool,
-           self._POOLNAME,
-           0,
-           [d.device_node for d in _device_list(_DEVICES, 1)]
+           name=self._POOLNAME,
+           redundancy=0,
+           force=False,
+           devices=[d.device_node for d in _device_list(_DEVICES, 1)]
         )
-        Pool.callMethod(
+        Pool.CreateFilesystems(
            get_object(poolpath),
-           _PN.CreateFilesystems,
-           [(self._VOLNAME, '', 0)]
+           specs=[(self._VOLNAME, '', 0)]
         )
-        Manager.callMethod(self._proxy, _MN.ConfigureSimulator, 8)
+        Manager.ConfigureSimulator(self._proxy, denominator=8)
 
     def tearDown(self):
         """
@@ -172,6 +174,8 @@ class Destroy3TestCase(unittest.TestCase):
         """
         This should fail since it has a filesystem on it.
         """
-        (rc, _) = \
-           checked_call(Manager, self._proxy, _MN.DestroyPool, self._POOLNAME)
-        self.assertEqual(rc, StratisdErrorsGen.get_object().BUSY)
+        (rc, _) = checked_call(
+           Manager.DestroyPool(self._proxy, name=self._POOLNAME),
+           ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
+        )
+        self.assertEqual(rc, self._errors.BUSY)

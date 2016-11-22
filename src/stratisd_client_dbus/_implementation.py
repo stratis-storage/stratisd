@@ -237,8 +237,8 @@ class PoolSpec(InterfaceSpec):
     INTERFACE_NAME = 'org.storage.stratis1.pool'
 
     INPUT_SIGS = {
-       MethodNames.AddCacheDevs: (("devices", ), "as"),
-       MethodNames.AddDevs: (("devices", ), "as"),
+       MethodNames.AddCacheDevs: (("force", "devices", ), "bas"),
+       MethodNames.AddDevs: (("force", "devices", ), "bas"),
        MethodNames.CreateFilesystems: (("specs", ), "a(sst)"),
        MethodNames.DestroyFilesystems: (("names", ), "as"),
        MethodNames.ListCacheDevs: ((), ""),

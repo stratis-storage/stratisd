@@ -729,7 +729,8 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let cache_devs: Array<&str, _> = try!(get_next_arg(&mut iter, 0));
+    let force: bool = try!(get_next_arg(&mut iter, 0));
+    let cache_devs: Array<&str, _> = try!(get_next_arg(&mut iter, 1));
 
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
@@ -750,7 +751,7 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut vec = Vec::new();
 
     for dev in cache_devs {
-        let result = pool.add_cachedev(Path::new(dev));
+        let result = pool.add_cachedev(Path::new(dev), force);
         match result {
             Ok(_) => {
                 let object_path: dbus::Path = create_dbus_cachedev(dbus_context.clone());
@@ -861,6 +862,7 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_string", "s"));
 
     let add_cache_devs_method = f.method(ADD_CACHE_DEVS, (), add_cache_devs)
+        .in_arg(("force", "b"))
         .in_arg(("cache_devs", "as"))
         .out_arg(("results", "a(oqs)"))
         .out_arg(("return_code", "q"))

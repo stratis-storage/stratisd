@@ -59,7 +59,7 @@ impl Pool for SimPool {
         Ok(())
     }
 
-    fn add_cachedev(&mut self, path: &Path) -> EngineResult<()> {
+    fn add_cachedev(&mut self, path: &Path, _force: bool) -> EngineResult<()> {
         self.cache_devs.push(SimCacheDev::new_cache(self.rdm.clone(), path));
         Ok(())
     }

@@ -90,7 +90,7 @@ impl Pool for StratPool {
         Ok(())
     }
 
-    fn add_cachedev(&mut self, _path: &Path) -> EngineResult<()> {
+    fn add_cachedev(&mut self, _path: &Path, _force: bool) -> EngineResult<()> {
         unimplemented!()
     }
 

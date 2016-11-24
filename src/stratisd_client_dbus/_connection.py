@@ -30,7 +30,7 @@ class Bus(object):
     _BUS = None
 
     @staticmethod
-    def get_bus():
+    def get_bus(): # pragma: no cover
         """
         Get our bus.
         """
@@ -39,7 +39,7 @@ class Bus(object):
 
         return Bus._BUS
 
-def get_object(object_path):
+def get_object(object_path): # pragma: no cover
     """
     Get an object from an object path.
 

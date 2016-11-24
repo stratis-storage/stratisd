@@ -22,7 +22,58 @@ import types
 
 import dbus
 
-from into_dbus_python import xformer
+from into_dbus_python import xformers
+
+_FALSE = lambda n: lambda x: x
+
+def _option_to_tuple(value, default):
+    """
+    Converts a Python "option" type, None or a value, to a tuple.
+
+    :param object value: any value
+    :param object default: a valid default to use if value is None
+    :returns: a tuple encoding the meaning of value
+    :rtypes: bool * object
+    """
+    return (False, default) if value is None else (True, value)
+
+
+def _info_to_xformer(names, inxform, sig):
+    """
+    Function that yields a xformer function.
+
+    :param names: the names of the parameters for this function
+    :type names: list of str
+    :param inxform: a function that yields transformation functions
+    :type inform: str -> (object -> object)
+    :param str sig: a D-Bus signature
+    :return: a transformation function
+    :rtype: (list of object) -> (list of object)
+    """
+    inxforms = [inxform(name) for name in names]
+    outxforms = [f for (f, _) in xformers(sig)]
+    expected_length = len(names)
+
+    if len(outxforms) != expected_length:
+        raise ValueError("xformation functions do not match")
+
+    def xformer(objects):
+        """
+        Transforms a list of objects to dbus-python types.
+
+        :param objects: list of objects
+        :type objects: list of object
+        :returns: a transformed list of objects
+        :rtype: list of object
+        """
+        if len(objects) != expected_length:
+            raise ValueError("wrong number of objects")
+
+        return \
+           [x for (x, _) in (f(g(a)) for \
+           ((f, g), a) in zip(zip(outxforms, inxforms), objects))]
+
+    return xformer
 
 
 def _xformers(key_to_sig):
@@ -34,10 +85,8 @@ def _xformers(key_to_sig):
     :returns: a map from keys to functions
     :rtype: dict of object * xformation function
     """
-    sig_to_xformers = \
-       dict((sig, xformer(sig)) for (_, sig) in key_to_sig.values())
-    return dict((method, (names, sig_to_xformers[sig])) for \
-       (method, (names, sig)) in key_to_sig.items())
+    return dict((method, (names, _info_to_xformer(names, inxform, sig))) for \
+       (method, (names, inxform, sig)) in key_to_sig.items())
 
 
 class InterfaceSpec(abc.ABC):
@@ -133,10 +182,10 @@ class FilesystemSpec(InterfaceSpec):
     INTERFACE_NAME = 'org.storage.stratis1.filesystem'
 
     INPUT_SIGS = {
-       MethodNames.CreateSnapshot: (("name", ), "s"),
-       MethodNames.Rename: (("name", ), "s"),
-       MethodNames.SetMountpoint: ((), ""),
-       MethodNames.SetQuota: (("quota", ), "s")
+       MethodNames.CreateSnapshot: (("name", ), _FALSE, "s"),
+       MethodNames.Rename: (("name", ), _FALSE, "s"),
+       MethodNames.SetMountpoint: ((), _FALSE, ""),
+       MethodNames.SetQuota: (("quota", ), _FALSE, "s")
     }
     OUTPUT_SIGS = {
        MethodNames.CreateSnapshot: "oqs",
@@ -178,19 +227,19 @@ class ManagerSpec(InterfaceSpec):
     INTERFACE_NAME = 'org.storage.stratis1.Manager'
 
     INPUT_SIGS = {
-        MethodNames.ConfigureSimulator : (("denominator", ), "u"),
+        MethodNames.ConfigureSimulator : (("denominator", ), _FALSE, "u"),
         MethodNames.CreatePool :
-           (("name", "redundancy", "force", "devices"), "sqbas"),
-        MethodNames.DestroyPool : (("name", ), "s"),
-        MethodNames.GetCacheObjectPath : (("name", ), "s"),
-        MethodNames.GetDevObjectPath : (("name", ), "s"),
-        MethodNames.GetDevTypes : ((), ""),
-        MethodNames.GetErrorCodes : ((), ""),
+           (("name", "redundancy", "force", "devices"), _FALSE, "sqbas"),
+        MethodNames.DestroyPool : (("name", ), _FALSE, "s"),
+        MethodNames.GetCacheObjectPath : (("name", ), _FALSE, "s"),
+        MethodNames.GetDevObjectPath : (("name", ), _FALSE, "s"),
+        MethodNames.GetDevTypes : ((), _FALSE, ""),
+        MethodNames.GetErrorCodes : ((), _FALSE, ""),
         MethodNames.GetFilesystemObjectPath :
-           (("pool_name", "filesystem_name"), "ss"),
-        MethodNames.GetPoolObjectPath : (("name", ), "s"),
-        MethodNames.GetRaidLevels : ((), ""),
-        MethodNames.ListPools : ((), ""),
+           (("pool_name", "filesystem_name"), _FALSE, "ss"),
+        MethodNames.GetPoolObjectPath : (("name", ), _FALSE, "s"),
+        MethodNames.GetRaidLevels : ((), _FALSE, ""),
+        MethodNames.ListPools : ((), _FALSE, ""),
     }
     OUTPUT_SIGS = {
         MethodNames.ConfigureSimulator : "qs",
@@ -236,16 +285,22 @@ class PoolSpec(InterfaceSpec):
 
     INTERFACE_NAME = 'org.storage.stratis1.pool'
 
-    INPUT_SIGS = {
-       MethodNames.AddCacheDevs: (("force", "devices", ), "bas"),
-       MethodNames.AddDevs: (("force", "devices", ), "bas"),
-       MethodNames.CreateFilesystems: (("specs", ), "a(sst)"),
-       MethodNames.DestroyFilesystems: (("names", ), "as"),
-       MethodNames.ListCacheDevs: ((), ""),
-       MethodNames.ListDevs: ((), ""),
-       MethodNames.ListFilesystems: ((), ""),
-       MethodNames.RemoveCacheDevs: (("names", ), "as"),
-       MethodNames.RemoveDevs: (("names", ), "as")
+    INPUT_SIGS = { # pragma: no cover
+       MethodNames.AddCacheDevs: (("force", "devices", ), _FALSE, "bas"),
+       MethodNames.AddDevs: (("force", "devices", ), _FALSE, "bas"),
+       MethodNames.CreateFilesystems: (
+          ("specs", ),
+          (lambda n: \
+             lambda x: \
+                [(x, y, _option_to_tuple(quota, 0)) for (x, y, quota) in x]),
+          "a(ss(bt))"
+       ),
+       MethodNames.DestroyFilesystems: (("names", ), _FALSE, "as"),
+       MethodNames.ListCacheDevs: ((), _FALSE, ""),
+       MethodNames.ListDevs: ((), _FALSE, ""),
+       MethodNames.ListFilesystems: ((), _FALSE, ""),
+       MethodNames.RemoveCacheDevs: (("names", ), _FALSE, "as"),
+       MethodNames.RemoveDevs: (("names", ), _FALSE, "as")
     }
     OUTPUT_SIGS = {
        MethodNames.AddCacheDevs: "a(oqs)qs",
@@ -283,7 +338,7 @@ def _prop_builder(spec):
             :param prop: the property
             """
 
-            def dbus_func(proxy_object):
+            def dbus_func(proxy_object): # pragma: no cover
                 """
                 The property getter.
                 """
@@ -324,7 +379,7 @@ def _iface_builder(spec):
             """
             (names, func) = spec.XFORMERS[method]
 
-            def dbus_func(proxy_object, **kwargs):
+            def dbus_func(proxy_object, **kwargs): # pragma: no cover
                 """
                 The function method spec.
                 """

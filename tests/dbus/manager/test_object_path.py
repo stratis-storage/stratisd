@@ -259,7 +259,7 @@ class GetVolume2TestCase(unittest.TestCase):
         )
         Pool.CreateFilesystems(
            get_object(poolpath),
-           specs=[(self._VOLNAME, '', 0)]
+           specs=[(self._VOLNAME, '', None)]
         )
 
     def tearDown(self):

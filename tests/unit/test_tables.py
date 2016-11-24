@@ -19,6 +19,8 @@ Test invariants on tables in implementation.
 
 import unittest
 
+import dbus
+
 from stratisd_client_dbus import Cache
 from stratisd_client_dbus import Dev
 from stratisd_client_dbus import Filesystem
@@ -30,6 +32,9 @@ from stratisd_client_dbus._implementation import DevSpec
 from stratisd_client_dbus._implementation import FilesystemSpec
 from stratisd_client_dbus._implementation import ManagerSpec
 from stratisd_client_dbus._implementation import PoolSpec
+
+from stratisd_client_dbus._implementation import _info_to_xformer
+from stratisd_client_dbus._implementation import _option_to_tuple
 
 _GENERATED_CLASSES = (Cache, Dev, Filesystem, Manager, Pool)
 _SPEC_CLASSES = (CacheSpec, DevSpec, FilesystemSpec, ManagerSpec, PoolSpec)
@@ -80,3 +85,54 @@ class GeneratedClassTestCase(unittest.TestCase):
         for (spec, klass) in zip(_SPEC_CLASSES, _GENERATED_CLASSES):
             for name in spec.MethodNames:
                 self.assertTrue(hasattr(klass, name.name))
+
+
+class XformerTestCase(unittest.TestCase):
+    """
+    Test that xformer generator works.
+    """
+
+    def testExceptions(self):
+        """
+        Test exception on bad data.
+        """
+        with self.assertRaises(Exception):
+            _info_to_xformer(["name"], lambda n: lambda x: x, "")
+
+    def testResultException(self):
+        """
+        Verify that the resulting function raises an error on bad data.
+        """
+        result = _info_to_xformer((), lambda n: lambda x: x, "")
+        with self.assertRaises(Exception):
+            result([2])
+
+    def testResultTuple(self):
+        """
+        Test result with tuple.
+        """
+        result = _info_to_xformer(
+           ("thing", ),
+           lambda n: lambda x: _option_to_tuple(x, 0),
+           "(bt)"
+        )
+
+        self.assertEqual(
+           result((None, )),
+           [
+              dbus.Struct(
+                 (dbus.Boolean(False), dbus.UInt64(0)),
+                 signature=dbus.Signature("bt")
+              )
+           ]
+        )
+
+        self.assertEqual(
+           result((32, )),
+           [
+              dbus.Struct(
+                 (dbus.Boolean(True), dbus.UInt64(32)),
+                 signature=dbus.Signature("bt")
+              )
+           ]
+        )

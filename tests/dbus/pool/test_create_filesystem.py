@@ -120,7 +120,7 @@ class CreateFSTestCase1(unittest.TestCase):
         self._pool_object = get_object(result)
         Pool.CreateFilesystems(
            self._pool_object,
-           specs=[(self._VOLNAME, '', 0)]
+           specs=[(self._VOLNAME, '', None)]
         )
         Manager.ConfigureSimulator(self._proxy, denominator=8)
 
@@ -139,7 +139,7 @@ class CreateFSTestCase1(unittest.TestCase):
         (result, rc, _) = checked_call(
            Pool.CreateFilesystems(
               self._pool_object,
-              specs=[(self._VOLNAME, "", 0)]
+              specs=[(self._VOLNAME, "", None)]
            ),
            PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
         )

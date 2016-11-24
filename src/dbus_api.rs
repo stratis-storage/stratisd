@@ -83,6 +83,11 @@ impl DataType for TData {
     type Signal = ();
 }
 
+/// Convert a tuple as option to an Option type
+fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {
+    if value.0 { Some(value.1) } else { None }
+}
+
 /// Get the next argument off the bus
 fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr>
     where T: dbus::arg::Get<'a> + dbus::arg::Arg
@@ -331,7 +336,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let filesystems: Array<(&str, &str, u64), _> = try!(get_next_arg(&mut iter, 0));
+    let filesystems: Array<(&str, &str, (bool, u64)), _> = try!(get_next_arg(&mut iter, 0));
     let dbus_context = m.path.get_data();
 
     let object_path = m.path.get_name();
@@ -353,7 +358,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut vec = Vec::new();
 
     for (name, mountpoint, size) in filesystems {
-        let result = pool.create_filesystem(name, mountpoint, size);
+        let result = pool.create_filesystem(name, mountpoint, tuple_to_option(size));
 
         match result {
             Ok(_) => {

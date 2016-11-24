@@ -85,7 +85,11 @@ impl Pool for SimPool {
         Ok(())
     }
 
-    fn create_filesystem(&mut self, name: &str, mount_point: &str, size: u64) -> EngineResult<()> {
+    fn create_filesystem(&mut self,
+                         name: &str,
+                         mount_point: &str,
+                         size: Option<u64>)
+                         -> EngineResult<()> {
 
         match self.get_filesystem_id(name) {
             Ok(_) => {

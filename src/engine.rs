@@ -73,7 +73,11 @@ impl From<nix::Error> for EngineError {
 }
 
 pub trait Pool: Debug {
-    fn create_filesystem(&mut self, name: &str, mount_point: &str, size: u64) -> EngineResult<()>;
+    fn create_filesystem(&mut self,
+                         name: &str,
+                         mount_point: &str,
+                         size: Option<u64>)
+                         -> EngineResult<()>;
     fn add_blockdev(&mut self, path: &Path, force: bool) -> EngineResult<()>;
     fn add_cachedev(&mut self, path: &Path, force: bool) -> EngineResult<()>;
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;

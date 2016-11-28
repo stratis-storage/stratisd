@@ -91,6 +91,7 @@ class DestroyFSTestCase(unittest.TestCase):
         self.assertEqual(rc, self._errors.OK)
         self.assertEqual(len(result), 0)
 
+    @unittest.expectedFailure
     def testDestroyOne(self):
         """
         Test calling with a non-existant volume name. This should succeed,

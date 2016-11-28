@@ -7,22 +7,22 @@ use engine::EngineResult;
 
 use uuid::Uuid;
 
-use super::consts::DEFAULT_FILESYSTEM_SIZE;
+use super::consts::DEFAULT_FILESYSTEM_QUOTA_SIZE;
 
 #[derive(Debug, Clone)]
 pub struct SimFilesystem {
     pub uuid: Uuid,
     pub name: String,
     pub mount_point: String,
-    pub size: u64,
+    pub quota_size: u64,
 }
 impl SimFilesystem {
-    pub fn new_filesystem(name: &str, mount_point: &str, size: Option<u64>) -> SimFilesystem {
+    pub fn new_filesystem(name: &str, mount_point: &str, quota_size: Option<u64>) -> SimFilesystem {
         SimFilesystem {
             name: name.to_owned(),
             uuid: Uuid::new_v4(),
             mount_point: mount_point.to_owned(),
-            size: size.unwrap_or(DEFAULT_FILESYSTEM_SIZE),
+            quota_size: quota_size.unwrap_or(DEFAULT_FILESYSTEM_QUOTA_SIZE),
         }
     }
 }

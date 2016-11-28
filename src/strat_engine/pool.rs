@@ -63,7 +63,7 @@ impl Pool for StratPool {
     fn create_filesystem(&mut self,
                          _filesystem_name: &str,
                          _mount_point: &str,
-                         _size: Option<u64>)
+                         _quota_size: Option<u64>)
                          -> EngineResult<()> {
         Ok(())
     }

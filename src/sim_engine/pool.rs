@@ -88,7 +88,7 @@ impl Pool for SimPool {
     fn create_filesystem(&mut self,
                          name: &str,
                          mount_point: &str,
-                         size: Option<u64>)
+                         quota_size: Option<u64>)
                          -> EngineResult<()> {
 
         match self.get_filesystem_id(name) {
@@ -98,7 +98,7 @@ impl Pool for SimPool {
             Err(_) => {}
         }
 
-        let new_filesystem = SimFilesystem::new_filesystem(name, mount_point, size);
+        let new_filesystem = SimFilesystem::new_filesystem(name, mount_point, quota_size);
 
         self.filesystems.insert(new_filesystem.get_id(), new_filesystem);
         Ok(())

@@ -357,8 +357,8 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let mut vec = Vec::new();
 
-    for (name, mountpoint, size) in filesystems {
-        let result = pool.create_filesystem(name, mountpoint, tuple_to_option(size));
+    for (name, mountpoint, quota_size) in filesystems {
+        let result = pool.create_filesystem(name, mountpoint, tuple_to_option(quota_size));
 
         match result {
             Ok(_) => {

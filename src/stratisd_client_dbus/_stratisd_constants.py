@@ -91,7 +91,7 @@ class StratisdConstantsGen(abc.ABC):
     _METHOD = abc.abstractproperty(doc="dbus method")
 
     @classmethod
-    def get_object(cls):
+    def get_object(cls): # pragma: no cover
         """
         Read the available list from the bus.
 

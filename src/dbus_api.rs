@@ -845,7 +845,7 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
     let create_filesystems_method = f.method(CREATE_FILESYSTEMS, (), create_filesystems)
-        .in_arg(("filesystems", "a(sst)"))
+        .in_arg(("filesystems", "a(ss(bt))"))
         .out_arg(("filesystems", "a(oqs)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

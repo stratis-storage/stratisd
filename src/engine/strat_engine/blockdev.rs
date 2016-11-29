@@ -74,15 +74,19 @@ impl BlockDev {
                                                               *MIN_MDA_SIZE))));
         }
 
-        let dev_info = devices.into_iter().map(|d: Device| (d, BlockDev::dev_info(&d, force)));
-        let (dev_info, mut errors) = dev_info.partition::<Vec<(Device, _)>, _>(|x| x.1.is_ok());
-        if !errors.is_empty() {
-            return Err(errors.swap_remove(0).1.unwrap_err());
+        let dev_infos = devices.into_iter().map(|d: Device| (d, BlockDev::dev_info(&d, force)));
+
+
+        let mut good_devs = Vec::new();
+        for (dev, dev_result) in dev_infos {
+            if dev_result.is_err() {
+                return Err(dev_result.unwrap_err());
+            }
+            good_devs.push((dev, dev_result.unwrap()));
         }
 
-
         let mut bds = BTreeMap::new();
-        for (dev, (devnode, dev_size)) in dev_info.into_iter().map(|x| (x.0, x.1.unwrap())) {
+        for (dev, (devnode, dev_size)) in good_devs {
 
             let mut bd = BlockDev {
                 dev: dev,

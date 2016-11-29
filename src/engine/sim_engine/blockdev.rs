@@ -23,7 +23,7 @@ pub enum State {
 #[derive(Clone,Debug)]
 /// A simulated device.
 pub struct SimDev {
-    pub name: PathBuf,
+    pub devnode: PathBuf,
     rdm: Rc<RefCell<Randomizer>>,
     pub state: State,
 }
@@ -36,7 +36,7 @@ impl fmt::Display for SimDev {
 
 impl Dev for SimDev {
     fn get_id(&self) -> String {
-        let id = self.name.to_str();
+        let id = self.devnode.to_str();
 
         match id {
             Some(x) => return String::from(x),
@@ -50,10 +50,10 @@ impl Dev for SimDev {
 }
 
 impl SimDev {
-    /// Generates a new device from any path.
-    pub fn new_dev(rdm: Rc<RefCell<Randomizer>>, name: &Path) -> SimDev {
+    /// Generates a new device from any devnode.
+    pub fn new_dev(rdm: Rc<RefCell<Randomizer>>, devnode: &Path) -> SimDev {
         SimDev {
-            name: name.to_owned(),
+            devnode: devnode.to_owned(),
             rdm: rdm,
             state: State::OK,
         }

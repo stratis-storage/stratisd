@@ -160,7 +160,7 @@ class Destroy3TestCase(unittest.TestCase):
         )
         Pool.CreateFilesystems(
            get_object(poolpath),
-           specs=[(self._VOLNAME, '', 0)]
+           specs=[(self._VOLNAME, '', None)]
         )
         Manager.ConfigureSimulator(self._proxy, denominator=8)
 

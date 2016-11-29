@@ -23,7 +23,7 @@ use types::Sectors;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockDevSave {
-    pub path: PathBuf,
+    pub devnode: PathBuf,
     pub sectors: Sectors,
 }
 

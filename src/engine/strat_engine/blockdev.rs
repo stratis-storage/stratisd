@@ -74,10 +74,15 @@ impl BlockDev {
                                                               *MIN_MDA_SIZE))));
         }
 
-        let dev_info = try!(BlockDev::dev_info(&devices, force));
+        let dev_info = devices.into_iter().map(|d: Device| (d, BlockDev::dev_info(&d, force)));
+        let (dev_info, mut errors) = dev_info.partition::<Vec<(Device, _)>, _>(|x| x.1.is_ok());
+        if !errors.is_empty() {
+            return Err(errors.swap_remove(0).1.unwrap_err());
+        }
+
 
         let mut bds = BTreeMap::new();
-        for (dev, (devnode, dev_size)) in devices.into_iter().zip(dev_info.into_iter()) {
+        for (dev, (devnode, dev_size)) in dev_info.into_iter().map(|x| (x.0, x.1.unwrap())) {
 
             let mut bd = BlockDev {
                 dev: dev,
@@ -108,48 +113,43 @@ impl BlockDev {
         Ok(bds)
     }
 
-    /// Gets device and device sizes, and returns an error if devices
+    /// Gets device and device size, and returns an error if device
     /// cannot be used by Stratis.
-    fn dev_info(devices: &BTreeSet<Device>, force: bool) -> EngineResult<Vec<(PathBuf, u64)>> {
-        let mut dev_infos = Vec::new();
-        for dev in devices {
-            let devnode = try!(dev.path().ok_or_else(|| {
-                io::Error::new(ErrorKind::InvalidInput,
-                               format!("could not get device node from dev {}", dev.dstr()))
+    fn dev_info(dev: &Device, force: bool) -> EngineResult<(PathBuf, u64)> {
+        let devnode = try!(dev.path().ok_or_else(|| {
+            io::Error::new(ErrorKind::InvalidInput,
+                           format!("could not get device node from dev {}", dev.dstr()))
+        }));
+        let mut f = try!(OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&devnode)
+            .map_err(|_| {
+                io::Error::new(ErrorKind::PermissionDenied,
+                               format!("Could not open {}", devnode.display()))
             }));
-            let mut f = try!(OpenOptions::new()
-                .read(true)
-                .write(true)
-                .open(&devnode)
-                .map_err(|_| {
-                    io::Error::new(ErrorKind::PermissionDenied,
-                                   format!("Could not open {}", devnode.display()))
-                }));
 
-            if !force {
-                let mut buf = [0u8; 4096];
-                try!(f.read(&mut buf));
+        if !force {
+            let mut buf = [0u8; 4096];
+            try!(f.read(&mut buf));
 
-                if buf.iter().any(|x| *x != 0) {
-                    return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                              format!("First 4K of {} is not \
-                                                                       zeroed, and not forced",
-                                                                      devnode.display()))));
-                }
-            }
-
-            let dev_size = try!(blkdev_size(&f));
-            if dev_size < MIN_DEV_SIZE {
+            if buf.iter().any(|x| *x != 0) {
                 return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                          format!("{} too small, {} minimum",
-                                                                  devnode.display(),
-                                                                  ByteSize::b(MIN_DEV_SIZE as usize)
-                                                                  .to_string(true)))));
+                                                          format!("First 4K of {} is not \
+                                                                   zeroed, and not forced",
+                                                                  devnode.display()))));
             }
-            dev_infos.push((devnode, dev_size));
         }
 
-        Ok(dev_infos)
+        let dev_size = try!(blkdev_size(&f));
+        if dev_size < MIN_DEV_SIZE {
+            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
+                                                      format!("{} too small, {} minimum",
+                                                              devnode.display(),
+                                                              ByteSize::b(MIN_DEV_SIZE as usize)
+                                                              .to_string(true)))));
+        };
+        Ok((devnode, dev_size))
     }
 
     /// If a Path refers to a valid Stratis blockdev, return its

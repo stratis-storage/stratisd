@@ -19,7 +19,7 @@ use uuid::Uuid;
 use bytesize::ByteSize;
 
 use types::{Sectors, SectorOffset};
-use engine::{EngineResult, EngineError};
+use engine::{EngineResult, EngineError, ErrorEnum};
 
 use consts::*;
 use super::consts::*;
@@ -81,19 +81,44 @@ impl BlockDev {
                                                               *MIN_MDA_SIZE))));
         }
 
-        let dev_infos = devices.into_iter().map(|d: Device| (d, BlockDev::dev_info(&d, force)));
+        let dev_infos = devices.into_iter().map(|d: Device| (d, BlockDev::dev_info(&d)));
 
 
-        let mut good_devs = Vec::new();
+        let mut add_devs = Vec::new();
         for (dev, dev_result) in dev_infos {
             if dev_result.is_err() {
                 return Err(dev_result.unwrap_err());
             }
-            good_devs.push((dev, dev_result.unwrap()));
+            let (devnode, dev_size, ownership) = dev_result.unwrap();
+            if dev_size < MIN_DEV_SIZE {
+                let error_message = format!("{} too small, {} minimum",
+                                            devnode.display(),
+                                            ByteSize::b(MIN_DEV_SIZE as usize).to_string(true));
+                return Err(EngineError::Stratis(ErrorEnum::Invalid(error_message)));
+            };
+            match ownership {
+                DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size))),
+                DevOwnership::Theirs => {
+                    if !force {
+                        let error_str = format!("First 4K of {} not zeroed", devnode.display());
+                        return Err(EngineError::Stratis(ErrorEnum::Invalid(error_str)));
+                    } else {
+                        add_devs.push((dev, (devnode, dev_size)))
+                    }
+                }
+                DevOwnership::Ours(uuid) => {
+                    if *pool_uuid != uuid {
+                        let error_str = format!("Device {} already belongs to Stratis pool {}",
+                                                devnode.display(),
+                                                uuid);
+                        return Err(EngineError::Stratis(ErrorEnum::Invalid(error_str)));
+                    }
+                }
+            }
         }
 
         let mut bds = BTreeMap::new();
-        for (dev, (devnode, dev_size)) in good_devs {
+        for (dev, (devnode, dev_size)) in add_devs {
 
             let mut bd = BlockDev {
                 dev: dev,
@@ -124,9 +149,9 @@ impl BlockDev {
         Ok(bds)
     }
 
-    /// Gets device and device size, and returns an error if device
-    /// cannot be used by Stratis.
-    fn dev_info(dev: &Device, force: bool) -> EngineResult<(PathBuf, u64)> {
+    /// Gets device information, returns an error if problem with obtaining
+    /// that information.
+    fn dev_info(dev: &Device) -> EngineResult<(PathBuf, u64, DevOwnership)> {
         let devnode = try!(dev.path().ok_or_else(|| {
             io::Error::new(ErrorKind::InvalidInput,
                            format!("could not get device node from dev {}", dev.dstr()))
@@ -140,27 +165,29 @@ impl BlockDev {
                                format!("Could not open {}", devnode.display()))
             }));
 
-        if !force {
-            let mut buf = [0u8; 4096];
-            try!(f.read(&mut buf));
+        let dev_size = try!(blkdev_size(&f));
 
+
+        let mut ownership = DevOwnership::Unowned;
+
+        let mut buf = [0u8; SECTOR_SIZE as usize];
+        try!(f.seek(SeekFrom::Start(SECTOR_SIZE)));
+        try!(f.read(&mut buf));
+
+        if &buf[4..20] == STRAT_MAGIC {
+            let pool_id = try!(Uuid::parse_str(from_utf8(&buf[32..64]).unwrap())
+                .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "invalid pool uid")));
+            ownership = DevOwnership::Ours(pool_id);
+        } else {
+            let mut buf = [0u8; 4096];
+            try!(f.seek(SeekFrom::Start(0)));
+            try!(f.read(&mut buf));
             if buf.iter().any(|x| *x != 0) {
-                return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                          format!("First 4K of {} is not \
-                                                                   zeroed, and not forced",
-                                                                  devnode.display()))));
+                ownership = DevOwnership::Theirs;
             }
         }
 
-        let dev_size = try!(blkdev_size(&f));
-        if dev_size < MIN_DEV_SIZE {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("{} too small, {} minimum",
-                                                              devnode.display(),
-                                                              ByteSize::b(MIN_DEV_SIZE as usize)
-                                                              .to_string(true)))));
-        };
-        Ok((devnode, dev_size))
+        Ok((devnode, dev_size, ownership))
     }
 
     /// If a Path refers to a valid Stratis blockdev, return its

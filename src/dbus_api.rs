@@ -232,6 +232,7 @@ fn engine_to_dbus_enum(err: &engine::ErrorEnum) -> (ErrorEnum, String) {
         engine::ErrorEnum::Error(_) => (ErrorEnum::ERROR, err.get_error_string()),
         engine::ErrorEnum::AlreadyExists(_) => (ErrorEnum::ALREADY_EXISTS, err.get_error_string()),
         engine::ErrorEnum::Busy(_) => (ErrorEnum::BUSY, err.get_error_string()),
+        engine::ErrorEnum::Invalid(_) => (ErrorEnum::ERROR, err.get_error_string()),
         engine::ErrorEnum::NotFound(_) => (ErrorEnum::NOTFOUND, err.get_error_string()),
     }
 }

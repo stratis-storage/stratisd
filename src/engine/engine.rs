@@ -19,6 +19,7 @@ pub enum ErrorEnum {
 
     AlreadyExists(String),
     Busy(String),
+    Invalid(String),
     NotFound(String),
 }
 
@@ -29,6 +30,7 @@ impl ErrorEnum {
             ErrorEnum::Error(ref x) => format!("{}", x),
             ErrorEnum::AlreadyExists(ref x) => format!("{} already exists", x),
             ErrorEnum::Busy(ref x) => format!("{} is busy", x),
+            ErrorEnum::Invalid(ref x) => format!("{}", x),
             ErrorEnum::NotFound(ref x) => format!("{} is not found", x),
         }
     }

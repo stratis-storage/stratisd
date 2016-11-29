@@ -8,13 +8,11 @@ use std::vec::Vec;
 use std::path::Path;
 use std::str::FromStr;
 use std::iter::FromIterator;
-use std::io;
-use std::io::ErrorKind;
 
 use uuid::Uuid;
 use devicemapper::Device;
 
-use engine::{EngineResult, EngineError};
+use engine::EngineResult;
 use engine::Pool;
 use engine::Filesystem;
 use engine::Dev;
@@ -75,16 +73,6 @@ impl Pool for StratPool {
     fn add_blockdev(&mut self, path: &Path, force: bool) -> EngineResult<()> {
         let dev = try!(Device::from_str(&path.to_string_lossy()));
         let dev_set = BTreeSet::from_iter([dev].iter().map(|x| *x));
-
-        for (_, bd) in &self.block_devs {
-            if dev_set.contains(&bd.dev) {
-                return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                          format!("blockdev {} already used \
-                                                                   in pool {}",
-                                                                  bd.dstr(),
-                                                                  self.name))));
-            }
-        }
 
         let (uuid, bd) = try!(BlockDev::initialize(&self.pool_uuid, dev_set, MIN_MDA_SIZE, force))
             .into_iter()

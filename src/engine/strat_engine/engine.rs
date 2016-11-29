@@ -8,8 +8,6 @@ use std::collections::btree_map::Entry;
 use std::collections::BTreeSet;
 use std::str::FromStr;
 use std::iter::FromIterator;
-use std::io;
-use std::io::ErrorKind;
 
 use devicemapper::Device;
 
@@ -53,18 +51,6 @@ impl Engine for StratEngine {
         for path in blockdev_paths {
             let dev = try!(Device::from_str(&path.to_string_lossy()));
             devices.insert(dev);
-        }
-
-        for (_, pool) in &self.pools {
-            for (_, bd) in &pool.block_devs {
-                if devices.contains(&bd.dev) {
-                    return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                              format!("blockdev {} already \
-                                                                       used in pool {}",
-                                                                      bd.dstr(),
-                                                                      pool.name))));
-                }
-            }
         }
 
         let pool = try!(StratPool::new(name, devices, raid_level, force));

@@ -968,15 +968,15 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
 
     let msg = match result {
-        Ok(_) => {
+        Ok(devnodes) => {
             let object_path: dbus::Path = create_dbus_pool(dbus_context.clone());
             dbus_context.pools.borrow_mut().insert(object_path.to_string(), String::from(name));
-            for dev in blockdevs {
+            for devnode in devnodes {
                 let dev_object_path: dbus::Path = create_dbus_blockdev(dbus_context.clone());
                 dbus_context.block_devs
                     .borrow_mut()
                     .insert(dev_object_path.to_string(),
-                            String::from(dev.to_str().unwrap()));
+                            devnode.to_str().unwrap().into());
             }
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)

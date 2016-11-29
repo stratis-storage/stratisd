@@ -10,10 +10,12 @@ use engine::ErrorEnum;
 use engine::Pool;
 
 use std::cell::RefCell;
-use std::path::Path;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
+use std::collections::BTreeSet;
 use std::iter::FromIterator;
+use std::path::Path;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use super::blockdev::SimDev;
@@ -43,14 +45,16 @@ impl Engine for SimEngine {
                    blockdev_paths: &[&Path],
                    raid_level: u16,
                    _force: bool)
-                   -> EngineResult<usize> {
+                   -> EngineResult<Vec<PathBuf>> {
 
         if self.pools.contains_key(name) {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
 
+        let devices = BTreeSet::from_iter(blockdev_paths);
+
         let mut devs: Vec<SimDev> =
-            blockdev_paths.iter().map(|x| SimDev::new_dev(self.rdm.clone(), x)).collect();
+            devices.iter().map(|x| SimDev::new_dev(self.rdm.clone(), x)).collect();
 
         for dev in devs.iter_mut() {
             dev.update();
@@ -68,10 +72,10 @@ impl Engine for SimEngine {
             return Err(EngineError::Stratis(ErrorEnum::Error("X".into())));
         }
 
-        let num_bdevs = pool.block_devs.len();
+        let bdev_paths = pool.block_devs.iter().map(|p| p.devnode.clone()).collect();
         self.pools.insert(name.to_owned(), pool);
 
-        Ok(num_bdevs)
+        Ok(bdev_paths)
     }
 
     fn destroy_pool(&mut self, name: &str) -> EngineResult<bool> {

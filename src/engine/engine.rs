@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::io;
 use std::path::Path;
+use std::path::PathBuf;
 
 use nix;
 
@@ -100,7 +101,7 @@ pub trait Engine: Debug {
                    blockdev_paths: &[&Path],
                    raid_level: u16,
                    force: bool)
-                   -> EngineResult<usize>;
+                   -> EngineResult<Vec<PathBuf>>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given name is absent on completion.

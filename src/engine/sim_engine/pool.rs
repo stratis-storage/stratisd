@@ -6,6 +6,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
 use std::path::Path;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::vec::Vec;
 
@@ -60,9 +61,8 @@ impl SimPool {
 }
 
 impl Pool for SimPool {
-    fn add_blockdev(&mut self, path: &Path, _force: bool) -> EngineResult<()> {
-        self.block_devs.push(SimDev::new_dev(self.rdm.clone(), path));
-        Ok(())
+    fn add_blockdevs(&mut self, _paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
+        Ok(vec![])
     }
 
     fn add_cachedev(&mut self, path: &Path, _force: bool) -> EngineResult<()> {

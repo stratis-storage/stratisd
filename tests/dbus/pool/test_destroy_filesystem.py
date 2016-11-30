@@ -28,13 +28,13 @@ from stratisd_client_dbus._constants import TOP_OBJECT
 
 from stratisd_client_dbus._implementation import PoolSpec
 
-from .._constants import _DEVICES
-
 from .._misc import checked_call
 from .._misc import _device_list
 from .._misc import Service
 
 _PN = PoolSpec.MethodNames
+
+_DEVICE_STRATEGY = _device_list(0)
 
 
 class DestroyFSTestCase(unittest.TestCase):
@@ -53,7 +53,7 @@ class DestroyFSTestCase(unittest.TestCase):
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         self._errors = StratisdErrorsGen.get_object()
-        self._devs = [d.device_node for d in _device_list(_DEVICES, 1)]
+        self._devs = _DEVICE_STRATEGY.example()
         (result, _, _) = Manager.CreatePool(
            self._proxy,
            name=self._POOLNAME,
@@ -129,7 +129,7 @@ class DestroyFSTestCase1(unittest.TestCase):
         time.sleep(2)
         self._proxy = get_object(TOP_OBJECT)
         self._errors = StratisdErrorsGen.get_object()
-        self._devs = [d.device_node for d in _device_list(_DEVICES, 1)]
+        self._devs = _DEVICE_STRATEGY.example()
         (result, _, _) = Manager.CreatePool(
            self._proxy,
            name=self._POOLNAME,

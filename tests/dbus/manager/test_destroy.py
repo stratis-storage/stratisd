@@ -28,15 +28,14 @@ from stratisd_client_dbus._implementation import ManagerSpec
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._constants import _DEVICES
-
-
 from .._misc import checked_call
 from .._misc import _device_list
 from .._misc import Service
 
 
 _MN = ManagerSpec.MethodNames
+
+_DEVICE_STRATEGY = _device_list(0)
 
 class Destroy1TestCase(unittest.TestCase):
     """
@@ -101,7 +100,7 @@ class Destroy2TestCase(unittest.TestCase):
            name=self._POOLNAME,
            redundancy=0,
            force=False,
-           devices=[d.device_node for d in _device_list(_DEVICES, 1)]
+           devices=_DEVICE_STRATEGY.example()
         )
         Manager.ConfigureSimulator(self._proxy, denominator=8)
 
@@ -156,7 +155,7 @@ class Destroy3TestCase(unittest.TestCase):
            name=self._POOLNAME,
            redundancy=0,
            force=False,
-           devices=[d.device_node for d in _device_list(_DEVICES, 1)]
+           devices=_DEVICE_STRATEGY.example()
         )
         Pool.CreateFilesystems(
            get_object(poolpath),

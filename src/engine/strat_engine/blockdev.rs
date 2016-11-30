@@ -30,6 +30,13 @@ pub use super::BlockDevSave;
 type PoolUuid = Uuid;
 type DevUuid = Uuid;
 
+#[derive(Debug)]
+enum DevOwnership {
+    Ours(Uuid),
+    Unowned,
+    Theirs,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MDA {
     pub last_updated: Timespec,

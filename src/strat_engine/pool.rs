@@ -68,6 +68,10 @@ impl Pool for StratPool {
         Ok(())
     }
 
+    fn create_snapshot(&mut self, _snapshot_name: &str, _source: &str) -> EngineResult<()> {
+        unimplemented!()
+    }
+
     fn add_blockdev(&mut self, path: &Path, force: bool) -> EngineResult<()> {
         let dev = try!(Device::from_str(&path.to_string_lossy()));
         let dev_set = BTreeSet::from_iter([dev].iter().map(|x| *x));
@@ -122,7 +126,11 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn get_filesystem_id(&mut self, _name: &str) -> EngineResult<Uuid> {
+    fn get_filesystem_id(&self, _name: &str) -> EngineResult<Uuid> {
+        unimplemented!()
+    }
+
+    fn get_filesystem_by_name(&mut self, _name: &str) -> EngineResult<&mut Filesystem> {
         unimplemented!()
     }
 }

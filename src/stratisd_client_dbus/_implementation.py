@@ -251,8 +251,8 @@ class PoolSpec(InterfaceSpec):
        MethodNames.Rename: (("new_name", ), _FALSE, "s")
     }
     OUTPUT_SIGS = {
-       MethodNames.AddCacheDevs: "a(oqs)qs",
-       MethodNames.AddDevs: "a(oqs)qs",
+       MethodNames.AddCacheDevs: "asqs",
+       MethodNames.AddDevs: "asqs",
        MethodNames.CreateFilesystems: "a(oqs)qs",
        MethodNames.DestroyFilesystems: "a(qs)qs",
        MethodNames.ListCacheDevs: "asqs",

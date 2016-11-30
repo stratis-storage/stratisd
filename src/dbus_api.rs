@@ -389,7 +389,38 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 }
 
 fn create_snapshot(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+
+    let snapshot_name: &str = try!(get_next_arg(&mut iter, 0));
+
+    let dbus_context = m.path.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let default_return = MessageItem::ObjectPath(default_object_path());
+
+    let (pool_name, filesystem_name) = dbus_try!(object_path_to_pair(dbus_context, object_path);
+		            default_return; return_message);
+
+    let mut b_engine = dbus_context.engine.borrow_mut();
+    let pool = engine_try!(b_engine.get_pool(&pool_name);default_return; return_message);
+
+    let msg = match pool.create_snapshot(snapshot_name, &filesystem_name) {
+        Ok(_) => {
+            let object_path: dbus::Path = create_dbus_filesystem(dbus_context.clone());
+            dbus_context.filesystems.borrow_mut().insert(object_path.to_string(),
+                                                         ((&pool_name).clone(),
+                                                          String::from(snapshot_name)));
+            let (rc, rs) = ok_message_items();
+            return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
+        }
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err(&err);
+            let (rc, rs) = code_to_message_items(rc, rs);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
 }
 
 fn set_filesystem_quota(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -523,8 +554,9 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                    return_message);
 
     let result = pool.filesystems();
-    let msg_vec =
-        result.values().map(|key| MessageItem::Str((*key).get_name().to_string())).collect();
+    let msg_vec = result.values()
+        .map(|key| MessageItem::Str((*key).get_name().to_string()))
+        .collect();
     let item_array = MessageItem::Array(msg_vec, return_sig.into());
     let (rc, rs) = ok_message_items();
     let msg = return_message.append3(item_array, rc, rs);

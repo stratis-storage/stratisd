@@ -51,6 +51,12 @@ impl SimPool {
 
         new_pool
     }
+
+    // If the source doesn't exist, return an error - otherwise the UUID of the soruce
+    fn validate_snapshot_source_exists(&mut self, source: &str) -> EngineResult<Uuid> {
+        let filesystem = try!(self.get_filesystem_by_name(&source));
+        Ok(filesystem.get_id())
+    }
 }
 
 impl Pool for SimPool {
@@ -104,6 +110,19 @@ impl Pool for SimPool {
         Ok(())
     }
 
+    fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<()> {
+
+        let parent_id = try!(self.validate_snapshot_source_exists(source));
+
+        try!(self.create_filesystem(&snapshot_name, &String::from(""), None));
+
+        let new_snapshot = try!(self.get_filesystem_by_name(&snapshot_name));
+
+        new_snapshot.add_ancestor(parent_id);
+
+        Ok(())
+    }
+
     fn filesystems(&mut self) -> BTreeMap<&Uuid, &mut Filesystem> {
         BTreeMap::from_iter(self.filesystems
             .iter_mut()
@@ -128,7 +147,7 @@ impl Pool for SimPool {
         Ok(return_filesystem)
     }
 
-    fn get_filesystem_id(&mut self, name: &str) -> EngineResult<Uuid> {
+    fn get_filesystem_id(&self, name: &str) -> EngineResult<Uuid> {
 
         for (_, value) in self.filesystems.iter() {
             if value.has_same(name) {
@@ -137,6 +156,11 @@ impl Pool for SimPool {
         }
 
         Err(EngineError::Stratis(ErrorEnum::NotFound(String::from(name))))
+    }
+
+    fn get_filesystem_by_name(&mut self, name: &str) -> EngineResult<&mut Filesystem> {
+        let id = try!(self.get_filesystem_id(name));
+        self.get_filesystem(&id)
     }
 
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()> {

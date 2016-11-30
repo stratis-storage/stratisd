@@ -58,6 +58,7 @@ pub trait Filesystem: Debug {
     fn get_name(&self) -> String;
     fn has_same(&self, other: &str) -> bool;
     fn rename(&mut self, new_name: &str) -> EngineResult<()>;
+    fn add_ancestor(&mut self, parent: Uuid);
 }
 
 impl From<io::Error> for EngineError {
@@ -78,6 +79,7 @@ pub trait Pool: Debug {
                          mount_point: &str,
                          quota_size: Option<u64>)
                          -> EngineResult<()>;
+    fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<()>;
     fn add_blockdev(&mut self, path: &Path, force: bool) -> EngineResult<()>;
     fn add_cachedev(&mut self, path: &Path, force: bool) -> EngineResult<()>;
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;
@@ -87,7 +89,8 @@ pub trait Pool: Debug {
     fn cachedevs(&mut self) -> Vec<&mut Cache>;
     fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()>;
     fn get_filesystem(&mut self, id: &Uuid) -> EngineResult<&mut Filesystem>;
-    fn get_filesystem_id(&mut self, name: &str) -> EngineResult<Uuid>;
+    fn get_filesystem_id(&self, name: &str) -> EngineResult<Uuid>;
+    fn get_filesystem_by_name(&mut self, name: &str) -> EngineResult<&mut Filesystem>;
 }
 
 pub trait Engine: Debug {

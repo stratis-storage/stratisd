@@ -15,7 +15,9 @@ pub struct SimFilesystem {
     pub name: String,
     pub mount_point: String,
     pub quota_size: u64,
+    pub nearest_ancestor: Option<Uuid>,
 }
+
 impl SimFilesystem {
     pub fn new_filesystem(name: &str, mount_point: &str, quota_size: Option<u64>) -> SimFilesystem {
         SimFilesystem {
@@ -23,6 +25,7 @@ impl SimFilesystem {
             uuid: Uuid::new_v4(),
             mount_point: mount_point.to_owned(),
             quota_size: quota_size.unwrap_or(DEFAULT_FILESYSTEM_QUOTA_SIZE),
+            nearest_ancestor: None,
         }
     }
 }
@@ -46,5 +49,9 @@ impl Filesystem for SimFilesystem {
     fn rename(&mut self, new_name: &str) -> EngineResult<()> {
         self.name = String::from(new_name);
         Ok(())
+    }
+
+    fn add_ancestor(&mut self, parent: Uuid) {
+        self.nearest_ancestor = Some(parent);
     }
 }

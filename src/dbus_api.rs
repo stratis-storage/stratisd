@@ -746,40 +746,35 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let return_sig = "(qs)";
+    let return_sig = "s";
+    let default_return = MessageItem::Array(vec![], return_sig.into());
 
-    let pool_name = dbus_try_0!(
+    let pool_name = dbus_try!(
         object_path_to_pool_name(dbus_context, object_path);
+        default_return;
         return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = engine_try_0!(b_engine.get_pool(&pool_name);
+    let mut pool = engine_try!(b_engine.get_pool(&pool_name);
+                                   default_return;
                                    return_message);
 
-    let ref mut list_rc = ErrorEnum::OK;
-    let mut vec = Vec::new();
+    let cachedevs = cache_devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
+    let result = pool.add_cachedevs(&cachedevs, force);
 
-    for dev in cache_devs {
-        let result = pool.add_cachedev(Path::new(dev), force);
-        match result {
-            Ok(_) => {
-                let (rc, rs) = ok_message_items();
-                let entry = MessageItem::Struct(vec![rc, rs]);
-                vec.push(entry);
-
-            }
-            Err(x) => {
-                *list_rc = ErrorEnum::LIST_FAILURE;
-                let (rc, rs) = engine_to_dbus_err(&x);
-                let (rc, rs) = code_to_message_items(rc, rs);
-                let entry = MessageItem::Struct(vec![rc, rs]);
-                vec.push(entry);
-            }
-        };
-    }
-    let (rc, rs) = code_to_message_items(*list_rc, list_rc.get_error_string().into());
-
-    Ok(vec![return_message.append3(MessageItem::Array(vec, return_sig.into()), rc, rs)])
+    let msg = match result {
+        Ok(devnodes) => {
+            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into()).collect();
+            let (rc, rs) = ok_message_items();
+            return_message.append3(MessageItem::Array(paths, return_sig.into()), rc, rs)
+        }
+        Err(x) => {
+            let (rc, rs) = engine_to_dbus_err(&x);
+            let (rc, rs) = code_to_message_items(rc, rs);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
 }
 
 fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -857,7 +852,7 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
     let add_cache_devs_method = f.method(ADD_CACHE_DEVS, (), add_cache_devs)
         .in_arg(("force", "b"))
         .in_arg(("cache_devs", "as"))
-        .out_arg(("results", "a(qs)"))
+        .out_arg(("results", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

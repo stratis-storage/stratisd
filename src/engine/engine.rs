@@ -84,7 +84,7 @@ pub trait Pool: Debug {
                          -> EngineResult<()>;
     fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<()>;
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
-    fn add_cachedev(&mut self, path: &Path, force: bool) -> EngineResult<()>;
+    fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;
     fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()>;
     fn filesystems(&mut self) -> BTreeMap<&Uuid, &mut Filesystem>;

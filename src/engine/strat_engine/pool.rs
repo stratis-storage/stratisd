@@ -31,7 +31,7 @@ pub struct StratFilesystem {
 pub struct StratPool {
     pub name: String,
     pub pool_uuid: Uuid,
-    pub cache_devs: Vec<BlockDev>,
+    pub cache_devs: BTreeMap<Uuid, BlockDev>,
     pub block_devs: BTreeMap<Uuid, BlockDev>,
     pub filesystems: BTreeMap<String, Box<StratFilesystem>>,
     pub raid_level: u16,
@@ -49,7 +49,7 @@ impl StratPool {
         Ok(StratPool {
             name: name.to_owned(),
             pool_uuid: pool_uuid,
-            cache_devs: Vec::new(),
+            cache_devs: BTreeMap::new(),
             block_devs: bds,
             filesystems: BTreeMap::new(),
             raid_level: raid_level,
@@ -83,8 +83,17 @@ impl Pool for StratPool {
         Ok(bdev_paths)
     }
 
-    fn add_cachedev(&mut self, _path: &Path, _force: bool) -> EngineResult<()> {
-        unimplemented!()
+    fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
+        let mut devices = BTreeSet::new();
+        for path in paths {
+            let dev = try!(Device::from_str(&path.to_string_lossy()));
+            devices.insert(dev);
+        }
+
+        let mut bds = try!(BlockDev::initialize(&self.pool_uuid, devices, MIN_MDA_SIZE, force));
+        let bdev_paths = bds.iter().map(|p| p.1.devnode.clone()).collect();
+        self.cache_devs.append(&mut bds);
+        Ok(bdev_paths)
     }
 
     fn destroy_filesystem(&mut self, _filesystem: &str) -> EngineResult<()> {

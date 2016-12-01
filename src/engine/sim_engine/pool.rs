@@ -65,9 +65,8 @@ impl Pool for SimPool {
         Ok(vec![])
     }
 
-    fn add_cachedev(&mut self, path: &Path, _force: bool) -> EngineResult<()> {
-        self.cache_devs.push(SimCacheDev::new_cache(self.rdm.clone(), path));
-        Ok(())
+    fn add_cachedevs(&mut self, _paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
+        Ok(vec![])
     }
 
     fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()> {

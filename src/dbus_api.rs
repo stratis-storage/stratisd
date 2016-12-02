@@ -919,17 +919,23 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
 
     let msg = match result {
-        Ok(_) => {
+        Ok(devnodes) => {
             let object_path: dbus::Path = create_dbus_pool(dbus_context.clone());
             dbus_context.pools.borrow_mut().insert(object_path.to_string(), String::from(name));
+            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into()).collect();
+            let return_path = MessageItem::ObjectPath(object_path);
+            let return_list = MessageItem::Array(paths, "s".into());
+            let return_value = MessageItem::Struct(vec![return_path, return_list]);
             let (rc, rs) = ok_message_items();
-            return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
+            return_message.append3(return_value, rc, rs)
         }
         Err(x) => {
-            let object_path: dbus::Path = default_object_path();
+            let return_path = MessageItem::ObjectPath(default_object_path());
+            let return_list = MessageItem::Array(vec![], "s".into());
+            let return_value = MessageItem::Struct(vec![return_path, return_list]);
             let (rc, rs) = engine_to_dbus_err(&x);
             let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
+            return_message.append3(return_value, rc, rs)
         }
     };
     Ok(vec![msg])
@@ -1076,7 +1082,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
         .in_arg(("raid_type", "q"))
         .in_arg(("force", "b"))
         .in_arg(("dev_list", "as"))
-        .out_arg(("object_path", "o"))
+        .out_arg(("result", "(oas)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

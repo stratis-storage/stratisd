@@ -1,4 +1,4 @@
-check: fmt build
+check: fmt build test
 
 ${HOME}/.cargo/bin/cargo-fmt:
 	cargo install rustfmt
@@ -8,3 +8,6 @@ fmt: ${HOME}/.cargo/bin/cargo-fmt
 
 build:
 	RUSTFLAGS='-D warnings' cargo build
+
+test:
+	cargo test

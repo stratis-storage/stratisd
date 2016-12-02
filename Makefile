@@ -7,4 +7,4 @@ fmt: ${HOME}/.cargo/bin/cargo-fmt
 	PATH=${HOME}/.cargo/bin:${PATH} cargo fmt -- --write-mode=diff
 
 build:
-	cargo build
+	RUSTFLAGS='-D warnings' cargo build

@@ -158,7 +158,7 @@ class Destroy3TestCase(unittest.TestCase):
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         self._errors = StratisdErrorsGen.get_object()
-        (poolpath, _, _) = Manager.CreatePool(
+        ((poolpath, _), _, _) = Manager.CreatePool(
            self._proxy,
            name=self._POOLNAME,
            redundancy=0,

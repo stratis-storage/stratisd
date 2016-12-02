@@ -65,7 +65,7 @@ class Create2TestCase(unittest.TestCase):
 
         If rc is OK, then pool must exist.
         """
-        (result, rc, _) = checked_call(
+        ((poolpath, _), rc, _) = checked_call(
            Manager.CreatePool(
               self._proxy,
               name=self._POOLNAME,
@@ -87,7 +87,7 @@ class Create2TestCase(unittest.TestCase):
         )
 
         if rc == self._errors.OK:
-            self.assertEqual(pool, result)
+            self.assertEqual(pool, poolpath)
             self.assertEqual(rc1, self._errors.OK)
             self.assertEqual(len(pools), 1)
         else:

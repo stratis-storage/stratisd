@@ -57,6 +57,12 @@ impl serde::Deserialize for Sectors {
     }
 }
 
+impl fmt::Display for Sectors {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{}", self)
+    }
+}
+
 custom_derive! {
     #[derive(NewtypeFrom, NewtypeAdd, NewtypeSub, NewtypeDeref,
              NewtypeBitAnd, NewtypeNot, NewtypeDiv, NewtypeRem,
@@ -65,7 +71,11 @@ custom_derive! {
     pub struct SectorOffset(pub u64);
 }
 
-
+impl fmt::Display for SectorOffset {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{}", self)
+    }
+}
 
 // A type for Data Blocks as used by the thin pool.
 custom_derive! {
@@ -75,7 +85,6 @@ custom_derive! {
              Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
     pub struct DataBlocks(pub u64);
 }
-
 
 // An error type for errors generated within Stratis
 //

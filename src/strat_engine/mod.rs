@@ -4,6 +4,7 @@
 
 mod blockdev;
 mod engine;
+mod lineardev;
 mod pool;
 mod util;
 mod consts;

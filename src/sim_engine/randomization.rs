@@ -45,15 +45,6 @@ impl Randomizer {
         self.denominator = denominator;
         self
     }
-
-    /// Choose a bad item from a list of items.
-    pub fn get_bad_item<'a, T>(&mut self, items: &'a [T]) -> Option<&'a T> {
-        if self.throw_die() {
-            self.rng.choose(items)
-        } else {
-            None
-        }
-    }
 }
 
 #[cfg(test)]

@@ -41,16 +41,35 @@ impl Randomizer {
     }
 
     /// Set the probability of a failure.
-    pub fn set_probability(&mut self, denominator: u32) -> () {
-        self.denominator = denominator
+    pub fn set_probability(&mut self, denominator: u32) -> &mut Self {
+        self.denominator = denominator;
+        self
     }
+}
 
-    /// Choose a bad item from a list of items.
-    pub fn get_bad_item<'a, T>(&mut self, items: &'a [T]) -> Option<&'a T> {
-        if self.throw_die() {
-            self.rng.choose(items)
-        } else {
-            None
+#[cfg(test)]
+mod tests {
+    use quickcheck::QuickCheck;
+
+    use super::*;
+
+    #[test]
+    fn prop_denominator_result() {
+
+        /// Verify that if the denominator is 0 the result is always false,
+        /// if 1, always true.
+        fn denominator_result(denominator: u32) -> bool {
+            let result = Randomizer::new().set_probability(denominator).throw_die();
+            if denominator > 1 {
+                true
+            } else {
+                if denominator == 0 {
+                    result == false
+                } else {
+                    result == true
+                }
+            }
         }
+        QuickCheck::new().tests(30).quickcheck(denominator_result as fn(u32) -> bool);
     }
 }

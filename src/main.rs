@@ -27,6 +27,9 @@ extern crate newtype_derive;
 #[macro_use]
 extern crate enum_derive;
 
+#[cfg(test)]
+extern crate quickcheck;
+
 pub static mut debug: bool = false;
 
 macro_rules! dbgp {

@@ -41,8 +41,9 @@ impl Randomizer {
     }
 
     /// Set the probability of a failure.
-    pub fn set_probability(&mut self, denominator: u32) -> () {
-        self.denominator = denominator
+    pub fn set_probability(&mut self, denominator: u32) -> &mut Self {
+        self.denominator = denominator;
+        self
     }
 
     /// Choose a bad item from a list of items.

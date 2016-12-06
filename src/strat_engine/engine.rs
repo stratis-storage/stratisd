@@ -80,10 +80,9 @@ impl Engine for StratEngine {
     }
 
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool> {
-        match self.pools.get_mut(name) {
-            Some(pool) => Ok(pool),
-            None => Err(EngineError::Stratis(ErrorEnum::NotFound(name.into()))),
-        }
+        Ok(try!(self.pools
+            .get_mut(name)
+            .ok_or(EngineError::Stratis(ErrorEnum::NotFound(name.into())))))
     }
 
     fn pools(&mut self) -> BTreeMap<&str, &mut Pool> {

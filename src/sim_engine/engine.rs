@@ -91,14 +91,12 @@ impl Engine for SimEngine {
         entry.remove();
         Ok(())
     }
+
+    /// Looks up the pool by its unique name
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool> {
-
-        let return_pool = match self.pools.get_mut(name) {
-            Some(pool) => pool,
-            None => return Err(EngineError::Stratis(ErrorEnum::NotFound(name.into()))),
-        };
-
-        Ok(return_pool)
+        Ok(try!(self.pools
+            .get_mut(name)
+            .ok_or(EngineError::Stratis(ErrorEnum::NotFound(name.into())))))
     }
 
     /// Returns a collection of the Pool objects that belong to this engine

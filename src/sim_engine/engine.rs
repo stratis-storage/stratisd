@@ -113,3 +113,125 @@ impl Engine for SimEngine {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use std::path::Path;
+
+    use quickcheck::QuickCheck;
+
+    use super::SimEngine;
+
+    use engine::Engine;
+    use engine::EngineError;
+    use engine::ErrorEnum;
+
+    #[test]
+    fn prop_configure_simulator_runs() {
+
+        /// Configure simulator should always return Ok.
+        fn configure_simulator_runs(denominator: u32) -> bool {
+            SimEngine::new().configure_simulator(denominator).is_ok()
+        }
+
+        QuickCheck::new().tests(10).quickcheck(configure_simulator_runs as fn(u32) -> bool);
+    }
+
+    #[test]
+    /// When an engine has no pools, any name lookup should fail
+    fn get_pool_err() {
+        assert!(match SimEngine::new().get_pool("name") {
+            Err(EngineError::Stratis(ErrorEnum::NotFound(_))) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// When an engine has no pools, the thing returned by pools() is empty
+    fn pools_empty() {
+        assert!(SimEngine::new().pools().is_empty());
+    }
+
+    #[test]
+    /// When an engine has no pools, destroying any pool must succeed
+    fn destroy_pool_empty() {
+        assert!(match SimEngine::new().destroy_pool("name") {
+            Ok(_) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Destroying an empty pool should succeed.
+    fn destroy_empty_pool() {
+        let name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(name, &vec![], 0, false).unwrap();
+        assert!(match engine.destroy_pool(name) {
+            Ok(_) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Destroying a pool with devices should fail
+    fn destroy_pool_w_devices() {
+        let name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(name, &vec![Path::new("/s/d")], 0, false).unwrap();
+        assert!(match engine.destroy_pool(name) {
+            Err(_) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    #[ignore]
+    /// Creating a new pool identical to the previous should succeed
+    fn create_new_pool_twice() {
+        let name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(name, &vec![], 0, false).unwrap();
+        assert!(match engine.create_pool(name, &vec![], 0, false) {
+            Ok(_) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Creating a new pool with the same name should fail
+    fn create_pool_name_collision() {
+        let name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(name, &vec![Path::new("/s/d")], 0, false).unwrap();
+        assert!(match engine.create_pool(name, &vec![], 0, false) {
+            Err(_) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Creating a pool with duplicate devices should succeed
+    fn create_pool_duplicate_devices() {
+        let path = "/s/d";
+        let mut engine = SimEngine::new();
+        let devices = vec![Path::new(path), Path::new(path)];
+        assert!(match engine.create_pool("name", &devices, 0, false) {
+            Ok(_) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    #[ignore]
+    /// Creating a pool with an impossible raid level should fail
+    fn create_pool_max_u16_raid() {
+        let mut engine = SimEngine::new();
+        assert!(match engine.create_pool("name", &vec![], u16::max_value(), false) {
+            Err(_) => true,
+            _ => false,
+        });
+    }
+
+}

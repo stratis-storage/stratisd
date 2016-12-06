@@ -156,10 +156,7 @@ mod tests {
     #[test]
     /// When an engine has no pools, destroying any pool must succeed
     fn destroy_pool_empty() {
-        assert!(match SimEngine::new().destroy_pool("name") {
-            Ok(_) => true,
-            _ => false,
-        });
+        assert!(SimEngine::new().destroy_pool("name").is_ok());
     }
 
     #[test]
@@ -168,10 +165,7 @@ mod tests {
         let name = "name";
         let mut engine = SimEngine::new();
         engine.create_pool(name, &vec![], 0, false).unwrap();
-        assert!(match engine.destroy_pool(name) {
-            Ok(_) => true,
-            _ => false,
-        });
+        assert!(engine.destroy_pool(name).is_ok());
     }
 
     #[test]
@@ -181,7 +175,7 @@ mod tests {
         let mut engine = SimEngine::new();
         engine.create_pool(name, &vec![Path::new("/s/d")], 0, false).unwrap();
         assert!(match engine.destroy_pool(name) {
-            Err(_) => true,
+            Err(EngineError::Stratis(ErrorEnum::Busy(_))) => true,
             _ => false,
         });
     }
@@ -193,10 +187,7 @@ mod tests {
         let name = "name";
         let mut engine = SimEngine::new();
         engine.create_pool(name, &vec![], 0, false).unwrap();
-        assert!(match engine.create_pool(name, &vec![], 0, false) {
-            Ok(_) => true,
-            _ => false,
-        });
+        assert!(engine.create_pool(name, &vec![], 0, false).is_ok());
     }
 
     #[test]
@@ -206,7 +197,7 @@ mod tests {
         let mut engine = SimEngine::new();
         engine.create_pool(name, &vec![Path::new("/s/d")], 0, false).unwrap();
         assert!(match engine.create_pool(name, &vec![], 0, false) {
-            Err(_) => true,
+            Err(EngineError::Stratis(ErrorEnum::AlreadyExists(_))) => true,
             _ => false,
         });
     }
@@ -217,10 +208,7 @@ mod tests {
         let path = "/s/d";
         let mut engine = SimEngine::new();
         let devices = vec![Path::new(path), Path::new(path)];
-        assert!(match engine.create_pool("name", &devices, 0, false) {
-            Ok(_) => true,
-            _ => false,
-        });
+        assert!(engine.create_pool("name", &devices, 0, false).is_ok());
     }
 
     #[test]
@@ -228,10 +216,7 @@ mod tests {
     /// Creating a pool with an impossible raid level should fail
     fn create_pool_max_u16_raid() {
         let mut engine = SimEngine::new();
-        assert!(match engine.create_pool("name", &vec![], u16::max_value(), false) {
-            Err(_) => true,
-            _ => false,
-        });
+        assert!(engine.create_pool("name", &vec![], u16::max_value(), false).is_err());
     }
 
 }

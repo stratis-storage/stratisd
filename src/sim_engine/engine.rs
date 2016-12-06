@@ -74,6 +74,7 @@ impl Engine for SimEngine {
         Ok(num_bdevs)
     }
 
+    /// Destroy a pool, if the pool does not exist, return Ok.
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()> {
         let entry = match self.pools.entry(name.into()) {
             Entry::Vacant(_) => return Ok(()),
@@ -100,12 +101,12 @@ impl Engine for SimEngine {
         Ok(return_pool)
     }
 
+    /// Returns a collection of the Pool objects that belong to this engine
     fn pools(&mut self) -> BTreeMap<&str, &mut Pool> {
-
         BTreeMap::from_iter(self.pools.iter_mut().map(|x| (x.0 as &str, x.1 as &mut Pool)))
-
     }
 
+    /// Set properties of the simulator
     fn configure_simulator(&mut self, denominator: u32) -> EngineResult<()> {
         self.rdm.borrow_mut().set_probability(denominator);
         Ok(())

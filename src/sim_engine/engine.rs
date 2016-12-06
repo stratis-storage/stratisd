@@ -84,8 +84,11 @@ impl Engine for SimEngine {
             return Err(EngineError::Stratis(ErrorEnum::Busy("filesystems remaining on pool"
                 .into())));
         };
-        if self.rdm.borrow_mut().throw_die() {
-            return Err(EngineError::Stratis(ErrorEnum::Busy("could not free devices in pool"
+        if !entry.get().block_devs.is_empty() {
+            return Err(EngineError::Stratis(ErrorEnum::Busy("devices remaining in pool".into())));
+        };
+        if !entry.get().cache_devs.is_empty() {
+            return Err(EngineError::Stratis(ErrorEnum::Busy("cache devices remaining in pool"
                 .into())));
         };
         entry.remove();

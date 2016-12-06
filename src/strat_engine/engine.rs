@@ -4,6 +4,7 @@
 
 use std::path::Path;
 use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 use std::collections::BTreeSet;
 use std::str::FromStr;
 use std::iter::FromIterator;
@@ -73,9 +74,24 @@ impl Engine for StratEngine {
         Ok(num_bdevs)
     }
 
+    /// Destroy a pool, if the pool does not exist, return Ok.
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()> {
-        self.pools.remove(name);
-
+        let entry = match self.pools.entry(name.into()) {
+            Entry::Vacant(_) => return Ok(()),
+            Entry::Occupied(entry) => entry,
+        };
+        if !entry.get().filesystems.is_empty() {
+            return Err(EngineError::Stratis(ErrorEnum::Busy("filesystems remaining on pool"
+                .into())));
+        };
+        if !entry.get().block_devs.is_empty() {
+            return Err(EngineError::Stratis(ErrorEnum::Busy("devices remaining in pool".into())));
+        };
+        if !entry.get().cache_devs.is_empty() {
+            return Err(EngineError::Stratis(ErrorEnum::Busy("cache devices remaining in pool"
+                .into())));
+        };
+        entry.remove();
         Ok(())
     }
 

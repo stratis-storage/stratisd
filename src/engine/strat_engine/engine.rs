@@ -79,6 +79,10 @@ impl Engine for StratEngine {
         destroy_pool!{self; name}
     }
 
+    fn rename_pool(&mut self, old_name: &str, new_name: &str) -> EngineResult<bool> {
+        rename_pool!{self; old_name; new_name}
+    }
+
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool> {
         get_pool!(self; name)
     }

@@ -107,6 +107,13 @@ pub trait Engine: Debug {
     /// Returns true if some action was necessary, otherwise false.
     fn destroy_pool(&mut self, name: &str) -> EngineResult<bool>;
 
+    /// Rename pool
+    /// Applies a mapping from old name to new name.
+    /// Raises an error if the mapping can't be applied because
+    /// the names aren't equal and both are in use.
+    /// Returns true if it was necessary to perform an action, false if not.
+    fn rename_pool(&mut self, old_name: &str, new_name: &str) -> EngineResult<bool>;
+
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool>;
     fn pools(&mut self) -> BTreeMap<&str, &mut Pool>;
 

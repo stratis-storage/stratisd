@@ -78,6 +78,10 @@ impl Engine for SimEngine {
         destroy_pool!{self; name}
     }
 
+    fn rename_pool(&mut self, old_name: &str, new_name: &str) -> EngineResult<bool> {
+        rename_pool!{self; old_name; new_name}
+    }
+
     /// Looks up the pool by its unique name
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool> {
         get_pool!(self; name)
@@ -198,6 +202,77 @@ mod tests {
     fn create_pool_max_u16_raid() {
         let mut engine = SimEngine::new();
         assert!(engine.create_pool("name", &vec![], u16::max_value(), false).is_err());
+    }
+
+    #[test]
+    /// Renaming a pool on an empty engine always works
+    fn rename_empty() {
+        let mut engine = SimEngine::new();
+        assert!(match engine.rename_pool("old_name", "new_name") {
+            Ok(false) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Renaming a pool to itself in an empty engine always works
+    fn rename_empty_identity() {
+        let mut engine = SimEngine::new();
+        assert!(match engine.rename_pool("old_name", "old_name") {
+            Ok(false) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Renaming a pool to itself always works
+    fn rename_identity() {
+        let name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(name, &vec![], 0, false).unwrap();
+        assert!(match engine.rename_pool(name, name) {
+            Ok(false) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Renaming a pool to another pool should work if new name not taken
+    fn rename_happens() {
+        let name = "old_name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(name, &vec![], 0, false).unwrap();
+        assert!(match engine.rename_pool(name, "new_name") {
+            Ok(true) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Renaming a pool to another pool should fail if new name taken
+    fn rename_fails() {
+        let old_name = "old_name";
+        let new_name = "new_name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(old_name, &vec![], 0, false).unwrap();
+        engine.create_pool(new_name, &vec![], 0, false).unwrap();
+        assert!(match engine.rename_pool(old_name, new_name) {
+            Err(EngineError::Stratis(ErrorEnum::AlreadyExists(_))) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Renaming should succeed if old_name absent, new present
+    fn rename_no_op() {
+        let old_name = "old_name";
+        let new_name = "new_name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(new_name, &vec![], 0, false).unwrap();
+        assert!(match engine.rename_pool(old_name, new_name) {
+            Ok(false) => true,
+            _ => false,
+        });
     }
 
 }

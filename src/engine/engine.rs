@@ -101,7 +101,12 @@ pub trait Engine: Debug {
                    raid_level: u16,
                    force: bool)
                    -> EngineResult<usize>;
-    fn destroy_pool(&mut self, name: &str) -> EngineResult<()>;
+
+    /// Destroy a pool.
+    /// Ensures that the pool of the given name is absent on completion.
+    /// Returns true if some action was necessary, otherwise false.
+    fn destroy_pool(&mut self, name: &str) -> EngineResult<bool>;
+
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool>;
     fn pools(&mut self) -> BTreeMap<&str, &mut Pool>;
 

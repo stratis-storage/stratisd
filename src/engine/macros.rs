@@ -5,7 +5,7 @@
 macro_rules! destroy_pool {
     ( $s:ident; $name: ident) => {
         let entry = match $s.pools.entry($name.into()) {
-            Entry::Vacant(_) => return Ok(()),
+            Entry::Vacant(_) => return Ok(false),
             Entry::Occupied(entry) => entry,
         };
         if !entry.get().filesystems.is_empty() {
@@ -20,7 +20,7 @@ macro_rules! destroy_pool {
                 .into())));
         };
         entry.remove();
-        Ok(())
+        Ok(true)
     }
 }
 

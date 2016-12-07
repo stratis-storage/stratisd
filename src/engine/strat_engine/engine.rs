@@ -75,7 +75,7 @@ impl Engine for StratEngine {
     }
 
     /// Destroy a pool, if the pool does not exist, return Ok.
-    fn destroy_pool(&mut self, name: &str) -> EngineResult<()> {
+    fn destroy_pool(&mut self, name: &str) -> EngineResult<bool> {
         destroy_pool!{self; name}
     }
 

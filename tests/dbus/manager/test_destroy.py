@@ -66,11 +66,12 @@ class Destroy1TestCase(unittest.TestCase):
         """
         Destroy should succeed.
         """
-        (_, rc, _) = checked_call(
+        (result, rc, _) = checked_call(
            Manager.DestroyPool(self._proxy, name=self._POOLNAME),
            ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
         )
         self.assertEqual(rc, self._errors.OK)
+        self.assertFalse(result)
 
         (_, rc1, _) = checked_call(
            Manager.GetPoolObjectPath(self._proxy, name=self._POOLNAME),
@@ -82,7 +83,8 @@ class Destroy1TestCase(unittest.TestCase):
 
 class Destroy2TestCase(unittest.TestCase):
     """
-    Test 'destroy' on database which contains the given pool.
+    Test 'destroy' on database which contains the given pool and an unknown
+    number of devices.
     """
     _POOLNAME = 'deadpool'
 
@@ -112,9 +114,10 @@ class Destroy2TestCase(unittest.TestCase):
 
     def testExecution(self):
         """
-        The pool was just created, so must be destroyable.
+        The pool was just created, and may or may not have devices.
+        So, it may be possible to destroy it, or it may not be.
         """
-        (_, rc, _) = checked_call(
+        (result, rc, _) = checked_call(
            Manager.DestroyPool(self._proxy, name=self._POOLNAME),
            ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
         )
@@ -126,10 +129,14 @@ class Destroy2TestCase(unittest.TestCase):
 
         if rc is self._errors.OK:
             expected_rc = self._errors.POOL_NOTFOUND
+            expected_result = True
         else:
+            self.assertEqual(rc, self._errors.BUSY)
             expected_rc = self._errors.OK
+            expected_result = False
 
         self.assertEqual(rc1, expected_rc)
+        self.assertEqual(result, expected_result)
 
 
 class Destroy3TestCase(unittest.TestCase):
@@ -171,10 +178,66 @@ class Destroy3TestCase(unittest.TestCase):
 
     def testExecution(self):
         """
-        This should fail since it has a filesystem on it.
+        This should fail since the pool has a filesystem on it.
         """
-        (_, rc, _) = checked_call(
+        (result, rc, _) = checked_call(
            Manager.DestroyPool(self._proxy, name=self._POOLNAME),
            ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
         )
         self.assertEqual(rc, self._errors.BUSY)
+        self.assertEqual(result, False)
+
+        (_, rc1, _) = checked_call(
+           Manager.GetPoolObjectPath(self._proxy, name=self._POOLNAME),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath],
+        )
+        self.assertEqual(rc1, self._errors.OK)
+
+class Destroy4TestCase(unittest.TestCase):
+    """
+    Test 'destroy' on database which contains the given pool with no devices.
+    """
+    _POOLNAME = 'deadpool'
+
+    def setUp(self):
+        """
+        Start the stratisd daemon with the simulator.
+        """
+        self._service = Service()
+        self._service.setUp()
+        time.sleep(1)
+        self._proxy = get_object(TOP_OBJECT)
+        self._errors = StratisdErrorsGen.get_object()
+        Manager.CreatePool(
+           self._proxy,
+           name=self._POOLNAME,
+           redundancy=0,
+           force=False,
+           devices=[]
+        )
+        Manager.ConfigureSimulator(self._proxy, denominator=8)
+
+    def tearDown(self):
+        """
+        Stop the stratisd simulator and daemon.
+        """
+        self._service.tearDown()
+
+    def testExecution(self):
+        """
+        The pool was just created and has no devices. It should always be
+        possible to destroy it.
+        """
+        (result, rc, _) = checked_call(
+           Manager.DestroyPool(self._proxy, name=self._POOLNAME),
+           ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
+        )
+
+        (_, rc1, _) = checked_call(
+           Manager.GetPoolObjectPath(self._proxy, name=self._POOLNAME),
+           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath],
+        )
+
+        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(result, True)
+        self.assertEqual(rc1, self._errors.POOL_NOTFOUND)

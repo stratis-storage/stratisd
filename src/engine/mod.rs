@@ -11,6 +11,9 @@ pub use self::engine::ErrorEnum;
 pub use self::engine::Filesystem;
 pub use self::engine::Pool;
 
+#[macro_use]
+mod macros;
+
 pub mod sim_engine;
 pub mod strat_engine;
 

@@ -76,35 +76,17 @@ impl Engine for SimEngine {
 
     /// Destroy a pool, if the pool does not exist, return Ok.
     fn destroy_pool(&mut self, name: &str) -> EngineResult<()> {
-        let entry = match self.pools.entry(name.into()) {
-            Entry::Vacant(_) => return Ok(()),
-            Entry::Occupied(entry) => entry,
-        };
-        if !entry.get().filesystems.is_empty() {
-            return Err(EngineError::Stratis(ErrorEnum::Busy("filesystems remaining on pool"
-                .into())));
-        };
-        if !entry.get().block_devs.is_empty() {
-            return Err(EngineError::Stratis(ErrorEnum::Busy("devices remaining in pool".into())));
-        };
-        if !entry.get().cache_devs.is_empty() {
-            return Err(EngineError::Stratis(ErrorEnum::Busy("cache devices remaining in pool"
-                .into())));
-        };
-        entry.remove();
-        Ok(())
+        destroy_pool!{self; name}
     }
 
     /// Looks up the pool by its unique name
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool> {
-        Ok(try!(self.pools
-            .get_mut(name)
-            .ok_or(EngineError::Stratis(ErrorEnum::NotFound(name.into())))))
+        get_pool!(self; name)
     }
 
     /// Returns a collection of the Pool objects that belong to this engine
     fn pools(&mut self) -> BTreeMap<&str, &mut Pool> {
-        BTreeMap::from_iter(self.pools.iter_mut().map(|x| (x.0 as &str, x.1 as &mut Pool)))
+        pools!(self)
     }
 
     /// Set properties of the simulator

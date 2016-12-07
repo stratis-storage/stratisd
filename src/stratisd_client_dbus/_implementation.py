@@ -244,7 +244,7 @@ class ManagerSpec(InterfaceSpec):
     OUTPUT_SIGS = {
         MethodNames.ConfigureSimulator : "qs",
         MethodNames.CreatePool : "oqs",
-        MethodNames.DestroyPool : "qs",
+        MethodNames.DestroyPool : "bqs",
         MethodNames.GetCacheObjectPath : "oqs",
         MethodNames.GetDevObjectPath : "oqs",
         MethodNames.GetDevTypes : "",

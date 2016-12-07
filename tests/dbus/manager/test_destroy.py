@@ -66,7 +66,7 @@ class Destroy1TestCase(unittest.TestCase):
         """
         Destroy should succeed.
         """
-        (rc, _) = checked_call(
+        (_, rc, _) = checked_call(
            Manager.DestroyPool(self._proxy, name=self._POOLNAME),
            ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
         )
@@ -114,7 +114,7 @@ class Destroy2TestCase(unittest.TestCase):
         """
         The pool was just created, so must be destroyable.
         """
-        (rc, _) = checked_call(
+        (_, rc, _) = checked_call(
            Manager.DestroyPool(self._proxy, name=self._POOLNAME),
            ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
         )
@@ -173,7 +173,7 @@ class Destroy3TestCase(unittest.TestCase):
         """
         This should fail since it has a filesystem on it.
         """
-        (rc, _) = checked_call(
+        (_, rc, _) = checked_call(
            Manager.DestroyPool(self._proxy, name=self._POOLNAME),
            ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
         )

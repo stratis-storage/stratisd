@@ -6,7 +6,7 @@ use std::path::Path;
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
 
-    let src = Path::new("src/strat_engine/serde_structs.rs.in");
+    let src = Path::new("src/engine/strat_engine/serde_structs.rs.in");
     let dst = Path::new(&out_dir).join("serde_structs.rs");
 
     serde_codegen::expand(&src, &dst).unwrap();

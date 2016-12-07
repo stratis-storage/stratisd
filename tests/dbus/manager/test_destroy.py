@@ -127,13 +127,14 @@ class Destroy2TestCase(unittest.TestCase):
            ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath],
         )
 
-        if rc is self._errors.OK:
+        if rc == self._errors.OK:
             expected_rc = self._errors.POOL_NOTFOUND
             expected_result = True
-        else:
-            self.assertEqual(rc, self._errors.BUSY)
+        elif rc == self._errors.BUSY:
             expected_rc = self._errors.OK
             expected_result = False
+        else:
+            self.fail("rc must be OK or BUSY, is %d" % rc)
 
         self.assertEqual(rc1, expected_rc)
         self.assertEqual(result, expected_result)

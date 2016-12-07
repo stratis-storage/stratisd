@@ -1005,7 +1005,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
 
     let msg = match result {
-        Ok(_) => {
+        Ok(action) => {
             match dbus_context.pools.borrow_mut().remove_by_second(name.into()) {
                 Some((object_path, _)) => {
                     remove_dbus_object_path(dbus_context, object_path.clone());
@@ -1013,12 +1013,12 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 _ => {}
             };
             let (rc, rs) = ok_message_items();
-            return_message.append2(rc, rs)
+            return_message.append3(MessageItem::Bool(action), rc, rs)
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err(&err);
             let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append2(rc, rs)
+            return_message.append3(MessageItem::Bool(false), rc, rs)
         }
     };
     Ok(vec![msg])
@@ -1138,6 +1138,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
 
     let destroy_pool_method = f.method(DESTROY_POOL, (), destroy_pool)
         .in_arg(("pool_name", "s"))
+        .out_arg(("action", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

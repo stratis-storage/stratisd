@@ -47,8 +47,6 @@ mod dbus_consts;
 mod stratis;
 mod dbus_api;
 mod engine;
-mod sim_engine;
-mod strat_engine;
 
 use std::io::Write;
 use std::error::Error;
@@ -59,8 +57,8 @@ use types::{StratisResult, StratisError};
 use clap::{App, Arg};
 
 use engine::Engine;
-use sim_engine::SimEngine;
-use strat_engine::StratEngine;
+use engine::sim_engine::SimEngine;
+use engine::strat_engine::StratEngine;
 
 
 fn write_err(err: StratisError) -> StratisResult<()> {

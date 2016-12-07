@@ -1006,6 +1006,12 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(_) => {
+            match dbus_context.pools.borrow_mut().remove_by_second(name.into()) {
+                Some((object_path, _)) => {
+                    remove_dbus_object_path(dbus_context, object_path.clone());
+                }
+                _ => {}
+            };
             let (rc, rs) = ok_message_items();
             return_message.append2(rc, rs)
         }

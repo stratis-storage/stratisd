@@ -21,14 +21,10 @@ import unittest
 
 import dbus
 
-from stratisd_client_dbus import Cache
-from stratisd_client_dbus import Dev
 from stratisd_client_dbus import Filesystem
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import Pool
 
-from stratisd_client_dbus._implementation import CacheSpec
-from stratisd_client_dbus._implementation import DevSpec
 from stratisd_client_dbus._implementation import FilesystemSpec
 from stratisd_client_dbus._implementation import ManagerSpec
 from stratisd_client_dbus._implementation import PoolSpec
@@ -36,8 +32,8 @@ from stratisd_client_dbus._implementation import PoolSpec
 from stratisd_client_dbus._implementation import _info_to_xformer
 from stratisd_client_dbus._implementation import _option_to_tuple
 
-_GENERATED_CLASSES = (Cache, Dev, Filesystem, Manager, Pool)
-_SPEC_CLASSES = (CacheSpec, DevSpec, FilesystemSpec, ManagerSpec, PoolSpec)
+_GENERATED_CLASSES = (Filesystem, Manager, Pool)
+_SPEC_CLASSES = (FilesystemSpec, ManagerSpec, PoolSpec)
 
 class KeysTestCase(unittest.TestCase):
     """

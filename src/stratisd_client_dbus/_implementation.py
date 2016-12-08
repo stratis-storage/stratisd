@@ -104,60 +104,6 @@ class InterfaceSpec(abc.ABC):
     PROPERTY_NAMES = abc.abstractproperty(doc="list of property names")
 
 
-class CacheSpec(InterfaceSpec):
-    """
-    Cache device interface.
-    """
-    # pylint: disable=too-few-public-methods
-
-    class MethodNames(enum.Enum):
-        """
-        Names of the methods of the dev interface.
-        """
-        pass
-
-    class PropertyNames(enum.Enum):
-        """
-        Names of the properties of the Filesystem interface.
-        """
-        Size = "Size"
-
-    INTERFACE_NAME = 'org.storage.stratis1.cache'
-
-    INPUT_SIGS = {
-    }
-    OUTPUT_SIGS = {
-    }
-    XFORMERS = _xformers(INPUT_SIGS)
-
-
-class DevSpec(InterfaceSpec):
-    """
-    Blockdev interface.
-    """
-    # pylint: disable=too-few-public-methods
-
-    class MethodNames(enum.Enum):
-        """
-        Names of the methods of the dev interface.
-        """
-        pass
-
-    class PropertyNames(enum.Enum):
-        """
-        Names of the properties of the Filesystem interface.
-        """
-        Size = "Size"
-
-    INTERFACE_NAME = 'org.storage.stratis1.dev'
-
-    INPUT_SIGS = {
-    }
-    OUTPUT_SIGS = {
-    }
-    XFORMERS = _xformers(INPUT_SIGS)
-
-
 class FilesystemSpec(InterfaceSpec):
     """
     Filesystem interface.
@@ -334,7 +280,7 @@ def _prop_builder(spec):
         :param namespace: the class's namespace
         """
 
-        def build_property(prop):
+        def build_property(prop): # pragma: no cover
             """
             Build a single property getter for this class.
 
@@ -413,12 +359,6 @@ def _iface_builder(spec):
     return builder
 
 
-Cache = types.new_class(
-   "Cache",
-   bases=(object,),
-   exec_body=_iface_builder(CacheSpec)
-)
-Dev = types.new_class("Dev", bases=(object,), exec_body=_iface_builder(DevSpec))
 Filesystem = types.new_class(
    "Filesystem",
    bases=(object,),

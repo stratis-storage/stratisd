@@ -172,7 +172,10 @@ mod tests {
         let name = "name";
         let mut engine = SimEngine::new();
         engine.create_pool(name, &vec![], 0, false).unwrap();
-        assert!(engine.create_pool(name, &vec![], 0, false).is_ok());
+        assert!(match engine.create_pool(name, &vec![], 0, false) {
+            Ok(devs) => devs.is_empty(),
+            Err(_) => false,
+        });
     }
 
     #[test]
@@ -193,7 +196,10 @@ mod tests {
         let path = "/s/d";
         let mut engine = SimEngine::new();
         let devices = vec![Path::new(path), Path::new(path)];
-        assert!(engine.create_pool("name", &devices, 0, false).is_ok());
+        assert!(match engine.create_pool("name", &devices, 0, false) {
+            Ok(devs) => devs.len() == 1,
+            _ => false,
+        });
     }
 
     #[test]

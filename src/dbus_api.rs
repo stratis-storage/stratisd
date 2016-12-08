@@ -872,6 +872,63 @@ fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![return_message.append3(MessageItem::Array(vec, return_sig.into()), rc, rs)])
 }
 
+fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+
+    let new_name: &str = try!(get_next_arg(&mut iter, 0));
+
+    let dbus_context = m.path.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let default_return = MessageItem::Bool(false);
+
+    let old_name = dbus_try!(
+        object_path_to_pool_name(dbus_context, object_path);
+        default_return; return_message);
+
+    let mut engine = dbus_context.engine.borrow_mut();
+    let result = engine.rename_pool(&old_name, new_name);
+
+    let msg = match result {
+        Ok(false) => {
+            let (rc, rs) = ok_message_items();
+            return_message.append3(MessageItem::Bool(false), rc, rs)
+        }
+        Ok(true) => {
+            let return_value = MessageItem::Bool(true);
+            let removed = dbus_context.pools.borrow_mut().remove_by_second(&old_name);
+            match removed {
+                Some((removed_object_path, _)) => {
+                    if object_path.to_string() == removed_object_path {
+                        dbus_context.pools
+                            .borrow_mut()
+                            .insert(removed_object_path, new_name.into());
+                        let (rc, rs) = ok_message_items();
+                        return_message.append3(return_value, rc, rs)
+                    } else {
+                        let error_message = format!("wrong dbus object_path for renamed pool");
+                        let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
+                                                             error_message);
+                        return_message.append3(return_value, rc, rs)
+                    }
+                }
+                None => {
+                    let error_message = format!("no dbus object path for renamed pool");
+                    let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR, error_message);
+                    return_message.append3(return_value, rc, rs)
+                }
+            }
+        }
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err(&err);
+            let (rc, rs) = code_to_message_items(rc, rs);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}
+
 fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
 
     let f = Factory::new_fn();
@@ -929,6 +986,12 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
+    let rename_method = f.method(RENAME_POOL, (), rename_pool)
+        .in_arg(("new_name", "s"))
+        .out_arg(("action", "b"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
+
     let object_name = format!("{}/{}",
                               STRATIS_BASE_PATH,
                               dbus_context.get_next_id().to_string());
@@ -944,7 +1007,8 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
             .add_m(add_cache_devs_method)
             .add_m(remove_cache_devs_method)
             .add_m(add_devs_method)
-            .add_m(remove_devs_method));
+            .add_m(remove_devs_method)
+            .add_m(rename_method));
 
     let path = object_path.get_name().to_owned();
     dbus_context.action_list.borrow_mut().push(DeferredAction::Add(object_path));

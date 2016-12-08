@@ -41,6 +41,7 @@ pub const ADD_CACHE_DEVS: &'static str = "AddCacheDevs";
 pub const REMOVE_CACHE_DEVS: &'static str = "RemoveCacheDevs";
 pub const ADD_DEVS: &'static str = "AddDevs";
 pub const REMOVE_DEVS: &'static str = "RemoveDevs";
+pub const RENAME_POOL: &'static str = "Rename";
 
 // Filesystem Methods
 pub const CREATE_SNAPSHOT: &'static str = "CreateSnapshot";

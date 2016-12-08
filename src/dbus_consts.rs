@@ -44,7 +44,7 @@ pub const REMOVE_DEVS: &'static str = "RemoveDevs";
 
 // Filesystem Methods
 pub const CREATE_SNAPSHOT: &'static str = "CreateSnapshot";
-pub const RENAME: &'static str = "Rename";
+pub const RENAME_FILESYSTEM: &'static str = "Rename";
 pub const SET_MOUNTPOINT: &'static str = "SetMountpoint";
 pub const SET_QUOTA: &'static str = "SetQuota";
 

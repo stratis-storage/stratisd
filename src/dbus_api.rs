@@ -297,7 +297,7 @@ fn create_dbus_filesystem<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let rename_method = f.method(RENAME, (), rename_filesystem)
+    let rename_method = f.method(RENAME_FILESYSTEM, (), rename_filesystem)
         .in_arg(("name", "s"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))

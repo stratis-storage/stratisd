@@ -10,6 +10,7 @@ pub use self::engine::EngineResult;
 pub use self::engine::ErrorEnum;
 pub use self::engine::Filesystem;
 pub use self::engine::Pool;
+pub use self::engine::RenameAction;
 
 #[macro_use]
 mod macros;

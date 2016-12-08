@@ -17,6 +17,7 @@ use engine::Engine;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
+use engine::RenameAction;
 use engine::Pool;
 
 use super::pool::StratPool;
@@ -77,6 +78,10 @@ impl Engine for StratEngine {
     /// Destroy a pool, if the pool does not exist, return Ok.
     fn destroy_pool(&mut self, name: &str) -> EngineResult<bool> {
         destroy_pool!{self; name}
+    }
+
+    fn rename_pool(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
+        rename_pool!{self; old_name; new_name}
     }
 
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool> {

@@ -15,12 +15,8 @@
 """
 General constants for testing.
 """
-import pyudev
 
 _STRATISD = '/home/mulhern/my-contributions/stratisd-c'
 _STRATISD_EXECUTABLE = 'stratisd'
 
 _STRATISD_RUST = '/home/mulhern/my-contributions/stratisd'
-
-_DEVICES = \
-   [x for x in pyudev.Context().list_devices(subsystem='block', DEVTYPE='disk')]

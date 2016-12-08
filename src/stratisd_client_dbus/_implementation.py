@@ -280,7 +280,7 @@ def _prop_builder(spec):
         :param namespace: the class's namespace
         """
 
-        def build_property(prop):
+        def build_property(prop): # pragma: no cover
             """
             Build a single property getter for this class.
 

@@ -4,17 +4,15 @@
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::vec::Vec;
 use std::path::Path;
+use std::path::PathBuf;
 use std::str::FromStr;
-use std::iter::FromIterator;
-use std::io;
-use std::io::ErrorKind;
+use std::vec::Vec;
 
 use uuid::Uuid;
 use devicemapper::Device;
 
-use engine::{EngineResult, EngineError};
+use engine::EngineResult;
 use engine::Pool;
 use engine::Filesystem;
 use engine::Dev;
@@ -33,7 +31,7 @@ pub struct StratFilesystem {
 pub struct StratPool {
     pub name: String,
     pub pool_uuid: Uuid,
-    pub cache_devs: Vec<BlockDev>,
+    pub cache_devs: BTreeMap<Uuid, BlockDev>,
     pub block_devs: BTreeMap<Uuid, BlockDev>,
     pub filesystems: BTreeMap<String, Box<StratFilesystem>>,
     pub raid_level: u16,
@@ -51,7 +49,7 @@ impl StratPool {
         Ok(StratPool {
             name: name.to_owned(),
             pool_uuid: pool_uuid,
-            cache_devs: Vec::new(),
+            cache_devs: BTreeMap::new(),
             block_devs: bds,
             filesystems: BTreeMap::new(),
             raid_level: raid_level,
@@ -72,30 +70,30 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn add_blockdev(&mut self, path: &Path, force: bool) -> EngineResult<()> {
-        let dev = try!(Device::from_str(&path.to_string_lossy()));
-        let dev_set = BTreeSet::from_iter([dev].iter().map(|x| *x));
-
-        for (_, bd) in &self.block_devs {
-            if dev_set.contains(&bd.dev) {
-                return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                          format!("blockdev {} already used \
-                                                                   in pool {}",
-                                                                  bd.dstr(),
-                                                                  self.name))));
-            }
+    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
+        let mut devices = BTreeSet::new();
+        for path in paths {
+            let dev = try!(Device::from_str(&path.to_string_lossy()));
+            devices.insert(dev);
         }
 
-        let (uuid, bd) = try!(BlockDev::initialize(&self.pool_uuid, dev_set, MIN_MDA_SIZE, force))
-            .into_iter()
-            .next()
-            .unwrap();
-        self.block_devs.insert(uuid, bd);
-        Ok(())
+        let mut bds = try!(BlockDev::initialize(&self.pool_uuid, devices, MIN_MDA_SIZE, force));
+        let bdev_paths = bds.iter().map(|p| p.1.devnode.clone()).collect();
+        self.block_devs.append(&mut bds);
+        Ok(bdev_paths)
     }
 
-    fn add_cachedev(&mut self, _path: &Path, _force: bool) -> EngineResult<()> {
-        unimplemented!()
+    fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
+        let mut devices = BTreeSet::new();
+        for path in paths {
+            let dev = try!(Device::from_str(&path.to_string_lossy()));
+            devices.insert(dev);
+        }
+
+        let mut bds = try!(BlockDev::initialize(&self.pool_uuid, devices, MIN_MDA_SIZE, force));
+        let bdev_paths = bds.iter().map(|p| p.1.devnode.clone()).collect();
+        self.cache_devs.append(&mut bds);
+        Ok(bdev_paths)
     }
 
     fn destroy_filesystem(&mut self, _filesystem: &str) -> EngineResult<()> {

@@ -19,7 +19,7 @@ use uuid::Uuid;
 use bytesize::ByteSize;
 
 use types::{Sectors, SectorOffset};
-use engine::{EngineResult, EngineError};
+use engine::{EngineResult, EngineError, ErrorEnum};
 
 use consts::*;
 use super::consts::*;
@@ -29,6 +29,13 @@ pub use super::BlockDevSave;
 
 type PoolUuid = Uuid;
 type DevUuid = Uuid;
+
+#[derive(Debug)]
+enum DevOwnership {
+    Ours(Uuid),
+    Unowned,
+    Theirs,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MDA {
@@ -42,7 +49,7 @@ pub struct MDA {
 #[derive(Debug, Clone, PartialEq)]
 pub struct BlockDev {
     pub dev: Device,
-    pub path: PathBuf,
+    pub devnode: PathBuf,
     pub sectors: Sectors,
     pub mdaa: MDA,
     pub mdab: MDA,
@@ -74,14 +81,48 @@ impl BlockDev {
                                                               *MIN_MDA_SIZE))));
         }
 
-        let dev_info = try!(BlockDev::dev_info(&devices, force));
+        let dev_infos = devices.into_iter().map(|d: Device| (d, BlockDev::dev_info(&d)));
+
+
+        let mut add_devs = Vec::new();
+        for (dev, dev_result) in dev_infos {
+            if dev_result.is_err() {
+                return Err(dev_result.unwrap_err());
+            }
+            let (devnode, dev_size, ownership) = dev_result.unwrap();
+            if dev_size < MIN_DEV_SIZE {
+                let error_message = format!("{} too small, {} minimum",
+                                            devnode.display(),
+                                            ByteSize::b(MIN_DEV_SIZE as usize).to_string(true));
+                return Err(EngineError::Stratis(ErrorEnum::Invalid(error_message)));
+            };
+            match ownership {
+                DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size))),
+                DevOwnership::Theirs => {
+                    if !force {
+                        let error_str = format!("First 4K of {} not zeroed", devnode.display());
+                        return Err(EngineError::Stratis(ErrorEnum::Invalid(error_str)));
+                    } else {
+                        add_devs.push((dev, (devnode, dev_size)))
+                    }
+                }
+                DevOwnership::Ours(uuid) => {
+                    if *pool_uuid != uuid {
+                        let error_str = format!("Device {} already belongs to Stratis pool {}",
+                                                devnode.display(),
+                                                uuid);
+                        return Err(EngineError::Stratis(ErrorEnum::Invalid(error_str)));
+                    }
+                }
+            }
+        }
 
         let mut bds = BTreeMap::new();
-        for (dev, (path, dev_size)) in devices.into_iter().zip(dev_info.into_iter()) {
+        for (dev, (devnode, dev_size)) in add_devs {
 
             let mut bd = BlockDev {
                 dev: dev,
-                path: path,
+                devnode: devnode,
                 sectors: Sectors(dev_size / SECTOR_SIZE),
                 mdaa: MDA {
                     last_updated: Timespec::new(0, 0),
@@ -108,61 +149,58 @@ impl BlockDev {
         Ok(bds)
     }
 
-    /// Gets device and device sizes, and returns an error if devices
-    /// cannot be used by Stratis.
-    fn dev_info(devices: &BTreeSet<Device>, force: bool) -> EngineResult<Vec<(PathBuf, u64)>> {
-        let mut dev_infos = Vec::new();
-        for dev in devices {
-            let path = try!(dev.path().ok_or_else(|| {
-                io::Error::new(ErrorKind::InvalidInput,
-                               format!("could not get path from dev {}", dev.dstr()))
+    /// Gets device information, returns an error if problem with obtaining
+    /// that information.
+    fn dev_info(dev: &Device) -> EngineResult<(PathBuf, u64, DevOwnership)> {
+        let devnode = try!(dev.path().ok_or_else(|| {
+            io::Error::new(ErrorKind::InvalidInput,
+                           format!("could not get device node from dev {}", dev.dstr()))
+        }));
+        let mut f = try!(OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&devnode)
+            .map_err(|_| {
+                io::Error::new(ErrorKind::PermissionDenied,
+                               format!("Could not open {}", devnode.display()))
             }));
-            let mut f = try!(OpenOptions::new()
-                .read(true)
-                .write(true)
-                .open(&path)
-                .map_err(|_| {
-                    io::Error::new(ErrorKind::PermissionDenied,
-                                   format!("Could not open {}", path.display()))
-                }));
 
-            if !force {
-                let mut buf = [0u8; 4096];
-                try!(f.read(&mut buf));
+        let dev_size = try!(blkdev_size(&f));
 
-                if buf.iter().any(|x| *x != 0) {
-                    return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                              format!("First 4K of {} is not \
-                                                                       zeroed, and not forced",
-                                                                      path.display()))));
-                }
+
+        let mut ownership = DevOwnership::Unowned;
+
+        let mut buf = [0u8; SECTOR_SIZE as usize];
+        try!(f.seek(SeekFrom::Start(SECTOR_SIZE)));
+        try!(f.read(&mut buf));
+
+        if &buf[4..20] == STRAT_MAGIC {
+            let pool_id = try!(Uuid::parse_str(from_utf8(&buf[32..64]).unwrap())
+                .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "invalid pool uid")));
+            ownership = DevOwnership::Ours(pool_id);
+        } else {
+            let mut buf = [0u8; 4096];
+            try!(f.seek(SeekFrom::Start(0)));
+            try!(f.read(&mut buf));
+            if buf.iter().any(|x| *x != 0) {
+                ownership = DevOwnership::Theirs;
             }
-
-            let dev_size = try!(blkdev_size(&f));
-            if dev_size < MIN_DEV_SIZE {
-                return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                          format!("{} too small, {} minimum",
-                                                                  path.display(),
-                                                                  ByteSize::b(MIN_DEV_SIZE as usize)
-                                                                  .to_string(true)))));
-            }
-            dev_infos.push((path, dev_size));
         }
 
-        Ok(dev_infos)
+        Ok((devnode, dev_size, ownership))
     }
 
     /// If a Path refers to a valid Stratis blockdev, return its
     /// parent uuid, its blockdev uuid, and the Blockdev.
-    pub fn setup(path: &Path) -> EngineResult<(PoolUuid, DevUuid, BlockDev)> {
-        let dev = try!(Device::from_str(&path.to_string_lossy()));
+    pub fn setup(devnode: &Path) -> EngineResult<(PoolUuid, DevUuid, BlockDev)> {
+        let dev = try!(Device::from_str(&devnode.to_string_lossy()));
 
         let mut f = try!(OpenOptions::new()
             .read(true)
-            .open(path)
+            .open(devnode)
             .map_err(|_| {
                 io::Error::new(ErrorKind::PermissionDenied,
-                               format!("Could not open {}", path.display()))
+                               format!("Could not open {}", devnode.display()))
             }));
 
         let mut buf = [0u8; SECTOR_SIZE as usize];
@@ -172,15 +210,15 @@ impl BlockDev {
         if &buf[4..20] != STRAT_MAGIC {
             return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
                                                       format!("{} is not a Stratis blockdev",
-                                                              path.display()))));
+                                                              devnode.display()))));
         }
 
         let crc = crc32::checksum_ieee(&buf[4..SECTOR_SIZE as usize]);
         if crc != LittleEndian::read_u32(&buf[..4]) {
-            dbgp!("{} header CRC failed", path.display());
+            dbgp!("{} header CRC failed", devnode.display());
             return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
                                                       format!("{} header CRC failed",
-                                                              path.display()))));
+                                                              devnode.display()))));
             // TODO: Try to read end-of-disk copy
         }
 
@@ -195,14 +233,14 @@ impl BlockDev {
             return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
                                                       format!("{} mda size is not an even \
                                                                number",
-                                                              path.display()))));
+                                                              devnode.display()))));
         }
 
         if mda_size < MIN_MDA_SIZE {
             return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
                                                       format!("{} mda size is less than \
                                                                minimum ({})",
-                                                              path.display(),
+                                                              devnode.display(),
                                                               *MIN_MDA_SIZE))));
         }
 
@@ -210,7 +248,7 @@ impl BlockDev {
             dev_id,
             BlockDev {
                 dev: dev,
-                path: path.to_owned(),
+                devnode: devnode.to_owned(),
                 sectors: Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE),
                 mdaa: MDA {
                     last_updated: Timespec::new(LittleEndian::read_u64(&buf[64..72]) as i64,
@@ -235,7 +273,7 @@ impl BlockDev {
 
     pub fn to_save(&self) -> BlockDevSave {
         BlockDevSave {
-            path: self.path.clone(),
+            devnode: self.devnode.clone(),
             sectors: self.sectors,
         }
     }
@@ -246,12 +284,12 @@ impl BlockDev {
     pub fn find_all() -> EngineResult<BTreeMap<PoolUuid, BTreeMap<DevUuid, BlockDev>>> {
         let mut pool_map = BTreeMap::new();
         for dir_e in try!(read_dir("/dev")) {
-            let path = match dir_e {
+            let devnode = match dir_e {
                 Ok(d) => d.path(),
                 Err(_) => continue,
             };
 
-            match BlockDev::setup(&path) {
+            match BlockDev::setup(&devnode) {
                 Ok((pool_uuid, dev_uuid, blockdev)) => {
                     pool_map.entry(pool_uuid)
                         .or_insert_with(BTreeMap::new)
@@ -287,7 +325,7 @@ impl BlockDev {
                                                       "Neither MDA region is in use")));
         }
 
-        let mut f = try!(OpenOptions::new().read(true).open(&self.path));
+        let mut f = try!(OpenOptions::new().read(true).open(&self.devnode));
         let mut buf = vec![0; younger_mda.used as usize];
 
         // read metadata from disk
@@ -322,7 +360,7 @@ impl BlockDev {
         older_mda.length = metadata.len() as u32;
         older_mda.last_updated = *time;
 
-        let mut f = try!(OpenOptions::new().write(true).open(&self.path));
+        let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
 
         // write metadata to disk
         try!(f.seek(SeekFrom::Start((*BDA_STATIC_HDR_SIZE + *older_mda.offset) * SECTOR_SIZE)));
@@ -360,19 +398,19 @@ impl BlockDev {
         let hdr_crc = crc32::checksum_ieee(&buf[4..SECTOR_SIZE as usize]);
         LittleEndian::write_u32(&mut buf[..4], hdr_crc);
 
-        try!(self.write_hdr_buf(&self.path, &buf));
+        try!(self.write_hdr_buf(&self.devnode, &buf));
 
         Ok(())
     }
 
     pub fn wipe_sigblock(&mut self) -> EngineResult<()> {
         let buf = [0u8; SECTOR_SIZE as usize];
-        try!(self.write_hdr_buf(&self.path, &buf));
+        try!(self.write_hdr_buf(&self.devnode, &buf));
         Ok(())
     }
 
-    fn write_hdr_buf(&self, path: &Path, buf: &[u8; SECTOR_SIZE as usize]) -> EngineResult<()> {
-        let mut f = try!(OpenOptions::new().write(true).open(path));
+    fn write_hdr_buf(&self, devnode: &Path, buf: &[u8; SECTOR_SIZE as usize]) -> EngineResult<()> {
+        let mut f = try!(OpenOptions::new().write(true).open(devnode));
         let zeroed = [0u8; (SECTOR_SIZE * 8) as usize];
 
         // Write 4K header to head & tail. Sigblock goes in sector 1.

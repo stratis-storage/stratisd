@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::io;
 use std::path::Path;
+use std::path::PathBuf;
 
 use nix;
 
@@ -25,6 +26,7 @@ pub enum ErrorEnum {
 
     AlreadyExists(String),
     Busy(String),
+    Invalid(String),
     NotFound(String),
 }
 
@@ -35,6 +37,7 @@ impl ErrorEnum {
             ErrorEnum::Error(ref x) => format!("{}", x),
             ErrorEnum::AlreadyExists(ref x) => format!("{} already exists", x),
             ErrorEnum::Busy(ref x) => format!("{} is busy", x),
+            ErrorEnum::Invalid(ref x) => format!("{}", x),
             ErrorEnum::NotFound(ref x) => format!("{} is not found", x),
         }
     }
@@ -87,8 +90,8 @@ pub trait Pool: Debug {
                          quota_size: Option<u64>)
                          -> EngineResult<()>;
     fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<()>;
-    fn add_blockdev(&mut self, path: &Path, force: bool) -> EngineResult<()>;
-    fn add_cachedev(&mut self, path: &Path, force: bool) -> EngineResult<()>;
+    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
+    fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;
     fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()>;
     fn filesystems(&mut self) -> BTreeMap<&Uuid, &mut Filesystem>;
@@ -107,7 +110,7 @@ pub trait Engine: Debug {
                    blockdev_paths: &[&Path],
                    raid_level: u16,
                    force: bool)
-                   -> EngineResult<usize>;
+                   -> EngineResult<Vec<PathBuf>>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given name is absent on completion.

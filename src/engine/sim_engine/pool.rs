@@ -4,8 +4,10 @@
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::iter::FromIterator;
 use std::path::Path;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::vec::Vec;
 
@@ -60,14 +62,18 @@ impl SimPool {
 }
 
 impl Pool for SimPool {
-    fn add_blockdev(&mut self, path: &Path, _force: bool) -> EngineResult<()> {
-        self.block_devs.push(SimDev::new_dev(self.rdm.clone(), path));
-        Ok(())
+    fn add_blockdevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
+        let rdm = self.rdm.clone();
+        let devices = BTreeSet::from_iter(paths);
+        self.block_devs.extend(devices.iter().map(|p| SimDev::new_dev(rdm.clone(), p)));
+        Ok(devices.iter().map(|d| d.to_path_buf()).collect())
     }
 
-    fn add_cachedev(&mut self, path: &Path, _force: bool) -> EngineResult<()> {
-        self.cache_devs.push(SimCacheDev::new_cache(self.rdm.clone(), path));
-        Ok(())
+    fn add_cachedevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
+        let rdm = self.rdm.clone();
+        let devices = BTreeSet::from_iter(paths);
+        self.cache_devs.extend(devices.iter().map(|p| SimCacheDev::new_cache(rdm.clone(), p)));
+        Ok(devices.iter().map(|d| d.to_path_buf()).collect())
     }
 
     fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()> {

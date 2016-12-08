@@ -2,14 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::path::Path;
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeSet;
-use std::str::FromStr;
 use std::iter::FromIterator;
-use std::io;
-use std::io::ErrorKind;
+use std::path::Path;
+use std::path::PathBuf;
+use std::str::FromStr;
 
 use devicemapper::Device;
 
@@ -44,7 +43,7 @@ impl Engine for StratEngine {
                    blockdev_paths: &[&Path],
                    raid_level: u16,
                    force: bool)
-                   -> EngineResult<usize> {
+                   -> EngineResult<Vec<PathBuf>> {
 
         if self.pools.contains_key(name) {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
@@ -56,23 +55,11 @@ impl Engine for StratEngine {
             devices.insert(dev);
         }
 
-        for (_, pool) in &self.pools {
-            for (_, bd) in &pool.block_devs {
-                if devices.contains(&bd.dev) {
-                    return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                              format!("blockdev {} already \
-                                                                       used in pool {}",
-                                                                      bd.dstr(),
-                                                                      pool.name))));
-                }
-            }
-        }
-
         let pool = try!(StratPool::new(name, devices, raid_level, force));
-        let num_bdevs = pool.block_devs.len();
+        let bdev_paths = pool.block_devs.iter().map(|p| p.1.devnode.clone()).collect();
 
         self.pools.insert(name.to_owned(), pool);
-        Ok(num_bdevs)
+        Ok(bdev_paths)
     }
 
     /// Destroy a pool, if the pool does not exist, return Ok.

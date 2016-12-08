@@ -41,23 +41,19 @@ macro_rules! pools {
 macro_rules! rename_pool {
     ( $s:ident; $old_name:ident; $new_name:ident ) => {
         if $old_name == $new_name {
-            return Ok(false);
+            return Ok(RenameAction::Identity);
+        }
+
+        if !$s.pools.contains_key($old_name) {
+            return Ok(RenameAction::NoSource);
         }
 
         if $s.pools.contains_key($new_name) {
-            if $s.pools.contains_key($old_name) {
-                return Err(EngineError::Stratis(ErrorEnum::AlreadyExists($new_name.into())));
-            } else {
-                return Ok(false);
-            }
+            return Err(EngineError::Stratis(ErrorEnum::AlreadyExists($new_name.into())));
         } else {
-            if $s.pools.contains_key($old_name) {
-                let pool = $s.pools.remove($old_name).unwrap();
-                $s.pools.insert($new_name.into(), pool);
-                return Ok(true);
-            } else {
-                return Ok(false);
-            }
+            let pool = $s.pools.remove($old_name).unwrap();
+            $s.pools.insert($new_name.into(), pool);
+            return Ok(RenameAction::Renamed);
         };
     }
 }

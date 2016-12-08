@@ -35,6 +35,7 @@ use dbus_consts::*;
 use engine;
 use engine::Engine;
 use engine::EngineError;
+use engine::RenameAction;
 
 use types::StratisResult;
 
@@ -891,11 +892,16 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let result = engine.rename_pool(&old_name, new_name);
 
     let msg = match result {
-        Ok(false) => {
+        Ok(RenameAction::NoSource) => {
+            let error_message = format!("engine doesn't know about pool {}", old_name);
+            let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR, error_message);
+            return_message.append3(default_return, rc, rs)
+        }
+        Ok(RenameAction::Identity) => {
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::Bool(false), rc, rs)
         }
-        Ok(true) => {
+        Ok(RenameAction::Renamed) => {
             let return_value = MessageItem::Bool(true);
             let removed = dbus_context.pools.borrow_mut().remove_by_second(&old_name);
             match removed {

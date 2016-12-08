@@ -9,6 +9,8 @@ use engine::ErrorEnum;
 
 use engine::Pool;
 
+use engine::RenameAction;
+
 use std::cell::RefCell;
 use std::path::Path;
 use std::collections::BTreeMap;
@@ -78,7 +80,7 @@ impl Engine for SimEngine {
         destroy_pool!{self; name}
     }
 
-    fn rename_pool(&mut self, old_name: &str, new_name: &str) -> EngineResult<bool> {
+    fn rename_pool(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
         rename_pool!{self; old_name; new_name}
     }
 
@@ -111,6 +113,7 @@ mod tests {
     use engine::Engine;
     use engine::EngineError;
     use engine::ErrorEnum;
+    use engine::RenameAction;
 
     #[test]
     fn prop_configure_simulator_runs() {
@@ -209,7 +212,7 @@ mod tests {
     fn rename_empty() {
         let mut engine = SimEngine::new();
         assert!(match engine.rename_pool("old_name", "new_name") {
-            Ok(false) => true,
+            Ok(RenameAction::NoSource) => true,
             _ => false,
         });
     }
@@ -219,7 +222,7 @@ mod tests {
     fn rename_empty_identity() {
         let mut engine = SimEngine::new();
         assert!(match engine.rename_pool("old_name", "old_name") {
-            Ok(false) => true,
+            Ok(RenameAction::Identity) => true,
             _ => false,
         });
     }
@@ -231,7 +234,7 @@ mod tests {
         let mut engine = SimEngine::new();
         engine.create_pool(name, &vec![], 0, false).unwrap();
         assert!(match engine.rename_pool(name, name) {
-            Ok(false) => true,
+            Ok(RenameAction::Identity) => true,
             _ => false,
         });
     }
@@ -243,7 +246,7 @@ mod tests {
         let mut engine = SimEngine::new();
         engine.create_pool(name, &vec![], 0, false).unwrap();
         assert!(match engine.rename_pool(name, "new_name") {
-            Ok(true) => true,
+            Ok(RenameAction::Renamed) => true,
             _ => false,
         });
     }
@@ -270,7 +273,7 @@ mod tests {
         let mut engine = SimEngine::new();
         engine.create_pool(new_name, &vec![], 0, false).unwrap();
         assert!(match engine.rename_pool(old_name, new_name) {
-            Ok(false) => true,
+            Ok(RenameAction::NoSource) => true,
             _ => false,
         });
     }

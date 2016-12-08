@@ -12,6 +12,13 @@ use nix;
 use uuid::Uuid;
 
 #[derive(Debug)]
+pub enum RenameAction {
+    Identity,
+    NoSource,
+    Renamed,
+}
+
+#[derive(Debug)]
 pub enum ErrorEnum {
     Ok,
     Error(String),
@@ -112,7 +119,7 @@ pub trait Engine: Debug {
     /// Raises an error if the mapping can't be applied because
     /// the names aren't equal and both are in use.
     /// Returns true if it was necessary to perform an action, false if not.
-    fn rename_pool(&mut self, old_name: &str, new_name: &str) -> EngineResult<bool>;
+    fn rename_pool(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction>;
 
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool>;
     fn pools(&mut self) -> BTreeMap<&str, &mut Pool>;

@@ -18,8 +18,6 @@ Top-level classes and methods.
 
 from ._connection import get_object
 
-from ._implementation import Cache
-from ._implementation import Dev
 from ._implementation import Filesystem
 from ._implementation import Manager
 from ._implementation import Pool

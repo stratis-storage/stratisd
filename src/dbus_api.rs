@@ -307,7 +307,7 @@ fn create_dbus_filesystem<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_string", "s"));
 
     let set_quota_method = f.method(SET_QUOTA, (), set_filesystem_quota)
-        .out_arg(("quota", "s"))
+        .in_arg(("quota", "s"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

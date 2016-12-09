@@ -71,9 +71,10 @@ impl Pool for SimPool {
         Ok(devices.iter().map(|d| d.to_path_buf()).collect())
     }
 
-    fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()> {
-        self.filesystems.remove(name);
-        Ok(())
+    fn destroy_filesystems<'a, 'b>(&'a mut self,
+                                   fs_names: &[&'b str])
+                                   -> EngineResult<Vec<&'b str>> {
+        destroy_filesystems!{self; fs_names}
     }
 
     fn create_filesystem(&mut self,
@@ -162,6 +163,7 @@ impl Pool for SimPool {
         rename_filesystem!{self; old_name; new_name}
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -259,5 +261,28 @@ mod tests {
             Ok(RenameAction::NoSource) => true,
             _ => false,
         });
+    }
+
+    #[test]
+    /// Removing an empty list of filesystems should always succeed
+    fn destroy_fs_empty() {
+        let name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(name, &vec![], 0, false).unwrap();
+        let mut pool = engine.get_pool(name).unwrap();
+        assert!(match pool.destroy_filesystems(&[]) {
+            Ok(names) => names.is_empty(),
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Removing a non-empty list of filesystems should succeed on empty pool
+    fn destroy_fs_some() {
+        let name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(name, &vec![], 0, false).unwrap();
+        let mut pool = engine.get_pool(name).unwrap();
+        assert!(pool.destroy_filesystems(&["fs"]).is_ok());
     }
 }

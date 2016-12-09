@@ -2,6 +2,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+macro_rules! destroy_filesystems {
+    ( $s:ident; $fs:expr ) => {
+        let mut removed = Vec::new();
+        for name in $fs.iter().map(|x| *x) {
+            if $s.filesystems.remove(name.into()).is_some() {
+                removed.push(name);
+            };
+        };
+        Ok(removed)
+    }
+}
+
 macro_rules! destroy_pool {
     ( $s:ident; $name: ident) => {
         let entry = match $s.pools.entry($name.into()) {

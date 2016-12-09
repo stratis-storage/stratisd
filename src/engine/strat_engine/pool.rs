@@ -94,8 +94,10 @@ impl Pool for StratPool {
         Ok(bdev_paths)
     }
 
-    fn destroy_filesystem(&mut self, _filesystem: &str) -> EngineResult<()> {
-        unimplemented!()
+    fn destroy_filesystems<'a, 'b>(&'a mut self,
+                                   fs_names: &[&'b str])
+                                   -> EngineResult<Vec<&'b str>> {
+        destroy_filesystems!{self; fs_names}
     }
 
     fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem> {

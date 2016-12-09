@@ -507,10 +507,15 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let filesystems: Array<&str, _> = try!(get_next_arg(&mut iter, 0));
 
+    let mut filesystem_names = Vec::new();
+    for name in filesystems {
+        filesystem_names.push(name);
+    }
+
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let return_sig = "(qs)";
+    let return_sig = "s";
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_name = dbus_try!(
@@ -522,32 +527,31 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                    default_return;
                                    return_message);
 
-    let ref mut list_rc = ErrorEnum::OK;
-    let mut vec = Vec::new();
-
-    for filesystem in filesystems {
-        let result = pool.destroy_filesystem(&filesystem);
-        match result {
-            Ok(_) => {
-                let result = fs_name_to_object_path(dbus_context, &pool_name, &filesystem);
-                let object_path = dbus_try!(result; default_return; return_message);
-                remove_dbus_object_path(dbus_context, object_path.clone());
-                let (rc, rs) = ok_message_items();
-                let entry = MessageItem::Struct(vec![rc, rs]);
-                vec.push(entry);
+    let result = pool.destroy_filesystems(&filesystem_names);
+    let msg = match result {
+        Ok(ref names) => {
+            for name in names {
+                match dbus_context.filesystems
+                    .borrow_mut()
+                    .remove_by_second(&(pool_name.clone(), (*name).into())) {
+                    Some((object_path, _)) => {
+                        remove_dbus_object_path(dbus_context, object_path.clone());
+                    }
+                    _ => {}
+                }
             }
-            Err(x) => {
-                *list_rc = ErrorEnum::LIST_FAILURE;
-                let (rc, rs) = engine_to_dbus_err(&x);
-                let (rc, rs) = code_to_message_items(rc, rs);
-                let entry = MessageItem::Struct(vec![rc, rs]);
-                vec.push(entry);
-            }
-        };
-    }
-    let (rc, rs) = code_to_message_items(*list_rc, list_rc.get_error_string().into());
 
-    Ok(vec![return_message.append3(MessageItem::Array(vec, return_sig.into()), rc, rs)])
+            let return_value = names.iter().map(|n| MessageItem::Str((*n).into())).collect();
+            let (rc, rs) = ok_message_items();
+            return_message.append3(MessageItem::Array(return_value, return_sig.into()), rc, rs)
+        }
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err(&err);
+            let (rc, rs) = code_to_message_items(rc, rs);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
 }
 
 fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -879,7 +883,7 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
 
     let destroy_filesystems_method = f.method(DESTROY_FILESYSTEMS, (), destroy_filesystems)
         .in_arg(("filesystems", "as"))
-        .out_arg(("results", "a(qs)"))
+        .out_arg(("results", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

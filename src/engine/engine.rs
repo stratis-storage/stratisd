@@ -90,7 +90,13 @@ pub trait Pool: Debug {
     fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem>;
     fn blockdevs(&mut self) -> Vec<&mut Dev>;
     fn cachedevs(&mut self) -> Vec<&mut Cache>;
-    fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()>;
+
+    /// Ensures that all designated filesystems are gone from pool.
+    /// Returns a list of the filesystems found, and actually destroyed.
+    /// This list will be a subset of the names passed in fs_names.
+    fn destroy_filesystems<'a, 'b>(&'a mut self,
+                                   fs_names: &[&'b str])
+                                   -> EngineResult<Vec<&'b str>>;
 
     /// Rename filesystem
     /// Applies a mapping from old name to new name.

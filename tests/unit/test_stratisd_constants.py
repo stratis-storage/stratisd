@@ -23,6 +23,8 @@ from hypothesis import given
 from hypothesis import settings
 from hypothesis import strategies
 
+from hypothesis import HealthCheck
+
 from stratisd_client_dbus._stratisd_constants import StratisdConstants
 
 class BuildTestCase(unittest.TestCase):
@@ -63,7 +65,7 @@ class GetTestCase(unittest.TestCase):
           unique_by=lambda x: x[0]
        )
     )
-    @settings(max_examples=20)
+    @settings(max_examples=20, suppress_health_check=[HealthCheck.too_slow])
     def testGet(self, constant_list):
         """
         Verify that the class has the properly set up fields.

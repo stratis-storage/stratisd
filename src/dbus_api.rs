@@ -660,23 +660,6 @@ fn remove_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
 }
 
-fn create_dbus_blockdev<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
-
-    let f = Factory::new_fn();
-
-    let object_name = format!("{}/{}",
-                              STRATIS_BASE_PATH,
-                              dbus_context.get_next_id().to_string());
-
-    let object_path = f.object_path(object_name, dbus_context.clone())
-        .introspectable()
-        .add(f.interface(STRATIS_DEV_BASE_INTERFACE, ())
-            .add_p(f.property::<u64, _>("Size", ())));
-
-    let path = object_path.get_name().to_owned();
-    dbus_context.action_list.borrow_mut().push(DeferredAction::Add(object_path));
-    path
-}
 
 fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
@@ -719,23 +702,6 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn create_dbus_cachedev<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
-
-    let f = Factory::new_fn();
-
-    let object_name = format!("{}/{}",
-                              STRATIS_BASE_PATH,
-                              dbus_context.get_next_id().to_string());
-
-    let object_path = f.object_path(object_name, dbus_context.clone())
-        .introspectable()
-        .add(f.interface(STRATIS_CACHE_BASE_INTERFACE, ())
-            .add_p(f.property::<u64, _>("Size", ())));
-
-    let path = object_path.get_name().to_owned();
-    dbus_context.action_list.borrow_mut().push(DeferredAction::Add(object_path));
-    path
-}
 
 fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;

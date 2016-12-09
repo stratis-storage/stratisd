@@ -76,25 +76,8 @@ impl Pool for SimPool {
         Ok(devices.iter().map(|d| d.to_path_buf()).collect())
     }
 
-    fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()> {
-
-        match self.get_filesystem_id(name) {
-            Ok(filesystem_id) => {
-                match self.filesystems.remove(&filesystem_id) {
-                    Some(_) => {
-                        return Ok(());
-                    }
-                    None => {
-                        return Err(EngineError::Stratis(ErrorEnum::NotFound(filesystem_id.simple()
-                            .to_string())))
-                    }
-                }
-            }
-            Err(err) => {
-                return Err(err);
-            }
-        }
-        Ok(())
+    fn destroy_filesystems(&mut self, _fs_names: &[&str]) -> EngineResult<Vec<&str>> {
+        Ok(vec![])
     }
 
     fn create_filesystem(&mut self,
@@ -198,5 +181,38 @@ impl Pool for SimPool {
             }
         }
         Ok(())
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+
+    use engine::Engine;
+
+    use super::super::SimEngine;
+
+    #[test]
+    /// Removing an empty list of filesystems should always succeed
+    fn remove_empty_fs() {
+        let name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(name, &vec![], 0, false).unwrap();
+        let mut pool = engine.get_pool(name).unwrap();
+        assert!(match pool.destroy_filesystems(&vec![]) {
+            Ok(names) => names.is_empty(),
+            _ => false,
+        });
+    }
+
+    #[ignore]
+    #[test]
+    /// Removing a non-empty list of filesystems should fail on empty pool
+    fn remove_some_fs() {
+        let name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(name, &vec![], 0, false).unwrap();
+        let mut pool = engine.get_pool(name).unwrap();
+        assert!(pool.destroy_filesystems(&vec!["fs"]).is_err());
     }
 }

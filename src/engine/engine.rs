@@ -97,7 +97,11 @@ pub trait Pool: Debug {
     fn filesystems(&mut self) -> BTreeMap<&Uuid, &mut Filesystem>;
     fn blockdevs(&mut self) -> Vec<&mut Dev>;
     fn cachedevs(&mut self) -> Vec<&mut Cache>;
-    fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()>;
+
+    /// Ensures that all designated filesystems are gone from pool.
+    /// Returns a list of the filesystems found, and actually destroyed.
+    /// This list will be a subset of the names passed in fs_names.
+    fn destroy_filesystems(&mut self, fs_names: &[&str]) -> EngineResult<Vec<&str>>;
     fn get_filesystem(&mut self, id: &Uuid) -> EngineResult<&mut Filesystem>;
     fn get_filesystem_id(&self, name: &str) -> EngineResult<Uuid>;
     fn get_filesystem_by_name(&mut self, name: &str) -> EngineResult<&mut Filesystem>;

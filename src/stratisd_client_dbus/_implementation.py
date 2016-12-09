@@ -300,7 +300,7 @@ def _prop_builder(spec):
             return dbus_func
 
         for prop in spec.PropertyNames:
-            namespace[prop.name] = staticmethod(build_property(prop))
+            namespace[prop.name] = staticmethod(build_property(prop)) # pragma: no cover
 
     return builder
 

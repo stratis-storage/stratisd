@@ -65,13 +65,14 @@ class Create2TestCase(unittest.TestCase):
 
         If rc is OK, then pool must exist.
         """
-        (result, rc, _) = checked_call(
+        devs = _DEVICE_STRATEGY.example()
+        ((poolpath, devnodes), rc, _) = checked_call(
            Manager.CreatePool(
               self._proxy,
               name=self._POOLNAME,
               redundancy=0,
               force=False,
-              devices=_DEVICE_STRATEGY.example()
+              devices=devs
            ),
            ManagerSpec.OUTPUT_SIGS[_MN.CreatePool]
         )
@@ -87,9 +88,10 @@ class Create2TestCase(unittest.TestCase):
         )
 
         if rc == self._errors.OK:
-            self.assertEqual(pool, result)
+            self.assertEqual(pool, poolpath)
             self.assertEqual(rc1, self._errors.OK)
             self.assertEqual(len(pools), 1)
+            self.assertLessEqual(len(devnodes), len(devs))
         else:
             self.assertEqual(rc1, self._errors.POOL_NOTFOUND)
             self.assertEqual(len(pools), 0)

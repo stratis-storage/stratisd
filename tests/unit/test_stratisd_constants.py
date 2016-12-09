@@ -23,6 +23,8 @@ from hypothesis import given
 from hypothesis import settings
 from hypothesis import strategies
 
+from hypothesis import HealthCheck
+
 from stratisd_client_dbus._stratisd_constants import StratisdConstants
 
 class BuildTestCase(unittest.TestCase):
@@ -54,14 +56,16 @@ class GetTestCase(unittest.TestCase):
     @given(
        strategies.lists(
           elements=strategies.tuples(
-             strategies.text(strategies.characters(), min_size=1),
+             strategies.text(strategies.characters(), min_size=1, max_size=10),
              strategies.integers(min_value=0),
-             strategies.text(strategies.characters())
+             strategies.text(strategies.characters(), max_size=50)
           ),
+          average_size=10,
+          max_size=30,
           unique_by=lambda x: x[0]
        )
     )
-    @settings(max_examples=50)
+    @settings(max_examples=20, suppress_health_check=[HealthCheck.too_slow])
     def testGet(self, constant_list):
         """
         Verify that the class has the properly set up fields.

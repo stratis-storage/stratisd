@@ -189,7 +189,7 @@ class ManagerSpec(InterfaceSpec):
     }
     OUTPUT_SIGS = {
         MethodNames.ConfigureSimulator : "qs",
-        MethodNames.CreatePool : "oqs",
+        MethodNames.CreatePool : "(oas)qs",
         MethodNames.DestroyPool : "bqs",
         MethodNames.GetCacheObjectPath : "oqs",
         MethodNames.GetDevObjectPath : "oqs",
@@ -251,8 +251,8 @@ class PoolSpec(InterfaceSpec):
        MethodNames.Rename: (("new_name", ), _FALSE, "s")
     }
     OUTPUT_SIGS = {
-       MethodNames.AddCacheDevs: "a(oqs)qs",
-       MethodNames.AddDevs: "a(oqs)qs",
+       MethodNames.AddCacheDevs: "asqs",
+       MethodNames.AddDevs: "asqs",
        MethodNames.CreateFilesystems: "a(oqs)qs",
        MethodNames.DestroyFilesystems: "a(qs)qs",
        MethodNames.ListCacheDevs: "asqs",
@@ -300,7 +300,7 @@ def _prop_builder(spec):
             return dbus_func
 
         for prop in spec.PropertyNames:
-            namespace[prop.name] = staticmethod(build_property(prop))
+            namespace[prop.name] = staticmethod(build_property(prop)) # pragma: no cover
 
     return builder
 

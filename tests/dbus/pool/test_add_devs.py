@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Test 'list' of blockdevs in pool.
+Test adding blockdevs to a pool.
 """
 
 import time
@@ -34,12 +34,12 @@ from .._misc import Service
 
 _PN = PoolSpec.MethodNames
 
-_DEVICE_STRATEGY = _device_list(0)
+_DEVICE_STRATEGY = _device_list(1)
 
 
-class ListTestCase(unittest.TestCase):
+class AddDevsTestCase(unittest.TestCase):
     """
-    Test listing devices for a pool.
+    Test adding devices to a pool which is initially empty.
     """
 
     _POOLNAME = 'deadpool'
@@ -53,12 +53,12 @@ class ListTestCase(unittest.TestCase):
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         self._errors = StratisdErrorsGen.get_object()
-        ((poolpath, self._devs), _, _) = Manager.CreatePool(
+        ((poolpath, _), _, _) = Manager.CreatePool(
            self._proxy,
            name=self._POOLNAME,
            redundancy=0,
            force=False,
-           devices=_DEVICE_STRATEGY.example()
+           devices=[]
         )
         self._pool_object = get_object(poolpath)
         Manager.ConfigureSimulator(self._proxy, denominator=8)
@@ -69,15 +69,50 @@ class ListTestCase(unittest.TestCase):
         """
         self._service.tearDown()
 
-    def testList(self):
+    def testEmptyDevs(self):
         """
-        List should succeed and contain the same number of entries as
-        devices in pool.
+        Adding an empty list of devs should leave the pool empty.
         """
         (result, rc, _) = checked_call(
+           Pool.AddDevs(self._pool_object, force=False, devices=[]),
+           PoolSpec.OUTPUT_SIGS[_PN.AddDevs]
+        )
+
+        self.assertEqual(len(result), 0)
+        self.assertEqual(rc, self._errors.OK)
+
+        (result1, rc1, _) = checked_call(
            Pool.ListDevs(self._pool_object),
            PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
         )
 
-        self.assertEqual(len(result), len(self._devs))
-        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(rc1, self._errors.OK)
+        self.assertEqual(len(result1), len(result))
+
+    def testSomeDevs(self):
+        """
+        Adding a non-empty list of devs should increase the number of devs
+        in the pool.
+        """
+        (result, rc, _) = checked_call(
+           Pool.AddDevs(
+              self._pool_object,
+              force=False,
+              devices=_DEVICE_STRATEGY.example()
+           ),
+           PoolSpec.OUTPUT_SIGS[_PN.AddDevs]
+        )
+
+        (result1, rc1, _) = checked_call(
+           Pool.ListDevs(self._pool_object),
+           PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
+        )
+        self.assertEqual(rc1, self._errors.OK)
+
+        num_devices_added = len(result)
+        self.assertEqual(len(result1), num_devices_added)
+
+        if rc == self._errors.OK:
+            self.assertGreater(num_devices_added, 0)
+        else:
+            self.assertEqual(num_devices_added, 0)

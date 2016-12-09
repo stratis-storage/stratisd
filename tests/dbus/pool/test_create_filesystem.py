@@ -53,14 +53,14 @@ class CreateFSTestCase(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         self._errors = StratisdErrorsGen.get_object()
         self._devs = _DEVICE_STRATEGY.example()
-        (result, _, _) = Manager.CreatePool(
+        ((poolpath, _), _, _) = Manager.CreatePool(
            self._proxy,
            name=self._POOLNAME,
            redundancy=0,
            force=False,
            devices=self._devs
         )
-        self._pool_object = get_object(result)
+        self._pool_object = get_object(poolpath)
         Manager.ConfigureSimulator(self._proxy, denominator=8)
 
     def tearDown(self):
@@ -109,14 +109,14 @@ class CreateFSTestCase1(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         self._errors = StratisdErrorsGen.get_object()
         self._devs = _DEVICE_STRATEGY.example()
-        (result, _, _) = Manager.CreatePool(
+        ((poolpath, _), _, _) = Manager.CreatePool(
            self._proxy,
            name=self._POOLNAME,
            redundancy=0,
            force=False,
            devices=self._devs
         )
-        self._pool_object = get_object(result)
+        self._pool_object = get_object(poolpath)
         Pool.CreateFilesystems(
            self._pool_object,
            specs=[(self._VOLNAME, '', None)]

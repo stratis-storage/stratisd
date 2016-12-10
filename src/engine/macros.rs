@@ -57,3 +57,23 @@ macro_rules! rename_pool {
         };
     }
 }
+
+macro_rules! rename_filesystem {
+    ( $s:ident; $old_name:ident; $new_name:ident ) => {
+        if $old_name == $new_name {
+            return Ok(RenameAction::Identity);
+        }
+
+        if !$s.filesystems.contains_key($old_name) {
+            return Ok(RenameAction::NoSource);
+        }
+
+        if $s.filesystems.contains_key($new_name) {
+            return Err(EngineError::Stratis(ErrorEnum::AlreadyExists($new_name.into())));
+        } else {
+            let filesystem = $s.filesystems.remove($old_name).unwrap();
+            $s.filesystems.insert($new_name.into(), filesystem);
+            return Ok(RenameAction::Renamed);
+        };
+    }
+}

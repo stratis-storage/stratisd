@@ -18,6 +18,7 @@ use engine::EngineResult;
 use engine::ErrorEnum;
 use engine::Filesystem;
 use engine::Pool;
+use engine::RenameAction;
 
 use super::blockdev::SimDev;
 use super::cache::SimCacheDev;
@@ -30,7 +31,7 @@ use uuid::Uuid;
 pub struct SimPool {
     pub block_devs: Vec<SimDev>,
     pub cache_devs: Vec<SimCacheDev>,
-    pub filesystems: BTreeMap<Uuid, SimFilesystem>,
+    pub filesystems: BTreeMap<String, SimFilesystem>,
     pub raid_level: u16,
     rdm: Rc<RefCell<Randomizer>>,
 }
@@ -53,12 +54,6 @@ impl SimPool {
 
         new_pool
     }
-
-    // If the source doesn't exist, return an error - otherwise the UUID of the soruce
-    fn validate_snapshot_source_exists(&mut self, source: &str) -> EngineResult<Uuid> {
-        let filesystem = try!(self.get_filesystem_by_name(&source));
-        Ok(filesystem.get_id())
-    }
 }
 
 impl Pool for SimPool {
@@ -77,23 +72,7 @@ impl Pool for SimPool {
     }
 
     fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()> {
-
-        match self.get_filesystem_id(name) {
-            Ok(filesystem_id) => {
-                match self.filesystems.remove(&filesystem_id) {
-                    Some(_) => {
-                        return Ok(());
-                    }
-                    None => {
-                        return Err(EngineError::Stratis(ErrorEnum::NotFound(filesystem_id.simple()
-                            .to_string())))
-                    }
-                }
-            }
-            Err(err) => {
-                return Err(err);
-            }
-        }
+        self.filesystems.remove(name);
         Ok(())
     }
 
@@ -101,38 +80,43 @@ impl Pool for SimPool {
                          name: &str,
                          mount_point: &str,
                          quota_size: Option<u64>)
-                         -> EngineResult<()> {
+                         -> EngineResult<Uuid> {
 
-        match self.get_filesystem_id(name) {
-            Ok(_) => {
+        match self.filesystems.get(name) {
+            Some(_) => {
                 return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(String::from(name))));
             }
-            Err(_) => {}
+            None => {}
         }
 
-        let new_filesystem = SimFilesystem::new_filesystem(name, mount_point, quota_size);
-
-        self.filesystems.insert(new_filesystem.get_id(), new_filesystem);
-        Ok(())
+        let fs_uuid = Uuid::new_v4();
+        let new_filesystem = SimFilesystem::new_filesystem(fs_uuid, mount_point, quota_size);
+        self.filesystems.insert(name.into(), new_filesystem);
+        Ok(fs_uuid)
     }
 
-    fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<()> {
+    fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<Uuid> {
 
-        let parent_id = try!(self.validate_snapshot_source_exists(source));
+        let parent_id = try!(self.filesystems
+                .get(source)
+                .ok_or(EngineError::Stratis(ErrorEnum::NotFound(String::from(source)))))
+            .fs_id;
 
-        try!(self.create_filesystem(&snapshot_name, &String::from(""), None));
+        let uuid = try!(self.create_filesystem(&snapshot_name, &String::from(""), None));
 
-        let new_snapshot = try!(self.get_filesystem_by_name(&snapshot_name));
+        let new_snapshot = try!(self.filesystems
+            .get_mut(snapshot_name)
+            .ok_or(EngineError::Stratis(ErrorEnum::NotFound(String::from(snapshot_name)))));
 
-        new_snapshot.add_ancestor(parent_id);
+        new_snapshot.nearest_ancestor = Some(parent_id);
 
-        Ok(())
+        Ok(uuid)
     }
 
-    fn filesystems(&mut self) -> BTreeMap<&Uuid, &mut Filesystem> {
+    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem> {
         BTreeMap::from_iter(self.filesystems
             .iter_mut()
-            .map(|x| (x.0 as &Uuid, x.1 as &mut Filesystem)))
+            .map(|x| (x.0 as &str, x.1 as &mut Filesystem)))
     }
 
     fn blockdevs(&mut self) -> Vec<&mut Dev> {
@@ -141,32 +125,6 @@ impl Pool for SimPool {
 
     fn cachedevs(&mut self) -> Vec<&mut Cache> {
         Vec::from_iter(self.cache_devs.iter_mut().map(|x| x as &mut Cache))
-    }
-
-    fn get_filesystem(&mut self, id: &Uuid) -> EngineResult<&mut Filesystem> {
-
-        let return_filesystem = match self.filesystems.get_mut(id) {
-            Some(filesystem) => filesystem,
-            None => return Err(EngineError::Stratis(ErrorEnum::NotFound(id.simple().to_string()))),
-        };
-
-        Ok(return_filesystem)
-    }
-
-    fn get_filesystem_id(&self, name: &str) -> EngineResult<Uuid> {
-
-        for (_, value) in self.filesystems.iter() {
-            if value.has_same(name) {
-                return Ok(value.get_id());
-            }
-        }
-
-        Err(EngineError::Stratis(ErrorEnum::NotFound(String::from(name))))
-    }
-
-    fn get_filesystem_by_name(&mut self, name: &str) -> EngineResult<&mut Filesystem> {
-        let id = try!(self.get_filesystem_id(name));
-        self.get_filesystem(&id)
     }
 
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()> {
@@ -198,5 +156,108 @@ impl Pool for SimPool {
             }
         }
         Ok(())
+    }
+
+    fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
+        rename_filesystem!{self; old_name; new_name}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use engine::Engine;
+    use engine::ErrorEnum;
+    use engine::EngineError;
+    use engine::RenameAction;
+
+    use super::super::SimEngine;
+
+    #[test]
+    /// Renaming a filesystem on an empty pool always works
+    fn rename_empty() {
+        let pool_name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let pool = engine.get_pool(pool_name).unwrap();
+        assert!(match pool.rename_filesystem("old_name", "new_name") {
+            Ok(RenameAction::NoSource) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Renaming a filesystem to itself on an empty pool always works.
+    fn rename_empty_identity() {
+        let pool_name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let pool = engine.get_pool(pool_name).unwrap();
+        assert!(match pool.rename_filesystem("old_name", "old_name") {
+            Ok(RenameAction::Identity) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Renaming a filesystem to itself always works
+    fn rename_identity() {
+        let name = "name";
+        let pool_name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let pool = engine.get_pool(pool_name).unwrap();
+        assert!(match pool.rename_filesystem(name, name) {
+            Ok(RenameAction::Identity) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Renaming a filesystem to another filesystem should work if new name not taken
+    fn rename_happens() {
+        let old_name = "old_name";
+        let pool_name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let pool = engine.get_pool(pool_name).unwrap();
+        pool.create_filesystem(old_name, "", None).unwrap();
+        assert!(match pool.rename_filesystem(old_name, "new_name") {
+            Ok(RenameAction::Renamed) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Renaming a filesystem to another filesystem should fail if new name taken
+    fn rename_fails() {
+        let old_name = "old_name";
+        let new_name = "new_name";
+        let pool_name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let pool = engine.get_pool(pool_name).unwrap();
+        pool.create_filesystem(new_name, "", None).unwrap();
+        pool.create_filesystem(old_name, "", None).unwrap();
+        assert!(match pool.rename_filesystem(old_name, new_name) {
+            Err(EngineError::Stratis(ErrorEnum::AlreadyExists(_))) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Renaming should succeed if old_name absent, new present
+    fn rename_no_op() {
+        let old_name = "old_name";
+        let new_name = "new_name";
+        let pool_name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let pool = engine.get_pool(pool_name).unwrap();
+        pool.create_filesystem(new_name, "", None).unwrap();
+        assert!(match pool.rename_filesystem(old_name, new_name) {
+            Ok(RenameAction::NoSource) => true,
+            _ => false,
+        });
     }
 }

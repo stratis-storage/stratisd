@@ -297,7 +297,7 @@ fn create_dbus_filesystem<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
 
     let rename_method = f.method(RENAME_FILESYSTEM, (), rename_filesystem)
         .in_arg(("name", "s"))
-        .out_arg(("object_path", "o"))
+        .out_arg(("action", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
@@ -438,49 +438,66 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
+    let default_return = MessageItem::Bool(false);
 
-    let (pool_name, filesystem_name) = dbus_try_0!(object_path_to_pair(dbus_context, object_path);
-                                                   return_message);
+    let (pool_name, filesystem_name) = dbus_try!(
+        object_path_to_pair(dbus_context, object_path);
+        default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = engine_try_0!(b_engine.get_pool(&pool_name);return_message);
+    let ref mut pool = engine_try!(
+        b_engine.get_pool(&pool_name);
+        default_return; return_message);
 
-    match pool.get_filesystem_id(&new_name) {
-        Ok(_) => {
-            let error =
-                EngineError::Stratis(engine::ErrorEnum::AlreadyExists(String::from(new_name)));
-            let (rc, rs) = engine_to_dbus_err(&error);
-            let (rc, rs) = code_to_message_items(rc, rs);
-            return Ok(vec![return_message.append2(rc, rs)]);
+    let result = pool.rename_filesystem(&filesystem_name, &new_name);
+
+    let msg = match result {
+        Ok(RenameAction::NoSource) => {
+            let error_message = format!("engine doesn't know about filesystem {} on pool {}",
+                                        filesystem_name,
+                                        pool_name);
+            let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR, error_message);
+            return_message.append3(default_return, rc, rs)
         }
-        Err(_) => {}
-    }
-
-    let filesystem = match pool.get_filesystem_id(&filesystem_name) {
-        Ok(id) => engine_try_0!(pool.get_filesystem(&id);return_message),
-        Err(err) => {
-            let (rc, rs) = engine_to_dbus_err(&err);
-            let (rc, rs) = code_to_message_items(rc, rs);
-            return Ok(vec![return_message.append2(rc, rs)]);
-        }
-    };
-
-    let msg = match filesystem.rename(new_name) {
-        Ok(_) => {
-            dbus_context.filesystems.borrow_mut().remove_by_first(&object_path.to_string());
-
-            dbus_context.filesystems.borrow_mut().insert(object_path.to_string(),
-                                                         ((&pool_name).clone(),
-                                                          String::from(new_name)));
+        Ok(RenameAction::Identity) => {
             let (rc, rs) = ok_message_items();
-            return_message.append2(rc, rs)
+            return_message.append3(default_return, rc, rs)
+        }
+        Ok(RenameAction::Renamed) => {
+            let return_value = MessageItem::Bool(true);
+            let removed = dbus_context.filesystems
+                .borrow_mut()
+                .remove_by_second(&(pool_name.clone(), filesystem_name.into()));
+            match removed {
+                Some((removed_object_path, _)) => {
+                    if object_path.to_string() == removed_object_path {
+                        dbus_context.filesystems
+                            .borrow_mut()
+                            .insert(removed_object_path, (pool_name.into(), new_name.into()));
+                        let (rc, rs) = ok_message_items();
+                        return_message.append3(return_value, rc, rs)
+                    } else {
+                        let error_message = format!("wrong dbus object_path for renamed \
+                                                    filesystem");
+                        let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
+                                                             error_message);
+                        return_message.append3(return_value, rc, rs)
+                    }
+                }
+                None => {
+                    let error_message = format!("no dbus object path for renamed filesystem");
+                    let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR, error_message);
+                    return_message.append3(return_value, rc, rs)
+                }
+            }
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err(&err);
             let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append2(rc, rs)
+            return_message.append3(default_return, rc, rs)
         }
     };
+
     Ok(vec![msg])
 }
 
@@ -552,9 +569,7 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                    return_message);
 
     let result = pool.filesystems();
-    let msg_vec = result.values()
-        .map(|key| MessageItem::Str((*key).get_name().to_string()))
-        .collect();
+    let msg_vec = result.keys().map(|key| MessageItem::Str((*key).into())).collect();
     let item_array = MessageItem::Array(msg_vec, return_sig.into());
     let (rc, rs) = ok_message_items();
     let msg = return_message.append3(item_array, rc, rs);

@@ -12,20 +12,18 @@ use std::vec::Vec;
 use uuid::Uuid;
 use devicemapper::Device;
 
+use engine::EngineError;
 use engine::EngineResult;
+use engine::ErrorEnum;
 use engine::Pool;
 use engine::Filesystem;
 use engine::Dev;
 use engine::Cache;
+use engine::RenameAction;
 
 use super::blockdev::BlockDev;
+use super::filesystem::StratFilesystem;
 use super::consts::*;
-
-#[derive(Debug, Clone)]
-pub struct StratFilesystem {
-    pub name: String,
-    pub thin_id: u32,
-}
 
 #[derive(Debug)]
 pub struct StratPool {
@@ -33,7 +31,7 @@ pub struct StratPool {
     pub pool_uuid: Uuid,
     pub cache_devs: BTreeMap<Uuid, BlockDev>,
     pub block_devs: BTreeMap<Uuid, BlockDev>,
-    pub filesystems: BTreeMap<String, Box<StratFilesystem>>,
+    pub filesystems: BTreeMap<String, StratFilesystem>,
     pub raid_level: u16,
 }
 
@@ -62,11 +60,11 @@ impl Pool for StratPool {
                          _filesystem_name: &str,
                          _mount_point: &str,
                          _quota_size: Option<u64>)
-                         -> EngineResult<()> {
-        Ok(())
+                         -> EngineResult<Uuid> {
+        Ok(Uuid::new_v4())
     }
 
-    fn create_snapshot(&mut self, _snapshot_name: &str, _source: &str) -> EngineResult<()> {
+    fn create_snapshot(&mut self, _snapshot_name: &str, _source: &str) -> EngineResult<Uuid> {
         unimplemented!()
     }
 
@@ -100,7 +98,7 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn filesystems(&mut self) -> BTreeMap<&Uuid, &mut Filesystem> {
+    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem> {
         unimplemented!()
     }
 
@@ -120,15 +118,7 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn get_filesystem(&mut self, _id: &Uuid) -> EngineResult<&mut Filesystem> {
-        unimplemented!()
-    }
-
-    fn get_filesystem_id(&self, _name: &str) -> EngineResult<Uuid> {
-        unimplemented!()
-    }
-
-    fn get_filesystem_by_name(&mut self, _name: &str) -> EngineResult<&mut Filesystem> {
-        unimplemented!()
+    fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
+        rename_filesystem!{self; old_name; new_name}
     }
 }

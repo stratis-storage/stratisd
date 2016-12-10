@@ -11,6 +11,8 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::vec::Vec;
 
+use bidir_map::BidirMap;
+
 use engine::Cache;
 use engine::Dev;
 use engine::EngineError;
@@ -30,7 +32,7 @@ use uuid::Uuid;
 pub struct SimPool {
     pub block_devs: Vec<SimDev>,
     pub cache_devs: Vec<SimCacheDev>,
-    pub filesystems: BTreeMap<Uuid, SimFilesystem>,
+    pub filesystems: BidirMap<Uuid, SimFilesystem>,
     pub raid_level: u16,
     rdm: Rc<RefCell<Randomizer>>,
 }
@@ -45,7 +47,7 @@ impl SimPool {
         vec.extend_from_slice(blockdevs);
         let new_pool = SimPool {
             block_devs: vec,
-            filesystems: BTreeMap::new(),
+            filesystems: BidirMap::new(),
             cache_devs: Vec::new(),
             raid_level: raid_level,
             rdm: rdm,
@@ -80,7 +82,7 @@ impl Pool for SimPool {
 
         match self.get_filesystem_id(name) {
             Ok(filesystem_id) => {
-                match self.filesystems.remove(&filesystem_id) {
+                match self.filesystems.remove_by_first(&filesystem_id) {
                     Some(_) => {
                         return Ok(());
                     }
@@ -132,7 +134,7 @@ impl Pool for SimPool {
     fn filesystems(&mut self) -> BTreeMap<&Uuid, &mut Filesystem> {
         BTreeMap::from_iter(self.filesystems
             .iter_mut()
-            .map(|x| (x.0 as &Uuid, x.1 as &mut Filesystem)))
+            .map(|x| (&x.0 as &Uuid, &mut x.1 as &mut Filesystem)))
     }
 
     fn blockdevs(&mut self) -> Vec<&mut Dev> {
@@ -145,7 +147,7 @@ impl Pool for SimPool {
 
     fn get_filesystem(&mut self, id: &Uuid) -> EngineResult<&mut Filesystem> {
 
-        let return_filesystem = match self.filesystems.get_mut(id) {
+        let return_filesystem = match self.filesystems.get_mut_by_first(id) {
             Some(filesystem) => filesystem,
             None => return Err(EngineError::Stratis(ErrorEnum::NotFound(id.simple().to_string()))),
         };
@@ -155,7 +157,8 @@ impl Pool for SimPool {
 
     fn get_filesystem_id(&self, name: &str) -> EngineResult<Uuid> {
 
-        for (_, value) in self.filesystems.iter() {
+        for entry in self.filesystems.iter() {
+            let ref value = entry.1;
             if value.has_same(name) {
                 return Ok(value.get_id());
             }

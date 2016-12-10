@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use super::consts::DEFAULT_FILESYSTEM_QUOTA_SIZE;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone,PartialEq)]
 pub struct SimFilesystem {
     pub uuid: Uuid,
     pub name: String,

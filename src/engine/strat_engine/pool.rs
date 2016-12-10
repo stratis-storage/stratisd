@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::vec::Vec;
 
+use bidir_map::BidirMap;
 use uuid::Uuid;
 use devicemapper::Device;
 
@@ -21,7 +22,7 @@ use engine::Cache;
 use super::blockdev::BlockDev;
 use super::consts::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone,PartialEq)]
 pub struct StratFilesystem {
     pub name: String,
     pub thin_id: u32,
@@ -33,7 +34,7 @@ pub struct StratPool {
     pub pool_uuid: Uuid,
     pub cache_devs: BTreeMap<Uuid, BlockDev>,
     pub block_devs: BTreeMap<Uuid, BlockDev>,
-    pub filesystems: BTreeMap<String, Box<StratFilesystem>>,
+    pub filesystems: BidirMap<Uuid, StratFilesystem>,
     pub raid_level: u16,
 }
 
@@ -51,7 +52,7 @@ impl StratPool {
             pool_uuid: pool_uuid,
             cache_devs: BTreeMap::new(),
             block_devs: bds,
-            filesystems: BTreeMap::new(),
+            filesystems: BidirMap::new(),
             raid_level: raid_level,
         })
     }

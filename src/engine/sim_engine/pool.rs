@@ -104,7 +104,7 @@ impl Pool for SimPool {
         }
 
         let new_filesystem = SimFilesystem::new_filesystem(name, mount_point, quota_size);
-        let fs_uuid = new_filesystem.get_id();
+        let fs_uuid = Uuid::new_v4();
         self.filesystems.insert(fs_uuid, new_filesystem);
         Ok(fs_uuid)
     }

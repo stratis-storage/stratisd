@@ -15,14 +15,6 @@ pub struct StratFilesystem {
 }
 
 impl Filesystem for StratFilesystem {
-    fn get_id(&self) -> Uuid {
-        unimplemented!()
-    }
-
-    fn eq(&self, _other: &Filesystem) -> bool {
-        unimplemented!()
-    }
-
     fn get_name(&self) -> String {
         unimplemented!()
     }

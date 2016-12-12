@@ -63,8 +63,6 @@ pub trait Cache: Debug {
 }
 
 pub trait Filesystem: Debug {
-    fn get_id(&self) -> Uuid;
-    fn eq(&self, other: &Filesystem) -> bool;
     fn get_name(&self) -> String;
     fn has_same(&self, other: &str) -> bool;
     fn rename(&mut self, new_name: &str) -> EngineResult<()>;

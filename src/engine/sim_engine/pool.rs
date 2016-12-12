@@ -122,9 +122,9 @@ impl Pool for SimPool {
 
         let parent_id = try!(self.validate_snapshot_source_exists(source));
 
-        try!(self.create_filesystem(&snapshot_name, &String::from(""), None));
+        let uuid = try!(self.create_filesystem(&snapshot_name, &String::from(""), None));
 
-        let new_snapshot = try!(self.get_filesystem_by_name(&snapshot_name));
+        let new_snapshot = try!(self.get_filesystem_by_id(&uuid));
 
         new_snapshot.add_ancestor(parent_id);
 

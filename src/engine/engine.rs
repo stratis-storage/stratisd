@@ -98,7 +98,7 @@ pub trait Pool: Debug {
     fn blockdevs(&mut self) -> Vec<&mut Dev>;
     fn cachedevs(&mut self) -> Vec<&mut Cache>;
     fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()>;
-    fn get_filesystem(&mut self, id: &Uuid) -> EngineResult<&mut Filesystem>;
+    fn get_filesystem_by_id(&mut self, id: &Uuid) -> EngineResult<&mut Filesystem>;
     fn get_filesystem_id(&self, name: &str) -> EngineResult<Uuid>;
     fn get_filesystem_by_name(&mut self, name: &str) -> EngineResult<&mut Filesystem>;
 }

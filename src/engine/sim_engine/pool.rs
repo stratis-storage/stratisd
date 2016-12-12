@@ -145,7 +145,7 @@ impl Pool for SimPool {
         Vec::from_iter(self.cache_devs.iter_mut().map(|x| x as &mut Cache))
     }
 
-    fn get_filesystem(&mut self, id: &Uuid) -> EngineResult<&mut Filesystem> {
+    fn get_filesystem_by_id(&mut self, id: &Uuid) -> EngineResult<&mut Filesystem> {
 
         let return_filesystem = match self.filesystems.get_mut_by_first(id) {
             Some(filesystem) => filesystem,

@@ -457,7 +457,7 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     }
 
     let filesystem = match pool.get_filesystem_id(&filesystem_name) {
-        Ok(id) => engine_try_0!(pool.get_filesystem(&id);return_message),
+        Ok(id) => engine_try_0!(pool.get_filesystem_by_id(&id);return_message),
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err(&err);
             let (rc, rs) = code_to_message_items(rc, rs);

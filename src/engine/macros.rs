@@ -57,3 +57,21 @@ macro_rules! rename_pool {
         };
     }
 }
+
+macro_rules! get_filesystem_by_id {
+    ( $s:ident; $id:expr) => {
+        match $s.filesystems.get_mut_by_first($id) {
+            Some(filesystem) => Ok(filesystem),
+            None => Err(EngineError::Stratis(ErrorEnum::NotFound($id.simple().to_string()))),
+        }
+    }
+}
+
+macro_rules! get_filesystem_by_name {
+    ( $s:ident; $name:expr) => {
+        match $s.filesystems.iter_mut().find(|f| f.1.name == $name) {
+            Some(pair) => Ok(& mut pair.1),
+            None => Err(EngineError::Stratis(ErrorEnum::NotFound(String::from($name)))),
+        }
+    }
+}

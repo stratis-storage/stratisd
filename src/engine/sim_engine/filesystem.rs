@@ -2,12 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use engine::Filesystem;
 use engine::EngineResult;
-
-use uuid::Uuid;
+use engine::Filesystem;
 
 use super::consts::DEFAULT_FILESYSTEM_QUOTA_SIZE;
+
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct SimFilesystem {

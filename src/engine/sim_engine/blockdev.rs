@@ -2,11 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::fmt;
 
 use engine::Dev;
 
 use std::cell::RefCell;
+use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;

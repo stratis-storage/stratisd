@@ -2,13 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
-use std::collections::BTreeSet;
-use std::iter::FromIterator;
-use std::path::Path;
-use std::path::PathBuf;
-use std::str::FromStr;
 
 use devicemapper::Device;
 
@@ -16,8 +9,15 @@ use engine::Engine;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
-use engine::RenameAction;
 use engine::Pool;
+use engine::RenameAction;
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::collections::btree_map::Entry;
+use std::iter::FromIterator;
+use std::path::Path;
+use std::path::PathBuf;
+use std::str::FromStr;
 
 use super::pool::StratPool;
 

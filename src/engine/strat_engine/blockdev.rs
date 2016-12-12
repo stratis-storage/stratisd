@@ -2,30 +2,30 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::io::{Read, Write, ErrorKind, Seek, SeekFrom};
-use std::fs::{OpenOptions, read_dir};
-use std::path::{Path, PathBuf};
-use std::io;
-use std::str::{FromStr, from_utf8};
+use byteorder::{LittleEndian, ByteOrder};
+use bytesize::ByteSize;
+
+use consts::*;
+use crc::crc32;
+use devicemapper::Device;
+use engine::{EngineResult, EngineError, ErrorEnum};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::fs::{OpenOptions, read_dir};
+use std::io;
+use std::io::{Read, Write, ErrorKind, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+use std::str::{FromStr, from_utf8};
 
-use time::Timespec;
-use devicemapper::Device;
-use crc::crc32;
-use byteorder::{LittleEndian, ByteOrder};
-use uuid::Uuid;
-use bytesize::ByteSize;
-
-use types::{Sectors, SectorOffset};
-use engine::{EngineResult, EngineError, ErrorEnum};
-
-use consts::*;
+pub use super::BlockDevSave;
 use super::consts::*;
 use super::util::blkdev_size;
 
-pub use super::BlockDevSave;
+use time::Timespec;
+
+use types::{Sectors, SectorOffset};
+use uuid::Uuid;
 
 type PoolUuid = Uuid;
 type DevUuid = Uuid;

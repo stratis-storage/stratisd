@@ -4,31 +4,23 @@
 
 use bidir_map::BidirMap;
 
-use std::borrow::Cow;
-use std::cell::Cell;
-use std::cell::RefCell;
-use std::fmt::Display;
-use std::path::Path;
-use std::rc::Rc;
-use std::vec::Vec;
-
 use dbus;
-use dbus::Connection;
 use dbus::BusType;
+use dbus::Connection;
+use dbus::ConnectionItem;
 use dbus::Message;
 use dbus::MessageItem;
 use dbus::NameFlag;
 use dbus::arg::Array;
 use dbus::arg::Iter;
-use dbus::tree::Factory;
 use dbus::tree::DataType;
-use dbus::tree::MethodErr;
+use dbus::tree::Factory;
 use dbus::tree::MTFn;
-use dbus::tree::MethodResult;
+use dbus::tree::MethodErr;
 use dbus::tree::MethodInfo;
-use dbus::tree::Tree;
+use dbus::tree::MethodResult;
 use dbus::tree::ObjectPath;
-use dbus::ConnectionItem;
+use dbus::tree::Tree;
 
 use dbus_consts::*;
 
@@ -36,6 +28,14 @@ use engine;
 use engine::Engine;
 use engine::EngineError;
 use engine::RenameAction;
+
+use std::borrow::Cow;
+use std::cell::Cell;
+use std::cell::RefCell;
+use std::fmt::Display;
+use std::path::Path;
+use std::rc::Rc;
+use std::vec::Vec;
 
 use types::StratisResult;
 

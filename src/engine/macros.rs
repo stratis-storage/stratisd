@@ -78,9 +78,6 @@ macro_rules! get_filesystem_by_name {
 
 macro_rules! get_filesystem_id {
     ( $s:ident; $name:expr ) => {
-        match $s.filesystems.iter().find(|f| f.1.name == $name) {
-            Some(pair) => Ok(pair.0),
-            None => Err(EngineError::Stratis(ErrorEnum::NotFound(String::from($name)))),
-        }
+        $s.filesystems.iter().find(|f| f.1.name == $name).map(|x| x.0)
     }
 }

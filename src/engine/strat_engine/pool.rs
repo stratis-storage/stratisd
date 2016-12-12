@@ -122,7 +122,7 @@ impl Pool for StratPool {
         get_filesystem_by_id!(self; id)
     }
 
-    fn get_filesystem_id(&self, name: &str) -> EngineResult<Uuid> {
+    fn get_filesystem_id(&self, name: &str) -> Option<Uuid> {
         get_filesystem_id!(self; name)
     }
 

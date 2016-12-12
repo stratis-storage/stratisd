@@ -446,18 +446,18 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let ref mut pool = engine_try_0!(b_engine.get_pool(&pool_name);return_message);
 
     match pool.get_filesystem_id(&new_name) {
-        Ok(_) => {
+        Some(_) => {
             let error =
                 EngineError::Stratis(engine::ErrorEnum::AlreadyExists(String::from(new_name)));
             let (rc, rs) = engine_to_dbus_err(&error);
             let (rc, rs) = code_to_message_items(rc, rs);
             return Ok(vec![return_message.append2(rc, rs)]);
         }
-        Err(_) => {}
+        None => {}
     }
 
-    let filesystem = match pool.get_filesystem_id(&filesystem_name) {
-        Ok(id) => engine_try_0!(pool.get_filesystem_by_id(&id);return_message),
+    let filesystem = match pool.get_filesystem_by_name(&filesystem_name) {
+        Ok(filesystem) => filesystem,
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err(&err);
             let (rc, rs) = code_to_message_items(rc, rs);

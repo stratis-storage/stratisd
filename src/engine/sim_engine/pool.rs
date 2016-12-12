@@ -146,13 +146,10 @@ impl Pool for SimPool {
     }
 
     fn get_filesystem_by_id(&mut self, id: &Uuid) -> EngineResult<&mut Filesystem> {
-
-        let return_filesystem = match self.filesystems.get_mut_by_first(id) {
-            Some(filesystem) => filesystem,
-            None => return Err(EngineError::Stratis(ErrorEnum::NotFound(id.simple().to_string()))),
-        };
-
-        Ok(return_filesystem)
+        match self.filesystems.get_mut_by_first(id) {
+            Some(filesystem) => Ok(filesystem),
+            None => Err(EngineError::Stratis(ErrorEnum::NotFound(id.simple().to_string()))),
+        }
     }
 
     fn get_filesystem_id(&self, name: &str) -> EngineResult<Uuid> {

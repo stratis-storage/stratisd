@@ -110,7 +110,7 @@ impl Pool for SimPool {
         Ok(fs_uuid)
     }
 
-    fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<()> {
+    fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<Uuid> {
 
         let parent_id = try!(self.get_filesystem_id(source)
             .ok_or(EngineError::Stratis(ErrorEnum::NotFound(String::from(source)))));
@@ -121,7 +121,7 @@ impl Pool for SimPool {
 
         new_snapshot.add_ancestor(parent_id);
 
-        Ok(())
+        Ok(uuid)
     }
 
     fn filesystems(&mut self) -> BTreeMap<&Uuid, &mut Filesystem> {

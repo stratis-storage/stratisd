@@ -89,7 +89,7 @@ pub trait Pool: Debug {
                          mount_point: &str,
                          quota_size: Option<u64>)
                          -> EngineResult<Uuid>;
-    fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<()>;
+    fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<Uuid>;
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
     fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;

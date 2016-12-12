@@ -64,7 +64,7 @@ impl Pool for StratPool {
         Ok(Uuid::new_v4())
     }
 
-    fn create_snapshot(&mut self, _snapshot_name: &str, _source: &str) -> EngineResult<()> {
+    fn create_snapshot(&mut self, _snapshot_name: &str, _source: &str) -> EngineResult<Uuid> {
         unimplemented!()
     }
 

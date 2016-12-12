@@ -117,7 +117,8 @@ impl Pool for SimPool {
 
         let uuid = try!(self.create_filesystem(&snapshot_name, &String::from(""), None));
 
-        let new_snapshot = try!(self.get_filesystem_by_id(&uuid));
+        let new_snapshot = try!(self.get_filesystem_by_id(&uuid)
+            .ok_or(EngineError::Stratis(ErrorEnum::NotFound(String::from(snapshot_name)))));
 
         new_snapshot.add_ancestor(parent_id);
 
@@ -138,7 +139,7 @@ impl Pool for SimPool {
         Vec::from_iter(self.cache_devs.iter_mut().map(|x| x as &mut Cache))
     }
 
-    fn get_filesystem_by_id(&mut self, id: &Uuid) -> EngineResult<&mut Filesystem> {
+    fn get_filesystem_by_id(&mut self, id: &Uuid) -> Option<&mut Filesystem> {
         get_filesystem_by_id!(self; id)
     }
 

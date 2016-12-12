@@ -13,9 +13,7 @@ use bidir_map::BidirMap;
 use uuid::Uuid;
 use devicemapper::Device;
 
-use engine::EngineError;
 use engine::EngineResult;
-use engine::ErrorEnum;
 use engine::Pool;
 use engine::Filesystem;
 use engine::Dev;
@@ -118,7 +116,7 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn get_filesystem_by_id(&mut self, id: &Uuid) -> EngineResult<&mut Filesystem> {
+    fn get_filesystem_by_id(&mut self, id: &Uuid) -> Option<&mut Filesystem> {
         get_filesystem_by_id!(self; id)
     }
 

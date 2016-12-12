@@ -60,10 +60,7 @@ macro_rules! rename_pool {
 
 macro_rules! get_filesystem_by_id {
     ( $s:ident; $id:expr) => {
-        match $s.filesystems.get_mut_by_first($id) {
-            Some(filesystem) => Ok(filesystem),
-            None => Err(EngineError::Stratis(ErrorEnum::NotFound($id.simple().to_string()))),
-        }
+        $s.filesystems.get_mut_by_first($id).map(|x| x as &mut Filesystem)
     }
 }
 

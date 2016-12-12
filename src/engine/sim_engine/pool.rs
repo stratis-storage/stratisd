@@ -55,7 +55,6 @@ impl SimPool {
 
         new_pool
     }
-
 }
 
 impl Pool for SimPool {

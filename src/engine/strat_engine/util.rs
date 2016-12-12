@@ -2,10 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::fs::File;
-use std::os::unix::prelude::AsRawFd;
 
 use engine::{EngineResult, EngineError};
+use std::fs::File;
+use std::os::unix::prelude::AsRawFd;
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);
 

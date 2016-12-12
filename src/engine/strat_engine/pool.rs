@@ -2,6 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use devicemapper::Device;
+use engine::Cache;
+use engine::Dev;
+
+use engine::EngineResult;
+use engine::Filesystem;
+use engine::Pool;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -9,17 +16,10 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::vec::Vec;
 
-use uuid::Uuid;
-use devicemapper::Device;
-
-use engine::EngineResult;
-use engine::Pool;
-use engine::Filesystem;
-use engine::Dev;
-use engine::Cache;
-
 use super::blockdev::BlockDev;
 use super::consts::*;
+
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct StratFilesystem {

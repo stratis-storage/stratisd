@@ -13,8 +13,8 @@ use engine::RenameAction;
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
 use std::collections::BTreeSet;
+use std::collections::btree_map::Entry;
 use std::iter::FromIterator;
 use std::path::Path;
 use std::path::PathBuf;
@@ -108,16 +108,16 @@ impl Engine for SimEngine {
 #[cfg(test)]
 mod tests {
 
-    use std::path::Path;
-
-    use quickcheck::QuickCheck;
-
-    use super::SimEngine;
 
     use engine::Engine;
     use engine::EngineError;
     use engine::ErrorEnum;
     use engine::RenameAction;
+
+    use quickcheck::QuickCheck;
+    use std::path::Path;
+
+    use super::SimEngine;
 
     #[test]
     fn prop_configure_simulator_runs() {

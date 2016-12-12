@@ -48,17 +48,17 @@ mod stratis;
 mod dbus_api;
 mod engine;
 
-use std::io::Write;
-use std::error::Error;
-use std::process::exit;
-
-use types::{StratisResult, StratisError};
 
 use clap::{App, Arg};
 
 use engine::Engine;
 use engine::sim_engine::SimEngine;
 use engine::strat_engine::StratEngine;
+use std::error::Error;
+use std::io::Write;
+use std::process::exit;
+
+use types::{StratisResult, StratisError};
 
 
 fn write_err(err: StratisError) -> StratisResult<()> {

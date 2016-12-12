@@ -2,13 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+
+use nix;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
-
-use nix;
 
 use uuid::Uuid;
 

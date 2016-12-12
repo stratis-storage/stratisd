@@ -20,13 +20,8 @@ use engine::Dev;
 use engine::Cache;
 
 use super::blockdev::BlockDev;
+use super::filesystem::StratFilesystem;
 use super::consts::*;
-
-#[derive(Debug, Clone,PartialEq)]
-pub struct StratFilesystem {
-    pub name: String,
-    pub thin_id: u32,
-}
 
 #[derive(Debug)]
 pub struct StratPool {

@@ -168,8 +168,10 @@ impl Pool for SimPool {
     }
 
     fn get_filesystem_by_name(&mut self, name: &str) -> EngineResult<&mut Filesystem> {
-        let id = try!(self.get_filesystem_id(name));
-        self.get_filesystem(&id)
+        match self.filesystems.iter_mut().find(|f| f.1.name == name) {
+            Some(pair) => Ok(& mut pair.1),
+            None => Err(EngineError::Stratis(ErrorEnum::NotFound(String::from(name)))),
+        }
     }
 
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()> {

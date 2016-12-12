@@ -11,8 +11,6 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::vec::Vec;
 
-use bidir_map::BidirMap;
-
 use engine::Cache;
 use engine::Dev;
 use engine::EngineError;
@@ -32,7 +30,7 @@ use uuid::Uuid;
 pub struct SimPool {
     pub block_devs: Vec<SimDev>,
     pub cache_devs: Vec<SimCacheDev>,
-    pub filesystems: BidirMap<Uuid, SimFilesystem>,
+    pub filesystems: BTreeMap<String, SimFilesystem>,
     pub raid_level: u16,
     rdm: Rc<RefCell<Randomizer>>,
 }
@@ -47,7 +45,7 @@ impl SimPool {
         vec.extend_from_slice(blockdevs);
         let new_pool = SimPool {
             block_devs: vec,
-            filesystems: BidirMap::new(),
+            filesystems: BTreeMap::new(),
             cache_devs: Vec::new(),
             raid_level: raid_level,
             rdm: rdm,
@@ -73,21 +71,8 @@ impl Pool for SimPool {
     }
 
     fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()> {
-
-        match self.get_filesystem_id(name) {
-            Some(filesystem_id) => {
-                match self.filesystems.remove_by_first(&filesystem_id) {
-                    Some(_) => {
-                        return Ok(());
-                    }
-                    None => {
-                        return Err(EngineError::Stratis(ErrorEnum::NotFound(filesystem_id.simple()
-                            .to_string())))
-                    }
-                }
-            }
-            None => Ok(()),
-        }
+        self.filesystems.remove(name);
+        Ok(())
     }
 
     fn create_filesystem(&mut self,
@@ -103,9 +88,9 @@ impl Pool for SimPool {
             None => {}
         }
 
-        let new_filesystem = SimFilesystem::new_filesystem(name, mount_point, quota_size);
         let fs_uuid = Uuid::new_v4();
-        self.filesystems.insert(fs_uuid, new_filesystem);
+        let new_filesystem = SimFilesystem::new_filesystem(name, fs_uuid, mount_point, quota_size);
+        self.filesystems.insert(name.into(), new_filesystem);
         Ok(fs_uuid)
     }
 
@@ -116,7 +101,7 @@ impl Pool for SimPool {
 
         let uuid = try!(self.create_filesystem(&snapshot_name, &String::from(""), None));
 
-        let new_snapshot = try!(self.get_filesystem_by_id(&uuid)
+        let new_snapshot = try!(self.get_filesystem_by_name(snapshot_name)
             .ok_or(EngineError::Stratis(ErrorEnum::NotFound(String::from(snapshot_name)))));
 
         new_snapshot.add_ancestor(parent_id);
@@ -124,10 +109,10 @@ impl Pool for SimPool {
         Ok(uuid)
     }
 
-    fn filesystems(&mut self) -> BTreeMap<&Uuid, &mut Filesystem> {
+    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem> {
         BTreeMap::from_iter(self.filesystems
             .iter_mut()
-            .map(|x| (&x.0 as &Uuid, &mut x.1 as &mut Filesystem)))
+            .map(|x| (x.0 as &str, x.1 as &mut Filesystem)))
     }
 
     fn blockdevs(&mut self) -> Vec<&mut Dev> {
@@ -136,10 +121,6 @@ impl Pool for SimPool {
 
     fn cachedevs(&mut self) -> Vec<&mut Cache> {
         Vec::from_iter(self.cache_devs.iter_mut().map(|x| x as &mut Cache))
-    }
-
-    fn get_filesystem_by_id(&mut self, id: &Uuid) -> Option<&mut Filesystem> {
-        get_filesystem_by_id!(self; id)
     }
 
     fn get_filesystem_id(&self, name: &str) -> Option<Uuid> {

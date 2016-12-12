@@ -92,11 +92,10 @@ pub trait Pool: Debug {
     fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;
     fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()>;
-    fn filesystems(&mut self) -> BTreeMap<&Uuid, &mut Filesystem>;
+    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem>;
     fn blockdevs(&mut self) -> Vec<&mut Dev>;
     fn cachedevs(&mut self) -> Vec<&mut Cache>;
     fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()>;
-    fn get_filesystem_by_id(&mut self, id: &Uuid) -> Option<&mut Filesystem>;
     fn get_filesystem_id(&self, name: &str) -> Option<Uuid>;
     fn get_filesystem_by_name(&mut self, name: &str) -> Option<&mut Filesystem>;
 }

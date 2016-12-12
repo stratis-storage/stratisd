@@ -8,9 +8,10 @@ use engine::EngineResult;
 use engine::Filesystem;
 
 
-#[derive(Debug, Clone,PartialEq)]
+#[derive(Debug, Clone)]
 pub struct StratFilesystem {
     pub name: String,
+    pub fs_id: Uuid,
     pub thin_id: u32,
 }
 

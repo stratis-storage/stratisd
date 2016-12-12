@@ -58,20 +58,14 @@ macro_rules! rename_pool {
     }
 }
 
-macro_rules! get_filesystem_by_id {
-    ( $s:ident; $id:expr) => {
-        $s.filesystems.get_mut_by_first($id).map(|x| x as &mut Filesystem)
-    }
-}
-
 macro_rules! get_filesystem_by_name {
     ( $s:ident; $name:expr) => {
-        $s.filesystems.iter_mut().find(|f| f.1.name == $name).map(|x| &mut x.1 as &mut Filesystem)
+        $s.filesystems.get_mut($name).map(|x| x as &mut Filesystem)
     }
 }
 
 macro_rules! get_filesystem_id {
     ( $s:ident; $name:expr ) => {
-        $s.filesystems.iter().find(|f| f.1.name == $name).map(|x| x.0)
+        $s.filesystems.iter().find(|f| f.1.name == $name).map(|x| x.1.fs_id)
     }
 }

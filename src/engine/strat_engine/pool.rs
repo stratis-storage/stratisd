@@ -9,7 +9,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::vec::Vec;
 
-use bidir_map::BidirMap;
 use uuid::Uuid;
 use devicemapper::Device;
 
@@ -29,7 +28,7 @@ pub struct StratPool {
     pub pool_uuid: Uuid,
     pub cache_devs: BTreeMap<Uuid, BlockDev>,
     pub block_devs: BTreeMap<Uuid, BlockDev>,
-    pub filesystems: BidirMap<Uuid, StratFilesystem>,
+    pub filesystems: BTreeMap<String, StratFilesystem>,
     pub raid_level: u16,
 }
 
@@ -47,7 +46,7 @@ impl StratPool {
             pool_uuid: pool_uuid,
             cache_devs: BTreeMap::new(),
             block_devs: bds,
-            filesystems: BidirMap::new(),
+            filesystems: BTreeMap::new(),
             raid_level: raid_level,
         })
     }
@@ -96,7 +95,7 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn filesystems(&mut self) -> BTreeMap<&Uuid, &mut Filesystem> {
+    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem> {
         unimplemented!()
     }
 
@@ -114,10 +113,6 @@ impl Pool for StratPool {
 
     fn cachedevs(&mut self) -> Vec<&mut Cache> {
         unimplemented!()
-    }
-
-    fn get_filesystem_by_id(&mut self, id: &Uuid) -> Option<&mut Filesystem> {
-        get_filesystem_by_id!(self; id)
     }
 
     fn get_filesystem_id(&self, name: &str) -> Option<Uuid> {

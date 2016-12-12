@@ -96,7 +96,7 @@ impl Pool for SimPool {
                          quota_size: Option<u64>)
                          -> EngineResult<Uuid> {
 
-        match self.get_filesystem_id(name) {
+        match self.get_filesystem_by_name(name) {
             Some(_) => {
                 return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(String::from(name))));
             }

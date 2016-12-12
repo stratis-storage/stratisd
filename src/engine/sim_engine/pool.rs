@@ -150,15 +150,7 @@ impl Pool for SimPool {
     }
 
     fn get_filesystem_id(&self, name: &str) -> EngineResult<Uuid> {
-
-        for entry in self.filesystems.iter() {
-            let ref value = entry.1;
-            if value.has_same(name) {
-                return Ok(value.get_id());
-            }
-        }
-
-        Err(EngineError::Stratis(ErrorEnum::NotFound(String::from(name))))
+        get_filesystem_id!(self; name)
     }
 
     fn get_filesystem_by_name(&mut self, name: &str) -> EngineResult<&mut Filesystem> {

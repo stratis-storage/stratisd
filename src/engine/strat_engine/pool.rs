@@ -122,8 +122,8 @@ impl Pool for StratPool {
         get_filesystem_by_id!(self; id)
     }
 
-    fn get_filesystem_id(&self, _name: &str) -> EngineResult<Uuid> {
-        unimplemented!()
+    fn get_filesystem_id(&self, name: &str) -> EngineResult<Uuid> {
+        get_filesystem_id!(self; name)
     }
 
     fn get_filesystem_by_name(&mut self, name: &str) -> EngineResult<&mut Filesystem> {

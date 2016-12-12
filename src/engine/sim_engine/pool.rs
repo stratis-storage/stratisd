@@ -103,7 +103,7 @@ impl Pool for SimPool {
                          name: &str,
                          mount_point: &str,
                          quota_size: Option<u64>)
-                         -> EngineResult<()> {
+                         -> EngineResult<Uuid> {
 
         match self.get_filesystem_id(name) {
             Ok(_) => {
@@ -113,9 +113,9 @@ impl Pool for SimPool {
         }
 
         let new_filesystem = SimFilesystem::new_filesystem(name, mount_point, quota_size);
-
-        self.filesystems.insert(new_filesystem.get_id(), new_filesystem);
-        Ok(())
+        let fs_uuid = new_filesystem.get_id();
+        self.filesystems.insert(fs_uuid, new_filesystem);
+        Ok(fs_uuid)
     }
 
     fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<()> {

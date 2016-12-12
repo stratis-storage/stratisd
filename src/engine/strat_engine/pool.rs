@@ -60,8 +60,8 @@ impl Pool for StratPool {
                          _filesystem_name: &str,
                          _mount_point: &str,
                          _quota_size: Option<u64>)
-                         -> EngineResult<()> {
-        Ok(())
+                         -> EngineResult<Uuid> {
+        Ok(Uuid::new_v4())
     }
 
     fn create_snapshot(&mut self, _snapshot_name: &str, _source: &str) -> EngineResult<()> {

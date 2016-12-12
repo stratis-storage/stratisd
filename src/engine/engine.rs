@@ -100,7 +100,7 @@ pub trait Pool: Debug {
     fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()>;
     fn get_filesystem_by_id(&mut self, id: &Uuid) -> EngineResult<&mut Filesystem>;
     fn get_filesystem_id(&self, name: &str) -> Option<Uuid>;
-    fn get_filesystem_by_name(&mut self, name: &str) -> EngineResult<&mut Filesystem>;
+    fn get_filesystem_by_name(&mut self, name: &str) -> Option<&mut Filesystem>;
 }
 
 pub trait Engine: Debug {

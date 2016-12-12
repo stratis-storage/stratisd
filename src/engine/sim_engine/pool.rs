@@ -146,7 +146,7 @@ impl Pool for SimPool {
         get_filesystem_id!(self; name)
     }
 
-    fn get_filesystem_by_name(&mut self, name: &str) -> EngineResult<&mut Filesystem> {
+    fn get_filesystem_by_name(&mut self, name: &str) -> Option<&mut Filesystem> {
         get_filesystem_by_name!(self; name)
     }
 

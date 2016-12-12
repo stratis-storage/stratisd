@@ -457,9 +457,10 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     }
 
     let filesystem = match pool.get_filesystem_by_name(&filesystem_name) {
-        Ok(filesystem) => filesystem,
-        Err(err) => {
-            let (rc, rs) = engine_to_dbus_err(&err);
+        Some(filesystem) => filesystem,
+        None => {
+            let error = EngineError::Stratis(engine::ErrorEnum::NotFound(String::from(new_name)));
+            let (rc, rs) = engine_to_dbus_err(&error);
             let (rc, rs) = code_to_message_items(rc, rs);
             return Ok(vec![return_message.append2(rc, rs)]);
         }

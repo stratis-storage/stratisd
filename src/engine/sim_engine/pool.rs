@@ -56,11 +56,6 @@ impl SimPool {
         new_pool
     }
 
-    // If the source doesn't exist, return an error - otherwise the UUID of the soruce
-    fn validate_snapshot_source_exists(&mut self, source: &str) -> EngineResult<Uuid> {
-        let filesystem = try!(self.get_filesystem_by_name(&source));
-        Ok(filesystem.get_id())
-    }
 }
 
 impl Pool for SimPool {
@@ -120,7 +115,7 @@ impl Pool for SimPool {
 
     fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<()> {
 
-        let parent_id = try!(self.validate_snapshot_source_exists(source));
+        let parent_id = try!(self.get_filesystem_id(source));
 
         let uuid = try!(self.create_filesystem(&snapshot_name, &String::from(""), None));
 

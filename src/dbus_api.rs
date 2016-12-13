@@ -339,7 +339,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let return_sig = "(oqs)";
+    let return_sig = "(os)";
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_name = dbus_try!(
@@ -351,38 +351,38 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                    default_return;
                                    return_message);
 
-    let ref mut list_rc = ErrorEnum::OK;
+    let specs = filesystems.map(|x| (x.0, x.1, tuple_to_option(x.2)));
+    let result = pool.create_filesystems(specs.collect());
 
-    let mut vec = Vec::new();
-
-    for (name, mountpoint, quota_size) in filesystems {
-        let result = pool.create_filesystem(name, mountpoint, tuple_to_option(quota_size));
-
-        match result {
-            Ok(_) => {
-                let object_path: dbus::Path = create_dbus_filesystem(dbus_context.clone());
-                dbus_context.filesystems.borrow_mut().insert(object_path.to_string(),
-                                                             ((&pool_name).clone(),
-                                                              String::from(name)));
-                let (rc, rs) = ok_message_items();
-                let entry = MessageItem::Struct(vec![MessageItem::ObjectPath(object_path), rc, rs]);
-                vec.push(entry);
-
+    let msg = match result {
+        Ok(ref names) => {
+            let mut return_value = Vec::new();
+            for name in names {
+                let fs_object_path: dbus::Path = create_dbus_filesystem(dbus_context.clone());
+                dbus_context.filesystems
+                    .borrow_mut()
+                    .insert(fs_object_path.to_string(),
+                            (pool_name.clone(), (*name).into()));
+                return_value.push((fs_object_path, name));
             }
-            Err(x) => {
-                *list_rc = ErrorEnum::LIST_FAILURE;
-                let object_path: dbus::Path = default_object_path();
-                let (rc, rs) = engine_to_dbus_err(&x);
-                let (rc, rs) = code_to_message_items(rc, rs);
-                let entry = MessageItem::Struct(vec![MessageItem::ObjectPath(object_path), rc, rs]);
-                vec.push(entry);
-            }
-        };
-    }
 
-    let (rc, rs) = code_to_message_items(*list_rc, list_rc.get_error_string().into());
-
-    Ok(vec![return_message.append3(MessageItem::Array(vec, return_sig.into()), rc, rs)])
+            let return_value = return_value.iter()
+                .map(|x| {
+                    MessageItem::Struct(vec![MessageItem::ObjectPath(x.0.clone()),
+                                             MessageItem::Str((*x.1).into())])
+                })
+                .collect();
+            let return_value = MessageItem::Array(return_value, return_sig.into());
+            let (rc, rs) = ok_message_items();
+            return_message.append3(return_value, rc, rs)
+        }
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err(&err);
+            let (rc, rs) = code_to_message_items(rc, rs);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
 
 }
 
@@ -877,7 +877,7 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
 
     let create_filesystems_method = f.method(CREATE_FILESYSTEMS, (), create_filesystems)
         .in_arg(("filesystems", "a(ss(bt))"))
-        .out_arg(("filesystems", "a(oqs)"))
+        .out_arg(("filesystems", "a(os)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

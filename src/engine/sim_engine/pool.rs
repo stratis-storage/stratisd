@@ -77,33 +77,47 @@ impl Pool for SimPool {
         destroy_filesystems!{self; fs_names}
     }
 
-    fn create_filesystem(&mut self,
-                         name: &str,
-                         mount_point: &str,
-                         quota_size: Option<u64>)
-                         -> EngineResult<Uuid> {
+    fn create_filesystems<'a, 'b, 'c>(&'a mut self,
+                                      mut specs: Vec<(&'b str, &'c str, Option<u64>)>)
+                                      -> EngineResult<Vec<&'b str>> {
+        specs.sort();
+        specs.dedup();
 
-        match self.filesystems.get(name) {
-            Some(_) => {
-                return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(String::from(name))));
-            }
-            None => {}
+        let names = BTreeSet::from_iter(specs.iter().map(|x| x.0));
+        if names.len() < specs.len() {
+            let error_message = "duplicate_names in filesystem spec";
+            return Err(EngineError::Stratis(ErrorEnum::Error(error_message.into())));
         }
 
-        let fs_uuid = Uuid::new_v4();
-        let new_filesystem = SimFilesystem::new_filesystem(fs_uuid, mount_point, quota_size);
-        self.filesystems.insert(name.into(), new_filesystem);
-        Ok(fs_uuid)
+        for spec in specs.iter() {
+            let name = spec.0;
+            if self.filesystems.contains_key(name) {
+                return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
+            }
+        }
+
+        let mut names = Vec::new();
+        for spec in specs.iter() {
+            let (name, mountpoint, quota) = *spec;
+            let new_filesystem = SimFilesystem::new_filesystem(Uuid::new_v4(), mountpoint, quota);
+            self.filesystems.insert(name.into(), new_filesystem);
+            names.push(name);
+        }
+
+        Ok(names)
     }
 
-    fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<Uuid> {
+    fn create_snapshot<'a, 'b, 'c>(&'a mut self,
+                                   snapshot_name: &'b str,
+                                   source: &'c str)
+                                   -> EngineResult<&'b str> {
 
         let parent_id = try!(self.filesystems
                 .get(source)
                 .ok_or(EngineError::Stratis(ErrorEnum::NotFound(String::from(source)))))
             .fs_id;
 
-        let uuid = try!(self.create_filesystem(&snapshot_name, &String::from(""), None));
+        let names = try!(self.create_filesystems(vec![(&snapshot_name, &String::from(""), None)]));
 
         let new_snapshot = try!(self.filesystems
             .get_mut(snapshot_name)
@@ -111,7 +125,7 @@ impl Pool for SimPool {
 
         new_snapshot.nearest_ancestor = Some(parent_id);
 
-        Ok(uuid)
+        Ok(names[0])
     }
 
     fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem> {
@@ -223,7 +237,7 @@ mod tests {
         let mut engine = SimEngine::new();
         engine.create_pool(pool_name, &vec![], 0, false).unwrap();
         let pool = engine.get_pool(pool_name).unwrap();
-        pool.create_filesystem(old_name, "", None).unwrap();
+        pool.create_filesystems(vec![(old_name, "", None)]).unwrap();
         assert!(match pool.rename_filesystem(old_name, "new_name") {
             Ok(RenameAction::Renamed) => true,
             _ => false,
@@ -239,8 +253,7 @@ mod tests {
         let mut engine = SimEngine::new();
         engine.create_pool(pool_name, &vec![], 0, false).unwrap();
         let pool = engine.get_pool(pool_name).unwrap();
-        pool.create_filesystem(new_name, "", None).unwrap();
-        pool.create_filesystem(old_name, "", None).unwrap();
+        pool.create_filesystems(vec![(old_name, "", None), (new_name, "", None)]).unwrap();
         assert!(match pool.rename_filesystem(old_name, new_name) {
             Err(EngineError::Stratis(ErrorEnum::AlreadyExists(_))) => true,
             _ => false,
@@ -256,7 +269,7 @@ mod tests {
         let mut engine = SimEngine::new();
         engine.create_pool(pool_name, &vec![], 0, false).unwrap();
         let pool = engine.get_pool(pool_name).unwrap();
-        pool.create_filesystem(new_name, "", None).unwrap();
+        pool.create_filesystems(vec![(new_name, "", None)]).unwrap();
         assert!(match pool.rename_filesystem(old_name, new_name) {
             Ok(RenameAction::NoSource) => true,
             _ => false,
@@ -284,5 +297,74 @@ mod tests {
         engine.create_pool(name, &vec![], 0, false).unwrap();
         let mut pool = engine.get_pool(name).unwrap();
         assert!(pool.destroy_filesystems(&vec!["fs"]).is_ok());
+    }
+
+    #[test]
+    /// Creating an empty list of filesystems should succeed, always
+    fn create_fs_none() {
+        let pool_name = "pool_name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let mut pool = engine.get_pool(pool_name).unwrap();
+        assert!(match pool.create_filesystems(vec![]) {
+            Ok(names) => names.is_empty(),
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Creating a non-empty list of filesystems always succeeds.
+    fn create_fs_some() {
+        let pool_name = "pool_name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let mut pool = engine.get_pool(pool_name).unwrap();
+        assert!(match pool.create_filesystems(vec![("name", "", None)]) {
+            Ok(names) => (names.len() == 1) & (names[0] == "name"),
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Creating a an already existing filesystem fails.
+    fn create_fs_conflict() {
+        let pool_name = "pool_name";
+        let fs_name = "fs_name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let mut pool = engine.get_pool(pool_name).unwrap();
+        pool.create_filesystems(vec![(fs_name, "", None)]).unwrap();
+        assert!(match pool.create_filesystems(vec![(fs_name, "", None)]) {
+            Err(EngineError::Stratis(ErrorEnum::AlreadyExists(_))) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Requesting identical filesystems succeeds.
+    fn create_fs_dups() {
+        let fs_name = "fs_name";
+        let pool_name = "pool_name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let mut pool = engine.get_pool(pool_name).unwrap();
+        assert!(match pool.create_filesystems(vec![(fs_name, "", None), (fs_name, "", None)]) {
+            Ok(names) => (names.len() == 1) & (names[0] == fs_name),
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Requesting filesystems with same name but different specs fails.
+    fn create_fs_conflicts() {
+        let fs_name = "fs_name";
+        let pool_name = "pool_name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let mut pool = engine.get_pool(pool_name).unwrap();
+        assert!(match pool.create_filesystems(vec![(fs_name, "", None), (fs_name, "/", None)]) {
+            Err(EngineError::Stratis(ErrorEnum::Error(_))) => true,
+            _ => false,
+        });
     }
 }

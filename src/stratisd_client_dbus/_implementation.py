@@ -254,7 +254,7 @@ class PoolSpec(InterfaceSpec):
        MethodNames.AddCacheDevs: "asqs",
        MethodNames.AddDevs: "asqs",
        MethodNames.CreateFilesystems: "a(oqs)qs",
-       MethodNames.DestroyFilesystems: "a(qs)qs",
+       MethodNames.DestroyFilesystems: "asqs",
        MethodNames.ListCacheDevs: "asqs",
        MethodNames.ListDevs: "asqs",
        MethodNames.ListFilesystems: "asqs",

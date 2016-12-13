@@ -91,7 +91,6 @@ class DestroyFSTestCase(unittest.TestCase):
         self.assertEqual(rc, self._errors.OK)
         self.assertEqual(len(result), 0)
 
-    @unittest.expectedFailure
     def testDestroyOne(self):
         """
         Test calling with a non-existant volume name. This should succeed,
@@ -101,7 +100,7 @@ class DestroyFSTestCase(unittest.TestCase):
            Pool.DestroyFilesystems(self._pool_object, names=['name']),
            PoolSpec.OUTPUT_SIGS[_PN.DestroyFilesystems]
         )
-        self.assertEqual(len(result), 1)
+        self.assertEqual(len(result), 0)
         self.assertEqual(rc, self._errors.OK)
 
         (result, rc, _) = checked_call(
@@ -150,7 +149,7 @@ class DestroyFSTestCase1(unittest.TestCase):
         """
         self._service.tearDown()
 
-    def testDestroy(self):
+    def testDestroyOne(self):
         """
         Test calling by specifying the volume name. Assume that destruction
         should always succeed.
@@ -161,12 +160,32 @@ class DestroyFSTestCase1(unittest.TestCase):
         )
 
         self.assertEqual(len(result), 1)
-
         self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(result[0], self._VOLNAME)
 
-        (rc, _) = result[0]
-
+        (result, rc, _) = checked_call(
+           Pool.ListFilesystems(self._pool_object),
+           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
+        )
         self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(len(result), 0)
+
+    def testDestroyTwo(self):
+        """
+        Test calling by specifying one existing volume name and one
+        non-existing. Should succeed, but only the existing name should be
+        returned.
+        """
+        (result, rc, _) = checked_call(
+           Pool.DestroyFilesystems(
+              self._pool_object, names=[self._VOLNAME, "bogus"]
+           ),
+           PoolSpec.OUTPUT_SIGS[_PN.DestroyFilesystems]
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(result[0], self._VOLNAME)
 
         (result, rc, _) = checked_call(
            Pool.ListFilesystems(self._pool_object),

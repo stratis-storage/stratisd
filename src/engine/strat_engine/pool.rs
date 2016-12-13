@@ -118,10 +118,6 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn get_filesystem_by_name(&mut self, name: &str) -> Option<&mut Filesystem> {
-        get_filesystem_by_name!(self; name)
-    }
-
     fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
         rename_filesystem!{self; old_name; new_name}
     }

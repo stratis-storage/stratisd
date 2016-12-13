@@ -58,12 +58,6 @@ macro_rules! rename_pool {
     }
 }
 
-macro_rules! get_filesystem_by_name {
-    ( $s:ident; $name:expr) => {
-        $s.filesystems.get_mut($name).map(|x| x as &mut Filesystem)
-    }
-}
-
 macro_rules! rename_filesystem {
     ( $s:ident; $old_name:ident; $new_name:ident ) => {
         if $old_name == $new_name {

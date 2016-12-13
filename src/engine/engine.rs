@@ -91,7 +91,6 @@ pub trait Pool: Debug {
     fn blockdevs(&mut self) -> Vec<&mut Dev>;
     fn cachedevs(&mut self) -> Vec<&mut Cache>;
     fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()>;
-    fn get_filesystem_by_name(&mut self, name: &str) -> Option<&mut Filesystem>;
 
     /// Rename filesystem
     /// Applies a mapping from old name to new name.

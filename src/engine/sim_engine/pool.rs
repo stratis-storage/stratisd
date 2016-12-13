@@ -82,7 +82,7 @@ impl Pool for SimPool {
                          quota_size: Option<u64>)
                          -> EngineResult<Uuid> {
 
-        match self.get_filesystem_by_name(name) {
+        match self.filesystems.get(name) {
             Some(_) => {
                 return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(String::from(name))));
             }
@@ -97,8 +97,10 @@ impl Pool for SimPool {
 
     fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<Uuid> {
 
-        let parent_id = try!(self.filesystems.get(source)
-            .ok_or(EngineError::Stratis(ErrorEnum::NotFound(String::from(source))))).fs_id;
+        let parent_id = try!(self.filesystems
+                .get(source)
+                .ok_or(EngineError::Stratis(ErrorEnum::NotFound(String::from(source)))))
+            .fs_id;
 
         let uuid = try!(self.create_filesystem(&snapshot_name, &String::from(""), None));
 
@@ -123,10 +125,6 @@ impl Pool for SimPool {
 
     fn cachedevs(&mut self) -> Vec<&mut Cache> {
         Vec::from_iter(self.cache_devs.iter_mut().map(|x| x as &mut Cache))
-    }
-
-    fn get_filesystem_by_name(&mut self, name: &str) -> Option<&mut Filesystem> {
-        get_filesystem_by_name!(self; name)
     }
 
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()> {

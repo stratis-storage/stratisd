@@ -64,12 +64,6 @@ macro_rules! get_filesystem_by_name {
     }
 }
 
-macro_rules! get_filesystem_id {
-    ( $s:ident; $name:expr ) => {
-        $s.filesystems.get($name).map(|x| x.fs_id)
-    }
-}
-
 macro_rules! rename_filesystem {
     ( $s:ident; $old_name:ident; $new_name:ident ) => {
         if $old_name == $new_name {

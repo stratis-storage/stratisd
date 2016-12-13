@@ -118,10 +118,6 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn get_filesystem_id(&self, name: &str) -> Option<Uuid> {
-        get_filesystem_id!(self; name)
-    }
-
     fn get_filesystem_by_name(&mut self, name: &str) -> Option<&mut Filesystem> {
         get_filesystem_by_name!(self; name)
     }

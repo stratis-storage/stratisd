@@ -97,8 +97,8 @@ impl Pool for SimPool {
 
     fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<Uuid> {
 
-        let parent_id = try!(self.get_filesystem_id(source)
-            .ok_or(EngineError::Stratis(ErrorEnum::NotFound(String::from(source)))));
+        let parent_id = try!(self.filesystems.get(source)
+            .ok_or(EngineError::Stratis(ErrorEnum::NotFound(String::from(source))))).fs_id;
 
         let uuid = try!(self.create_filesystem(&snapshot_name, &String::from(""), None));
 
@@ -123,10 +123,6 @@ impl Pool for SimPool {
 
     fn cachedevs(&mut self) -> Vec<&mut Cache> {
         Vec::from_iter(self.cache_devs.iter_mut().map(|x| x as &mut Cache))
-    }
-
-    fn get_filesystem_id(&self, name: &str) -> Option<Uuid> {
-        get_filesystem_id!(self; name)
     }
 
     fn get_filesystem_by_name(&mut self, name: &str) -> Option<&mut Filesystem> {

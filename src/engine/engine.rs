@@ -10,8 +10,6 @@ use std::path::PathBuf;
 
 use nix;
 
-use uuid::Uuid;
-
 #[derive(Debug)]
 pub enum RenameAction {
     Identity,
@@ -77,12 +75,19 @@ impl From<nix::Error> for EngineError {
 }
 
 pub trait Pool: Debug {
-    fn create_filesystem(&mut self,
-                         name: &str,
-                         mount_point: &str,
-                         quota_size: Option<u64>)
-                         -> EngineResult<Uuid>;
-    fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<Uuid>;
+    /// Creates the filesystems specified by specs.
+    /// Returns a list of the names of filesystems actually created.
+    /// Returns an error if any of the specified names are already in use
+    /// for filesystems in this pool.
+    fn create_filesystems<'a, 'b, 'c>(&'a mut self,
+                                      specs: &[(&'b str, &'c str, Option<u64>)])
+                                      -> EngineResult<Vec<&'b str>>;
+
+    fn create_snapshot<'a, 'b, 'c>(&'a mut self,
+                                   snapshot_name: &'b str,
+                                   source: &'c str)
+                                   -> EngineResult<&'b str>;
+
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
     fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;

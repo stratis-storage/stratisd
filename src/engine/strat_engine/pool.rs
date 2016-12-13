@@ -56,15 +56,16 @@ impl StratPool {
 }
 
 impl Pool for StratPool {
-    fn create_filesystem(&mut self,
-                         _filesystem_name: &str,
-                         _mount_point: &str,
-                         _quota_size: Option<u64>)
-                         -> EngineResult<Uuid> {
-        Ok(Uuid::new_v4())
+    fn create_filesystems<'a, 'b, 'c>(&'a mut self,
+                                      _specs: &[(&'b str, &'c str, Option<u64>)])
+                                      -> EngineResult<Vec<&'b str>> {
+        Ok(vec![])
     }
 
-    fn create_snapshot(&mut self, _snapshot_name: &str, _source: &str) -> EngineResult<Uuid> {
+    fn create_snapshot<'a, 'b, 'c>(&'a mut self,
+                                   _snapshot_name: &'b str,
+                                   _source: &'c str)
+                                   -> EngineResult<&'b str> {
         unimplemented!()
     }
 

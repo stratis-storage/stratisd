@@ -62,9 +62,7 @@ pub trait Cache: Debug {
     fn has_same(&self, other: &Path) -> bool;
 }
 
-pub trait Filesystem: Debug {
-    fn add_ancestor(&mut self, parent: Uuid);
-}
+pub trait Filesystem: Debug {}
 
 impl From<io::Error> for EngineError {
     fn from(err: io::Error) -> EngineError {

@@ -102,10 +102,11 @@ impl Pool for SimPool {
 
         let uuid = try!(self.create_filesystem(&snapshot_name, &String::from(""), None));
 
-        let new_snapshot = try!(self.get_filesystem_by_name(snapshot_name)
+        let new_snapshot = try!(self.filesystems
+            .get_mut(snapshot_name)
             .ok_or(EngineError::Stratis(ErrorEnum::NotFound(String::from(snapshot_name)))));
 
-        new_snapshot.add_ancestor(parent_id);
+        new_snapshot.nearest_ancestor = Some(parent_id);
 
         Ok(uuid)
     }

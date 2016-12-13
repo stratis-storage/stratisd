@@ -29,8 +29,4 @@ impl SimFilesystem {
         }
     }
 }
-impl Filesystem for SimFilesystem {
-    fn add_ancestor(&mut self, parent: Uuid) {
-        self.nearest_ancestor = Some(parent);
-    }
-}
+impl Filesystem for SimFilesystem {}

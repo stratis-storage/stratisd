@@ -13,8 +13,4 @@ pub struct StratFilesystem {
     pub thin_id: u32,
 }
 
-impl Filesystem for StratFilesystem {
-    fn add_ancestor(&mut self, _parent: Uuid) {
-        unimplemented!()
-    }
-}
+impl Filesystem for StratFilesystem {}

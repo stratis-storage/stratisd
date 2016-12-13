@@ -63,9 +63,6 @@ pub trait Cache: Debug {
 }
 
 pub trait Filesystem: Debug {
-    fn get_name(&self) -> String;
-    fn has_same(&self, other: &str) -> bool;
-    fn rename(&mut self, new_name: &str) -> EngineResult<()>;
     fn add_ancestor(&mut self, parent: Uuid);
 }
 
@@ -98,6 +95,13 @@ pub trait Pool: Debug {
     fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()>;
     fn get_filesystem_id(&self, name: &str) -> Option<Uuid>;
     fn get_filesystem_by_name(&mut self, name: &str) -> Option<&mut Filesystem>;
+
+    /// Rename filesystem
+    /// Applies a mapping from old name to new name.
+    /// Raises an error if the mapping can't be applied because
+    /// the names aren't equal and both are in use.
+    /// The result indicate whether an action was performed, and if not, why.
+    fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction>;
 }
 
 pub trait Engine: Debug {

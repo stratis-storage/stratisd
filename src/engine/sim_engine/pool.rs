@@ -18,6 +18,7 @@ use engine::EngineResult;
 use engine::ErrorEnum;
 use engine::Filesystem;
 use engine::Pool;
+use engine::RenameAction;
 
 use super::blockdev::SimDev;
 use super::cache::SimCacheDev;
@@ -89,7 +90,7 @@ impl Pool for SimPool {
         }
 
         let fs_uuid = Uuid::new_v4();
-        let new_filesystem = SimFilesystem::new_filesystem(name, fs_uuid, mount_point, quota_size);
+        let new_filesystem = SimFilesystem::new_filesystem(fs_uuid, mount_point, quota_size);
         self.filesystems.insert(name.into(), new_filesystem);
         Ok(fs_uuid)
     }
@@ -160,5 +161,108 @@ impl Pool for SimPool {
             }
         }
         Ok(())
+    }
+
+    fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
+        rename_filesystem!{self; old_name; new_name}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use engine::Engine;
+    use engine::ErrorEnum;
+    use engine::EngineError;
+    use engine::RenameAction;
+
+    use super::super::SimEngine;
+
+    #[test]
+    /// Renaming a filesystem on an empty pool always works
+    fn rename_empty() {
+        let pool_name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let pool = engine.get_pool(pool_name).unwrap();
+        assert!(match pool.rename_filesystem("old_name", "new_name") {
+            Ok(RenameAction::NoSource) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Renaming a filesystem to itself on an empty pool always works.
+    fn rename_empty_identity() {
+        let pool_name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let pool = engine.get_pool(pool_name).unwrap();
+        assert!(match pool.rename_filesystem("old_name", "old_name") {
+            Ok(RenameAction::Identity) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Renaming a filesystem to itself always works
+    fn rename_identity() {
+        let name = "name";
+        let pool_name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let pool = engine.get_pool(pool_name).unwrap();
+        assert!(match pool.rename_filesystem(name, name) {
+            Ok(RenameAction::Identity) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Renaming a filesystem to another filesystem should work if new name not taken
+    fn rename_happens() {
+        let old_name = "old_name";
+        let pool_name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let pool = engine.get_pool(pool_name).unwrap();
+        pool.create_filesystem(old_name, "", None).unwrap();
+        assert!(match pool.rename_filesystem(old_name, "new_name") {
+            Ok(RenameAction::Renamed) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Renaming a filesystem to another filesystem should fail if new name taken
+    fn rename_fails() {
+        let old_name = "old_name";
+        let new_name = "new_name";
+        let pool_name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let pool = engine.get_pool(pool_name).unwrap();
+        pool.create_filesystem(new_name, "", None).unwrap();
+        pool.create_filesystem(old_name, "", None).unwrap();
+        assert!(match pool.rename_filesystem(old_name, new_name) {
+            Err(EngineError::Stratis(ErrorEnum::AlreadyExists(_))) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Renaming should succeed if old_name absent, new present
+    fn rename_no_op() {
+        let old_name = "old_name";
+        let new_name = "new_name";
+        let pool_name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let pool = engine.get_pool(pool_name).unwrap();
+        pool.create_filesystem(new_name, "", None).unwrap();
+        assert!(match pool.rename_filesystem(old_name, new_name) {
+            Ok(RenameAction::NoSource) => true,
+            _ => false,
+        });
     }
 }

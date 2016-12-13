@@ -12,11 +12,14 @@ use std::vec::Vec;
 use uuid::Uuid;
 use devicemapper::Device;
 
+use engine::EngineError;
 use engine::EngineResult;
+use engine::ErrorEnum;
 use engine::Pool;
 use engine::Filesystem;
 use engine::Dev;
 use engine::Cache;
+use engine::RenameAction;
 
 use super::blockdev::BlockDev;
 use super::filesystem::StratFilesystem;
@@ -121,5 +124,9 @@ impl Pool for StratPool {
 
     fn get_filesystem_by_name(&mut self, name: &str) -> Option<&mut Filesystem> {
         get_filesystem_by_name!(self; name)
+    }
+
+    fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
+        rename_filesystem!{self; old_name; new_name}
     }
 }

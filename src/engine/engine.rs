@@ -52,7 +52,6 @@ pub type EngineResult<T> = Result<T, EngineError>;
 
 pub trait Dev: Debug {
     fn get_id(&self) -> String;
-    fn has_same(&self, other: &Path) -> bool;
 }
 
 pub trait Filesystem: Debug {}

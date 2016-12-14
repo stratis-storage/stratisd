@@ -43,10 +43,6 @@ impl Dev for SimDev {
             None => return String::from("Conversion Failure"),
         }
     }
-
-    fn has_same(&self, other: &Path) -> bool {
-        self.get_id() == String::from(other.to_str().unwrap())
-    }
 }
 
 impl SimDev {

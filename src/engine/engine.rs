@@ -10,8 +10,6 @@ use std::path::PathBuf;
 
 use nix;
 
-use uuid::Uuid;
-
 #[derive(Debug)]
 pub enum RenameAction {
     Identity,
@@ -62,14 +60,7 @@ pub trait Cache: Debug {
     fn has_same(&self, other: &Path) -> bool;
 }
 
-pub trait Filesystem: Debug {
-    fn get_id(&self) -> Uuid;
-    fn eq(&self, other: &Filesystem) -> bool;
-    fn get_name(&self) -> String;
-    fn has_same(&self, other: &str) -> bool;
-    fn rename(&mut self, new_name: &str) -> EngineResult<()>;
-    fn add_ancestor(&mut self, parent: Uuid);
-}
+pub trait Filesystem: Debug {}
 
 impl From<io::Error> for EngineError {
     fn from(err: io::Error) -> EngineError {
@@ -84,23 +75,39 @@ impl From<nix::Error> for EngineError {
 }
 
 pub trait Pool: Debug {
-    fn create_filesystem(&mut self,
-                         name: &str,
-                         mount_point: &str,
-                         quota_size: Option<u64>)
-                         -> EngineResult<()>;
-    fn create_snapshot(&mut self, snapshot_name: &str, source: &str) -> EngineResult<()>;
+    /// Creates the filesystems specified by specs.
+    /// Returns a list of the names of filesystems actually created.
+    /// Returns an error if any filesystems of the given name occur.
+    fn create_filesystems<'a, 'b, 'c>(&'a mut self,
+                                      mut specs: Vec<(&'b str, &'c str, Option<u64>)>)
+                                      -> EngineResult<Vec<&'b str>>;
+
+    fn create_snapshot<'a, 'b, 'c>(&'a mut self,
+                                   snapshot_name: &'b str,
+                                   source: &'c str)
+                                   -> EngineResult<&'b str>;
+
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
     fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;
     fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()>;
-    fn filesystems(&mut self) -> BTreeMap<&Uuid, &mut Filesystem>;
+    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem>;
     fn blockdevs(&mut self) -> Vec<&mut Dev>;
     fn cachedevs(&mut self) -> Vec<&mut Cache>;
-    fn destroy_filesystem(&mut self, name: &str) -> EngineResult<()>;
-    fn get_filesystem(&mut self, id: &Uuid) -> EngineResult<&mut Filesystem>;
-    fn get_filesystem_id(&self, name: &str) -> EngineResult<Uuid>;
-    fn get_filesystem_by_name(&mut self, name: &str) -> EngineResult<&mut Filesystem>;
+
+    /// Ensures that all designated filesystems are gone from pool.
+    /// Returns a list of the filesystems found, and actually destroyed.
+    /// This list will be a subset of the names passed in fs_names.
+    fn destroy_filesystems<'a, 'b>(&'a mut self,
+                                   fs_names: &[&'b str])
+                                   -> EngineResult<Vec<&'b str>>;
+
+    /// Rename filesystem
+    /// Applies a mapping from old name to new name.
+    /// Raises an error if the mapping can't be applied because
+    /// the names aren't equal and both are in use.
+    /// The result indicate whether an action was performed, and if not, why.
+    fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction>;
 }
 
 pub trait Engine: Debug {

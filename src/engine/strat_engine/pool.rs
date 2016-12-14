@@ -12,20 +12,18 @@ use std::vec::Vec;
 use uuid::Uuid;
 use devicemapper::Device;
 
+use engine::EngineError;
 use engine::EngineResult;
+use engine::ErrorEnum;
 use engine::Pool;
 use engine::Filesystem;
 use engine::Dev;
 use engine::Cache;
+use engine::RenameAction;
 
 use super::blockdev::BlockDev;
+use super::filesystem::StratFilesystem;
 use super::consts::*;
-
-#[derive(Debug, Clone)]
-pub struct StratFilesystem {
-    pub name: String,
-    pub thin_id: u32,
-}
 
 #[derive(Debug)]
 pub struct StratPool {
@@ -33,7 +31,7 @@ pub struct StratPool {
     pub pool_uuid: Uuid,
     pub cache_devs: BTreeMap<Uuid, BlockDev>,
     pub block_devs: BTreeMap<Uuid, BlockDev>,
-    pub filesystems: BTreeMap<String, Box<StratFilesystem>>,
+    pub filesystems: BTreeMap<String, StratFilesystem>,
     pub raid_level: u16,
 }
 
@@ -58,15 +56,16 @@ impl StratPool {
 }
 
 impl Pool for StratPool {
-    fn create_filesystem(&mut self,
-                         _filesystem_name: &str,
-                         _mount_point: &str,
-                         _quota_size: Option<u64>)
-                         -> EngineResult<()> {
-        Ok(())
+    fn create_filesystems<'a, 'b, 'c>(&'a mut self,
+                                      mut _specs: Vec<(&'b str, &'c str, Option<u64>)>)
+                                      -> EngineResult<Vec<&'b str>> {
+        Ok(vec![])
     }
 
-    fn create_snapshot(&mut self, _snapshot_name: &str, _source: &str) -> EngineResult<()> {
+    fn create_snapshot<'a, 'b, 'c>(&'a mut self,
+                                   _snapshot_name: &'b str,
+                                   _source: &'c str)
+                                   -> EngineResult<&'b str> {
         unimplemented!()
     }
 
@@ -96,11 +95,13 @@ impl Pool for StratPool {
         Ok(bdev_paths)
     }
 
-    fn destroy_filesystem(&mut self, _filesystem: &str) -> EngineResult<()> {
-        unimplemented!()
+    fn destroy_filesystems<'a, 'b>(&'a mut self,
+                                   fs_names: &[&'b str])
+                                   -> EngineResult<Vec<&'b str>> {
+        destroy_filesystems!{self; fs_names}
     }
 
-    fn filesystems(&mut self) -> BTreeMap<&Uuid, &mut Filesystem> {
+    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem> {
         unimplemented!()
     }
 
@@ -120,15 +121,7 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn get_filesystem(&mut self, _id: &Uuid) -> EngineResult<&mut Filesystem> {
-        unimplemented!()
-    }
-
-    fn get_filesystem_id(&self, _name: &str) -> EngineResult<Uuid> {
-        unimplemented!()
-    }
-
-    fn get_filesystem_by_name(&mut self, _name: &str) -> EngineResult<&mut Filesystem> {
-        unimplemented!()
+    fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
+        rename_filesystem!{self; old_name; new_name}
     }
 }

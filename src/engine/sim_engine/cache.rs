@@ -21,16 +21,16 @@ pub enum CacheState {
 #[derive(Clone, Debug)]
 /// A simulated cache device.
 pub struct SimCacheDev {
-    pub name: PathBuf,
+    pub devnode: PathBuf,
     rdm: Rc<RefCell<Randomizer>>,
     pub state: CacheState,
 }
 
 impl SimCacheDev {
     /// Generates a new cache device from a path.
-    pub fn new_cache(rdm: Rc<RefCell<Randomizer>>, name: &Path) -> SimCacheDev {
+    pub fn new_cache(rdm: Rc<RefCell<Randomizer>>, devnode: &Path) -> SimCacheDev {
         SimCacheDev {
-            name: name.to_owned(),
+            devnode: devnode.to_owned(),
             rdm: rdm,
             state: CacheState::OK,
         }
@@ -49,14 +49,11 @@ impl SimCacheDev {
 
 impl Cache for SimCacheDev {
     fn get_id(&self) -> String {
-        let id = self.name.to_str();
+        let id = self.devnode.to_str();
 
         match id {
             Some(x) => return String::from(x),
             None => return String::from("Conversion Failure"),
         }
-    }
-    fn has_same(&self, other: &Path) -> bool {
-        self.name == other
     }
 }

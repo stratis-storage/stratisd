@@ -147,7 +147,7 @@ impl Pool for SimPool {
     }
 
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()> {
-        let index = self.block_devs.iter().position(|x| x.has_same(path));
+        let index = self.block_devs.iter().position(|x| x.devnode.as_path() == path);
         match index {
             Some(index) => {
                 self.block_devs.remove(index);
@@ -162,7 +162,7 @@ impl Pool for SimPool {
     }
 
     fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()> {
-        let index = self.cache_devs.iter().position(|x| x.has_same(path));
+        let index = self.cache_devs.iter().position(|x| x.devnode.as_path() == path);
 
         match index {
             Some(index) => {

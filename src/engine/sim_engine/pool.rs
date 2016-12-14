@@ -300,6 +300,21 @@ mod tests {
     }
 
     #[test]
+    /// Removing a non-empty list of filesystems should succeed on any pool
+    fn destroy_fs_any() {
+        let pool_name = "name";
+        let fs_name = "fs_name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &vec![], 0, false).unwrap();
+        let mut pool = engine.get_pool(pool_name).unwrap();
+        pool.create_filesystems(vec![(fs_name, "", None)]).unwrap();
+        assert!(match pool.destroy_filesystems(&vec![fs_name, "other"]) {
+            Ok(names) => names == vec![fs_name],
+            _ => false,
+        });
+    }
+
+    #[test]
     /// Creating an empty list of filesystems should succeed, always
     fn create_fs_none() {
         let pool_name = "pool_name";

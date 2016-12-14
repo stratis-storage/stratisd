@@ -709,7 +709,8 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(devnodes) => {
-            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into()).collect();
+            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
+            let paths = paths.map(|x| MessageItem::Str(x)).collect();
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::Array(paths, return_sig.into()), rc, rs)
         }
@@ -751,7 +752,8 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(devnodes) => {
-            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into()).collect();
+            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
+            let paths = paths.map(|x| MessageItem::Str(x)).collect();
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::Array(paths, return_sig.into()), rc, rs)
         }
@@ -978,7 +980,8 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(devnodes) => {
             let object_path: dbus::Path = create_dbus_pool(dbus_context.clone());
             dbus_context.pools.borrow_mut().insert(object_path.to_string(), String::from(name));
-            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into()).collect();
+            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
+            let paths = paths.map(|x| MessageItem::Str(x)).collect();
             let return_path = MessageItem::ObjectPath(object_path);
             let return_list = MessageItem::Array(paths, "s".into());
             let return_value = MessageItem::Struct(vec![return_path, return_list]);

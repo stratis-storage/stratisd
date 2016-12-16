@@ -2,6 +2,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+macro_rules! destroy_filesystems {
+    ( $s:ident; $fs:expr ) => {
+        let mut removed = Vec::new();
+        for name in $fs.iter().map(|x| *x) {
+            if $s.filesystems.remove(name.into()).is_some() {
+                removed.push(name);
+            };
+        };
+        Ok(removed)
+    }
+}
+
 macro_rules! destroy_pool {
     ( $s:ident; $name: ident) => {
         let entry = match $s.pools.entry($name.into()) {
@@ -53,6 +65,26 @@ macro_rules! rename_pool {
         } else {
             let pool = $s.pools.remove($old_name).unwrap();
             $s.pools.insert($new_name.into(), pool);
+            return Ok(RenameAction::Renamed);
+        };
+    }
+}
+
+macro_rules! rename_filesystem {
+    ( $s:ident; $old_name:ident; $new_name:ident ) => {
+        if $old_name == $new_name {
+            return Ok(RenameAction::Identity);
+        }
+
+        if !$s.filesystems.contains_key($old_name) {
+            return Ok(RenameAction::NoSource);
+        }
+
+        if $s.filesystems.contains_key($new_name) {
+            return Err(EngineError::Stratis(ErrorEnum::AlreadyExists($new_name.into())));
+        } else {
+            let filesystem = $s.filesystems.remove($old_name).unwrap();
+            $s.filesystems.insert($new_name.into(), filesystem);
             return Ok(RenameAction::Renamed);
         };
     }

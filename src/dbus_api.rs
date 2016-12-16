@@ -297,7 +297,7 @@ fn create_dbus_filesystem<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
 
     let rename_method = f.method(RENAME_FILESYSTEM, (), rename_filesystem)
         .in_arg(("name", "s"))
-        .out_arg(("object_path", "o"))
+        .out_arg(("action", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
@@ -339,7 +339,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let return_sig = "(oqs)";
+    let return_sig = "(os)";
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_name = dbus_try!(
@@ -351,38 +351,39 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                    default_return;
                                    return_message);
 
-    let ref mut list_rc = ErrorEnum::OK;
+    let specs = filesystems.map(|x| (x.0, x.1, tuple_to_option(x.2)))
+        .collect::<Vec<(&str, &str, Option<u64>)>>();
+    let result = pool.create_filesystems(&specs);
 
-    let mut vec = Vec::new();
-
-    for (name, mountpoint, quota_size) in filesystems {
-        let result = pool.create_filesystem(name, mountpoint, tuple_to_option(quota_size));
-
-        match result {
-            Ok(_) => {
-                let object_path: dbus::Path = create_dbus_filesystem(dbus_context.clone());
-                dbus_context.filesystems.borrow_mut().insert(object_path.to_string(),
-                                                             ((&pool_name).clone(),
-                                                              String::from(name)));
-                let (rc, rs) = ok_message_items();
-                let entry = MessageItem::Struct(vec![MessageItem::ObjectPath(object_path), rc, rs]);
-                vec.push(entry);
-
+    let msg = match result {
+        Ok(ref names) => {
+            let mut return_value = Vec::new();
+            for name in names {
+                let fs_object_path: dbus::Path = create_dbus_filesystem(dbus_context.clone());
+                dbus_context.filesystems
+                    .borrow_mut()
+                    .insert(fs_object_path.to_string(),
+                            (pool_name.clone(), (*name).into()));
+                return_value.push((fs_object_path, name));
             }
-            Err(x) => {
-                *list_rc = ErrorEnum::LIST_FAILURE;
-                let object_path: dbus::Path = default_object_path();
-                let (rc, rs) = engine_to_dbus_err(&x);
-                let (rc, rs) = code_to_message_items(rc, rs);
-                let entry = MessageItem::Struct(vec![MessageItem::ObjectPath(object_path), rc, rs]);
-                vec.push(entry);
-            }
-        };
-    }
 
-    let (rc, rs) = code_to_message_items(*list_rc, list_rc.get_error_string().into());
-
-    Ok(vec![return_message.append3(MessageItem::Array(vec, return_sig.into()), rc, rs)])
+            let return_value = return_value.iter()
+                .map(|x| {
+                    MessageItem::Struct(vec![MessageItem::ObjectPath(x.0.clone()),
+                                             MessageItem::Str((*x.1).into())])
+                })
+                .collect();
+            let return_value = MessageItem::Array(return_value, return_sig.into());
+            let (rc, rs) = ok_message_items();
+            return_message.append3(return_value, rc, rs)
+        }
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err(&err);
+            let (rc, rs) = code_to_message_items(rc, rs);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
 
 }
 
@@ -438,49 +439,66 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
+    let default_return = MessageItem::Bool(false);
 
-    let (pool_name, filesystem_name) = dbus_try_0!(object_path_to_pair(dbus_context, object_path);
-                                                   return_message);
+    let (pool_name, filesystem_name) = dbus_try!(
+        object_path_to_pair(dbus_context, object_path);
+        default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = engine_try_0!(b_engine.get_pool(&pool_name);return_message);
+    let ref mut pool = engine_try!(
+        b_engine.get_pool(&pool_name);
+        default_return; return_message);
 
-    match pool.get_filesystem_id(&new_name) {
-        Ok(_) => {
-            let error =
-                EngineError::Stratis(engine::ErrorEnum::AlreadyExists(String::from(new_name)));
-            let (rc, rs) = engine_to_dbus_err(&error);
-            let (rc, rs) = code_to_message_items(rc, rs);
-            return Ok(vec![return_message.append2(rc, rs)]);
+    let result = pool.rename_filesystem(&filesystem_name, &new_name);
+
+    let msg = match result {
+        Ok(RenameAction::NoSource) => {
+            let error_message = format!("engine doesn't know about filesystem {} on pool {}",
+                                        filesystem_name,
+                                        pool_name);
+            let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR, error_message);
+            return_message.append3(default_return, rc, rs)
         }
-        Err(_) => {}
-    }
-
-    let filesystem = match pool.get_filesystem_id(&filesystem_name) {
-        Ok(id) => engine_try_0!(pool.get_filesystem(&id);return_message),
-        Err(err) => {
-            let (rc, rs) = engine_to_dbus_err(&err);
-            let (rc, rs) = code_to_message_items(rc, rs);
-            return Ok(vec![return_message.append2(rc, rs)]);
-        }
-    };
-
-    let msg = match filesystem.rename(new_name) {
-        Ok(_) => {
-            dbus_context.filesystems.borrow_mut().remove_by_first(&object_path.to_string());
-
-            dbus_context.filesystems.borrow_mut().insert(object_path.to_string(),
-                                                         ((&pool_name).clone(),
-                                                          String::from(new_name)));
+        Ok(RenameAction::Identity) => {
             let (rc, rs) = ok_message_items();
-            return_message.append2(rc, rs)
+            return_message.append3(default_return, rc, rs)
+        }
+        Ok(RenameAction::Renamed) => {
+            let return_value = MessageItem::Bool(true);
+            let removed = dbus_context.filesystems
+                .borrow_mut()
+                .remove_by_second(&(pool_name.clone(), filesystem_name.into()));
+            match removed {
+                Some((removed_object_path, _)) => {
+                    if object_path.to_string() == removed_object_path {
+                        dbus_context.filesystems
+                            .borrow_mut()
+                            .insert(removed_object_path, (pool_name.into(), new_name.into()));
+                        let (rc, rs) = ok_message_items();
+                        return_message.append3(return_value, rc, rs)
+                    } else {
+                        let error_message = format!("wrong dbus object_path for renamed \
+                                                    filesystem");
+                        let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
+                                                             error_message);
+                        return_message.append3(return_value, rc, rs)
+                    }
+                }
+                None => {
+                    let error_message = format!("no dbus object path for renamed filesystem");
+                    let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR, error_message);
+                    return_message.append3(return_value, rc, rs)
+                }
+            }
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err(&err);
             let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append2(rc, rs)
+            return_message.append3(default_return, rc, rs)
         }
     };
+
     Ok(vec![msg])
 }
 
@@ -490,10 +508,15 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let filesystems: Array<&str, _> = try!(get_next_arg(&mut iter, 0));
 
+    let mut filesystem_names = Vec::new();
+    for name in filesystems {
+        filesystem_names.push(name);
+    }
+
     let dbus_context = m.path.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let return_sig = "(qs)";
+    let return_sig = "s";
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_name = dbus_try!(
@@ -505,32 +528,31 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                    default_return;
                                    return_message);
 
-    let ref mut list_rc = ErrorEnum::OK;
-    let mut vec = Vec::new();
-
-    for filesystem in filesystems {
-        let result = pool.destroy_filesystem(&filesystem);
-        match result {
-            Ok(_) => {
-                let result = fs_name_to_object_path(dbus_context, &pool_name, &filesystem);
-                let object_path = dbus_try!(result; default_return; return_message);
-                remove_dbus_object_path(dbus_context, object_path.clone());
-                let (rc, rs) = ok_message_items();
-                let entry = MessageItem::Struct(vec![rc, rs]);
-                vec.push(entry);
+    let result = pool.destroy_filesystems(&filesystem_names);
+    let msg = match result {
+        Ok(ref names) => {
+            for name in names {
+                match dbus_context.filesystems
+                    .borrow_mut()
+                    .remove_by_second(&(pool_name.clone(), (*name).into())) {
+                    Some((object_path, _)) => {
+                        remove_dbus_object_path(dbus_context, object_path.clone());
+                    }
+                    _ => {}
+                }
             }
-            Err(x) => {
-                *list_rc = ErrorEnum::LIST_FAILURE;
-                let (rc, rs) = engine_to_dbus_err(&x);
-                let (rc, rs) = code_to_message_items(rc, rs);
-                let entry = MessageItem::Struct(vec![rc, rs]);
-                vec.push(entry);
-            }
-        };
-    }
-    let (rc, rs) = code_to_message_items(*list_rc, list_rc.get_error_string().into());
 
-    Ok(vec![return_message.append3(MessageItem::Array(vec, return_sig.into()), rc, rs)])
+            let return_value = names.iter().map(|n| MessageItem::Str((*n).into())).collect();
+            let (rc, rs) = ok_message_items();
+            return_message.append3(MessageItem::Array(return_value, return_sig.into()), rc, rs)
+        }
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err(&err);
+            let (rc, rs) = code_to_message_items(rc, rs);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
 }
 
 fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -552,9 +574,7 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                    return_message);
 
     let result = pool.filesystems();
-    let msg_vec = result.values()
-        .map(|key| MessageItem::Str((*key).get_name().to_string()))
-        .collect();
+    let msg_vec = result.keys().map(|key| MessageItem::Str((*key).into())).collect();
     let item_array = MessageItem::Array(msg_vec, return_sig.into());
     let (rc, rs) = ok_message_items();
     let msg = return_message.append3(item_array, rc, rs);
@@ -689,7 +709,8 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(devnodes) => {
-            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into()).collect();
+            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
+            let paths = paths.map(|x| MessageItem::Str(x)).collect();
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::Array(paths, return_sig.into()), rc, rs)
         }
@@ -731,7 +752,8 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(devnodes) => {
-            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into()).collect();
+            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
+            let paths = paths.map(|x| MessageItem::Str(x)).collect();
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::Array(paths, return_sig.into()), rc, rs)
         }
@@ -858,13 +880,13 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
 
     let create_filesystems_method = f.method(CREATE_FILESYSTEMS, (), create_filesystems)
         .in_arg(("filesystems", "a(ss(bt))"))
-        .out_arg(("filesystems", "a(oqs)"))
+        .out_arg(("filesystems", "a(os)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
     let destroy_filesystems_method = f.method(DESTROY_FILESYSTEMS, (), destroy_filesystems)
         .in_arg(("filesystems", "as"))
-        .out_arg(("results", "a(qs)"))
+        .out_arg(("results", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
@@ -958,7 +980,8 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(devnodes) => {
             let object_path: dbus::Path = create_dbus_pool(dbus_context.clone());
             dbus_context.pools.borrow_mut().insert(object_path.to_string(), String::from(name));
-            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into()).collect();
+            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
+            let paths = paths.map(|x| MessageItem::Str(x)).collect();
             let return_path = MessageItem::ObjectPath(object_path);
             let return_list = MessageItem::Array(paths, "s".into());
             let return_value = MessageItem::Struct(vec![return_path, return_list]);

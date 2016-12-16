@@ -57,32 +57,15 @@ pub struct BlockDev {
 }
 
 impl BlockDev {
-    /// Initialize multiple blockdevs at once. This allows all of them
-    /// to be checked for usability before writing to any of them.
-    pub fn initialize(pool_uuid: &PoolUuid,
-                      devices: BTreeSet<Device>,
-                      mda_size: Sectors,
+    /// Filter devices for admission to pool based on dev_infos.
+    /// If there is an error finding out the info, return that error.
+    /// Also, return an error if a device is not appropriate for this pool.
+    fn filter_devs<I>(dev_infos: I,
+                      pool_uuid: &Uuid,
                       force: bool)
-                      -> EngineResult<BTreeMap<DevUuid, BlockDev>> {
-
-        if *mda_size % 2 != 0 {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("mda size {} is not an even \
-                                                               number",
-                                                              *mda_size))));
-        }
-
-        if mda_size < MIN_MDA_SIZE {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("mda size {} is less than \
-                                                               minimum ({})",
-                                                              *mda_size,
-                                                              *MIN_MDA_SIZE))));
-        }
-
-        let dev_infos = devices.into_iter().map(|d: Device| (d, BlockDev::dev_info(&d)));
-
-
+                      -> EngineResult<Vec<(Device, (PathBuf, u64))>>
+        where I: Iterator<Item = (Device, EngineResult<(PathBuf, u64, DevOwnership)>)>
+    {
         let mut add_devs = Vec::new();
         for (dev, dev_result) in dev_infos {
             if dev_result.is_err() {
@@ -115,6 +98,35 @@ impl BlockDev {
                 }
             }
         }
+        Ok(add_devs)
+    }
+
+    /// Initialize multiple blockdevs at once. This allows all of them
+    /// to be checked for usability before writing to any of them.
+    pub fn initialize(pool_uuid: &PoolUuid,
+                      devices: BTreeSet<Device>,
+                      mda_size: Sectors,
+                      force: bool)
+                      -> EngineResult<BTreeMap<DevUuid, BlockDev>> {
+
+        if *mda_size % 2 != 0 {
+            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
+                                                      format!("mda size {} is not an even \
+                                                               number",
+                                                              *mda_size))));
+        }
+
+        if mda_size < MIN_MDA_SIZE {
+            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
+                                                      format!("mda size {} is less than \
+                                                               minimum ({})",
+                                                              *mda_size,
+                                                              *MIN_MDA_SIZE))));
+        }
+
+        let dev_infos = devices.into_iter().map(|d: Device| (d, BlockDev::dev_info(&d)));
+
+        let add_devs = try!(BlockDev::filter_devs(dev_infos, pool_uuid, force));
 
         let mut bds = BTreeMap::new();
         for (dev, (devnode, dev_size)) in add_devs {

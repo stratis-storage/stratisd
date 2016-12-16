@@ -253,7 +253,7 @@ class PoolSpec(InterfaceSpec):
     OUTPUT_SIGS = {
        MethodNames.AddCacheDevs: "asqs",
        MethodNames.AddDevs: "asqs",
-       MethodNames.CreateFilesystems: "a(oqs)qs",
+       MethodNames.CreateFilesystems: "a(os)qs",
        MethodNames.DestroyFilesystems: "asqs",
        MethodNames.ListCacheDevs: "asqs",
        MethodNames.ListDevs: "asqs",

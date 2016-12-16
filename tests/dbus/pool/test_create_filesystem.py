@@ -143,12 +143,8 @@ class CreateFSTestCase1(unittest.TestCase):
            PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
         )
 
-        self.assertEqual(rc, self._errors.LIST_FAILURE)
-        self.assertEqual(len(result), 1)
-
-        (result, rc, _) = result[0]
-
         self.assertEqual(rc, self._errors.ALREADY_EXISTS)
+        self.assertEqual(len(result), 0)
 
         (result, rc, _) = checked_call(
            Pool.ListFilesystems(self._pool_object),

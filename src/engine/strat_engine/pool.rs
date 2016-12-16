@@ -6,7 +6,6 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::vec::Vec;
 
 use uuid::Uuid;
@@ -22,6 +21,8 @@ use engine::RenameAction;
 
 use super::blockdev::BlockDev;
 use super::filesystem::StratFilesystem;
+use super::util::resolve_devices;
+
 use super::consts::*;
 
 #[derive(Debug)]
@@ -69,12 +70,7 @@ impl Pool for StratPool {
     }
 
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
-        let mut devices = BTreeSet::new();
-        for path in paths {
-            let dev = try!(Device::from_str(&path.to_string_lossy()));
-            devices.insert(dev);
-        }
-
+        let devices = try!(resolve_devices(paths));
         let mut bds = try!(BlockDev::initialize(&self.pool_uuid, devices, MIN_MDA_SIZE, force));
         let bdev_paths = bds.iter().map(|p| p.1.devnode.clone()).collect();
         self.block_devs.append(&mut bds);
@@ -82,12 +78,7 @@ impl Pool for StratPool {
     }
 
     fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
-        let mut devices = BTreeSet::new();
-        for path in paths {
-            let dev = try!(Device::from_str(&path.to_string_lossy()));
-            devices.insert(dev);
-        }
-
+        let devices = try!(resolve_devices(paths));
         let mut bds = try!(BlockDev::initialize(&self.pool_uuid, devices, MIN_MDA_SIZE, force));
         let bdev_paths = bds.iter().map(|p| p.1.devnode.clone()).collect();
         self.cache_devs.append(&mut bds);

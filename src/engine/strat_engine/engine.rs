@@ -4,13 +4,9 @@
 
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
-use std::collections::BTreeSet;
 use std::iter::FromIterator;
 use std::path::Path;
 use std::path::PathBuf;
-use std::str::FromStr;
-
-use devicemapper::Device;
 
 use engine::Engine;
 use engine::EngineError;
@@ -20,6 +16,7 @@ use engine::RenameAction;
 use engine::Pool;
 
 use super::pool::StratPool;
+use super::util::resolve_devices;
 
 
 #[derive(Debug)]
@@ -49,12 +46,7 @@ impl Engine for StratEngine {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
 
-        let mut devices = BTreeSet::new();
-        for path in blockdev_paths {
-            let dev = try!(Device::from_str(&path.to_string_lossy()));
-            devices.insert(dev);
-        }
-
+        let devices = try!(resolve_devices(blockdev_paths));
         let pool = try!(StratPool::new(name, devices, raid_level, force));
         let bdev_paths = pool.block_devs.iter().map(|p| p.1.devnode.clone()).collect();
 

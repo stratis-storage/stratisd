@@ -90,6 +90,58 @@ class CreateFSTestCase(unittest.TestCase):
         self.assertEqual(rc, self._errors.OK)
         self.assertEqual(len(result), 0)
 
+    def testConflictingSpecs(self):
+        """
+        Test calling with conflicting specification for same filesystem name.
+        """
+        fs_name = "name"
+
+        (result, rc, _) = checked_call(
+           Pool.CreateFilesystems(
+              self._pool_object,
+              specs=[(fs_name, "", None), (fs_name, "/", None)]
+           ),
+           PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
+        )
+
+        self.assertEqual(rc, self._errors.ERROR)
+        self.assertEqual(len(result), 0)
+
+        (result, rc, _) = checked_call(
+           Pool.ListFilesystems(self._pool_object),
+           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
+        )
+        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(len(result), 0)
+
+    def testDuplicateSpecs(self):
+        """
+        Test calling with duplicate specification for same filesystem name.
+        """
+        new_name = "name"
+        spec = (new_name, "", None)
+
+        (result, rc, _) = checked_call(
+           Pool.CreateFilesystems(
+              self._pool_object,
+              specs=[spec, spec]
+           ),
+           PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
+        )
+
+        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(len(result), 1)
+
+        (_, fs_name) = result[0]
+        self.assertEqual(fs_name, new_name)
+
+        (result, rc, _) = checked_call(
+           Pool.ListFilesystems(self._pool_object),
+           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
+        )
+        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(len(result), 1)
+
 
 class CreateFSTestCase1(unittest.TestCase):
     """
@@ -143,12 +195,60 @@ class CreateFSTestCase1(unittest.TestCase):
            PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
         )
 
-        self.assertEqual(rc, self._errors.LIST_FAILURE)
+        self.assertEqual(rc, self._errors.ALREADY_EXISTS)
+        self.assertEqual(len(result), 0)
+
+        (result, rc, _) = checked_call(
+           Pool.ListFilesystems(self._pool_object),
+           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
+        )
+        self.assertEqual(rc, self._errors.OK)
         self.assertEqual(len(result), 1)
 
-        (result, rc, _) = result[0]
+    def testCreateOne(self):
+        """
+        Test calling by specifying a new and different volume name.
+        The new volume will be created.
+        """
+        new_name = "newname"
+
+        (result, rc, _) = checked_call(
+           Pool.CreateFilesystems(
+              self._pool_object,
+              specs=[(new_name, "", None)]
+           ),
+           PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
+        )
+
+        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(len(result), 1)
+
+        (_, fs_name) = result[0]
+        self.assertEqual(fs_name, new_name)
+
+        (result, rc, _) = checked_call(
+           Pool.ListFilesystems(self._pool_object),
+           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
+        )
+        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(len(result), 2)
+
+    def testCreateWithConflict(self):
+        """
+        Test calling by specifying several volumes. Because there is already
+        a volume with the given name, the creation of the new volumes should
+        fail, and no additional volume should be created.
+        """
+        (result, rc, _) = checked_call(
+           Pool.CreateFilesystems(
+              self._pool_object,
+              specs=[(self._VOLNAME, "", None), ("newname", "", None)]
+           ),
+           PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
+        )
 
         self.assertEqual(rc, self._errors.ALREADY_EXISTS)
+        self.assertEqual(len(result), 0)
 
         (result, rc, _) = checked_call(
            Pool.ListFilesystems(self._pool_object),

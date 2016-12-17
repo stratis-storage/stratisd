@@ -7,7 +7,6 @@ use std::fs::{OpenOptions, read_dir};
 use std::path::{Path, PathBuf};
 use std::io;
 use std::str::{FromStr, from_utf8};
-use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
@@ -23,7 +22,7 @@ use engine::{EngineResult, EngineError, ErrorEnum};
 
 use consts::*;
 use super::consts::*;
-use super::metadata::MDA;
+use super::metadata::MDAGroup;
 use super::util::blkdev_size;
 
 pub use super::BlockDevSave;
@@ -43,8 +42,7 @@ pub struct BlockDev {
     pub dev: Device,
     pub devnode: PathBuf,
     pub total_size: Sectors,
-    pub mdaa: MDA,
-    pub mdab: MDA,
+    pub mda: MDAGroup,
     mda_sectors: Sectors,
     reserved_sectors: Sectors,
 }
@@ -134,15 +132,13 @@ impl BlockDev {
         let add_devs = try!(BlockDev::filter_devs(dev_infos, pool_uuid, force));
 
         let mut bds = BTreeMap::new();
-        let mda_length = (*mda_size / NUM_MDA_COPIES * SECTOR_SIZE) as u32;
         for (dev, (devnode, dev_size)) in add_devs {
 
             let mut bd = BlockDev {
                 dev: dev,
                 devnode: devnode,
                 total_size: Sectors(dev_size / SECTOR_SIZE),
-                mdaa: MDA::new(mda_length, SectorOffset(0)),
-                mdab: MDA::new(mda_length, SectorOffset(*mda_size / NUM_MDA_COPIES)),
+                mda: MDAGroup::new(mda_size),
                 mda_sectors: mda_size,
                 reserved_sectors: MDA_RESERVED_SIZE,
             };
@@ -247,8 +243,7 @@ impl BlockDev {
                 dev: dev,
                 devnode: devnode.to_owned(),
                 total_size: Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE),
-                mdaa: MDA::read(&buf, 96, (*mda_size / NUM_MDA_COPIES * SECTOR_SIZE) as u32, SectorOffset(0)),
-                mdab: MDA::read(&buf, 128, (*mda_size / NUM_MDA_COPIES * SECTOR_SIZE) as u32, SectorOffset(*mda_size / NUM_MDA_COPIES)),
+                mda: MDAGroup::read(&buf, 96, mda_size),
                 mda_sectors: mda_size,
                 reserved_sectors: Sectors(LittleEndian::read_u32(&buf[164..168]) as u64),
             }))
@@ -297,16 +292,13 @@ impl BlockDev {
 
     // Read metadata from newest MDA
     pub fn read_mdax(&self) -> EngineResult<Vec<u8>> {
-        let younger_mda = match self.mdaa.last_updated.cmp(&self.mdab.last_updated) {
-            Ordering::Less => &self.mdab,
-            Ordering::Greater => &self.mdaa,
-            Ordering::Equal => &self.mdab,
+        let younger_mda = match self.mda.most_recent() {
+            None => {
+                let message = "Neither MDA region is in use";
+                return Err(EngineError::Stratis(ErrorEnum::Invalid(message.into())));
+            }
+            Some(mda) => mda,
         };
-
-        if younger_mda.last_updated == Timespec::new(0, 0) {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      "Neither MDA region is in use")));
-        }
 
         let mut f = try!(OpenOptions::new().read(true).open(&self.devnode));
         let mut buf = vec![0; younger_mda.used as usize];
@@ -326,11 +318,7 @@ impl BlockDev {
     // Write metadata to least-recently-written MDA
     fn write_mdax(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
         let aux_bda_size = self.aux_bda_size() as i64;
-        let older_mda = match self.mdaa.last_updated.cmp(&self.mdab.last_updated) {
-            Ordering::Less => &mut self.mdaa,
-            Ordering::Greater => &mut self.mdab,
-            Ordering::Equal => &mut self.mdaa,
-        };
+        let older_mda = self.mda.least_recent();
 
         if metadata.len() > older_mda.length as usize {
             return Err(EngineError::Io(io::Error::new(io::ErrorKind::InvalidInput,
@@ -364,8 +352,7 @@ impl BlockDev {
         buf[32..64].clone_from_slice(pool_uuid.simple().to_string().as_bytes());
         buf[64..96].clone_from_slice(dev_uuid.simple().to_string().as_bytes());
 
-        self.mdaa.write(&mut buf, 96);
-        self.mdab.write(&mut buf, 128);
+        self.mda.write(&mut buf, 96);
 
         LittleEndian::write_u32(&mut buf[160..164], *self.mda_sectors as u32);
         LittleEndian::write_u32(&mut buf[164..168], *self.reserved_sectors as u32);

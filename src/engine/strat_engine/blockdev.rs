@@ -7,7 +7,6 @@ use std::fs::{OpenOptions, read_dir};
 use std::path::{Path, PathBuf};
 use std::io;
 use std::str::{FromStr, from_utf8};
-use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
@@ -22,6 +21,10 @@ use engine::{EngineResult, EngineError, ErrorEnum};
 
 use consts::*;
 use super::consts::*;
+
+use super::metadata::MDAGroup;
+use super::metadata::validate_mda_size;
+
 use super::util::blkdev_size;
 
 pub use super::BlockDevSave;
@@ -36,22 +39,12 @@ enum DevOwnership {
     Theirs,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct MDA {
-    pub last_updated: Timespec,
-    used: u32,
-    length: u32,
-    crc: u32,
-    offset: SectorOffset, // From start of MDA, not BDA
-}
-
 #[derive(Debug, Clone)]
 pub struct BlockDev {
     pub dev: Device,
     pub devnode: PathBuf,
     pub total_size: Sectors,
-    pub mdaa: MDA,
-    pub mdab: MDA,
+    pub mda: MDAGroup,
     mda_sectors: Sectors,
     reserved_sectors: Sectors,
 }
@@ -109,20 +102,12 @@ impl BlockDev {
                       force: bool)
                       -> EngineResult<BTreeMap<DevUuid, BlockDev>> {
 
-        if *mda_size % 2 != 0 {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("mda size {} is not an even \
-                                                               number",
-                                                              *mda_size))));
-        }
-
-        if mda_size < MIN_MDA_SIZE {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("mda size {} is less than \
-                                                               minimum ({})",
-                                                              *mda_size,
-                                                              *MIN_MDA_SIZE))));
-        }
+        match validate_mda_size(mda_size) {
+            None => {}
+            Some(err) => {
+                return Err(EngineError::Stratis(ErrorEnum::Invalid(err)));
+            }
+        };
 
         let dev_infos = devices.into_iter().map(|d: Device| (d, BlockDev::dev_info(&d)));
 
@@ -135,20 +120,7 @@ impl BlockDev {
                 dev: dev,
                 devnode: devnode,
                 total_size: Sectors(dev_size / SECTOR_SIZE),
-                mdaa: MDA {
-                    last_updated: Timespec::new(0, 0),
-                    used: 0,
-                    length: (*mda_size / 2 * SECTOR_SIZE) as u32,
-                    crc: 0,
-                    offset: SectorOffset(0),
-                },
-                mdab: MDA {
-                    last_updated: Timespec::new(0, 0),
-                    used: 0,
-                    length: (*mda_size / 2 * SECTOR_SIZE) as u32,
-                    crc: 0,
-                    offset: SectorOffset(*mda_size / 2),
-                },
+                mda: MDAGroup::new(mda_size),
                 mda_sectors: mda_size,
                 reserved_sectors: MDA_RESERVED_SIZE,
             };
@@ -240,20 +212,12 @@ impl BlockDev {
 
         let mda_size = Sectors(LittleEndian::read_u32(&buf[160..164]) as u64);
 
-        if *mda_size % 2 != 0 {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("{} mda size is not an even \
-                                                               number",
-                                                              devnode.display()))));
-        }
-
-        if mda_size < MIN_MDA_SIZE {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("{} mda size is less than \
-                                                               minimum ({})",
-                                                              devnode.display(),
-                                                              *MIN_MDA_SIZE))));
-        }
+        match validate_mda_size(mda_size) {
+            None => {}
+            Some(err) => {
+                return Err(EngineError::Stratis(ErrorEnum::Invalid(err)));
+            }
+        };
 
         Ok((pool_id,
             dev_id,
@@ -261,22 +225,7 @@ impl BlockDev {
                 dev: dev,
                 devnode: devnode.to_owned(),
                 total_size: Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE),
-                mdaa: MDA {
-                    last_updated: Timespec::new(LittleEndian::read_u64(&buf[64..72]) as i64,
-                                                LittleEndian::read_u32(&buf[72..76]) as i32),
-                    used: LittleEndian::read_u32(&buf[76..80]),
-                    length: (*mda_size / 2 * SECTOR_SIZE) as u32,
-                    crc: LittleEndian::read_u32(&buf[80..84]),
-                    offset: SectorOffset(0),
-                },
-                mdab: MDA {
-                    last_updated: Timespec::new(LittleEndian::read_u64(&buf[96..104]) as i64,
-                                                LittleEndian::read_u32(&buf[104..108]) as i32),
-                    used: LittleEndian::read_u32(&buf[108..112]),
-                    length: (*mda_size / 2 * SECTOR_SIZE) as u32,
-                    crc: LittleEndian::read_u32(&buf[112..116]),
-                    offset: SectorOffset(*mda_size / 2),
-                },
+                mda: MDAGroup::read(&buf, 96, mda_size),
                 mda_sectors: mda_size,
                 reserved_sectors: Sectors(LittleEndian::read_u32(&buf[164..168]) as u64),
             }))
@@ -315,16 +264,12 @@ impl BlockDev {
 
     // Read metadata from newest MDA
     pub fn read_mdax(&self) -> EngineResult<Vec<u8>> {
-        let younger_mda = match self.mdaa.last_updated.cmp(&self.mdab.last_updated) {
-            Ordering::Less => &self.mdab,
-            Ordering::Greater => &self.mdaa,
-            Ordering::Equal => &self.mdab,
-        };
+        let younger_mda = self.mda.most_recent();
 
         if younger_mda.last_updated == Timespec::new(0, 0) {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      "Neither MDA region is in use")));
-        }
+            let message = "Neither MDA region is in use";
+            return Err(EngineError::Stratis(ErrorEnum::Invalid(message.into())));
+        };
 
         let mut f = try!(OpenOptions::new().read(true).open(&self.devnode));
         let mut buf = vec![0; younger_mda.used as usize];
@@ -344,21 +289,17 @@ impl BlockDev {
     // Write metadata to least-recently-written MDA
     fn write_mdax(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
         let aux_bda_size = (*self.aux_bda_size() * SECTOR_SIZE) as i64;
-        let older_mda = match self.mdaa.last_updated.cmp(&self.mdab.last_updated) {
-            Ordering::Less => &mut self.mdaa,
-            Ordering::Greater => &mut self.mdab,
-            Ordering::Equal => &mut self.mdaa,
-        };
 
-        if metadata.len() > older_mda.length as usize {
+        if metadata.len() > self.mda.mda_length as usize {
             return Err(EngineError::Io(io::Error::new(io::ErrorKind::InvalidInput,
                                                       format!("Metadata too large for MDA, {} \
                                                                bytes",
                                                               metadata.len()))));
         }
 
+        let older_mda = self.mda.least_recent();
         older_mda.crc = crc32::checksum_ieee(metadata);
-        older_mda.length = metadata.len() as u32;
+        older_mda.used = metadata.len() as u32;
         older_mda.last_updated = *time;
 
         let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
@@ -382,15 +323,7 @@ impl BlockDev {
         buf[32..64].clone_from_slice(pool_uuid.simple().to_string().as_bytes());
         buf[64..96].clone_from_slice(dev_uuid.simple().to_string().as_bytes());
 
-        LittleEndian::write_u64(&mut buf[64..72], self.mdaa.last_updated.sec as u64);
-        LittleEndian::write_u32(&mut buf[72..76], self.mdaa.last_updated.nsec as u32);
-        LittleEndian::write_u32(&mut buf[76..80], self.mdaa.length);
-        LittleEndian::write_u32(&mut buf[80..84], self.mdaa.crc);
-
-        LittleEndian::write_u64(&mut buf[96..104], self.mdab.last_updated.sec as u64);
-        LittleEndian::write_u32(&mut buf[104..108], self.mdab.last_updated.nsec as u32);
-        LittleEndian::write_u32(&mut buf[108..112], self.mdab.length);
-        LittleEndian::write_u32(&mut buf[112..116], self.mdab.crc);
+        self.mda.write(&mut buf, 96);
 
         LittleEndian::write_u32(&mut buf[160..164], *self.mda_sectors as u32);
         LittleEndian::write_u32(&mut buf[164..168], *self.reserved_sectors as u32);

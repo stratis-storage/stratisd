@@ -5,6 +5,7 @@
 mod blockdev;
 mod engine;
 mod filesystem;
+mod metadata;
 mod pool;
 mod util;
 mod consts;

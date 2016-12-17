@@ -37,7 +37,7 @@ enum DevOwnership {
     Theirs,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy)]
 pub struct MDA {
     pub last_updated: Timespec,
     used: u32,
@@ -46,7 +46,7 @@ pub struct MDA {
     offset: SectorOffset, // From start of MDA, not BDA
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct BlockDev {
     pub dev: Device,
     pub devnode: PathBuf,

@@ -58,6 +58,26 @@ pub struct BlockDev {
 }
 
 impl BlockDev {
+    /// Validate MDA size
+    /// Return None if MDA size is fine, otherwise a message.
+    fn validate_mda_size(size: Sectors) -> Option<String> {
+        if *size % NUM_MDA_COPIES != 0 {
+            let error_message = format!("MDA size {} is not divisible by number of copies \
+                                        required {}",
+                                        *size,
+                                        NUM_MDA_COPIES);
+            return Some(error_message);
+        };
+
+        if size < MIN_MDA_SIZE {
+            let error_message = format!("MDA size {} is less than minimum ({})",
+                                        *size,
+                                        *MIN_MDA_SIZE);
+            return Some(error_message);
+        };
+        None
+    }
+
     /// Filter devices for admission to pool based on dev_infos.
     /// If there is an error finding out the info, return that error.
     /// Also, return an error if a device is not appropriate for this pool.
@@ -110,20 +130,12 @@ impl BlockDev {
                       force: bool)
                       -> EngineResult<BTreeMap<DevUuid, BlockDev>> {
 
-        if *mda_size % 2 != 0 {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("mda size {} is not an even \
-                                                               number",
-                                                              *mda_size))));
-        }
-
-        if mda_size < MIN_MDA_SIZE {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("mda size {} is less than \
-                                                               minimum ({})",
-                                                              *mda_size,
-                                                              *MIN_MDA_SIZE))));
-        }
+        match BlockDev::validate_mda_size(mda_size) {
+            None => {}
+            Some(err) => {
+                return Err(EngineError::Stratis(ErrorEnum::Invalid(err)));
+            }
+        };
 
         let dev_infos = devices.into_iter().map(|d: Device| (d, BlockDev::dev_info(&d)));
 
@@ -139,16 +151,16 @@ impl BlockDev {
                 mdaa: MDA {
                     last_updated: Timespec::new(0, 0),
                     used: 0,
-                    length: (*mda_size / 2 * SECTOR_SIZE) as u32,
+                    length: (*mda_size / NUM_MDA_COPIES * SECTOR_SIZE) as u32,
                     crc: 0,
                     offset: SectorOffset(0),
                 },
                 mdab: MDA {
                     last_updated: Timespec::new(0, 0),
                     used: 0,
-                    length: (*mda_size / 2 * SECTOR_SIZE) as u32,
+                    length: (*mda_size / NUM_MDA_COPIES * SECTOR_SIZE) as u32,
                     crc: 0,
-                    offset: SectorOffset(*mda_size / 2),
+                    offset: SectorOffset(*mda_size / NUM_MDA_COPIES),
                 },
                 mda_sectors: mda_size,
                 reserved_sectors: MDA_RESERVED_SIZE,
@@ -241,20 +253,12 @@ impl BlockDev {
 
         let mda_size = Sectors(LittleEndian::read_u32(&buf[160..164]) as u64);
 
-        if *mda_size % 2 != 0 {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("{} mda size is not an even \
-                                                               number",
-                                                              devnode.display()))));
-        }
-
-        if mda_size < MIN_MDA_SIZE {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("{} mda size is less than \
-                                                               minimum ({})",
-                                                              devnode.display(),
-                                                              *MIN_MDA_SIZE))));
-        }
+        match BlockDev::validate_mda_size(mda_size) {
+            None => {}
+            Some(err) => {
+                return Err(EngineError::Stratis(ErrorEnum::Invalid(err)));
+            }
+        };
 
         Ok((pool_id,
             dev_id,
@@ -266,7 +270,7 @@ impl BlockDev {
                     last_updated: Timespec::new(LittleEndian::read_u64(&buf[64..72]) as i64,
                                                 LittleEndian::read_u32(&buf[72..76]) as i32),
                     used: LittleEndian::read_u32(&buf[76..80]),
-                    length: (*mda_size / 2 * SECTOR_SIZE) as u32,
+                    length: (*mda_size / NUM_MDA_COPIES * SECTOR_SIZE) as u32,
                     crc: LittleEndian::read_u32(&buf[80..84]),
                     offset: SectorOffset(0),
                 },
@@ -274,9 +278,9 @@ impl BlockDev {
                     last_updated: Timespec::new(LittleEndian::read_u64(&buf[96..104]) as i64,
                                                 LittleEndian::read_u32(&buf[104..108]) as i32),
                     used: LittleEndian::read_u32(&buf[108..112]),
-                    length: (*mda_size / 2 * SECTOR_SIZE) as u32,
+                    length: (*mda_size / NUM_MDA_COPIES * SECTOR_SIZE) as u32,
                     crc: LittleEndian::read_u32(&buf[112..116]),
-                    offset: SectorOffset(*mda_size / 2),
+                    offset: SectorOffset(*mda_size / NUM_MDA_COPIES),
                 },
                 mda_sectors: mda_size,
                 reserved_sectors: Sectors(LittleEndian::read_u32(&buf[164..168]) as u64),

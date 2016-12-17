@@ -14,3 +14,4 @@ pub const BDA_STATIC_HDR_SIZE: Sectors = Sectors(8);
 pub const MIN_MDA_SIZE: Sectors = Sectors(2040);
 
 pub const MDA_RESERVED_SIZE: Sectors = Sectors(2048 * 3); // 3 MiB
+pub const NUM_MDA_COPIES: u64 = 2;

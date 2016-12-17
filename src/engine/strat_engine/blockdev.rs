@@ -23,6 +23,7 @@ use engine::{EngineResult, EngineError, ErrorEnum};
 
 use consts::*;
 use super::consts::*;
+use super::metadata::MDA;
 use super::util::blkdev_size;
 
 pub use super::BlockDevSave;
@@ -35,15 +36,6 @@ enum DevOwnership {
     Ours(Uuid),
     Unowned,
     Theirs,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct MDA {
-    pub last_updated: Timespec,
-    used: u32,
-    length: u32,
-    crc: u32,
-    offset: SectorOffset, // From start of MDA, not BDA
 }
 
 #[derive(Debug, Clone)]
@@ -142,26 +134,15 @@ impl BlockDev {
         let add_devs = try!(BlockDev::filter_devs(dev_infos, pool_uuid, force));
 
         let mut bds = BTreeMap::new();
+        let mda_length = (*mda_size / NUM_MDA_COPIES * SECTOR_SIZE) as u32;
         for (dev, (devnode, dev_size)) in add_devs {
 
             let mut bd = BlockDev {
                 dev: dev,
                 devnode: devnode,
                 total_size: Sectors(dev_size / SECTOR_SIZE),
-                mdaa: MDA {
-                    last_updated: Timespec::new(0, 0),
-                    used: 0,
-                    length: (*mda_size / NUM_MDA_COPIES * SECTOR_SIZE) as u32,
-                    crc: 0,
-                    offset: SectorOffset(0),
-                },
-                mdab: MDA {
-                    last_updated: Timespec::new(0, 0),
-                    used: 0,
-                    length: (*mda_size / NUM_MDA_COPIES * SECTOR_SIZE) as u32,
-                    crc: 0,
-                    offset: SectorOffset(*mda_size / NUM_MDA_COPIES),
-                },
+                mdaa: MDA::new(mda_length, SectorOffset(0)),
+                mdab: MDA::new(mda_length, SectorOffset(*mda_size / NUM_MDA_COPIES)),
                 mda_sectors: mda_size,
                 reserved_sectors: MDA_RESERVED_SIZE,
             };
@@ -266,22 +247,8 @@ impl BlockDev {
                 dev: dev,
                 devnode: devnode.to_owned(),
                 total_size: Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE),
-                mdaa: MDA {
-                    last_updated: Timespec::new(LittleEndian::read_u64(&buf[64..72]) as i64,
-                                                LittleEndian::read_u32(&buf[72..76]) as i32),
-                    used: LittleEndian::read_u32(&buf[76..80]),
-                    length: (*mda_size / NUM_MDA_COPIES * SECTOR_SIZE) as u32,
-                    crc: LittleEndian::read_u32(&buf[80..84]),
-                    offset: SectorOffset(0),
-                },
-                mdab: MDA {
-                    last_updated: Timespec::new(LittleEndian::read_u64(&buf[96..104]) as i64,
-                                                LittleEndian::read_u32(&buf[104..108]) as i32),
-                    used: LittleEndian::read_u32(&buf[108..112]),
-                    length: (*mda_size / NUM_MDA_COPIES * SECTOR_SIZE) as u32,
-                    crc: LittleEndian::read_u32(&buf[112..116]),
-                    offset: SectorOffset(*mda_size / NUM_MDA_COPIES),
-                },
+                mdaa: MDA::read(&buf, 96, (*mda_size / NUM_MDA_COPIES * SECTOR_SIZE) as u32, SectorOffset(0)),
+                mdab: MDA::read(&buf, 128, (*mda_size / NUM_MDA_COPIES * SECTOR_SIZE) as u32, SectorOffset(*mda_size / NUM_MDA_COPIES)),
                 mda_sectors: mda_size,
                 reserved_sectors: Sectors(LittleEndian::read_u32(&buf[164..168]) as u64),
             }))
@@ -397,15 +364,8 @@ impl BlockDev {
         buf[32..64].clone_from_slice(pool_uuid.simple().to_string().as_bytes());
         buf[64..96].clone_from_slice(dev_uuid.simple().to_string().as_bytes());
 
-        LittleEndian::write_u64(&mut buf[64..72], self.mdaa.last_updated.sec as u64);
-        LittleEndian::write_u32(&mut buf[72..76], self.mdaa.last_updated.nsec as u32);
-        LittleEndian::write_u32(&mut buf[76..80], self.mdaa.length);
-        LittleEndian::write_u32(&mut buf[80..84], self.mdaa.crc);
-
-        LittleEndian::write_u64(&mut buf[96..104], self.mdab.last_updated.sec as u64);
-        LittleEndian::write_u32(&mut buf[104..108], self.mdab.last_updated.nsec as u32);
-        LittleEndian::write_u32(&mut buf[108..112], self.mdab.length);
-        LittleEndian::write_u32(&mut buf[112..116], self.mdab.crc);
+        self.mdaa.write(&mut buf, 96);
+        self.mdab.write(&mut buf, 128);
 
         LittleEndian::write_u32(&mut buf[160..164], *self.mda_sectors as u32);
         LittleEndian::write_u32(&mut buf[164..168], *self.reserved_sectors as u32);

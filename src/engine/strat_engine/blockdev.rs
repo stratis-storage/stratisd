@@ -50,7 +50,7 @@ pub struct MDA {
 pub struct BlockDev {
     pub dev: Device,
     pub devnode: PathBuf,
-    pub sectors: Sectors,
+    pub total_size: Sectors,
     pub mdaa: MDA,
     pub mdab: MDA,
     mda_sectors: Sectors,
@@ -123,7 +123,7 @@ impl BlockDev {
             let mut bd = BlockDev {
                 dev: dev,
                 devnode: devnode,
-                sectors: Sectors(dev_size / SECTOR_SIZE),
+                total_size: Sectors(dev_size / SECTOR_SIZE),
                 mdaa: MDA {
                     last_updated: Timespec::new(0, 0),
                     used: 0,
@@ -249,7 +249,7 @@ impl BlockDev {
             BlockDev {
                 dev: dev,
                 devnode: devnode.to_owned(),
-                sectors: Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE),
+                total_size: Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE),
                 mdaa: MDA {
                     last_updated: Timespec::new(LittleEndian::read_u64(&buf[64..72]) as i64,
                                                 LittleEndian::read_u32(&buf[72..76]) as i32),
@@ -274,7 +274,7 @@ impl BlockDev {
     pub fn to_save(&self) -> BlockDevSave {
         BlockDevSave {
             devnode: self.devnode.clone(),
-            sectors: self.sectors,
+            total_size: self.total_size,
         }
     }
 
@@ -376,7 +376,7 @@ impl BlockDev {
     fn write_sigblock(&mut self, pool_uuid: &PoolUuid, dev_uuid: &DevUuid) -> EngineResult<()> {
         let mut buf = [0u8; SECTOR_SIZE as usize];
         buf[4..20].clone_from_slice(STRAT_MAGIC);
-        LittleEndian::write_u64(&mut buf[20..28], *self.sectors);
+        LittleEndian::write_u64(&mut buf[20..28], *self.total_size);
         // no flags yet
         buf[32..64].clone_from_slice(pool_uuid.simple().to_string().as_bytes());
         buf[64..96].clone_from_slice(dev_uuid.simple().to_string().as_bytes());
@@ -446,7 +446,7 @@ impl BlockDev {
     /// List the available-for-upper-layer-use range in this blockdev.
     pub fn avail_range(&self) -> (SectorOffset, Sectors) {
         let start = SectorOffset(*BDA_STATIC_HDR_SIZE + *self.mda_sectors + *self.reserved_sectors);
-        let length = Sectors(*self.sectors - *start - *BDA_STATIC_HDR_SIZE - *self.mda_sectors);
+        let length = Sectors(*self.total_size - *start - *BDA_STATIC_HDR_SIZE - *self.mda_sectors);
         (start, length)
     }
 }

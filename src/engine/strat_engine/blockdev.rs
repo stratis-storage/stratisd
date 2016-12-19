@@ -6,14 +6,13 @@ use std::io::{Read, Write, ErrorKind, Seek, SeekFrom};
 use std::fs::{OpenOptions, read_dir};
 use std::path::{Path, PathBuf};
 use std::io;
-use std::str::{FromStr, from_utf8};
+use std::str::FromStr;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use time::Timespec;
 use devicemapper::Device;
 use crc::crc32;
-use byteorder::{LittleEndian, ByteOrder};
 use uuid::Uuid;
 use bytesize::ByteSize;
 
@@ -23,7 +22,7 @@ use engine::{EngineResult, EngineError, ErrorEnum};
 use consts::*;
 use super::consts::*;
 
-use super::metadata::MDAGroup;
+use super::metadata::SigBlock;
 use super::metadata::validate_mda_size;
 
 use super::util::blkdev_size;
@@ -44,10 +43,7 @@ enum DevOwnership {
 pub struct BlockDev {
     pub dev: Device,
     pub devnode: PathBuf,
-    pub total_size: Sectors,
-    pub mda: MDAGroup,
-    mda_sectors: Sectors,
-    reserved_sectors: Sectors,
+    pub sigblock: SigBlock,
 }
 
 impl BlockDev {
@@ -117,17 +113,17 @@ impl BlockDev {
         let mut bds = BTreeMap::new();
         for (dev, (devnode, dev_size)) in add_devs {
 
-            let mut bd = BlockDev {
+            let dev_uuid = Uuid::new_v4();
+            let bd = BlockDev {
                 dev: dev,
                 devnode: devnode,
-                total_size: Sectors(dev_size / SECTOR_SIZE),
-                mda: MDAGroup::new(mda_size),
-                mda_sectors: mda_size,
-                reserved_sectors: MDA_RESERVED_SIZE,
+                sigblock: SigBlock::new(pool_uuid,
+                                        &dev_uuid,
+                                        mda_size,
+                                        Sectors(dev_size / SECTOR_SIZE)),
             };
 
-            let dev_uuid = Uuid::new_v4();
-            try!(bd.write_sigblock(pool_uuid, &dev_uuid));
+            try!(bd.write_sigblock());
             bds.insert(dev_uuid, bd);
         }
         Ok(bds)
@@ -158,10 +154,15 @@ impl BlockDev {
         try!(f.seek(SeekFrom::Start(SECTOR_SIZE)));
         try!(f.read(&mut buf));
 
-        if &buf[4..20] == STRAT_MAGIC {
-            let pool_id = try!(Uuid::parse_str(from_utf8(&buf[32..64]).unwrap())
-                .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "invalid pool uid")));
-            ownership = DevOwnership::Ours(pool_id);
+        if SigBlock::read_strat_magic(&buf, 0) == STRAT_MAGIC {
+            ownership = match SigBlock::read_pool_uuid(&buf, 0) {
+                Ok(pool_id) => DevOwnership::Ours(pool_id),
+                Err(_) => {
+                    let error_message = format!("Unable to read pool uuid for device {}",
+                                                devnode.display());
+                    return Err(EngineError::Stratis(ErrorEnum::Invalid(error_message)));
+                }
+            }
         } else {
             let mut buf = [0u8; 4096];
             try!(f.seek(SeekFrom::Start(0)));
@@ -174,9 +175,9 @@ impl BlockDev {
         Ok((devnode, dev_size, ownership))
     }
 
-    /// If a Path refers to a valid Stratis blockdev, return its
-    /// parent uuid, its blockdev uuid, and the Blockdev.
-    pub fn setup(devnode: &Path) -> EngineResult<(PoolUuid, DevUuid, BlockDev)> {
+    /// If a Path refers to a valid Stratis blockdev, return a BlockDev
+    /// struct. Otherwise, return an error.
+    pub fn setup(devnode: &Path) -> EngineResult<BlockDev> {
         let dev = try!(Device::from_str(&devnode.to_string_lossy()));
 
         let mut f = try!(OpenOptions::new()
@@ -191,51 +192,22 @@ impl BlockDev {
         try!(f.seek(SeekFrom::Start(SECTOR_SIZE)));
         try!(f.read(&mut buf));
 
-        if &buf[4..20] != STRAT_MAGIC {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("{} is not a Stratis blockdev",
-                                                              devnode.display()))));
-        }
-
-        let crc = crc32::checksum_ieee(&buf[4..SECTOR_SIZE as usize]);
-        if crc != LittleEndian::read_u32(&buf[..4]) {
-            dbgp!("{} header CRC failed", devnode.display());
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput,
-                                                      format!("{} header CRC failed",
-                                                              devnode.display()))));
-            // TODO: Try to read end-of-disk copy
-        }
-
-        let pool_id = try!(Uuid::parse_str(from_utf8(&buf[32..64]).unwrap())
-            .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "invalid pool uid")));
-        let dev_id = try!(Uuid::parse_str(from_utf8(&buf[64..96]).unwrap())
-            .map_err(|_| io::Error::new(ErrorKind::InvalidInput, "invalid dev uuid")));
-
-        let mda_size = Sectors(LittleEndian::read_u32(&buf[160..164]) as u64);
-
-        match validate_mda_size(mda_size) {
-            None => {}
-            Some(err) => {
-                return Err(EngineError::Stratis(ErrorEnum::Invalid(err)));
-            }
-        };
-
-        Ok((pool_id,
-            dev_id,
-            BlockDev {
-                dev: dev,
-                devnode: devnode.to_owned(),
-                total_size: Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE),
-                mda: MDAGroup::read(&buf, 96, mda_size),
-                mda_sectors: mda_size,
-                reserved_sectors: Sectors(LittleEndian::read_u32(&buf[164..168]) as u64),
-            }))
+        Ok(BlockDev {
+            dev: dev,
+            devnode: devnode.to_owned(),
+            sigblock: match SigBlock::read(&buf, 0, Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE)) {
+                Ok(sigblock) => sigblock,
+                Err(err) => {
+                    return Err(EngineError::Stratis(ErrorEnum::Invalid(err)));
+                }
+            },
+        })
     }
 
     pub fn to_save(&self) -> BlockDevSave {
         BlockDevSave {
             devnode: self.devnode.clone(),
-            total_size: self.total_size,
+            total_size: self.sigblock.total_size,
         }
     }
 
@@ -251,10 +223,10 @@ impl BlockDev {
             };
 
             match BlockDev::setup(&devnode) {
-                Ok((pool_uuid, dev_uuid, blockdev)) => {
-                    pool_map.entry(pool_uuid)
+                Ok(blockdev) => {
+                    pool_map.entry(blockdev.sigblock.pool_uuid)
                         .or_insert_with(BTreeMap::new)
-                        .insert(dev_uuid, blockdev);
+                        .insert(blockdev.sigblock.dev_uuid, blockdev);
                 }
                 Err(_) => continue,
             };
@@ -265,17 +237,18 @@ impl BlockDev {
 
     /// Size of the BDA copy at the beginning of the blockdev
     fn main_bda_size(&self) -> u64 {
-        *(BDA_STATIC_HDR_SIZE + self.mda_sectors + self.reserved_sectors) * SECTOR_SIZE
+        *(BDA_STATIC_HDR_SIZE + self.sigblock.mda_sectors + self.sigblock.reserved_sectors) *
+        SECTOR_SIZE
     }
 
     /// Size of the BDA copy at the end of the blockdev
     fn aux_bda_size(&self) -> u64 {
-        *(BDA_STATIC_HDR_SIZE + self.mda_sectors) * SECTOR_SIZE
+        *(BDA_STATIC_HDR_SIZE + self.sigblock.mda_sectors) * SECTOR_SIZE
     }
 
     // Read metadata from newest MDA
     pub fn read_mdax(&self) -> EngineResult<Vec<u8>> {
-        let younger_mda = match self.mda.most_recent() {
+        let younger_mda = match self.sigblock.mda.most_recent() {
             None => {
                 let message = "Neither MDA region is in use";
                 return Err(EngineError::Stratis(ErrorEnum::Invalid(message.into())));
@@ -301,7 +274,7 @@ impl BlockDev {
     // Write metadata to least-recently-written MDA
     fn write_mdax(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
         let aux_bda_size = self.aux_bda_size() as i64;
-        let older_mda = self.mda.least_recent();
+        let older_mda = self.sigblock.mda.least_recent();
 
         if metadata.len() > older_mda.length as usize {
             return Err(EngineError::Io(io::Error::new(io::ErrorKind::InvalidInput,
@@ -327,25 +300,10 @@ impl BlockDev {
         Ok(())
     }
 
-    fn write_sigblock(&mut self, pool_uuid: &PoolUuid, dev_uuid: &DevUuid) -> EngineResult<()> {
+    fn write_sigblock(&self) -> EngineResult<()> {
         let mut buf = [0u8; SECTOR_SIZE as usize];
-        buf[4..20].clone_from_slice(STRAT_MAGIC);
-        LittleEndian::write_u64(&mut buf[20..28], *self.total_size);
-        // no flags yet
-        buf[32..64].clone_from_slice(pool_uuid.simple().to_string().as_bytes());
-        buf[64..96].clone_from_slice(dev_uuid.simple().to_string().as_bytes());
-
-        self.mda.write(&mut buf, 96);
-
-        LittleEndian::write_u32(&mut buf[160..164], *self.mda_sectors as u32);
-        LittleEndian::write_u32(&mut buf[164..168], *self.reserved_sectors as u32);
-
-        // All done, calc CRC and write
-        let hdr_crc = crc32::checksum_ieee(&buf[4..SECTOR_SIZE as usize]);
-        LittleEndian::write_u32(&mut buf[..4], hdr_crc);
-
+        self.sigblock.write(&mut buf, 0);
         try!(self.write_hdr_buf(&self.devnode, &buf));
-
         Ok(())
     }
 
@@ -372,14 +330,9 @@ impl BlockDev {
         Ok(())
     }
 
-    pub fn save_state(&mut self,
-                      time: &Timespec,
-                      metadata: &[u8],
-                      pool_uuid: &PoolUuid,
-                      dev_uuid: &DevUuid)
-                      -> EngineResult<()> {
+    pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
         try!(self.write_mdax(time, metadata));
-        try!(self.write_sigblock(pool_uuid, dev_uuid));
+        try!(self.write_sigblock());
 
         Ok(())
     }
@@ -391,8 +344,10 @@ impl BlockDev {
 
     /// List the available-for-upper-layer-use range in this blockdev.
     pub fn avail_range(&self) -> (SectorOffset, Sectors) {
-        let start = SectorOffset(*BDA_STATIC_HDR_SIZE + *self.mda_sectors + *self.reserved_sectors);
-        let length = Sectors(*self.total_size - *start - *BDA_STATIC_HDR_SIZE - *self.mda_sectors);
+        let start = SectorOffset(*BDA_STATIC_HDR_SIZE + *self.sigblock.mda_sectors +
+                                 *self.sigblock.reserved_sectors);
+        let length = Sectors(*self.sigblock.total_size - *start - *BDA_STATIC_HDR_SIZE -
+                             *self.sigblock.mda_sectors);
         (start, length)
     }
 }

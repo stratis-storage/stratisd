@@ -7,6 +7,7 @@ mod engine;
 mod filesystem;
 mod metadata;
 mod pool;
+mod setup;
 mod util;
 mod consts;
 

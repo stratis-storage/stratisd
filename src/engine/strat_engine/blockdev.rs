@@ -246,30 +246,6 @@ impl BlockDev {
         *(BDA_STATIC_HDR_SIZE + self.sigblock.mda_sectors) * SECTOR_SIZE
     }
 
-    // Read metadata from newest MDA
-    pub fn read_mdax(&self) -> EngineResult<Vec<u8>> {
-        let younger_mda = match self.sigblock.mda.most_recent() {
-            None => {
-                let message = "Neither MDA region is in use";
-                return Err(EngineError::Stratis(ErrorEnum::Invalid(message.into())));
-            }
-            Some(mda) => mda,
-        };
-
-        let mut f = try!(OpenOptions::new().read(true).open(&self.devnode));
-        let mut buf = vec![0; younger_mda.used as usize];
-
-        // read metadata from disk
-        try!(f.seek(SeekFrom::Start((*BDA_STATIC_HDR_SIZE + *younger_mda.offset) * SECTOR_SIZE)));
-        try!(f.read_exact(&mut buf));
-
-        if younger_mda.crc != crc32::checksum_ieee(&buf) {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput, "MDA CRC failed")));
-            // TODO: Read end-of-blockdev copy
-        }
-
-        Ok(buf)
-    }
 
     // Write metadata to least-recently-written MDA
     fn write_mdax(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {

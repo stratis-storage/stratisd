@@ -140,6 +140,11 @@ impl MDAGroup {
             _ => &mut self.mdaa,
         }
     }
+
+    /// Read metadata
+    pub fn read_mdax(&self) -> Option<Vec<u8>> {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]

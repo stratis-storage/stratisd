@@ -22,7 +22,10 @@ use engine::{EngineResult, EngineError, ErrorEnum};
 
 use consts::*;
 use super::consts::*;
+
 use super::metadata::MDAGroup;
+use super::metadata::validate_mda_size;
+
 use super::util::blkdev_size;
 
 pub use super::BlockDevSave;
@@ -48,26 +51,6 @@ pub struct BlockDev {
 }
 
 impl BlockDev {
-    /// Validate MDA size
-    /// Return None if MDA size is fine, otherwise a message.
-    fn validate_mda_size(size: Sectors) -> Option<String> {
-        if *size % NUM_MDA_COPIES != 0 {
-            let error_message = format!("MDA size {} is not divisible by number of copies \
-                                        required {}",
-                                        *size,
-                                        NUM_MDA_COPIES);
-            return Some(error_message);
-        };
-
-        if size < MIN_MDA_SIZE {
-            let error_message = format!("MDA size {} is less than minimum ({})",
-                                        *size,
-                                        *MIN_MDA_SIZE);
-            return Some(error_message);
-        };
-        None
-    }
-
     /// Filter devices for admission to pool based on dev_infos.
     /// If there is an error finding out the info, return that error.
     /// Also, return an error if a device is not appropriate for this pool.
@@ -120,7 +103,7 @@ impl BlockDev {
                       force: bool)
                       -> EngineResult<BTreeMap<DevUuid, BlockDev>> {
 
-        match BlockDev::validate_mda_size(mda_size) {
+        match validate_mda_size(mda_size) {
             None => {}
             Some(err) => {
                 return Err(EngineError::Stratis(ErrorEnum::Invalid(err)));
@@ -230,7 +213,7 @@ impl BlockDev {
 
         let mda_size = Sectors(LittleEndian::read_u32(&buf[160..164]) as u64);
 
-        match BlockDev::validate_mda_size(mda_size) {
+        match validate_mda_size(mda_size) {
             None => {}
             Some(err) => {
                 return Err(EngineError::Stratis(ErrorEnum::Invalid(err)));

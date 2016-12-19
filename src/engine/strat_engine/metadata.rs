@@ -14,6 +14,7 @@ use types::Sectors;
 use types::SectorOffset;
 
 use super::consts::NUM_MDA_COPIES;
+use super::consts::MIN_MDA_SIZE;
 
 #[derive(Debug, Clone, Copy)]
 pub struct MDA {
@@ -131,4 +132,25 @@ impl MDAGroup {
             _ => &mut self.mdaa,
         }
     }
+}
+
+
+/// Validate MDA size
+/// Return None if MDA size is fine, otherwise a message.
+pub fn validate_mda_size(size: Sectors) -> Option<String> {
+    if *size % NUM_MDA_COPIES != 0 {
+        let error_message = format!("MDA size {} is not divisible by number of copies \
+                                    required {}",
+                                    *size,
+                                    NUM_MDA_COPIES);
+        return Some(error_message);
+    };
+
+    if size < MIN_MDA_SIZE {
+        let error_message = format!("MDA size {} is less than minimum ({})",
+                                    *size,
+                                    *MIN_MDA_SIZE);
+        return Some(error_message);
+    };
+    None
 }

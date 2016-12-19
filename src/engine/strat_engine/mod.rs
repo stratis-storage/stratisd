@@ -7,7 +7,6 @@ mod engine;
 mod filesystem;
 mod metadata;
 mod pool;
-mod util;
 mod consts;
 
 mod serde_structs {

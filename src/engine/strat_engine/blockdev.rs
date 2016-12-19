@@ -12,7 +12,6 @@ use std::collections::BTreeSet;
 
 use time::Timespec;
 use devicemapper::Device;
-use crc::crc32;
 use uuid::Uuid;
 use bytesize::ByteSize;
 
@@ -246,36 +245,6 @@ impl BlockDev {
         *(BDA_STATIC_HDR_SIZE + self.sigblock.mda_sectors) * SECTOR_SIZE
     }
 
-
-    // Write metadata to least-recently-written MDA
-    fn write_mdax(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
-        let aux_bda_size = self.aux_bda_size() as i64;
-        let older_mda = self.sigblock.mda.least_recent();
-
-        if metadata.len() > older_mda.length as usize {
-            return Err(EngineError::Io(io::Error::new(io::ErrorKind::InvalidInput,
-                                                      format!("Metadata too large for MDA, {} \
-                                                               bytes",
-                                                              metadata.len()))));
-        }
-
-        older_mda.crc = crc32::checksum_ieee(metadata);
-        older_mda.length = metadata.len() as u32;
-        older_mda.last_updated = *time;
-
-        let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
-
-        // write metadata to disk
-        try!(f.seek(SeekFrom::Start((*BDA_STATIC_HDR_SIZE + *older_mda.offset) * SECTOR_SIZE)));
-        try!(f.write_all(&metadata));
-        try!(f.seek(SeekFrom::End(-aux_bda_size)));
-        try!(f.seek(SeekFrom::Current((*older_mda.offset * SECTOR_SIZE) as i64)));
-        try!(f.write_all(&metadata));
-        try!(f.flush());
-
-        Ok(())
-    }
-
     fn write_sigblock(&self) -> EngineResult<()> {
         let mut buf = [0u8; SECTOR_SIZE as usize];
         self.sigblock.write(&mut buf, 0);
@@ -307,9 +276,11 @@ impl BlockDev {
     }
 
     pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
-        try!(self.write_mdax(time, metadata));
+        try!(self.sigblock
+            .mda
+            .write_mdax(time, metadata)
+            .map_err(|e| EngineError::Stratis(ErrorEnum::Error(e))));
         try!(self.write_sigblock());
-
         Ok(())
     }
 

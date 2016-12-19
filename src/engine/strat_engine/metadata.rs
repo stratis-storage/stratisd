@@ -145,6 +145,11 @@ impl MDAGroup {
     pub fn read_mdax(&self) -> Option<Vec<u8>> {
         unimplemented!()
     }
+
+    /// Write metadata
+    pub fn write_mdax(&mut self, _time: &Timespec, _metadata: &[u8]) -> Result<(), String> {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone)]

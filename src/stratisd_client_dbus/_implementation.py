@@ -135,7 +135,7 @@ class FilesystemSpec(InterfaceSpec):
     }
     OUTPUT_SIGS = {
        MethodNames.CreateSnapshot: "oqs",
-       MethodNames.Rename: "oqs",
+       MethodNames.Rename: "bqs",
        MethodNames.SetMountpoint: "oqs",
        MethodNames.SetQuota: "oqs"
     }

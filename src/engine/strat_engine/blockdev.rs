@@ -16,7 +16,6 @@ use devicemapper::Device;
 use crc::crc32;
 use byteorder::{LittleEndian, ByteOrder};
 use uuid::Uuid;
-use bytesize::ByteSize;
 
 use types::{Sectors, SectorOffset};
 use engine::{EngineResult, EngineError, ErrorEnum};
@@ -91,9 +90,9 @@ impl BlockDev {
             }
             let (devnode, dev_size, ownership) = dev_result.unwrap();
             if dev_size < MIN_DEV_SIZE {
-                let error_message = format!("{} too small, {} minimum",
+                let error_message = format!("{} too small, {} bytes minimum",
                                             devnode.display(),
-                                            ByteSize::b(MIN_DEV_SIZE as usize).to_string(true));
+                                            MIN_DEV_SIZE);
                 return Err(EngineError::Stratis(ErrorEnum::Invalid(error_message)));
             };
             match ownership {

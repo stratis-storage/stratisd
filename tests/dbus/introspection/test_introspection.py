@@ -125,7 +125,7 @@ class InterfacesTestCase(unittest.TestCase):
         self._introspection_data[PoolSpec.INTERFACE_NAME] = \
            pool.Introspect(dbus_interface=dbus.INTROSPECTABLE_IFACE)
 
-        ([(fspath, _, _)], _, _) = \
+        ([(fspath, _)], _, _) = \
            Pool.CreateFilesystems(pool, specs=[("filesystem", '', None)])
         fs = get_object(fspath)
         self._introspection_data[FilesystemSpec.INTERFACE_NAME] = \

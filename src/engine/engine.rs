@@ -99,15 +99,15 @@ pub trait Pool: Debug {
     /// or there was an error while reading or writing a blockdev.
     fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
 
-    /// Remove specified block device from this pool.
-    /// Returns true if the device was removed, otherwise false.
-    /// Raises an error if removal failed.
-    fn remove_blockdev(&mut self, path: &Path) -> EngineResult<bool>;
+    /// Remove specified block devices from this pool.
+    /// Returns a list of the devices actually removed.
+    /// Returns an error if a device could not be removed.
+    fn remove_blockdevs(&mut self, path: &[&Path]) -> EngineResult<Vec<PathBuf>>;
 
-    /// Remove specified cache device from this pool.
-    /// Returns true if the device was removed, otherwise false.
-    /// Raises an error if removal failed.
-    fn remove_cachedev(&mut self, path: &Path) -> EngineResult<bool>;
+    /// Remove specified cache devices from this pool.
+    /// Returns a list of the devices actually removed.
+    /// Returns an error if a device could not be removed.
+    fn remove_cachedevs(&mut self, path: &[&Path]) -> EngineResult<Vec<PathBuf>>;
 
     fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem>;
     fn blockdevs(&mut self) -> Vec<&mut Dev>;

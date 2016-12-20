@@ -27,8 +27,8 @@ use super::consts::*;
 pub struct StratPool {
     pub name: String,
     pub pool_uuid: Uuid,
-    pub cache_devs: BTreeMap<Uuid, BlockDev>,
-    pub block_devs: BTreeMap<Uuid, BlockDev>,
+    pub cache_devs: BTreeMap<PathBuf, BlockDev>,
+    pub block_devs: BTreeMap<PathBuf, BlockDev>,
     pub filesystems: BTreeMap<String, StratFilesystem>,
     pub raid_level: u16,
 }

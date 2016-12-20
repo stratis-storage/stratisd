@@ -127,7 +127,6 @@ pub mod initialize {
 
     use std::path::PathBuf;
 
-    use bytesize::ByteSize;
     use devicemapper::Device;
     use uuid::Uuid;
 
@@ -165,9 +164,9 @@ pub mod initialize {
             }
             let (devnode, dev_size, ownership) = dev_result.unwrap();
             if dev_size < MIN_DEV_SIZE {
-                let error_message = format!("{} too small, {} minimum",
+                let error_message = format!("{} too small, minimum {} bytes",
                                             devnode.display(),
-                                            ByteSize::b(MIN_DEV_SIZE as usize).to_string(true));
+                                            MIN_DEV_SIZE);
                 return Err(EngineError::Stratis(ErrorEnum::Invalid(error_message)));
             };
             match ownership {

@@ -14,7 +14,6 @@ extern crate bidir_map;
 extern crate byteorder;
 extern crate uuid;
 extern crate time;
-extern crate bytesize;
 extern crate dbus;
 extern crate term;
 extern crate rand;

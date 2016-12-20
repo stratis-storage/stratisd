@@ -28,7 +28,7 @@ pub struct SimCacheDev {
 
 impl SimCacheDev {
     /// Generates a new cache device from a path.
-    pub fn new_cache(rdm: Rc<RefCell<Randomizer>>, devnode: &Path) -> SimCacheDev {
+    pub fn new(rdm: Rc<RefCell<Randomizer>>, devnode: &Path) -> SimCacheDev {
         SimCacheDev {
             devnode: devnode.to_owned(),
             rdm: rdm,

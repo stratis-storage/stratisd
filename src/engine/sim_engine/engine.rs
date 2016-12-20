@@ -20,7 +20,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use super::blockdev::SimDev;
 use super::pool::SimPool;
 use super::randomization::Randomizer;
 
@@ -53,28 +52,16 @@ impl Engine for SimEngine {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
 
-        let devices = BTreeSet::from_iter(blockdev_paths);
+        let devices =
+            BTreeSet::from_iter(blockdev_paths).into_iter().map(|x| *x).collect::<Vec<&Path>>();
 
-        let mut devs: Vec<SimDev> =
-            devices.iter().map(|x| SimDev::new_dev(self.rdm.clone(), x)).collect();
-
-        for dev in devs.iter_mut() {
-            dev.update();
-        }
-
-        let bad_devs: Vec<&SimDev> = devs.iter().filter(|dev| !dev.usable()).collect();
-
-        if !bad_devs.is_empty() {
-            return Err(EngineError::Stratis(ErrorEnum::Busy("some devices are unusable".into())));
-        }
-
-        let pool = SimPool::new_pool(self.rdm.clone(), devs.as_slice(), raid_level);
+        let pool = SimPool::new(self.rdm.clone(), &devices, raid_level);
 
         if self.rdm.borrow_mut().throw_die() {
             return Err(EngineError::Stratis(ErrorEnum::Error("X".into())));
         }
 
-        let bdev_paths = pool.block_devs.iter().map(|p| p.devnode.clone()).collect();
+        let bdev_paths = pool.block_devs.values().map(|p| p.devnode.clone()).collect();
         self.pools.insert(name.to_owned(), pool);
 
         Ok(bdev_paths)

@@ -47,7 +47,7 @@ impl Dev for SimDev {
 
 impl SimDev {
     /// Generates a new device from any devnode.
-    pub fn new_dev(rdm: Rc<RefCell<Randomizer>>, devnode: &Path) -> SimDev {
+    pub fn new(rdm: Rc<RefCell<Randomizer>>, devnode: &Path) -> SimDev {
         SimDev {
             devnode: devnode.to_owned(),
             rdm: rdm,

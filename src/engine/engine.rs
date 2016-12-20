@@ -98,8 +98,17 @@ pub trait Pool: Debug {
     /// Returns an error if a blockdev can not be added because it is owned
     /// or there was an error while reading or writing a blockdev.
     fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
-    fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;
-    fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()>;
+
+    /// Remove specified block device from this pool.
+    /// Returns true if the device was removed, otherwise false.
+    /// Raises an error if removal failed.
+    fn remove_blockdev(&mut self, path: &Path) -> EngineResult<bool>;
+
+    /// Remove specified cache device from this pool.
+    /// Returns true if the device was removed, otherwise false.
+    /// Raises an error if removal failed.
+    fn remove_cachedev(&mut self, path: &Path) -> EngineResult<bool>;
+
     fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem>;
     fn blockdevs(&mut self) -> Vec<&mut Dev>;
     fn cachedevs(&mut self) -> Vec<&mut Cache>;

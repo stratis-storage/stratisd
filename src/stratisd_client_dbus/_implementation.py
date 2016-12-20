@@ -258,8 +258,8 @@ class PoolSpec(InterfaceSpec):
        MethodNames.ListCacheDevs: "asqs",
        MethodNames.ListDevs: "asqs",
        MethodNames.ListFilesystems: "asqs",
-       MethodNames.RemoveCacheDevs: "a(qs)qs",
-       MethodNames.RemoveDevs: "a(qs)qs",
+       MethodNames.RemoveCacheDevs: "asqs",
+       MethodNames.RemoveDevs: "asqs",
        MethodNames.Rename: "bqs"
     }
     XFORMERS = _xformers(INPUT_SIGS)

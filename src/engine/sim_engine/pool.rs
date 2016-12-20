@@ -11,7 +11,6 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::vec::Vec;
 
-use engine::Cache;
 use engine::Dev;
 use engine::EngineError;
 use engine::EngineResult;
@@ -21,7 +20,6 @@ use engine::Pool;
 use engine::RenameAction;
 
 use super::blockdev::SimDev;
-use super::cache::SimCacheDev;
 use super::filesystem::SimFilesystem;
 use super::randomization::Randomizer;
 
@@ -30,7 +28,7 @@ use uuid::Uuid;
 #[derive(Debug)]
 pub struct SimPool {
     pub block_devs: BTreeMap<PathBuf, SimDev>,
-    pub cache_devs: BTreeMap<PathBuf, SimCacheDev>,
+    pub cache_devs: BTreeMap<PathBuf, SimDev>,
     pub filesystems: BTreeMap<String, SimFilesystem>,
     pub raid_level: u16,
     rdm: Rc<RefCell<Randomizer>>,
@@ -68,7 +66,7 @@ impl Pool for SimPool {
         let rdm = self.rdm.clone();
         let devices = BTreeSet::from_iter(paths);
         let device_pairs = devices.iter()
-            .map(|p| (p.to_path_buf(), SimCacheDev::new(rdm.clone(), p)));
+            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
         self.cache_devs.extend(device_pairs);
         Ok(devices.iter().map(|d| d.to_path_buf()).collect())
     }
@@ -144,8 +142,8 @@ impl Pool for SimPool {
         Vec::from_iter(self.block_devs.values_mut().map(|x| x as &mut Dev))
     }
 
-    fn cachedevs(&mut self) -> Vec<&mut Cache> {
-        Vec::from_iter(self.cache_devs.values_mut().map(|x| x as &mut Cache))
+    fn cachedevs(&mut self) -> Vec<&mut Dev> {
+        Vec::from_iter(self.cache_devs.values_mut().map(|x| x as &mut Dev))
     }
 
     // Should verify that block devices are not required by pool, but does not.

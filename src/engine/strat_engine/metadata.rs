@@ -24,6 +24,8 @@ use super::consts::MIN_MDA_SIZE;
 use super::consts::NUM_MDA_COPIES;
 use super::consts::STRAT_MAGIC;
 
+use super::engine::DevOwnership;
+
 #[derive(Debug, Clone, Copy)]
 pub struct MDA {
     // Recorded values
@@ -242,6 +244,25 @@ impl SigBlock {
     pub fn read_pool_uuid(buf: &[u8], offset: usize) -> Result<Uuid, String> {
         Uuid::parse_str(from_utf8(&buf[offset + 32..offset + 64]).unwrap())
             .map_err(|_| "invalid pool uuid".into())
+    }
+
+    /// Determine the ownership of a device based on data in buf.
+    pub fn determine_ownership(buf: &[u8]) -> Result<DevOwnership, String> {
+        let mut ownership = DevOwnership::Unowned;
+        if SigBlock::read_strat_magic(&buf, SECTOR_SIZE as usize) == STRAT_MAGIC {
+            ownership = match SigBlock::read_pool_uuid(&buf, SECTOR_SIZE as usize) {
+                Ok(pool_id) => DevOwnership::Ours(pool_id),
+                Err(_) => {
+                    let error_message = format!("unable to read pool uuid");
+                    return Err(error_message.into());
+                }
+            }
+        } else {
+            if buf.iter().any(|x| *x != 0) {
+                ownership = DevOwnership::Theirs;
+            }
+        };
+        Ok(ownership)
     }
 }
 

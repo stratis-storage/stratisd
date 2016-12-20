@@ -8,6 +8,8 @@ use std::iter::FromIterator;
 use std::path::Path;
 use std::path::PathBuf;
 
+use uuid::Uuid;
+
 use engine::Engine;
 use engine::EngineError;
 use engine::EngineResult;
@@ -18,6 +20,12 @@ use engine::Pool;
 use super::pool::StratPool;
 use super::util::resolve_devices;
 
+#[derive(Debug)]
+pub enum DevOwnership {
+    Ours(Uuid),
+    Unowned,
+    Theirs,
+}
 
 #[derive(Debug)]
 pub struct StratEngine {

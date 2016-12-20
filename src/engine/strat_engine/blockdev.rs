@@ -20,6 +20,8 @@ use engine::{EngineResult, EngineError, ErrorEnum};
 use consts::*;
 use super::consts::*;
 
+use super::engine::DevOwnership;
+
 use super::metadata::SigBlock;
 use super::metadata::validate_mda_size;
 
@@ -29,13 +31,6 @@ pub use super::BlockDevSave;
 
 type PoolUuid = Uuid;
 type DevUuid = Uuid;
-
-#[derive(Debug)]
-enum DevOwnership {
-    Ours(Uuid),
-    Unowned,
-    Theirs,
-}
 
 #[derive(Debug, Clone)]
 pub struct BlockDev {
@@ -145,30 +140,17 @@ impl BlockDev {
 
         let dev_size = try!(blkdev_size(&f));
 
-
-        let mut ownership = DevOwnership::Unowned;
-
-        let mut buf = [0u8; SECTOR_SIZE as usize];
-        try!(f.seek(SeekFrom::Start(SECTOR_SIZE)));
+        let mut buf = [0u8; 4096];
+        try!(f.seek(SeekFrom::Start(0)));
         try!(f.read(&mut buf));
 
-        if SigBlock::read_strat_magic(&buf, 0) == STRAT_MAGIC {
-            ownership = match SigBlock::read_pool_uuid(&buf, 0) {
-                Ok(pool_id) => DevOwnership::Ours(pool_id),
-                Err(_) => {
-                    let error_message = format!("Unable to read pool uuid for device {}",
-                                                devnode.display());
-                    return Err(EngineError::Stratis(ErrorEnum::Invalid(error_message)));
-                }
+        let ownership = match SigBlock::determine_ownership(&buf) {
+            Ok(ownership) => ownership,
+            Err(err) => {
+                let error_message = format!("{} for device {}", err, devnode.display());
+                return Err(EngineError::Stratis(ErrorEnum::Invalid(error_message)));
             }
-        } else {
-            let mut buf = [0u8; 4096];
-            try!(f.seek(SeekFrom::Start(0)));
-            try!(f.read(&mut buf));
-            if buf.iter().any(|x| *x != 0) {
-                ownership = DevOwnership::Theirs;
-            }
-        }
+        };
 
         Ok((devnode, dev_size, ownership))
     }

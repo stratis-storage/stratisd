@@ -3,13 +3,11 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::collections::BTreeMap;
-use std::collections::BTreeSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::vec::Vec;
 
 use uuid::Uuid;
-use devicemapper::Device;
 
 use engine::EngineError;
 use engine::EngineResult;
@@ -39,10 +37,11 @@ pub struct StratPool {
 
 impl StratPool {
     pub fn new(name: &str,
-               devices: BTreeSet<Device>,
+               paths: &[&Path],
                raid_level: u16,
                force: bool)
                -> EngineResult<StratPool> {
+        let devices = try!(resolve_devices(paths));
         let pool_uuid = Uuid::new_v4();
         let bds = try!(initialize(&pool_uuid, devices, MIN_MDA_SIZE, force));
 

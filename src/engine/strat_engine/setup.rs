@@ -18,6 +18,7 @@ use engine::{EngineResult, EngineError, ErrorEnum};
 use consts::SECTOR_SIZE;
 
 use super::blockdev::BlockDev;
+use super::engine::DevOwnership;
 use super::metadata::SigBlock;
 use super::util::blkdev_size;
 
@@ -26,8 +27,9 @@ type DevUuid = Uuid;
 
 
 /// If a Path refers to a valid Stratis blockdev, return a BlockDev
-/// struct. Otherwise, return an error.
-fn setup(devnode: &Path) -> EngineResult<BlockDev> {
+/// struct. Otherwise, return None. Return an error if there was
+/// a problem inspecting the device.
+fn setup(devnode: &Path) -> EngineResult<Option<BlockDev>> {
     let dev = try!(Device::from_str(&devnode.to_string_lossy()));
 
     let mut f = try!(OpenOptions::new()
@@ -38,11 +40,22 @@ fn setup(devnode: &Path) -> EngineResult<BlockDev> {
                            format!("Could not open {}", devnode.display()))
         }));
 
-    let mut buf = [0u8; SECTOR_SIZE as usize];
-    try!(f.seek(SeekFrom::Start(SECTOR_SIZE)));
+    let mut buf = [0u8; 4096];
+    try!(f.seek(SeekFrom::Start(0)));
     try!(f.read(&mut buf));
 
-    Ok(BlockDev {
+    match SigBlock::determine_ownership(&buf) {
+        Ok(DevOwnership::Ours(_)) => {}
+        Ok(_) => {
+            return Ok(None);
+        }
+        Err(err) => {
+            let error_message = format!("{} for devnode {}", err, devnode.display());
+            return Err(EngineError::Stratis(ErrorEnum::Invalid(error_message)));
+        }
+    };
+
+    Ok(Some(BlockDev {
         dev: dev,
         devnode: devnode.to_owned(),
         sigblock: match SigBlock::read(&buf, 0, Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE)) {
@@ -51,7 +64,7 @@ fn setup(devnode: &Path) -> EngineResult<BlockDev> {
                 return Err(EngineError::Stratis(ErrorEnum::Invalid(err)));
             }
         },
-    })
+    }))
 }
 
 
@@ -67,12 +80,12 @@ pub fn find_all() -> EngineResult<BTreeMap<PoolUuid, BTreeMap<DevUuid, BlockDev>
         };
 
         match setup(&devnode) {
-            Ok(blockdev) => {
+            Ok(Some(blockdev)) => {
                 pool_map.entry(blockdev.sigblock.pool_uuid)
                     .or_insert_with(BTreeMap::new)
                     .insert(blockdev.sigblock.dev_uuid, blockdev);
             }
-            Err(_) => continue,
+            _ => continue,
         };
     }
 

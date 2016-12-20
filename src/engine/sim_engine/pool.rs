@@ -11,7 +11,6 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::vec::Vec;
 
-use engine::Cache;
 use engine::Dev;
 use engine::EngineError;
 use engine::EngineResult;
@@ -21,7 +20,6 @@ use engine::Pool;
 use engine::RenameAction;
 
 use super::blockdev::SimDev;
-use super::cache::SimCacheDev;
 use super::filesystem::SimFilesystem;
 use super::randomization::Randomizer;
 
@@ -30,7 +28,7 @@ use uuid::Uuid;
 #[derive(Debug)]
 pub struct SimPool {
     pub block_devs: Vec<SimDev>,
-    pub cache_devs: Vec<SimCacheDev>,
+    pub cache_devs: Vec<SimDev>,
     pub filesystems: BTreeMap<String, SimFilesystem>,
     pub raid_level: u16,
     rdm: Rc<RefCell<Randomizer>>,
@@ -60,14 +58,14 @@ impl Pool for SimPool {
     fn add_blockdevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
         let rdm = self.rdm.clone();
         let devices = BTreeSet::from_iter(paths);
-        self.block_devs.extend(devices.iter().map(|p| SimDev::new_dev(rdm.clone(), p)));
+        self.block_devs.extend(devices.iter().map(|p| SimDev::new(rdm.clone(), p)));
         Ok(devices.iter().map(|d| d.to_path_buf()).collect())
     }
 
     fn add_cachedevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
         let rdm = self.rdm.clone();
         let devices = BTreeSet::from_iter(paths);
-        self.cache_devs.extend(devices.iter().map(|p| SimCacheDev::new_cache(rdm.clone(), p)));
+        self.cache_devs.extend(devices.iter().map(|p| SimDev::new(rdm.clone(), p)));
         Ok(devices.iter().map(|d| d.to_path_buf()).collect())
     }
 
@@ -142,8 +140,8 @@ impl Pool for SimPool {
         Vec::from_iter(self.block_devs.iter_mut().map(|x| x as &mut Dev))
     }
 
-    fn cachedevs(&mut self) -> Vec<&mut Cache> {
-        Vec::from_iter(self.cache_devs.iter_mut().map(|x| x as &mut Cache))
+    fn cachedevs(&mut self) -> Vec<&mut Dev> {
+        Vec::from_iter(self.cache_devs.iter_mut().map(|x| x as &mut Dev))
     }
 
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()> {

@@ -56,7 +56,7 @@ impl Engine for SimEngine {
         let devices = BTreeSet::from_iter(blockdev_paths);
 
         let mut devs: Vec<SimDev> =
-            devices.iter().map(|x| SimDev::new_dev(self.rdm.clone(), x)).collect();
+            devices.iter().map(|x| SimDev::new(self.rdm.clone(), x)).collect();
 
         for dev in devs.iter_mut() {
             dev.update();

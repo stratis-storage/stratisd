@@ -18,7 +18,6 @@ use engine::ErrorEnum;
 use engine::Pool;
 use engine::Filesystem;
 use engine::Dev;
-use engine::Cache;
 use engine::RenameAction;
 
 use super::blockdev::BlockDev;
@@ -117,7 +116,7 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn cachedevs(&mut self) -> Vec<&mut Cache> {
+    fn cachedevs(&mut self) -> Vec<&mut Dev> {
         unimplemented!()
     }
 

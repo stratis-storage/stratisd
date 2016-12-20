@@ -55,11 +55,6 @@ pub trait Dev: Debug {
     fn has_same(&self, other: &Path) -> bool;
 }
 
-pub trait Cache: Debug {
-    fn get_id(&self) -> String;
-    fn has_same(&self, other: &Path) -> bool;
-}
-
 pub trait Filesystem: Debug {}
 
 impl From<io::Error> for EngineError {
@@ -94,7 +89,7 @@ pub trait Pool: Debug {
     fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()>;
     fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem>;
     fn blockdevs(&mut self) -> Vec<&mut Dev>;
-    fn cachedevs(&mut self) -> Vec<&mut Cache>;
+    fn cachedevs(&mut self) -> Vec<&mut Dev>;
 
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.

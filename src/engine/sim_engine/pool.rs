@@ -27,27 +27,25 @@ use uuid::Uuid;
 
 #[derive(Debug)]
 pub struct SimPool {
-    pub block_devs: Vec<SimDev>,
-    pub cache_devs: Vec<SimDev>,
+    pub block_devs: BTreeMap<PathBuf, SimDev>,
+    pub cache_devs: BTreeMap<PathBuf, SimDev>,
     pub filesystems: BTreeMap<String, SimFilesystem>,
     pub raid_level: u16,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
 impl SimPool {
-    pub fn new_pool(rdm: Rc<RefCell<Randomizer>>,
-                    blockdevs: &[SimDev],
-                    raid_level: u16)
-                    -> SimPool {
+    pub fn new(rdm: Rc<RefCell<Randomizer>>, paths: &[&Path], raid_level: u16) -> SimPool {
 
-        let mut vec = Vec::new();
-        vec.extend_from_slice(blockdevs);
+        let devices = BTreeSet::from_iter(paths);
+        let device_pairs = devices.iter()
+            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
         let new_pool = SimPool {
-            block_devs: vec,
+            block_devs: BTreeMap::from_iter(device_pairs),
             filesystems: BTreeMap::new(),
-            cache_devs: Vec::new(),
+            cache_devs: BTreeMap::new(),
             raid_level: raid_level,
-            rdm: rdm,
+            rdm: rdm.clone(),
         };
 
         new_pool
@@ -58,14 +56,18 @@ impl Pool for SimPool {
     fn add_blockdevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
         let rdm = self.rdm.clone();
         let devices = BTreeSet::from_iter(paths);
-        self.block_devs.extend(devices.iter().map(|p| SimDev::new(rdm.clone(), p)));
+        let device_pairs = devices.iter()
+            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
+        self.block_devs.extend(device_pairs);
         Ok(devices.iter().map(|d| d.to_path_buf()).collect())
     }
 
     fn add_cachedevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
         let rdm = self.rdm.clone();
         let devices = BTreeSet::from_iter(paths);
-        self.cache_devs.extend(devices.iter().map(|p| SimDev::new(rdm.clone(), p)));
+        let device_pairs = devices.iter()
+            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
+        self.cache_devs.extend(device_pairs);
         Ok(devices.iter().map(|d| d.to_path_buf()).collect())
     }
 
@@ -137,42 +139,27 @@ impl Pool for SimPool {
     }
 
     fn blockdevs(&mut self) -> Vec<&mut Dev> {
-        Vec::from_iter(self.block_devs.iter_mut().map(|x| x as &mut Dev))
+        Vec::from_iter(self.block_devs.values_mut().map(|x| x as &mut Dev))
     }
 
     fn cachedevs(&mut self) -> Vec<&mut Dev> {
-        Vec::from_iter(self.cache_devs.iter_mut().map(|x| x as &mut Dev))
+        Vec::from_iter(self.cache_devs.values_mut().map(|x| x as &mut Dev))
     }
 
-    fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()> {
-        let index = self.block_devs.iter().position(|x| x.devnode.as_path() == path);
-        match index {
-            Some(index) => {
-                self.block_devs.remove(index);
-                return Ok(());
-            }
-            None => {
-                return Err(EngineError::Stratis(ErrorEnum::NotFound(String::from(path.to_str()
-                    .unwrap()))))
-            }
+    // Should verify that block device is not required by pool, but does not.
+    fn remove_blockdev(&mut self, path: &Path) -> EngineResult<bool> {
+        match self.block_devs.remove(path) {
+            Some(_) => Ok(true),
+            None => Ok(false),
         }
-        Ok(())
     }
 
-    fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()> {
-        let index = self.cache_devs.iter().position(|x| x.devnode.as_path() == path);
-
-        match index {
-            Some(index) => {
-                self.cache_devs.remove(index);
-                return Ok(());
-            }
-            None => {
-                return Err(EngineError::Stratis(ErrorEnum::NotFound(String::from(path.to_str()
-                    .unwrap()))))
-            }
+    // Should verify that block device is not required by pool, but does not.
+    fn remove_cachedev(&mut self, path: &Path) -> EngineResult<bool> {
+        match self.cache_devs.remove(path) {
+            Some(_) => Ok(true),
+            None => Ok(false),
         }
-        Ok(())
     }
 
     fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {

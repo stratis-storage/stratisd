@@ -16,7 +16,6 @@ use engine::RenameAction;
 use engine::Pool;
 
 use super::pool::StratPool;
-use super::util::resolve_devices;
 
 
 #[derive(Debug)]
@@ -45,9 +44,7 @@ impl Engine for StratEngine {
         if self.pools.contains_key(name) {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
-
-        let devices = try!(resolve_devices(blockdev_paths));
-        let pool = try!(StratPool::new(name, devices, raid_level, force));
+        let pool = try!(StratPool::new(name, blockdev_paths, raid_level, force));
         let bdev_paths = pool.block_devs.iter().map(|p| p.1.devnode.clone()).collect();
 
         self.pools.insert(name.to_owned(), pool);

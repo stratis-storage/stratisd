@@ -82,7 +82,17 @@ pub trait Pool: Debug {
                                    source: &'c str)
                                    -> EngineResult<&'b str>;
 
+    /// Adds blockdevs specified by paths to pool.
+    /// Returns a list of device nodes corresponding to devices actually added.
+    /// Returns an error if a blockdev can not be added because it is owned
+    /// or there was an error while reading or writing a blockdev.
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
+
+
+    /// Adds blockdevs specified by paths to pool cache.
+    /// Returns a list of device nodes corresponding to devices actually added.
+    /// Returns an error if a blockdev can not be added because it is owned
+    /// or there was an error while reading or writing a blockdev.
     fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
     fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;
     fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()>;

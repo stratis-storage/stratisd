@@ -148,7 +148,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
                   devices: BTreeSet<Device>,
                   mda_size: Sectors,
                   force: bool)
-                  -> EngineResult<BTreeMap<DevUuid, BlockDev>> {
+                  -> EngineResult<BTreeMap<PathBuf, BlockDev>> {
 
     match validate_mda_size(mda_size) {
         None => {}
@@ -164,18 +164,17 @@ pub fn initialize(pool_uuid: &PoolUuid,
     let mut bds = BTreeMap::new();
     for (dev, (devnode, dev_size)) in add_devs {
 
-        let dev_uuid = Uuid::new_v4();
         let bd = BlockDev {
             dev: dev,
-            devnode: devnode,
+            devnode: devnode.clone(),
             sigblock: SigBlock::new(pool_uuid,
-                                    &dev_uuid,
+                                    &Uuid::new_v4(),
                                     mda_size,
                                     Sectors(dev_size / SECTOR_SIZE)),
         };
 
         try!(bd.write_sigblock());
-        bds.insert(dev_uuid, bd);
+        bds.insert(devnode, bd);
     }
     Ok(bds)
 }

@@ -146,20 +146,34 @@ impl Pool for SimPool {
         Vec::from_iter(self.cache_devs.values_mut().map(|x| x as &mut Dev))
     }
 
-    // Should verify that block device is not required by pool, but does not.
-    fn remove_blockdev(&mut self, path: &Path) -> EngineResult<bool> {
-        match self.block_devs.remove(path) {
-            Some(_) => Ok(true),
-            None => Ok(false),
+    // Should verify that block devices are not required by pool, but does not.
+    fn remove_blockdevs(&mut self, paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
+        let devices = BTreeSet::from_iter(paths);
+
+        let mut removed = vec![];
+        for dev in devices {
+            let pathbuf = dev.to_path_buf();
+            match self.block_devs.remove(&pathbuf) {
+                Some(_) => removed.push(pathbuf),
+                _ => {}
+            }
         }
+        Ok(removed)
     }
 
-    // Should verify that block device is not required by pool, but does not.
-    fn remove_cachedev(&mut self, path: &Path) -> EngineResult<bool> {
-        match self.cache_devs.remove(path) {
-            Some(_) => Ok(true),
-            None => Ok(false),
+    // Should verify that block devices are not required by pool, but does not.
+    fn remove_cachedevs(&mut self, paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
+        let devices = BTreeSet::from_iter(paths);
+
+        let mut removed = vec![];
+        for dev in devices {
+            let pathbuf = dev.to_path_buf();
+            match self.cache_devs.remove(&pathbuf) {
+                Some(_) => removed.push(pathbuf),
+                _ => {}
+            }
         }
+        Ok(removed)
     }
 
     fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {

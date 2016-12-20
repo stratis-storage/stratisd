@@ -94,11 +94,11 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn remove_blockdev(&mut self, _path: &Path) -> EngineResult<bool> {
+    fn remove_blockdevs(&mut self, _paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
         unimplemented!()
     }
 
-    fn remove_cachedev(&mut self, _path: &Path) -> EngineResult<bool> {
+    fn remove_cachedevs(&mut self, _paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
         unimplemented!()
     }
 

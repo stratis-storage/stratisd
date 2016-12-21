@@ -3,14 +3,11 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::collections::BTreeMap;
-use std::collections::BTreeSet;
 use std::path::Path;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::vec::Vec;
 
 use uuid::Uuid;
-use devicemapper::Device;
 
 use engine::EngineError;
 use engine::EngineResult;
@@ -18,31 +15,35 @@ use engine::ErrorEnum;
 use engine::Pool;
 use engine::Filesystem;
 use engine::Dev;
-use engine::Cache;
 use engine::RenameAction;
 
 use super::blockdev::BlockDev;
 use super::filesystem::StratFilesystem;
+
+use super::util::initialize;
+use super::util::resolve_devices;
+
 use super::consts::*;
 
 #[derive(Debug)]
 pub struct StratPool {
     pub name: String,
     pub pool_uuid: Uuid,
-    pub cache_devs: BTreeMap<Uuid, BlockDev>,
-    pub block_devs: BTreeMap<Uuid, BlockDev>,
+    pub cache_devs: BTreeMap<PathBuf, BlockDev>,
+    pub block_devs: BTreeMap<PathBuf, BlockDev>,
     pub filesystems: BTreeMap<String, StratFilesystem>,
     pub raid_level: u16,
 }
 
 impl StratPool {
     pub fn new(name: &str,
-               devices: BTreeSet<Device>,
+               paths: &[&Path],
                raid_level: u16,
                force: bool)
                -> EngineResult<StratPool> {
+        let devices = try!(resolve_devices(paths));
         let pool_uuid = Uuid::new_v4();
-        let bds = try!(BlockDev::initialize(&pool_uuid, devices, MIN_MDA_SIZE, force));
+        let bds = try!(initialize::initialize(&pool_uuid, devices, MIN_MDA_SIZE, force));
 
         Ok(StratPool {
             name: name.to_owned(),
@@ -70,26 +71,16 @@ impl Pool for StratPool {
     }
 
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
-        let mut devices = BTreeSet::new();
-        for path in paths {
-            let dev = try!(Device::from_str(&path.to_string_lossy()));
-            devices.insert(dev);
-        }
-
-        let mut bds = try!(BlockDev::initialize(&self.pool_uuid, devices, MIN_MDA_SIZE, force));
+        let devices = try!(resolve_devices(paths));
+        let mut bds = try!(initialize::initialize(&self.pool_uuid, devices, MIN_MDA_SIZE, force));
         let bdev_paths = bds.iter().map(|p| p.1.devnode.clone()).collect();
         self.block_devs.append(&mut bds);
         Ok(bdev_paths)
     }
 
     fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
-        let mut devices = BTreeSet::new();
-        for path in paths {
-            let dev = try!(Device::from_str(&path.to_string_lossy()));
-            devices.insert(dev);
-        }
-
-        let mut bds = try!(BlockDev::initialize(&self.pool_uuid, devices, MIN_MDA_SIZE, force));
+        let devices = try!(resolve_devices(paths));
+        let mut bds = try!(initialize::initialize(&self.pool_uuid, devices, MIN_MDA_SIZE, force));
         let bdev_paths = bds.iter().map(|p| p.1.devnode.clone()).collect();
         self.cache_devs.append(&mut bds);
         Ok(bdev_paths)
@@ -105,11 +96,11 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn remove_blockdev(&mut self, _path: &Path) -> EngineResult<()> {
+    fn remove_blockdevs(&mut self, _paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
         unimplemented!()
     }
 
-    fn remove_cachedev(&mut self, _path: &Path) -> EngineResult<()> {
+    fn remove_cachedevs(&mut self, _paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
         unimplemented!()
     }
 
@@ -117,7 +108,7 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn cachedevs(&mut self) -> Vec<&mut Cache> {
+    fn cachedevs(&mut self) -> Vec<&mut Dev> {
         unimplemented!()
     }
 

@@ -34,19 +34,17 @@ pub struct MDA {
     pub used: u32,
 
     // Computed values
-    pub length: u32,
     pub offset: SectorOffset, // From start of MDA, not BDA
 }
 
 const MDA_OFFSETS: [usize; 4] = [8, 12, 16, 20];
 
 impl MDA {
-    pub fn new(length: u32, offset: SectorOffset) -> MDA {
+    pub fn new(offset: SectorOffset) -> MDA {
         MDA {
             crc: 0,
             last_updated: Timespec::new(0, 0),
             used: 0,
-            length: length,
             offset: offset,
         }
     }
@@ -71,7 +69,7 @@ impl MDA {
     }
 
     /// Read recorded values into buffer at buf_offset.
-    pub fn read(buf: &[u8], buf_offset: usize, length: u32, offset: SectorOffset) -> MDA {
+    pub fn read(buf: &[u8], buf_offset: usize, offset: SectorOffset) -> MDA {
         let (offset1, offset2, offset3, offset4) = MDA::offsets(buf_offset);
 
         MDA {
@@ -79,7 +77,6 @@ impl MDA {
                                         LittleEndian::read_u32(&buf[offset1..offset2]) as i32),
             used: LittleEndian::read_u32(&buf[offset2..offset3]),
             crc: LittleEndian::read_u32(&buf[offset3..offset4]),
-            length: length,
             offset: offset,
         }
     }
@@ -87,29 +84,27 @@ impl MDA {
 
 #[derive(Debug, Clone)]
 pub struct MDAGroup {
+    mda_length: u32,
     mdaa: MDA,
     mdab: MDA,
 }
 
 impl MDAGroup {
     pub fn new(size: Sectors) -> MDAGroup {
-        let length = ((*size / NUM_MDA_COPIES) * SECTOR_SIZE) as u32;
         MDAGroup {
-            mdaa: MDA::new(length, SectorOffset(0)),
-            mdab: MDA::new(length, SectorOffset(*size / NUM_MDA_COPIES)),
+            mda_length: ((*size / NUM_MDA_COPIES) * SECTOR_SIZE) as u32,
+            mdaa: MDA::new(SectorOffset(0)),
+            mdab: MDA::new(SectorOffset(*size / NUM_MDA_COPIES)),
         }
     }
 
     /// Read MDAGroup from buf at offset.
     /// Use size to calculate values for each MDA in the group.
     pub fn read(buf: &[u8], offset: usize, size: Sectors) -> MDAGroup {
-        let length = ((*size / NUM_MDA_COPIES) * SECTOR_SIZE) as u32;
         MDAGroup {
-            mdaa: MDA::read(&buf, offset, length, SectorOffset(0)),
-            mdab: MDA::read(&buf,
-                            offset + 32,
-                            length,
-                            SectorOffset(*size / NUM_MDA_COPIES)),
+            mda_length: ((*size / NUM_MDA_COPIES) * SECTOR_SIZE) as u32,
+            mdaa: MDA::read(&buf, offset, SectorOffset(0)),
+            mdab: MDA::read(&buf, offset + 32, SectorOffset(*size / NUM_MDA_COPIES)),
         }
     }
 

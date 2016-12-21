@@ -2,9 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::io::{Write, Seek, SeekFrom};
 use std::fs::OpenOptions;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use time::Timespec;
 use devicemapper::Device;
@@ -15,6 +14,7 @@ use engine::{EngineResult, EngineError, ErrorEnum};
 use consts::*;
 
 use super::metadata::SigBlock;
+use super::metadata::write_hdr_buf;
 
 pub use super::BlockDevSave;
 
@@ -36,31 +36,14 @@ impl BlockDev {
     pub fn write_sigblock(&self) -> EngineResult<()> {
         let mut buf = [0u8; SECTOR_SIZE as usize];
         self.sigblock.write(&mut buf, 0);
-        try!(self.write_hdr_buf(&self.devnode, &buf));
-        Ok(())
+        let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
+        Ok(try!(write_hdr_buf(&buf, &mut f, &self.sigblock)))
     }
 
     pub fn wipe_sigblock(&mut self) -> EngineResult<()> {
         let buf = [0u8; SECTOR_SIZE as usize];
-        try!(self.write_hdr_buf(&self.devnode, &buf));
-        Ok(())
-    }
-
-    fn write_hdr_buf(&self, devnode: &Path, buf: &[u8; SECTOR_SIZE as usize]) -> EngineResult<()> {
-        let mut f = try!(OpenOptions::new().write(true).open(devnode));
-        let zeroed = [0u8; (SECTOR_SIZE * 8) as usize];
-
-        // Write 4K header to head & tail. Sigblock goes in sector 1.
-        try!(f.write_all(&zeroed[..SECTOR_SIZE as usize]));
-        try!(f.write_all(buf));
-        try!(f.write_all(&zeroed[(SECTOR_SIZE * 2) as usize..]));
-        try!(f.seek(SeekFrom::End(-((*(self.sigblock.aux_bda_size()) * SECTOR_SIZE) as i64))));
-        try!(f.write_all(&zeroed[..SECTOR_SIZE as usize]));
-        try!(f.write_all(buf));
-        try!(f.write_all(&zeroed[(SECTOR_SIZE * 2) as usize..]));
-        try!(f.flush());
-
-        Ok(())
+        let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
+        Ok(try!(write_hdr_buf(&buf, &mut f, &self.sigblock)))
     }
 
     pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {

@@ -2,7 +2,15 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::io;
+
 use std::cmp::Ordering;
+
+use std::io::Seek;
+use std::io::SeekFrom;
+use std::io::Write;
+
+use std::fs::File;
 use std::str::from_utf8;
 
 use byteorder::ByteOrder;
@@ -19,6 +27,7 @@ use consts::SECTOR_SIZE;
 use types::Sectors;
 use types::SectorOffset;
 
+use super::consts::BDA_STATIC_HDR_BYTES;
 use super::consts::BDA_STATIC_HDR_SIZE;
 use super::consts::MDA_RESERVED_SIZE;
 use super::consts::MIN_MDA_SIZE;
@@ -270,6 +279,22 @@ impl SigBlock {
     pub fn aux_bda_size(&self) -> Sectors {
         BDA_STATIC_HDR_SIZE + self.mda_sectors
     }
+}
+
+/// Write buf to opened device f at assorted locations.
+pub fn write_hdr_buf(buf: &[u8], f: &mut File, sigblock: &SigBlock) -> io::Result<()> {
+    let zeroed = [0u8; BDA_STATIC_HDR_BYTES as usize];
+
+    try!(f.write_all(&zeroed[..SECTOR_SIZE as usize]));
+    try!(f.write_all(buf));
+    try!(f.write_all(&zeroed[(SECTOR_SIZE * 2) as usize..]));
+    try!(f.seek(SeekFrom::End(-((*(sigblock.aux_bda_size()) * SECTOR_SIZE) as i64))));
+    try!(f.write_all(&zeroed[..SECTOR_SIZE as usize]));
+    try!(f.write_all(buf));
+    try!(f.write_all(&zeroed[(SECTOR_SIZE * 2) as usize..]));
+    try!(f.flush());
+
+    Ok(())
 }
 
 /// Validate MDA size

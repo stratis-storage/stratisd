@@ -19,7 +19,8 @@ use engine::RenameAction;
 
 use super::blockdev::BlockDev;
 use super::filesystem::StratFilesystem;
-use super::setup::initialize;
+
+use super::util::initialize;
 use super::util::resolve_devices;
 
 use super::consts::*;

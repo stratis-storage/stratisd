@@ -301,16 +301,6 @@ impl BlockDev {
         Ok(pool_map)
     }
 
-    /// Size of the BDA copy at the beginning of the blockdev
-    fn main_bda_size(&self) -> u64 {
-        *(BDA_STATIC_HDR_SIZE + self.mda_sectors + self.reserved_sectors) * SECTOR_SIZE
-    }
-
-    /// Size of the BDA copy at the end of the blockdev
-    fn aux_bda_size(&self) -> u64 {
-        *(BDA_STATIC_HDR_SIZE + self.mda_sectors) * SECTOR_SIZE
-    }
-
     // Read metadata from newest MDA
     pub fn read_mdax(&self) -> EngineResult<Vec<u8>> {
         let younger_mda = match self.mdaa.last_updated.cmp(&self.mdab.last_updated) {
@@ -341,7 +331,7 @@ impl BlockDev {
 
     // Write metadata to least-recently-written MDA
     fn write_mdax(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
-        let aux_bda_size = self.aux_bda_size() as i64;
+        let aux_bda_size = (*self.aux_bda_size() * SECTOR_SIZE) as i64;
         let older_mda = match self.mdaa.last_updated.cmp(&self.mdab.last_updated) {
             Ordering::Less => &mut self.mdaa,
             Ordering::Greater => &mut self.mdab,
@@ -409,6 +399,7 @@ impl BlockDev {
     }
 
     fn write_hdr_buf(&self, devnode: &Path, buf: &[u8; SECTOR_SIZE as usize]) -> EngineResult<()> {
+        let aux_bda_size = (*self.aux_bda_size() * SECTOR_SIZE) as i64;
         let mut f = try!(OpenOptions::new().write(true).open(devnode));
         let zeroed = [0u8; (SECTOR_SIZE * 8) as usize];
 
@@ -416,7 +407,7 @@ impl BlockDev {
         try!(f.write_all(&zeroed[..SECTOR_SIZE as usize]));
         try!(f.write_all(buf));
         try!(f.write_all(&zeroed[(SECTOR_SIZE * 2) as usize..]));
-        try!(f.seek(SeekFrom::End(-(self.aux_bda_size() as i64))));
+        try!(f.seek(SeekFrom::End(-(aux_bda_size))));
         try!(f.write_all(&zeroed[..SECTOR_SIZE as usize]));
         try!(f.write_all(buf));
         try!(f.write_all(&zeroed[(SECTOR_SIZE * 2) as usize..]));
@@ -442,10 +433,20 @@ impl BlockDev {
         self.dev.dstr()
     }
 
+    /// Size of the BDA copy at the beginning of the blockdev
+    fn main_bda_size(&self) -> Sectors {
+        BDA_STATIC_HDR_SIZE + self.mda_sectors + self.reserved_sectors
+    }
+
+    /// Size of the BDA copy at the end of the blockdev
+    fn aux_bda_size(&self) -> Sectors {
+        BDA_STATIC_HDR_SIZE + self.mda_sectors
+    }
+
     /// List the available-for-upper-layer-use range in this blockdev.
     pub fn avail_range(&self) -> (SectorOffset, Sectors) {
-        let start = SectorOffset(*BDA_STATIC_HDR_SIZE + *self.mda_sectors + *self.reserved_sectors);
-        let length = Sectors(*self.total_size - *start - *BDA_STATIC_HDR_SIZE - *self.mda_sectors);
-        (start, length)
+        let start = self.main_bda_size();
+        let length = self.total_size - start - self.aux_bda_size();
+        (SectorOffset(*start), length)
     }
 }

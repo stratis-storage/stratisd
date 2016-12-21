@@ -19,6 +19,7 @@ use consts::SECTOR_SIZE;
 use types::Sectors;
 use types::SectorOffset;
 
+use super::consts::BDA_STATIC_HDR_SIZE;
 use super::consts::MDA_RESERVED_SIZE;
 use super::consts::MIN_MDA_SIZE;
 use super::consts::NUM_MDA_COPIES;
@@ -258,6 +259,16 @@ impl SigBlock {
             }
         };
         Ok(ownership)
+    }
+
+    /// Size of the BDA copy at the beginning of the blockdev in Sectors.
+    pub fn main_bda_size(&self) -> Sectors {
+        BDA_STATIC_HDR_SIZE + self.mda_sectors + self.reserved_sectors
+    }
+
+    /// Size of the BDA copy at the end of the blockdev in Sectors.
+    pub fn aux_bda_size(&self) -> Sectors {
+        BDA_STATIC_HDR_SIZE + self.mda_sectors
     }
 }
 

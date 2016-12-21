@@ -13,7 +13,6 @@ use types::{Sectors, SectorOffset};
 use engine::{EngineResult, EngineError, ErrorEnum};
 
 use consts::*;
-use super::consts::*;
 
 use super::metadata::SigBlock;
 
@@ -32,17 +31,6 @@ impl BlockDev {
             devnode: self.devnode.clone(),
             total_size: self.sigblock.total_size,
         }
-    }
-
-    /// Size of the BDA copy at the beginning of the blockdev
-    fn main_bda_size(&self) -> u64 {
-        *(BDA_STATIC_HDR_SIZE + self.sigblock.mda_sectors + self.sigblock.reserved_sectors) *
-        SECTOR_SIZE
-    }
-
-    /// Size of the BDA copy at the end of the blockdev
-    fn aux_bda_size(&self) -> u64 {
-        *(BDA_STATIC_HDR_SIZE + self.sigblock.mda_sectors) * SECTOR_SIZE
     }
 
     pub fn write_sigblock(&self) -> EngineResult<()> {
@@ -66,7 +54,7 @@ impl BlockDev {
         try!(f.write_all(&zeroed[..SECTOR_SIZE as usize]));
         try!(f.write_all(buf));
         try!(f.write_all(&zeroed[(SECTOR_SIZE * 2) as usize..]));
-        try!(f.seek(SeekFrom::End(-(self.aux_bda_size() as i64))));
+        try!(f.seek(SeekFrom::End(-((*(self.sigblock.aux_bda_size()) * SECTOR_SIZE) as i64))));
         try!(f.write_all(&zeroed[..SECTOR_SIZE as usize]));
         try!(f.write_all(buf));
         try!(f.write_all(&zeroed[(SECTOR_SIZE * 2) as usize..]));
@@ -89,12 +77,10 @@ impl BlockDev {
         self.dev.dstr()
     }
 
-    /// List the available-for-upper-layer-use range in this blockdev.
+    /// The available-for-upper-layer-use range in this blockdev.
     pub fn avail_range(&self) -> (SectorOffset, Sectors) {
-        let start = SectorOffset(*BDA_STATIC_HDR_SIZE + *self.sigblock.mda_sectors +
-                                 *self.sigblock.reserved_sectors);
-        let length = Sectors(*self.sigblock.total_size - *start - *BDA_STATIC_HDR_SIZE -
-                             *self.sigblock.mda_sectors);
-        (start, length)
+        let start = self.sigblock.main_bda_size();
+        let length = self.sigblock.total_size - start - self.sigblock.aux_bda_size();
+        (SectorOffset(*start), length)
     }
 }

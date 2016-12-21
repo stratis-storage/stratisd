@@ -49,8 +49,6 @@ mod setup {
 
     use std::io::ErrorKind;
     use std::io::Read;
-    use std::io::Seek;
-    use std::io::SeekFrom;
 
     use std::path::Path;
 
@@ -91,7 +89,6 @@ mod setup {
             }));
 
         let mut buf = [0u8; 4096];
-        try!(f.seek(SeekFrom::Start(0)));
         try!(f.read(&mut buf));
 
         match SigBlock::determine_ownership(&buf) {
@@ -156,8 +153,6 @@ pub mod initialize {
 
     use std::io::ErrorKind;
     use std::io::Read;
-    use std::io::Seek;
-    use std::io::SeekFrom;
 
     use std::path::PathBuf;
 
@@ -283,7 +278,6 @@ pub mod initialize {
         let dev_size = try!(blkdev_size(&f));
 
         let mut buf = [0u8; 4096];
-        try!(f.seek(SeekFrom::Start(0)));
         try!(f.read(&mut buf));
 
         let ownership = match SigBlock::determine_ownership(&buf) {

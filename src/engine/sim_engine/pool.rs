@@ -11,7 +11,6 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::vec::Vec;
 
-use engine::Cache;
 use engine::Dev;
 use engine::EngineError;
 use engine::EngineResult;
@@ -21,7 +20,6 @@ use engine::Pool;
 use engine::RenameAction;
 
 use super::blockdev::SimDev;
-use super::cache::SimCacheDev;
 use super::filesystem::SimFilesystem;
 use super::randomization::Randomizer;
 
@@ -29,27 +27,25 @@ use uuid::Uuid;
 
 #[derive(Debug)]
 pub struct SimPool {
-    pub block_devs: Vec<SimDev>,
-    pub cache_devs: Vec<SimCacheDev>,
+    pub block_devs: BTreeMap<PathBuf, SimDev>,
+    pub cache_devs: BTreeMap<PathBuf, SimDev>,
     pub filesystems: BTreeMap<String, SimFilesystem>,
     pub raid_level: u16,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
 impl SimPool {
-    pub fn new_pool(rdm: Rc<RefCell<Randomizer>>,
-                    blockdevs: &[SimDev],
-                    raid_level: u16)
-                    -> SimPool {
+    pub fn new(rdm: Rc<RefCell<Randomizer>>, paths: &[&Path], raid_level: u16) -> SimPool {
 
-        let mut vec = Vec::new();
-        vec.extend_from_slice(blockdevs);
+        let devices = BTreeSet::from_iter(paths);
+        let device_pairs = devices.iter()
+            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
         let new_pool = SimPool {
-            block_devs: vec,
+            block_devs: BTreeMap::from_iter(device_pairs),
             filesystems: BTreeMap::new(),
-            cache_devs: Vec::new(),
+            cache_devs: BTreeMap::new(),
             raid_level: raid_level,
-            rdm: rdm,
+            rdm: rdm.clone(),
         };
 
         new_pool
@@ -60,14 +56,18 @@ impl Pool for SimPool {
     fn add_blockdevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
         let rdm = self.rdm.clone();
         let devices = BTreeSet::from_iter(paths);
-        self.block_devs.extend(devices.iter().map(|p| SimDev::new_dev(rdm.clone(), p)));
+        let device_pairs = devices.iter()
+            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
+        self.block_devs.extend(device_pairs);
         Ok(devices.iter().map(|d| d.to_path_buf()).collect())
     }
 
     fn add_cachedevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
         let rdm = self.rdm.clone();
         let devices = BTreeSet::from_iter(paths);
-        self.cache_devs.extend(devices.iter().map(|p| SimCacheDev::new_cache(rdm.clone(), p)));
+        let device_pairs = devices.iter()
+            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
+        self.cache_devs.extend(device_pairs);
         Ok(devices.iter().map(|d| d.to_path_buf()).collect())
     }
 
@@ -139,42 +139,41 @@ impl Pool for SimPool {
     }
 
     fn blockdevs(&mut self) -> Vec<&mut Dev> {
-        Vec::from_iter(self.block_devs.iter_mut().map(|x| x as &mut Dev))
+        Vec::from_iter(self.block_devs.values_mut().map(|x| x as &mut Dev))
     }
 
-    fn cachedevs(&mut self) -> Vec<&mut Cache> {
-        Vec::from_iter(self.cache_devs.iter_mut().map(|x| x as &mut Cache))
+    fn cachedevs(&mut self) -> Vec<&mut Dev> {
+        Vec::from_iter(self.cache_devs.values_mut().map(|x| x as &mut Dev))
     }
 
-    fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()> {
-        let index = self.block_devs.iter().position(|x| x.has_same(path));
-        match index {
-            Some(index) => {
-                self.block_devs.remove(index);
-                return Ok(());
-            }
-            None => {
-                return Err(EngineError::Stratis(ErrorEnum::NotFound(String::from(path.to_str()
-                    .unwrap()))))
+    // Should verify that block devices are not required by pool, but does not.
+    fn remove_blockdevs(&mut self, paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
+        let devices = BTreeSet::from_iter(paths);
+
+        let mut removed = vec![];
+        for dev in devices {
+            let pathbuf = dev.to_path_buf();
+            match self.block_devs.remove(&pathbuf) {
+                Some(_) => removed.push(pathbuf),
+                _ => {}
             }
         }
-        Ok(())
+        Ok(removed)
     }
 
-    fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()> {
-        let index = self.cache_devs.iter().position(|x| x.has_same(path));
+    // Should verify that block devices are not required by pool, but does not.
+    fn remove_cachedevs(&mut self, paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
+        let devices = BTreeSet::from_iter(paths);
 
-        match index {
-            Some(index) => {
-                self.cache_devs.remove(index);
-                return Ok(());
-            }
-            None => {
-                return Err(EngineError::Stratis(ErrorEnum::NotFound(String::from(path.to_str()
-                    .unwrap()))))
+        let mut removed = vec![];
+        for dev in devices {
+            let pathbuf = dev.to_path_buf();
+            match self.cache_devs.remove(&pathbuf) {
+                Some(_) => removed.push(pathbuf),
+                _ => {}
             }
         }
-        Ok(())
+        Ok(removed)
     }
 
     fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
@@ -185,6 +184,8 @@ impl Pool for SimPool {
 
 #[cfg(test)]
 mod tests {
+
+    use std::path::Path;
 
     use engine::Engine;
     use engine::ErrorEnum;
@@ -383,6 +384,61 @@ mod tests {
         let mut pool = engine.get_pool(pool_name).unwrap();
         assert!(match pool.create_filesystems(&[(fs_name, "", None), (fs_name, "/", None)]) {
             Err(EngineError::Stratis(ErrorEnum::Error(_))) => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Removing an empty list of devices from an empty pool yields empty list.
+    fn remove_device_empty() {
+        let pool_name = "pool_name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &[], 0, false).unwrap();
+        let mut pool = engine.get_pool(pool_name).unwrap();
+        assert!(match pool.remove_blockdevs(&[]) {
+            Ok(devs) => devs.is_empty(),
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Removing a non-empyt list of devices from empty pool yields empty list.
+    fn remove_device_empty_2() {
+        let pool_name = "pool_name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &[], 0, false).unwrap();
+        let mut pool = engine.get_pool(pool_name).unwrap();
+        assert!(match pool.remove_blockdevs(&[Path::new("/s/b")]) {
+            Ok(devs) => devs.is_empty(),
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Removing a list of devices from non-empty pool yields intersection.
+    fn remove_device_intersection() {
+        let pool_name = "pool_name";
+        let mut engine = SimEngine::new();
+        let devices = [Path::new("/s/a"), Path::new("/s/b")];
+        engine.create_pool(pool_name, &devices, 0, false).unwrap();
+        let mut pool = engine.get_pool(pool_name).unwrap();
+        let remove_devices = [Path::new("/s/a"), Path::new("/s/c")];
+        assert!(match pool.remove_blockdevs(&remove_devices) {
+            Ok(devs) => devs == [Path::new("/s/a")],
+            _ => false,
+        });
+    }
+
+    #[test]
+    /// Adding a list of devices to an empty pool should yield list.
+    fn add_device_empty() {
+        let pool_name = "pool_name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(pool_name, &[], 0, false).unwrap();
+        let mut pool = engine.get_pool(pool_name).unwrap();
+        let devices = [Path::new("/s/a"), Path::new("/s/b")];
+        assert!(match pool.add_blockdevs(&devices, false) {
+            Ok(devs) => devs == devices,
             _ => false,
         });
     }

@@ -52,12 +52,6 @@ pub type EngineResult<T> = Result<T, EngineError>;
 
 pub trait Dev: Debug {
     fn get_id(&self) -> String;
-    fn has_same(&self, other: &Path) -> bool;
-}
-
-pub trait Cache: Debug {
-    fn get_id(&self) -> String;
-    fn has_same(&self, other: &Path) -> bool;
 }
 
 pub trait Filesystem: Debug {}
@@ -88,13 +82,32 @@ pub trait Pool: Debug {
                                    source: &'c str)
                                    -> EngineResult<&'b str>;
 
+    /// Adds blockdevs specified by paths to pool.
+    /// Returns a list of device nodes corresponding to devices actually added.
+    /// Returns an error if a blockdev can not be added because it is owned
+    /// or there was an error while reading or writing a blockdev.
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
+
+
+    /// Adds blockdevs specified by paths to pool cache.
+    /// Returns a list of device nodes corresponding to devices actually added.
+    /// Returns an error if a blockdev can not be added because it is owned
+    /// or there was an error while reading or writing a blockdev.
     fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
-    fn remove_blockdev(&mut self, path: &Path) -> EngineResult<()>;
-    fn remove_cachedev(&mut self, path: &Path) -> EngineResult<()>;
+
+    /// Remove specified block devices from this pool.
+    /// Returns a list of the devices actually removed.
+    /// Returns an error if a device could not be removed.
+    fn remove_blockdevs(&mut self, path: &[&Path]) -> EngineResult<Vec<PathBuf>>;
+
+    /// Remove specified cache devices from this pool.
+    /// Returns a list of the devices actually removed.
+    /// Returns an error if a device could not be removed.
+    fn remove_cachedevs(&mut self, path: &[&Path]) -> EngineResult<Vec<PathBuf>>;
+
     fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem>;
     fn blockdevs(&mut self) -> Vec<&mut Dev>;
-    fn cachedevs(&mut self) -> Vec<&mut Cache>;
+    fn cachedevs(&mut self) -> Vec<&mut Dev>;
 
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.

@@ -9,3 +9,4 @@
 target
 .project 
 .settings
+stratis-tests/Cargo.lock

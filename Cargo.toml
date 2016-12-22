@@ -4,6 +4,15 @@ version = "0.1.0"
 authors = ["Andy Grover <agrover@redhat.com>", "Mulhern <amulhern@redhat.com>", "Todd Gill <tgill@redhat.com>"]
 build = "build.rs"
 
+[[bin]]
+name = "stratisd"
+test = false
+doc = false
+
+[lib]
+name = "stratisd"
+path = "src/lib.rs"
+
 [build-dependencies]
 serde_codegen = "0"
 

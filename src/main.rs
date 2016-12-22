@@ -29,12 +29,12 @@ extern crate enum_derive;
 #[cfg(test)]
 extern crate quickcheck;
 
-pub static mut debug: bool = false;
+pub static mut DEBUG: bool = false;
 
 macro_rules! dbgp {
     ($($arg:tt)*) => (
         unsafe {
-            if ::debug {
+            if ::DEBUG {
                 println!($($arg)*)
             }
         })
@@ -82,7 +82,7 @@ fn main() {
         .get_matches();
 
     if matches.is_present("debug") {
-        unsafe { debug = true }
+        unsafe { DEBUG = true }
     };
 
     let engine: Box<Engine> = {

@@ -135,7 +135,7 @@ class FilesystemSpec(InterfaceSpec):
     }
     OUTPUT_SIGS = {
        MethodNames.CreateSnapshot: "oqs",
-       MethodNames.Rename: "oqs",
+       MethodNames.Rename: "bqs",
        MethodNames.SetMountpoint: "oqs",
        MethodNames.SetQuota: "oqs"
     }
@@ -246,8 +246,8 @@ class PoolSpec(InterfaceSpec):
        MethodNames.ListCacheDevs: ((), _FALSE, ""),
        MethodNames.ListDevs: ((), _FALSE, ""),
        MethodNames.ListFilesystems: ((), _FALSE, ""),
-       MethodNames.RemoveCacheDevs: (("names", ), _FALSE, "as"),
-       MethodNames.RemoveDevs: (("names", ), _FALSE, "as"),
+       MethodNames.RemoveCacheDevs: (("devices", ), _FALSE, "as"),
+       MethodNames.RemoveDevs: (("devices", ), _FALSE, "as"),
        MethodNames.Rename: (("new_name", ), _FALSE, "s")
     }
     OUTPUT_SIGS = {
@@ -258,8 +258,8 @@ class PoolSpec(InterfaceSpec):
        MethodNames.ListCacheDevs: "asqs",
        MethodNames.ListDevs: "asqs",
        MethodNames.ListFilesystems: "asqs",
-       MethodNames.RemoveCacheDevs: "a(qs)qs",
-       MethodNames.RemoveDevs: "a(qs)qs",
+       MethodNames.RemoveCacheDevs: "asqs",
+       MethodNames.RemoveDevs: "asqs",
        MethodNames.Rename: "bqs"
     }
     XFORMERS = _xformers(INPUT_SIGS)

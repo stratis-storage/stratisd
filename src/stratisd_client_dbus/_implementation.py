@@ -246,8 +246,8 @@ class PoolSpec(InterfaceSpec):
        MethodNames.ListCacheDevs: ((), _FALSE, ""),
        MethodNames.ListDevs: ((), _FALSE, ""),
        MethodNames.ListFilesystems: ((), _FALSE, ""),
-       MethodNames.RemoveCacheDevs: (("names", ), _FALSE, "as"),
-       MethodNames.RemoveDevs: (("names", ), _FALSE, "as"),
+       MethodNames.RemoveCacheDevs: (("devices", ), _FALSE, "as"),
+       MethodNames.RemoveDevs: (("devices", ), _FALSE, "as"),
        MethodNames.Rename: (("new_name", ), _FALSE, "s")
     }
     OUTPUT_SIGS = {

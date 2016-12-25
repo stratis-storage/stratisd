@@ -20,13 +20,13 @@ use types::Sectors;
 use types::SectorOffset;
 
 use super::consts::MIN_MDA_SIZE;
-use super::consts::STRAT_MAGIC;
 
 use super::engine::DevOwnership;
 
 const MDA_OFFSETS: [usize; 4] = [8, 12, 16, 20];
 const MDA_RESERVED_SIZE: Sectors = Sectors(2048 * 3); // = 3 MiB
 const NUM_MDA_COPIES: u64 = 2;
+const STRAT_MAGIC: &'static [u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
 #[derive(Debug, Clone, Copy)]
 pub struct MDA {

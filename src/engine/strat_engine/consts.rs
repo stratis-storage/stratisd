@@ -4,7 +4,5 @@
 
 use types::Sectors;
 
-pub const STRAT_MAGIC: &'static [u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
-
 pub const BDA_STATIC_HDR_SIZE: Sectors = Sectors(8);
 pub const MIN_MDA_SIZE: Sectors = Sectors(2040);

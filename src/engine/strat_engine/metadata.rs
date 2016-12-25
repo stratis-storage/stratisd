@@ -19,12 +19,11 @@ use consts::SECTOR_SIZE;
 use types::Sectors;
 use types::SectorOffset;
 
-use super::consts::MIN_MDA_SIZE;
-
 use super::engine::DevOwnership;
 
 const MDA_OFFSETS: [usize; 4] = [8, 12, 16, 20];
 const MDA_RESERVED_SIZE: Sectors = Sectors(2048 * 3); // = 3 MiB
+pub const MIN_MDA_SIZE: Sectors = Sectors(2040);
 const NUM_MDA_COPIES: u64 = 2;
 const STRAT_MAGIC: &'static [u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 

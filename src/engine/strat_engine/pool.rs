@@ -21,7 +21,7 @@ use super::blockdev::{BlockDev, initialize, resolve_devices};
 
 use super::filesystem::StratFilesystem;
 
-use super::consts::*;
+use super::metadata::MIN_MDA_SIZE;
 
 #[derive(Debug)]
 pub struct StratPool {

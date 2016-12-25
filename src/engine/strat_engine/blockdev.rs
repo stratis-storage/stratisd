@@ -23,7 +23,6 @@ use types::{Sectors, SectorOffset};
 use engine::{EngineResult, EngineError, ErrorEnum};
 
 use consts::*;
-use super::consts::*;
 
 use super::metadata::{SigBlock, validate_mda_size};
 use super::engine::DevOwnership;
@@ -33,6 +32,7 @@ pub use super::BlockDevSave;
 type DevUuid = Uuid;
 type PoolUuid = Uuid;
 
+const BDA_STATIC_HDR_SIZE: Sectors = Sectors(8);
 const MIN_DEV_SIZE: u64 = GIGA;
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);

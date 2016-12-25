@@ -4,5 +4,4 @@
 
 use types::Sectors;
 
-pub const BDA_STATIC_HDR_SIZE: Sectors = Sectors(8);
 pub const MIN_MDA_SIZE: Sectors = Sectors(2040);

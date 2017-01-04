@@ -64,6 +64,11 @@ impl DbusContext {
             pools: Rc::new(RefCell::new(BidirMap::new())),
         }
     }
+
+    /// Generates a new id for object paths.
+    /// It is assumed that, while Stratisd is running, it will never generate
+    /// more than 2^64 object paths. If it turns out that this is a bad
+    /// assumption, the solution is to use unbounded integers.
     pub fn get_next_id(&mut self) -> u64 {
         self.next_index.set(self.next_index.get() + 1);
         self.next_index.get()

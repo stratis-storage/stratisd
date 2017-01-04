@@ -541,7 +541,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                     .borrow_mut()
                     .remove_by_second(&(pool_name.clone(), (*name).into())) {
                     Some((object_path, _)) => {
-                        remove_dbus_object_path(dbus_context, object_path.clone());
+                        remove_dbus_object_path(dbus_context, object_path);
                     }
                     _ => {}
                 }
@@ -1019,7 +1019,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(action) => {
             match dbus_context.pools.borrow_mut().remove_by_second(name.into()) {
                 Some((object_path, _)) => {
-                    remove_dbus_object_path(dbus_context, object_path.clone());
+                    remove_dbus_object_path(dbus_context, object_path);
                 }
                 _ => {}
             };
@@ -1245,10 +1245,8 @@ pub fn run(engine: Box<Engine>) -> StratisResult<()> {
                         tree.insert(path);
                     }
                     DeferredAction::Remove(path) => {
-                        let object_path: dbus::Path<'static> = dbus::Path::new(path.clone())
-                            .unwrap();
-                        tree.remove(&object_path);
                         c.unregister_object_path(&path);
+                        tree.remove(&dbus::Path::new(path).unwrap());
                     }
                 }
             }

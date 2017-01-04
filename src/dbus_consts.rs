@@ -2,19 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-pub const DBUS_TIMEOUT: i32 = 20000; // millieconds
-
-pub const STRATIS_VERSION: &'static str = "1";
-pub const MANAGER_NAME: &'static str = "/Manager";
 pub const STRATIS_BASE_PATH: &'static str = "/org/storage/stratis1";
 pub const STRATIS_BASE_SERVICE: &'static str = "org.storage.stratis1";
-pub const STRATIS_BASE_MANAGER: &'static str = "/org/storage/stratis1/Manager";
 pub const STRATIS_MANAGER_INTERFACE: &'static str = "org.storage.stratis1.Manager";
 pub const STRATIS_POOL_BASE_INTERFACE: &'static str = "org.storage.stratis1.pool";
 pub const STRATIS_FILESYSTEM_BASE_INTERFACE: &'static str = "org.storage.stratis1.filesystem";
-pub const STRATIS_DEV_BASE_INTERFACE: &'static str = "org.storage.stratis1.dev";
-pub const STRATIS_CACHE_BASE_INTERFACE: &'static str = "org.storage.stratis1.cache";
-pub const STRATIS_POOL_BASE_PATH: &'static str = "/org/storage/stratis/pool";
 
 pub const DEFAULT_OBJECT_PATH: &'static str = "/";
 

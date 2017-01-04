@@ -5,9 +5,8 @@
 mod blockdev;
 mod engine;
 mod filesystem;
+mod metadata;
 mod pool;
-mod util;
-mod consts;
 
 mod serde_structs {
     include!(concat!(env!("OUT_DIR"), "/serde_structs.rs"));

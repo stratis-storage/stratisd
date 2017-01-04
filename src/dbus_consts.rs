@@ -16,11 +16,8 @@ pub const CREATE_POOL: &'static str = "CreatePool";
 pub const DESTROY_POOL: &'static str = "DestroyPool";
 pub const GET_POOL_OBJECT_PATH: &'static str = "GetPoolObjectPath";
 pub const GET_FILESYSTEM_OBJECT_PATH: &'static str = "GetFilesystemObjectPath";
-pub const GET_DEV_OBJECT_PATH: &'static str = "GetDevObjectPath";
-pub const GET_CACHE_OBJECT_PATH: &'static str = "GetCacheObjectPath";
 pub const GET_ERROR_CODES: &'static str = "GetErrorCodes";
 pub const GET_RAID_LEVELS: &'static str = "GetRaidLevels";
-pub const GET_DEV_TYPES: &'static str = "GetDevTypes";
 pub const CONFIGURE_SIMULATOR: &'static str = "ConfigureSimulator";
 
 // Pool Methods

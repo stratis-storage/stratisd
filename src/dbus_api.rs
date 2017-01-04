@@ -427,12 +427,12 @@ fn create_snapshot(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn set_filesystem_quota(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+fn set_filesystem_quota(_m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    unimplemented!()
 }
 
-fn set_filesystem_mountpoint(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
+fn set_filesystem_mountpoint(_m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    unimplemented!()
 }
 
 fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -1071,14 +1071,6 @@ fn get_filesystem_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResul
     Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
 }
 
-fn get_dev_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    Ok(vec![m.msg.method_return().append3("/dbus/dev/path", 0, "Ok")])
-}
-
-fn get_cache_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    Ok(vec![m.msg.method_return().append3("/dbus/cache/path", 0, "Ok")])
-}
-
 fn get_list_items<T, I>(m: &MethodInfo<MTFn<TData>, TData>, iter: I) -> MethodResult
     where T: HasCodes + Display,
           I: Iterator<Item = T>
@@ -1101,10 +1093,6 @@ fn get_error_codes(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
 fn get_raid_levels(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     get_list_items(m, RaidType::iter_variants())
-}
-
-fn get_dev_types(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    Ok(vec![m.msg.method_return()])
 }
 
 fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -1172,25 +1160,11 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
             .out_arg(("return_code", "q"))
             .out_arg(("return_string", "s"));
 
-    let get_dev_object_path_method = f.method(GET_DEV_OBJECT_PATH, (), get_dev_object_path)
-        .in_arg(("dev_name", "s"))
-        .out_arg(("object_path", "o"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let get_cache_object_path_method = f.method(GET_CACHE_OBJECT_PATH, (), get_cache_object_path)
-        .in_arg(("cache_dev_name", "s"))
-        .out_arg(("object_path", "o"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
     let get_error_codes_method = f.method(GET_ERROR_CODES, (), get_error_codes)
         .out_arg(("error_codes", "a(sqs)"));
 
     let get_raid_levels_method = f.method(GET_RAID_LEVELS, (), get_raid_levels)
         .out_arg(("error_codes", "a(sqs)"));
-
-    let get_dev_types_method = f.method(GET_DEV_TYPES, (), get_dev_types);
 
     let configure_simulator_method = f.method(CONFIGURE_SIMULATOR, (), configure_simulator)
         .in_arg(("denominator", "u"))
@@ -1206,11 +1180,8 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
             .add_m(destroy_pool_method)
             .add_m(get_pool_object_path_method)
             .add_m(get_filesystem_object_path_method)
-            .add_m(get_dev_object_path_method)
-            .add_m(get_cache_object_path_method)
             .add_m(get_error_codes_method)
             .add_m(get_raid_levels_method)
-            .add_m(get_dev_types_method)
             .add_m(configure_simulator_method));
 
     let base_tree = base_tree.add(obj_path);

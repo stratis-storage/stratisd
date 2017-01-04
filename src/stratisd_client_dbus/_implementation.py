@@ -155,8 +155,6 @@ class ManagerSpec(InterfaceSpec):
         ConfigureSimulator = "ConfigureSimulator"
         CreatePool = "CreatePool"
         DestroyPool = "DestroyPool"
-        GetCacheObjectPath = "GetCacheObjectPath"
-        GetDevObjectPath = "GetDevObjectPath"
         GetDevTypes = "GetDevTypes"
         GetErrorCodes = "GetErrorCodes"
         GetFilesystemObjectPath = "GetFilesystemObjectPath"
@@ -177,8 +175,6 @@ class ManagerSpec(InterfaceSpec):
         MethodNames.CreatePool :
            (("name", "redundancy", "force", "devices"), _FALSE, "sqbas"),
         MethodNames.DestroyPool : (("name", ), _FALSE, "s"),
-        MethodNames.GetCacheObjectPath : (("name", ), _FALSE, "s"),
-        MethodNames.GetDevObjectPath : (("name", ), _FALSE, "s"),
         MethodNames.GetDevTypes : ((), _FALSE, ""),
         MethodNames.GetErrorCodes : ((), _FALSE, ""),
         MethodNames.GetFilesystemObjectPath :
@@ -191,8 +187,6 @@ class ManagerSpec(InterfaceSpec):
         MethodNames.ConfigureSimulator : "qs",
         MethodNames.CreatePool : "(oas)qs",
         MethodNames.DestroyPool : "bqs",
-        MethodNames.GetCacheObjectPath : "oqs",
-        MethodNames.GetDevObjectPath : "oqs",
         MethodNames.GetDevTypes : "",
         MethodNames.GetErrorCodes : "a(sqs)",
         MethodNames.GetFilesystemObjectPath : "oqs",

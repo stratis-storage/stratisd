@@ -9,12 +9,13 @@ use std::vec::Vec;
 
 use uuid::Uuid;
 
+use engine::Dev;
+use engine::Filesystem;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
 use engine::Pool;
-use engine::Filesystem;
-use engine::Dev;
+use engine::Redundancy;
 use engine::RenameAction;
 
 use super::blockdev::{BlockDev, initialize, resolve_devices};
@@ -30,13 +31,13 @@ pub struct StratPool {
     pub cache_devs: BTreeMap<PathBuf, BlockDev>,
     pub block_devs: BTreeMap<PathBuf, BlockDev>,
     pub filesystems: BTreeMap<String, StratFilesystem>,
-    pub raid_level: u16,
+    pub redundancy: Redundancy,
 }
 
 impl StratPool {
     pub fn new(name: &str,
                paths: &[&Path],
-               raid_level: u16,
+               redundancy: Redundancy,
                force: bool)
                -> EngineResult<StratPool> {
         let devices = try!(resolve_devices(paths));
@@ -49,7 +50,7 @@ impl StratPool {
             cache_devs: BTreeMap::new(),
             block_devs: bds,
             filesystems: BTreeMap::new(),
-            raid_level: raid_level,
+            redundancy: redundancy,
         })
     }
 }

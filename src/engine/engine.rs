@@ -90,11 +90,14 @@ pub trait Pool: Debug {
 }
 
 pub trait Engine: Debug {
-    /// Create a Stratis pool. Returns the number of blockdevs the pool contains.
+    /// Create a Stratis pool.
+    /// Returns the number of blockdevs the pool contains.
+    /// Returns an error if the redundancy code does not correspond to a
+    /// supported redundancy.
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
-                   raid_level: u16,
+                   redundancy: u16,
                    force: bool)
                    -> EngineResult<Vec<PathBuf>>;
 

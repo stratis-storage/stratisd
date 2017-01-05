@@ -50,14 +50,17 @@ impl Engine for StratEngine {
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
-                   raid_level: u16,
+                   redundancy: u16,
                    force: bool)
                    -> EngineResult<Vec<PathBuf>> {
 
         if self.pools.contains_key(name) {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
-        let pool = try!(StratPool::new(name, blockdev_paths, raid_level, force));
+
+        let redundancy = calculate_redundancy!{self; redundancy as usize};
+
+        let pool = try!(StratPool::new(name, blockdev_paths, redundancy, force));
         let bdev_paths = pool.block_devs.iter().map(|p| p.1.devnode.clone()).collect();
 
         self.pools.insert(name.to_owned(), pool);

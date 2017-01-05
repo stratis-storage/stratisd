@@ -45,7 +45,7 @@ impl Engine for SimEngine {
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
-                   raid_level: u16,
+                   redundancy: u16,
                    _force: bool)
                    -> EngineResult<Vec<PathBuf>> {
 
@@ -53,10 +53,12 @@ impl Engine for SimEngine {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
 
+        let redundancy = calculate_redundancy!{self; redundancy as usize};
+
         let devices =
             BTreeSet::from_iter(blockdev_paths).into_iter().map(|x| *x).collect::<Vec<&Path>>();
 
-        let pool = SimPool::new(self.rdm.clone(), &devices, raid_level);
+        let pool = SimPool::new(self.rdm.clone(), &devices, redundancy);
 
         if self.rdm.borrow_mut().throw_die() {
             return Err(EngineError::Stratis(ErrorEnum::Error("X".into())));

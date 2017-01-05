@@ -6,9 +6,8 @@ use engine::Engine;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
-
 use engine::Pool;
-
+use engine::Redundancy;
 use engine::RenameAction;
 
 use std::cell::RefCell;
@@ -27,7 +26,8 @@ use super::randomization::Randomizer;
 
 #[derive(Debug)]
 pub struct SimEngine {
-    pub pools: BTreeMap<String, SimPool>,
+    pools: BTreeMap<String, SimPool>,
+    redundancies: Vec<Redundancy>,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
@@ -35,6 +35,7 @@ impl SimEngine {
     pub fn new() -> SimEngine {
         SimEngine {
             pools: BTreeMap::new(),
+            redundancies: Redundancy::iter_variants().collect(),
             rdm: Rc::new(RefCell::new(Randomizer::new())),
         }
     }
@@ -44,7 +45,7 @@ impl Engine for SimEngine {
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
-                   raid_level: u16,
+                   redundancy: u16,
                    _force: bool)
                    -> EngineResult<Vec<PathBuf>> {
 
@@ -52,10 +53,12 @@ impl Engine for SimEngine {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
 
+        let redundancy = calculate_redundancy!{self; redundancy as usize};
+
         let devices =
             BTreeSet::from_iter(blockdev_paths).into_iter().map(|x| *x).collect::<Vec<&Path>>();
 
-        let pool = SimPool::new(self.rdm.clone(), &devices, raid_level);
+        let pool = SimPool::new(self.rdm.clone(), &devices, redundancy);
 
         if self.rdm.borrow_mut().throw_die() {
             return Err(EngineError::Stratis(ErrorEnum::Error("X".into())));
@@ -90,6 +93,10 @@ impl Engine for SimEngine {
         self.rdm.borrow_mut().set_probability(denominator);
         Ok(())
     }
+
+    fn supported_redundancies(&self) -> &[Redundancy] {
+        supported_redundancies!(self)
+    }
 }
 
 #[cfg(test)]
@@ -104,6 +111,7 @@ mod tests {
     use engine::Engine;
     use engine::EngineError;
     use engine::ErrorEnum;
+    use engine::Redundancy;
     use engine::RenameAction;
 
     #[test]
@@ -273,6 +281,13 @@ mod tests {
             Ok(RenameAction::NoSource) => true,
             _ => false,
         });
+    }
+
+    #[test]
+    /// Make sure supported redundancy contains at least RAID0.
+    fn test_supported_redundancy_raid0() {
+        let engine = SimEngine::new();
+        assert!(engine.supported_redundancies().contains(&Redundancy::RAID0));
     }
 
 }

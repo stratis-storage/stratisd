@@ -2,42 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-pub const STRATIS_BASE_PATH: &'static str = "/org/storage/stratis1";
-pub const STRATIS_BASE_SERVICE: &'static str = "org.storage.stratis1";
-pub const STRATIS_MANAGER_INTERFACE: &'static str = "org.storage.stratis1.Manager";
-pub const STRATIS_POOL_BASE_INTERFACE: &'static str = "org.storage.stratis1.pool";
-pub const STRATIS_FILESYSTEM_BASE_INTERFACE: &'static str = "org.storage.stratis1.filesystem";
-
-pub const DEFAULT_OBJECT_PATH: &'static str = "/";
-
-// Manager Methods
-pub const LIST_POOLS: &'static str = "ListPools";
-pub const CREATE_POOL: &'static str = "CreatePool";
-pub const DESTROY_POOL: &'static str = "DestroyPool";
-pub const GET_POOL_OBJECT_PATH: &'static str = "GetPoolObjectPath";
-pub const GET_FILESYSTEM_OBJECT_PATH: &'static str = "GetFilesystemObjectPath";
-pub const GET_ERROR_CODES: &'static str = "GetErrorCodes";
-pub const GET_RAID_LEVELS: &'static str = "GetRaidLevels";
-pub const CONFIGURE_SIMULATOR: &'static str = "ConfigureSimulator";
-
-// Pool Methods
-pub const CREATE_FILESYSTEMS: &'static str = "CreateFilesystems";
-pub const DESTROY_FILESYSTEMS: &'static str = "DestroyFilesystems";
-pub const LIST_FILESYSTEMS: &'static str = "ListFilesystems";
-pub const LIST_DEVS: &'static str = "ListDevs";
-pub const LIST_CACHE_DEVS: &'static str = "ListCacheDevs";
-pub const ADD_CACHE_DEVS: &'static str = "AddCacheDevs";
-pub const REMOVE_CACHE_DEVS: &'static str = "RemoveCacheDevs";
-pub const ADD_DEVS: &'static str = "AddDevs";
-pub const REMOVE_DEVS: &'static str = "RemoveDevs";
-pub const RENAME_POOL: &'static str = "Rename";
-
-// Filesystem Methods
-pub const CREATE_SNAPSHOT: &'static str = "CreateSnapshot";
-pub const RENAME_FILESYSTEM: &'static str = "Rename";
-pub const SET_MOUNTPOINT: &'static str = "SetMountpoint";
-pub const SET_QUOTA: &'static str = "SetQuota";
-
 pub trait HasCodes {
     /// Indicates that this enum can be converted to an int or described
     /// with a string.

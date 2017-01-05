@@ -39,6 +39,9 @@ use engine::RenameAction;
 
 use types::StratisResult;
 
+const STRATIS_BASE_PATH: &'static str = "/org/storage/stratis1";
+const STRATIS_BASE_SERVICE: &'static str = "org.storage.stratis1";
+
 #[derive(Debug)]
 pub enum DeferredAction {
     Add(ObjectPath<MTFn<TData>, TData>),
@@ -271,7 +274,7 @@ fn ok_message_items() -> (MessageItem, MessageItem) {
 }
 
 fn default_object_path<'a>() -> dbus::Path<'a> {
-    dbus::Path::new(DEFAULT_OBJECT_PATH).unwrap()
+    dbus::Path::new("/").unwrap()
 }
 
 fn remove_dbus_object_path(dbus_context: &DbusContext, path: String) {
@@ -294,24 +297,24 @@ fn create_dbus_filesystem<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
 
     let f = Factory::new_fn();
 
-    let create_snapshot_method = f.method(CREATE_SNAPSHOT, (), create_snapshot)
+    let create_snapshot_method = f.method("CreateSnapshot", (), create_snapshot)
         .in_arg(("name", "s"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let rename_method = f.method(RENAME_FILESYSTEM, (), rename_filesystem)
+    let rename_method = f.method("Rename", (), rename_filesystem)
         .in_arg(("name", "s"))
         .out_arg(("action", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let set_mountpoint_method = f.method(SET_MOUNTPOINT, (), set_filesystem_mountpoint)
+    let set_mountpoint_method = f.method("SetMountpoint", (), set_filesystem_mountpoint)
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let set_quota_method = f.method(SET_QUOTA, (), set_filesystem_quota)
+    let set_quota_method = f.method("SetQuota", (), set_filesystem_quota)
         .in_arg(("quota", "s"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
@@ -322,9 +325,11 @@ fn create_dbus_filesystem<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
                               STRATIS_BASE_PATH,
                               dbus_context.get_next_id().to_string());
 
+    let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "filesystem");
+
     let object_path = f.object_path(object_name, dbus_context.clone())
         .introspectable()
-        .add(f.interface(STRATIS_FILESYSTEM_BASE_INTERFACE, ())
+        .add(f.interface(interface_name, ())
             .add_m(create_snapshot_method)
             .add_m(rename_method)
             .add_m(set_mountpoint_method)
@@ -880,60 +885,60 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
 
     let f = Factory::new_fn();
 
-    let create_filesystems_method = f.method(CREATE_FILESYSTEMS, (), create_filesystems)
+    let create_filesystems_method = f.method("CreateFilesystems", (), create_filesystems)
         .in_arg(("filesystems", "a(ss(bt))"))
         .out_arg(("filesystems", "a(os)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let destroy_filesystems_method = f.method(DESTROY_FILESYSTEMS, (), destroy_filesystems)
+    let destroy_filesystems_method = f.method("DestroyFilesystems", (), destroy_filesystems)
         .in_arg(("filesystems", "as"))
         .out_arg(("results", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let list_filesystems_method = f.method(LIST_FILESYSTEMS, (), list_filesystems)
+    let list_filesystems_method = f.method("ListFilesystems", (), list_filesystems)
         .out_arg(("filesystems", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let list_cache_devs_method = f.method(LIST_CACHE_DEVS, (), list_cache_devs)
+    let list_cache_devs_method = f.method("ListCacheDevs", (), list_cache_devs)
         .out_arg(("cache_devs", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let add_cache_devs_method = f.method(ADD_CACHE_DEVS, (), add_cache_devs)
+    let add_cache_devs_method = f.method("AddCacheDevs", (), add_cache_devs)
         .in_arg(("force", "b"))
         .in_arg(("cache_devs", "as"))
         .out_arg(("results", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let remove_cache_devs_method = f.method(REMOVE_CACHE_DEVS, (), remove_cache_devs)
+    let remove_cache_devs_method = f.method("RemoveCacheDevs", (), remove_cache_devs)
         .in_arg(("cache_devs", "as"))
         .out_arg(("results", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let list_devs_method = f.method(LIST_DEVS, (), list_devs)
+    let list_devs_method = f.method("ListDevs", (), list_devs)
         .out_arg(("devs", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let add_devs_method = f.method(ADD_DEVS, (), add_devs)
+    let add_devs_method = f.method("AddDevs", (), add_devs)
         .in_arg(("force", "b"))
         .in_arg(("devs", "as"))
         .out_arg(("results", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let remove_devs_method = f.method(REMOVE_DEVS, (), remove_devs)
+    let remove_devs_method = f.method("RemoveDevs", (), remove_devs)
         .in_arg(("devs", "as"))
         .out_arg(("results", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let rename_method = f.method(RENAME_POOL, (), rename_pool)
+    let rename_method = f.method("Rename", (), rename_pool)
         .in_arg(("new_name", "s"))
         .out_arg(("action", "b"))
         .out_arg(("return_code", "q"))
@@ -943,9 +948,11 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
                               STRATIS_BASE_PATH,
                               dbus_context.get_next_id().to_string());
 
+    let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "pool");
+
     let object_path = f.object_path(object_name, dbus_context.clone())
         .introspectable()
-        .add(f.interface(STRATIS_POOL_BASE_INTERFACE, ())
+        .add(f.interface(interface_name, ())
             .add_m(create_filesystems_method)
             .add_m(destroy_filesystems_method)
             .add_m(list_filesystems_method)
@@ -1126,7 +1133,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
 
     let base_tree = f.tree();
 
-    let create_pool_method = f.method(CREATE_POOL, (), create_pool)
+    let create_pool_method = f.method("CreatePool", (), create_pool)
         .in_arg(("pool_name", "s"))
         .in_arg(("raid_type", "q"))
         .in_arg(("force", "b"))
@@ -1135,46 +1142,48 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let destroy_pool_method = f.method(DESTROY_POOL, (), destroy_pool)
+    let destroy_pool_method = f.method("DestroyPool", (), destroy_pool)
         .in_arg(("pool_name", "s"))
         .out_arg(("action", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let list_pools_method = f.method(LIST_POOLS, (), list_pools)
+    let list_pools_method = f.method("ListPools", (), list_pools)
         .out_arg(("pool_names", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let get_pool_object_path_method = f.method(GET_POOL_OBJECT_PATH, (), get_pool_object_path)
+    let get_pool_object_path_method = f.method("GetPoolObjectPath", (), get_pool_object_path)
         .in_arg(("pool_name", "s"))
         .out_arg(("object_path", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
     let get_filesystem_object_path_method =
-        f.method(GET_FILESYSTEM_OBJECT_PATH, (), get_filesystem_object_path)
+        f.method("GetFilesystemObjectPath", (), get_filesystem_object_path)
             .in_arg(("pool_name", "s"))
             .in_arg(("filesystem_name", "s"))
             .out_arg(("object_path", "o"))
             .out_arg(("return_code", "q"))
             .out_arg(("return_string", "s"));
 
-    let get_error_codes_method = f.method(GET_ERROR_CODES, (), get_error_codes)
+    let get_error_codes_method = f.method("GetErrorCodes", (), get_error_codes)
         .out_arg(("error_codes", "a(sqs)"));
 
-    let get_raid_levels_method = f.method(GET_RAID_LEVELS, (), get_raid_levels)
+    let get_raid_levels_method = f.method("GetRaidLevels", (), get_raid_levels)
         .out_arg(("error_codes", "a(sqs)"));
 
-    let configure_simulator_method = f.method(CONFIGURE_SIMULATOR, (), configure_simulator)
+    let configure_simulator_method = f.method("ConfigureSimulator", (), configure_simulator)
         .in_arg(("denominator", "u"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
+    let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "Manager");
+
     let obj_path = f.object_path(STRATIS_BASE_PATH, dbus_context)
         .introspectable()
         .object_manager()
-        .add(f.interface(STRATIS_MANAGER_INTERFACE, ())
+        .add(f.interface(interface_name, ())
             .add_m(list_pools_method)
             .add_m(create_pool_method)
             .add_m(destroy_pool_method)

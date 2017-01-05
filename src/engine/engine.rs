@@ -4,11 +4,9 @@
 
 use std::collections::BTreeMap;
 use std::fmt::Debug;
-use std::io;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use nix;
+use super::errors::EngineResult;
 
 #[derive(Debug)]
 pub enum RenameAction {
@@ -17,56 +15,11 @@ pub enum RenameAction {
     Renamed,
 }
 
-#[derive(Debug)]
-pub enum ErrorEnum {
-    Ok,
-    Error(String),
-
-    AlreadyExists(String),
-    Busy(String),
-    Invalid(String),
-    NotFound(String),
-}
-
-impl ErrorEnum {
-    pub fn get_error_string(&self) -> String {
-        match *self {
-            ErrorEnum::Ok => "Ok".into(),
-            ErrorEnum::Error(ref x) => format!("{}", x),
-            ErrorEnum::AlreadyExists(ref x) => format!("{} already exists", x),
-            ErrorEnum::Busy(ref x) => format!("{} is busy", x),
-            ErrorEnum::Invalid(ref x) => format!("{}", x),
-            ErrorEnum::NotFound(ref x) => format!("{} is not found", x),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum EngineError {
-    Stratis(ErrorEnum),
-    Io(io::Error),
-    Nix(nix::Error),
-}
-
-pub type EngineResult<T> = Result<T, EngineError>;
-
 pub trait Dev: Debug {
     fn get_id(&self) -> String;
 }
 
 pub trait Filesystem: Debug {}
-
-impl From<io::Error> for EngineError {
-    fn from(err: io::Error) -> EngineError {
-        EngineError::Io(err)
-    }
-}
-
-impl From<nix::Error> for EngineError {
-    fn from(err: nix::Error) -> EngineError {
-        EngineError::Nix(err)
-    }
-}
 
 pub trait Pool: Debug {
     /// Creates the filesystems specified by specs.

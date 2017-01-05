@@ -28,7 +28,7 @@ pub enum DevOwnership {
 
 #[derive(Debug)]
 pub struct StratEngine {
-    pub pools: BTreeMap<String, StratPool>,
+    pools: BTreeMap<String, StratPool>,
 }
 
 impl StratEngine {

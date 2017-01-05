@@ -6,9 +6,8 @@ use engine::Engine;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
-
 use engine::Pool;
-
+use engine::Redundancy;
 use engine::RenameAction;
 
 use std::cell::RefCell;
@@ -28,6 +27,7 @@ use super::randomization::Randomizer;
 #[derive(Debug)]
 pub struct SimEngine {
     pools: BTreeMap<String, SimPool>,
+    redundancies: Vec<Redundancy>,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
@@ -35,6 +35,7 @@ impl SimEngine {
     pub fn new() -> SimEngine {
         SimEngine {
             pools: BTreeMap::new(),
+            redundancies: Redundancy::iter_variants().collect(),
             rdm: Rc::new(RefCell::new(Randomizer::new())),
         }
     }
@@ -90,6 +91,10 @@ impl Engine for SimEngine {
         self.rdm.borrow_mut().set_probability(denominator);
         Ok(())
     }
+
+    fn supported_redundancies(&self) -> &[Redundancy] {
+        supported_redundancies!(self)
+    }
 }
 
 #[cfg(test)]
@@ -104,6 +109,7 @@ mod tests {
     use engine::Engine;
     use engine::EngineError;
     use engine::ErrorEnum;
+    use engine::Redundancy;
     use engine::RenameAction;
 
     #[test]
@@ -273,6 +279,13 @@ mod tests {
             Ok(RenameAction::NoSource) => true,
             _ => false,
         });
+    }
+
+    #[test]
+    /// Make sure supported redundancy contains at least RAID0.
+    fn test_supported_redundancy_raid0() {
+        let engine = SimEngine::new();
+        assert!(engine.supported_redundancies().contains(&Redundancy::RAID0));
     }
 
 }

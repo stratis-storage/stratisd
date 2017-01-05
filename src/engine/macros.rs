@@ -89,3 +89,9 @@ macro_rules! rename_filesystem {
         };
     }
 }
+
+macro_rules! supported_redundancies {
+    ( $s: ident ) => {
+        &$s.redundancies
+    }
+}

@@ -6,6 +6,7 @@ pub use self::engine::Dev;
 pub use self::engine::Engine;
 pub use self::engine::Filesystem;
 pub use self::engine::Pool;
+pub use self::engine::Redundancy;
 pub use self::engine::RenameAction;
 
 pub use self::errors::EngineError;

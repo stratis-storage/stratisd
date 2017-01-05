@@ -15,6 +15,18 @@ pub enum RenameAction {
     Renamed,
 }
 
+/// Redundancy classifications.
+custom_derive! {
+    #[derive(Clone, Copy, Debug, PartialEq,
+             EnumDisplay,
+             IterVariants(RedundancyValues))]
+    #[allow(non_camel_case_types)]
+    /// Redundancy specification for a pool.
+    pub enum Redundancy {
+        RAID0,
+    }
+}
+
 pub trait Dev: Debug {
     fn get_id(&self) -> String;
 }
@@ -104,4 +116,7 @@ pub trait Engine: Debug {
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.
     fn configure_simulator(&mut self, denominator: u32) -> EngineResult<()>;
+
+    /// Indicate the supported redundancy classifications.
+    fn supported_redundancies(&self) -> &[Redundancy];
 }

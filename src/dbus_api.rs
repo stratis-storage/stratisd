@@ -979,14 +979,16 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut iter = message.iter_init();
 
     let name: &str = try!(get_next_arg(&mut iter, 0));
-    let raid_level: u16 = try!(get_next_arg(&mut iter, 1));
+    let redundancy: (bool, u16) = try!(get_next_arg(&mut iter, 1));
     let force: bool = try!(get_next_arg(&mut iter, 2));
     let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 3));
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
     let dbus_context = m.path.get_data();
-    let result = dbus_context.engine.borrow_mut().create_pool(name, &blockdevs, raid_level, force);
+    let result = dbus_context.engine
+        .borrow_mut()
+        .create_pool(name, &blockdevs, tuple_to_option(redundancy), force);
 
     let return_message = message.method_return();
 
@@ -1143,7 +1145,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
 
     let create_pool_method = f.method("CreatePool", (), create_pool)
         .in_arg(("pool_name", "s"))
-        .in_arg(("redundancy", "q"))
+        .in_arg(("redundancy", "(bq)"))
         .in_arg(("force", "b"))
         .in_arg(("dev_list", "as"))
         .out_arg(("result", "(oas)"))

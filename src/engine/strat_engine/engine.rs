@@ -46,11 +46,10 @@ impl Engine for StratEngine {
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
-                   redundancy: u16,
+                   redundancy: Option<u16>,
                    force: bool)
                    -> EngineResult<Vec<PathBuf>> {
 
-        let redundancy = redundancy as usize;
         let redundancy = calculate_redundancy!(redundancy);
 
         if self.pools.contains_key(name) {

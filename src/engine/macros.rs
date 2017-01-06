@@ -4,12 +4,17 @@
 
 macro_rules! calculate_redundancy {
     ( $redundancy:ident ) => {
-        match Redundancy::iter_variants().nth($redundancy) {
-            None => {
-                let message = format!("code {} does not correspond to any redundancy", $redundancy);
-                return Err(EngineError::Stratis(ErrorEnum::Error(message)));
+        match $redundancy {
+            None => Redundancy::NONE,
+            Some(n) => {
+                match Redundancy::iter_variants().nth(n as usize) {
+                    None => {
+                        let message = format!("code {} does not correspond to any redundancy", n);
+                        return Err(EngineError::Stratis(ErrorEnum::Error(message)));
+                    }
+                    Some(r) => r
+                }
             }
-            Some(r) => r
         }
     }
 }

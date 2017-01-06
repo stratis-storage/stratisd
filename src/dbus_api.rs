@@ -7,7 +7,6 @@ use bidir_map::BidirMap;
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::cell::RefCell;
-use std::fmt::Display;
 use std::path::Path;
 use std::rc::Rc;
 use std::vec::Vec;
@@ -1084,23 +1083,16 @@ fn get_filesystem_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResul
     Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
 }
 
-fn get_list_items<T, I>(m: &MethodInfo<MTFn<TData>, TData>, iter: I) -> MethodResult
-    where T: HasCodes + Display,
-          I: Iterator<Item = T>
-{
-    let msg_vec = iter.map(|item| {
+fn get_error_codes(i: &mut IterAppend, _p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+    let msg_vec = ErrorEnum::iter_variants()
+        .map(|item| {
             MessageItem::Struct(vec![MessageItem::Str(format!("{}", item)),
-                                     MessageItem::UInt16(item.get_error_int()),
-                                     MessageItem::Str(format!("{}", item.get_error_string()))])
+                                     MessageItem::UInt16(item as u16)])
         })
         .collect::<Vec<MessageItem>>();
-
-    let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sqs)"));
-    Ok(vec![m.msg.method_return().append1(item_array)])
-}
-
-fn get_error_codes(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    get_list_items(m, ErrorEnum::iter_variants())
+    let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sq)"));
+    i.append(item_array);
+    Ok(())
 }
 
 
@@ -1183,9 +1175,6 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
             .out_arg(("return_code", "q"))
             .out_arg(("return_string", "s"));
 
-    let get_error_codes_method = f.method("GetErrorCodes", (), get_error_codes)
-        .out_arg(("error_codes", "a(sqs)"));
-
     let configure_simulator_method = f.method("ConfigureSimulator", (), configure_simulator)
         .in_arg(("denominator", "u"))
         .out_arg(("return_code", "q"))
@@ -1196,6 +1185,11 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
                                                                               ())
             .access(Access::Read)
             .on_get(get_redundancy_codes);
+
+    let error_codes_property =
+        f.property::<Array<(&str, u16), &Iterator<Item = (&str, u16)>>, _>("ErrorCodes", ())
+            .access(Access::Read)
+            .on_get(get_error_codes);
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "Manager");
 
@@ -1208,8 +1202,8 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
             .add_m(destroy_pool_method)
             .add_m(get_pool_object_path_method)
             .add_m(get_filesystem_object_path_method)
-            .add_m(get_error_codes_method)
             .add_m(configure_simulator_method)
+            .add_p(error_codes_property)
             .add_p(redundancy_codes_property));
 
     let base_tree = base_tree.add(obj_path);

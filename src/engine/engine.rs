@@ -96,7 +96,7 @@ pub trait Engine: Debug {
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
-                   redundancy: u16,
+                   redundancy: Option<u16>,
                    force: bool)
                    -> EngineResult<Vec<PathBuf>>;
 

@@ -169,10 +169,16 @@ class ManagerSpec(InterfaceSpec):
 
     INTERFACE_NAME = 'org.storage.stratis1.Manager'
 
-    INPUT_SIGS = {
+    INPUT_SIGS = { # pragma: no cover
         MethodNames.ConfigureSimulator : (("denominator", ), _FALSE, "u"),
         MethodNames.CreatePool :
-           (("name", "redundancy", "force", "devices"), _FALSE, "sqbas"),
+           (
+               ("name", "redundancy", "force", "devices"),
+               (lambda n:
+                   (lambda x: _option_to_tuple(x, 0)) \
+                      if n == "redundancy" else (lambda x: x)),
+               "s(bq)bas"
+           ),
         MethodNames.DestroyPool : (("name", ), _FALSE, "s"),
         MethodNames.GetErrorCodes : ((), _FALSE, ""),
         MethodNames.GetFilesystemObjectPath :

@@ -101,7 +101,7 @@ class InterfaceSpec(abc.ABC):
     OUTPUT_SIGS = \
        abc.abstractproperty(doc="map from method name to output signatures")
     XFORMERS = abc.abstractproperty(doc="map from method name to xformer")
-    PROPERTY_NAMES = abc.abstractproperty(doc="list of property names")
+    PROPERTY_SIGS = abc.abstractproperty(doc="map from property names to sigs")
 
 
 class FilesystemSpec(InterfaceSpec):
@@ -141,6 +141,8 @@ class FilesystemSpec(InterfaceSpec):
     }
     XFORMERS = _xformers(INPUT_SIGS)
 
+    PROPERTY_SIGS = {}
+
 
 class ManagerSpec(InterfaceSpec):
     """
@@ -155,17 +157,16 @@ class ManagerSpec(InterfaceSpec):
         ConfigureSimulator = "ConfigureSimulator"
         CreatePool = "CreatePool"
         DestroyPool = "DestroyPool"
-        GetErrorCodes = "GetErrorCodes"
         GetFilesystemObjectPath = "GetFilesystemObjectPath"
         GetPoolObjectPath = "GetPoolObjectPath"
-        GetRaidLevels = "GetRaidLevels"
         ListPools = "ListPools"
 
     class PropertyNames(enum.Enum):
         """
         Names of the properties of the manager interface.
         """
-        pass
+        ErrorValues = "ErrorValues"
+        RedundancyValues = "RedundancyValues"
 
     INTERFACE_NAME = 'org.storage.stratis1.Manager'
 
@@ -180,24 +181,25 @@ class ManagerSpec(InterfaceSpec):
                "s(bq)bas"
            ),
         MethodNames.DestroyPool : (("name", ), _FALSE, "s"),
-        MethodNames.GetErrorCodes : ((), _FALSE, ""),
         MethodNames.GetFilesystemObjectPath :
            (("pool_name", "filesystem_name"), _FALSE, "ss"),
         MethodNames.GetPoolObjectPath : (("name", ), _FALSE, "s"),
-        MethodNames.GetRaidLevels : ((), _FALSE, ""),
         MethodNames.ListPools : ((), _FALSE, ""),
     }
     OUTPUT_SIGS = {
         MethodNames.ConfigureSimulator : "qs",
         MethodNames.CreatePool : "(oas)qs",
         MethodNames.DestroyPool : "bqs",
-        MethodNames.GetErrorCodes : "a(sqs)",
         MethodNames.GetFilesystemObjectPath : "oqs",
         MethodNames.GetPoolObjectPath : "oqs",
-        MethodNames.GetRaidLevels : "a(sqs)",
         MethodNames.ListPools : "asqs",
     }
     XFORMERS = _xformers(INPUT_SIGS)
+
+    PROPERTY_SIGS = {
+       PropertyNames.ErrorValues: "a(sq)",
+       PropertyNames.RedundancyValues: "a(sq)"
+    }
 
 
 class PoolSpec(InterfaceSpec):
@@ -260,6 +262,8 @@ class PoolSpec(InterfaceSpec):
        MethodNames.Rename: "bqs"
     }
     XFORMERS = _xformers(INPUT_SIGS)
+
+    PROPERTY_SIGS = {}
 
 
 def _prop_builder(spec):

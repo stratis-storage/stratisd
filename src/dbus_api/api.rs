@@ -229,10 +229,6 @@ fn default_object_path<'a>() -> dbus::Path<'a> {
     dbus::Path::new("/").unwrap()
 }
 
-fn remove_dbus_object_path(dbus_context: &DbusContext, path: String) {
-    dbus_context.action_list.borrow_mut().push(DeferredAction::Remove(path));
-}
-
 fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let mut engine = dbus_context.engine.borrow_mut();
@@ -288,7 +284,7 @@ fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
             .add_m(set_quota_method));
 
     let path = object_path.get_name().to_owned();
-    dbus_context.action_list.borrow_mut().push(DeferredAction::Add(object_path));
+    dbus_context.actions.borrow_mut().push_add(object_path);
     path
 }
 
@@ -499,7 +495,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                     .borrow_mut()
                     .remove_by_second(&(pool_name.clone(), (*name).into())) {
                     Some((object_path, _)) => {
-                        remove_dbus_object_path(dbus_context, object_path);
+                        dbus_context.actions.borrow_mut().push_remove(object_path);
                     }
                     _ => {}
                 }
@@ -919,7 +915,7 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
             .add_m(rename_method));
 
     let path = object_path.get_name().to_owned();
-    dbus_context.action_list.borrow_mut().push(DeferredAction::Add(object_path));
+    dbus_context.actions.borrow_mut().push_add(object_path);
     path
 }
 
@@ -982,7 +978,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(action) => {
             match dbus_context.pools.borrow_mut().remove_by_second(name.into()) {
                 Some((object_path, _)) => {
-                    remove_dbus_object_path(dbus_context, object_path);
+                    dbus_context.actions.borrow_mut().push_remove(object_path);
                 }
                 _ => {}
             };
@@ -1192,8 +1188,8 @@ pub fn run(engine: Box<Engine>) -> StratisResult<()> {
                     let _ = c.send(m);
                 }
             }
-            let mut b_action_list = dbus_context.action_list.borrow_mut();
-            for action in b_action_list.drain(..) {
+            let mut b_actions = dbus_context.actions.borrow_mut();
+            for action in b_actions.drain() {
                 match action {
                     DeferredAction::Add(path) => {
                         try!(c.register_object_path(path.get_name()));

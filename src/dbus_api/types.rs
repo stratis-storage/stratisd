@@ -4,11 +4,10 @@
 
 use bidir_map::BidirMap;
 
-use std::cell::Cell;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::collections::vec_deque::{Drain, VecDeque};
 use std::convert::From;
 use std::rc::Rc;
-use std::vec::Vec;
 
 use dbus::tree::{DataType, MTFn, ObjectPath};
 
@@ -83,14 +82,14 @@ pub struct DbusContext {
     pub next_index: Rc<Cell<u64>>,
     pub pools: Rc<RefCell<BidirMap<String, String>>>,
     pub engine: Rc<RefCell<Box<Engine>>>,
-    pub action_list: Rc<RefCell<Vec<DeferredAction>>>,
+    pub actions: Rc<RefCell<ActionQueue>>,
     pub filesystems: Rc<RefCell<BidirMap<String, (String, String)>>>,
 }
 
 impl DbusContext {
     pub fn new(engine: Box<Engine>) -> DbusContext {
         DbusContext {
-            action_list: Rc::new(RefCell::new(Vec::new())),
+            actions: Rc::new(RefCell::new(ActionQueue::new())),
             engine: Rc::new(RefCell::new(engine)),
             filesystems: Rc::new(RefCell::new(BidirMap::new())),
             next_index: Rc::new(Cell::new(0)),
@@ -117,4 +116,34 @@ impl DataType for TData {
     type Method = ();
     type Signal = ();
     type Tree = DbusContext;
+}
+
+/// An action queue.
+/// Add and remove actions are pushed onto the queue.
+/// The queue can also be drained.
+#[derive(Debug)]
+pub struct ActionQueue {
+    queue: VecDeque<DeferredAction>,
+}
+
+impl ActionQueue {
+    /// Initialize an empty action queue.
+    pub fn new() -> ActionQueue {
+        ActionQueue { queue: VecDeque::new() }
+    }
+
+    /// Push an Add action onto the back of the queue.
+    pub fn push_add(&mut self, object_path: ObjectPath<MTFn<TData>, TData>) {
+        self.queue.push_back(DeferredAction::Add(object_path))
+    }
+
+    /// Push a Remove action onto the back of the queue.
+    pub fn push_remove(&mut self, object_path: String) {
+        self.queue.push_back(DeferredAction::Remove(object_path))
+    }
+
+    /// Drain the queue.
+    pub fn drain(&mut self) -> Drain<DeferredAction> {
+        self.queue.drain(..)
+    }
 }

@@ -200,7 +200,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     /// Creating a pool with an impossible raid level should fail
     fn create_pool_max_u16_raid() {
         let mut engine = SimEngine::new();

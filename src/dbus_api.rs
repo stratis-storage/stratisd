@@ -20,12 +20,15 @@ use dbus::MessageItem;
 use dbus::NameFlag;
 use dbus::arg::Array;
 use dbus::arg::Iter;
+use dbus::arg::IterAppend;
+use dbus::tree::Access;
 use dbus::tree::Factory;
 use dbus::tree::DataType;
 use dbus::tree::MethodErr;
 use dbus::tree::MTFn;
 use dbus::tree::MethodResult;
 use dbus::tree::MethodInfo;
+use dbus::tree::PropInfo;
 use dbus::tree::Tree;
 use dbus::tree::ObjectPath;
 use dbus::ConnectionItem;
@@ -35,6 +38,7 @@ use dbus_consts::*;
 use engine;
 use engine::Engine;
 use engine::EngineError;
+use engine::Redundancy;
 use engine::RenameAction;
 
 use types::StratisResult;
@@ -1098,8 +1102,18 @@ fn get_error_codes(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 }
 
 
-fn get_raid_levels(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    get_list_items(m, RaidType::iter_variants())
+fn get_redundancy_codes(i: &mut IterAppend,
+                        _p: &PropInfo<MTFn<TData>, TData>)
+                        -> Result<(), MethodErr> {
+    let msg_vec = Redundancy::iter_variants()
+        .map(|item| {
+            MessageItem::Struct(vec![MessageItem::Str(format!("{}", item)),
+                                     MessageItem::UInt16(item as u16)])
+        })
+        .collect::<Vec<MessageItem>>();
+    let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sq)"));
+    i.append(item_array);
+    Ok(())
 }
 
 fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -1170,13 +1184,16 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
     let get_error_codes_method = f.method("GetErrorCodes", (), get_error_codes)
         .out_arg(("error_codes", "a(sqs)"));
 
-    let get_raid_levels_method = f.method("GetRaidLevels", (), get_raid_levels)
-        .out_arg(("error_codes", "a(sqs)"));
-
     let configure_simulator_method = f.method("ConfigureSimulator", (), configure_simulator)
         .in_arg(("denominator", "u"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
+
+    let redundancy_codes_property =
+        f.property::<Array<(&str, u16), &Iterator<Item = (&str, u16)>>, _>("RedundancyCodes",
+                                                                              ())
+            .access(Access::Read)
+            .on_get(get_redundancy_codes);
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "Manager");
 
@@ -1190,8 +1207,8 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
             .add_m(get_pool_object_path_method)
             .add_m(get_filesystem_object_path_method)
             .add_m(get_error_codes_method)
-            .add_m(get_raid_levels_method)
-            .add_m(configure_simulator_method));
+            .add_m(configure_simulator_method)
+            .add_p(redundancy_codes_property));
 
     let base_tree = base_tree.add(obj_path);
 

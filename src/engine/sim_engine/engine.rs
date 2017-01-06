@@ -8,8 +8,8 @@ use engine::EngineResult;
 use engine::ErrorEnum;
 
 use engine::Pool;
-
 use engine::RenameAction;
+use engine::Redundancy;
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -44,9 +44,12 @@ impl Engine for SimEngine {
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
-                   raid_level: u16,
+                   redundancy: u16,
                    _force: bool)
                    -> EngineResult<Vec<PathBuf>> {
+
+        let redundancy = redundancy as usize;
+        let redundancy = calculate_redundancy!(redundancy);
 
         if self.pools.contains_key(name) {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
@@ -55,7 +58,7 @@ impl Engine for SimEngine {
         let devices =
             BTreeSet::from_iter(blockdev_paths).into_iter().map(|x| *x).collect::<Vec<&Path>>();
 
-        let pool = SimPool::new(self.rdm.clone(), &devices, raid_level);
+        let pool = SimPool::new(self.rdm.clone(), &devices, redundancy);
 
         if self.rdm.borrow_mut().throw_die() {
             return Err(EngineError::Stratis(ErrorEnum::Error("X".into())));

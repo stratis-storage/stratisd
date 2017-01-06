@@ -63,33 +63,3 @@ impl HasCodes for ErrorEnum {
         }
     }
 }
-
-custom_derive! {
-    #[derive(Copy, Clone, EnumDisplay,
-             IterVariants(StratisDBusRaidTypeVariants),
-             IterVariantNames(StratisDBusRaidTypeVariantNames))]
-    #[allow(non_camel_case_types)]
-    pub enum RaidType {
-        RAID_TYPE_UNKNOWN,
-        RAID_TYPE_SINGLE,
-        RAID_TYPE_RAID1,
-        RAID_TYPE_RAID5,
-        RAID_TYPE_RAID6,
-    }
-}
-
-impl HasCodes for RaidType {
-    fn get_error_int(&self) -> u16 {
-        *self as u16
-    }
-
-    fn get_error_string(&self) -> &str {
-        match *self {
-            RaidType::RAID_TYPE_UNKNOWN => "Unknown",
-            RaidType::RAID_TYPE_SINGLE => "Single",
-            RaidType::RAID_TYPE_RAID1 => "Mirrored",
-            RaidType::RAID_TYPE_RAID5 => "Block-level striping with distributed parity",
-            RaidType::RAID_TYPE_RAID6 => "Block-level striping with two distributed parities",
-        }
-    }
-}

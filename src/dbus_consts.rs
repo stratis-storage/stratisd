@@ -2,11 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-pub trait HasCodes {
-    /// Indicates that this enum can be described as a string.
-    fn get_error_string(&self) -> &str;
-}
-
 custom_derive! {
     #[derive(Copy, Clone, EnumDisplay,
              IterVariants(StratisDBusErrorVariants),
@@ -41,8 +36,8 @@ impl From<ErrorEnum> for u16 {
     }
 }
 
-impl HasCodes for ErrorEnum {
-    fn get_error_string(&self) -> &str {
+impl ErrorEnum {
+    pub fn get_error_string(&self) -> &str {
         match *self {
             ErrorEnum::OK => "Ok",
             ErrorEnum::ERROR => "A general error happened",

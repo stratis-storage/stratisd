@@ -14,8 +14,9 @@ use engine::Engine;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
-use engine::RenameAction;
 use engine::Pool;
+use engine::Redundancy;
+use engine::RenameAction;
 
 use super::pool::StratPool;
 
@@ -28,7 +29,7 @@ pub enum DevOwnership {
 
 #[derive(Debug)]
 pub struct StratEngine {
-    pub pools: BTreeMap<String, StratPool>,
+    pools: BTreeMap<String, StratPool>,
 }
 
 impl StratEngine {
@@ -45,14 +46,18 @@ impl Engine for StratEngine {
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
-                   raid_level: u16,
+                   redundancy: Option<u16>,
                    force: bool)
                    -> EngineResult<Vec<PathBuf>> {
+
+        let redundancy = redundancy.unwrap_or(0) as usize;
+        let redundancy = calculate_redundancy!(redundancy);
 
         if self.pools.contains_key(name) {
             return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
         }
-        let pool = try!(StratPool::new(name, blockdev_paths, raid_level, force));
+
+        let pool = try!(StratPool::new(name, blockdev_paths, redundancy, force));
         let bdev_paths = pool.block_devs.iter().map(|p| p.1.devnode.clone()).collect();
 
         self.pools.insert(name.to_owned(), pool);

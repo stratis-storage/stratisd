@@ -2,13 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-pub trait HasCodes {
-    /// Indicates that this enum can be converted to an int or described
-    /// with a string.
-    fn get_error_int(&self) -> u16;
-    fn get_error_string(&self) -> &str;
-}
-
 custom_derive! {
     #[derive(Copy, Clone, EnumDisplay,
              IterVariants(StratisDBusErrorVariants),
@@ -36,12 +29,15 @@ custom_derive! {
     }
 }
 
-impl HasCodes for ErrorEnum {
-    fn get_error_int(&self) -> u16 {
-        *self as u16
+/// Get the u16 value of this ErrorEnum constructor.
+impl From<ErrorEnum> for u16 {
+    fn from(e: ErrorEnum) -> u16 {
+        e as u16
     }
+}
 
-    fn get_error_string(&self) -> &str {
+impl ErrorEnum {
+    pub fn get_error_string(&self) -> &str {
         match *self {
             ErrorEnum::OK => "Ok",
             ErrorEnum::ERROR => "A general error happened",
@@ -60,36 +56,6 @@ impl HasCodes for ErrorEnum {
             ErrorEnum::IO_ERROR => "IO error during operation.",
             ErrorEnum::NIX_ERROR => "System error during operation.",
             ErrorEnum::BUSY => "Operation can not be performed at this time",
-        }
-    }
-}
-
-custom_derive! {
-    #[derive(Copy, Clone, EnumDisplay,
-             IterVariants(StratisDBusRaidTypeVariants),
-             IterVariantNames(StratisDBusRaidTypeVariantNames))]
-    #[allow(non_camel_case_types)]
-    pub enum RaidType {
-        RAID_TYPE_UNKNOWN,
-        RAID_TYPE_SINGLE,
-        RAID_TYPE_RAID1,
-        RAID_TYPE_RAID5,
-        RAID_TYPE_RAID6,
-    }
-}
-
-impl HasCodes for RaidType {
-    fn get_error_int(&self) -> u16 {
-        *self as u16
-    }
-
-    fn get_error_string(&self) -> &str {
-        match *self {
-            RaidType::RAID_TYPE_UNKNOWN => "Unknown",
-            RaidType::RAID_TYPE_SINGLE => "Single",
-            RaidType::RAID_TYPE_RAID1 => "Mirrored",
-            RaidType::RAID_TYPE_RAID5 => "Block-level striping with distributed parity",
-            RaidType::RAID_TYPE_RAID6 => "Block-level striping with two distributed parities",
         }
     }
 }

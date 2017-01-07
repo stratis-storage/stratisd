@@ -26,6 +26,13 @@ custom_derive! {
     }
 }
 
+/// Get the u16 value of this Redundancy constructor.
+impl From<Redundancy> for u16 {
+    fn from(r: Redundancy) -> u16 {
+        r as u16
+    }
+}
+
 pub trait Dev: Debug {
     fn get_id(&self) -> String;
 }

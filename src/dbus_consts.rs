@@ -3,9 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 pub trait HasCodes {
-    /// Indicates that this enum can be converted to an int or described
-    /// with a string.
-    fn get_error_int(&self) -> u16;
+    /// Indicates that this enum can be described as a string.
     fn get_error_string(&self) -> &str;
 }
 
@@ -36,11 +34,14 @@ custom_derive! {
     }
 }
 
-impl HasCodes for ErrorEnum {
-    fn get_error_int(&self) -> u16 {
-        *self as u16
+/// Get the u16 value of this ErrorEnum constructor.
+impl From<ErrorEnum> for u16 {
+    fn from(e: ErrorEnum) -> u16 {
+        e as u16
     }
+}
 
+impl HasCodes for ErrorEnum {
     fn get_error_string(&self) -> &str {
         match *self {
             ErrorEnum::OK => "Ok",

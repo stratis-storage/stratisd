@@ -7,6 +7,8 @@ use bidir_map::BidirMap;
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::cell::RefCell;
+use std::convert::From;
+use std::fmt::Display;
 use std::path::Path;
 use std::rc::Rc;
 use std::vec::Vec;
@@ -267,7 +269,7 @@ fn engine_to_dbus_err(err: &EngineError) -> (ErrorEnum, String) {
 /// Convenience function to convert a return code and a string to
 /// appropriately typed MessageItems.
 fn code_to_message_items(code: ErrorEnum, mes: String) -> (MessageItem, MessageItem) {
-    (MessageItem::UInt16(code.get_error_int()), MessageItem::Str(mes))
+    (MessageItem::UInt16(code.into()), MessageItem::Str(mes))
 }
 
 /// Convenience function to directly yield MessageItems for OK code and message.
@@ -1083,11 +1085,13 @@ fn get_filesystem_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResul
     Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
 }
 
-fn get_error_codes(i: &mut IterAppend, _p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
-    let msg_vec = ErrorEnum::iter_variants()
-        .map(|item| {
+fn get_list_items<T, I>(i: &mut IterAppend, iter: I) -> Result<(), MethodErr>
+    where T: Display + Into<u16>,
+          I: Iterator<Item = T>
+{
+    let msg_vec = iter.map(|item| {
             MessageItem::Struct(vec![MessageItem::Str(format!("{}", item)),
-                                     MessageItem::UInt16(item as u16)])
+                                     MessageItem::UInt16(item.into())])
         })
         .collect::<Vec<MessageItem>>();
     let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sq)"));
@@ -1095,19 +1099,15 @@ fn get_error_codes(i: &mut IterAppend, _p: &PropInfo<MTFn<TData>, TData>) -> Res
     Ok(())
 }
 
+fn get_error_codes(i: &mut IterAppend, _p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+    get_list_items(i, ErrorEnum::iter_variants())
+}
+
 
 fn get_redundancy_codes(i: &mut IterAppend,
                         _p: &PropInfo<MTFn<TData>, TData>)
                         -> Result<(), MethodErr> {
-    let msg_vec = Redundancy::iter_variants()
-        .map(|item| {
-            MessageItem::Struct(vec![MessageItem::Str(format!("{}", item)),
-                                     MessageItem::UInt16(item as u16)])
-        })
-        .collect::<Vec<MessageItem>>();
-    let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sq)"));
-    i.append(item_array);
-    Ok(())
+    get_list_items(i, Redundancy::iter_variants())
 }
 
 fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {

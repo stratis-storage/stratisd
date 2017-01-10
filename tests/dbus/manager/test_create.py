@@ -32,6 +32,7 @@ from .._misc import _device_list
 from .._misc import Service
 
 _MN = ManagerSpec.MethodNames
+_MP = ManagerSpec.PropertyNames
 
 _DEVICE_STRATEGY = _device_list(0)
 
@@ -96,6 +97,24 @@ class Create2TestCase(unittest.TestCase):
             self.assertEqual(rc1, self._errors.POOL_NOTFOUND)
             self.assertEqual(len(pools), 0)
 
+    def testCreateBadRAID(self):
+        """
+        Creation should always fail if RAID value is wrong.
+        """
+        redundancy_values = Manager.Properties.RedundancyValues(self._proxy)
+
+        devs = _DEVICE_STRATEGY.example()
+        (_, rc, _) = checked_call(
+           Manager.CreatePool(
+              self._proxy,
+              name=self._POOLNAME,
+              redundancy=len(redundancy_values),
+              force=False,
+              devices=devs
+           ),
+           ManagerSpec.OUTPUT_SIGS[_MN.CreatePool]
+        )
+        self.assertEqual(rc, self._errors.ERROR)
 
 class Create3TestCase(unittest.TestCase):
     """

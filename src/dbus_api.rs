@@ -7,6 +7,7 @@ use bidir_map::BidirMap;
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::cell::RefCell;
+use std::convert::From;
 use std::fmt::Display;
 use std::path::Path;
 use std::rc::Rc;
@@ -20,12 +21,15 @@ use dbus::MessageItem;
 use dbus::NameFlag;
 use dbus::arg::Array;
 use dbus::arg::Iter;
+use dbus::arg::IterAppend;
+use dbus::tree::Access;
 use dbus::tree::Factory;
 use dbus::tree::DataType;
 use dbus::tree::MethodErr;
 use dbus::tree::MTFn;
 use dbus::tree::MethodResult;
 use dbus::tree::MethodInfo;
+use dbus::tree::PropInfo;
 use dbus::tree::Tree;
 use dbus::tree::ObjectPath;
 use dbus::ConnectionItem;
@@ -35,6 +39,7 @@ use dbus_consts::*;
 use engine;
 use engine::Engine;
 use engine::EngineError;
+use engine::Redundancy;
 use engine::RenameAction;
 
 use types::StratisResult;
@@ -264,7 +269,7 @@ fn engine_to_dbus_err(err: &EngineError) -> (ErrorEnum, String) {
 /// Convenience function to convert a return code and a string to
 /// appropriately typed MessageItems.
 fn code_to_message_items(code: ErrorEnum, mes: String) -> (MessageItem, MessageItem) {
-    (MessageItem::UInt16(code.get_error_int()), MessageItem::Str(mes))
+    (MessageItem::UInt16(code.into()), MessageItem::Str(mes))
 }
 
 /// Convenience function to directly yield MessageItems for OK code and message.
@@ -974,14 +979,16 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut iter = message.iter_init();
 
     let name: &str = try!(get_next_arg(&mut iter, 0));
-    let raid_level: u16 = try!(get_next_arg(&mut iter, 1));
+    let redundancy: (bool, u16) = try!(get_next_arg(&mut iter, 1));
     let force: bool = try!(get_next_arg(&mut iter, 2));
     let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 3));
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
     let dbus_context = m.path.get_data();
-    let result = dbus_context.engine.borrow_mut().create_pool(name, &blockdevs, raid_level, force);
+    let result = dbus_context.engine
+        .borrow_mut()
+        .create_pool(name, &blockdevs, tuple_to_option(redundancy), force);
 
     let return_message = message.method_return();
 
@@ -1078,28 +1085,31 @@ fn get_filesystem_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResul
     Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
 }
 
-fn get_list_items<T, I>(m: &MethodInfo<MTFn<TData>, TData>, iter: I) -> MethodResult
-    where T: HasCodes + Display,
+fn get_list_items<T, I>(i: &mut IterAppend, iter: I) -> Result<(), MethodErr>
+    where T: Display + Into<u16>,
           I: Iterator<Item = T>
 {
     let msg_vec = iter.map(|item| {
             MessageItem::Struct(vec![MessageItem::Str(format!("{}", item)),
-                                     MessageItem::UInt16(item.get_error_int()),
-                                     MessageItem::Str(format!("{}", item.get_error_string()))])
+                                     MessageItem::UInt16(item.into())])
         })
         .collect::<Vec<MessageItem>>();
-
-    let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sqs)"));
-    Ok(vec![m.msg.method_return().append1(item_array)])
+    let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sq)"));
+    i.append(item_array);
+    Ok(())
 }
 
-fn get_error_codes(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    get_list_items(m, ErrorEnum::iter_variants())
+fn get_error_values(i: &mut IterAppend,
+                    _p: &PropInfo<MTFn<TData>, TData>)
+                    -> Result<(), MethodErr> {
+    get_list_items(i, ErrorEnum::iter_variants())
 }
 
 
-fn get_raid_levels(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    get_list_items(m, RaidType::iter_variants())
+fn get_redundancy_values(i: &mut IterAppend,
+                         _p: &PropInfo<MTFn<TData>, TData>)
+                         -> Result<(), MethodErr> {
+    get_list_items(i, Redundancy::iter_variants())
 }
 
 fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -1135,7 +1145,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
 
     let create_pool_method = f.method("CreatePool", (), create_pool)
         .in_arg(("pool_name", "s"))
-        .in_arg(("raid_type", "q"))
+        .in_arg(("redundancy", "(bq)"))
         .in_arg(("force", "b"))
         .in_arg(("dev_list", "as"))
         .out_arg(("result", "(oas)"))
@@ -1167,16 +1177,21 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
             .out_arg(("return_code", "q"))
             .out_arg(("return_string", "s"));
 
-    let get_error_codes_method = f.method("GetErrorCodes", (), get_error_codes)
-        .out_arg(("error_codes", "a(sqs)"));
-
-    let get_raid_levels_method = f.method("GetRaidLevels", (), get_raid_levels)
-        .out_arg(("error_codes", "a(sqs)"));
-
     let configure_simulator_method = f.method("ConfigureSimulator", (), configure_simulator)
         .in_arg(("denominator", "u"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
+
+    let redundancy_values_property =
+        f.property::<Array<(&str, u16), &Iterator<Item = (&str, u16)>>, _>("RedundancyValues",
+                                                                              ())
+            .access(Access::Read)
+            .on_get(get_redundancy_values);
+
+    let error_values_property =
+        f.property::<Array<(&str, u16), &Iterator<Item = (&str, u16)>>, _>("ErrorValues", ())
+            .access(Access::Read)
+            .on_get(get_error_values);
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "Manager");
 
@@ -1189,9 +1204,9 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
             .add_m(destroy_pool_method)
             .add_m(get_pool_object_path_method)
             .add_m(get_filesystem_object_path_method)
-            .add_m(get_error_codes_method)
-            .add_m(get_raid_levels_method)
-            .add_m(configure_simulator_method));
+            .add_m(configure_simulator_method)
+            .add_p(error_values_property)
+            .add_p(redundancy_values_property));
 
     let base_tree = base_tree.add(obj_path);
 

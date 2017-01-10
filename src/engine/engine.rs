@@ -4,11 +4,9 @@
 
 use std::collections::BTreeMap;
 use std::fmt::Debug;
-use std::io;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use nix;
+use super::errors::EngineResult;
 
 #[derive(Debug)]
 pub enum RenameAction {
@@ -17,56 +15,30 @@ pub enum RenameAction {
     Renamed,
 }
 
-#[derive(Debug)]
-pub enum ErrorEnum {
-    Ok,
-    Error(String),
-
-    AlreadyExists(String),
-    Busy(String),
-    Invalid(String),
-    NotFound(String),
-}
-
-impl ErrorEnum {
-    pub fn get_error_string(&self) -> String {
-        match *self {
-            ErrorEnum::Ok => "Ok".into(),
-            ErrorEnum::Error(ref x) => format!("{}", x),
-            ErrorEnum::AlreadyExists(ref x) => format!("{} already exists", x),
-            ErrorEnum::Busy(ref x) => format!("{} is busy", x),
-            ErrorEnum::Invalid(ref x) => format!("{}", x),
-            ErrorEnum::NotFound(ref x) => format!("{} is not found", x),
-        }
+/// Redundancy classifications which the engine allows for pools.
+custom_derive! {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq, EnumDisplay,
+             IterVariants(RedundancyVariants))]
+    #[allow(non_camel_case_types)]
+    /// Redundancy specification for a pool.
+    pub enum Redundancy {
+        NONE,
     }
 }
 
-#[derive(Debug)]
-pub enum EngineError {
-    Stratis(ErrorEnum),
-    Io(io::Error),
-    Nix(nix::Error),
+/// Get the u16 value of this Redundancy constructor.
+impl From<Redundancy> for u16 {
+    fn from(r: Redundancy) -> u16 {
+        r as u16
+    }
 }
 
-pub type EngineResult<T> = Result<T, EngineError>;
 
 pub trait Dev: Debug {
     fn get_id(&self) -> String;
 }
 
 pub trait Filesystem: Debug {}
-
-impl From<io::Error> for EngineError {
-    fn from(err: io::Error) -> EngineError {
-        EngineError::Io(err)
-    }
-}
-
-impl From<nix::Error> for EngineError {
-    fn from(err: nix::Error) -> EngineError {
-        EngineError::Nix(err)
-    }
-}
 
 pub trait Pool: Debug {
     /// Creates the filesystems specified by specs.
@@ -125,11 +97,14 @@ pub trait Pool: Debug {
 }
 
 pub trait Engine: Debug {
-    /// Create a Stratis pool. Returns the number of blockdevs the pool contains.
+    /// Create a Stratis pool.
+    /// Returns the number of blockdevs the pool contains.
+    /// Returns an error if the redundancy code does not correspond to a
+    /// supported redundancy.
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
-                   raid_level: u16,
+                   redundancy: Option<u16>,
                    force: bool)
                    -> EngineResult<Vec<PathBuf>>;
 

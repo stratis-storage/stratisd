@@ -2,6 +2,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+macro_rules! calculate_redundancy {
+    ( $redundancy:ident ) => {
+        match Redundancy::iter_variants().nth($redundancy) {
+            None => {
+                let message = format!("code {} does not correspond to any redundancy", $redundancy);
+                return Err(EngineError::Stratis(ErrorEnum::Error(message)));
+            }
+            Some(r) => r
+        }
+    }
+}
+
 macro_rules! destroy_filesystems {
     ( $s:ident; $fs:expr ) => {
         let mut removed = Vec::new();

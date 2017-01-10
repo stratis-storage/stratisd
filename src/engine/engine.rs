@@ -15,6 +15,25 @@ pub enum RenameAction {
     Renamed,
 }
 
+/// Redundancy classifications which the engine allows for pools.
+custom_derive! {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq, EnumDisplay,
+             IterVariants(RedundancyVariants))]
+    #[allow(non_camel_case_types)]
+    /// Redundancy specification for a pool.
+    pub enum Redundancy {
+        NONE,
+    }
+}
+
+/// Get the u16 value of this Redundancy constructor.
+impl From<Redundancy> for u16 {
+    fn from(r: Redundancy) -> u16 {
+        r as u16
+    }
+}
+
+
 pub trait Dev: Debug {
     fn get_id(&self) -> String;
 }
@@ -78,11 +97,14 @@ pub trait Pool: Debug {
 }
 
 pub trait Engine: Debug {
-    /// Create a Stratis pool. Returns the number of blockdevs the pool contains.
+    /// Create a Stratis pool.
+    /// Returns the number of blockdevs the pool contains.
+    /// Returns an error if the redundancy code does not correspond to a
+    /// supported redundancy.
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
-                   raid_level: u16,
+                   redundancy: u16,
                    force: bool)
                    -> EngineResult<Vec<PathBuf>>;
 

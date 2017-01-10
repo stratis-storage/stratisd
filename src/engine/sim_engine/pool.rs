@@ -19,6 +19,8 @@ use engine::Filesystem;
 use engine::Pool;
 use engine::RenameAction;
 
+use engine::engine::Redundancy;
+
 use super::blockdev::SimDev;
 use super::filesystem::SimFilesystem;
 use super::randomization::Randomizer;
@@ -30,12 +32,12 @@ pub struct SimPool {
     pub block_devs: BTreeMap<PathBuf, SimDev>,
     pub cache_devs: BTreeMap<PathBuf, SimDev>,
     pub filesystems: BTreeMap<String, SimFilesystem>,
-    pub raid_level: u16,
+    redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
 impl SimPool {
-    pub fn new(rdm: Rc<RefCell<Randomizer>>, paths: &[&Path], raid_level: u16) -> SimPool {
+    pub fn new(rdm: Rc<RefCell<Randomizer>>, paths: &[&Path], redundancy: Redundancy) -> SimPool {
 
         let devices = BTreeSet::from_iter(paths);
         let device_pairs = devices.iter()
@@ -44,7 +46,7 @@ impl SimPool {
             block_devs: BTreeMap::from_iter(device_pairs),
             filesystems: BTreeMap::new(),
             cache_devs: BTreeMap::new(),
-            raid_level: raid_level,
+            redundancy: redundancy,
             rdm: rdm.clone(),
         };
 

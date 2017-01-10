@@ -1135,7 +1135,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
 
     let create_pool_method = f.method("CreatePool", (), create_pool)
         .in_arg(("pool_name", "s"))
-        .in_arg(("raid_type", "q"))
+        .in_arg(("redundancy", "q"))
         .in_arg(("force", "b"))
         .in_arg(("dev_list", "as"))
         .out_arg(("result", "(oas)"))

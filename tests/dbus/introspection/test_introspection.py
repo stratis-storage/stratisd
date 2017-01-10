@@ -52,6 +52,73 @@ def _signature(method_data, direction):
        "".join(x.attrib['type'] for \
           x in method_data.findall("./arg[@direction='%s']" % direction))
 
+def _verify_names(introspection_names, spec_names):
+    """
+    Verify that names are correct.
+
+    :param iterable introspection_names:
+    :param iterable spec_names:
+
+    :returns: an error string if some error was found, else None
+    :rtype: str or NoneType
+    """
+    introspection_names = [x for x in introspection_names]
+
+    names_set = frozenset(introspection_names)
+    if len(names_set) != len(introspection_names):
+        return "duplicate_names"
+
+    if names_set != frozenset(spec_names):
+        return "names do not match"
+
+    return None
+
+def _verify_properties(klass, klass_datum):
+    """
+    Verify that property introspection data matches klass's expectations.
+
+    :param type klass: the specification class for an interface
+    :param str klass_datum: introspection data for this class
+
+    :returns: an error string if some error was found, else None
+    :rtype: str or NoneType
+    """
+    for prop in klass.PropertyNames:
+        property_data = klass_datum.findall("./property[@name='%s']" % prop.name)
+        property_datum = property_data[0]
+
+        if property_datum.attrib['type'] != klass.PROPERTY_SIGS[prop]:
+            return "signature for property %s in interface %s does not match" \
+               % (prop.name, klass.INTERFACE_NAME)
+
+        if property_datum.attrib['access'] != 'read':
+            return "property %s in interface %s has access other than 'read'" \
+               % (prop.name, klass.INTERFACE_NAME)
+
+def _verify_methods(klass, klass_datum):
+    """
+    Verify that method introspection data matches klass's expectations.
+
+    :param type klass: the specification class for an interface
+    :param str klass_datum: introspection data for this class
+
+    :returns: an error string if some error was found, else None
+    :rtype: str or NoneType
+    """
+    for method in klass.MethodNames:
+        method_data = klass_datum.findall("./method[@name='%s']" % method.name)
+        method_datum = method_data[0]
+
+        sig = _signature(method_datum, "in")
+        if sig != klass.INPUT_SIGS[method][2]:
+            return "in signatures for method %s in interface %s do not match" \
+               % (method.name, klass.INTERFACE_NAME)
+
+        sig = _signature(method_datum, "out")
+        if sig != klass.OUTPUT_SIGS[method]:
+            return "out signatures for method %s in interface %s do not match" \
+               % (method.name, klass.INTERFACE_NAME)
+    return None
 
 def _verify_class(klass, introspect_data):
     """
@@ -67,31 +134,27 @@ def _verify_class(klass, introspect_data):
        introspect_data.findall("./interface[@name='%s']" % klass.INTERFACE_NAME)
     klass_datum = klass_data[0]
 
-    method_names = [m.attrib['name'] for m in klass_datum.findall("./method")]
-    method_names_set = frozenset(method_names)
-    if len(method_names_set) != len(method_names):
-        return "duplicate names in %s introspection data" % \
-           klass.INTERFACE_NAME
+    result = _verify_names(
+       (m.attrib['name'] for m in klass_datum.findall("./method")),
+       (n.name for n in klass.MethodNames)
+    )
+    if result is not None:
+        return "%s for methods in %s introspection_data" \
+           % (result, klass.INTERFACE_NAME)
 
-    if method_names_set != frozenset(n.name for n in klass.MethodNames):
-        return "method names in %s introspection data do not match expected" % \
-           klass.INTERFACE_NAME
+    result = _verify_names(
+       (m.attrib['name'] for m in klass_datum.findall("./property")),
+       (n.name for n in klass.PropertyNames)
+    )
+    if result is not None:
+        return "%s for properties in %s introspection_data" \
+           % (result, klass.INTERFACE_NAME)
 
-    for method in klass.MethodNames:
-        method_data = klass_datum.findall("./method[@name='%s']" % method.name)
-        method_datum = method_data[0]
+    result = _verify_methods(klass, klass_datum)
+    if result is not None:
+        return result
 
-        sig = _signature(method_datum, "in")
-        if sig != klass.INPUT_SIGS[method][2]:
-            return "in signatures for method %s in interface %s do not match" \
-               % (method.name, klass.INTERFACE_NAME)
-
-        sig = _signature(method_datum, "out")
-        if sig != klass.OUTPUT_SIGS[method]:
-            return "out signatures for method %s in interface %s do not match" \
-               % (method.name, klass.INTERFACE_NAME)
-
-    return None
+    return _verify_properties(klass, klass_datum)
 
 
 class InterfacesTestCase(unittest.TestCase):

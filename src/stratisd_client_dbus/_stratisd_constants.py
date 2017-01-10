@@ -25,61 +25,6 @@ from ._constants import TOP_OBJECT
 from ._implementation import Manager
 
 
-class StratisdConstants(object):
-    """
-    Simple class to provide access to published stratisd constants.
-    """
-
-    @staticmethod
-    def parse_list(constant_list):
-        """
-        Parse the list of stratisd constants.
-
-        :param constant_list: list of constants published by stratisd
-        :type constant_list: Array of String * `a * String
-
-        :returns: the values and the descriptions attached to the constants
-        :rtype: (dict of String * `a) * (dict of `a * String)
-        """
-
-        values = dict()
-        descriptions = dict()
-        for (key, value, desc) in constant_list:
-            values[key] = value
-            descriptions[value] = desc
-        return (values, descriptions)
-
-    @staticmethod
-    def build_class(classname, values):
-        """
-        Build a StratisdErrors class with a bunch of class attributes which
-        represent the stratisd errors.
-
-        :param str classname: the name of the class to construct
-        :param values: the values for the attributes
-        :type values: dict of String * Int32
-        :rtype: type
-        :returns: StratisdError class
-        """
-        values['FIELDS'] = [x for x in values.keys()]
-        return type(classname, (object,), values)
-
-    @staticmethod
-    def get_class(classname, constant_list):
-        """
-        Get a class from ``constant_list``.
-
-        :param str classname: the name of the class to construct
-        :param constant_list: list of constants published by stratisd
-        :type constant_list: Array of String * `a * String
-
-        :returns: the class which supports a mapping from constant codes to ints
-        :rtype: type
-        """
-        (values, _) = StratisdConstants.parse_list(constant_list)
-        return StratisdConstants.build_class(classname, values)
-
-
 class StratisdConstantsGen(abc.ABC):
     """
     Meta class for generating classes that define constants as class-level
@@ -99,7 +44,7 @@ class StratisdConstantsGen(abc.ABC):
         :rtype: type
         """
         values = cls._METHOD(get_object(TOP_OBJECT))
-        return StratisdConstants.get_class(cls._CLASSNAME, values)
+        return type(cls._CLASSNAME, (object,), dict(values))
 
 
 class StratisdErrorsGen(StratisdConstantsGen):
@@ -109,13 +54,14 @@ class StratisdErrorsGen(StratisdConstantsGen):
     # pylint: disable=too-few-public-methods
 
     _CLASSNAME = 'StratisdErrors'
-    _METHOD = Manager.GetErrorCodes
+    _METHOD = Manager.Properties.ErrorValues
+
 
 class StratisdRaidGen(StratisdConstantsGen):
     """
-    Simple class to provide access to published stratisd raid levels.
+    Simple class to provide access to published stratisd errors.
     """
     # pylint: disable=too-few-public-methods
 
-    _CLASSNAME = 'StratisdRaidLevels'
-    _METHOD = Manager.GetRaidLevels
+    _CLASSNAME = 'StratisdRedundancies'
+    _METHOD = Manager.Properties.RedundancyValues

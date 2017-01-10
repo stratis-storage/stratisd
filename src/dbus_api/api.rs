@@ -37,8 +37,8 @@ use dbus::tree::Tree;
 use dbus::tree::ObjectPath;
 use dbus::ConnectionItem;
 
-use super::stratis::VERSION;
-use super::types::Bytes;
+use super::super::types::Bytes;
+use super::super::stratis::VERSION;
 
 use engine;
 use engine::Engine;

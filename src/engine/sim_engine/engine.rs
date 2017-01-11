@@ -12,8 +12,6 @@ use engine::RenameAction;
 use engine::Redundancy;
 
 use std::cell::RefCell;
-use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
 use std::collections::BTreeSet;
 use std::iter::FromIterator;
 use std::path::Path;
@@ -23,18 +21,19 @@ use std::rc::Rc;
 use super::pool::SimPool;
 use super::randomization::Randomizer;
 
+use super::super::structures::Table;
 
 
 #[derive(Debug)]
 pub struct SimEngine {
-    pools: BTreeMap<String, SimPool>,
+    pools: Table<SimPool>,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
 impl SimEngine {
     pub fn new() -> SimEngine {
         SimEngine {
-            pools: BTreeMap::new(),
+            pools: Table::new(),
             rdm: Rc::new(RefCell::new(Randomizer::new())),
         }
     }
@@ -50,21 +49,21 @@ impl Engine for SimEngine {
 
         let redundancy = calculate_redundancy!(redundancy);
 
-        if self.pools.contains_key(name) {
+        if self.pools.contains_name(name) {
             return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
         let devices =
             BTreeSet::from_iter(blockdev_paths).into_iter().map(|x| *x).collect::<Vec<&Path>>();
 
-        let pool = SimPool::new(self.rdm.clone(), &devices, redundancy);
+        let pool = SimPool::new(self.rdm.clone(), name, &devices, redundancy);
 
         if self.rdm.borrow_mut().throw_die() {
             return Err(EngineError::Engine(ErrorEnum::Error, "X".into()));
         }
 
         let bdev_paths = pool.block_devs.values().map(|p| p.devnode.clone()).collect();
-        self.pools.insert(name.to_owned(), pool);
+        self.pools.insert(pool);
 
         Ok(bdev_paths)
     }

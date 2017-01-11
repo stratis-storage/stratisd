@@ -6,11 +6,24 @@ use uuid::Uuid;
 
 use engine::Filesystem;
 
+use super::super::engine::{HasName, HasUuid};
 
 #[derive(Debug)]
 pub struct StratFilesystem {
     pub fs_id: Uuid,
     pub thin_id: u32,
+}
+
+impl HasName for StratFilesystem {
+    fn name(&self) -> &str {
+        "dummy"
+    }
+}
+
+impl HasUuid for StratFilesystem {
+    fn uuid(&self) -> &Uuid {
+        &self.fs_id
+    }
 }
 
 impl Filesystem for StratFilesystem {}

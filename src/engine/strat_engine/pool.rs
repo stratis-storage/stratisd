@@ -21,6 +21,9 @@ use engine::engine::Redundancy;
 
 use super::super::super::types::Bytes;
 
+use super::super::engine::{HasName, HasUuid};
+use super::super::structures::Table;
+
 use super::serde_structs::StratSave;
 use super::blockdev::{BlockDev, initialize, resolve_devices};
 use super::filesystem::StratFilesystem;
@@ -28,11 +31,11 @@ use super::metadata::MIN_MDA_SECTORS;
 
 #[derive(Debug)]
 pub struct StratPool {
-    pub name: String,
-    pub pool_uuid: Uuid,
+    name: String,
+    pool_uuid: Uuid,
     pub cache_devs: BTreeMap<PathBuf, BlockDev>,
     pub block_devs: BTreeMap<PathBuf, BlockDev>,
-    pub filesystems: BTreeMap<String, StratFilesystem>,
+    pub filesystems: Table<StratFilesystem>,
     redundancy: Redundancy,
 }
 
@@ -52,7 +55,7 @@ impl StratPool {
             pool_uuid: pool_uuid,
             cache_devs: BTreeMap::new(),
             block_devs: bds,
-            filesystems: BTreeMap::new(),
+            filesystems: Table::new(),
             redundancy: redundancy,
         };
 
@@ -129,7 +132,7 @@ impl Pool for StratPool {
     fn create_filesystems<'a, 'b, 'c>(&'a mut self,
                                       _specs: &[(&'b str, &'c str, Option<Bytes>)])
                                       -> EngineResult<Vec<&'b str>> {
-        Ok(vec![])
+        unimplemented!()
     }
 
     fn create_snapshot<'a, 'b, 'c>(&'a mut self,
@@ -179,5 +182,21 @@ impl Pool for StratPool {
 
     fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
         rename_filesystem!{self; old_name; new_name}
+    }
+
+    fn rename(&mut self, name: &str) {
+        self.name = name.to_owned();
+    }
+}
+
+impl HasUuid for StratPool {
+    fn uuid(&self) -> &Uuid {
+        &self.pool_uuid
+    }
+}
+
+impl HasName for StratPool {
+    fn name(&self) -> &str {
+        &self.name
     }
 }

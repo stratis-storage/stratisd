@@ -11,6 +11,8 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::vec::Vec;
 
+use uuid::Uuid;
+
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
@@ -22,29 +24,37 @@ use engine::engine::Redundancy;
 use super::super::super::types::Bytes;
 
 use super::blockdev::SimDev;
+use super::super::engine::{HasName, HasUuid};
+use super::super::structures::Table;
 use super::filesystem::SimFilesystem;
 use super::randomization::Randomizer;
 
-use uuid::Uuid;
-
 #[derive(Debug)]
 pub struct SimPool {
+    name: String,
+    pool_uuid: Uuid,
     pub block_devs: BTreeMap<PathBuf, SimDev>,
     pub cache_devs: BTreeMap<PathBuf, SimDev>,
-    pub filesystems: BTreeMap<String, SimFilesystem>,
+    pub filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
 impl SimPool {
-    pub fn new(rdm: Rc<RefCell<Randomizer>>, paths: &[&Path], redundancy: Redundancy) -> SimPool {
+    pub fn new(rdm: Rc<RefCell<Randomizer>>,
+               name: &str,
+               paths: &[&Path],
+               redundancy: Redundancy)
+               -> SimPool {
 
         let devices = BTreeSet::from_iter(paths);
         let device_pairs = devices.iter()
             .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
         let new_pool = SimPool {
+            name: name.to_owned(),
+            pool_uuid: Uuid::new_v4(),
             block_devs: BTreeMap::from_iter(device_pairs),
-            filesystems: BTreeMap::new(),
+            filesystems: Table::new(),
             cache_devs: BTreeMap::new(),
             redundancy: redundancy,
             rdm: rdm.clone(),
@@ -102,7 +112,7 @@ impl Pool for SimPool {
 
         for spec in temp.iter() {
             let name = spec.0;
-            if self.filesystems.contains_key(name) {
+            if self.filesystems.contains_name(name) {
                 return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.into()));
             }
         }
@@ -110,8 +120,8 @@ impl Pool for SimPool {
         let mut names = Vec::new();
         for spec in temp.iter() {
             let (name, mountpoint, quota) = **spec;
-            let new_filesystem = SimFilesystem::new(Uuid::new_v4(), mountpoint, quota);
-            self.filesystems.insert(name.into(), new_filesystem);
+            let new_filesystem = SimFilesystem::new(Uuid::new_v4(), name, mountpoint, quota);
+            self.filesystems.insert(new_filesystem);
             names.push(name);
         }
 
@@ -119,28 +129,30 @@ impl Pool for SimPool {
     }
 
     fn create_snapshot<'a, 'b, 'c>(&'a mut self,
-                                   snapshot_name: &'b str,
-                                   source: &'c str)
+                                   _snapshot_name: &'b str,
+                                   _source: &'c str)
                                    -> EngineResult<&'b str> {
-
-        let parent_id = try!(self.filesystems
-                .get(source)
-                .ok_or(EngineError::Engine(ErrorEnum::NotFound, String::from(source))))
-            .fs_id;
-
-        let names = try!(self.create_filesystems(&[(snapshot_name, "", None)]));
-
-        let new_snapshot = try!(self.filesystems
-            .get_mut(snapshot_name)
-            .ok_or(EngineError::Engine(ErrorEnum::NotFound, String::from(snapshot_name))));
-
-        new_snapshot.nearest_ancestor = Some(parent_id);
-
-        Ok(names[0])
+        unimplemented!()
     }
 
     fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
         rename_filesystem!{self; old_name; new_name}
+    }
+
+    fn rename(&mut self, name: &str) {
+        self.name = name.to_owned();
+    }
+}
+
+impl HasUuid for SimPool {
+    fn uuid(&self) -> &Uuid {
+        &self.pool_uuid
+    }
+}
+
+impl HasName for SimPool {
+    fn name(&self) -> &str {
+        &self.name
     }
 }
 

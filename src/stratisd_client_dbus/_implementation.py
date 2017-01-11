@@ -167,6 +167,7 @@ class ManagerSpec(InterfaceSpec):
         """
         ErrorValues = "ErrorValues"
         RedundancyValues = "RedundancyValues"
+        Version = "Version"
 
     INTERFACE_NAME = 'org.storage.stratis1.Manager'
 
@@ -198,7 +199,8 @@ class ManagerSpec(InterfaceSpec):
 
     PROPERTY_SIGS = {
        PropertyNames.ErrorValues: "a(sq)",
-       PropertyNames.RedundancyValues: "a(sq)"
+       PropertyNames.RedundancyValues: "a(sq)",
+       PropertyNames.Version: "s"
     }
 
 

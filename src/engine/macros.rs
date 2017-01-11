@@ -23,7 +23,7 @@ macro_rules! destroy_filesystems {
     ( $s:ident; $fs:expr ) => {
         let mut removed = Vec::new();
         for name in $fs.iter().map(|x| *x) {
-            if $s.filesystems.remove(name.into()).is_some() {
+            if $s.filesystems.remove_by_name(name.into()).is_some() {
                 removed.push(name);
             };
         };
@@ -33,22 +33,22 @@ macro_rules! destroy_filesystems {
 
 macro_rules! destroy_pool {
     ( $s:ident; $name: ident) => {
-        let entry = match $s.pools.entry($name.into()) {
-            Entry::Vacant(_) => return Ok(false),
-            Entry::Occupied(entry) => entry,
-        };
-        if !entry.get().filesystems.is_empty() {
-            return Err(EngineError::Engine(
-                ErrorEnum::Busy, "filesystems remaining on pool".into()));
-        };
-        try!(entry.remove().destroy());
+        if let Some(ref pool) = $s.pools.get_by_name($name) {
+            if !pool.filesystems.is_empty() {
+                return Err(EngineError::Engine(
+                    ErrorEnum::Busy, "filesystems remaining on pool".into()));
+            };
+        } else {
+            return Ok(false);
+        }
+        try!($s.pools.remove_by_name($name).unwrap().destroy());
         Ok(true)
     }
 }
 
 macro_rules! get_pool {
     ( $s:ident; $name:ident ) => {
-        $s.pools.get_mut($name).map(|p| p as &mut Pool)
+        $s.pools.get_mut_by_name($name).map(|p| p as &mut Pool)
     }
 }
 
@@ -58,15 +58,16 @@ macro_rules! rename_pool {
             return Ok(RenameAction::Identity);
         }
 
-        if !$s.pools.contains_key($old_name) {
+        if !$s.pools.contains_name($old_name) {
             return Ok(RenameAction::NoSource);
         }
 
-        if $s.pools.contains_key($new_name) {
+        if $s.pools.contains_name($new_name) {
             return Err(EngineError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
         } else {
-            let pool = $s.pools.remove($old_name).unwrap();
-            $s.pools.insert($new_name.into(), pool);
+            let mut pool = $s.pools.remove_by_name($old_name).unwrap();
+            pool.rename($new_name);
+            $s.pools.insert(pool);
             return Ok(RenameAction::Renamed);
         };
     }
@@ -78,15 +79,15 @@ macro_rules! rename_filesystem {
             return Ok(RenameAction::Identity);
         }
 
-        if !$s.filesystems.contains_key($old_name) {
+        if !$s.filesystems.contains_name($old_name) {
             return Ok(RenameAction::NoSource);
         }
 
-        if $s.filesystems.contains_key($new_name) {
+        if $s.filesystems.contains_name($new_name) {
             return Err(EngineError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
         } else {
-            let filesystem = $s.filesystems.remove($old_name).unwrap();
-            $s.filesystems.insert($new_name.into(), filesystem);
+            let filesystem = $s.filesystems.remove_by_name($old_name).unwrap();
+            $s.filesystems.insert(filesystem);
             return Ok(RenameAction::Renamed);
         };
     }

@@ -21,3 +21,4 @@ pub mod strat_engine;
 
 mod engine;
 mod errors;
+mod structures;

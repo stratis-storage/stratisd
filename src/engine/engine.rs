@@ -5,6 +5,8 @@
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 
+use uuid::Uuid;
+
 use super::super::types::Bytes;
 
 use super::errors::EngineResult;
@@ -34,14 +36,21 @@ impl From<Redundancy> for u16 {
     }
 }
 
+pub trait HasUuid: Debug {
+    fn uuid(&self) -> &Uuid;
+}
+
+pub trait HasName: Debug {
+    fn name(&self) -> &str;
+}
 
 pub trait Dev: Debug {
     fn get_id(&self) -> String;
 }
 
-pub trait Filesystem: Debug {}
+pub trait Filesystem: HasName + HasUuid {}
 
-pub trait Pool: Debug {
+pub trait Pool: HasName + HasUuid {
     /// Creates the filesystems specified by specs.
     /// Returns a list of the names of filesystems actually created.
     /// Returns an error if any of the specified names are already in use
@@ -86,6 +95,9 @@ pub trait Pool: Debug {
     /// the names aren't equal and both are in use.
     /// The result indicate whether an action was performed, and if not, why.
     fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction>;
+
+    /// Rename this pool.
+    fn rename(&mut self, name: &str) -> ();
 }
 
 pub trait Engine: Debug {

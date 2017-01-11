@@ -34,6 +34,8 @@ use dbus::tree::Tree;
 use dbus::tree::ObjectPath;
 use dbus::ConnectionItem;
 
+use super::stratis::VERSION;
+
 use dbus_consts::*;
 
 use engine;
@@ -1112,6 +1114,11 @@ fn get_redundancy_values(i: &mut IterAppend,
     get_list_items(i, Redundancy::iter_variants())
 }
 
+fn get_version(i: &mut IterAppend, _p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+    i.append(VERSION);
+    Ok(())
+}
+
 fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message = m.msg;
     let mut iter = message.iter_init();
@@ -1193,6 +1200,9 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
             .access(Access::Read)
             .on_get(get_error_values);
 
+    let version_property =
+        f.property::<&str, _>("Version", ()).access(Access::Read).on_get(get_version);
+
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "Manager");
 
     let obj_path = f.object_path(STRATIS_BASE_PATH, dbus_context)
@@ -1206,7 +1216,8 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
             .add_m(get_filesystem_object_path_method)
             .add_m(configure_simulator_method)
             .add_p(error_values_property)
-            .add_p(redundancy_values_property));
+            .add_p(redundancy_values_property)
+            .add_p(version_property));
 
     let base_tree = base_tree.add(obj_path);
 

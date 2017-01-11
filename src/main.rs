@@ -29,20 +29,10 @@ extern crate enum_derive;
 #[cfg(test)]
 extern crate quickcheck;
 
-pub static mut DEBUG: bool = false;
-
-macro_rules! dbgp {
-    ($($arg:tt)*) => (
-        unsafe {
-            if ::DEBUG {
-                println!($($arg)*)
-            }
-        })
-}
-
 mod types;
 mod consts;
 mod dbus_consts;
+#[macro_use]
 mod stratis;
 mod dbus_api;
 mod engine;
@@ -50,6 +40,8 @@ mod engine;
 use std::io::Write;
 use std::error::Error;
 use std::process::exit;
+
+use stratis::{DEBUG, VERSION};
 
 use types::{StratisResult, StratisError};
 
@@ -71,7 +63,7 @@ fn write_err(err: StratisError) -> StratisResult<()> {
 
 fn main() {
     let matches = App::new("stratis")
-        .version(&crate_version!())
+        .version(VERSION)
         .about("Stratis storage management")
         .arg(Arg::with_name("debug")
             .long("debug")

@@ -48,10 +48,12 @@ class StratisTestCase(unittest.TestCase):
         """
         self._service.tearDown()
 
-    @unittest.skip("Unimplemented")
     def testStratisVersion(self):
         """
-        Getting version should just succeed.
+        Getting version should succeed.
+
+        Major version number should be 0.
         """
-        # pylint: disable=no-self-use
-        Manager.Properties.Version(get_object(TOP_OBJECT))
+        version = Manager.Properties.Version(get_object(TOP_OBJECT))
+        (major, _, _) = version.split(".")
+        self.assertEqual(major, "0")

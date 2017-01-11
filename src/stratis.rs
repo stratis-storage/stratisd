@@ -17,3 +17,14 @@ pub enum StratisState {
     ThinPoolFailed,
     ThinFailed,
 }
+
+pub static mut DEBUG: bool = false;
+
+macro_rules! dbgp {
+    ($($arg:tt)*) => (
+        unsafe {
+            if DEBUG {
+                println!($($arg)*)
+            }
+        })
+}

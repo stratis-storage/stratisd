@@ -23,6 +23,7 @@ use dbus::arg::Array;
 use dbus::arg::Iter;
 use dbus::arg::IterAppend;
 use dbus::tree::Access;
+use dbus::tree::EmitsChangedSignal;
 use dbus::tree::Factory;
 use dbus::tree::DataType;
 use dbus::tree::MethodErr;
@@ -1193,15 +1194,19 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
         f.property::<Array<(&str, u16), &Iterator<Item = (&str, u16)>>, _>("RedundancyValues",
                                                                               ())
             .access(Access::Read)
+            .emits_changed(EmitsChangedSignal::Const)
             .on_get(get_redundancy_values);
 
     let error_values_property =
         f.property::<Array<(&str, u16), &Iterator<Item = (&str, u16)>>, _>("ErrorValues", ())
             .access(Access::Read)
+            .emits_changed(EmitsChangedSignal::Const)
             .on_get(get_error_values);
 
-    let version_property =
-        f.property::<&str, _>("Version", ()).access(Access::Read).on_get(get_version);
+    let version_property = f.property::<&str, _>("Version", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_version);
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "Manager");
 

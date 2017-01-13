@@ -2,7 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 
@@ -79,10 +78,6 @@ pub trait Pool: Debug {
     /// Returns an error if a device could not be removed.
     fn remove_cachedevs(&mut self, path: &[&Path]) -> EngineResult<Vec<PathBuf>>;
 
-    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem>;
-    fn blockdevs(&mut self) -> Vec<&mut Dev>;
-    fn cachedevs(&mut self) -> Vec<&mut Dev>;
-
     /// Destroy the pool.
     /// Will fail if filesystems allocated from the pool are in use,
     /// or even exist.
@@ -128,7 +123,6 @@ pub trait Engine: Debug {
     fn rename_pool(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction>;
 
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool>;
-    fn pools(&mut self) -> BTreeMap<&str, &mut Pool>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.

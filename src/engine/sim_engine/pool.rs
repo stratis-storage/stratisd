@@ -11,11 +11,9 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::vec::Vec;
 
-use engine::Dev;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
-use engine::Filesystem;
 use engine::Pool;
 use engine::RenameAction;
 
@@ -139,20 +137,6 @@ impl Pool for SimPool {
         new_snapshot.nearest_ancestor = Some(parent_id);
 
         Ok(names[0])
-    }
-
-    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem> {
-        BTreeMap::from_iter(self.filesystems
-            .iter_mut()
-            .map(|x| (x.0 as &str, x.1 as &mut Filesystem)))
-    }
-
-    fn blockdevs(&mut self) -> Vec<&mut Dev> {
-        Vec::from_iter(self.block_devs.values_mut().map(|x| x as &mut Dev))
-    }
-
-    fn cachedevs(&mut self) -> Vec<&mut Dev> {
-        Vec::from_iter(self.cache_devs.values_mut().map(|x| x as &mut Dev))
     }
 
     // Should verify that block devices are not required by pool, but does not.

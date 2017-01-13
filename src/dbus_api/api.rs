@@ -62,26 +62,6 @@ fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr>
     Ok(value)
 }
 
-/// Get object path from filesystem name
-fn fs_name_to_object_path(dbus_context: &DbusContext,
-                          pool_name: &str,
-                          name: &str)
-                          -> Result<String, (MessageItem, MessageItem)> {
-    let object_path =
-        match dbus_context.filesystems.borrow().get_by_second(&(pool_name.into(), name.into())) {
-            Some(pool) => pool.clone(),
-            None => {
-                let items = code_to_message_items(DbusErrorEnum::FILESYSTEM_NOTFOUND,
-                                                  format!("no object path for filesystem {} \
-                                                           belonging to pool {}",
-                                                          name,
-                                                          pool_name));
-                return Err(items);
-            }
-        };
-    Ok(object_path)
-}
-
 /// Get filesystem name from object path
 fn object_path_to_pair(dbus_context: &DbusContext,
                        fs_object_path: &str)
@@ -97,34 +77,6 @@ fn object_path_to_pair(dbus_context: &DbusContext,
     };
 
     Ok(fs_pool_pair)
-}
-
-/// Get object path from pool name
-fn pool_name_to_object_path(dbus_context: &DbusContext,
-                            name: &str)
-                            -> Result<String, (MessageItem, MessageItem)> {
-    let object_path = match dbus_context.pools.borrow().get_by_second(name) {
-        Some(pool) => pool.clone(),
-        None => {
-            let items = code_to_message_items(DbusErrorEnum::POOL_NOTFOUND,
-                                              format!("no object path for pool name {}", name));
-            return Err(items);
-        }
-    };
-    Ok(object_path)
-}
-
-/// Convert a string from a object path/name map to an object path
-fn string_to_object_path<'a>(path: String) -> Result<dbus::Path<'a>, (MessageItem, MessageItem)> {
-    let object_path = match dbus::Path::new(path) {
-        Ok(p) => p,
-        Err(s) => {
-            let items = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
-                                              format!("malformed object path {} in table", s));
-            return Err(items);
-        }
-    };
-    Ok(object_path)
 }
 
 /// Get name for pool from object path
@@ -229,20 +181,7 @@ fn default_object_path<'a>() -> dbus::Path<'a> {
     dbus::Path::new("/").unwrap()
 }
 
-fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let dbus_context = m.tree.get_data();
-    let mut engine = dbus_context.engine.borrow_mut();
-
-    let result = engine.pools();
-    let msg_vec = result.keys().map(|key| MessageItem::Str((*key).into())).collect();
-    let item_array = MessageItem::Array(msg_vec, "s".into());
-    let (rc, rs) = ok_message_items();
-    let msg = m.msg.method_return().append3(item_array, rc, rs);
-    Ok(vec![msg])
-}
-
 fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
-
     let f = Factory::new_fn();
 
     let create_snapshot_method = f.method("CreateSnapshot", (), create_snapshot)
@@ -514,84 +453,6 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-
-    let dbus_context = m.tree.get_data();
-    let object_path = m.path.get_name();
-    let return_message = message.method_return();
-    let return_sig = "s";
-    let default_return = MessageItem::Array(vec![], return_sig.into());
-
-    let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, object_path);
-        default_return; return_message);
-
-    let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
-                                   default_return;
-                                   return_message);
-
-    let result = pool.filesystems();
-    let msg_vec = result.keys().map(|key| MessageItem::Str((*key).into())).collect();
-    let item_array = MessageItem::Array(msg_vec, return_sig.into());
-    let (rc, rs) = ok_message_items();
-    let msg = return_message.append3(item_array, rc, rs);
-    Ok(vec![msg])
-}
-
-fn list_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-
-    let dbus_context = m.tree.get_data();
-    let object_path = m.path.get_name();
-    let return_message = message.method_return();
-    let return_sig = "s";
-    let default_return = MessageItem::Array(vec![], return_sig.into());
-
-    let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, object_path);
-        default_return; return_message);
-
-    let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
-                                   default_return;
-                                   return_message);
-
-    let result = pool.blockdevs();
-    let msg_vec = result.iter().map(|x| MessageItem::Str(x.get_id().into())).collect();
-    let item_array = MessageItem::Array(msg_vec, return_sig.into());
-    let (rc, rs) = ok_message_items();
-    let msg = return_message.append3(item_array, rc, rs);
-    Ok(vec![msg])
-}
-
-fn list_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-
-    let dbus_context = m.tree.get_data();
-    let object_path = m.path.get_name();
-    let return_message = message.method_return();
-    let return_sig = "s";
-    let default_return = MessageItem::Array(vec![], return_sig.into());
-
-    let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, object_path);
-        default_return; return_message);
-
-    let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
-                                   default_return;
-                                   return_message);
-
-    let result = pool.cachedevs();
-    let msg_vec = result.iter().map(|x| MessageItem::Str(x.get_id().into())).collect();
-    let item_array = MessageItem::Array(msg_vec, return_sig.into());
-    let (rc, rs) = ok_message_items();
-    let msg = return_message.append3(item_array, rc, rs);
-    Ok(vec![msg])
-}
-
 fn remove_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
@@ -847,16 +708,6 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let list_filesystems_method = f.method("ListFilesystems", (), list_filesystems)
-        .out_arg(("filesystems", "as"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let list_cache_devs_method = f.method("ListCacheDevs", (), list_cache_devs)
-        .out_arg(("cache_devs", "as"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
     let add_cache_devs_method = f.method("AddCacheDevs", (), add_cache_devs)
         .in_arg(("force", "b"))
         .in_arg(("cache_devs", "as"))
@@ -867,11 +718,6 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
     let remove_cache_devs_method = f.method("RemoveCacheDevs", (), remove_cache_devs)
         .in_arg(("cache_devs", "as"))
         .out_arg(("results", "as"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let list_devs_method = f.method("ListDevs", (), list_devs)
-        .out_arg(("devs", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
@@ -905,9 +751,6 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .add(f.interface(interface_name, ())
             .add_m(create_filesystems_method)
             .add_m(destroy_filesystems_method)
-            .add_m(list_filesystems_method)
-            .add_m(list_devs_method)
-            .add_m(list_cache_devs_method)
             .add_m(add_cache_devs_method)
             .add_m(remove_cache_devs_method)
             .add_m(add_devs_method)
@@ -994,42 +837,6 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn get_pool_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-
-    let name: &str = try!(get_next_arg(&mut iter, 0));
-
-    let dbus_context = m.tree.get_data();
-    let return_message = message.method_return();
-    let default_return = MessageItem::ObjectPath(default_object_path());
-    let result = pool_name_to_object_path(dbus_context, name);
-    let object_path = dbus_try!(result; default_return; return_message);
-    let path =
-        dbus_try!(string_to_object_path(object_path.clone()); default_return; return_message);
-    let (rc, rs) = ok_message_items();
-    Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
-}
-
-fn get_filesystem_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-
-    let pool_name: &str = try!(get_next_arg(&mut iter, 0));
-    let name: &str = try!(get_next_arg(&mut iter, 1));
-
-    let dbus_context = m.tree.get_data();
-    let return_message = message.method_return();
-    let default_return = MessageItem::ObjectPath(default_object_path());
-    let result = fs_name_to_object_path(dbus_context, pool_name, name);
-    let object_path = dbus_try!(result; default_return; return_message);
-
-    let path =
-        dbus_try!(string_to_object_path(object_path.clone()); default_return; return_message);
-    let (rc, rs) = ok_message_items();
-    Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
-}
-
 fn get_list_items<T, I>(i: &mut IterAppend, iter: I) -> Result<(), MethodErr>
     where T: Display + Into<u16>,
           I: Iterator<Item = T>
@@ -1108,25 +915,6 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let list_pools_method = f.method("ListPools", (), list_pools)
-        .out_arg(("pool_names", "as"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let get_pool_object_path_method = f.method("GetPoolObjectPath", (), get_pool_object_path)
-        .in_arg(("pool_name", "s"))
-        .out_arg(("object_path", "o"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let get_filesystem_object_path_method =
-        f.method("GetFilesystemObjectPath", (), get_filesystem_object_path)
-            .in_arg(("pool_name", "s"))
-            .in_arg(("filesystem_name", "s"))
-            .out_arg(("object_path", "o"))
-            .out_arg(("return_code", "q"))
-            .out_arg(("return_string", "s"));
-
     let configure_simulator_method = f.method("ConfigureSimulator", (), configure_simulator)
         .in_arg(("denominator", "u"))
         .out_arg(("return_code", "q"))
@@ -1156,11 +944,8 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
         .introspectable()
         .object_manager()
         .add(f.interface(interface_name, ())
-            .add_m(list_pools_method)
             .add_m(create_pool_method)
             .add_m(destroy_pool_method)
-            .add_m(get_pool_object_path_method)
-            .add_m(get_filesystem_object_path_method)
             .add_m(configure_simulator_method)
             .add_p(error_values_property)
             .add_p(redundancy_values_property)

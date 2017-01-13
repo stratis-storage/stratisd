@@ -54,12 +54,6 @@ macro_rules! get_pool {
     }
 }
 
-macro_rules! pools {
-    ( $s:ident ) => {
-        BTreeMap::from_iter($s.pools.iter_mut().map(|x| (x.0 as &str, x.1 as &mut Pool)))
-    }
-}
-
 macro_rules! rename_pool {
     ( $s:ident; $old_name:ident; $new_name:ident ) => {
         if $old_name == $new_name {

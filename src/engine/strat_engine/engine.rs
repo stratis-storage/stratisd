@@ -4,7 +4,6 @@
 
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
-use std::iter::FromIterator;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -74,9 +73,5 @@ impl Engine for StratEngine {
 
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool> {
         get_pool!(self; name)
-    }
-
-    fn pools(&mut self) -> BTreeMap<&str, &mut Pool> {
-        pools!(self)
     }
 }

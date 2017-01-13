@@ -82,11 +82,6 @@ impl Engine for SimEngine {
         get_pool!(self; name)
     }
 
-    /// Returns a collection of the Pool objects that belong to this engine
-    fn pools(&mut self) -> BTreeMap<&str, &mut Pool> {
-        pools!(self)
-    }
-
     /// Set properties of the simulator
     fn configure_simulator(&mut self, denominator: u32) -> EngineResult<()> {
         self.rdm.borrow_mut().set_probability(denominator);
@@ -127,12 +122,6 @@ mod tests {
             Err(EngineError::Engine(ErrorEnum::NotFound, _)) => true,
             _ => false,
         });
-    }
-
-    #[test]
-    /// When an engine has no pools, the thing returned by pools() is empty
-    fn pools_empty() {
-        assert!(SimEngine::new().pools().is_empty());
     }
 
     #[test]

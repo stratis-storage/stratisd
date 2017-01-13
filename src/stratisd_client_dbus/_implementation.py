@@ -104,6 +104,38 @@ class InterfaceSpec(abc.ABC):
     PROPERTY_SIGS = abc.abstractproperty(doc="map from property names to sigs")
 
 
+class ObjectManagerSpec(InterfaceSpec):
+    """
+    org.freedesktop.DBus.ObjectManager interface
+    """
+    # pylint: disable=too-few-public-methods
+
+    class MethodNames(enum.Enum):
+        """
+        Method names.
+        """
+        GetManagedObjects = "GetManagedObjects"
+
+    class PropertyNames(enum.Enum):
+        """
+        Property names.
+        """
+        pass
+
+    INTERFACE_NAME = "org.freedesktop.DBus.ObjectManager"
+
+    INPUT_SIGS = {
+       MethodNames.GetManagedObjects: ((), _FALSE, ""),
+    }
+
+    OUTPUT_SIGS = {
+       MethodNames.GetManagedObjects: "a{oa{sa{sv}}}"
+    }
+    XFORMERS = _xformers(INPUT_SIGS)
+
+    PROPERTY_SIGS = {}
+
+
 class FilesystemSpec(InterfaceSpec):
     """
     Filesystem interface.
@@ -361,7 +393,11 @@ def _iface_builder(spec):
 
     return builder
 
-
+ObjectManager = types.new_class(
+   "ObjectManager",
+   bases=(object,),
+   exec_body=_iface_builder(ObjectManagerSpec)
+)
 Filesystem = types.new_class(
    "Filesystem",
    bases=(object,),

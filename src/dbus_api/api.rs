@@ -229,20 +229,7 @@ fn default_object_path<'a>() -> dbus::Path<'a> {
     dbus::Path::new("/").unwrap()
 }
 
-fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let dbus_context = m.tree.get_data();
-    let mut engine = dbus_context.engine.borrow_mut();
-
-    let result = engine.pools();
-    let msg_vec = result.keys().map(|key| MessageItem::Str((*key).into())).collect();
-    let item_array = MessageItem::Array(msg_vec, "s".into());
-    let (rc, rs) = ok_message_items();
-    let msg = m.msg.method_return().append3(item_array, rc, rs);
-    Ok(vec![msg])
-}
-
 fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
-
     let f = Factory::new_fn();
 
     let create_snapshot_method = f.method("CreateSnapshot", (), create_snapshot)
@@ -1108,11 +1095,6 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let list_pools_method = f.method("ListPools", (), list_pools)
-        .out_arg(("pool_names", "as"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
     let get_pool_object_path_method = f.method("GetPoolObjectPath", (), get_pool_object_path)
         .in_arg(("pool_name", "s"))
         .out_arg(("object_path", "o"))
@@ -1156,7 +1138,6 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
         .introspectable()
         .object_manager()
         .add(f.interface(interface_name, ())
-            .add_m(list_pools_method)
             .add_m(create_pool_method)
             .add_m(destroy_pool_method)
             .add_m(get_pool_object_path_method)

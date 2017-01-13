@@ -128,7 +128,6 @@ pub trait Engine: Debug {
     fn rename_pool(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction>;
 
     fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool>;
-    fn pools(&mut self) -> BTreeMap<&str, &mut Pool>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.

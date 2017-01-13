@@ -23,3 +23,4 @@ from ._implementation import Manager
 from ._implementation import Pool
 
 from ._stratisd_constants import StratisdErrorsGen
+from ._stratisd_constants import StratisdRaidGen

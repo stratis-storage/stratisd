@@ -23,6 +23,7 @@ from stratisd_client_dbus import Manager
 from stratisd_client_dbus import Pool
 from stratisd_client_dbus import StratisdErrorsGen
 from stratisd_client_dbus import get_object
+from stratisd_client_dbus import get_managed_objects
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
@@ -84,11 +85,7 @@ class DestroyFSTestCase(unittest.TestCase):
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, self._errors.OK)
 
-        (result, rc, _) = checked_call(
-           Pool.ListFilesystems(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
-        )
-        self.assertEqual(rc, self._errors.OK)
+        result = [x for x in get_managed_objects(self._proxy).filesystems()]
         self.assertEqual(len(result), 0)
 
     def testDestroyOne(self):
@@ -103,11 +100,7 @@ class DestroyFSTestCase(unittest.TestCase):
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, self._errors.OK)
 
-        (result, rc, _) = checked_call(
-           Pool.ListFilesystems(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
-        )
-        self.assertEqual(rc, self._errors.OK)
+        result = [x for x in get_managed_objects(self._proxy).filesystems()]
         self.assertEqual(len(result), 0)
 
 
@@ -163,11 +156,7 @@ class DestroyFSTestCase1(unittest.TestCase):
         self.assertEqual(rc, self._errors.OK)
         self.assertEqual(result[0], self._VOLNAME)
 
-        (result, rc, _) = checked_call(
-           Pool.ListFilesystems(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
-        )
-        self.assertEqual(rc, self._errors.OK)
+        result = [x for x in get_managed_objects(self._proxy).filesystems()]
         self.assertEqual(len(result), 0)
 
     def testDestroyTwo(self):
@@ -187,9 +176,5 @@ class DestroyFSTestCase1(unittest.TestCase):
         self.assertEqual(rc, self._errors.OK)
         self.assertEqual(result[0], self._VOLNAME)
 
-        (result, rc, _) = checked_call(
-           Pool.ListFilesystems(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
-        )
-        self.assertEqual(rc, self._errors.OK)
+        result = [x for x in get_managed_objects(self._proxy).filesystems()]
         self.assertEqual(len(result), 0)

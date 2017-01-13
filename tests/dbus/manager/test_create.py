@@ -21,10 +21,10 @@ import unittest
 
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import StratisdErrorsGen
+from stratisd_client_dbus import get_managed_objects
 from stratisd_client_dbus import get_object
 
 from stratisd_client_dbus._implementation import ManagerSpec
-
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import checked_call
@@ -83,10 +83,7 @@ class Create2TestCase(unittest.TestCase):
            ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath]
         )
 
-        (pools, _, _) = checked_call(
-           Manager.ListPools(self._proxy),
-           ManagerSpec.OUTPUT_SIGS[_MN.ListPools]
-        )
+        pools = [x for x in get_managed_objects(self._proxy).pools()]
 
         if rc == self._errors.OK:
             self.assertEqual(pool, poolpath)
@@ -150,10 +147,7 @@ class Create3TestCase(unittest.TestCase):
         """
         Create should fail trying to create new pool with same name as previous.
         """
-        (pools1, _, _) = checked_call(
-           Manager.ListPools(self._proxy),
-           ManagerSpec.OUTPUT_SIGS[_MN.ListPools]
-        )
+        pools1 = get_managed_objects(self._proxy).pools()
 
         (_, rc, _) = checked_call(
            Manager.CreatePool(
@@ -173,10 +167,10 @@ class Create3TestCase(unittest.TestCase):
            ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath]
         )
 
-        (pools2, _, _) = checked_call(
-           Manager.ListPools(self._proxy),
-           ManagerSpec.OUTPUT_SIGS[_MN.ListPools]
-        )
+        pools2 = get_managed_objects(self._proxy).pools()
 
         self.assertEqual(rc1, self._errors.OK)
-        self.assertEqual(pools1, pools2)
+        self.assertEqual(
+           frozenset(x for (x, y) in pools1),
+           frozenset(x for (x, y) in pools2)
+        )

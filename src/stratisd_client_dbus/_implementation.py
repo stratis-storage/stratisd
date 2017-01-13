@@ -189,9 +189,6 @@ class ManagerSpec(InterfaceSpec):
         ConfigureSimulator = "ConfigureSimulator"
         CreatePool = "CreatePool"
         DestroyPool = "DestroyPool"
-        GetFilesystemObjectPath = "GetFilesystemObjectPath"
-        GetPoolObjectPath = "GetPoolObjectPath"
-        ListPools = "ListPools"
 
     class PropertyNames(enum.Enum):
         """
@@ -214,18 +211,11 @@ class ManagerSpec(InterfaceSpec):
                "s(bq)bas"
            ),
         MethodNames.DestroyPool : (("name", ), _FALSE, "s"),
-        MethodNames.GetFilesystemObjectPath :
-           (("pool_name", "filesystem_name"), _FALSE, "ss"),
-        MethodNames.GetPoolObjectPath : (("name", ), _FALSE, "s"),
-        MethodNames.ListPools : ((), _FALSE, ""),
     }
     OUTPUT_SIGS = {
         MethodNames.ConfigureSimulator : "qs",
         MethodNames.CreatePool : "(oas)qs",
         MethodNames.DestroyPool : "bqs",
-        MethodNames.GetFilesystemObjectPath : "oqs",
-        MethodNames.GetPoolObjectPath : "oqs",
-        MethodNames.ListPools : "asqs",
     }
     XFORMERS = _xformers(INPUT_SIGS)
 
@@ -250,9 +240,6 @@ class PoolSpec(InterfaceSpec):
         AddDevs = "AddDevs"
         CreateFilesystems = "CreateFilesystems"
         DestroyFilesystems = "DestroyFilesystems"
-        ListCacheDevs = "ListCacheDevs"
-        ListDevs = "ListDevs"
-        ListFilesystems = "ListFilesystems"
         RemoveCacheDevs = "RemoveCacheDevs"
         RemoveDevs = "RemoveDevs"
         Rename = "Rename"
@@ -276,9 +263,6 @@ class PoolSpec(InterfaceSpec):
           "a(ss(bt))"
        ),
        MethodNames.DestroyFilesystems: (("names", ), _FALSE, "as"),
-       MethodNames.ListCacheDevs: ((), _FALSE, ""),
-       MethodNames.ListDevs: ((), _FALSE, ""),
-       MethodNames.ListFilesystems: ((), _FALSE, ""),
        MethodNames.RemoveCacheDevs: (("devices", ), _FALSE, "as"),
        MethodNames.RemoveDevs: (("devices", ), _FALSE, "as"),
        MethodNames.Rename: (("new_name", ), _FALSE, "s")
@@ -288,9 +272,6 @@ class PoolSpec(InterfaceSpec):
        MethodNames.AddDevs: "asqs",
        MethodNames.CreateFilesystems: "a(os)qs",
        MethodNames.DestroyFilesystems: "asqs",
-       MethodNames.ListCacheDevs: "asqs",
-       MethodNames.ListDevs: "asqs",
-       MethodNames.ListFilesystems: "asqs",
        MethodNames.RemoveCacheDevs: "asqs",
        MethodNames.RemoveDevs: "asqs",
        MethodNames.Rename: "bqs"

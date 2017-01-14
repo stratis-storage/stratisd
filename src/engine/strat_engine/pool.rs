@@ -16,7 +16,6 @@ use engine::Dev;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
-use engine::Filesystem;
 use engine::Pool;
 use engine::RenameAction;
 use engine::engine::Redundancy;
@@ -176,10 +175,6 @@ impl Pool for StratPool {
                                    fs_names: &[&'b str])
                                    -> EngineResult<Vec<&'b str>> {
         destroy_filesystems!{self; fs_names}
-    }
-
-    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem> {
-        unimplemented!()
     }
 
     fn remove_blockdevs(&mut self, _paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {

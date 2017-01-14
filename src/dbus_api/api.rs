@@ -501,32 +501,6 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-
-    let dbus_context = m.tree.get_data();
-    let object_path = m.path.get_name();
-    let return_message = message.method_return();
-    let return_sig = "s";
-    let default_return = MessageItem::Array(vec![], return_sig.into());
-
-    let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, object_path);
-        default_return; return_message);
-
-    let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
-                                   default_return;
-                                   return_message);
-
-    let result = pool.filesystems();
-    let msg_vec = result.keys().map(|key| MessageItem::Str((*key).into())).collect();
-    let item_array = MessageItem::Array(msg_vec, return_sig.into());
-    let (rc, rs) = ok_message_items();
-    let msg = return_message.append3(item_array, rc, rs);
-    Ok(vec![msg])
-}
-
 fn list_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
 
@@ -834,11 +808,6 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let list_filesystems_method = f.method("ListFilesystems", (), list_filesystems)
-        .out_arg(("filesystems", "as"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
     let list_cache_devs_method = f.method("ListCacheDevs", (), list_cache_devs)
         .out_arg(("cache_devs", "as"))
         .out_arg(("return_code", "q"))
@@ -892,7 +861,6 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .add(f.interface(interface_name, ())
             .add_m(create_filesystems_method)
             .add_m(destroy_filesystems_method)
-            .add_m(list_filesystems_method)
             .add_m(list_devs_method)
             .add_m(list_cache_devs_method)
             .add_m(add_cache_devs_method)

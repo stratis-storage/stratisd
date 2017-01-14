@@ -2,7 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 
@@ -79,7 +78,6 @@ pub trait Pool: Debug {
     /// Returns an error if a device could not be removed.
     fn remove_cachedevs(&mut self, path: &[&Path]) -> EngineResult<Vec<PathBuf>>;
 
-    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem>;
     fn blockdevs(&mut self) -> Vec<&mut Dev>;
     fn cachedevs(&mut self) -> Vec<&mut Dev>;
 

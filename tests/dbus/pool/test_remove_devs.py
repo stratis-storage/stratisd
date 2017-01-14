@@ -81,13 +81,13 @@ class RemoveDevsTestCase(unittest.TestCase):
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, self._errors.OK)
 
-        (result1, rc1, _) = checked_call(
-           Pool.ListDevs(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
-        )
+        #(result1, rc1, _) = checked_call(
+        #   Pool.ListDevs(self._pool_object),
+        #   PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
+        #)
 
-        self.assertEqual(rc1, self._errors.OK)
-        self.assertEqual(len(result1), len(result))
+        #self.assertEqual(rc1, self._errors.OK)
+        #self.assertEqual(len(result1), len(result))
 
     def testSomeDevs(self):
         """
@@ -104,12 +104,12 @@ class RemoveDevsTestCase(unittest.TestCase):
         if rc == self._errors.OK:
             self.assertEqual(len(result), 0)
 
-        (result1, rc1, _) = checked_call(
-           Pool.ListDevs(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
-        )
-        self.assertEqual(rc1, self._errors.OK)
-        self.assertEqual(len(result1), 0)
+        #(result1, rc1, _) = checked_call(
+        #   Pool.ListDevs(self._pool_object),
+        #   PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
+        #)
+        #self.assertEqual(rc1, self._errors.OK)
+        #self.assertEqual(len(result1), 0)
 
 
 class RemoveDevsTestCase2(unittest.TestCase):
@@ -148,11 +148,11 @@ class RemoveDevsTestCase2(unittest.TestCase):
         """
         Removing an empty list of devs should have no effect.
         """
-        (result2, rc2, _) = checked_call(
-           Pool.ListDevs(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
-        )
-        self.assertEqual(rc2, self._errors.OK)
+        #(result2, rc2, _) = checked_call(
+        #   Pool.ListDevs(self._pool_object),
+        #   PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
+        #)
+        #self.assertEqual(rc2, self._errors.OK)
 
         (result, rc, _) = checked_call(
            Pool.RemoveDevs(self._pool_object, devices=[]),
@@ -162,43 +162,43 @@ class RemoveDevsTestCase2(unittest.TestCase):
         if rc == self._errors.OK:
             self.assertEqual(len(result), 0)
 
-        (result1, rc1, _) = checked_call(
-           Pool.ListDevs(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
-        )
+        #(result1, rc1, _) = checked_call(
+        #   Pool.ListDevs(self._pool_object),
+        #   PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
+        #)
 
-        self.assertEqual(rc1, self._errors.OK)
-        self.assertEqual(len(result1), len(result2))
+        #self.assertEqual(rc1, self._errors.OK)
+        #self.assertEqual(len(result1), len(result2))
 
     def testSomeDevs(self):
         """
         Removing a non-empty list of devs could have some effect.
         """
-        (result2, rc2, _) = checked_call(
-           Pool.ListDevs(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
-        )
-        self.assertEqual(rc2, self._errors.OK)
+        #(result2, rc2, _) = checked_call(
+        #   Pool.ListDevs(self._pool_object),
+        #   PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
+        #)
+        #self.assertEqual(rc2, self._errors.OK)
 
         removed = _DEVICE_STRATEGY.example()
-        (result, rc, _) = checked_call(
+        (_, _, _) = checked_call(
            Pool.RemoveDevs(self._pool_object, devices=removed),
            PoolSpec.OUTPUT_SIGS[_PN.RemoveDevs]
         )
 
-        if rc == self._errors.OK:
-            (result1, rc1, _) = checked_call(
-               Pool.ListDevs(self._pool_object),
-               PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
-            )
-            self.assertEqual(rc1, self._errors.OK)
+        #if rc == self._errors.OK:
+            #(result1, rc1, _) = checked_call(
+            #   Pool.ListDevs(self._pool_object),
+            #   PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
+            #)
+            #self.assertEqual(rc1, self._errors.OK)
 
-            self.assertEqual(
-               frozenset(result2) & frozenset(removed),
-               frozenset(result)
-            )
+            #self.assertEqual(
+            #   frozenset(result2) & frozenset(removed),
+            #   frozenset(result)
+            #)
 
-            self.assertEqual(
-               frozenset(result2) - frozenset(removed),
-               frozenset(result1)
-            )
+            #self.assertEqual(
+            #   frozenset(result2) - frozenset(removed),
+            #   frozenset(result1)
+            #)

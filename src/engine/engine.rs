@@ -78,9 +78,6 @@ pub trait Pool: Debug {
     /// Returns an error if a device could not be removed.
     fn remove_cachedevs(&mut self, path: &[&Path]) -> EngineResult<Vec<PathBuf>>;
 
-    fn blockdevs(&mut self) -> Vec<&mut Dev>;
-    fn cachedevs(&mut self) -> Vec<&mut Dev>;
-
     /// Destroy the pool.
     /// Will fail if filesystems allocated from the pool are in use,
     /// or even exist.

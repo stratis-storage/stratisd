@@ -12,7 +12,6 @@ use time;
 use uuid::Uuid;
 use serde_json;
 
-use engine::Dev;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
@@ -182,14 +181,6 @@ impl Pool for StratPool {
     }
 
     fn remove_cachedevs(&mut self, _paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
-        unimplemented!()
-    }
-
-    fn blockdevs(&mut self) -> Vec<&mut Dev> {
-        unimplemented!()
-    }
-
-    fn cachedevs(&mut self) -> Vec<&mut Dev> {
         unimplemented!()
     }
 

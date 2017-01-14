@@ -501,58 +501,6 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn list_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-
-    let dbus_context = m.tree.get_data();
-    let object_path = m.path.get_name();
-    let return_message = message.method_return();
-    let return_sig = "s";
-    let default_return = MessageItem::Array(vec![], return_sig.into());
-
-    let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, object_path);
-        default_return; return_message);
-
-    let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
-                                   default_return;
-                                   return_message);
-
-    let result = pool.blockdevs();
-    let msg_vec = result.iter().map(|x| MessageItem::Str(x.get_id().into())).collect();
-    let item_array = MessageItem::Array(msg_vec, return_sig.into());
-    let (rc, rs) = ok_message_items();
-    let msg = return_message.append3(item_array, rc, rs);
-    Ok(vec![msg])
-}
-
-fn list_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-
-    let dbus_context = m.tree.get_data();
-    let object_path = m.path.get_name();
-    let return_message = message.method_return();
-    let return_sig = "s";
-    let default_return = MessageItem::Array(vec![], return_sig.into());
-
-    let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, object_path);
-        default_return; return_message);
-
-    let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
-                                   default_return;
-                                   return_message);
-
-    let result = pool.cachedevs();
-    let msg_vec = result.iter().map(|x| MessageItem::Str(x.get_id().into())).collect();
-    let item_array = MessageItem::Array(msg_vec, return_sig.into());
-    let (rc, rs) = ok_message_items();
-    let msg = return_message.append3(item_array, rc, rs);
-    Ok(vec![msg])
-}
-
 fn remove_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
@@ -808,11 +756,6 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let list_cache_devs_method = f.method("ListCacheDevs", (), list_cache_devs)
-        .out_arg(("cache_devs", "as"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
     let add_cache_devs_method = f.method("AddCacheDevs", (), add_cache_devs)
         .in_arg(("force", "b"))
         .in_arg(("cache_devs", "as"))
@@ -823,11 +766,6 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
     let remove_cache_devs_method = f.method("RemoveCacheDevs", (), remove_cache_devs)
         .in_arg(("cache_devs", "as"))
         .out_arg(("results", "as"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let list_devs_method = f.method("ListDevs", (), list_devs)
-        .out_arg(("devs", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
@@ -861,8 +799,6 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .add(f.interface(interface_name, ())
             .add_m(create_filesystems_method)
             .add_m(destroy_filesystems_method)
-            .add_m(list_devs_method)
-            .add_m(list_cache_devs_method)
             .add_m(add_cache_devs_method)
             .add_m(remove_cache_devs_method)
             .add_m(add_devs_method)

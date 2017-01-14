@@ -11,7 +11,6 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::vec::Vec;
 
-use engine::Dev;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
@@ -138,14 +137,6 @@ impl Pool for SimPool {
         new_snapshot.nearest_ancestor = Some(parent_id);
 
         Ok(names[0])
-    }
-
-    fn blockdevs(&mut self) -> Vec<&mut Dev> {
-        Vec::from_iter(self.block_devs.values_mut().map(|x| x as &mut Dev))
-    }
-
-    fn cachedevs(&mut self) -> Vec<&mut Dev> {
-        Vec::from_iter(self.cache_devs.values_mut().map(|x| x as &mut Dev))
     }
 
     // Should verify that block devices are not required by pool, but does not.

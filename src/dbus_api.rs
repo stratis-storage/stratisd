@@ -245,7 +245,6 @@ macro_rules! engine_try_0 {
 /// Translates an engine ErrorEnum to a dbus ErrorEnum.
 fn engine_to_dbus_enum(err: &engine::ErrorEnum) -> (ErrorEnum, String) {
     match *err {
-        engine::ErrorEnum::Ok => (ErrorEnum::OK, err.get_error_string()),
         engine::ErrorEnum::Error(_) => (ErrorEnum::ERROR, err.get_error_string()),
         engine::ErrorEnum::AlreadyExists(_) => (ErrorEnum::ALREADY_EXISTS, err.get_error_string()),
         engine::ErrorEnum::Busy(_) => (ErrorEnum::BUSY, err.get_error_string()),

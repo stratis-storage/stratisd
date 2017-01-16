@@ -8,7 +8,6 @@ use nix;
 
 #[derive(Debug)]
 pub enum ErrorEnum {
-    Ok,
     Error(String),
 
     AlreadyExists(String),
@@ -20,7 +19,6 @@ pub enum ErrorEnum {
 impl ErrorEnum {
     pub fn get_error_string(&self) -> String {
         match *self {
-            ErrorEnum::Ok => "Ok".into(),
             ErrorEnum::Error(ref x) => format!("{}", x),
             ErrorEnum::AlreadyExists(ref x) => format!("{} already exists", x),
             ErrorEnum::Busy(ref x) => format!("{} is busy", x),

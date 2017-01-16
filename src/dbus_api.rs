@@ -37,7 +37,7 @@ use dbus::ConnectionItem;
 
 use super::stratis::VERSION;
 
-use dbus_consts::*;
+use dbus_consts::DbusErrorEnum;
 
 use engine;
 use engine::Engine;
@@ -121,7 +121,7 @@ fn fs_name_to_object_path(dbus_context: &DbusContext,
         match dbus_context.filesystems.borrow().get_by_second(&(pool_name.into(), name.into())) {
             Some(pool) => pool.clone(),
             None => {
-                let items = code_to_message_items(ErrorEnum::FILESYSTEM_NOTFOUND,
+                let items = code_to_message_items(DbusErrorEnum::FILESYSTEM_NOTFOUND,
                                                   format!("no object path for filesystem {} \
                                                            belonging to pool {}",
                                                           name,
@@ -139,7 +139,7 @@ fn object_path_to_pair(dbus_context: &DbusContext,
     let fs_pool_pair = match dbus_context.filesystems.borrow().get_by_first(fs_object_path) {
         Some(fs_name) => fs_name.clone(),
         None => {
-            let items = code_to_message_items(ErrorEnum::FILESYSTEM_NOTFOUND,
+            let items = code_to_message_items(DbusErrorEnum::FILESYSTEM_NOTFOUND,
                                               format!("no filesystem for object path {}",
                                                       fs_object_path));
             return Err(items);
@@ -156,7 +156,7 @@ fn pool_name_to_object_path(dbus_context: &DbusContext,
     let object_path = match dbus_context.pools.borrow().get_by_second(name) {
         Some(pool) => pool.clone(),
         None => {
-            let items = code_to_message_items(ErrorEnum::POOL_NOTFOUND,
+            let items = code_to_message_items(DbusErrorEnum::POOL_NOTFOUND,
                                               format!("no object path for pool name {}", name));
             return Err(items);
         }
@@ -169,7 +169,7 @@ fn string_to_object_path<'a>(path: String) -> Result<dbus::Path<'a>, (MessageIte
     let object_path = match dbus::Path::new(path) {
         Ok(p) => p,
         Err(s) => {
-            let items = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
+            let items = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
                                               format!("malformed object path {} in table", s));
             return Err(items);
         }
@@ -184,7 +184,7 @@ fn object_path_to_pool_name(dbus_context: &DbusContext,
     let pool_name = match dbus_context.pools.borrow().get_by_first(path) {
         Some(pool) => pool.clone(),
         None => {
-            let items = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
+            let items = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
                                               format!("no pool for object path {}", path));
             return Err(items);
         }
@@ -254,15 +254,15 @@ fn engine_to_dbus_enum(err: &engine::ErrorEnum) -> (ErrorEnum, String) {
 }
 
 /// Translates an engine error to a dbus error.
-fn engine_to_dbus_err(err: &EngineError) -> (ErrorEnum, String) {
+fn engine_to_dbus_err(err: &EngineError) -> (DbusErrorEnum, String) {
     match *err {
-        EngineError::Stratis(ref e) => engine_to_dbus_enum(e),
+        EngineError::Stratis(ref e) => engine_to_dbus_error(e),
         EngineError::Io(_) => {
-            let error = ErrorEnum::IO_ERROR;
+            let error = DbusErrorEnum::IO_ERROR;
             (error, error.get_error_string().into())
         }
         EngineError::Nix(_) => {
-            let error = ErrorEnum::NIX_ERROR;
+            let error = DbusErrorEnum::NIX_ERROR;
             (error, error.get_error_string().into())
         }
     }
@@ -270,13 +270,13 @@ fn engine_to_dbus_err(err: &EngineError) -> (ErrorEnum, String) {
 
 /// Convenience function to convert a return code and a string to
 /// appropriately typed MessageItems.
-fn code_to_message_items(code: ErrorEnum, mes: String) -> (MessageItem, MessageItem) {
+fn code_to_message_items(code: DbusErrorEnum, mes: String) -> (MessageItem, MessageItem) {
     (MessageItem::UInt16(code.into()), MessageItem::Str(mes))
 }
 
 /// Convenience function to directly yield MessageItems for OK code and message.
 fn ok_message_items() -> (MessageItem, MessageItem) {
-    let code = ErrorEnum::OK;
+    let code = DbusErrorEnum::OK;
     code_to_message_items(code, code.get_error_string().into())
 }
 
@@ -474,7 +474,7 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let error_message = format!("engine doesn't know about filesystem {} on pool {}",
                                         filesystem_name,
                                         pool_name);
-            let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR, error_message);
+            let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, error_message);
             return_message.append3(default_return, rc, rs)
         }
         Ok(RenameAction::Identity) => {
@@ -497,14 +497,15 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                     } else {
                         let error_message = format!("wrong dbus object_path for renamed \
                                                     filesystem");
-                        let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
+                        let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
                                                              error_message);
                         return_message.append3(return_value, rc, rs)
                     }
                 }
                 None => {
                     let error_message = format!("no dbus object path for renamed filesystem");
-                    let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR, error_message);
+                    let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
+                                                         error_message);
                     return_message.append3(return_value, rc, rs)
                 }
             }
@@ -847,7 +848,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match result {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", old_name);
-            let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR, error_message);
+            let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, error_message);
             return_message.append3(default_return, rc, rs)
         }
         Ok(RenameAction::Identity) => {
@@ -867,14 +868,15 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                         return_message.append3(return_value, rc, rs)
                     } else {
                         let error_message = format!("wrong dbus object_path for renamed pool");
-                        let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR,
+                        let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
                                                              error_message);
                         return_message.append3(return_value, rc, rs)
                     }
                 }
                 None => {
                     let error_message = format!("no dbus object path for renamed pool");
-                    let (rc, rs) = code_to_message_items(ErrorEnum::INTERNAL_ERROR, error_message);
+                    let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
+                                                         error_message);
                     return_message.append3(return_value, rc, rs)
                 }
             }
@@ -1104,7 +1106,7 @@ fn get_list_items<T, I>(i: &mut IterAppend, iter: I) -> Result<(), MethodErr>
 fn get_error_values(i: &mut IterAppend,
                     _p: &PropInfo<MTFn<TData>, TData>)
                     -> Result<(), MethodErr> {
-    get_list_items(i, ErrorEnum::iter_variants())
+    get_list_items(i, DbusErrorEnum::iter_variants())
 }
 
 

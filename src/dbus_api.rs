@@ -12,6 +12,7 @@ use std::fmt::Display;
 use std::path::Path;
 use std::rc::Rc;
 use std::vec::Vec;
+use std::error::Error;
 
 use dbus;
 use dbus::Connection;
@@ -242,30 +243,22 @@ macro_rules! engine_try_0 {
     }
 }
 
-/// Translates an engine ErrorEnum to a dbus ErrorEnum.
-fn engine_to_dbus_enum(err: &engine::ErrorEnum) -> (ErrorEnum, String) {
-    match *err {
-        engine::ErrorEnum::Error(_) => (ErrorEnum::ERROR, err.get_error_string()),
-        engine::ErrorEnum::AlreadyExists(_) => (ErrorEnum::ALREADY_EXISTS, err.get_error_string()),
-        engine::ErrorEnum::Busy(_) => (ErrorEnum::BUSY, err.get_error_string()),
-        engine::ErrorEnum::Invalid(_) => (ErrorEnum::ERROR, err.get_error_string()),
-        engine::ErrorEnum::NotFound(_) => (ErrorEnum::NOTFOUND, err.get_error_string()),
-    }
-}
-
 /// Translates an engine error to a dbus error.
 fn engine_to_dbus_err(err: &EngineError) -> (DbusErrorEnum, String) {
-    match *err {
-        EngineError::Stratis(ref e) => engine_to_dbus_error(e),
-        EngineError::Io(_) => {
-            let error = DbusErrorEnum::IO_ERROR;
-            (error, error.get_error_string().into())
+    let error = match *err {
+        EngineError::Engine(ref e, _) => {
+            match *e {
+                engine::ErrorEnum::Error => DbusErrorEnum::ERROR,
+                engine::ErrorEnum::AlreadyExists => DbusErrorEnum::ALREADY_EXISTS,
+                engine::ErrorEnum::Busy => DbusErrorEnum::BUSY,
+                engine::ErrorEnum::Invalid => DbusErrorEnum::ERROR,
+                engine::ErrorEnum::NotFound => DbusErrorEnum::NOTFOUND,
+            }
         }
-        EngineError::Nix(_) => {
-            let error = DbusErrorEnum::NIX_ERROR;
-            (error, error.get_error_string().into())
-        }
-    }
+        EngineError::Io(_) => DbusErrorEnum::IO_ERROR,
+        EngineError::Nix(_) => DbusErrorEnum::NIX_ERROR,
+    };
+    (error, err.description().to_owned())
 }
 
 /// Convenience function to convert a return code and a string to

@@ -87,7 +87,7 @@ pub fn find_all() -> EngineResult<BTreeMap<PoolUuid, BTreeMap<DevUuid, BlockDev>
             }
             Err(err) => {
                 let error_message = format!("{} for devnode {}", err, devnode.display());
-                return Err(EngineError::Stratis(ErrorEnum::Invalid(error_message)));
+                return Err(EngineError::Engine(ErrorEnum::Invalid, error_message));
             }
         };
 
@@ -97,7 +97,7 @@ pub fn find_all() -> EngineResult<BTreeMap<PoolUuid, BTreeMap<DevUuid, BlockDev>
             sigblock: match SigBlock::read(&buf, 0, Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE)) {
                 Ok(sigblock) => sigblock,
                 Err(err) => {
-                    return Err(EngineError::Stratis(ErrorEnum::Invalid(err)));
+                    return Err(EngineError::Engine(ErrorEnum::Invalid, err));
                 }
             },
         }))
@@ -159,7 +159,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
             Ok(ownership) => ownership,
             Err(err) => {
                 let error_message = format!("{} for device {}", err, devnode.display());
-                return Err(EngineError::Stratis(ErrorEnum::Invalid(error_message)));
+                return Err(EngineError::Engine(ErrorEnum::Invalid, error_message));
             }
         };
 
@@ -185,14 +185,15 @@ pub fn initialize(pool_uuid: &PoolUuid,
                 let error_message = format!("{} too small, minimum {} bytes",
                                             devnode.display(),
                                             MIN_DEV_SIZE);
-                return Err(EngineError::Stratis(ErrorEnum::Invalid(error_message)));
+                return Err(EngineError::Engine(ErrorEnum::Invalid, error_message));
             };
             match ownership {
                 DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size))),
                 DevOwnership::Theirs => {
                     if !force {
                         let error_str = format!("First 4K of {} not zeroed", devnode.display());
-                        return Err(EngineError::Stratis(ErrorEnum::Invalid(error_str)));
+                        return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
+
                     } else {
                         add_devs.push((dev, (devnode, dev_size)))
                     }
@@ -202,7 +203,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
                         let error_str = format!("Device {} already belongs to Stratis pool {}",
                                                 devnode.display(),
                                                 uuid);
-                        return Err(EngineError::Stratis(ErrorEnum::Invalid(error_str)));
+                        return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
                     }
                 }
             }
@@ -213,7 +214,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
     match validate_mda_size(mda_size) {
         None => {}
         Some(err) => {
-            return Err(EngineError::Stratis(ErrorEnum::Invalid(err)));
+            return Err(EngineError::Engine(ErrorEnum::Invalid, err));
         }
     };
 
@@ -259,7 +260,7 @@ impl BlockDev {
 
         if younger_mda.last_updated == Timespec::new(0, 0) {
             let message = "Neither MDA region is in use";
-            return Err(EngineError::Stratis(ErrorEnum::Invalid(message.into())));
+            return Err(EngineError::Engine(ErrorEnum::Invalid, message.into()));
         };
 
         let mut f = try!(OpenOptions::new().read(true).open(&self.devnode));

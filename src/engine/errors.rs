@@ -3,36 +3,46 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::io;
+use std::fmt;
+use std::error;
 
 use nix;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ErrorEnum {
-    Error(String),
+    Error,
 
-    AlreadyExists(String),
-    Busy(String),
-    Invalid(String),
-    NotFound(String),
-}
-
-impl ErrorEnum {
-    pub fn get_error_string(&self) -> String {
-        match *self {
-            ErrorEnum::Error(ref x) => format!("{}", x),
-            ErrorEnum::AlreadyExists(ref x) => format!("{} already exists", x),
-            ErrorEnum::Busy(ref x) => format!("{} is busy", x),
-            ErrorEnum::Invalid(ref x) => format!("{}", x),
-            ErrorEnum::NotFound(ref x) => format!("{} is not found", x),
-        }
-    }
+    AlreadyExists,
+    Busy,
+    Invalid,
+    NotFound,
 }
 
 #[derive(Debug)]
 pub enum EngineError {
-    Stratis(ErrorEnum),
+    Engine(ErrorEnum, String),
     Io(io::Error),
     Nix(nix::Error),
+}
+
+impl fmt::Display for EngineError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            EngineError::Engine(_, ref msg) => write!(f, "Stratis error: {}", msg),
+            EngineError::Io(ref err) => write!(f, "IO error: {}", err),
+            EngineError::Nix(ref err) => write!(f, "Nix error: {}", err.errno().desc()),
+        }
+    }
+}
+
+impl error::Error for EngineError {
+    fn description(&self) -> &str {
+        match *self {
+            EngineError::Engine(_, ref msg) => msg,
+            EngineError::Io(ref err) => err.description(),
+            EngineError::Nix(ref err) => err.errno().desc(),
+        }
+    }
 }
 
 pub type EngineResult<T> = Result<T, EngineError>;

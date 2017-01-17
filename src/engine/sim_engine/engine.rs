@@ -51,7 +51,7 @@ impl Engine for SimEngine {
         let redundancy = calculate_redundancy!(redundancy);
 
         if self.pools.contains_key(name) {
-            return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
+            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
         let devices =
@@ -60,7 +60,7 @@ impl Engine for SimEngine {
         let pool = SimPool::new(self.rdm.clone(), &devices, redundancy);
 
         if self.rdm.borrow_mut().throw_die() {
-            return Err(EngineError::Stratis(ErrorEnum::Error("X".into())));
+            return Err(EngineError::Engine(ErrorEnum::Error, "X".into()));
         }
 
         let bdev_paths = pool.block_devs.values().map(|p| p.devnode.clone()).collect();
@@ -123,7 +123,7 @@ mod tests {
     /// When an engine has no pools, any name lookup should fail
     fn get_pool_err() {
         assert!(match SimEngine::new().get_pool("name") {
-            Err(EngineError::Stratis(ErrorEnum::NotFound(_))) => true,
+            Err(EngineError::Engine(ErrorEnum::NotFound, _)) => true,
             _ => false,
         });
     }
@@ -156,7 +156,7 @@ mod tests {
         let mut engine = SimEngine::new();
         engine.create_pool(name, &[Path::new("/s/d")], None, false).unwrap();
         assert!(match engine.destroy_pool(name) {
-            Err(EngineError::Stratis(ErrorEnum::Busy(_))) => true,
+            Err(EngineError::Engine(ErrorEnum::Busy, _)) => true,
             _ => false,
         });
     }
@@ -181,7 +181,7 @@ mod tests {
         let mut engine = SimEngine::new();
         engine.create_pool(name, &[Path::new("/s/d")], None, false).unwrap();
         assert!(match engine.create_pool(name, &[], None, false) {
-            Err(EngineError::Stratis(ErrorEnum::AlreadyExists(_))) => true,
+            Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
             _ => false,
         });
     }
@@ -258,7 +258,7 @@ mod tests {
         engine.create_pool(old_name, &[], None, false).unwrap();
         engine.create_pool(new_name, &[], None, false).unwrap();
         assert!(match engine.rename_pool(old_name, new_name) {
-            Err(EngineError::Stratis(ErrorEnum::AlreadyExists(_))) => true,
+            Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
             _ => false,
         });
     }

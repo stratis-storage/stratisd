@@ -62,26 +62,6 @@ fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr>
     Ok(value)
 }
 
-/// Get object path from filesystem name
-fn fs_name_to_object_path(dbus_context: &DbusContext,
-                          pool_name: &str,
-                          name: &str)
-                          -> Result<String, (MessageItem, MessageItem)> {
-    let object_path =
-        match dbus_context.filesystems.borrow().get_by_second(&(pool_name.into(), name.into())) {
-            Some(pool) => pool.clone(),
-            None => {
-                let items = code_to_message_items(DbusErrorEnum::FILESYSTEM_NOTFOUND,
-                                                  format!("no object path for filesystem {} \
-                                                           belonging to pool {}",
-                                                          name,
-                                                          pool_name));
-                return Err(items);
-            }
-        };
-    Ok(object_path)
-}
-
 /// Get filesystem name from object path
 fn object_path_to_pair(dbus_context: &DbusContext,
                        fs_object_path: &str)
@@ -902,25 +882,6 @@ fn get_pool_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
 }
 
-fn get_filesystem_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-
-    let pool_name: &str = try!(get_next_arg(&mut iter, 0));
-    let name: &str = try!(get_next_arg(&mut iter, 1));
-
-    let dbus_context = m.tree.get_data();
-    let return_message = message.method_return();
-    let default_return = MessageItem::ObjectPath(default_object_path());
-    let result = fs_name_to_object_path(dbus_context, pool_name, name);
-    let object_path = dbus_try!(result; default_return; return_message);
-
-    let path =
-        dbus_try!(string_to_object_path(object_path.clone()); default_return; return_message);
-    let (rc, rs) = ok_message_items();
-    Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
-}
-
 fn get_list_items<T, I>(i: &mut IterAppend, iter: I) -> Result<(), MethodErr>
     where T: Display + Into<u16>,
           I: Iterator<Item = T>
@@ -1005,14 +966,6 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let get_filesystem_object_path_method =
-        f.method("GetFilesystemObjectPath", (), get_filesystem_object_path)
-            .in_arg(("pool_name", "s"))
-            .in_arg(("filesystem_name", "s"))
-            .out_arg(("object_path", "o"))
-            .out_arg(("return_code", "q"))
-            .out_arg(("return_string", "s"));
-
     let configure_simulator_method = f.method("ConfigureSimulator", (), configure_simulator)
         .in_arg(("denominator", "u"))
         .out_arg(("return_code", "q"))
@@ -1045,7 +998,6 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
             .add_m(create_pool_method)
             .add_m(destroy_pool_method)
             .add_m(get_pool_object_path_method)
-            .add_m(get_filesystem_object_path_method)
             .add_m(configure_simulator_method)
             .add_p(error_values_property)
             .add_p(redundancy_values_property)

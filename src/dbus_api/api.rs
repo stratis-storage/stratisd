@@ -79,34 +79,6 @@ fn object_path_to_pair(dbus_context: &DbusContext,
     Ok(fs_pool_pair)
 }
 
-/// Get object path from pool name
-fn pool_name_to_object_path(dbus_context: &DbusContext,
-                            name: &str)
-                            -> Result<String, (MessageItem, MessageItem)> {
-    let object_path = match dbus_context.pools.borrow().get_by_second(name) {
-        Some(pool) => pool.clone(),
-        None => {
-            let items = code_to_message_items(DbusErrorEnum::POOL_NOTFOUND,
-                                              format!("no object path for pool name {}", name));
-            return Err(items);
-        }
-    };
-    Ok(object_path)
-}
-
-/// Convert a string from a object path/name map to an object path
-fn string_to_object_path<'a>(path: String) -> Result<dbus::Path<'a>, (MessageItem, MessageItem)> {
-    let object_path = match dbus::Path::new(path) {
-        Ok(p) => p,
-        Err(s) => {
-            let items = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
-                                              format!("malformed object path {} in table", s));
-            return Err(items);
-        }
-    };
-    Ok(object_path)
-}
-
 /// Get name for pool from object path
 fn object_path_to_pool_name(dbus_context: &DbusContext,
                             path: &str)
@@ -865,23 +837,6 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn get_pool_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-
-    let name: &str = try!(get_next_arg(&mut iter, 0));
-
-    let dbus_context = m.tree.get_data();
-    let return_message = message.method_return();
-    let default_return = MessageItem::ObjectPath(default_object_path());
-    let result = pool_name_to_object_path(dbus_context, name);
-    let object_path = dbus_try!(result; default_return; return_message);
-    let path =
-        dbus_try!(string_to_object_path(object_path.clone()); default_return; return_message);
-    let (rc, rs) = ok_message_items();
-    Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
-}
-
 fn get_list_items<T, I>(i: &mut IterAppend, iter: I) -> Result<(), MethodErr>
     where T: Display + Into<u16>,
           I: Iterator<Item = T>
@@ -960,12 +915,6 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let get_pool_object_path_method = f.method("GetPoolObjectPath", (), get_pool_object_path)
-        .in_arg(("pool_name", "s"))
-        .out_arg(("object_path", "o"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
     let configure_simulator_method = f.method("ConfigureSimulator", (), configure_simulator)
         .in_arg(("denominator", "u"))
         .out_arg(("return_code", "q"))
@@ -997,7 +946,6 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
         .add(f.interface(interface_name, ())
             .add_m(create_pool_method)
             .add_m(destroy_pool_method)
-            .add_m(get_pool_object_path_method)
             .add_m(configure_simulator_method)
             .add_p(error_values_property)
             .add_p(redundancy_values_property)

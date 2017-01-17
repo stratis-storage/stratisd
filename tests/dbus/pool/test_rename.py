@@ -22,6 +22,7 @@ import unittest
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import Pool
 from stratisd_client_dbus import StratisdErrorsGen
+from stratisd_client_dbus import get_managed_objects
 from stratisd_client_dbus import get_object
 
 from stratisd_client_dbus._constants import TOP_OBJECT
@@ -83,13 +84,9 @@ class RenameTestCase(unittest.TestCase):
         self.assertEqual(rc, self._errors.OK)
         self.assertFalse(result)
 
-        (result, rc, _) = checked_call(
-           Manager.GetPoolObjectPath(self._proxy, name=self._POOLNAME),
-           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath],
-        )
-
-        self.assertEqual(rc, self._errors.OK)
-        self.assertEqual(result, self._pool_object_path)
+        managed_objects = get_managed_objects(self._proxy)
+        pool = managed_objects.get_pool_by_name(self._POOLNAME)
+        self.assertEqual(pool, self._pool_object_path)
 
     def testNewName(self):
         """
@@ -105,17 +102,7 @@ class RenameTestCase(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(rc, self._errors.OK)
 
-        (result, rc, _) = checked_call(
-           Manager.GetPoolObjectPath(self._proxy, name=self._POOLNAME),
-           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath],
-        )
-
-        self.assertEqual(rc, self._errors.POOL_NOTFOUND)
-
-        (result, rc, _) = checked_call(
-           Manager.GetPoolObjectPath(self._proxy, name=new_name),
-           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath],
-        )
-
-        self.assertEqual(rc, self._errors.OK)
-        self.assertEqual(result, self._pool_object_path)
+        managed_objects = get_managed_objects(self._proxy)
+        self.assertIsNone(managed_objects.get_pool_by_name(self._POOLNAME))
+        pool = managed_objects.get_pool_by_name(new_name)
+        self.assertEqual(pool, self._pool_object_path)

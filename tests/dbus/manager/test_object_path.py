@@ -18,16 +18,10 @@ Test object path methods.
 import time
 import unittest
 
-from stratisd_client_dbus import Manager
-from stratisd_client_dbus import Pool
-from stratisd_client_dbus import StratisdErrorsGen
 from stratisd_client_dbus import get_object
-
-from stratisd_client_dbus._constants import TOP_OBJECT
 
 from stratisd_client_dbus._implementation import ManagerSpec
 
-from .._misc import checked_call
 from .._misc import _device_list
 from .._misc import Service
 

@@ -78,20 +78,16 @@ class Create2TestCase(unittest.TestCase):
            ManagerSpec.OUTPUT_SIGS[_MN.CreatePool]
         )
 
-        (pool, rc1, _) = checked_call(
-           Manager.GetPoolObjectPath(self._proxy, name=self._POOLNAME),
-           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath]
-        )
-
-        pools = [x for x in get_managed_objects(self._proxy).pools()]
+        managed_objects = get_managed_objects(self._proxy)
+        pools = [x for x in managed_objects.pools()]
+        pool = managed_objects.get_pool_by_name(self._POOLNAME)
 
         if rc == self._errors.OK:
             self.assertEqual(pool, poolpath)
-            self.assertEqual(rc1, self._errors.OK)
             self.assertEqual(len(pools), 1)
             self.assertLessEqual(len(devnodes), len(devs))
         else:
-            self.assertEqual(rc1, self._errors.POOL_NOTFOUND)
+            self.assertIsNone(pool)
             self.assertEqual(len(pools), 0)
 
     def testCreateBadRAID(self):
@@ -162,14 +158,11 @@ class Create3TestCase(unittest.TestCase):
         expected_rc = self._errors.ALREADY_EXISTS
         self.assertEqual(rc, expected_rc)
 
-        (_, rc1, _) = checked_call(
-           Manager.GetPoolObjectPath(self._proxy, name=self._POOLNAME),
-           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath]
-        )
+        managed_objects = get_managed_objects(self._proxy)
+        pools2 = [x for x in managed_objects.pools()]
+        pool = managed_objects.get_pool_by_name(self._POOLNAME)
 
-        pools2 = get_managed_objects(self._proxy).pools()
-
-        self.assertEqual(rc1, self._errors.OK)
+        self.assertIsNotNone(pool)
         self.assertEqual(
            frozenset(x for (x, y) in pools1),
            frozenset(x for (x, y) in pools2)

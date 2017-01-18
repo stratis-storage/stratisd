@@ -14,7 +14,7 @@ use libstratis::engine::strat_engine::metadata::MIN_MDA_SIZE;
 
 use std::path::Path;
 
-use util::blockdev_utils::clean_blockdevs_headers;
+use util::blockdev_utils::clean_blockdev_headers;
 use util::test_config::TestConfig;
 use util::test_consts::DEFAULT_CONFIG_FILE;
 use util::test_result::TestError::Framework;
@@ -87,8 +87,7 @@ pub fn test_blockdev_setup() {
 
     let device_paths = safe_to_destroy_devs.iter().map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
-    try_clean_devs!(&device_paths);
-    info!("devices cleaned for test");
+    clean_blockdev_headers(&device_paths);
 
     assert!(match test_blockdev_force_flag(&device_paths) {
         Ok(_) => true,

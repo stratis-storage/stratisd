@@ -14,6 +14,8 @@ use util::test_result::TestErrorEnum;
 
 use util::test_result::TestResult;
 
+
+#[allow(dead_code)]
 pub fn get_ownership(path: &PathBuf) -> TestResult<DevOwnership> {
 
     let mut f = try!(OpenOptions::new()
@@ -35,7 +37,7 @@ pub fn get_ownership(path: &PathBuf) -> TestResult<DevOwnership> {
     Ok(ownership)
 }
 
-pub fn clean_blockdevs_headers(blockdev_paths: &Vec<&Path>) -> TestResult<()> {
+pub fn clean_blockdev_headers(blockdev_paths: &Vec<&Path>) {
 
     for path in blockdev_paths {
         match wipe_header(path) {
@@ -45,16 +47,14 @@ pub fn clean_blockdevs_headers(blockdev_paths: &Vec<&Path>) -> TestResult<()> {
             }
         }
     }
-
-    Ok(())
+    info!("devices cleaned for test");
 }
 
 fn wipe_header(path: &Path) -> TestResult<()> {
     let mut f = try!(OpenOptions::new().write(true).open(path));
-    let zeroed = [0u8; (SECTOR_SIZE * 8) as usize];
+    let zeroed = [0u8; (SECTOR_SIZE * 16) as usize];
 
-    try!(f.write_all(&zeroed[..(SECTOR_SIZE * 8) as usize]));
-    try!(f.write_all(&zeroed[..(SECTOR_SIZE * 8) as usize]));
+    try!(f.write_all(&zeroed[..(SECTOR_SIZE * 16) as usize]));
 
     Ok(())
 }

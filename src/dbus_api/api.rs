@@ -691,6 +691,31 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
+fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+    let dbus_context = p.tree.get_data();
+    let object_path = p.path.get_name();
+    i.append(try!(dbus_context.pools
+        .borrow()
+        .get_by_first(object_path as &str)
+        .ok_or(MethodErr::failed(&format!("no name for pool with object path {}", object_path)))));
+    Ok(())
+}
+
+fn get_pool_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+    let dbus_context = p.tree.get_data();
+    let object_path = p.path.get_name();
+    let pools = dbus_context.pools.borrow();
+    let name = try!(pools.get_by_first(object_path as &str)
+        .ok_or(MethodErr::failed(&format!("no name for pool with object path {}", object_path))));
+
+    let mut engine = dbus_context.engine.borrow_mut();
+    let uuid = try!(engine.get_pool(name)
+        .ok_or(MethodErr::failed(&format!("no pool for name {}", name)))
+        .map(|x| x.uuid()));
+    i.append(format!("{}", uuid.simple()));
+    Ok(())
+}
+
 fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
 
     let f = Factory::new_fn();
@@ -739,6 +764,16 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
+    let name_property = f.property::<&str, _>("Name", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::False)
+        .on_get(get_pool_name);
+
+    let uuid_property = f.property::<&str, _>("Uuid", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_pool_uuid);
+
     let object_name = format!("{}/{}",
                               STRATIS_BASE_PATH,
                               dbus_context.get_next_id().to_string());
@@ -754,7 +789,9 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
             .add_m(remove_cache_devs_method)
             .add_m(add_devs_method)
             .add_m(remove_devs_method)
-            .add_m(rename_method));
+            .add_m(rename_method)
+            .add_p(name_property)
+            .add_p(uuid_property));
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);

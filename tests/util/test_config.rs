@@ -42,26 +42,7 @@ impl TestConfig {
 
     }
 
-    pub fn get_destroy_devs() {
-        match get_safe_to_destroy_devs() {
-            Ok(devs) => {
-                if devs.len() == 0 {
-                    warn!("Test not run.  No available devices.");
-                    return;
-                }
-                devs
-            }
-            Err(e) => {
-                error!("Failed to read safe to destroy device list from config file. {}",
-                       e);
-                assert!(false);
-                return;
-            }
-        }
-    }
-
-
-    fn get_safe_to_destroy_devs(&mut self) -> TestResult<Vec<String>> {
+    pub fn get_safe_to_destroy_devs(&mut self) -> TestResult<Vec<String>> {
 
         if self.config_string.is_none() {
             return Err(TestError::Framework(TestErrorEnum::JsonError("Array not found".into())));
@@ -80,6 +61,11 @@ impl TestConfig {
 
         match json_path.as_array() {
             Some(array) => {
+                if array.len() == 0 {
+                    return Err(TestError::Framework(TestErrorEnum::JsonError("safe to destroy \
+                                                                              list empty"
+                        .into())));
+                }
                 for path in array.iter() {
                     match path.as_string() {
                         Some(p) => ok_to_destroy_dev_list.push(String::from(p)),

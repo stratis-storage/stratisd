@@ -2,7 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#![allow(dead_code)] // only temporary, until more stuff is filled in
+#[macro_use]
+extern crate libstratis;
 
 extern crate devicemapper;
 #[macro_use]
@@ -29,28 +30,17 @@ extern crate enum_derive;
 #[cfg(test)]
 extern crate quickcheck;
 
-mod types;
-mod consts;
-mod dbus_consts;
-#[macro_use]
-mod stratis;
-mod dbus_api;
-mod engine;
-
 use std::io::Write;
 use std::error::Error;
 use std::process::exit;
 
-use stratis::{DEBUG, VERSION};
-
-use types::{StratisResult, StratisError};
-
 use clap::{App, Arg};
 
-use engine::Engine;
-use engine::sim_engine::SimEngine;
-use engine::strat_engine::StratEngine;
-
+use libstratis::engine::Engine;
+use libstratis::engine::sim_engine::SimEngine;
+use libstratis::engine::strat_engine::StratEngine;
+use libstratis::stratis::VERSION;
+use libstratis::types::{StratisResult, StratisError};
 
 fn write_err(err: StratisError) -> StratisResult<()> {
     let mut out = term::stderr().expect("could not get stderr");
@@ -59,6 +49,17 @@ fn write_err(err: StratisError) -> StratisResult<()> {
     try!(writeln!(out, "{}", err.description()));
     try!(out.reset());
     Ok(())
+}
+
+pub static mut DEBUG: bool = false;
+
+macro_rules! dbgp {
+    ($($arg:tt)*) => (
+        unsafe {
+            if DEBUG {
+                println!($($arg)*)
+            }
+        })
 }
 
 fn main() {
@@ -87,7 +88,7 @@ fn main() {
         }
     };
 
-    let r = dbus_api::run(engine);
+    let r = libstratis::dbus_api::run(engine);
 
     if let Err(r) = r {
         if let Err(e) = write_err(r) {

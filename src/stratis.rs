@@ -18,15 +18,4 @@ pub enum StratisState {
     ThinFailed,
 }
 
-pub static mut DEBUG: bool = false;
-
-macro_rules! dbgp {
-    ($($arg:tt)*) => (
-        unsafe {
-            if DEBUG {
-                println!($($arg)*)
-            }
-        })
-}
-
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");

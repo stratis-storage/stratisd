@@ -78,7 +78,7 @@ impl Engine for SimEngine {
     }
 
     /// Looks up the pool by its unique name
-    fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool> {
+    fn get_pool(&mut self, name: &str) -> Option<&mut Pool> {
         get_pool!(self; name)
     }
 
@@ -118,10 +118,7 @@ mod tests {
     #[test]
     /// When an engine has no pools, any name lookup should fail
     fn get_pool_err() {
-        assert!(match SimEngine::new().get_pool("name") {
-            Err(EngineError::Engine(ErrorEnum::NotFound, _)) => true,
-            _ => false,
-        });
+        assert!(SimEngine::new().get_pool("name").is_none());
     }
 
     #[test]

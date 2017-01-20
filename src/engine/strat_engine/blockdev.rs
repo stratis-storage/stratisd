@@ -3,36 +3,30 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::io;
-
 use std::collections::BTreeSet;
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::{ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::ErrorKind;
 use std::fs::{OpenOptions, read_dir};
-
 use std::os::unix::prelude::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use time::Timespec;
 use devicemapper::Device;
-use crc::crc32;
 use uuid::Uuid;
 
 use types::{Sectors, SectorOffset};
 use engine::{EngineResult, EngineError, ErrorEnum};
 
 use consts::*;
-
-use super::metadata::{SigBlock, validate_mda_size};
+use super::metadata::{StaticHeader, BDA, validate_mda_size, BDA_STATIC_HDR_SECTORS};
 use super::engine::DevOwnership;
-
 pub use super::BlockDevSave;
 
 type DevUuid = Uuid;
 type PoolUuid = Uuid;
 
-const BDA_STATIC_HDR_SIZE: Sectors = Sectors(8);
 const MIN_DEV_SIZE: u64 = GIGA;
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);
@@ -70,36 +64,15 @@ pub fn find_all() -> EngineResult<BTreeMap<PoolUuid, BTreeMap<DevUuid, BlockDev>
 
         let mut f = try!(OpenOptions::new()
             .read(true)
-            .open(devnode)
-            .map_err(|_| {
-                io::Error::new(ErrorKind::PermissionDenied,
-                               format!("Could not open {}", devnode.display()))
-            }));
+            .open(devnode));
 
-        let mut buf = [0u8; 4096];
-        try!(f.seek(SeekFrom::Start(0)));
-        try!(f.read(&mut buf));
-
-        match SigBlock::determine_ownership(&buf) {
-            Ok(DevOwnership::Ours(_)) => {}
-            Ok(_) => {
-                return Ok(None);
-            }
-            Err(err) => {
-                let error_message = format!("{} for devnode {}", err, devnode.display());
-                return Err(EngineError::Engine(ErrorEnum::Invalid, error_message));
-            }
-        };
+        let static_header = try!(StaticHeader::setup(&mut f));
+        let bda = try!(BDA::load(&mut f, static_header));
 
         Ok(Some(BlockDev {
             dev: dev,
             devnode: devnode.to_owned(),
-            sigblock: match SigBlock::read(&buf, 0, Sectors(try!(blkdev_size(&f)) / SECTOR_SIZE)) {
-                Ok(sigblock) => sigblock,
-                Err(err) => {
-                    return Err(EngineError::Engine(ErrorEnum::Invalid, err));
-                }
-            },
+            bda: bda,
         }))
     }
 
@@ -112,9 +85,9 @@ pub fn find_all() -> EngineResult<BTreeMap<PoolUuid, BTreeMap<DevUuid, BlockDev>
 
         match setup(&devnode) {
             Ok(Some(blockdev)) => {
-                pool_map.entry(blockdev.sigblock.pool_uuid)
+                pool_map.entry(blockdev.bda.header.pool_uuid)
                     .or_insert_with(BTreeMap::new)
-                    .insert(blockdev.sigblock.dev_uuid, blockdev);
+                    .insert(blockdev.bda.header.dev_uuid, blockdev);
             }
             _ => continue,
         };
@@ -135,7 +108,10 @@ pub fn initialize(pool_uuid: &PoolUuid,
 
     /// Gets device information, returns an error if problem with obtaining
     /// that information.
-    fn dev_info(dev: &Device) -> EngineResult<(PathBuf, u64, DevOwnership)> {
+    /// Returns a tuple with the blockdev's path, its size in bytes,
+    /// its ownership as determined by calling determine_ownership(),
+    /// and an open File handle, all of which are needed later.
+    fn dev_info(dev: &Device) -> EngineResult<(PathBuf, u64, DevOwnership, File)> {
         let devnode = try!(dev.path().ok_or_else(|| {
             io::Error::new(ErrorKind::InvalidInput,
                            format!("could not get device node from dev {}", dev.dstr()))
@@ -151,11 +127,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
 
         let dev_size = try!(blkdev_size(&f));
 
-        let mut buf = [0u8; 4096];
-        try!(f.seek(SeekFrom::Start(0)));
-        try!(f.read(&mut buf));
-
-        let ownership = match SigBlock::determine_ownership(&buf) {
+        let ownership = match StaticHeader::determine_ownership(&mut f) {
             Ok(ownership) => ownership,
             Err(err) => {
                 let error_message = format!("{} for device {}", err, devnode.display());
@@ -163,7 +135,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
             }
         };
 
-        Ok((devnode, dev_size, ownership))
+        Ok((devnode, dev_size, ownership, f))
     }
 
     /// Filter devices for admission to pool based on dev_infos.
@@ -172,15 +144,15 @@ pub fn initialize(pool_uuid: &PoolUuid,
     fn filter_devs<I>(dev_infos: I,
                       pool_uuid: &PoolUuid,
                       force: bool)
-                      -> EngineResult<Vec<(Device, (PathBuf, u64))>>
-        where I: Iterator<Item = (Device, EngineResult<(PathBuf, u64, DevOwnership)>)>
+                      -> EngineResult<Vec<(Device, (PathBuf, u64, File))>>
+        where I: Iterator<Item = (Device, EngineResult<(PathBuf, u64, DevOwnership, File)>)>
     {
         let mut add_devs = Vec::new();
         for (dev, dev_result) in dev_infos {
             if dev_result.is_err() {
                 return Err(dev_result.unwrap_err());
             }
-            let (devnode, dev_size, ownership) = dev_result.unwrap();
+            let (devnode, dev_size, ownership, f) = dev_result.unwrap();
             if dev_size < MIN_DEV_SIZE {
                 let error_message = format!("{} too small, minimum {} bytes",
                                             devnode.display(),
@@ -188,14 +160,13 @@ pub fn initialize(pool_uuid: &PoolUuid,
                 return Err(EngineError::Engine(ErrorEnum::Invalid, error_message));
             };
             match ownership {
-                DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size))),
+                DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, f))),
                 DevOwnership::Theirs => {
                     if !force {
-                        let error_str = format!("First 4K of {} not zeroed", devnode.display());
+                        let error_str = format!("First 8K of {} not zeroed", devnode.display());
                         return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
-
                     } else {
-                        add_devs.push((dev, (devnode, dev_size)))
+                        add_devs.push((dev, (devnode, dev_size, f)))
                     }
                 }
                 DevOwnership::Ours(uuid) => {
@@ -211,28 +182,26 @@ pub fn initialize(pool_uuid: &PoolUuid,
         Ok(add_devs)
     }
 
-    match validate_mda_size(mda_size) {
-        None => {}
-        Some(err) => {
-            return Err(EngineError::Engine(ErrorEnum::Invalid, err));
-        }
-    };
+    try!(validate_mda_size(mda_size));
 
     let dev_infos = devices.into_iter().map(|d: Device| (d, dev_info(&d)));
 
     let add_devs = try!(filter_devs(dev_infos, pool_uuid, force));
 
     let mut bds = BTreeMap::new();
-    for (dev, (devnode, dev_size)) in add_devs {
+    for (dev, (devnode, dev_size, mut f)) in add_devs {
+
+        let static_header = StaticHeader::new(pool_uuid,
+                                              &Uuid::new_v4(),
+                                              mda_size,
+                                              Sectors(dev_size / SECTOR_SIZE));
+        let bda = try!(BDA::initialize(&mut f, static_header));
+
         let bd = BlockDev {
             dev: dev,
             devnode: devnode.clone(),
-            sigblock: SigBlock::new(pool_uuid,
-                                    &Uuid::new_v4(),
-                                    mda_size,
-                                    Sectors(dev_size / SECTOR_SIZE)),
+            bda: bda,
         };
-        try!(bd.write_sigblock());
         bds.insert(devnode, bd);
     }
     Ok(bds)
@@ -243,106 +212,15 @@ pub fn initialize(pool_uuid: &PoolUuid,
 pub struct BlockDev {
     pub dev: Device,
     pub devnode: PathBuf,
-    pub sigblock: SigBlock,
+    pub bda: BDA,
 }
 
 impl BlockDev {
     pub fn to_save(&self) -> BlockDevSave {
         BlockDevSave {
             devnode: self.devnode.clone(),
-            total_size: self.sigblock.total_size,
+            total_size: self.bda.header.blkdev_size,
         }
-    }
-
-    // Read metadata from newest MDA
-    pub fn read_mdax(&self) -> EngineResult<Vec<u8>> {
-        let younger_mda = self.sigblock.mda.most_recent();
-
-        if younger_mda.last_updated == Timespec::new(0, 0) {
-            let message = "Neither MDA region is in use";
-            return Err(EngineError::Engine(ErrorEnum::Invalid, message.into()));
-        };
-
-        let mut f = try!(OpenOptions::new().read(true).open(&self.devnode));
-        let mut buf = vec![0; younger_mda.used as usize];
-
-        // read metadata from disk
-        try!(f.seek(SeekFrom::Start((*BDA_STATIC_HDR_SIZE + *younger_mda.offset) * SECTOR_SIZE)));
-        try!(f.read_exact(&mut buf));
-
-        if younger_mda.crc != crc32::checksum_ieee(&buf) {
-            return Err(EngineError::Io(io::Error::new(ErrorKind::InvalidInput, "MDA CRC failed")));
-            // TODO: Read end-of-blockdev copy
-        }
-
-        Ok(buf)
-    }
-
-    // Write metadata to least-recently-written MDA
-    fn write_mdax(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
-        let aux_bda_size = (*self.aux_bda_size() * SECTOR_SIZE) as i64;
-
-        if metadata.len() > self.sigblock.mda.mda_length as usize {
-            return Err(EngineError::Io(io::Error::new(io::ErrorKind::InvalidInput,
-                                                      format!("Metadata too large for MDA, {} \
-                                                               bytes",
-                                                              metadata.len()))));
-        }
-
-        let older_mda = self.sigblock.mda.least_recent();
-        older_mda.crc = crc32::checksum_ieee(metadata);
-        older_mda.used = metadata.len() as u32;
-        older_mda.last_updated = *time;
-
-        let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
-
-        // write metadata to disk
-        try!(f.seek(SeekFrom::Start((*BDA_STATIC_HDR_SIZE + *older_mda.offset) * SECTOR_SIZE)));
-        try!(f.write_all(&metadata));
-        try!(f.seek(SeekFrom::End(-aux_bda_size)));
-        try!(f.seek(SeekFrom::Current((*older_mda.offset * SECTOR_SIZE) as i64)));
-        try!(f.write_all(&metadata));
-        try!(f.flush());
-
-        Ok(())
-    }
-
-    pub fn write_sigblock(&self) -> EngineResult<()> {
-        let mut buf = [0u8; SECTOR_SIZE as usize];
-        self.sigblock.write(&mut buf, 0);
-        try!(self.write_hdr_buf(&self.devnode, &buf));
-        Ok(())
-    }
-
-    pub fn wipe_sigblock(&mut self) -> EngineResult<()> {
-        let buf = [0u8; SECTOR_SIZE as usize];
-        try!(self.write_hdr_buf(&self.devnode, &buf));
-        Ok(())
-    }
-
-    fn write_hdr_buf(&self, devnode: &Path, buf: &[u8; SECTOR_SIZE as usize]) -> EngineResult<()> {
-        let aux_bda_size = (*self.aux_bda_size() * SECTOR_SIZE) as i64;
-        let mut f = try!(OpenOptions::new().write(true).open(devnode));
-        let zeroed = [0u8; (SECTOR_SIZE * 8) as usize];
-
-        // Write 4K header to head & tail. Sigblock goes in sector 1.
-        try!(f.write_all(&zeroed[..SECTOR_SIZE as usize]));
-        try!(f.write_all(buf));
-        try!(f.write_all(&zeroed[(SECTOR_SIZE * 2) as usize..]));
-        try!(f.seek(SeekFrom::End(-(aux_bda_size))));
-        try!(f.write_all(&zeroed[..SECTOR_SIZE as usize]));
-        try!(f.write_all(buf));
-        try!(f.write_all(&zeroed[(SECTOR_SIZE * 2) as usize..]));
-        try!(f.flush());
-
-        Ok(())
-    }
-
-    pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
-        try!(self.write_mdax(time, metadata));
-        try!(self.write_sigblock());
-
-        Ok(())
     }
 
     /// Get the "x:y" device string for this blockdev
@@ -350,20 +228,18 @@ impl BlockDev {
         self.dev.dstr()
     }
 
-    /// Size of the BDA copy at the beginning of the blockdev
-    fn main_bda_size(&self) -> Sectors {
-        BDA_STATIC_HDR_SIZE + self.sigblock.mda_sectors + self.sigblock.reserved_sectors
-    }
+    pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
+        let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
+        try!(self.bda.save_state(time, metadata, &mut f));
 
-    /// Size of the BDA copy at the end of the blockdev
-    fn aux_bda_size(&self) -> Sectors {
-        BDA_STATIC_HDR_SIZE + self.sigblock.mda_sectors
+        Ok(())
     }
 
     /// List the available-for-upper-layer-use range in this blockdev.
     pub fn avail_range(&self) -> (SectorOffset, Sectors) {
-        let start = self.main_bda_size();
-        let length = self.sigblock.total_size - start - self.aux_bda_size();
+        let start = Sectors(BDA_STATIC_HDR_SECTORS) + self.bda.header.mda_size +
+                    self.bda.header.reserved_size;
+        let length = self.bda.header.blkdev_size - start;
         (SectorOffset(*start), length)
     }
 }

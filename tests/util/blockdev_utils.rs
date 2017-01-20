@@ -3,9 +3,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 use libstratis::consts::SECTOR_SIZE;
 use libstratis::engine::strat_engine::engine::DevOwnership;
-use libstratis::engine::strat_engine::metadata::SigBlock;
+use libstratis::engine::strat_engine::metadata::StaticHeader;
 use std::fs::OpenOptions;
-use std::io::{Read, Seek, SeekFrom};
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
@@ -22,11 +21,7 @@ pub fn get_ownership(path: &PathBuf) -> TestResult<DevOwnership> {
         .read(true)
         .open(&path));
 
-    let mut buf = [0u8; 4096];
-    try!(f.seek(SeekFrom::Start(0)));
-    try!(f.read(&mut buf));
-
-    let ownership = match SigBlock::determine_ownership(&buf) {
+    let ownership = match StaticHeader::determine_ownership(&mut f) {
         Ok(ownership) => ownership,
         Err(err) => {
             let error_message = format!("{} for device {:?}", err, path);

@@ -6,7 +6,9 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::vec::Vec;
+use std::fs::OpenOptions;
 
+use time;
 use uuid::Uuid;
 
 use engine::Dev;
@@ -53,6 +55,56 @@ impl StratPool {
             filesystems: BTreeMap::new(),
             redundancy: redundancy,
         })
+    }
+
+    /// Read the latest data across all blockdevs
+    pub fn read_metadata(&self) -> Option<Vec<u8>> {
+
+        let mut bds: Vec<&BlockDev> = self.block_devs
+            .iter()
+            .map(|(_, bd)| bd)
+            .filter(|bd| bd.bda.last_update_time().is_some())
+            .collect();
+
+        bds.sort_by_key(|k| k.bda.last_update_time().unwrap());
+
+        // Only try to read blockdevs with the latest metadata
+        let last_update_time = match bds.last() {
+            Some(bd) => bd.bda.last_update_time().unwrap(),
+            None => return None,
+        };
+
+        for bd in bds.iter()
+            .rev()
+            .take_while(|bd| bd.bda.last_update_time().unwrap() == last_update_time) {
+            let mut f = match OpenOptions::new()
+                .read(true)
+                .open(&bd.devnode) {
+                Ok(f) => f,
+                Err(_) => continue,
+            };
+            match bd.bda.load_state(&mut f) {
+                Ok(Some(data)) => return Some(data),
+                _ => continue,
+            }
+        }
+        None
+    }
+
+    /// Write the given data to all blockdevs
+    pub fn write_metadata(&mut self, data: &[u8]) -> EngineResult<()> {
+
+        // TODO: Cap # of blockdevs written to, as described in SWDD
+        // TODO: Check current time against global last updated, and use
+        // alternate time value if earlier, as described in SWDD
+
+        let time = time::now().to_timespec();
+
+        for (_, bd) in &mut self.block_devs {
+            bd.save_state(&time, data).unwrap(); // ignoring failure
+        }
+
+        Ok(())
     }
 }
 

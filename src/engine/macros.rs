@@ -48,9 +48,7 @@ macro_rules! destroy_pool {
 
 macro_rules! get_pool {
     ( $s:ident; $name:ident ) => {
-        Ok(try!($s.pools
-            .get_mut_by_name($name)
-            .ok_or(EngineError::Engine(ErrorEnum::NotFound, $name.into()))))
+        $s.pools.get_mut_by_name($name).map(|p| p as &mut Pool)
     }
 }
 

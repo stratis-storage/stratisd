@@ -94,6 +94,19 @@ fn object_path_to_pool_name(dbus_context: &DbusContext,
     Ok(pool_name)
 }
 
+/// Macro for early return with Ok dbus message on failure to get pool.
+macro_rules! get_pool {
+    ( $engine:ident; $name:ident; $default:expr; $message:expr ) => {
+        match $engine.get_pool(&$name) {
+            Some(pool) => pool,
+            None => {
+                let (rc, rs) = code_to_message_items(DbusErrorEnum::POOL_NOTFOUND,
+                                                     format!("no pool for name {}", $name));
+                return Ok(vec![$message.append3($default, rc, rs)]);
+            }
+        }
+    }
+}
 /// Macros for early return with an Ok dbus message on a dbus error
 macro_rules! dbus_try {
     ( $val:expr; $default:expr; $message:expr ) => {
@@ -244,9 +257,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
-                                   default_return;
-                                   return_message);
+    let ref mut pool = get_pool!(b_engine; pool_name; default_return; return_message);
 
     let specs = filesystems.map(|x| (x.0, x.1, tuple_to_option(x.2).map(|x| Bytes(x))))
         .collect::<Vec<(&str, &str, Option<Bytes>)>>();
@@ -299,7 +310,7 @@ fn create_snapshot(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 		            default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let pool = engine_try!(b_engine.get_pool(&pool_name);default_return; return_message);
+    let pool = get_pool!(b_engine; pool_name; default_return; return_message);
 
     let msg = match pool.create_snapshot(snapshot_name, &filesystem_name) {
         Ok(_) => {
@@ -343,9 +354,7 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = engine_try!(
-        b_engine.get_pool(&pool_name);
-        default_return; return_message);
+    let ref mut pool = get_pool!(b_engine; pool_name; default_return; return_message);
 
     let result = pool.rename_filesystem(&filesystem_name, &new_name);
 
@@ -422,9 +431,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
-                                   default_return;
-                                   return_message);
+    let ref mut pool = get_pool!(b_engine; pool_name; default_return; return_message);
 
     let result = pool.destroy_filesystems(&filesystem_names);
     let msg = match result {
@@ -475,9 +482,7 @@ fn remove_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
-                                   default_return;
-                                   return_message);
+    let ref mut pool = get_pool!(b_engine; pool_name; default_return; return_message);
 
     let result = pool.remove_cachedevs(&device_paths);
 
@@ -518,9 +523,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let mut pool = engine_try!(b_engine.get_pool(&pool_name);
-                                   default_return;
-                                   return_message);
+    let ref mut pool = get_pool!(b_engine; pool_name; default_return; return_message);
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
     let result = pool.add_blockdevs(&blockdevs, force);
@@ -561,9 +564,7 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let mut pool = engine_try!(b_engine.get_pool(&pool_name);
-                                   default_return;
-                                   return_message);
+    let ref mut pool = get_pool!(b_engine; pool_name; default_return; return_message);
 
     let cachedevs = cache_devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
     let result = pool.add_cachedevs(&cachedevs, force);
@@ -606,9 +607,7 @@ fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = engine_try!(b_engine.get_pool(&pool_name);
-                                   default_return;
-                                   return_message);
+    let ref mut pool = get_pool!(b_engine; pool_name; default_return; return_message);
 
     let result = pool.remove_blockdevs(&device_paths);
 

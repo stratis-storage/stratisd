@@ -5,8 +5,10 @@
 use std::io;
 use std::fmt;
 use std::error;
+use std::str;
 
 use nix;
+use uuid;
 
 #[derive(Debug, Clone)]
 pub enum ErrorEnum {
@@ -23,6 +25,8 @@ pub enum EngineError {
     Engine(ErrorEnum, String),
     Io(io::Error),
     Nix(nix::Error),
+    Uuid(uuid::ParseError),
+    Utf8(str::Utf8Error),
 }
 
 impl fmt::Display for EngineError {
@@ -31,6 +35,8 @@ impl fmt::Display for EngineError {
             EngineError::Engine(_, ref msg) => write!(f, "Stratis error: {}", msg),
             EngineError::Io(ref err) => write!(f, "IO error: {}", err),
             EngineError::Nix(ref err) => write!(f, "Nix error: {}", err.errno().desc()),
+            EngineError::Uuid(ref err) => write!(f, "Uuid error: {}", err),
+            EngineError::Utf8(ref err) => write!(f, "Utf8 error: {}", err),
         }
     }
 }
@@ -41,6 +47,8 @@ impl error::Error for EngineError {
             EngineError::Engine(_, ref msg) => msg,
             EngineError::Io(ref err) => err.description(),
             EngineError::Nix(ref err) => err.errno().desc(),
+            EngineError::Uuid(_) => "Uuid::ParseError",
+            EngineError::Utf8(ref err) => err.description(),
         }
     }
 }
@@ -56,5 +64,17 @@ impl From<io::Error> for EngineError {
 impl From<nix::Error> for EngineError {
     fn from(err: nix::Error) -> EngineError {
         EngineError::Nix(err)
+    }
+}
+
+impl From<uuid::ParseError> for EngineError {
+    fn from(err: uuid::ParseError) -> EngineError {
+        EngineError::Uuid(err)
+    }
+}
+
+impl From<str::Utf8Error> for EngineError {
+    fn from(err: str::Utf8Error) -> EngineError {
+        EngineError::Utf8(err)
     }
 }

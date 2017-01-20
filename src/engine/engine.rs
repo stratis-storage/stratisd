@@ -112,7 +112,7 @@ pub trait Engine: Debug {
     /// Returns true if it was necessary to perform an action, false if not.
     fn rename_pool(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction>;
 
-    fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool>;
+    fn get_pool(&mut self, name: &str) -> Option<&mut Pool>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.

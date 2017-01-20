@@ -261,7 +261,7 @@ class PoolSpec(InterfaceSpec):
         """
         Names of the properties of the manager interface.
         """
-        pass
+        Name = "Name"
 
     INTERFACE_NAME = 'org.storage.stratis1.pool'
 
@@ -297,7 +297,9 @@ class PoolSpec(InterfaceSpec):
     }
     XFORMERS = _xformers(INPUT_SIGS)
 
-    PROPERTY_SIGS = {}
+    PROPERTY_SIGS = {
+       PropertyNames.Name: "s",
+    }
 
 
 def _prop_builder(spec):

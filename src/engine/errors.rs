@@ -9,6 +9,7 @@ use std::str;
 
 use nix;
 use uuid;
+use serde_json;
 
 #[derive(Debug, Clone)]
 pub enum ErrorEnum {
@@ -27,6 +28,7 @@ pub enum EngineError {
     Nix(nix::Error),
     Uuid(uuid::ParseError),
     Utf8(str::Utf8Error),
+    Serde(serde_json::error::Error),
 }
 
 impl fmt::Display for EngineError {
@@ -37,6 +39,7 @@ impl fmt::Display for EngineError {
             EngineError::Nix(ref err) => write!(f, "Nix error: {}", err.errno().desc()),
             EngineError::Uuid(ref err) => write!(f, "Uuid error: {}", err),
             EngineError::Utf8(ref err) => write!(f, "Utf8 error: {}", err),
+            EngineError::Serde(ref err) => write!(f, "Serde error: {}", err),
         }
     }
 }
@@ -49,6 +52,7 @@ impl error::Error for EngineError {
             EngineError::Nix(ref err) => err.errno().desc(),
             EngineError::Uuid(_) => "Uuid::ParseError",
             EngineError::Utf8(ref err) => err.description(),
+            EngineError::Serde(ref err) => err.description(),
         }
     }
 }
@@ -76,5 +80,11 @@ impl From<uuid::ParseError> for EngineError {
 impl From<str::Utf8Error> for EngineError {
     fn from(err: str::Utf8Error) -> EngineError {
         EngineError::Utf8(err)
+    }
+}
+
+impl From<serde_json::error::Error> for EngineError {
+    fn from(err: serde_json::error::Error) -> EngineError {
+        EngineError::Serde(err)
     }
 }

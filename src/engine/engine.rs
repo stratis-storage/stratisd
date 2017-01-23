@@ -17,7 +17,7 @@ pub enum RenameAction {
 
 /// Redundancy classifications which the engine allows for pools.
 custom_derive! {
-    #[derive(Clone, Copy, Debug, Eq, PartialEq, EnumDisplay,
+    #[derive(Debug, Eq, PartialEq, EnumDisplay,
              IterVariants(RedundancyVariants))]
     #[allow(non_camel_case_types)]
     /// Redundancy specification for a pool.

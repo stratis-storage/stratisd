@@ -79,7 +79,7 @@ custom_derive! {
 
 // An error type for errors generated within Stratis
 //
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct InternalError(pub Cow<'static, str>);
 
 impl fmt::Display for InternalError {

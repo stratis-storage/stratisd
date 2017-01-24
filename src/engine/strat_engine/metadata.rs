@@ -415,7 +415,11 @@ impl MDAHeader {
         try!(f.read_exact(&mut hdr_buf));
 
         if self.used > self.region_size {
-            return Err(EngineError::Engine(ErrorEnum::Invalid, "mda0.used > region_size".into()));
+            return Err(EngineError::Engine(ErrorEnum::Invalid,
+                                           format!("region mda.used {} > region_size {}",
+                                                   self.used,
+                                                   self.region_size)
+                                               .into()));
         }
 
         if self.used == 0 {

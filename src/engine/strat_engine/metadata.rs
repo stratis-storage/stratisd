@@ -19,7 +19,7 @@ use consts::{SECTOR_SIZE, MEGA};
 use engine::{EngineResult, EngineError, ErrorEnum};
 
 pub const BDA_STATIC_HDR_SECTORS: u64 = 16;
-pub const BDA_STATIC_HDR_SIZE: u64 = BDA_STATIC_HDR_SECTORS * SECTOR_SIZE;
+const BDA_STATIC_HDR_SIZE: u64 = BDA_STATIC_HDR_SECTORS * SECTOR_SIZE;
 const MDA_RESERVED_SIZE: Sectors = Sectors(3 * MEGA / SECTOR_SIZE); // = 3 MiB
 const NUM_MDA_REGIONS: u64 = 4;
 const PER_MDA_REGION_COPIES: u64 = 2;

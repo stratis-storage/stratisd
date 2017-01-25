@@ -11,3 +11,9 @@ build:
 
 test:
 	cargo test
+
+.PHONY:
+	check
+	fmt
+	build
+	test

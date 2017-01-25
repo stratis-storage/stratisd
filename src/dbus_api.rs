@@ -1227,13 +1227,13 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
 }
 
 pub fn run(engine: Box<Engine>) -> StratisResult<()> {
-    let dbus_context = DbusContext::new(engine);
-    let mut tree = get_base_tree(dbus_context.clone());
-
-    // Setup DBus connection
     let c = try!(Connection::get_private(BusType::Session));
-    c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32).unwrap();
+
+    let mut tree = get_base_tree(DbusContext::new(engine));
+    let dbus_context = tree.get_data().clone();
     try!(tree.set_registered(&c, true));
+
+    c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32).unwrap();
 
     // ...and serve incoming requests.
     for c_item in c.iter(10000) {

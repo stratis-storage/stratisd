@@ -68,10 +68,10 @@ pub struct DbusContext {
 }
 
 impl DbusContext {
-    pub fn new(engine: Rc<RefCell<Box<Engine>>>) -> DbusContext {
+    pub fn new(engine: Box<Engine>) -> DbusContext {
         DbusContext {
             action_list: Rc::new(RefCell::new(Vec::new())),
-            engine: engine.clone(),
+            engine: Rc::new(RefCell::new(engine)),
             filesystems: Rc::new(RefCell::new(BidirMap::new())),
             next_index: Rc::new(Cell::new(0)),
             pools: Rc::new(RefCell::new(BidirMap::new())),
@@ -1229,7 +1229,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
 }
 
 pub fn run(engine: Box<Engine>) -> StratisResult<()> {
-    let dbus_context = DbusContext::new(Rc::new(RefCell::new(engine)));
+    let dbus_context = DbusContext::new(engine);
     let mut tree = get_base_tree(dbus_context.clone()).unwrap();
 
     // Setup DBus connection

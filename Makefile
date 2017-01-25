@@ -1,4 +1,4 @@
-check: fmt build test
+check: fmt build test docs
 
 ${HOME}/.cargo/bin/cargo-fmt:
 	cargo install rustfmt --vers 0.6.3
@@ -12,8 +12,12 @@ build:
 test:
 	cargo test
 
+docs:
+	cargo doc --no-deps
+
 .PHONY:
 	check
 	fmt
 	build
 	test
+	docs

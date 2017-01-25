@@ -82,7 +82,7 @@ impl DbusContext {
     /// It is assumed that, while Stratisd is running, it will never generate
     /// more than 2^64 object paths. If it turns out that this is a bad
     /// assumption, the solution is to use unbounded integers.
-    pub fn get_next_id(&mut self) -> u64 {
+    pub fn get_next_id(&self) -> u64 {
         self.next_index.set(self.next_index.get() + 1);
         self.next_index.get()
     }
@@ -298,7 +298,7 @@ fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn create_dbus_filesystem<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
+fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
 
     let f = Factory::new_fn();
 
@@ -374,7 +374,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(ref names) => {
             let mut return_value = Vec::new();
             for name in names {
-                let fs_object_path: dbus::Path = create_dbus_filesystem(dbus_context.clone());
+                let fs_object_path: dbus::Path = create_dbus_filesystem(dbus_context);
                 dbus_context.filesystems
                     .borrow_mut()
                     .insert(fs_object_path.to_string(),
@@ -421,7 +421,7 @@ fn create_snapshot(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match pool.create_snapshot(snapshot_name, &filesystem_name) {
         Ok(_) => {
-            let object_path: dbus::Path = create_dbus_filesystem(dbus_context.clone());
+            let object_path: dbus::Path = create_dbus_filesystem(dbus_context);
             dbus_context.filesystems.borrow_mut().insert(object_path.to_string(),
                                                          ((&pool_name).clone(),
                                                           String::from(snapshot_name)));
@@ -888,7 +888,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
+fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
 
     let f = Factory::new_fn();
 
@@ -996,7 +996,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(devnodes) => {
-            let object_path: dbus::Path = create_dbus_pool(dbus_context.clone());
+            let object_path: dbus::Path = create_dbus_pool(dbus_context);
             dbus_context.pools.borrow_mut().insert(object_path.to_string(), String::from(name));
             let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
             let paths = paths.map(|x| MessageItem::Str(x)).collect();

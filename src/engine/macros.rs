@@ -38,7 +38,8 @@ macro_rules! destroy_pool {
             Entry::Occupied(entry) => entry,
         };
         if !entry.get().filesystems.is_empty() {
-            return Err(EngineError::Engine(ErrorEnum::Busy, "filesystems remaining on pool".into()));
+            return Err(EngineError::Engine(
+                ErrorEnum::Busy, "filesystems remaining on pool".into()));
         };
         if !entry.get().block_devs.is_empty() {
             return Err(EngineError::Engine(ErrorEnum::Busy, "devices remaining in pool".into()));

@@ -208,7 +208,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BlockDev {
     pub dev: Device,
     pub devnode: PathBuf,

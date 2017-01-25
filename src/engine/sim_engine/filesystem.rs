@@ -8,7 +8,7 @@ use engine::Filesystem;
 
 use super::consts::DEFAULT_FILESYSTEM_QUOTA_SIZE;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SimFilesystem {
     pub fs_id: Uuid,
     pub mount_point: String,

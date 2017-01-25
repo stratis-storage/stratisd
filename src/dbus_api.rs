@@ -87,7 +87,7 @@ impl DbusContext {
     }
 }
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Default, Debug)]
 pub struct TData;
 impl DataType for TData {
     type ObjectPath = DbusContext;

@@ -28,7 +28,7 @@ const MDA_REGION_HDR_SIZE: usize = 32;
 pub const MIN_MDA_SIZE: Sectors = Sectors(2040);
 const STRAT_MAGIC: &'static [u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct BDA {
     pub header: StaticHeader,
     pub regions: MDARegions,
@@ -100,7 +100,7 @@ impl BDA {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct StaticHeader {
     pub blkdev_size: Sectors,
     pub pool_uuid: Uuid,
@@ -223,7 +223,7 @@ impl StaticHeader {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MDARegions {
     // Spec defines 4 regions, but regions 2 & 3 are duplicates of 0 and 1 respectively
     pub region_size: Sectors,

@@ -3,13 +3,13 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum StratisRunningState {
     Good,
     Degraded(u8),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum StratisState {
     Initializing,
     Good(StratisRunningState),

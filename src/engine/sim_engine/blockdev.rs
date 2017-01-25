@@ -13,14 +13,14 @@ use std::rc::Rc;
 
 use super::randomization::Randomizer;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 /// A list of very basic states a SimDev can be in.
 pub enum State {
     OK,
     FAILED,
 }
 
-#[derive(Clone,Debug)]
+#[derive(Debug)]
 /// A simulated device.
 pub struct SimDev {
     pub devnode: PathBuf,

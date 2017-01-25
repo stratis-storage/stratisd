@@ -7,7 +7,7 @@ use uuid::Uuid;
 use engine::Filesystem;
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct StratFilesystem {
     pub fs_id: Uuid,
     pub thin_id: u32,

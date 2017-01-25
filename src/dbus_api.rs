@@ -1144,7 +1144,7 @@ fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData>, TData>> {
+fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
 
     let f = Factory::new_fn();
 
@@ -1223,14 +1223,12 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
             .add_p(redundancy_values_property)
             .add_p(version_property));
 
-    let base_tree = base_tree.add(obj_path);
-
-    Ok(base_tree)
+    base_tree.add(obj_path)
 }
 
 pub fn run(engine: Box<Engine>) -> StratisResult<()> {
     let dbus_context = DbusContext::new(engine);
-    let mut tree = get_base_tree(dbus_context.clone()).unwrap();
+    let mut tree = get_base_tree(dbus_context.clone());
 
     // Setup DBus connection
     let c = try!(Connection::get_private(BusType::Session));

@@ -27,7 +27,7 @@ pub const MIN_MDA_SIZE: Sectors = Sectors(2040);
 const NUM_MDA_COPIES: u64 = 2;
 const STRAT_MAGIC: &'static [u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct MDA {
     // Recorded values
     pub crc: u32,
@@ -81,7 +81,7 @@ impl MDA {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MDAGroup {
     pub mda_length: u32,
     mdaa: MDA,
@@ -132,7 +132,7 @@ impl MDAGroup {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SigBlock {
     pub total_size: Sectors,
     pub pool_uuid: Uuid,

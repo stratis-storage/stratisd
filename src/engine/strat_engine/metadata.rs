@@ -380,9 +380,12 @@ impl MDAHeader {
         }
 
         let time = {
-            match LittleEndian::read_i64(&buf[16..24]) {
+            match LittleEndian::read_u64(&buf[16..24]) {
                 0 => None,
-                secs => Some(Timespec::new(secs, LittleEndian::read_i32(&buf[24..28]))),
+                // Signed cast is safe, highest order bit of each value read is guaranteed to be 0.
+                secs => {
+                    Some(Timespec::new(secs as i64, LittleEndian::read_u32(&buf[24..28]) as i32))
+                }
             }
         };
 
@@ -395,6 +398,10 @@ impl MDAHeader {
     }
 
     pub fn to_buf(data: &[u8], timestamp: &Timespec) -> [u8; MDA_REGION_HDR_SIZE] {
+
+        // Unsigned casts are always safe, as sec and nsec values are never negative
+        assert!(timestamp.sec >= 0 && timestamp.nsec >= 0);
+
         let mut buf = [0u8; MDA_REGION_HDR_SIZE];
 
         LittleEndian::write_u32(&mut buf[4..8], crc32::checksum_ieee(data));

@@ -2,8 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -19,6 +17,8 @@ use engine::RenameAction;
 
 use super::pool::StratPool;
 
+use super::super::structures::PoolTable;
+
 #[derive(Debug)]
 pub enum DevOwnership {
     Ours(Uuid),
@@ -28,12 +28,12 @@ pub enum DevOwnership {
 
 #[derive(Debug)]
 pub struct StratEngine {
-    pools: BTreeMap<String, StratPool>,
+    pools: PoolTable<StratPool>,
 }
 
 impl StratEngine {
     pub fn new() -> StratEngine {
-        StratEngine { pools: BTreeMap::new() }
+        StratEngine { pools: PoolTable::new() }
     }
 }
 
@@ -51,14 +51,14 @@ impl Engine for StratEngine {
 
         let redundancy = calculate_redundancy!(redundancy);
 
-        if self.pools.contains_key(name) {
+        if self.pools.contains_name(name) {
             return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
         let pool = try!(StratPool::new(name, blockdev_paths, redundancy, force));
         let bdev_paths = pool.block_devs.iter().map(|p| p.1.devnode.clone()).collect();
 
-        self.pools.insert(name.to_owned(), pool);
+        self.pools.insert(pool);
         Ok(bdev_paths)
     }
 

@@ -2,8 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::slice::IterMut;
@@ -38,6 +36,7 @@ impl<Pool: PoolTableValue> PoolTable<Pool> {
     }
 
     /// Returns true if map has a Pool corresponding to this uuid, else false.
+    #[allow(dead_code)]
     pub fn contains_uuid(&self, uuid: &Uuid) -> bool {
         self.uuid_map.contains_key(uuid)
     }
@@ -48,6 +47,7 @@ impl<Pool: PoolTableValue> PoolTable<Pool> {
     }
 
     /// Get pool by uuid.
+    #[allow(dead_code)]
     pub fn get_by_uuid(&self, uuid: &Uuid) -> Option<&Pool> {
         self.uuid_map.get(uuid).map(|index| &self.pools[*index])
     }
@@ -62,6 +62,7 @@ impl<Pool: PoolTableValue> PoolTable<Pool> {
     }
 
     /// Get mutable pool by uuid.
+    #[allow(dead_code)]
     pub fn get_mut_by_uuid(&mut self, uuid: &Uuid) -> Option<&mut Pool> {
         if let Some(index) = self.uuid_map.get(uuid) {
             Some(&mut self.pools[*index])
@@ -71,6 +72,7 @@ impl<Pool: PoolTableValue> PoolTable<Pool> {
     }
 
     /// A mutable iterator through Pools.
+    #[allow(dead_code)]
     pub fn iter_mut(&mut self) -> IterMut<Pool> {
         self.pools.iter_mut()
     }

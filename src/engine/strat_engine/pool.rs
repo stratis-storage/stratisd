@@ -26,8 +26,6 @@ use super::blockdev::{BlockDev, initialize, resolve_devices};
 use super::filesystem::StratFilesystem;
 use super::metadata::MIN_MDA_SECTORS;
 
-use super::super::structures::PoolTableValue;
-
 #[derive(Debug)]
 pub struct StratPool {
     name: String,
@@ -195,17 +193,11 @@ impl Pool for StratPool {
         &self.pool_uuid
     }
 
-    fn rename(&mut self, name: &str) {
-        self.name = name.to_owned();
-    }
-}
-
-impl PoolTableValue for StratPool {
-    fn uuid(&self) -> &Uuid {
-        &self.pool_uuid
-    }
-
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn rename(&mut self, name: &str) {
+        self.name = name.to_owned();
     }
 }

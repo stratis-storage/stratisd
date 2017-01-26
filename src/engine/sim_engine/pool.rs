@@ -27,8 +27,6 @@ use super::blockdev::SimDev;
 use super::filesystem::SimFilesystem;
 use super::randomization::Randomizer;
 
-use super::super::structures::PoolTableValue;
-
 #[derive(Debug)]
 pub struct SimPool {
     name: String,
@@ -187,18 +185,12 @@ impl Pool for SimPool {
         &self.pool_uuid
     }
 
-    fn rename(&mut self, name: &str) {
-        self.name = name.to_owned();
-    }
-}
-
-impl PoolTableValue for SimPool {
-    fn uuid(&self) -> &Uuid {
-        &self.pool_uuid
-    }
-
     fn name(&self) -> &str {
         &self.name
+    }
+
+    fn rename(&mut self, name: &str) {
+        self.name = name.to_owned();
     }
 }
 

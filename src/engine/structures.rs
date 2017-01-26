@@ -3,26 +3,23 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::collections::HashMap;
-use std::fmt::Debug;
 use std::slice::IterMut;
 
 use uuid::Uuid;
 
-pub trait PoolTableValue: Debug {
-    fn uuid(&self) -> &Uuid;
-    fn name(&self) -> &str;
-}
+use engine::Pool;
+
 
 /// Map various keys to pool objects
 #[derive(Debug)]
-pub struct PoolTable<Pool: PoolTableValue> {
-    pools: Vec<Pool>,
+pub struct PoolTable<P: Pool> {
+    pools: Vec<P>,
     name_map: HashMap<String, usize>,
     uuid_map: HashMap<Uuid, usize>,
 }
 
-impl<Pool: PoolTableValue> PoolTable<Pool> {
-    pub fn new() -> PoolTable<Pool> {
+impl<P: Pool> PoolTable<P> {
+    pub fn new() -> Self {
         PoolTable {
             pools: Vec::new(),
             name_map: HashMap::new(),
@@ -42,18 +39,18 @@ impl<Pool: PoolTableValue> PoolTable<Pool> {
     }
 
     /// Get pool by name.
-    pub fn get_by_name(&self, name: &str) -> Option<&Pool> {
+    pub fn get_by_name(&self, name: &str) -> Option<&P> {
         self.name_map.get(name).map(|index| &self.pools[*index])
     }
 
     /// Get pool by uuid.
     #[allow(dead_code)]
-    pub fn get_by_uuid(&self, uuid: &Uuid) -> Option<&Pool> {
+    pub fn get_by_uuid(&self, uuid: &Uuid) -> Option<&P> {
         self.uuid_map.get(uuid).map(|index| &self.pools[*index])
     }
 
     /// Get mutable pool by name.
-    pub fn get_mut_by_name(&mut self, name: &str) -> Option<&mut Pool> {
+    pub fn get_mut_by_name(&mut self, name: &str) -> Option<&mut P> {
         if let Some(index) = self.name_map.get(name) {
             Some(&mut self.pools[*index])
         } else {
@@ -63,7 +60,7 @@ impl<Pool: PoolTableValue> PoolTable<Pool> {
 
     /// Get mutable pool by uuid.
     #[allow(dead_code)]
-    pub fn get_mut_by_uuid(&mut self, uuid: &Uuid) -> Option<&mut Pool> {
+    pub fn get_mut_by_uuid(&mut self, uuid: &Uuid) -> Option<&mut P> {
         if let Some(index) = self.uuid_map.get(uuid) {
             Some(&mut self.pools[*index])
         } else {
@@ -73,12 +70,12 @@ impl<Pool: PoolTableValue> PoolTable<Pool> {
 
     /// A mutable iterator through Pools.
     #[allow(dead_code)]
-    pub fn iter_mut(&mut self) -> IterMut<Pool> {
+    pub fn iter_mut(&mut self) -> IterMut<P> {
         self.pools.iter_mut()
     }
 
     /// Removes the Pool corresponding to name if there is one.
-    pub fn remove_by_name(&mut self, name: &str) -> Option<Pool> {
+    pub fn remove_by_name(&mut self, name: &str) -> Option<P> {
         if let Some(index) = self.name_map.remove(name) {
             // There is guaranteed to be a last because there is at least
             // one index into the pool.
@@ -104,7 +101,7 @@ impl<Pool: PoolTableValue> PoolTable<Pool> {
     }
 
     /// Removes the Pool corresponding to the uuid if there is one.
-    pub fn remove_by_uuid(&mut self, uuid: &Uuid) -> Option<Pool> {
+    pub fn remove_by_uuid(&mut self, uuid: &Uuid) -> Option<P> {
         if let Some(index) = self.uuid_map.remove(uuid) {
             // There is guaranteed to be a last because there is at least
             // one index into the pool.
@@ -134,7 +131,7 @@ impl<Pool: PoolTableValue> PoolTable<Pool> {
     /// are displaced, have one entry if the uuid and the name map to the same
     /// pool, and may have two entries if the uuid and the name map to
     /// different pools.
-    pub fn insert(&mut self, pool: Pool) -> Vec<Pool> {
+    pub fn insert(&mut self, pool: P) -> Vec<P> {
         let name_pool = self.remove_by_name(pool.name());
         let uuid_pool = self.remove_by_uuid(pool.uuid());
 

@@ -102,6 +102,9 @@ pub trait Pool: Debug {
     /// Get the uuid of this pool.
     fn uuid(&self) -> &Uuid;
 
+    /// Get the name of this pool.
+    fn name(&self) -> &str;
+
     /// Rename this pool.
     fn rename(&mut self, name: &str) -> ();
 }

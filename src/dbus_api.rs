@@ -20,6 +20,7 @@ use dbus::BusType;
 use dbus::Message;
 use dbus::MessageItem;
 use dbus::NameFlag;
+use dbus::arg::ArgType;
 use dbus::arg::Array;
 use dbus::arg::Iter;
 use dbus::arg::IterAppend;
@@ -95,6 +96,7 @@ impl DataType for TData {
     type Interface = ();
     type Method = ();
     type Signal = ();
+    type Tree = ();
 }
 
 /// Convert a tuple as option to an Option type
@@ -106,7 +108,7 @@ fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {
 fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr>
     where T: dbus::arg::Get<'a> + dbus::arg::Arg
 {
-    if iter.arg_type() == 0 {
+    if iter.arg_type() == ArgType::Invalid {
         return Err(MethodErr::no_arg());
     };
     let value: T = try!(iter.read::<T>().map_err(|_| MethodErr::invalid_arg(&loc)));
@@ -1146,7 +1148,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
 
     let f = Factory::new_fn();
 
-    let base_tree = f.tree();
+    let base_tree = f.tree(());
 
     let create_pool_method = f.method("CreatePool", (), create_pool)
         .in_arg(("pool_name", "s"))

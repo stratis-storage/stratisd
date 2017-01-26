@@ -20,6 +20,7 @@ use dbus::BusType;
 use dbus::Message;
 use dbus::MessageItem;
 use dbus::NameFlag;
+use dbus::arg::ArgType;
 use dbus::arg::Array;
 use dbus::arg::Iter;
 use dbus::arg::IterAppend;
@@ -67,10 +68,10 @@ pub struct DbusContext {
 }
 
 impl DbusContext {
-    pub fn new(engine: Rc<RefCell<Box<Engine>>>) -> DbusContext {
+    pub fn new(engine: Box<Engine>) -> DbusContext {
         DbusContext {
             action_list: Rc::new(RefCell::new(Vec::new())),
-            engine: engine.clone(),
+            engine: Rc::new(RefCell::new(engine)),
             filesystems: Rc::new(RefCell::new(BidirMap::new())),
             next_index: Rc::new(Cell::new(0)),
             pools: Rc::new(RefCell::new(BidirMap::new())),
@@ -81,7 +82,7 @@ impl DbusContext {
     /// It is assumed that, while Stratisd is running, it will never generate
     /// more than 2^64 object paths. If it turns out that this is a bad
     /// assumption, the solution is to use unbounded integers.
-    pub fn get_next_id(&mut self) -> u64 {
+    pub fn get_next_id(&self) -> u64 {
         self.next_index.set(self.next_index.get() + 1);
         self.next_index.get()
     }
@@ -90,11 +91,12 @@ impl DbusContext {
 #[derive(Default, Debug)]
 pub struct TData;
 impl DataType for TData {
-    type ObjectPath = DbusContext;
+    type ObjectPath = ();
     type Property = ();
     type Interface = ();
     type Method = ();
     type Signal = ();
+    type Tree = DbusContext;
 }
 
 /// Convert a tuple as option to an Option type
@@ -106,7 +108,7 @@ fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {
 fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr>
     where T: dbus::arg::Get<'a> + dbus::arg::Arg
 {
-    if iter.arg_type() == 0 {
+    if iter.arg_type() == ArgType::Invalid {
         return Err(MethodErr::no_arg());
     };
     let value: T = try!(iter.read::<T>().map_err(|_| MethodErr::invalid_arg(&loc)));
@@ -285,7 +287,7 @@ fn remove_dbus_object_path(dbus_context: &DbusContext, path: String) {
 }
 
 fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let mut engine = dbus_context.engine.borrow_mut();
 
     let result = engine.pools();
@@ -296,7 +298,7 @@ fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn create_dbus_filesystem<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
+fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
 
     let f = Factory::new_fn();
 
@@ -330,7 +332,7 @@ fn create_dbus_filesystem<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "filesystem");
 
-    let object_path = f.object_path(object_name, dbus_context.clone())
+    let object_path = f.object_path(object_name, ())
         .introspectable()
         .add(f.interface(interface_name, ())
             .add_m(create_snapshot_method)
@@ -348,7 +350,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut iter = message.iter_init();
 
     let filesystems: Array<(&str, &str, (bool, u64)), _> = try!(get_next_arg(&mut iter, 0));
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
 
     let object_path = m.path.get_name();
     let return_message = message.method_return();
@@ -372,7 +374,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(ref names) => {
             let mut return_value = Vec::new();
             for name in names {
-                let fs_object_path: dbus::Path = create_dbus_filesystem(dbus_context.clone());
+                let fs_object_path: dbus::Path = create_dbus_filesystem(dbus_context);
                 dbus_context.filesystems
                     .borrow_mut()
                     .insert(fs_object_path.to_string(),
@@ -406,7 +408,7 @@ fn create_snapshot(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let snapshot_name: &str = try!(get_next_arg(&mut iter, 0));
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
     let default_return = MessageItem::ObjectPath(default_object_path());
@@ -419,7 +421,7 @@ fn create_snapshot(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match pool.create_snapshot(snapshot_name, &filesystem_name) {
         Ok(_) => {
-            let object_path: dbus::Path = create_dbus_filesystem(dbus_context.clone());
+            let object_path: dbus::Path = create_dbus_filesystem(dbus_context);
             dbus_context.filesystems.borrow_mut().insert(object_path.to_string(),
                                                          ((&pool_name).clone(),
                                                           String::from(snapshot_name)));
@@ -449,7 +451,7 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let new_name: &str = try!(get_next_arg(&mut iter, 0));
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
     let default_return = MessageItem::Bool(false);
@@ -527,7 +529,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         filesystem_names.push(name);
     }
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
     let return_sig = "s";
@@ -572,7 +574,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
     let return_sig = "s";
@@ -598,7 +600,7 @@ fn list_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 fn list_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
     let return_sig = "s";
@@ -624,7 +626,7 @@ fn list_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 fn list_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
     let return_sig = "s";
@@ -658,7 +660,7 @@ fn remove_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         device_paths.push(Path::new(path));
     }
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
     let return_sig = "s";
@@ -700,7 +702,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let force: bool = try!(get_next_arg(&mut iter, 0));
     let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 1));
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
     let return_sig = "s";
@@ -743,7 +745,7 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let force: bool = try!(get_next_arg(&mut iter, 0));
     let cache_devs: Array<&str, _> = try!(get_next_arg(&mut iter, 1));
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
     let return_sig = "s";
@@ -789,7 +791,7 @@ fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         device_paths.push(Path::new(path));
     }
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
     let return_sig = "s";
@@ -829,7 +831,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let new_name: &str = try!(get_next_arg(&mut iter, 0));
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
     let default_return = MessageItem::Bool(false);
@@ -886,7 +888,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
+fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
 
     let f = Factory::new_fn();
 
@@ -955,7 +957,7 @@ fn create_dbus_pool<'a>(mut dbus_context: DbusContext) -> dbus::Path<'a> {
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "pool");
 
-    let object_path = f.object_path(object_name, dbus_context.clone())
+    let object_path = f.object_path(object_name, ())
         .introspectable()
         .add(f.interface(interface_name, ())
             .add_m(create_filesystems_method)
@@ -985,7 +987,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let result = dbus_context.engine
         .borrow_mut()
         .create_pool(name, &blockdevs, tuple_to_option(redundancy), force);
@@ -994,7 +996,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(devnodes) => {
-            let object_path: dbus::Path = create_dbus_pool(dbus_context.clone());
+            let object_path: dbus::Path = create_dbus_pool(dbus_context);
             dbus_context.pools.borrow_mut().insert(object_path.to_string(), String::from(name));
             let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
             let paths = paths.map(|x| MessageItem::Str(x)).collect();
@@ -1023,7 +1025,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let name: &str = try!(get_next_arg(&mut iter, 0));
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let ref engine = dbus_context.engine;
     let result = engine.borrow_mut().destroy_pool(&name);
 
@@ -1055,7 +1057,7 @@ fn get_pool_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let name: &str = try!(get_next_arg(&mut iter, 0));
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let return_message = message.method_return();
     let default_return = MessageItem::ObjectPath(default_object_path());
     let result = pool_name_to_object_path(dbus_context, name);
@@ -1073,7 +1075,7 @@ fn get_filesystem_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResul
     let pool_name: &str = try!(get_next_arg(&mut iter, 0));
     let name: &str = try!(get_next_arg(&mut iter, 1));
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let return_message = message.method_return();
     let default_return = MessageItem::ObjectPath(default_object_path());
     let result = fs_name_to_object_path(dbus_context, pool_name, name);
@@ -1123,7 +1125,7 @@ fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let denominator: u32 = try!(get_next_arg(&mut iter, 0));
 
-    let dbus_context = m.path.get_data();
+    let dbus_context = m.tree.get_data();
     let result = dbus_context.engine.borrow_mut().configure_simulator(denominator);
 
     let return_message = message.method_return();
@@ -1142,11 +1144,11 @@ fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData>, TData>> {
+fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
 
     let f = Factory::new_fn();
 
-    let base_tree = f.tree();
+    let base_tree = f.tree(dbus_context);
 
     let create_pool_method = f.method("CreatePool", (), create_pool)
         .in_arg(("pool_name", "s"))
@@ -1207,7 +1209,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "Manager");
 
-    let obj_path = f.object_path(STRATIS_BASE_PATH, dbus_context)
+    let obj_path = f.object_path(STRATIS_BASE_PATH, ())
         .introspectable()
         .object_manager()
         .add(f.interface(interface_name, ())
@@ -1221,19 +1223,17 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> StratisResult<Tree<MTFn<TData
             .add_p(redundancy_values_property)
             .add_p(version_property));
 
-    let base_tree = base_tree.add(obj_path);
-
-    Ok(base_tree)
+    base_tree.add(obj_path)
 }
 
 pub fn run(engine: Box<Engine>) -> StratisResult<()> {
-    let dbus_context = DbusContext::new(Rc::new(RefCell::new(engine)));
-    let mut tree = get_base_tree(dbus_context.clone()).unwrap();
-
-    // Setup DBus connection
     let c = try!(Connection::get_private(BusType::Session));
-    c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32).unwrap();
+
+    let mut tree = get_base_tree(DbusContext::new(engine));
+    let dbus_context = tree.get_data().clone();
     try!(tree.set_registered(&c, true));
+
+    c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32).unwrap();
 
     // ...and serve incoming requests.
     for c_item in c.iter(10000) {

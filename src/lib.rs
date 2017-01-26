@@ -25,7 +25,6 @@ pub mod consts;
 pub mod stratis;
 pub mod engine;
 pub mod dbus_api;
-mod dbus_consts;
 
 
 #[macro_use]

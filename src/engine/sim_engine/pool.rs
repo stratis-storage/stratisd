@@ -11,6 +11,8 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::vec::Vec;
 
+use uuid::Uuid;
+
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
@@ -25,10 +27,12 @@ use super::blockdev::SimDev;
 use super::filesystem::SimFilesystem;
 use super::randomization::Randomizer;
 
-use uuid::Uuid;
+use super::super::structures::PoolTableValue;
 
 #[derive(Debug)]
 pub struct SimPool {
+    name: String,
+    pool_uuid: Uuid,
     pub block_devs: BTreeMap<PathBuf, SimDev>,
     pub cache_devs: BTreeMap<PathBuf, SimDev>,
     pub filesystems: BTreeMap<String, SimFilesystem>,
@@ -37,12 +41,18 @@ pub struct SimPool {
 }
 
 impl SimPool {
-    pub fn new(rdm: Rc<RefCell<Randomizer>>, paths: &[&Path], redundancy: Redundancy) -> SimPool {
+    pub fn new(rdm: Rc<RefCell<Randomizer>>,
+               name: &str,
+               paths: &[&Path],
+               redundancy: Redundancy)
+               -> SimPool {
 
         let devices = BTreeSet::from_iter(paths);
         let device_pairs = devices.iter()
             .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
         let new_pool = SimPool {
+            name: name.to_owned(),
+            pool_uuid: Uuid::new_v4(),
             block_devs: BTreeMap::from_iter(device_pairs),
             filesystems: BTreeMap::new(),
             cache_devs: BTreeMap::new(),
@@ -171,6 +181,24 @@ impl Pool for SimPool {
 
     fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
         rename_filesystem!{self; old_name; new_name}
+    }
+
+    fn uuid(&self) -> &Uuid {
+        &self.pool_uuid
+    }
+
+    fn rename(&mut self, name: &str) {
+        self.name = name.to_owned();
+    }
+}
+
+impl PoolTableValue for SimPool {
+    fn uuid(&self) -> &Uuid {
+        &self.pool_uuid
+    }
+
+    fn name(&self) -> &str {
+        &self.name
     }
 }
 

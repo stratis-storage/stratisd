@@ -26,10 +26,12 @@ use super::blockdev::{BlockDev, initialize, resolve_devices};
 use super::filesystem::StratFilesystem;
 use super::metadata::MIN_MDA_SECTORS;
 
+use super::super::structures::PoolTableValue;
+
 #[derive(Debug)]
 pub struct StratPool {
-    pub name: String,
-    pub pool_uuid: Uuid,
+    name: String,
+    pool_uuid: Uuid,
     pub cache_devs: BTreeMap<PathBuf, BlockDev>,
     pub block_devs: BTreeMap<PathBuf, BlockDev>,
     pub filesystems: BTreeMap<String, StratFilesystem>,
@@ -187,5 +189,23 @@ impl Pool for StratPool {
 
     fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
         rename_filesystem!{self; old_name; new_name}
+    }
+
+    fn uuid(&self) -> &Uuid {
+        &self.pool_uuid
+    }
+
+    fn rename(&mut self, name: &str) {
+        self.name = name.to_owned();
+    }
+}
+
+impl PoolTableValue for StratPool {
+    fn uuid(&self) -> &Uuid {
+        &self.pool_uuid
+    }
+
+    fn name(&self) -> &str {
+        &self.name
     }
 }

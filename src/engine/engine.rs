@@ -5,6 +5,8 @@
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 
+use uuid::Uuid;
+
 use super::super::types::Bytes;
 
 use super::errors::EngineResult;
@@ -96,6 +98,12 @@ pub trait Pool: Debug {
     /// the names aren't equal and both are in use.
     /// The result indicate whether an action was performed, and if not, why.
     fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction>;
+
+    /// Get the uuid of this pool.
+    fn uuid(&self) -> &Uuid;
+
+    /// Rename this pool.
+    fn rename(&mut self, name: &str) -> ();
 }
 
 pub trait Engine: Debug {

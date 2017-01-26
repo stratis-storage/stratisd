@@ -57,7 +57,7 @@ impl Engine for SimEngine {
         let devices =
             BTreeSet::from_iter(blockdev_paths).into_iter().map(|x| *x).collect::<Vec<&Path>>();
 
-        let pool = SimPool::new(self.rdm.clone(), &devices, redundancy);
+        let pool = SimPool::new(self.rdm.clone(), name, &devices, redundancy);
 
         if self.rdm.borrow_mut().throw_die() {
             return Err(EngineError::Engine(ErrorEnum::Error, "X".into()));

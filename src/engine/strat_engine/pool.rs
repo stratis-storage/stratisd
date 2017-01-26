@@ -41,7 +41,7 @@ impl StratPool {
                paths: &[&Path],
                redundancy: Redundancy,
                force: bool)
-               -> EngineResult<StratPool> {
+               -> EngineResult<Self> {
         let devices = try!(resolve_devices(paths));
         let pool_uuid = Uuid::new_v4();
         let bds = try!(initialize(&pool_uuid, devices, MIN_MDA_SIZE, force));

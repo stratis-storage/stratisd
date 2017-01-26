@@ -36,7 +36,7 @@ pub struct BDA {
 
 impl BDA {
     /// Initialize a blockdev with a Stratis BDA.
-    pub fn initialize(mut f: &mut File, header: StaticHeader) -> EngineResult<BDA> {
+    pub fn initialize(mut f: &mut File, header: StaticHeader) -> EngineResult<Self> {
         let zeroed = [0u8; BDA_STATIC_HDR_SIZE as usize];
         let hdr_buf = header.sigblock_to_buf();
 
@@ -58,7 +58,7 @@ impl BDA {
         })
     }
 
-    pub fn load(f: &mut File, header: StaticHeader) -> EngineResult<BDA> {
+    pub fn load(f: &mut File, header: StaticHeader) -> EngineResult<Self> {
         let regions = try!(MDARegions::load(&header, f));
 
         Ok(BDA {
@@ -111,11 +111,7 @@ pub struct StaticHeader {
 }
 
 impl StaticHeader {
-    pub fn new(pool_uuid: &Uuid,
-               dev_uuid: &Uuid,
-               mda_size: Sectors,
-               blkdev_size: Sectors)
-               -> StaticHeader {
+    pub fn new(pool_uuid: &Uuid, dev_uuid: &Uuid, mda_size: Sectors, blkdev_size: Sectors) -> Self {
         StaticHeader {
             blkdev_size: blkdev_size,
             pool_uuid: pool_uuid.clone(),
@@ -127,7 +123,7 @@ impl StaticHeader {
     }
 
     /// Try to find a valid StaticHeader on a device.
-    pub fn setup(f: &mut File) -> EngineResult<StaticHeader> {
+    pub fn setup(f: &mut File) -> EngineResult<Self> {
         try!(f.seek(SeekFrom::Start(0)));
         let mut buf = [0u8; BDA_STATIC_HDR_SIZE as usize];
         try!(f.read(&mut buf));
@@ -136,7 +132,7 @@ impl StaticHeader {
     }
 
     /// Try to find a valid StaticHeader in a buffer.
-    pub fn setup_from_buf(buf: &[u8; BDA_STATIC_HDR_SIZE as usize]) -> EngineResult<StaticHeader> {
+    pub fn setup_from_buf(buf: &[u8; BDA_STATIC_HDR_SIZE as usize]) -> EngineResult<Self> {
         let sigblock_spots = [&buf[SECTOR_SIZE as usize..2 * SECTOR_SIZE as usize],
                               &buf[9 * SECTOR_SIZE as usize..10 * SECTOR_SIZE as usize]];
 
@@ -190,7 +186,7 @@ impl StaticHeader {
 
     /// Build a StaticHeader from a SECTOR_SIZE buf that was read from
     /// a blockdev.
-    pub fn sigblock_from_buf(buf: &[u8]) -> EngineResult<StaticHeader> {
+    pub fn sigblock_from_buf(buf: &[u8]) -> EngineResult<Self> {
 
         assert_eq!(buf.len(), SECTOR_SIZE as usize);
 
@@ -231,7 +227,7 @@ pub struct MDARegions {
 }
 
 impl MDARegions {
-    pub fn initialize(header: &StaticHeader, f: &mut File) -> EngineResult<MDARegions> {
+    pub fn initialize(header: &StaticHeader, f: &mut File) -> EngineResult<Self> {
         let region_size = Sectors(*header.mda_size / NUM_MDA_REGIONS);
         let per_region_size: u64 = *region_size * SECTOR_SIZE;
         let hdr_buf = [0u8; MDA_REGION_HDR_SIZE];
@@ -250,7 +246,7 @@ impl MDARegions {
     }
 
     // Construct MDARegions based on on-disk info
-    pub fn load(header: &StaticHeader, f: &mut File) -> EngineResult<MDARegions> {
+    pub fn load(header: &StaticHeader, f: &mut File) -> EngineResult<Self> {
         let region_size = Sectors(*header.mda_size / NUM_MDA_REGIONS);
         let per_region_size: u64 = *region_size * SECTOR_SIZE;
 
@@ -365,7 +361,7 @@ pub struct MDAHeader {
 }
 
 impl MDAHeader {
-    pub fn new(region_size: u64) -> MDAHeader {
+    pub fn new(region_size: u64) -> Self {
         MDAHeader {
             last_updated: None,
             used: 0,
@@ -374,7 +370,7 @@ impl MDAHeader {
         }
     }
 
-    pub fn from_buf(buf: &[u8; MDA_REGION_HDR_SIZE], region_size: u64) -> EngineResult<MDAHeader> {
+    pub fn from_buf(buf: &[u8; MDA_REGION_HDR_SIZE], region_size: u64) -> EngineResult<Self> {
         if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_ieee(&buf[4..]) {
             return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region header CRC".into()));
         }

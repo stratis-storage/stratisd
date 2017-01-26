@@ -37,7 +37,7 @@ pub struct SimPool {
 }
 
 impl SimPool {
-    pub fn new(rdm: Rc<RefCell<Randomizer>>, paths: &[&Path], redundancy: Redundancy) -> SimPool {
+    pub fn new(rdm: Rc<RefCell<Randomizer>>, paths: &[&Path], redundancy: Redundancy) -> Self {
 
         let devices = BTreeSet::from_iter(paths);
         let device_pairs = devices.iter()

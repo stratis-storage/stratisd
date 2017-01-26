@@ -68,7 +68,7 @@ pub struct DbusContext {
 }
 
 impl DbusContext {
-    pub fn new(engine: Box<Engine>) -> DbusContext {
+    pub fn new(engine: Box<Engine>) -> Self {
         DbusContext {
             action_list: Rc::new(RefCell::new(Vec::new())),
             engine: Rc::new(RefCell::new(engine)),

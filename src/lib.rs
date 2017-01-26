@@ -12,6 +12,7 @@ extern crate dbus;
 extern crate term;
 extern crate rand;
 extern crate serde;
+extern crate serde_json;
 
 #[cfg(test)]
 extern crate quickcheck;

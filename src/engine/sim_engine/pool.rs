@@ -92,13 +92,13 @@ impl Pool for SimPool {
         let names = BTreeSet::from_iter(temp.iter().map(|x| x.0));
         if names.len() < temp.len() {
             let error_message = "duplicate_names in filesystem spec";
-            return Err(EngineError::Stratis(ErrorEnum::Error(error_message.into())));
+            return Err(EngineError::Engine(ErrorEnum::Error, error_message.into()));
         }
 
         for spec in temp.iter() {
             let name = spec.0;
             if self.filesystems.contains_key(name) {
-                return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
+                return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.into()));
             }
         }
 
@@ -120,14 +120,14 @@ impl Pool for SimPool {
 
         let parent_id = try!(self.filesystems
                 .get(source)
-                .ok_or(EngineError::Stratis(ErrorEnum::NotFound(String::from(source)))))
+                .ok_or(EngineError::Engine(ErrorEnum::NotFound, String::from(source))))
             .fs_id;
 
         let names = try!(self.create_filesystems(&[(snapshot_name, "", None)]));
 
         let new_snapshot = try!(self.filesystems
             .get_mut(snapshot_name)
-            .ok_or(EngineError::Stratis(ErrorEnum::NotFound(String::from(snapshot_name)))));
+            .ok_or(EngineError::Engine(ErrorEnum::NotFound, String::from(snapshot_name))));
 
         new_snapshot.nearest_ancestor = Some(parent_id);
 
@@ -262,7 +262,7 @@ mod tests {
         let pool = engine.get_pool(pool_name).unwrap();
         pool.create_filesystems(&[(old_name, "", None), (new_name, "", None)]).unwrap();
         assert!(match pool.rename_filesystem(old_name, new_name) {
-            Err(EngineError::Stratis(ErrorEnum::AlreadyExists(_))) => true,
+            Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
             _ => false,
         });
     }
@@ -357,7 +357,7 @@ mod tests {
         let mut pool = engine.get_pool(pool_name).unwrap();
         pool.create_filesystems(&[(fs_name, "", None)]).unwrap();
         assert!(match pool.create_filesystems(&[(fs_name, "", None)]) {
-            Err(EngineError::Stratis(ErrorEnum::AlreadyExists(_))) => true,
+            Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
             _ => false,
         });
     }
@@ -385,7 +385,7 @@ mod tests {
         engine.create_pool(pool_name, &[], None, false).unwrap();
         let mut pool = engine.get_pool(pool_name).unwrap();
         assert!(match pool.create_filesystems(&[(fs_name, "", None), (fs_name, "/", None)]) {
-            Err(EngineError::Stratis(ErrorEnum::Error(_))) => true,
+            Err(EngineError::Engine(ErrorEnum::Error, _)) => true,
             _ => false,
         });
     }

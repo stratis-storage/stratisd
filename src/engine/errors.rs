@@ -3,38 +3,58 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::io;
+use std::fmt;
+use std::error;
+use std::str;
 
 use nix;
+use uuid;
+use serde_json;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ErrorEnum {
-    Ok,
-    Error(String),
+    Error,
 
-    AlreadyExists(String),
-    Busy(String),
-    Invalid(String),
-    NotFound(String),
-}
-
-impl ErrorEnum {
-    pub fn get_error_string(&self) -> String {
-        match *self {
-            ErrorEnum::Ok => "Ok".into(),
-            ErrorEnum::Error(ref x) => format!("{}", x),
-            ErrorEnum::AlreadyExists(ref x) => format!("{} already exists", x),
-            ErrorEnum::Busy(ref x) => format!("{} is busy", x),
-            ErrorEnum::Invalid(ref x) => format!("{}", x),
-            ErrorEnum::NotFound(ref x) => format!("{} is not found", x),
-        }
-    }
+    AlreadyExists,
+    Busy,
+    Invalid,
+    NotFound,
 }
 
 #[derive(Debug)]
 pub enum EngineError {
-    Stratis(ErrorEnum),
+    Engine(ErrorEnum, String),
     Io(io::Error),
     Nix(nix::Error),
+    Uuid(uuid::ParseError),
+    Utf8(str::Utf8Error),
+    Serde(serde_json::error::Error),
+}
+
+impl fmt::Display for EngineError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            EngineError::Engine(_, ref msg) => write!(f, "Stratis error: {}", msg),
+            EngineError::Io(ref err) => write!(f, "IO error: {}", err),
+            EngineError::Nix(ref err) => write!(f, "Nix error: {}", err.errno().desc()),
+            EngineError::Uuid(ref err) => write!(f, "Uuid error: {}", err),
+            EngineError::Utf8(ref err) => write!(f, "Utf8 error: {}", err),
+            EngineError::Serde(ref err) => write!(f, "Serde error: {}", err),
+        }
+    }
+}
+
+impl error::Error for EngineError {
+    fn description(&self) -> &str {
+        match *self {
+            EngineError::Engine(_, ref msg) => msg,
+            EngineError::Io(ref err) => err.description(),
+            EngineError::Nix(ref err) => err.errno().desc(),
+            EngineError::Uuid(_) => "Uuid::ParseError",
+            EngineError::Utf8(ref err) => err.description(),
+            EngineError::Serde(ref err) => err.description(),
+        }
+    }
 }
 
 pub type EngineResult<T> = Result<T, EngineError>;
@@ -48,5 +68,23 @@ impl From<io::Error> for EngineError {
 impl From<nix::Error> for EngineError {
     fn from(err: nix::Error) -> EngineError {
         EngineError::Nix(err)
+    }
+}
+
+impl From<uuid::ParseError> for EngineError {
+    fn from(err: uuid::ParseError) -> EngineError {
+        EngineError::Uuid(err)
+    }
+}
+
+impl From<str::Utf8Error> for EngineError {
+    fn from(err: str::Utf8Error) -> EngineError {
+        EngineError::Utf8(err)
+    }
+}
+
+impl From<serde_json::error::Error> for EngineError {
+    fn from(err: serde_json::error::Error) -> EngineError {
+        EngineError::Serde(err)
     }
 }

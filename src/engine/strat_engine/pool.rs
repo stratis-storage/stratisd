@@ -6,8 +6,11 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::vec::Vec;
+use std::fs::OpenOptions;
 
+use time;
 use uuid::Uuid;
+use serde_json;
 
 use engine::Dev;
 use engine::EngineError;
@@ -16,13 +19,11 @@ use engine::ErrorEnum;
 use engine::Filesystem;
 use engine::Pool;
 use engine::RenameAction;
-
 use engine::engine::Redundancy;
 
+use super::serde_structs::StratSave;
 use super::blockdev::{BlockDev, initialize, resolve_devices};
-
 use super::filesystem::StratFilesystem;
-
 use super::metadata::MIN_MDA_SIZE;
 
 #[derive(Debug)]
@@ -45,14 +46,81 @@ impl StratPool {
         let pool_uuid = Uuid::new_v4();
         let bds = try!(initialize(&pool_uuid, devices, MIN_MDA_SIZE, force));
 
-        Ok(StratPool {
+        let mut pool = StratPool {
             name: name.to_owned(),
             pool_uuid: pool_uuid,
             cache_devs: BTreeMap::new(),
             block_devs: bds,
             filesystems: BTreeMap::new(),
             redundancy: redundancy,
-        })
+        };
+
+        try!(pool.write_metadata());
+
+        Ok(pool)
+    }
+
+    /// Read the latest data across all blockdevs
+    pub fn read_metadata(&self) -> Option<Vec<u8>> {
+
+        let mut bds: Vec<&BlockDev> = self.block_devs
+            .iter()
+            .map(|(_, bd)| bd)
+            .filter(|bd| bd.bda.last_update_time().is_some())
+            .collect();
+
+        bds.sort_by_key(|k| k.bda.last_update_time().unwrap());
+
+        // Only try to read blockdevs with the latest metadata
+        let last_update_time = match bds.last() {
+            Some(bd) => bd.bda.last_update_time().unwrap(),
+            None => return None,
+        };
+
+        for bd in bds.iter()
+            .rev()
+            .take_while(|bd| bd.bda.last_update_time().unwrap() == last_update_time) {
+            let mut f = match OpenOptions::new()
+                .read(true)
+                .open(&bd.devnode) {
+                Ok(f) => f,
+                Err(_) => continue,
+            };
+            match bd.bda.load_state(&mut f) {
+                Ok(Some(data)) => return Some(data),
+                _ => continue,
+            }
+        }
+        None
+    }
+
+    /// Write the given data to all blockdevs
+    pub fn write_metadata(&mut self) -> EngineResult<()> {
+
+        let data = try!(serde_json::to_string(&self.to_save()));
+
+        // TODO: Cap # of blockdevs written to, as described in SWDD
+        // TODO: Check current time against global last updated, and use
+        // alternate time value if earlier, as described in SWDD
+
+        let time = time::now().to_timespec();
+
+        for (_, bd) in &mut self.block_devs {
+            bd.save_state(&time, data.as_bytes()).unwrap(); // ignoring failure
+        }
+
+        Ok(())
+    }
+
+    pub fn to_save(&self) -> StratSave {
+        StratSave {
+            name: self.name.clone(),
+            id: self.pool_uuid.simple().to_string(),
+            block_devs: self.block_devs
+                .iter()
+                .map(|(_, bd)| (bd.bda.header.dev_uuid.simple().to_string(), bd.to_save()))
+                .collect(),
+        }
     }
 }
 
@@ -75,6 +143,7 @@ impl Pool for StratPool {
         let mut bds = try!(initialize(&self.pool_uuid, devices, MIN_MDA_SIZE, force));
         let bdev_paths = bds.iter().map(|p| p.1.devnode.clone()).collect();
         self.block_devs.append(&mut bds);
+        try!(self.write_metadata());
         Ok(bdev_paths)
     }
 

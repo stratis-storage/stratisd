@@ -7,7 +7,7 @@ custom_derive! {
              IterVariants(StratisDBusErrorVariants),
              IterVariantNames(StratisDBusErrorVariantNames))]
     #[allow(non_camel_case_types)]
-    pub enum ErrorEnum {
+    pub enum DbusErrorEnum {
         OK,
         ERROR,
 
@@ -30,32 +30,32 @@ custom_derive! {
 }
 
 /// Get the u16 value of this ErrorEnum constructor.
-impl From<ErrorEnum> for u16 {
-    fn from(e: ErrorEnum) -> u16 {
+impl From<DbusErrorEnum> for u16 {
+    fn from(e: DbusErrorEnum) -> u16 {
         e as u16
     }
 }
 
-impl ErrorEnum {
+impl DbusErrorEnum {
     pub fn get_error_string(&self) -> &str {
         match *self {
-            ErrorEnum::OK => "Ok",
-            ErrorEnum::ERROR => "A general error happened",
-            ErrorEnum::NULL => "Null parameter was supplied",
-            ErrorEnum::NOTFOUND => "Not found",
-            ErrorEnum::POOL_NOTFOUND => "Pool not found",
-            ErrorEnum::FILESYSTEM_NOTFOUND => "Filesystem not found",
-            ErrorEnum::CACHE_NOTFOUND => "Cache not found",
-            ErrorEnum::BAD_PARAM => "Bad parameter",
-            ErrorEnum::DEV_NOTFOUND => "Dev not found",
-            ErrorEnum::ALREADY_EXISTS => "Already exists",
-            ErrorEnum::NULL_NAME => "Null name supplied",
-            ErrorEnum::NO_POOLS => "No pools",
-            ErrorEnum::LIST_FAILURE => "List operation failure.",
-            ErrorEnum::INTERNAL_ERROR => "Internal error",
-            ErrorEnum::IO_ERROR => "IO error during operation.",
-            ErrorEnum::NIX_ERROR => "System error during operation.",
-            ErrorEnum::BUSY => "Operation can not be performed at this time",
+            DbusErrorEnum::OK => "Ok",
+            DbusErrorEnum::ERROR => "A general error happened",
+            DbusErrorEnum::NULL => "Null parameter was supplied",
+            DbusErrorEnum::NOTFOUND => "Not found",
+            DbusErrorEnum::POOL_NOTFOUND => "Pool not found",
+            DbusErrorEnum::FILESYSTEM_NOTFOUND => "Filesystem not found",
+            DbusErrorEnum::CACHE_NOTFOUND => "Cache not found",
+            DbusErrorEnum::BAD_PARAM => "Bad parameter",
+            DbusErrorEnum::DEV_NOTFOUND => "Dev not found",
+            DbusErrorEnum::ALREADY_EXISTS => "Already exists",
+            DbusErrorEnum::NULL_NAME => "Null name supplied",
+            DbusErrorEnum::NO_POOLS => "No pools",
+            DbusErrorEnum::LIST_FAILURE => "List operation failure",
+            DbusErrorEnum::INTERNAL_ERROR => "Internal error",
+            DbusErrorEnum::IO_ERROR => "IO error during operation",
+            DbusErrorEnum::NIX_ERROR => "System error during operation",
+            DbusErrorEnum::BUSY => "Operation can not be performed at this time",
         }
     }
 }

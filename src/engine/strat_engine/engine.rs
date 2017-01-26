@@ -53,7 +53,7 @@ impl Engine for StratEngine {
         let redundancy = calculate_redundancy!(redundancy);
 
         if self.pools.contains_key(name) {
-            return Err(EngineError::Stratis(ErrorEnum::AlreadyExists(name.into())));
+            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
         let pool = try!(StratPool::new(name, blockdev_paths, redundancy, force));

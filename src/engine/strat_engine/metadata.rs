@@ -462,3 +462,77 @@ pub fn validate_mda_size(size: Sectors) -> EngineResult<()> {
     };
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use crc::crc32;
+    use time::Timespec;
+    use uuid::Uuid;
+
+    use quickcheck::{QuickCheck, TestResult};
+
+    use types::Sectors;
+
+    use super::*;
+
+    #[test]
+    /// Construct an arbitrary StaticHeader object.
+    /// Write it to a buffer, read it out and make sure you get the same thing.
+    fn prop_static_header() {
+        fn static_header(blkdev_size: u64, mda_size: u64) -> TestResult {
+            let pool_uuid = Uuid::new_v4();
+            let dev_uuid = Uuid::new_v4();
+
+            let mda_size = Sectors(mda_size);
+            if mda_size < MIN_MDA_SIZE {
+                return TestResult::discard();
+            }
+
+            let blkdev_size = Sectors(blkdev_size);
+            let sh1 = StaticHeader::new(&pool_uuid, &dev_uuid, mda_size, blkdev_size);
+            let buf = sh1.sigblock_to_buf();
+            let sh2 = StaticHeader::sigblock_from_buf(&buf).unwrap();
+            TestResult::from_bool(sh1.pool_uuid == sh2.pool_uuid && sh1.dev_uuid == sh2.dev_uuid &&
+                                  sh1.blkdev_size == sh2.blkdev_size &&
+                                  sh1.mda_size == sh2.mda_size &&
+                                  sh1.reserved_size == sh2.reserved_size &&
+                                  sh1.flags == sh2.flags)
+        }
+
+        QuickCheck::new()
+            .tests(30)
+            .quickcheck(static_header as fn(u64, u64) -> TestResult);
+    }
+
+    #[test]
+    /// Using an arbitrary data buffer, construct an mda header buffer
+    /// Read the mda header buffer twice.
+    /// Verify that the resulting MDAHeaders have all equal components.
+    /// Verify timestamp and data CRC against original values.
+    fn prop_mda_header() {
+        fn mda_header(data: Vec<u8>, sec: i64, nsec: i32, region_size: u64) -> TestResult {
+            if sec < 0 || nsec < 0 {
+                return TestResult::discard();
+            }
+            // 4 is NUM_MDA_REGIONS which is not imported from super.
+            if region_size < *MIN_MDA_SIZE / 4 {
+                return TestResult::discard();
+            }
+            let timestamp = Timespec::new(sec, nsec);
+            let buf = MDAHeader::to_buf(&data, &timestamp);
+            let mda1 = MDAHeader::from_buf(&buf, region_size).unwrap();
+            let mda2 = MDAHeader::from_buf(&buf, region_size).unwrap();
+
+            TestResult::from_bool(mda1.last_updated == mda2.last_updated &&
+                                  mda1.used == mda2.used &&
+                                  mda1.region_size == mda2.region_size &&
+                                  mda1.data_crc == mda2.data_crc &&
+                                  timestamp == mda1.last_updated.unwrap() &&
+                                  crc32::checksum_ieee(&data) == mda1.data_crc)
+        }
+
+        QuickCheck::new()
+            .tests(30)
+            .quickcheck(mda_header as fn(Vec<u8>, i64, i32, u64) -> TestResult);
+    }
+}

@@ -33,7 +33,7 @@ pub struct StratEngine {
 }
 
 impl StratEngine {
-    pub fn new() -> StratEngine {
+    pub fn new() -> Self {
         StratEngine { pools: BTreeMap::new() }
     }
 }

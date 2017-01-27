@@ -60,31 +60,31 @@ impl error::Error for EngineError {
 pub type EngineResult<T> = Result<T, EngineError>;
 
 impl From<io::Error> for EngineError {
-    fn from(err: io::Error) -> EngineError {
+    fn from(err: io::Error) -> Self {
         EngineError::Io(err)
     }
 }
 
 impl From<nix::Error> for EngineError {
-    fn from(err: nix::Error) -> EngineError {
+    fn from(err: nix::Error) -> Self {
         EngineError::Nix(err)
     }
 }
 
 impl From<uuid::ParseError> for EngineError {
-    fn from(err: uuid::ParseError) -> EngineError {
+    fn from(err: uuid::ParseError) -> Self {
         EngineError::Uuid(err)
     }
 }
 
 impl From<str::Utf8Error> for EngineError {
-    fn from(err: str::Utf8Error) -> EngineError {
+    fn from(err: str::Utf8Error) -> Self {
         EngineError::Utf8(err)
     }
 }
 
 impl From<serde_json::error::Error> for EngineError {
-    fn from(err: serde_json::error::Error) -> EngineError {
+    fn from(err: serde_json::error::Error) -> Self {
         EngineError::Serde(err)
     }
 }

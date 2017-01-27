@@ -32,7 +32,7 @@ pub struct SimEngine {
 }
 
 impl SimEngine {
-    pub fn new() -> SimEngine {
+    pub fn new() -> Self {
         SimEngine {
             pools: BTreeMap::new(),
             rdm: Rc::new(RefCell::new(Randomizer::new())),

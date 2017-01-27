@@ -142,13 +142,13 @@ impl Error for StratisError {
 }
 
 impl From<InternalError> for StratisError {
-    fn from(err: InternalError) -> StratisError {
+    fn from(err: InternalError) -> Self {
         StratisError::Stratis(err)
     }
 }
 
 impl From<io::Error> for StratisError {
-    fn from(err: io::Error) -> StratisError {
+    fn from(err: io::Error) -> Self {
         StratisError::Io(err)
     }
 }
@@ -156,19 +156,19 @@ impl From<io::Error> for StratisError {
 
 
 impl From<nix::Error> for StratisError {
-    fn from(err: nix::Error) -> StratisError {
+    fn from(err: nix::Error) -> Self {
         StratisError::Nix(err)
     }
 }
 
 impl From<dbus::Error> for StratisError {
-    fn from(err: dbus::Error) -> StratisError {
+    fn from(err: dbus::Error) -> Self {
         StratisError::Dbus(err)
     }
 }
 
 impl From<term::Error> for StratisError {
-    fn from(err: term::Error) -> StratisError {
+    fn from(err: term::Error) -> Self {
         StratisError::Term(err)
     }
 }

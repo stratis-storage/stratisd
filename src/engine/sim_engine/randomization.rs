@@ -23,7 +23,7 @@ impl fmt::Debug for Randomizer {
 }
 
 impl Randomizer {
-    pub fn new() -> Randomizer {
+    pub fn new() -> Self {
         Randomizer {
             rng: thread_rng(),
             denominator: 0u32,

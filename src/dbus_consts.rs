@@ -31,7 +31,7 @@ custom_derive! {
 
 /// Get the u16 value of this ErrorEnum constructor.
 impl From<DbusErrorEnum> for u16 {
-    fn from(e: DbusErrorEnum) -> u16 {
+    fn from(e: DbusErrorEnum) -> Self {
         e as u16
     }
 }

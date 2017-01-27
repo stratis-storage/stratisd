@@ -37,7 +37,7 @@ pub struct SimPool {
 }
 
 impl SimPool {
-    pub fn new(rdm: Rc<RefCell<Randomizer>>, paths: &[&Path], redundancy: Redundancy) -> SimPool {
+    pub fn new(rdm: Rc<RefCell<Randomizer>>, paths: &[&Path], redundancy: Redundancy) -> Self {
 
         let devices = BTreeSet::from_iter(paths);
         let device_pairs = devices.iter()
@@ -105,7 +105,7 @@ impl Pool for SimPool {
         let mut names = Vec::new();
         for spec in temp.iter() {
             let (name, mountpoint, quota) = **spec;
-            let new_filesystem = SimFilesystem::new_filesystem(Uuid::new_v4(), mountpoint, quota);
+            let new_filesystem = SimFilesystem::new(Uuid::new_v4(), mountpoint, quota);
             self.filesystems.insert(name.into(), new_filesystem);
             names.push(name);
         }

@@ -17,10 +17,7 @@ pub struct SimFilesystem {
 }
 
 impl SimFilesystem {
-    pub fn new_filesystem(fs_id: Uuid,
-                          mount_point: &str,
-                          quota_size: Option<u64>)
-                          -> SimFilesystem {
+    pub fn new(fs_id: Uuid, mount_point: &str, quota_size: Option<u64>) -> Self {
         SimFilesystem {
             fs_id: fs_id,
             mount_point: mount_point.to_owned(),

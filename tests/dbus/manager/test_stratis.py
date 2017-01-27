@@ -23,9 +23,12 @@ from stratisd_client_dbus import Manager
 from stratisd_client_dbus import get_object
 
 from stratisd_client_dbus._constants import TOP_OBJECT
+from stratisd_client_dbus._implementation import ManagerSpec
 
+from .._misc import checked_property
 from .._misc import Service
 
+_PN = ManagerSpec.PropertyNames
 
 class StratisTestCase(unittest.TestCase):
     """
@@ -54,6 +57,9 @@ class StratisTestCase(unittest.TestCase):
 
         Major version number should be 0.
         """
-        version = Manager.Properties.Version(get_object(TOP_OBJECT))
+        version = checked_property(
+           Manager.Properties.Version(get_object(TOP_OBJECT)),
+           ManagerSpec.PROPERTY_SIGS[_PN.Version]
+        )
         (major, _, _) = version.split(".")
         self.assertEqual(major, "0")

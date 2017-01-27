@@ -43,6 +43,18 @@ def checked_call(value, sig):
         raise ValueError("result type does not match signature")
     return value
 
+def checked_property(value, sig):
+    """
+    Check the signature of a property.
+
+    :param value: the property value
+    :param str sig: the expected signature of the value
+    :returns: value for convenience
+    :raises ValueError: if the property type is incorrect
+    """
+    if signature(value, unpack=True) != sig:
+        raise ValueError("property type does not match signature")
+    return value
 
 def _device_list(minimum):
     """

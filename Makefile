@@ -10,7 +10,7 @@ build:
 	RUSTFLAGS='-D warnings' cargo build
 
 test:
-	cargo test
+	cargo test -- --skip test_pools --skip test_blockdev_setup
 
 docs:
 	cargo doc --no-deps

@@ -20,8 +20,6 @@ pub type StratisResult<T> = Result<T, StratisError>;
 //
 custom_derive! {
     #[derive(NewtypeFrom, NewtypeAdd, NewtypeSub, NewtypeDeref,
-             NewtypeBitAnd, NewtypeNot, NewtypeDiv, NewtypeRem,
-             NewtypeMul,
              Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
     pub struct Sectors(pub u64);
 }

@@ -66,17 +66,6 @@ custom_derive! {
 }
 
 
-
-// A type for Data Blocks as used by the thin pool.
-custom_derive! {
-    #[derive(NewtypeFrom, NewtypeAdd, NewtypeSub, NewtypeDeref,
-             NewtypeBitAnd, NewtypeNot, NewtypeDiv, NewtypeRem,
-             NewtypeMul,
-             Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-    pub struct DataBlocks(pub u64);
-}
-
-
 // An error type for errors generated within Stratis
 //
 #[derive(Debug)]

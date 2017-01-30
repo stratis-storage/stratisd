@@ -194,7 +194,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
         let static_header = StaticHeader::new(pool_uuid,
                                               &Uuid::new_v4(),
                                               mda_size,
-                                              Sectors(dev_size / SECTOR_SIZE));
+                                              Sectors(dev_size / (SECTOR_SIZE as u64)));
         let bda = try!(BDA::initialize(&mut f, static_header));
 
         let bd = BlockDev {
@@ -237,7 +237,7 @@ impl BlockDev {
 
     /// List the available-for-upper-layer-use range in this blockdev.
     pub fn avail_range(&self) -> (Sectors, Sectors) {
-        let start = Sectors(BDA_STATIC_HDR_SECTORS) + self.bda.header.mda_size +
+        let start = BDA_STATIC_HDR_SECTORS + self.bda.header.mda_size +
                     self.bda.header.reserved_size;
         let length = self.bda.header.blkdev_size - start;
         (start, length)

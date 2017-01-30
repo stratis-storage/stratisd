@@ -47,9 +47,9 @@ pub fn clean_blockdev_headers(blockdev_paths: &Vec<&Path>) {
 
 fn wipe_header(path: &Path) -> TestResult<()> {
     let mut f = try!(OpenOptions::new().write(true).open(path));
-    let zeroed = [0u8; (SECTOR_SIZE * 16) as usize];
+    let zeroed = [0u8; SECTOR_SIZE * 16];
 
-    try!(f.write_all(&zeroed[..(SECTOR_SIZE * 16) as usize]));
+    try!(f.write_all(&zeroed[..SECTOR_SIZE * 16]));
 
     Ok(())
 }

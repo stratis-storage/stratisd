@@ -16,7 +16,7 @@ use time::Timespec;
 use devicemapper::Device;
 use uuid::Uuid;
 
-use types::{Sectors, SectorOffset};
+use types::Sectors;
 use engine::{EngineResult, EngineError, ErrorEnum};
 
 use consts::*;
@@ -236,10 +236,10 @@ impl BlockDev {
     }
 
     /// List the available-for-upper-layer-use range in this blockdev.
-    pub fn avail_range(&self) -> (SectorOffset, Sectors) {
+    pub fn avail_range(&self) -> (Sectors, Sectors) {
         let start = Sectors(BDA_STATIC_HDR_SECTORS) + self.bda.header.mda_size +
                     self.bda.header.reserved_size;
         let length = self.bda.header.blkdev_size - start;
-        (SectorOffset(*start), length)
+        (start, length)
     }
 }

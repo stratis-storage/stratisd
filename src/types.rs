@@ -43,14 +43,6 @@ impl serde::Deserialize for Sectors {
     }
 }
 
-custom_derive! {
-    #[derive(NewtypeFrom, NewtypeAdd, NewtypeSub, NewtypeDeref,
-             NewtypeBitAnd, NewtypeNot, NewtypeDiv, NewtypeRem,
-             NewtypeMul,
-             Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
-    pub struct SectorOffset(pub u64);
-}
-
 
 // An error type for errors generated within Stratis
 //

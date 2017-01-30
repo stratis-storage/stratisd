@@ -180,8 +180,8 @@ impl StaticHeader {
         LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size);
         buf[32..64].clone_from_slice(self.pool_uuid.simple().to_string().as_bytes());
         buf[64..96].clone_from_slice(self.dev_uuid.simple().to_string().as_bytes());
-        LittleEndian::write_u32(&mut buf[160..164], *self.mda_size as u32);
-        LittleEndian::write_u32(&mut buf[164..168], *self.reserved_size as u32);
+        LittleEndian::write_u64(&mut buf[96..104], *self.mda_size);
+        LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size);
 
         let hdr_crc = crc32::checksum_ieee(&buf[4..SECTOR_SIZE as usize]);
         LittleEndian::write_u32(&mut buf[..4], hdr_crc);
@@ -208,7 +208,7 @@ impl StaticHeader {
         let pool_uuid = try!(Uuid::parse_str(try!(from_utf8(&buf[32..64]))));
         let dev_uuid = try!(Uuid::parse_str(try!(from_utf8(&buf[64..96]))));
 
-        let mda_size = Sectors(LittleEndian::read_u64(&buf[96..104]) as u64);
+        let mda_size = Sectors(LittleEndian::read_u64(&buf[96..104]));
 
         try!(validate_mda_size(mda_size));
 
@@ -217,7 +217,7 @@ impl StaticHeader {
             dev_uuid: dev_uuid,
             blkdev_size: blkdev_size,
             mda_size: mda_size,
-            reserved_size: Sectors(LittleEndian::read_u64(&buf[104..112]) as u64),
+            reserved_size: Sectors(LittleEndian::read_u64(&buf[104..112])),
             flags: 0,
         })
     }

@@ -6,7 +6,6 @@ use std::io;
 use std::fmt;
 use std::error::Error;
 use std::borrow::Cow;
-use std::ops::Add;
 
 use nix;
 use term;
@@ -26,19 +25,6 @@ custom_derive! {
              Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
     pub struct Sectors(pub u64);
 }
-
-// `SumSectors` can be discarded once `std::iter::Sum` is stable.
-pub trait SumSectors: Iterator
-    where Sectors: Add<Self::Item, Output = Sectors>
-{
-    fn sum_sectors(self) -> Sectors
-        where Self: Sized
-    {
-        self.fold(Sectors(0), Add::add)
-    }
-}
-
-impl<T: Iterator> SumSectors for T where Sectors: Add<T::Item, Output = Sectors> {}
 
 impl serde::Serialize for Sectors {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>

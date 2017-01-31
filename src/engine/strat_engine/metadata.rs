@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std;
 use std::cmp::Ordering;
 use std::str::from_utf8;
 use std::fs::File;
@@ -439,6 +440,10 @@ impl MDAHeader {
         if self.used == Bytes(0) {
             Ok(None)
         } else {
+            // This cast could fail if running on a 32-bit machine and
+            // size of metadata is greater than 2^32 - 1 bytes, which is
+            // unlikely.
+            assert!(*self.used <= std::usize::MAX as u64);
             let mut data_buf = vec![0u8; *self.used as usize];
             try!(f.read_exact(&mut data_buf));
 

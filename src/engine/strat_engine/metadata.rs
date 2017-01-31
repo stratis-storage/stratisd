@@ -236,13 +236,18 @@ pub struct MDARegions {
 }
 
 impl MDARegions {
+    /// Calculate the offset from start of device for an MDARegion.
+    fn mda_offset(index: usize, per_region_size: Bytes) -> u64 {
+        BDA_STATIC_HDR_SIZE as u64 + *(per_region_size * index)
+    }
+
     pub fn initialize(header: &StaticHeader, f: &mut File) -> EngineResult<MDARegions> {
         let hdr_buf = [0u8; MDA_REGION_HDR_SIZE];
 
         let region_size = header.mda_size / NUM_MDA_REGIONS;
         let per_region_size = region_size.bytes();
         for region in 0..NUM_MDA_REGIONS {
-            try!(f.seek(SeekFrom::Start(BDA_STATIC_HDR_SIZE as u64 + *(per_region_size * region))));
+            try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(region, per_region_size))));
             try!(f.write_all(&hdr_buf));
         }
 
@@ -261,9 +266,7 @@ impl MDARegions {
 
         let mut load_a_region = |region: usize| -> EngineResult<MDAHeader> {
             let mut hdr_buf = [0u8; MDA_REGION_HDR_SIZE];
-            let offset = BDA_STATIC_HDR_SIZE as u64 + *(per_region_size * region);
-
-            try!(f.seek(SeekFrom::Start(offset)));
+            try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(region, per_region_size))));
             try!(f.read_exact(&mut hdr_buf));
             let mda = try!(MDAHeader::from_buf(&hdr_buf, per_region_size));
 
@@ -301,9 +304,7 @@ impl MDARegions {
         }
 
         let mut save_region = |region: usize| -> EngineResult<()> {
-            let offset = BDA_STATIC_HDR_SIZE as u64 + *(region_size * region);
-
-            try!(f.seek(SeekFrom::Start(offset)));
+            try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(region, region_size))));
             try!(f.write_all(&hdr_buf));
             try!(f.write_all(data));
             try!(f.flush());
@@ -337,7 +338,7 @@ impl MDARegions {
         let mda = &self.mdas[newer_region];
 
         let mut load_region = |region: usize| {
-            let offset = BDA_STATIC_HDR_SIZE as u64 + *(self.region_size * region).bytes() +
+            let offset = MDARegions::mda_offset(region, self.region_size.bytes()) +
                          MDA_REGION_HDR_SIZE as u64;
             try!(f.seek(SeekFrom::Start(offset)));
             mda.load_region(f)

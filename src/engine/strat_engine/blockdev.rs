@@ -237,6 +237,10 @@ impl BlockDev {
     pub fn avail_range(&self) -> (Sectors, Sectors) {
         let start = BDA_STATIC_HDR_SECTORS + self.bda.header.mda_size +
                     self.bda.header.reserved_size;
+        // Blockdev size is at least MIN_DEV_SIZE, so this can fail only if
+        // size of metadata area exceeds 1 GiB. Initial metadata area size
+        // is 4 MiB.
+        assert!(start <= self.bda.header.blkdev_size);
         let length = self.bda.header.blkdev_size - start;
         (start, length)
     }

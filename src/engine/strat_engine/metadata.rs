@@ -21,12 +21,13 @@ use engine::{EngineResult, EngineError, ErrorEnum};
 const _BDA_STATIC_HDR_SECTORS: usize = 16;
 pub const BDA_STATIC_HDR_SECTORS: Sectors = Sectors(_BDA_STATIC_HDR_SECTORS as u64);
 const BDA_STATIC_HDR_SIZE: usize = _BDA_STATIC_HDR_SECTORS * SECTOR_SIZE;
-const MDA_RESERVED_SIZE: Sectors = Sectors(3 * MEGA / (SECTOR_SIZE as u64)); // = 3 MiB
+const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * MEGA / (SECTOR_SIZE as u64)); // = 3 MiB
 const NUM_MDA_REGIONS: u64 = 4;
 const PER_MDA_REGION_COPIES: u64 = 2;
 const NUM_PRIMARY_MDA_REGIONS: usize = (NUM_MDA_REGIONS / PER_MDA_REGION_COPIES) as usize;
 const MDA_REGION_HDR_SIZE: usize = 32;
-pub const MIN_MDA_SIZE: Sectors = Sectors(2032);
+pub const MIN_MDA_SECTORS: Sectors = Sectors(2032);
+
 const STRAT_MAGIC: &'static [u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
 #[derive(Debug)]
@@ -122,7 +123,7 @@ impl StaticHeader {
             pool_uuid: pool_uuid.clone(),
             dev_uuid: dev_uuid.clone(),
             mda_size: mda_size,
-            reserved_size: MDA_RESERVED_SIZE,
+            reserved_size: MDA_RESERVED_SECTORS,
             flags: 0,
         }
     }
@@ -460,11 +461,11 @@ pub fn validate_mda_size(size: Sectors) -> EngineResult<()> {
                                                NUM_MDA_REGIONS)));
     };
 
-    if size < MIN_MDA_SIZE {
+    if size < MIN_MDA_SECTORS {
         return Err(EngineError::Engine(ErrorEnum::Invalid,
                                        format!("MDA size {} is less than minimum ({})",
                                                *size,
-                                               *MIN_MDA_SIZE)));
+                                               *MIN_MDA_SECTORS)));
     };
     Ok(())
 }
@@ -489,7 +490,7 @@ mod tests {
             let pool_uuid = Uuid::new_v4();
             let dev_uuid = Uuid::new_v4();
 
-            let mda_size = MIN_MDA_SIZE + Sectors((mda_size_factor * 4) as u64);
+            let mda_size = MIN_MDA_SECTORS + Sectors((mda_size_factor * 4) as u64);
             let blkdev_size = Sectors(blkdev_size);
             let sh1 = StaticHeader::new(&pool_uuid, &dev_uuid, mda_size, blkdev_size);
             let buf = sh1.sigblock_to_buf();
@@ -524,7 +525,7 @@ mod tests {
             }
 
             // 4 is NUM_MDA_REGIONS which is not imported from super.
-            let region_size = *MIN_MDA_SIZE / 4 + region_size_ext as u64;
+            let region_size = *MIN_MDA_SECTORS / 4 + region_size_ext as u64;
             let timestamp = Timespec::new(sec, nsec);
             let data_crc = crc32::checksum_ieee(&data);
             let buf = MDAHeader::to_buf(data.len(), data_crc, &timestamp);

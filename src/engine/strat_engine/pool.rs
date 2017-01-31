@@ -24,7 +24,7 @@ use engine::engine::Redundancy;
 use super::serde_structs::StratSave;
 use super::blockdev::{BlockDev, initialize, resolve_devices};
 use super::filesystem::StratFilesystem;
-use super::metadata::MIN_MDA_SIZE;
+use super::metadata::MIN_MDA_SECTORS;
 
 #[derive(Debug)]
 pub struct StratPool {
@@ -44,7 +44,7 @@ impl StratPool {
                -> EngineResult<StratPool> {
         let devices = try!(resolve_devices(paths));
         let pool_uuid = Uuid::new_v4();
-        let bds = try!(initialize(&pool_uuid, devices, MIN_MDA_SIZE, force));
+        let bds = try!(initialize(&pool_uuid, devices, MIN_MDA_SECTORS, force));
 
         let mut pool = StratPool {
             name: name.to_owned(),
@@ -140,7 +140,7 @@ impl Pool for StratPool {
 
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
         let devices = try!(resolve_devices(paths));
-        let mut bds = try!(initialize(&self.pool_uuid, devices, MIN_MDA_SIZE, force));
+        let mut bds = try!(initialize(&self.pool_uuid, devices, MIN_MDA_SECTORS, force));
         let bdev_paths = bds.iter().map(|p| p.1.devnode.clone()).collect();
         self.block_devs.append(&mut bds);
         try!(self.write_metadata());
@@ -149,7 +149,7 @@ impl Pool for StratPool {
 
     fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
         let devices = try!(resolve_devices(paths));
-        let mut bds = try!(initialize(&self.pool_uuid, devices, MIN_MDA_SIZE, force));
+        let mut bds = try!(initialize(&self.pool_uuid, devices, MIN_MDA_SECTORS, force));
         let bdev_paths = bds.iter().map(|p| p.1.devnode.clone()).collect();
         self.cache_devs.append(&mut bds);
         Ok(bdev_paths)

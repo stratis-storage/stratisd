@@ -10,7 +10,7 @@ extern crate libstratis;
 mod util;
 
 use libstratis::engine::strat_engine::blockdev;
-use libstratis::engine::strat_engine::metadata::MIN_MDA_SIZE;
+use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 
 use std::path::Path;
 
@@ -38,7 +38,7 @@ pub fn test_blockdev_force_flag(blockdev_paths: &Vec<&Path>) -> TestResult<()> {
     let devices_copy = unique_devices.clone();
 
     // Initialzie devices with force = ture
-    match blockdev::initialize(&Uuid::new_v4(), unique_devices, MIN_MDA_SIZE, true) {
+    match blockdev::initialize(&Uuid::new_v4(), unique_devices, MIN_MDA_SECTORS, true) {
         Ok(_) => {
             debug!("Initialzied starting set of devices");
         }
@@ -49,7 +49,7 @@ pub fn test_blockdev_force_flag(blockdev_paths: &Vec<&Path>) -> TestResult<()> {
     }
 
     // Try to initialzie again with different uuid, force = false - this should fail
-    match blockdev::initialize(&Uuid::new_v4(), devices_copy, MIN_MDA_SIZE, false) {
+    match blockdev::initialize(&Uuid::new_v4(), devices_copy, MIN_MDA_SECTORS, false) {
         Ok(_) => {
             let message = format!("initialize of already initialized blockdevs succeeded \
                                         without force flag");

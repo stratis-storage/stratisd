@@ -180,8 +180,8 @@ impl StaticHeader {
         LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size);
         buf[32..64].clone_from_slice(self.pool_uuid.simple().to_string().as_bytes());
         buf[64..96].clone_from_slice(self.dev_uuid.simple().to_string().as_bytes());
-        LittleEndian::write_u32(&mut buf[160..164], *self.mda_size as u32);
-        LittleEndian::write_u32(&mut buf[164..168], *self.reserved_size as u32);
+        LittleEndian::write_u64(&mut buf[96..104], *self.mda_size);
+        LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size);
 
         let hdr_crc = crc32::checksum_ieee(&buf[4..SECTOR_SIZE as usize]);
         LittleEndian::write_u32(&mut buf[..4], hdr_crc);
@@ -208,7 +208,7 @@ impl StaticHeader {
         let pool_uuid = try!(Uuid::parse_str(try!(from_utf8(&buf[32..64]))));
         let dev_uuid = try!(Uuid::parse_str(try!(from_utf8(&buf[64..96]))));
 
-        let mda_size = Sectors(LittleEndian::read_u64(&buf[96..104]) as u64);
+        let mda_size = Sectors(LittleEndian::read_u64(&buf[96..104]));
 
         try!(validate_mda_size(mda_size));
 
@@ -217,7 +217,7 @@ impl StaticHeader {
             dev_uuid: dev_uuid,
             blkdev_size: blkdev_size,
             mda_size: mda_size,
-            reserved_size: Sectors(LittleEndian::read_u64(&buf[104..112]) as u64),
+            reserved_size: Sectors(LittleEndian::read_u64(&buf[104..112])),
             flags: 0,
         })
     }
@@ -479,15 +479,11 @@ mod tests {
     /// Construct an arbitrary StaticHeader object.
     /// Write it to a buffer, read it out and make sure you get the same thing.
     fn prop_static_header() {
-        fn static_header(blkdev_size: u64, mda_size: u64) -> TestResult {
+        fn static_header(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
             let pool_uuid = Uuid::new_v4();
             let dev_uuid = Uuid::new_v4();
 
-            let mda_size = Sectors(mda_size);
-            if mda_size < MIN_MDA_SIZE {
-                return TestResult::discard();
-            }
-
+            let mda_size = MIN_MDA_SIZE + Sectors((mda_size_factor * 4) as u64);
             let blkdev_size = Sectors(blkdev_size);
             let sh1 = StaticHeader::new(&pool_uuid, &dev_uuid, mda_size, blkdev_size);
             let buf = sh1.sigblock_to_buf();
@@ -501,7 +497,7 @@ mod tests {
 
         QuickCheck::new()
             .tests(30)
-            .quickcheck(static_header as fn(u64, u64) -> TestResult);
+            .quickcheck(static_header as fn(u64, u32) -> TestResult);
     }
 
     #[test]
@@ -510,14 +506,19 @@ mod tests {
     /// Verify that the resulting MDAHeaders have all equal components.
     /// Verify timestamp and data CRC against original values.
     fn prop_mda_header() {
-        fn mda_header(data: Vec<u8>, sec: i64, nsec: i32, region_size: u64) -> TestResult {
+        fn mda_header(data: Vec<u8>, sec: i64, nsec: i32, region_size_ext: u32) -> TestResult {
+            // unwritable timestamp
             if sec < 0 || nsec < 0 {
                 return TestResult::discard();
             }
-            // 4 is NUM_MDA_REGIONS which is not imported from super.
-            if region_size < *MIN_MDA_SIZE / 4 {
+
+            // sec value of 0 is interpreted as no timestamp when read
+            if sec == 0 {
                 return TestResult::discard();
             }
+
+            // 4 is NUM_MDA_REGIONS which is not imported from super.
+            let region_size = *MIN_MDA_SIZE / 4 + region_size_ext as u64;
             let timestamp = Timespec::new(sec, nsec);
             let buf = MDAHeader::to_buf(&data, &timestamp);
             let mda1 = MDAHeader::from_buf(&buf, region_size).unwrap();
@@ -532,7 +533,7 @@ mod tests {
         }
 
         QuickCheck::new()
-            .tests(30)
-            .quickcheck(mda_header as fn(Vec<u8>, i64, i32, u64) -> TestResult);
+            .tests(50)
+            .quickcheck(mda_header as fn(Vec<u8>, i64, i32, u32) -> TestResult);
     }
 }

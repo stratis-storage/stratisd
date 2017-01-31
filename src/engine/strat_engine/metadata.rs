@@ -203,7 +203,7 @@ impl StaticHeader {
             return Err(EngineError::Engine(ErrorEnum::Invalid, "header CRC invalid".into()));
         }
 
-        let blkdev_size = Sectors(LittleEndian::read_u64(&buf[20..28]) as u64);
+        let blkdev_size = Sectors(LittleEndian::read_u64(&buf[20..28]));
 
         let pool_uuid = try!(Uuid::parse_str(try!(from_utf8(&buf[32..64]))));
         let dev_uuid = try!(Uuid::parse_str(try!(from_utf8(&buf[64..96]))));

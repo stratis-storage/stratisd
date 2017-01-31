@@ -23,9 +23,11 @@ const _BDA_STATIC_HDR_SECTORS: usize = 16;
 pub const BDA_STATIC_HDR_SECTORS: Sectors = Sectors(_BDA_STATIC_HDR_SECTORS as u64);
 const BDA_STATIC_HDR_SIZE: usize = _BDA_STATIC_HDR_SECTORS * SECTOR_SIZE;
 const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * MEGA / (SECTOR_SIZE as u64)); // = 3 MiB
-const NUM_MDA_REGIONS: u64 = 4;
-const PER_MDA_REGION_COPIES: u64 = 2;
-const NUM_PRIMARY_MDA_REGIONS: usize = (NUM_MDA_REGIONS / PER_MDA_REGION_COPIES) as usize;
+
+const NUM_MDA_REGIONS: usize = 4;
+const PER_MDA_REGION_COPIES: usize = 2;
+const NUM_PRIMARY_MDA_REGIONS: usize = NUM_MDA_REGIONS / PER_MDA_REGION_COPIES;
+
 const MDA_REGION_HDR_SIZE: usize = 32;
 pub const MIN_MDA_SECTORS: Sectors = Sectors(2032);
 
@@ -529,7 +531,7 @@ mod tests {
             }
 
             // 4 is NUM_MDA_REGIONS which is not imported from super.
-            let region_size = (MIN_MDA_SECTORS / 4u64).bytes() + Bytes(region_size_ext as u64);
+            let region_size = (MIN_MDA_SECTORS / 4usize).bytes() + Bytes(region_size_ext as u64);
             let timestamp = Timespec::new(sec, nsec);
             let data_crc = crc32::checksum_ieee(&data);
             let buf = MDAHeader::to_buf(data.len(), data_crc, &timestamp);

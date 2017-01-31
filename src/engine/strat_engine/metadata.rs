@@ -294,14 +294,13 @@ impl MDARegions {
         let hdr_buf = MDAHeader::to_buf(used, data_crc, time);
 
         let region_size: u64 = *self.region_size * (SECTOR_SIZE as u64);
-        if MDA_REGION_HDR_SIZE + used > region_size as usize {
+        if (MDA_REGION_HDR_SIZE + used) as u64 > region_size {
             return Err(EngineError::Engine(ErrorEnum::Invalid,
                                            "data larger than region_size".into()));
         }
 
         let mut save_region = |region: usize| -> EngineResult<()> {
             let offset = BDA_STATIC_HDR_SIZE as u64 + (region as u64 * region_size);
-
             try!(f.seek(SeekFrom::Start(offset)));
             try!(f.write_all(&hdr_buf));
             try!(f.write_all(data));

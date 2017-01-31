@@ -132,7 +132,7 @@ impl StaticHeader {
         let mut buf = [0u8; BDA_STATIC_HDR_SIZE as usize];
         try!(f.read(&mut buf));
 
-        Self::setup_from_buf(&buf)
+        StaticHeader::setup_from_buf(&buf)
     }
 
     /// Try to find a valid StaticHeader in a buffer.
@@ -161,7 +161,7 @@ impl StaticHeader {
         // not sufficient to have STRAT_MAGIC to be considered "Ours",
         // it must also have correct CRC, no weird stuff in fields,
         // etc!
-        match Self::setup_from_buf(&buf) {
+        match StaticHeader::setup_from_buf(&buf) {
             Ok(sh) => Ok(DevOwnership::Ours(sh.pool_uuid)),
             Err(_) => {
                 if buf.iter().any(|x| *x != 0) {

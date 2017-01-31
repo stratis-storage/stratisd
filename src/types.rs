@@ -6,13 +6,44 @@ use std::io;
 use std::fmt;
 use std::error::Error;
 use std::borrow::Cow;
+use std::fmt::Display;
+use std::ops::{Div, Mul, Rem};
 
 use nix;
 use term;
 use dbus;
 use serde;
 
+use consts::SECTOR_SIZE;
+
 pub type StratisResult<T> = Result<T, StratisError>;
+
+custom_derive! {
+    #[derive(NewtypeFrom, NewtypeAdd, NewtypeSub, NewtypeDeref,
+             Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+    pub struct Bytes(pub u64);
+}
+
+impl Bytes {
+    /// Return the number of Sectors fully contained in these bytes.
+    pub fn sectors(self) -> Sectors {
+        Sectors(self.0 / SECTOR_SIZE as u64)
+    }
+}
+
+impl Mul<u64> for Bytes {
+    type Output = Bytes;
+    fn mul(self, rhs: u64) -> Bytes {
+        Bytes(self.0 * rhs)
+    }
+}
+
+
+impl Display for Bytes {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{} bytes", self.0)
+    }
+}
 
 // Use distinct 'newtype' types for sectors and sector offsets for type safety.
 // When needed, these can still be derefed to u64.
@@ -22,6 +53,54 @@ custom_derive! {
     #[derive(NewtypeFrom, NewtypeAdd, NewtypeSub, NewtypeDeref,
              Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
     pub struct Sectors(pub u64);
+}
+
+impl Sectors {
+    /// The number of bytes in these sectors.
+    pub fn bytes(&self) -> Bytes {
+        Bytes(self.0 * SECTOR_SIZE as u64)
+    }
+}
+
+impl Div<usize> for Sectors {
+    type Output = Sectors;
+    fn div(self, rhs: usize) -> Sectors {
+        Sectors(self.0 / rhs as u64)
+    }
+}
+
+impl Div<u64> for Sectors {
+    type Output = Sectors;
+    fn div(self, rhs: u64) -> Sectors {
+        Sectors(self.0 / rhs)
+    }
+}
+
+impl Mul<u64> for Sectors {
+    type Output = Sectors;
+    fn mul(self, rhs: u64) -> Sectors {
+        Sectors(self.0 * rhs)
+    }
+}
+
+impl Rem<usize> for Sectors {
+    type Output = Sectors;
+    fn rem(self, rhs: usize) -> Sectors {
+        Sectors(self.0 % rhs as u64)
+    }
+}
+
+impl Rem<u64> for Sectors {
+    type Output = Sectors;
+    fn rem(self, rhs: u64) -> Sectors {
+        Sectors(self.0 % rhs)
+    }
+}
+
+impl Display for Sectors {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{} sectors", self.0)
+    }
 }
 
 impl serde::Serialize for Sectors {

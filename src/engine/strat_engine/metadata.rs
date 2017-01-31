@@ -13,7 +13,7 @@ use crc::crc32;
 use time::Timespec;
 use uuid::Uuid;
 
-use types::Sectors;
+use types::{Bytes, Sectors};
 use super::engine::DevOwnership;
 use consts::{SECTOR_SIZE, MEGA};
 use engine::{EngineResult, EngineError, ErrorEnum};
@@ -234,13 +234,13 @@ pub struct MDARegions {
 
 impl MDARegions {
     pub fn initialize(header: &StaticHeader, f: &mut File) -> EngineResult<MDARegions> {
-        let region_size = Sectors(*header.mda_size / NUM_MDA_REGIONS);
-        let per_region_size: u64 = *region_size * (SECTOR_SIZE as u64);
         let hdr_buf = [0u8; MDA_REGION_HDR_SIZE];
 
+        let region_size = header.mda_size / NUM_MDA_REGIONS;
+        let per_region_size = region_size.bytes();
         for region in 0..NUM_MDA_REGIONS {
             try!(f.seek(SeekFrom::Start(BDA_STATIC_HDR_SIZE as u64 +
-                                        (region as u64 * per_region_size))));
+                                        *(per_region_size * region as u64))));
             try!(f.write_all(&hdr_buf));
         }
 
@@ -254,13 +254,12 @@ impl MDARegions {
 
     // Construct MDARegions based on on-disk info
     pub fn load(header: &StaticHeader, f: &mut File) -> EngineResult<MDARegions> {
-        let region_size = Sectors(*header.mda_size / NUM_MDA_REGIONS);
-        let per_region_size: u64 = *region_size * (SECTOR_SIZE as u64);
+        let region_size = header.mda_size / NUM_MDA_REGIONS;
+        let per_region_size = region_size.bytes();
 
         let mut load_a_region = |region: u8| -> EngineResult<MDAHeader> {
             let mut hdr_buf = [0u8; MDA_REGION_HDR_SIZE];
-            let offset = BDA_STATIC_HDR_SIZE as u64 +
-                         (region as u64 * *region_size * (SECTOR_SIZE as u64));
+            let offset = BDA_STATIC_HDR_SIZE as u64 + *(per_region_size * region as u64);
 
             try!(f.seek(SeekFrom::Start(offset)));
             try!(f.read_exact(&mut hdr_buf));
@@ -293,14 +292,14 @@ impl MDARegions {
         let data_crc = crc32::checksum_ieee(data);
         let hdr_buf = MDAHeader::to_buf(used, data_crc, time);
 
-        let region_size: u64 = *self.region_size * (SECTOR_SIZE as u64);
-        if (MDA_REGION_HDR_SIZE + used) as u64 > region_size {
+        let region_size = self.region_size.bytes();
+        if Bytes((MDA_REGION_HDR_SIZE + used) as u64) > region_size {
             return Err(EngineError::Engine(ErrorEnum::Invalid,
                                            "data larger than region_size".into()));
         }
 
         let mut save_region = |region: usize| -> EngineResult<()> {
-            let offset = BDA_STATIC_HDR_SIZE as u64 + (region as u64 * region_size);
+            let offset = BDA_STATIC_HDR_SIZE as u64 + *(region_size * region as u64);
             try!(f.seek(SeekFrom::Start(offset)));
             try!(f.write_all(&hdr_buf));
             try!(f.write_all(data));
@@ -324,7 +323,7 @@ impl MDARegions {
         try!(save_region(older_region + 2));
 
         self.mdas[older_region].last_updated = Some(*time);
-        self.mdas[older_region].used = used as u64;
+        self.mdas[older_region].used = Bytes(used as u64);
         self.mdas[older_region].data_crc = data_crc;
 
         Ok(())
@@ -335,8 +334,7 @@ impl MDARegions {
         let mda = &self.mdas[newer_region];
 
         let mut load_region = |region| {
-            let offset = BDA_STATIC_HDR_SIZE as u64 +
-                         (region as u64 * *self.region_size * (SECTOR_SIZE as u64)) +
+            let offset = BDA_STATIC_HDR_SIZE as u64 + *(self.region_size * region as u64).bytes() +
                          MDA_REGION_HDR_SIZE as u64;
             try!(f.seek(SeekFrom::Start(offset)));
             mda.load_region(f)
@@ -366,22 +364,24 @@ impl MDARegions {
 #[derive(Debug, Clone, Copy)]
 pub struct MDAHeader {
     pub last_updated: Option<Timespec>,
-    pub used: u64,
-    pub region_size: u64,
+    pub used: Bytes,
+    pub region_size: Bytes,
     pub data_crc: u32,
 }
 
 impl MDAHeader {
-    pub fn new(region_size: u64) -> MDAHeader {
+    pub fn new(region_size: Bytes) -> MDAHeader {
         MDAHeader {
             last_updated: None,
-            used: 0,
+            used: Bytes(0),
             region_size: region_size,
             data_crc: 0,
         }
     }
 
-    pub fn from_buf(buf: &[u8; MDA_REGION_HDR_SIZE], region_size: u64) -> EngineResult<MDAHeader> {
+    pub fn from_buf(buf: &[u8; MDA_REGION_HDR_SIZE],
+                    region_size: Bytes)
+                    -> EngineResult<MDAHeader> {
         if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_ieee(&buf[4..]) {
             return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region header CRC".into()));
         }
@@ -397,7 +397,7 @@ impl MDAHeader {
         };
 
         Ok(MDAHeader {
-            used: LittleEndian::read_u64(&buf[8..16]),
+            used: Bytes(LittleEndian::read_u64(&buf[8..16])),
             last_updated: time,
             region_size: region_size,
             data_crc: LittleEndian::read_u32(&buf[4..8]),
@@ -436,10 +436,10 @@ impl MDAHeader {
                                                .into()));
         }
 
-        if self.used == 0 {
+        if self.used == Bytes(0) {
             Ok(None)
         } else {
-            let mut data_buf = vec![0u8; self.used as usize];
+            let mut data_buf = vec![0u8; *self.used as usize];
             try!(f.read_exact(&mut data_buf));
 
             if self.data_crc != crc32::checksum_ieee(&data_buf) {
@@ -452,19 +452,19 @@ impl MDAHeader {
 
 /// Validate MDA size
 pub fn validate_mda_size(size: Sectors) -> EngineResult<()> {
-    if *size % NUM_MDA_REGIONS != 0 {
+    if size % NUM_MDA_REGIONS != Sectors(0) {
         return Err(EngineError::Engine(ErrorEnum::Invalid,
                                        format!("MDA size {} is not divisible by number of \
                                                 copies required {}",
-                                               *size,
+                                               size,
                                                NUM_MDA_REGIONS)));
     };
 
     if size < MIN_MDA_SECTORS {
         return Err(EngineError::Engine(ErrorEnum::Invalid,
                                        format!("MDA size {} is less than minimum ({})",
-                                               *size,
-                                               *MIN_MDA_SECTORS)));
+                                               size,
+                                               MIN_MDA_SECTORS)));
     };
     Ok(())
 }
@@ -477,7 +477,7 @@ mod tests {
 
     use quickcheck::{QuickCheck, TestResult};
 
-    use types::Sectors;
+    use types::{Bytes, Sectors};
 
     use super::*;
 
@@ -524,7 +524,7 @@ mod tests {
             }
 
             // 4 is NUM_MDA_REGIONS which is not imported from super.
-            let region_size = *MIN_MDA_SECTORS / 4 + region_size_ext as u64;
+            let region_size = (MIN_MDA_SECTORS / 4u64).bytes() + Bytes(region_size_ext as u64);
             let timestamp = Timespec::new(sec, nsec);
             let data_crc = crc32::checksum_ieee(&data);
             let buf = MDAHeader::to_buf(data.len(), data_crc, &timestamp);

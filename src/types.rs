@@ -31,6 +31,13 @@ impl Bytes {
     }
 }
 
+impl Mul<usize> for Bytes {
+    type Output = Bytes;
+    fn mul(self, rhs: usize) -> Bytes {
+        Bytes(self.0 * rhs as u64)
+    }
+}
+
 impl Mul<u64> for Bytes {
     type Output = Bytes;
     fn mul(self, rhs: u64) -> Bytes {
@@ -73,6 +80,13 @@ impl Div<u64> for Sectors {
     type Output = Sectors;
     fn div(self, rhs: u64) -> Sectors {
         Sectors(self.0 / rhs)
+    }
+}
+
+impl Mul<usize> for Sectors {
+    type Output = Sectors;
+    fn mul(self, rhs: usize) -> Sectors {
+        Sectors(self.0 * rhs as u64)
     }
 }
 

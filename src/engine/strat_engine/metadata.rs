@@ -240,8 +240,7 @@ impl MDARegions {
         let region_size = header.mda_size / NUM_MDA_REGIONS;
         let per_region_size = region_size.bytes();
         for region in 0..NUM_MDA_REGIONS {
-            try!(f.seek(SeekFrom::Start(BDA_STATIC_HDR_SIZE as u64 +
-                                        *(per_region_size * region as u64))));
+            try!(f.seek(SeekFrom::Start(BDA_STATIC_HDR_SIZE as u64 + *(per_region_size * region))));
             try!(f.write_all(&hdr_buf));
         }
 
@@ -258,9 +257,9 @@ impl MDARegions {
         let region_size = header.mda_size / NUM_MDA_REGIONS;
         let per_region_size = region_size.bytes();
 
-        let mut load_a_region = |region: u8| -> EngineResult<MDAHeader> {
+        let mut load_a_region = |region: usize| -> EngineResult<MDAHeader> {
             let mut hdr_buf = [0u8; MDA_REGION_HDR_SIZE];
-            let offset = BDA_STATIC_HDR_SIZE as u64 + *(per_region_size * region as u64);
+            let offset = BDA_STATIC_HDR_SIZE as u64 + *(per_region_size * region);
 
             try!(f.seek(SeekFrom::Start(offset)));
             try!(f.read_exact(&mut hdr_buf));
@@ -300,7 +299,8 @@ impl MDARegions {
         }
 
         let mut save_region = |region: usize| -> EngineResult<()> {
-            let offset = BDA_STATIC_HDR_SIZE as u64 + *(region_size * region as u64);
+            let offset = BDA_STATIC_HDR_SIZE as u64 + *(region_size * region);
+
             try!(f.seek(SeekFrom::Start(offset)));
             try!(f.write_all(&hdr_buf));
             try!(f.write_all(data));
@@ -334,8 +334,8 @@ impl MDARegions {
         let newer_region = self.newer();
         let mda = &self.mdas[newer_region];
 
-        let mut load_region = |region| {
-            let offset = BDA_STATIC_HDR_SIZE as u64 + *(self.region_size * region as u64).bytes() +
+        let mut load_region = |region: usize| {
+            let offset = BDA_STATIC_HDR_SIZE as u64 + *(self.region_size * region).bytes() +
                          MDA_REGION_HDR_SIZE as u64;
             try!(f.seek(SeekFrom::Start(offset)));
             mda.load_region(f)

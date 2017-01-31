@@ -16,7 +16,7 @@ use time::Timespec;
 use devicemapper::Device;
 use uuid::Uuid;
 
-use types::Sectors;
+use types::{Bytes, Sectors};
 use engine::{EngineResult, EngineError, ErrorEnum};
 
 use consts::*;
@@ -27,16 +27,16 @@ pub use super::BlockDevSave;
 type DevUuid = Uuid;
 type PoolUuid = Uuid;
 
-const MIN_DEV_SIZE: u64 = GIGA;
+const MIN_DEV_SIZE: Bytes = Bytes(GIGA as u64);
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);
 
-pub fn blkdev_size(file: &File) -> EngineResult<u64> {
+pub fn blkdev_size(file: &File) -> EngineResult<Bytes> {
     let mut val: u64 = 0;
 
     match unsafe { blkgetsize64(file.as_raw_fd(), &mut val) } {
         Err(x) => Err(EngineError::Nix(x)),
-        Ok(_) => Ok(val),
+        Ok(_) => Ok(Bytes(val)),
     }
 }
 
@@ -111,7 +111,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
     /// Returns a tuple with the blockdev's path, its size in bytes,
     /// its ownership as determined by calling determine_ownership(),
     /// and an open File handle, all of which are needed later.
-    fn dev_info(dev: &Device) -> EngineResult<(PathBuf, u64, DevOwnership, File)> {
+    fn dev_info(dev: &Device) -> EngineResult<(PathBuf, Bytes, DevOwnership, File)> {
         let devnode = try!(dev.path().ok_or_else(|| {
             io::Error::new(ErrorKind::InvalidInput,
                            format!("could not get device node from dev {}", dev.dstr()))
@@ -144,8 +144,8 @@ pub fn initialize(pool_uuid: &PoolUuid,
     fn filter_devs<I>(dev_infos: I,
                       pool_uuid: &PoolUuid,
                       force: bool)
-                      -> EngineResult<Vec<(Device, (PathBuf, u64, File))>>
-        where I: Iterator<Item = (Device, EngineResult<(PathBuf, u64, DevOwnership, File)>)>
+                      -> EngineResult<Vec<(Device, (PathBuf, Bytes, File))>>
+        where I: Iterator<Item = (Device, EngineResult<(PathBuf, Bytes, DevOwnership, File)>)>
     {
         let mut add_devs = Vec::new();
         for (dev, dev_result) in dev_infos {
@@ -191,10 +191,8 @@ pub fn initialize(pool_uuid: &PoolUuid,
     let mut bds = BTreeMap::new();
     for (dev, (devnode, dev_size, mut f)) in add_devs {
 
-        let static_header = StaticHeader::new(pool_uuid,
-                                              &Uuid::new_v4(),
-                                              mda_size,
-                                              Sectors(dev_size / (SECTOR_SIZE as u64)));
+        let static_header =
+            StaticHeader::new(pool_uuid, &Uuid::new_v4(), mda_size, dev_size.sectors());
         let bda = try!(BDA::initialize(&mut f, static_header));
 
         let bd = BlockDev {

@@ -21,6 +21,8 @@ use engine::Pool;
 use engine::RenameAction;
 use engine::engine::Redundancy;
 
+use super::super::super::types::Bytes;
+
 use super::serde_structs::StratSave;
 use super::blockdev::{BlockDev, initialize, resolve_devices};
 use super::filesystem::StratFilesystem;
@@ -126,7 +128,7 @@ impl StratPool {
 
 impl Pool for StratPool {
     fn create_filesystems<'a, 'b, 'c>(&'a mut self,
-                                      _specs: &[(&'b str, &'c str, Option<u64>)])
+                                      _specs: &[(&'b str, &'c str, Option<Bytes>)])
                                       -> EngineResult<Vec<&'b str>> {
         Ok(vec![])
     }

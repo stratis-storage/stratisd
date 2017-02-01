@@ -6,6 +6,8 @@ use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 
+use super::super::types::Bytes;
+
 use super::errors::EngineResult;
 
 #[derive(Debug)]
@@ -46,7 +48,7 @@ pub trait Pool: Debug {
     /// Returns an error if any of the specified names are already in use
     /// for filesystems in this pool.
     fn create_filesystems<'a, 'b, 'c>(&'a mut self,
-                                      specs: &[(&'b str, &'c str, Option<u64>)])
+                                      specs: &[(&'b str, &'c str, Option<Bytes>)])
                                       -> EngineResult<Vec<&'b str>>;
 
     fn create_snapshot<'a, 'b, 'c>(&'a mut self,

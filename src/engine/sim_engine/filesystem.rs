@@ -6,18 +6,20 @@ use uuid::Uuid;
 
 use engine::Filesystem;
 
+use super::super::super::types::Bytes;
+
 use super::consts::DEFAULT_FILESYSTEM_QUOTA_SIZE;
 
 #[derive(Debug)]
 pub struct SimFilesystem {
     pub fs_id: Uuid,
     pub mount_point: String,
-    pub quota_size: u64,
+    pub quota_size: Bytes,
     pub nearest_ancestor: Option<Uuid>,
 }
 
 impl SimFilesystem {
-    pub fn new(fs_id: Uuid, mount_point: &str, quota_size: Option<u64>) -> SimFilesystem {
+    pub fn new(fs_id: Uuid, mount_point: &str, quota_size: Option<Bytes>) -> SimFilesystem {
         SimFilesystem {
             fs_id: fs_id,
             mount_point: mount_point.to_owned(),

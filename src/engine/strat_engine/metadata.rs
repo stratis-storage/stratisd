@@ -300,10 +300,7 @@ impl MDARegions {
         let hdr_buf = MDAHeader::to_buf(used, data_crc, time);
 
         let region_size = self.region_size.bytes();
-        if MDA_REGION_HDR_SIZE + Bytes(used as u64) > region_size {
-            return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                           "data larger than region_size".into()));
-        }
+        try!(check_mda_region_size(Bytes(used as u64), region_size));
 
         let mut save_region = |region: usize| -> EngineResult<()> {
             try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(region, region_size))));
@@ -370,8 +367,14 @@ impl MDARegions {
 #[derive(Debug, Clone, Copy)]
 pub struct MDAHeader {
     pub last_updated: Option<Timespec>,
+
+    /// Size of region used for pool metadata.
     pub used: Bytes,
+
+    /// Total size of region, including both the header and space used for
+    /// pool metadata.
     pub region_size: Bytes,
+
     pub data_crc: u32,
 }
 
@@ -433,14 +436,7 @@ impl MDAHeader {
     /// Given a pre-seek()ed File, load the MDA region and return the contents
     // MDAHeader cannot seek because it doesn't know which region it's in
     pub fn load_region(&self, f: &mut File) -> EngineResult<Option<Vec<u8>>> {
-        if self.used > self.region_size {
-            return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                           format!("region mda.used {} > region_size {}",
-                                                   self.used,
-                                                   self.region_size)
-                                               .into()));
-        }
-
+        try!(check_mda_region_size(self.used, self.region_size));
         if self.used == Bytes(0) {
             Ok(None)
         } else {
@@ -457,6 +453,21 @@ impl MDAHeader {
             Ok(Some(data_buf))
         }
     }
+}
+
+
+/// Check that data size does not exceed region available.
+/// Note that used is the amount used for metadata only.
+fn check_mda_region_size(used: Bytes, available: Bytes) -> EngineResult<()> {
+    if MDA_REGION_HDR_SIZE + used > available {
+        return Err(EngineError::Engine(ErrorEnum::Invalid,
+                                       format!("metadata length {} exceeds region available {}",
+                                               used,
+                                               // available region > header size
+                                               available - MDA_REGION_HDR_SIZE)
+                                           .into()));
+    };
+    Ok(())
 }
 
 /// Validate MDA size

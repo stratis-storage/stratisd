@@ -341,8 +341,8 @@ impl MDARegions {
 
     pub fn older(&self) -> usize {
         match self.mdas[0].last_updated.cmp(&self.mdas[1].last_updated) {
-            Ordering::Less => 1,
-            Ordering::Greater => 0,
+            Ordering::Less => 0,
+            Ordering::Greater => 1,
             Ordering::Equal => 1,
         }
     }

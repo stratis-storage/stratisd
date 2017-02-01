@@ -529,21 +529,27 @@ mod tests {
 
     use quickcheck::{QuickCheck, TestResult};
 
+    use consts::IEC;
     use types::{Bytes, Sectors};
 
     use super::*;
+
+    /// Return a static header with random block device and MDA size.
+    /// The block device is less than the minimum, for efficiency in testing.
+    fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
+        let pool_uuid = Uuid::new_v4();
+        let dev_uuid = Uuid::new_v4();
+        let mda_size = MIN_MDA_SECTORS + Sectors((mda_size_factor * 4) as u64);
+        let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
+        StaticHeader::new(&pool_uuid, &dev_uuid, mda_size, blkdev_size)
+    }
 
     #[test]
     /// Construct an arbitrary StaticHeader object.
     /// Write it to a buffer, read it out and make sure you get the same thing.
     fn prop_static_header() {
         fn static_header(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
-            let pool_uuid = Uuid::new_v4();
-            let dev_uuid = Uuid::new_v4();
-
-            let mda_size = MIN_MDA_SECTORS + Sectors((mda_size_factor * 4) as u64);
-            let blkdev_size = Sectors(blkdev_size);
-            let sh1 = StaticHeader::new(&pool_uuid, &dev_uuid, mda_size, blkdev_size);
+            let sh1 = random_static_header(blkdev_size, mda_size_factor);
             let buf = sh1.sigblock_to_buf();
             let sh2 = StaticHeader::sigblock_from_buf(&buf).unwrap();
             TestResult::from_bool(sh1.pool_uuid == sh2.pool_uuid && sh1.dev_uuid == sh2.dev_uuid &&

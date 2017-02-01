@@ -5,7 +5,6 @@
 use std;
 use std::cmp::Ordering;
 use std::str::from_utf8;
-use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 
 use byteorder::ByteOrder;
@@ -43,12 +42,14 @@ pub struct BDA {
 
 impl BDA {
     /// Initialize a blockdev with a Stratis BDA.
-    pub fn initialize(mut f: &mut File,
-                      pool_uuid: &Uuid,
-                      dev_uuid: &Uuid,
-                      mda_size: Sectors,
-                      blkdev_size: Sectors)
-                      -> EngineResult<BDA> {
+    pub fn initialize<F>(mut f: &mut F,
+                         pool_uuid: &Uuid,
+                         dev_uuid: &Uuid,
+                         mda_size: Sectors,
+                         blkdev_size: Sectors)
+                         -> EngineResult<BDA>
+        where F: Seek + Write
+    {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
         let header = StaticHeader::new(pool_uuid, dev_uuid, mda_size, blkdev_size);
         let hdr_buf = header.sigblock_to_buf();
@@ -71,7 +72,9 @@ impl BDA {
         })
     }
 
-    pub fn load(f: &mut File) -> EngineResult<BDA> {
+    pub fn load<F>(f: &mut F) -> EngineResult<BDA>
+        where F: Read + Seek
+    {
         let header = try!(StaticHeader::setup(f));
         let regions = try!(MDARegions::load(&header, f));
 
@@ -83,7 +86,9 @@ impl BDA {
 
     /// Zero out Static Header on the blockdev. This causes it to no
     /// longer be seen as a Stratis blockdev.
-    pub fn wipe(f: &mut File) -> EngineResult<()> {
+    pub fn wipe<F>(f: &mut F) -> EngineResult<()>
+        where F: Seek + Write
+    {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
 
         // Wiping Static Header should do it
@@ -94,16 +99,20 @@ impl BDA {
     }
 
     /// Save metadata to the disk
-    pub fn save_state(&mut self,
-                      time: &Timespec,
-                      metadata: &[u8],
-                      mut f: &mut File)
-                      -> EngineResult<()> {
+    pub fn save_state<F>(&mut self,
+                         time: &Timespec,
+                         metadata: &[u8],
+                         mut f: &mut F)
+                         -> EngineResult<()>
+        where F: Seek + Write
+    {
         self.regions.save_state(time, metadata, &mut f)
     }
 
     /// Read latest metadata from the disk
-    pub fn load_state(&self, mut f: &mut File) -> EngineResult<Option<Vec<u8>>> {
+    pub fn load_state<F>(&self, mut f: &mut F) -> EngineResult<Option<Vec<u8>>>
+        where F: Read + Seek
+    {
         self.regions.load_state(&mut f)
     }
 
@@ -141,7 +150,9 @@ impl StaticHeader {
     }
 
     /// Try to find a valid StaticHeader on a device.
-    pub fn setup(f: &mut File) -> EngineResult<StaticHeader> {
+    pub fn setup<F>(f: &mut F) -> EngineResult<StaticHeader>
+        where F: Read + Seek
+    {
         try!(f.seek(SeekFrom::Start(0)));
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
         try!(f.read(&mut buf));
@@ -166,7 +177,11 @@ impl StaticHeader {
     }
 
     /// Determine the ownership of a device.
-    pub fn determine_ownership(f: &mut File) -> EngineResult<DevOwnership> {
+    pub fn determine_ownership<F>(f: &mut F) -> EngineResult<DevOwnership>
+        where F: Read + Seek
+    {
+
+
         try!(f.seek(SeekFrom::Start(0)));
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
         try!(f.read(&mut buf));
@@ -250,7 +265,9 @@ impl MDARegions {
         *(BDA_STATIC_HDR_SIZE + per_region_size * index)
     }
 
-    pub fn initialize(header: &StaticHeader, f: &mut File) -> EngineResult<MDARegions> {
+    pub fn initialize<F>(header: &StaticHeader, f: &mut F) -> EngineResult<MDARegions>
+        where F: Seek + Write
+    {
         let hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
 
         let region_size = header.mda_size / NUM_MDA_REGIONS;
@@ -269,7 +286,9 @@ impl MDARegions {
     }
 
     // Construct MDARegions based on on-disk info
-    pub fn load(header: &StaticHeader, f: &mut File) -> EngineResult<MDARegions> {
+    pub fn load<F>(header: &StaticHeader, f: &mut F) -> EngineResult<MDARegions>
+        where F: Read + Seek
+    {
         let region_size = header.mda_size / NUM_MDA_REGIONS;
         let per_region_size = region_size.bytes();
 
@@ -301,7 +320,9 @@ impl MDARegions {
     }
 
     // Write data to the older region
-    pub fn save_state(&mut self, time: &Timespec, data: &[u8], f: &mut File) -> EngineResult<()> {
+    pub fn save_state<F>(&mut self, time: &Timespec, data: &[u8], f: &mut F) -> EngineResult<()>
+        where F: Seek + Write
+    {
         let used = data.len();
         let data_crc = crc32::checksum_ieee(data);
         let hdr_buf = MDAHeader::to_buf(used, data_crc, time);
@@ -339,7 +360,9 @@ impl MDARegions {
         Ok(())
     }
 
-    pub fn load_state(&self, f: &mut File) -> EngineResult<Option<Vec<u8>>> {
+    pub fn load_state<F>(&self, f: &mut F) -> EngineResult<Option<Vec<u8>>>
+        where F: Read + Seek
+    {
         let newer_region = self.newer();
         let mda = &self.mdas[newer_region];
 
@@ -442,7 +465,9 @@ impl MDAHeader {
 
     /// Given a pre-seek()ed File, load the MDA region and return the contents
     // MDAHeader cannot seek because it doesn't know which region it's in
-    pub fn load_region(&self, f: &mut File) -> EngineResult<Option<Vec<u8>>> {
+    pub fn load_region<F>(&self, f: &mut F) -> EngineResult<Option<Vec<u8>>>
+        where F: Read
+    {
         try!(check_mda_region_size(self.used, self.region_size));
         if self.used == Bytes(0) {
             Ok(None)

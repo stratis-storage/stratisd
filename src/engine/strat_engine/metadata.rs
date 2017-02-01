@@ -424,9 +424,6 @@ impl MDAHeader {
     /// Given a pre-seek()ed File, load the MDA region and return the contents
     // MDAHeader cannot seek because it doesn't know which region it's in
     pub fn load_region(&self, f: &mut File) -> EngineResult<Option<Vec<u8>>> {
-        let mut hdr_buf = [0u8; MDA_REGION_HDR_SIZE];
-        try!(f.read_exact(&mut hdr_buf));
-
         if self.used > self.region_size {
             return Err(EngineError::Engine(ErrorEnum::Invalid,
                                            format!("region mda.used {} > region_size {}",

@@ -450,7 +450,6 @@ impl MDAHeader {
 }
 
 /// Validate MDA size
-/// Return None if MDA size is fine, otherwise a message.
 pub fn validate_mda_size(size: Sectors) -> EngineResult<()> {
     if *size % NUM_MDA_REGIONS != 0 {
         return Err(EngineError::Engine(ErrorEnum::Invalid,

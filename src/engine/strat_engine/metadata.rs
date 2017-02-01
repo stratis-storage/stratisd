@@ -468,10 +468,10 @@ impl MDAHeader {
     pub fn load_region<F>(&self, f: &mut F) -> EngineResult<Option<Vec<u8>>>
         where F: Read
     {
-        try!(check_mda_region_size(self.used, self.region_size));
-        if self.used == Bytes(0) {
+        if self.last_updated.is_none() {
             Ok(None)
         } else {
+            try!(check_mda_region_size(self.used, self.region_size));
             // This cast could fail if running on a 32-bit machine and
             // size of metadata is greater than 2^32 - 1 bytes, which is
             // unlikely.

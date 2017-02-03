@@ -320,6 +320,7 @@ impl MDARegions {
 
         self.mdas[older_region].last_updated = Some(*time);
         self.mdas[older_region].used = data.len() as u64;
+        self.mdas[older_region].data_crc = crc32::checksum_ieee(data);
 
         Ok(())
     }

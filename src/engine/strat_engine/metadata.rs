@@ -285,16 +285,18 @@ impl MDARegions {
 
     // Write data to the older region
     pub fn save_state(&mut self, time: &Timespec, data: &[u8], f: &mut File) -> EngineResult<()> {
+        let used = data.len();
+        let data_crc = crc32::checksum_ieee(data);
+        let hdr_buf = MDAHeader::to_buf(used, data_crc, time);
+
         let region_size: u64 = *self.region_size * SECTOR_SIZE;
+        if MDA_REGION_HDR_SIZE + used > region_size as usize {
+            return Err(EngineError::Engine(ErrorEnum::Invalid,
+                                           "data larger than region_size".into()));
+        }
 
         let mut save_region = |region: usize| -> EngineResult<()> {
-            let hdr_buf = MDAHeader::to_buf(data, time);
             let offset = BDA_STATIC_HDR_SIZE + (region as u64 * region_size);
-
-            if MDA_REGION_HDR_SIZE + data.len() > region_size as usize {
-                return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                               "data larger than region_size".into()));
-            }
 
             try!(f.seek(SeekFrom::Start(offset)));
             try!(f.write_all(&hdr_buf));
@@ -319,7 +321,8 @@ impl MDARegions {
         try!(save_region(older_region + 2));
 
         self.mdas[older_region].last_updated = Some(*time);
-        self.mdas[older_region].used = data.len() as u64;
+        self.mdas[older_region].used = used as u64;
+        self.mdas[older_region].data_crc = data_crc;
 
         Ok(())
     }
@@ -397,15 +400,18 @@ impl MDAHeader {
         })
     }
 
-    pub fn to_buf(data: &[u8], timestamp: &Timespec) -> [u8; MDA_REGION_HDR_SIZE] {
+    pub fn to_buf(data_len: usize,
+                  data_crc: u32,
+                  timestamp: &Timespec)
+                  -> [u8; MDA_REGION_HDR_SIZE] {
 
         // Unsigned casts are always safe, as sec and nsec values are never negative
         assert!(timestamp.sec >= 0 && timestamp.nsec >= 0);
 
         let mut buf = [0u8; MDA_REGION_HDR_SIZE];
 
-        LittleEndian::write_u32(&mut buf[4..8], crc32::checksum_ieee(data));
-        LittleEndian::write_u64(&mut buf[8..16], data.len() as u64);
+        LittleEndian::write_u32(&mut buf[4..8], data_crc);
+        LittleEndian::write_u64(&mut buf[8..16], data_len as u64);
         LittleEndian::write_u64(&mut buf[16..24], timestamp.sec as u64);
         LittleEndian::write_u32(&mut buf[24..28], timestamp.nsec as u32);
 
@@ -520,7 +526,8 @@ mod tests {
             // 4 is NUM_MDA_REGIONS which is not imported from super.
             let region_size = *MIN_MDA_SIZE / 4 + region_size_ext as u64;
             let timestamp = Timespec::new(sec, nsec);
-            let buf = MDAHeader::to_buf(&data, &timestamp);
+            let data_crc = crc32::checksum_ieee(&data);
+            let buf = MDAHeader::to_buf(data.len(), data_crc, &timestamp);
             let mda1 = MDAHeader::from_buf(&buf, region_size).unwrap();
             let mda2 = MDAHeader::from_buf(&buf, region_size).unwrap();
 
@@ -529,7 +536,7 @@ mod tests {
                                   mda1.region_size == mda2.region_size &&
                                   mda1.data_crc == mda2.data_crc &&
                                   timestamp == mda1.last_updated.unwrap() &&
-                                  crc32::checksum_ieee(&data) == mda1.data_crc)
+                                  data_crc == mda1.data_crc)
         }
 
         QuickCheck::new()

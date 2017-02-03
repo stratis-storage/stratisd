@@ -4,7 +4,9 @@
 
 #[macro_use]
 extern crate libstratis;
-
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 extern crate devicemapper;
 #[macro_use]
 extern crate clap;
@@ -31,10 +33,13 @@ extern crate enum_derive;
 extern crate quickcheck;
 
 use std::io::Write;
+use std::env;
 use std::error::Error;
 use std::process::exit;
 
 use clap::{App, Arg};
+use log::LogLevelFilter;
+use env_logger::LogBuilder;
 
 use libstratis::engine::Engine;
 use libstratis::engine::sim_engine::SimEngine;
@@ -51,18 +56,8 @@ fn write_err(err: StratisError) -> StratisResult<()> {
     Ok(())
 }
 
-pub static mut DEBUG: bool = false;
-
-macro_rules! dbgp {
-    ($($arg:tt)*) => (
-        unsafe {
-            if DEBUG {
-                println!($($arg)*)
-            }
-        })
-}
-
 fn main() {
+
     let matches = App::new("stratis")
         .version(VERSION)
         .about("Stratis storage management")
@@ -74,16 +69,23 @@ fn main() {
             .help("Use simulator engine"))
         .get_matches();
 
+    let mut builder = LogBuilder::new();
     if matches.is_present("debug") {
-        unsafe { DEBUG = true }
+        builder.filter(Some("stratisd"), LogLevelFilter::Debug);
+        builder.filter(Some("libstratis"), LogLevelFilter::Debug);
+    } else {
+        if let Ok(s) = env::var("RUST_LOG") {
+            builder.parse(&s);
+        }
     };
+    builder.init().unwrap();
 
     let engine: Box<Engine> = {
         if matches.is_present("sim") {
-            dbgp!("Using SimEngine");
+            info!("Using SimEngine");
             Box::new(SimEngine::new())
         } else {
-            dbgp!("Using StratEngine");
+            info!("Using StratEngine");
             Box::new(StratEngine::new())
         }
     };

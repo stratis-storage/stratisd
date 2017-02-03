@@ -13,6 +13,8 @@ extern crate term;
 extern crate rand;
 extern crate serde;
 extern crate serde_json;
+#[macro_use]
+extern crate log;
 
 #[cfg(test)]
 extern crate quickcheck;

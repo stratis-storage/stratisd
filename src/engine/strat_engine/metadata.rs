@@ -531,14 +531,18 @@ pub fn validate_mda_size(size: Sectors) -> EngineResult<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use crc::crc32;
-    use time::Timespec;
+    use time::{now, Timespec};
     use uuid::Uuid;
 
     use quickcheck::{QuickCheck, TestResult};
 
     use consts::IEC;
     use types::{Bytes, Sectors};
+
+    use super::super::engine::DevOwnership;
 
     use super::*;
 
@@ -550,6 +554,164 @@ mod tests {
         let mda_size = MIN_MDA_SECTORS + Sectors((mda_size_factor * 4) as u64);
         let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
         StaticHeader::new(&pool_uuid, &dev_uuid, mda_size, blkdev_size)
+    }
+
+    #[test]
+    /// Construct an arbitrary StaticHeader object.
+    /// Verify that the "file" is unowned.
+    /// Initialize a BDA.
+    /// Verify that Stratis owns the file.
+    /// Wipe the BDA.
+    /// Verify that the file is again unowned.
+    fn prop_test_ownership() {
+        fn test_ownership(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
+            let sh = random_static_header(blkdev_size, mda_size_factor);
+            let pool_uuid = sh.pool_uuid;
+            let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
+            match ownership {
+                DevOwnership::Unowned => {}
+                _ => return TestResult::failed(),
+            }
+
+            BDA::initialize(&mut buf,
+                            &sh.pool_uuid,
+                            &sh.dev_uuid,
+                            sh.mda_size,
+                            sh.blkdev_size)
+                .unwrap();
+            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
+            match ownership {
+                DevOwnership::Ours(uuid) => {
+                    if pool_uuid != uuid {
+                        return TestResult::failed();
+                    }
+                }
+                _ => return TestResult::failed(),
+            }
+
+            BDA::wipe(&mut buf).unwrap();
+            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
+            match ownership {
+                DevOwnership::Unowned => {}
+                _ => return TestResult::failed(),
+            }
+
+            TestResult::passed()
+        }
+        QuickCheck::new()
+            .tests(20)
+            .quickcheck(test_ownership as fn(u64, u32) -> TestResult);
+    }
+
+    #[test]
+    /// Construct an arbitrary StaticHeader object.
+    /// Initialize a BDA.
+    /// Verify that the last update time is None.
+    fn prop_empty_bda() {
+        fn empty_bda(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
+            let sh = random_static_header(blkdev_size, mda_size_factor);
+            let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+            let bda = BDA::initialize(&mut buf,
+                                      &sh.pool_uuid,
+                                      &sh.dev_uuid,
+                                      sh.mda_size,
+                                      sh.blkdev_size)
+                .unwrap();
+            TestResult::from_bool(bda.last_update_time().is_none())
+        }
+
+        QuickCheck::new()
+            .tests(20)
+            .quickcheck(empty_bda as fn(u64, u32) -> TestResult);
+    }
+
+    #[test]
+    /// Construct an arbitrary StaticHeader object.
+    /// Initialize a BDA.
+    /// Save metadata and verify correct update time and state.
+    /// Reload BDA and verify that new BDA has correct update time.
+    /// Load state using new BDA and verify correct state.
+    /// Save metadata again, and reload one more time, verifying new timestamp.
+    fn prop_check_state() {
+        fn check_state(blkdev_size: u64,
+                       mda_size_factor: u32,
+                       state: Vec<u8>,
+                       next_state: Vec<u8>)
+                       -> TestResult {
+            let sh = random_static_header(blkdev_size, mda_size_factor);
+            let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+            let mut bda = BDA::initialize(&mut buf,
+                                          &sh.pool_uuid,
+                                          &sh.dev_uuid,
+                                          sh.mda_size,
+                                          sh.blkdev_size)
+                .unwrap();
+            let current_time = now().to_timespec();
+            bda.save_state(&current_time, &state, &mut buf).unwrap();
+            let loaded_state = bda.load_state(&mut buf).unwrap();
+
+            if let &Some(t) = bda.last_update_time() {
+                if t != current_time {
+                    return TestResult::failed();
+                }
+            } else {
+                return TestResult::failed();
+            }
+
+            if let Some(s) = loaded_state {
+                if s != state {
+                    return TestResult::failed();
+                }
+            } else {
+                return TestResult::failed();
+            }
+
+            let mut bda = BDA::load(&mut buf).unwrap();
+            let loaded_state = bda.load_state(&mut buf).unwrap();
+
+            if let Some(s) = loaded_state {
+                if s != state {
+                    return TestResult::failed();
+                }
+            } else {
+                return TestResult::failed();
+            }
+
+            if let &Some(t) = bda.last_update_time() {
+                if t != current_time {
+                    return TestResult::failed();
+                }
+            } else {
+                return TestResult::failed();
+            }
+
+            let current_time = now().to_timespec();
+            bda.save_state(&current_time, &next_state, &mut buf).unwrap();
+            let loaded_state = bda.load_state(&mut buf).unwrap();
+
+            if let Some(s) = loaded_state {
+                if s != next_state {
+                    return TestResult::failed();
+                }
+            } else {
+                return TestResult::failed();
+            }
+
+            if let &Some(t) = bda.last_update_time() {
+                if t != current_time {
+                    return TestResult::failed();
+                }
+            } else {
+                return TestResult::failed();
+            }
+
+            TestResult::passed()
+        }
+
+        QuickCheck::new()
+            .tests(20)
+            .quickcheck(check_state as fn(u64, u32, Vec<u8>, Vec<u8>) -> TestResult);
     }
 
     #[test]

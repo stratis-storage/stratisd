@@ -285,18 +285,18 @@ impl MDARegions {
 
     // Write data to the older region
     pub fn save_state(&mut self, time: &Timespec, data: &[u8], f: &mut File) -> EngineResult<()> {
-        let region_size: u64 = *self.region_size * SECTOR_SIZE;
         let used = data.len();
         let data_crc = crc32::checksum_ieee(data);
         let hdr_buf = MDAHeader::to_buf(used, data_crc, time);
 
+        let region_size: u64 = *self.region_size * SECTOR_SIZE;
+        if MDA_REGION_HDR_SIZE + used > region_size as usize {
+            return Err(EngineError::Engine(ErrorEnum::Invalid,
+                                           "data larger than region_size".into()));
+        }
+
         let mut save_region = |region: usize| -> EngineResult<()> {
             let offset = BDA_STATIC_HDR_SIZE + (region as u64 * region_size);
-
-            if MDA_REGION_HDR_SIZE + data.len() > region_size as usize {
-                return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                               "data larger than region_size".into()));
-            }
 
             try!(f.seek(SeekFrom::Start(offset)));
             try!(f.write_all(&hdr_buf));

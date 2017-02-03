@@ -286,9 +286,9 @@ impl MDARegions {
     // Write data to the older region
     pub fn save_state(&mut self, time: &Timespec, data: &[u8], f: &mut File) -> EngineResult<()> {
         let region_size: u64 = *self.region_size * SECTOR_SIZE;
+        let hdr_buf = MDAHeader::to_buf(data, time);
 
         let mut save_region = |region: usize| -> EngineResult<()> {
-            let hdr_buf = MDAHeader::to_buf(data, time);
             let offset = BDA_STATIC_HDR_SIZE + (region as u64 * region_size);
 
             if MDA_REGION_HDR_SIZE + data.len() > region_size as usize {

@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use types::{Bytes, Sectors};
 use super::engine::DevOwnership;
-use consts::{SECTOR_SIZE, MEGA};
+use consts::{SECTOR_SIZE, IEC};
 use engine::{EngineResult, EngineError, ErrorEnum};
 
 const _BDA_STATIC_HDR_SECTORS: usize = 16;
@@ -24,7 +24,7 @@ pub const BDA_STATIC_HDR_SECTORS: Sectors = Sectors(_BDA_STATIC_HDR_SECTORS as u
 const _BDA_STATIC_HDR_SIZE: usize = _BDA_STATIC_HDR_SECTORS * SECTOR_SIZE;
 const BDA_STATIC_HDR_SIZE: Bytes = Bytes(_BDA_STATIC_HDR_SIZE as u64);
 
-const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * MEGA / (SECTOR_SIZE as u64)); // = 3 MiB
+const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
 const NUM_MDA_REGIONS: usize = 4;
 const PER_MDA_REGION_COPIES: usize = 2;
 const NUM_PRIMARY_MDA_REGIONS: usize = NUM_MDA_REGIONS / PER_MDA_REGION_COPIES;

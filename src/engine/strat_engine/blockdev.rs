@@ -27,7 +27,7 @@ pub use super::BlockDevSave;
 type DevUuid = Uuid;
 type PoolUuid = Uuid;
 
-const MIN_DEV_SIZE: Bytes = Bytes(GIGA as u64);
+const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);
 

@@ -21,6 +21,8 @@ use engine::RenameAction;
 
 use engine::engine::Redundancy;
 
+use super::super::super::types::Bytes;
+
 use super::blockdev::SimDev;
 use super::filesystem::SimFilesystem;
 use super::randomization::Randomizer;
@@ -80,7 +82,7 @@ impl Pool for SimPool {
     }
 
     fn create_filesystems<'a, 'b, 'c>(&'a mut self,
-                                      specs: &[(&'b str, &'c str, Option<u64>)])
+                                      specs: &[(&'b str, &'c str, Option<Bytes>)])
                                       -> EngineResult<Vec<&'b str>> {
         let mut temp = Vec::new();
         for spec in specs {

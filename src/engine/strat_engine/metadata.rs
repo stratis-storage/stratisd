@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std;
 use std::cmp::Ordering;
 use std::str::from_utf8;
 use std::fs::File;
@@ -13,19 +14,25 @@ use crc::crc32;
 use time::Timespec;
 use uuid::Uuid;
 
-use types::Sectors;
+use types::{Bytes, Sectors};
 use super::engine::DevOwnership;
-use consts::{SECTOR_SIZE, MEGA};
+use consts::{SECTOR_SIZE, IEC};
 use engine::{EngineResult, EngineError, ErrorEnum};
 
-pub const BDA_STATIC_HDR_SECTORS: u64 = 16;
-const BDA_STATIC_HDR_SIZE: u64 = BDA_STATIC_HDR_SECTORS * SECTOR_SIZE;
-const MDA_RESERVED_SIZE: Sectors = Sectors(3 * MEGA / SECTOR_SIZE); // = 3 MiB
-const NUM_MDA_REGIONS: u64 = 4;
-const PER_MDA_REGION_COPIES: u64 = 2;
-const NUM_PRIMARY_MDA_REGIONS: u64 = NUM_MDA_REGIONS / PER_MDA_REGION_COPIES;
-const MDA_REGION_HDR_SIZE: usize = 32;
-pub const MIN_MDA_SIZE: Sectors = Sectors(2032);
+const _BDA_STATIC_HDR_SECTORS: usize = 16;
+pub const BDA_STATIC_HDR_SECTORS: Sectors = Sectors(_BDA_STATIC_HDR_SECTORS as u64);
+const _BDA_STATIC_HDR_SIZE: usize = _BDA_STATIC_HDR_SECTORS * SECTOR_SIZE;
+const BDA_STATIC_HDR_SIZE: Bytes = Bytes(_BDA_STATIC_HDR_SIZE as u64);
+
+const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
+const NUM_MDA_REGIONS: usize = 4;
+const PER_MDA_REGION_COPIES: usize = 2;
+const NUM_PRIMARY_MDA_REGIONS: usize = NUM_MDA_REGIONS / PER_MDA_REGION_COPIES;
+
+const _MDA_REGION_HDR_SIZE: usize = 32;
+const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
+pub const MIN_MDA_SECTORS: Sectors = Sectors(2032);
+
 const STRAT_MAGIC: &'static [u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
 #[derive(Debug)]
@@ -37,17 +44,17 @@ pub struct BDA {
 impl BDA {
     /// Initialize a blockdev with a Stratis BDA.
     pub fn initialize(mut f: &mut File, header: StaticHeader) -> EngineResult<BDA> {
-        let zeroed = [0u8; BDA_STATIC_HDR_SIZE as usize];
+        let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
         let hdr_buf = header.sigblock_to_buf();
 
         // Write 8K header. Static_Header copies go in sectors 1 and 9.
         try!(f.seek(SeekFrom::Start(0)));
-        try!(f.write_all(&zeroed[..SECTOR_SIZE as usize]));
+        try!(f.write_all(&zeroed[..SECTOR_SIZE]));
         try!(f.write_all(&hdr_buf));
-        try!(f.write_all(&zeroed[(SECTOR_SIZE * 7) as usize..]));
+        try!(f.write_all(&zeroed[SECTOR_SIZE * 7..]));
         try!(f.flush());
         try!(f.write_all(&hdr_buf));
-        try!(f.write_all(&zeroed[(SECTOR_SIZE * 6) as usize..]));
+        try!(f.write_all(&zeroed[SECTOR_SIZE * 6..]));
         try!(f.flush());
 
         let regions = try!(MDARegions::initialize(&header, &mut f));
@@ -70,7 +77,7 @@ impl BDA {
     /// Zero out Static Header on the blockdev. This causes it to no
     /// longer be seen as a Stratis blockdev.
     pub fn wipe(f: &mut File) -> EngineResult<()> {
-        let zeroed = [0u8; BDA_STATIC_HDR_SIZE as usize];
+        let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
 
         // Wiping Static Header should do it
         try!(f.seek(SeekFrom::Start(0)));
@@ -121,7 +128,7 @@ impl StaticHeader {
             pool_uuid: pool_uuid.clone(),
             dev_uuid: dev_uuid.clone(),
             mda_size: mda_size,
-            reserved_size: MDA_RESERVED_SIZE,
+            reserved_size: MDA_RESERVED_SECTORS,
             flags: 0,
         }
     }
@@ -129,16 +136,16 @@ impl StaticHeader {
     /// Try to find a valid StaticHeader on a device.
     pub fn setup(f: &mut File) -> EngineResult<StaticHeader> {
         try!(f.seek(SeekFrom::Start(0)));
-        let mut buf = [0u8; BDA_STATIC_HDR_SIZE as usize];
+        let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
         try!(f.read(&mut buf));
 
         StaticHeader::setup_from_buf(&buf)
     }
 
     /// Try to find a valid StaticHeader in a buffer.
-    pub fn setup_from_buf(buf: &[u8; BDA_STATIC_HDR_SIZE as usize]) -> EngineResult<StaticHeader> {
-        let sigblock_spots = [&buf[SECTOR_SIZE as usize..2 * SECTOR_SIZE as usize],
-                              &buf[9 * SECTOR_SIZE as usize..10 * SECTOR_SIZE as usize]];
+    pub fn setup_from_buf(buf: &[u8; _BDA_STATIC_HDR_SIZE]) -> EngineResult<StaticHeader> {
+        let sigblock_spots = [&buf[SECTOR_SIZE..2 * SECTOR_SIZE],
+                              &buf[9 * SECTOR_SIZE..10 * SECTOR_SIZE]];
 
         // Check both copies of sigblock for validity
         for buf in &sigblock_spots {
@@ -154,7 +161,7 @@ impl StaticHeader {
     /// Determine the ownership of a device.
     pub fn determine_ownership(f: &mut File) -> EngineResult<DevOwnership> {
         try!(f.seek(SeekFrom::Start(0)));
-        let mut buf = [0u8; BDA_STATIC_HDR_SIZE as usize];
+        let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
         try!(f.read(&mut buf));
 
         // Using setup() as a test of ownership sets a high bar. It is
@@ -174,8 +181,8 @@ impl StaticHeader {
     }
 
     /// Generate a buf suitable for writing to blockdev
-    pub fn sigblock_to_buf(&self) -> [u8; SECTOR_SIZE as usize] {
-        let mut buf = [0u8; SECTOR_SIZE as usize];
+    pub fn sigblock_to_buf(&self) -> [u8; SECTOR_SIZE] {
+        let mut buf = [0u8; SECTOR_SIZE];
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size);
         buf[32..64].clone_from_slice(self.pool_uuid.simple().to_string().as_bytes());
@@ -183,7 +190,7 @@ impl StaticHeader {
         LittleEndian::write_u64(&mut buf[96..104], *self.mda_size);
         LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size);
 
-        let hdr_crc = crc32::checksum_ieee(&buf[4..SECTOR_SIZE as usize]);
+        let hdr_crc = crc32::checksum_ieee(&buf[4..SECTOR_SIZE]);
         LittleEndian::write_u32(&mut buf[..4], hdr_crc);
         buf
     }
@@ -192,13 +199,13 @@ impl StaticHeader {
     /// a blockdev.
     pub fn sigblock_from_buf(buf: &[u8]) -> EngineResult<StaticHeader> {
 
-        assert_eq!(buf.len(), SECTOR_SIZE as usize);
+        assert_eq!(buf.len(), SECTOR_SIZE);
 
         if &buf[4..20] != STRAT_MAGIC {
             return Err(EngineError::Engine(ErrorEnum::Invalid, "No Stratis magic".into()));
         }
 
-        let crc = crc32::checksum_ieee(&buf[4..SECTOR_SIZE as usize]);
+        let crc = crc32::checksum_ieee(&buf[4..SECTOR_SIZE]);
         if crc != LittleEndian::read_u32(&buf[..4]) {
             return Err(EngineError::Engine(ErrorEnum::Invalid, "header CRC invalid".into()));
         }
@@ -227,17 +234,22 @@ impl StaticHeader {
 pub struct MDARegions {
     // Spec defines 4 regions, but regions 2 & 3 are duplicates of 0 and 1 respectively
     pub region_size: Sectors,
-    pub mdas: [MDAHeader; NUM_PRIMARY_MDA_REGIONS as usize],
+    pub mdas: [MDAHeader; NUM_PRIMARY_MDA_REGIONS],
 }
 
 impl MDARegions {
-    pub fn initialize(header: &StaticHeader, f: &mut File) -> EngineResult<MDARegions> {
-        let region_size = Sectors(*header.mda_size / NUM_MDA_REGIONS);
-        let per_region_size: u64 = *region_size * SECTOR_SIZE;
-        let hdr_buf = [0u8; MDA_REGION_HDR_SIZE];
+    /// Calculate the offset from start of device for an MDARegion.
+    fn mda_offset(index: usize, per_region_size: Bytes) -> u64 {
+        *(BDA_STATIC_HDR_SIZE + per_region_size * index)
+    }
 
+    pub fn initialize(header: &StaticHeader, f: &mut File) -> EngineResult<MDARegions> {
+        let hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
+
+        let region_size = header.mda_size / NUM_MDA_REGIONS;
+        let per_region_size = region_size.bytes();
         for region in 0..NUM_MDA_REGIONS {
-            try!(f.seek(SeekFrom::Start(BDA_STATIC_HDR_SIZE + (region as u64 * per_region_size))));
+            try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(region, per_region_size))));
             try!(f.write_all(&hdr_buf));
         }
 
@@ -251,14 +263,12 @@ impl MDARegions {
 
     // Construct MDARegions based on on-disk info
     pub fn load(header: &StaticHeader, f: &mut File) -> EngineResult<MDARegions> {
-        let region_size = Sectors(*header.mda_size / NUM_MDA_REGIONS);
-        let per_region_size: u64 = *region_size * SECTOR_SIZE;
+        let region_size = header.mda_size / NUM_MDA_REGIONS;
+        let per_region_size = region_size.bytes();
 
-        let mut load_a_region = |region: u8| -> EngineResult<MDAHeader> {
-            let mut hdr_buf = [0u8; MDA_REGION_HDR_SIZE];
-            let offset = BDA_STATIC_HDR_SIZE + (region as u64 * *region_size * SECTOR_SIZE);
-
-            try!(f.seek(SeekFrom::Start(offset)));
+        let mut load_a_region = |region: usize| -> EngineResult<MDAHeader> {
+            let mut hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
+            try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(region, per_region_size))));
             try!(f.read_exact(&mut hdr_buf));
             let mda = try!(MDAHeader::from_buf(&hdr_buf, per_region_size));
 
@@ -289,16 +299,11 @@ impl MDARegions {
         let data_crc = crc32::checksum_ieee(data);
         let hdr_buf = MDAHeader::to_buf(used, data_crc, time);
 
-        let region_size: u64 = *self.region_size * SECTOR_SIZE;
-        if MDA_REGION_HDR_SIZE + used > region_size as usize {
-            return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                           "data larger than region_size".into()));
-        }
+        let region_size = self.region_size.bytes();
+        try!(check_mda_region_size(Bytes(used as u64), region_size));
 
         let mut save_region = |region: usize| -> EngineResult<()> {
-            let offset = BDA_STATIC_HDR_SIZE + (region as u64 * region_size);
-
-            try!(f.seek(SeekFrom::Start(offset)));
+            try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(region, region_size))));
             try!(f.write_all(&hdr_buf));
             try!(f.write_all(data));
             try!(f.flush());
@@ -321,7 +326,7 @@ impl MDARegions {
         try!(save_region(older_region + 2));
 
         self.mdas[older_region].last_updated = Some(*time);
-        self.mdas[older_region].used = used as u64;
+        self.mdas[older_region].used = Bytes(used as u64);
         self.mdas[older_region].data_crc = data_crc;
 
         Ok(())
@@ -331,9 +336,9 @@ impl MDARegions {
         let newer_region = self.newer();
         let mda = &self.mdas[newer_region];
 
-        let mut load_region = |region| {
-            let offset = BDA_STATIC_HDR_SIZE + (region as u64 * *self.region_size * SECTOR_SIZE) +
-                         MDA_REGION_HDR_SIZE as u64;
+        let mut load_region = |region: usize| {
+            let offset = MDARegions::mda_offset(region, self.region_size.bytes()) +
+                         _MDA_REGION_HDR_SIZE as u64;
             try!(f.seek(SeekFrom::Start(offset)));
             mda.load_region(f)
         };
@@ -362,22 +367,30 @@ impl MDARegions {
 #[derive(Debug, Clone, Copy)]
 pub struct MDAHeader {
     pub last_updated: Option<Timespec>,
-    pub used: u64,
-    pub region_size: u64,
+
+    /// Size of region used for pool metadata.
+    pub used: Bytes,
+
+    /// Total size of region, including both the header and space used for
+    /// pool metadata.
+    pub region_size: Bytes,
+
     pub data_crc: u32,
 }
 
 impl MDAHeader {
-    pub fn new(region_size: u64) -> MDAHeader {
+    pub fn new(region_size: Bytes) -> MDAHeader {
         MDAHeader {
             last_updated: None,
-            used: 0,
+            used: Bytes(0),
             region_size: region_size,
             data_crc: 0,
         }
     }
 
-    pub fn from_buf(buf: &[u8; MDA_REGION_HDR_SIZE], region_size: u64) -> EngineResult<MDAHeader> {
+    pub fn from_buf(buf: &[u8; _MDA_REGION_HDR_SIZE],
+                    region_size: Bytes)
+                    -> EngineResult<MDAHeader> {
         if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_ieee(&buf[4..]) {
             return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region header CRC".into()));
         }
@@ -393,7 +406,7 @@ impl MDAHeader {
         };
 
         Ok(MDAHeader {
-            used: LittleEndian::read_u64(&buf[8..16]),
+            used: Bytes(LittleEndian::read_u64(&buf[8..16])),
             last_updated: time,
             region_size: region_size,
             data_crc: LittleEndian::read_u32(&buf[4..8]),
@@ -403,19 +416,18 @@ impl MDAHeader {
     pub fn to_buf(data_len: usize,
                   data_crc: u32,
                   timestamp: &Timespec)
-                  -> [u8; MDA_REGION_HDR_SIZE] {
-
+                  -> [u8; _MDA_REGION_HDR_SIZE] {
         // Unsigned casts are always safe, as sec and nsec values are never negative
         assert!(timestamp.sec >= 0 && timestamp.nsec >= 0);
 
-        let mut buf = [0u8; MDA_REGION_HDR_SIZE];
+        let mut buf = [0u8; _MDA_REGION_HDR_SIZE];
 
         LittleEndian::write_u32(&mut buf[4..8], data_crc);
         LittleEndian::write_u64(&mut buf[8..16], data_len as u64);
         LittleEndian::write_u64(&mut buf[16..24], timestamp.sec as u64);
         LittleEndian::write_u32(&mut buf[24..28], timestamp.nsec as u32);
 
-        let buf_crc = crc32::checksum_ieee(&buf[4..MDA_REGION_HDR_SIZE]);
+        let buf_crc = crc32::checksum_ieee(&buf[4.._MDA_REGION_HDR_SIZE]);
         LittleEndian::write_u32(&mut buf[..4], buf_crc);
 
         buf
@@ -424,18 +436,15 @@ impl MDAHeader {
     /// Given a pre-seek()ed File, load the MDA region and return the contents
     // MDAHeader cannot seek because it doesn't know which region it's in
     pub fn load_region(&self, f: &mut File) -> EngineResult<Option<Vec<u8>>> {
-        if self.used > self.region_size {
-            return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                           format!("region mda.used {} > region_size {}",
-                                                   self.used,
-                                                   self.region_size)
-                                               .into()));
-        }
-
-        if self.used == 0 {
+        try!(check_mda_region_size(self.used, self.region_size));
+        if self.used == Bytes(0) {
             Ok(None)
         } else {
-            let mut data_buf = vec![0u8; self.used as usize];
+            // This cast could fail if running on a 32-bit machine and
+            // size of metadata is greater than 2^32 - 1 bytes, which is
+            // unlikely.
+            assert!(*self.used <= std::usize::MAX as u64);
+            let mut data_buf = vec![0u8; *self.used as usize];
             try!(f.read_exact(&mut data_buf));
 
             if self.data_crc != crc32::checksum_ieee(&data_buf) {
@@ -446,21 +455,36 @@ impl MDAHeader {
     }
 }
 
+
+/// Check that data size does not exceed region available.
+/// Note that used is the amount used for metadata only.
+fn check_mda_region_size(used: Bytes, available: Bytes) -> EngineResult<()> {
+    if MDA_REGION_HDR_SIZE + used > available {
+        return Err(EngineError::Engine(ErrorEnum::Invalid,
+                                       format!("metadata length {} exceeds region available {}",
+                                               used,
+                                               // available region > header size
+                                               available - MDA_REGION_HDR_SIZE)
+                                           .into()));
+    };
+    Ok(())
+}
+
 /// Validate MDA size
 pub fn validate_mda_size(size: Sectors) -> EngineResult<()> {
-    if *size % NUM_MDA_REGIONS != 0 {
+    if size % NUM_MDA_REGIONS != Sectors(0) {
         return Err(EngineError::Engine(ErrorEnum::Invalid,
                                        format!("MDA size {} is not divisible by number of \
                                                 copies required {}",
-                                               *size,
+                                               size,
                                                NUM_MDA_REGIONS)));
     };
 
-    if size < MIN_MDA_SIZE {
+    if size < MIN_MDA_SECTORS {
         return Err(EngineError::Engine(ErrorEnum::Invalid,
                                        format!("MDA size {} is less than minimum ({})",
-                                               *size,
-                                               *MIN_MDA_SIZE)));
+                                               size,
+                                               MIN_MDA_SECTORS)));
     };
     Ok(())
 }
@@ -473,7 +497,7 @@ mod tests {
 
     use quickcheck::{QuickCheck, TestResult};
 
-    use types::Sectors;
+    use types::{Bytes, Sectors};
 
     use super::*;
 
@@ -485,7 +509,7 @@ mod tests {
             let pool_uuid = Uuid::new_v4();
             let dev_uuid = Uuid::new_v4();
 
-            let mda_size = MIN_MDA_SIZE + Sectors((mda_size_factor * 4) as u64);
+            let mda_size = MIN_MDA_SECTORS + Sectors((mda_size_factor * 4) as u64);
             let blkdev_size = Sectors(blkdev_size);
             let sh1 = StaticHeader::new(&pool_uuid, &dev_uuid, mda_size, blkdev_size);
             let buf = sh1.sigblock_to_buf();
@@ -520,7 +544,7 @@ mod tests {
             }
 
             // 4 is NUM_MDA_REGIONS which is not imported from super.
-            let region_size = *MIN_MDA_SIZE / 4 + region_size_ext as u64;
+            let region_size = (MIN_MDA_SECTORS / 4usize).bytes() + Bytes(region_size_ext as u64);
             let timestamp = Timespec::new(sec, nsec);
             let data_crc = crc32::checksum_ieee(&data);
             let buf = MDAHeader::to_buf(data.len(), data_crc, &timestamp);

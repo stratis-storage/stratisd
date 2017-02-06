@@ -18,6 +18,47 @@ use consts::SECTOR_SIZE;
 
 pub type StratisResult<T> = Result<T, StratisError>;
 
+// macros for unsigned operations on Sectors and Bytes
+macro_rules! unsigned_div {
+    ($t: ty, $T: ident) => {
+        impl Div<$t> for $T {
+            type Output = $T;
+            fn div(self, rhs: $t) -> $T {
+                $T(self.0 / rhs as u64)
+            }
+        }
+    }
+}
+
+macro_rules! unsigned_mul {
+    ($t: ty, $T: ident) => {
+        impl Mul<$t> for $T {
+            type Output = $T;
+            fn mul(self, rhs: $t) -> $T {
+                $T(self.0 * rhs as u64)
+            }
+        }
+
+        impl Mul<$T> for $t {
+            type Output = $T;
+            fn mul(self, rhs: $T) -> $T {
+                $T(self as u64 * rhs.0)
+            }
+        }
+    }
+}
+
+macro_rules! unsigned_rem {
+    ($t: ty, $T: ident) => {
+        impl Rem<$t> for $T {
+            type Output = $T;
+            fn rem(self, rhs: $t) -> $T {
+                $T(self.0 % rhs as u64)
+            }
+        }
+    }
+}
+
 custom_derive! {
     #[derive(NewtypeFrom, NewtypeAdd, NewtypeSub, NewtypeDeref,
              Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
@@ -31,20 +72,11 @@ impl Bytes {
     }
 }
 
-impl Mul<usize> for Bytes {
-    type Output = Bytes;
-    fn mul(self, rhs: usize) -> Bytes {
-        Bytes(self.0 * rhs as u64)
-    }
-}
-
-impl Mul<u64> for Bytes {
-    type Output = Bytes;
-    fn mul(self, rhs: u64) -> Bytes {
-        Bytes(self.0 * rhs)
-    }
-}
-
+unsigned_mul!(u64, Bytes);
+unsigned_mul!(u32, Bytes);
+unsigned_mul!(u16, Bytes);
+unsigned_mul!(u8, Bytes);
+unsigned_mul!(usize, Bytes);
 
 impl Display for Bytes {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
@@ -69,47 +101,23 @@ impl Sectors {
     }
 }
 
-impl Div<usize> for Sectors {
-    type Output = Sectors;
-    fn div(self, rhs: usize) -> Sectors {
-        Sectors(self.0 / rhs as u64)
-    }
-}
+unsigned_div!(u64, Sectors);
+unsigned_div!(u32, Sectors);
+unsigned_div!(u16, Sectors);
+unsigned_div!(u8, Sectors);
+unsigned_div!(usize, Sectors);
 
-impl Div<u64> for Sectors {
-    type Output = Sectors;
-    fn div(self, rhs: u64) -> Sectors {
-        Sectors(self.0 / rhs)
-    }
-}
+unsigned_mul!(u64, Sectors);
+unsigned_mul!(u32, Sectors);
+unsigned_mul!(u16, Sectors);
+unsigned_mul!(u8, Sectors);
+unsigned_mul!(usize, Sectors);
 
-impl Mul<usize> for Sectors {
-    type Output = Sectors;
-    fn mul(self, rhs: usize) -> Sectors {
-        Sectors(self.0 * rhs as u64)
-    }
-}
-
-impl Mul<u64> for Sectors {
-    type Output = Sectors;
-    fn mul(self, rhs: u64) -> Sectors {
-        Sectors(self.0 * rhs)
-    }
-}
-
-impl Rem<usize> for Sectors {
-    type Output = Sectors;
-    fn rem(self, rhs: usize) -> Sectors {
-        Sectors(self.0 % rhs as u64)
-    }
-}
-
-impl Rem<u64> for Sectors {
-    type Output = Sectors;
-    fn rem(self, rhs: u64) -> Sectors {
-        Sectors(self.0 % rhs)
-    }
-}
+unsigned_rem!(u64, Sectors);
+unsigned_rem!(u32, Sectors);
+unsigned_rem!(u16, Sectors);
+unsigned_rem!(u8, Sectors);
+unsigned_rem!(usize, Sectors);
 
 impl Display for Sectors {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {

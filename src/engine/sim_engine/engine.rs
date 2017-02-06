@@ -97,6 +97,7 @@ impl Engine for SimEngine {
 #[cfg(test)]
 mod tests {
 
+    use std;
     use std::path::Path;
 
     use quickcheck::QuickCheck;
@@ -202,7 +203,7 @@ mod tests {
     /// Creating a pool with an impossible raid level should fail
     fn create_pool_max_u16_raid() {
         let mut engine = SimEngine::new();
-        assert!(engine.create_pool("name", &[], Some(u16::max_value()), false).is_err());
+        assert!(engine.create_pool("name", &[], Some(std::u16::MAX), false).is_err());
     }
 
     #[test]

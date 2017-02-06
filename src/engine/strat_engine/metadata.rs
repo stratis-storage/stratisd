@@ -132,7 +132,7 @@ impl StaticHeader {
         let mut buf = [0u8; BDA_STATIC_HDR_SIZE as usize];
         try!(f.read(&mut buf));
 
-        Self::setup_from_buf(&buf)
+        StaticHeader::setup_from_buf(&buf)
     }
 
     /// Try to find a valid StaticHeader in a buffer.
@@ -161,7 +161,7 @@ impl StaticHeader {
         // not sufficient to have STRAT_MAGIC to be considered "Ours",
         // it must also have correct CRC, no weird stuff in fields,
         // etc!
-        match Self::setup_from_buf(&buf) {
+        match StaticHeader::setup_from_buf(&buf) {
             Ok(sh) => Ok(DevOwnership::Ours(sh.pool_uuid)),
             Err(_) => {
                 if buf.iter().any(|x| *x != 0) {
@@ -203,7 +203,7 @@ impl StaticHeader {
             return Err(EngineError::Engine(ErrorEnum::Invalid, "header CRC invalid".into()));
         }
 
-        let blkdev_size = Sectors(LittleEndian::read_u64(&buf[20..28]) as u64);
+        let blkdev_size = Sectors(LittleEndian::read_u64(&buf[20..28]));
 
         let pool_uuid = try!(Uuid::parse_str(try!(from_utf8(&buf[32..64]))));
         let dev_uuid = try!(Uuid::parse_str(try!(from_utf8(&buf[64..96]))));
@@ -424,9 +424,6 @@ impl MDAHeader {
     /// Given a pre-seek()ed File, load the MDA region and return the contents
     // MDAHeader cannot seek because it doesn't know which region it's in
     pub fn load_region(&self, f: &mut File) -> EngineResult<Option<Vec<u8>>> {
-        let mut hdr_buf = [0u8; MDA_REGION_HDR_SIZE];
-        try!(f.read_exact(&mut hdr_buf));
-
         if self.used > self.region_size {
             return Err(EngineError::Engine(ErrorEnum::Invalid,
                                            format!("region mda.used {} > region_size {}",
@@ -450,7 +447,6 @@ impl MDAHeader {
 }
 
 /// Validate MDA size
-/// Return None if MDA size is fine, otherwise a message.
 pub fn validate_mda_size(size: Sectors) -> EngineResult<()> {
     if *size % NUM_MDA_REGIONS != 0 {
         return Err(EngineError::Engine(ErrorEnum::Invalid,

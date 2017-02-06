@@ -25,7 +25,7 @@ const NUM_MDA_REGIONS: u64 = 4;
 const PER_MDA_REGION_COPIES: u64 = 2;
 const NUM_PRIMARY_MDA_REGIONS: u64 = NUM_MDA_REGIONS / PER_MDA_REGION_COPIES;
 const MDA_REGION_HDR_SIZE: usize = 32;
-pub const MIN_MDA_SIZE: Sectors = Sectors(2040);
+pub const MIN_MDA_SIZE: Sectors = Sectors(2032);
 const STRAT_MAGIC: &'static [u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
 #[derive(Debug)]

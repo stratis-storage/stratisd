@@ -2,15 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use bidir_map::BidirMap;
-
 use std::borrow::Cow;
-use std::cell::Cell;
-use std::cell::RefCell;
 use std::convert::From;
 use std::fmt::Display;
 use std::path::Path;
-use std::rc::Rc;
 use std::vec::Vec;
 use std::error::Error;
 
@@ -27,20 +22,16 @@ use dbus::arg::IterAppend;
 use dbus::tree::Access;
 use dbus::tree::EmitsChangedSignal;
 use dbus::tree::Factory;
-use dbus::tree::DataType;
 use dbus::tree::MethodErr;
 use dbus::tree::MTFn;
 use dbus::tree::MethodResult;
 use dbus::tree::MethodInfo;
 use dbus::tree::PropInfo;
 use dbus::tree::Tree;
-use dbus::tree::ObjectPath;
 use dbus::ConnectionItem;
 
-use super::stratis::VERSION;
-use super::types::Bytes;
-
-use dbus_consts::DbusErrorEnum;
+use super::super::types::Bytes;
+use super::super::stratis::VERSION;
 
 use engine;
 use engine::Engine;
@@ -50,55 +41,10 @@ use engine::RenameAction;
 
 use types::StratisResult;
 
+use super::types::{DeferredAction, DbusContext, DbusErrorEnum, TData};
+
 const STRATIS_BASE_PATH: &'static str = "/org/storage/stratis1";
 const STRATIS_BASE_SERVICE: &'static str = "org.storage.stratis1";
-
-#[derive(Debug)]
-pub enum DeferredAction {
-    Add(ObjectPath<MTFn<TData>, TData>),
-    Remove(String),
-}
-
-#[derive(Debug, Clone)]
-pub struct DbusContext {
-    pub next_index: Rc<Cell<u64>>,
-    pub pools: Rc<RefCell<BidirMap<String, String>>>,
-    pub engine: Rc<RefCell<Box<Engine>>>,
-    pub action_list: Rc<RefCell<Vec<DeferredAction>>>,
-    pub filesystems: Rc<RefCell<BidirMap<String, (String, String)>>>,
-}
-
-impl DbusContext {
-    pub fn new(engine: Box<Engine>) -> DbusContext {
-        DbusContext {
-            action_list: Rc::new(RefCell::new(Vec::new())),
-            engine: Rc::new(RefCell::new(engine)),
-            filesystems: Rc::new(RefCell::new(BidirMap::new())),
-            next_index: Rc::new(Cell::new(0)),
-            pools: Rc::new(RefCell::new(BidirMap::new())),
-        }
-    }
-
-    /// Generates a new id for object paths.
-    /// It is assumed that, while Stratisd is running, it will never generate
-    /// more than 2^64 object paths. If it turns out that this is a bad
-    /// assumption, the solution is to use unbounded integers.
-    pub fn get_next_id(&self) -> u64 {
-        self.next_index.set(self.next_index.get() + 1);
-        self.next_index.get()
-    }
-}
-
-#[derive(Default, Debug)]
-pub struct TData;
-impl DataType for TData {
-    type ObjectPath = ();
-    type Property = ();
-    type Interface = ();
-    type Method = ();
-    type Signal = ();
-    type Tree = DbusContext;
-}
 
 /// Convert a tuple as option to an Option type
 fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {
@@ -283,10 +229,6 @@ fn default_object_path<'a>() -> dbus::Path<'a> {
     dbus::Path::new("/").unwrap()
 }
 
-fn remove_dbus_object_path(dbus_context: &DbusContext, path: String) {
-    dbus_context.action_list.borrow_mut().push(DeferredAction::Remove(path));
-}
-
 fn list_pools(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let mut engine = dbus_context.engine.borrow_mut();
@@ -342,7 +284,7 @@ fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
             .add_m(set_quota_method));
 
     let path = object_path.get_name().to_owned();
-    dbus_context.action_list.borrow_mut().push(DeferredAction::Add(object_path));
+    dbus_context.actions.borrow_mut().push_add(object_path);
     path
 }
 
@@ -553,7 +495,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                     .borrow_mut()
                     .remove_by_second(&(pool_name.clone(), (*name).into())) {
                     Some((object_path, _)) => {
-                        remove_dbus_object_path(dbus_context, object_path);
+                        dbus_context.actions.borrow_mut().push_remove(object_path);
                     }
                     _ => {}
                 }
@@ -973,7 +915,7 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
             .add_m(rename_method));
 
     let path = object_path.get_name().to_owned();
-    dbus_context.action_list.borrow_mut().push(DeferredAction::Add(object_path));
+    dbus_context.actions.borrow_mut().push_add(object_path);
     path
 }
 
@@ -1036,7 +978,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(action) => {
             match dbus_context.pools.borrow_mut().remove_by_second(name.into()) {
                 Some((object_path, _)) => {
-                    remove_dbus_object_path(dbus_context, object_path);
+                    dbus_context.actions.borrow_mut().push_remove(object_path);
                 }
                 _ => {}
             };
@@ -1246,8 +1188,8 @@ pub fn run(engine: Box<Engine>) -> StratisResult<()> {
                     let _ = c.send(m);
                 }
             }
-            let mut b_action_list = dbus_context.action_list.borrow_mut();
-            for action in b_action_list.drain(..) {
+            let mut b_actions = dbus_context.actions.borrow_mut();
+            for action in b_actions.drain() {
                 match action {
                     DeferredAction::Add(path) => {
                         try!(c.register_object_path(path.get_name()));

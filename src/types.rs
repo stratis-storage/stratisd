@@ -60,7 +60,10 @@ macro_rules! unsigned_rem {
 }
 
 custom_derive! {
-    #[derive(NewtypeFrom, NewtypeAdd, NewtypeSub, NewtypeDeref,
+    #[derive(NewtypeAdd, NewtypeAddAssign,
+             NewtypeDeref,
+             NewtypeFrom,
+             NewtypeSub,
              Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
     pub struct Bytes(pub u64);
 }
@@ -89,7 +92,10 @@ impl Display for Bytes {
 // Derive a bunch of stuff so we can do ops on them.
 //
 custom_derive! {
-    #[derive(NewtypeFrom, NewtypeAdd, NewtypeSub, NewtypeDeref,
+    #[derive(NewtypeAdd, NewtypeAddAssign,
+             NewtypeDeref,
+             NewtypeFrom,
+             NewtypeSub,
              Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
     pub struct Sectors(pub u64);
 }

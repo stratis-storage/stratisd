@@ -5,7 +5,6 @@
 use std;
 use std::cmp::Ordering;
 use std::str::from_utf8;
-use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 
 use byteorder::ByteOrder;
@@ -43,12 +42,14 @@ pub struct BDA {
 
 impl BDA {
     /// Initialize a blockdev with a Stratis BDA.
-    pub fn initialize(mut f: &mut File,
-                      pool_uuid: &Uuid,
-                      dev_uuid: &Uuid,
-                      mda_size: Sectors,
-                      blkdev_size: Sectors)
-                      -> EngineResult<BDA> {
+    pub fn initialize<F>(mut f: &mut F,
+                         pool_uuid: &Uuid,
+                         dev_uuid: &Uuid,
+                         mda_size: Sectors,
+                         blkdev_size: Sectors)
+                         -> EngineResult<BDA>
+        where F: Seek + Write
+    {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
         let header = StaticHeader::new(pool_uuid, dev_uuid, mda_size, blkdev_size);
         let hdr_buf = header.sigblock_to_buf();
@@ -71,7 +72,9 @@ impl BDA {
         })
     }
 
-    pub fn load(f: &mut File) -> EngineResult<BDA> {
+    pub fn load<F>(f: &mut F) -> EngineResult<BDA>
+        where F: Read + Seek
+    {
         let header = try!(StaticHeader::setup(f));
         let regions = try!(MDARegions::load(&header, f));
 
@@ -83,7 +86,9 @@ impl BDA {
 
     /// Zero out Static Header on the blockdev. This causes it to no
     /// longer be seen as a Stratis blockdev.
-    pub fn wipe(f: &mut File) -> EngineResult<()> {
+    pub fn wipe<F>(f: &mut F) -> EngineResult<()>
+        where F: Seek + Write
+    {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
 
         // Wiping Static Header should do it
@@ -94,16 +99,20 @@ impl BDA {
     }
 
     /// Save metadata to the disk
-    pub fn save_state(&mut self,
-                      time: &Timespec,
-                      metadata: &[u8],
-                      mut f: &mut File)
-                      -> EngineResult<()> {
+    pub fn save_state<F>(&mut self,
+                         time: &Timespec,
+                         metadata: &[u8],
+                         mut f: &mut F)
+                         -> EngineResult<()>
+        where F: Seek + Write
+    {
         self.regions.save_state(time, metadata, &mut f)
     }
 
     /// Read latest metadata from the disk
-    pub fn load_state(&self, mut f: &mut File) -> EngineResult<Option<Vec<u8>>> {
+    pub fn load_state<F>(&self, mut f: &mut F) -> EngineResult<Option<Vec<u8>>>
+        where F: Read + Seek
+    {
         self.regions.load_state(&mut f)
     }
 
@@ -141,7 +150,9 @@ impl StaticHeader {
     }
 
     /// Try to find a valid StaticHeader on a device.
-    pub fn setup(f: &mut File) -> EngineResult<StaticHeader> {
+    pub fn setup<F>(f: &mut F) -> EngineResult<StaticHeader>
+        where F: Read + Seek
+    {
         try!(f.seek(SeekFrom::Start(0)));
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
         try!(f.read(&mut buf));
@@ -166,7 +177,11 @@ impl StaticHeader {
     }
 
     /// Determine the ownership of a device.
-    pub fn determine_ownership(f: &mut File) -> EngineResult<DevOwnership> {
+    pub fn determine_ownership<F>(f: &mut F) -> EngineResult<DevOwnership>
+        where F: Read + Seek
+    {
+
+
         try!(f.seek(SeekFrom::Start(0)));
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
         try!(f.read(&mut buf));
@@ -250,7 +265,9 @@ impl MDARegions {
         *(BDA_STATIC_HDR_SIZE + per_region_size * index)
     }
 
-    pub fn initialize(header: &StaticHeader, f: &mut File) -> EngineResult<MDARegions> {
+    pub fn initialize<F>(header: &StaticHeader, f: &mut F) -> EngineResult<MDARegions>
+        where F: Seek + Write
+    {
         let hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
 
         let region_size = header.mda_size / NUM_MDA_REGIONS;
@@ -269,7 +286,9 @@ impl MDARegions {
     }
 
     // Construct MDARegions based on on-disk info
-    pub fn load(header: &StaticHeader, f: &mut File) -> EngineResult<MDARegions> {
+    pub fn load<F>(header: &StaticHeader, f: &mut F) -> EngineResult<MDARegions>
+        where F: Read + Seek
+    {
         let region_size = header.mda_size / NUM_MDA_REGIONS;
         let per_region_size = region_size.bytes();
 
@@ -301,7 +320,9 @@ impl MDARegions {
     }
 
     // Write data to the older region
-    pub fn save_state(&mut self, time: &Timespec, data: &[u8], f: &mut File) -> EngineResult<()> {
+    pub fn save_state<F>(&mut self, time: &Timespec, data: &[u8], f: &mut F) -> EngineResult<()>
+        where F: Seek + Write
+    {
         let used = data.len();
         let data_crc = crc32::checksum_ieee(data);
         let hdr_buf = MDAHeader::to_buf(used, data_crc, time);
@@ -333,13 +354,15 @@ impl MDARegions {
         try!(save_region(older_region + 2));
 
         self.mdas[older_region].last_updated = Some(*time);
-        self.mdas[older_region].used = Bytes(used as u64);
-        self.mdas[older_region].data_crc = data_crc;
+        self.mdas[older_region].used = Some(Bytes(used as u64));
+        self.mdas[older_region].data_crc = Some(data_crc);
 
         Ok(())
     }
 
-    pub fn load_state(&self, f: &mut File) -> EngineResult<Option<Vec<u8>>> {
+    pub fn load_state<F>(&self, f: &mut F) -> EngineResult<Option<Vec<u8>>>
+        where F: Read + Seek
+    {
         let newer_region = self.newer();
         let mda = &self.mdas[newer_region];
 
@@ -376,22 +399,22 @@ pub struct MDAHeader {
     pub last_updated: Option<Timespec>,
 
     /// Size of region used for pool metadata.
-    pub used: Bytes,
+    pub used: Option<Bytes>,
 
     /// Total size of region, including both the header and space used for
     /// pool metadata.
     pub region_size: Bytes,
 
-    pub data_crc: u32,
+    pub data_crc: Option<u32>,
 }
 
 impl MDAHeader {
     pub fn new(region_size: Bytes) -> MDAHeader {
         MDAHeader {
             last_updated: None,
-            used: Bytes(0),
+            used: None,
             region_size: region_size,
-            data_crc: 0,
+            data_crc: None,
         }
     }
 
@@ -413,10 +436,10 @@ impl MDAHeader {
         };
 
         Ok(MDAHeader {
-            used: Bytes(LittleEndian::read_u64(&buf[8..16])),
+            used: Some(Bytes(LittleEndian::read_u64(&buf[8..16]))),
             last_updated: time,
             region_size: region_size,
-            data_crc: LittleEndian::read_u32(&buf[4..8]),
+            data_crc: Some(LittleEndian::read_u32(&buf[4..8])),
         })
     }
 
@@ -442,23 +465,29 @@ impl MDAHeader {
 
     /// Given a pre-seek()ed File, load the MDA region and return the contents
     // MDAHeader cannot seek because it doesn't know which region it's in
-    pub fn load_region(&self, f: &mut File) -> EngineResult<Option<Vec<u8>>> {
-        try!(check_mda_region_size(self.used, self.region_size));
-        if self.used == Bytes(0) {
-            Ok(None)
-        } else {
-            // This cast could fail if running on a 32-bit machine and
-            // size of metadata is greater than 2^32 - 1 bytes, which is
-            // unlikely.
-            assert!(*self.used <= std::usize::MAX as u64);
-            let mut data_buf = vec![0u8; *self.used as usize];
-            try!(f.read_exact(&mut data_buf));
-
-            if self.data_crc != crc32::checksum_ieee(&data_buf) {
-                return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region data CRC".into()));
-            }
-            Ok(Some(data_buf))
+    pub fn load_region<F>(&self, f: &mut F) -> EngineResult<Option<Vec<u8>>>
+        where F: Read
+    {
+        if self.last_updated.is_none() {
+            return Ok(None);
         }
+
+        // Should always succeed, because used is None exactly when
+        // last_updated is None.
+        let used = self.used.unwrap();
+
+        try!(check_mda_region_size(used, self.region_size));
+        // This cast could fail if running on a 32-bit machine and
+        // size of metadata is greater than 2^32 - 1 bytes, which is
+        // unlikely.
+        assert!(*used <= std::usize::MAX as u64);
+        let mut data_buf = vec![0u8; *used as usize];
+        try!(f.read_exact(&mut data_buf));
+
+        if self.data_crc.unwrap() != crc32::checksum_ieee(&data_buf) {
+            return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region data CRC".into()));
+        }
+        Ok(Some(data_buf))
     }
 }
 
@@ -498,27 +527,195 @@ pub fn validate_mda_size(size: Sectors) -> EngineResult<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use crc::crc32;
-    use time::Timespec;
+    use time::{now, Timespec};
     use uuid::Uuid;
 
     use quickcheck::{QuickCheck, TestResult};
 
+    use consts::IEC;
     use types::{Bytes, Sectors};
 
+    use super::super::engine::DevOwnership;
+
     use super::*;
+
+    /// Return a static header with random block device and MDA size.
+    /// The block device is less than the minimum, for efficiency in testing.
+    fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
+        let pool_uuid = Uuid::new_v4();
+        let dev_uuid = Uuid::new_v4();
+        let mda_size = MIN_MDA_SECTORS + Sectors((mda_size_factor * 4) as u64);
+        let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
+        StaticHeader::new(&pool_uuid, &dev_uuid, mda_size, blkdev_size)
+    }
+
+    #[test]
+    /// Construct an arbitrary StaticHeader object.
+    /// Verify that the "file" is unowned.
+    /// Initialize a BDA.
+    /// Verify that Stratis owns the file.
+    /// Wipe the BDA.
+    /// Verify that the file is again unowned.
+    fn prop_test_ownership() {
+        fn test_ownership(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
+            let sh = random_static_header(blkdev_size, mda_size_factor);
+            let pool_uuid = sh.pool_uuid;
+            let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
+            match ownership {
+                DevOwnership::Unowned => {}
+                _ => return TestResult::failed(),
+            }
+
+            BDA::initialize(&mut buf,
+                            &sh.pool_uuid,
+                            &sh.dev_uuid,
+                            sh.mda_size,
+                            sh.blkdev_size)
+                .unwrap();
+            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
+            match ownership {
+                DevOwnership::Ours(uuid) => {
+                    if pool_uuid != uuid {
+                        return TestResult::failed();
+                    }
+                }
+                _ => return TestResult::failed(),
+            }
+
+            BDA::wipe(&mut buf).unwrap();
+            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
+            match ownership {
+                DevOwnership::Unowned => {}
+                _ => return TestResult::failed(),
+            }
+
+            TestResult::passed()
+        }
+        QuickCheck::new()
+            .tests(20)
+            .quickcheck(test_ownership as fn(u64, u32) -> TestResult);
+    }
+
+    #[test]
+    /// Construct an arbitrary StaticHeader object.
+    /// Initialize a BDA.
+    /// Verify that the last update time is None.
+    fn prop_empty_bda() {
+        fn empty_bda(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
+            let sh = random_static_header(blkdev_size, mda_size_factor);
+            let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+            let bda = BDA::initialize(&mut buf,
+                                      &sh.pool_uuid,
+                                      &sh.dev_uuid,
+                                      sh.mda_size,
+                                      sh.blkdev_size)
+                .unwrap();
+            TestResult::from_bool(bda.last_update_time().is_none())
+        }
+
+        QuickCheck::new()
+            .tests(20)
+            .quickcheck(empty_bda as fn(u64, u32) -> TestResult);
+    }
+
+    #[test]
+    /// Construct an arbitrary StaticHeader object.
+    /// Initialize a BDA.
+    /// Save metadata and verify correct update time and state.
+    /// Reload BDA and verify that new BDA has correct update time.
+    /// Load state using new BDA and verify correct state.
+    /// Save metadata again, and reload one more time, verifying new timestamp.
+    fn prop_check_state() {
+        fn check_state(blkdev_size: u64,
+                       mda_size_factor: u32,
+                       state: Vec<u8>,
+                       next_state: Vec<u8>)
+                       -> TestResult {
+            let sh = random_static_header(blkdev_size, mda_size_factor);
+            let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+            let mut bda = BDA::initialize(&mut buf,
+                                          &sh.pool_uuid,
+                                          &sh.dev_uuid,
+                                          sh.mda_size,
+                                          sh.blkdev_size)
+                .unwrap();
+            let current_time = now().to_timespec();
+            bda.save_state(&current_time, &state, &mut buf).unwrap();
+            let loaded_state = bda.load_state(&mut buf).unwrap();
+
+            if let &Some(t) = bda.last_update_time() {
+                if t != current_time {
+                    return TestResult::failed();
+                }
+            } else {
+                return TestResult::failed();
+            }
+
+            if let Some(s) = loaded_state {
+                if s != state {
+                    return TestResult::failed();
+                }
+            } else {
+                return TestResult::failed();
+            }
+
+            let mut bda = BDA::load(&mut buf).unwrap();
+            let loaded_state = bda.load_state(&mut buf).unwrap();
+
+            if let Some(s) = loaded_state {
+                if s != state {
+                    return TestResult::failed();
+                }
+            } else {
+                return TestResult::failed();
+            }
+
+            if let &Some(t) = bda.last_update_time() {
+                if t != current_time {
+                    return TestResult::failed();
+                }
+            } else {
+                return TestResult::failed();
+            }
+
+            let current_time = now().to_timespec();
+            bda.save_state(&current_time, &next_state, &mut buf).unwrap();
+            let loaded_state = bda.load_state(&mut buf).unwrap();
+
+            if let Some(s) = loaded_state {
+                if s != next_state {
+                    return TestResult::failed();
+                }
+            } else {
+                return TestResult::failed();
+            }
+
+            if let &Some(t) = bda.last_update_time() {
+                if t != current_time {
+                    return TestResult::failed();
+                }
+            } else {
+                return TestResult::failed();
+            }
+
+            TestResult::passed()
+        }
+
+        QuickCheck::new()
+            .tests(20)
+            .quickcheck(check_state as fn(u64, u32, Vec<u8>, Vec<u8>) -> TestResult);
+    }
 
     #[test]
     /// Construct an arbitrary StaticHeader object.
     /// Write it to a buffer, read it out and make sure you get the same thing.
     fn prop_static_header() {
         fn static_header(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
-            let pool_uuid = Uuid::new_v4();
-            let dev_uuid = Uuid::new_v4();
-
-            let mda_size = MIN_MDA_SECTORS + Sectors((mda_size_factor * 4) as u64);
-            let blkdev_size = Sectors(blkdev_size);
-            let sh1 = StaticHeader::new(&pool_uuid, &dev_uuid, mda_size, blkdev_size);
+            let sh1 = random_static_header(blkdev_size, mda_size_factor);
             let buf = sh1.sigblock_to_buf();
             let sh2 = StaticHeader::sigblock_from_buf(&buf).unwrap();
             TestResult::from_bool(sh1.pool_uuid == sh2.pool_uuid && sh1.dev_uuid == sh2.dev_uuid &&
@@ -563,7 +760,7 @@ mod tests {
                                   mda1.region_size == mda2.region_size &&
                                   mda1.data_crc == mda2.data_crc &&
                                   timestamp == mda1.last_updated.unwrap() &&
-                                  data_crc == mda1.data_crc)
+                                  data_crc == mda1.data_crc.unwrap())
         }
 
         QuickCheck::new()

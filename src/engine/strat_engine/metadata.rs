@@ -354,8 +354,8 @@ impl MDARegions {
         try!(save_region(older_region + 2));
 
         self.mdas[older_region].last_updated = Some(*time);
-        self.mdas[older_region].used = Bytes(used as u64);
-        self.mdas[older_region].data_crc = data_crc;
+        self.mdas[older_region].used = Some(Bytes(used as u64));
+        self.mdas[older_region].data_crc = Some(data_crc);
 
         Ok(())
     }
@@ -399,22 +399,22 @@ pub struct MDAHeader {
     pub last_updated: Option<Timespec>,
 
     /// Size of region used for pool metadata.
-    pub used: Bytes,
+    pub used: Option<Bytes>,
 
     /// Total size of region, including both the header and space used for
     /// pool metadata.
     pub region_size: Bytes,
 
-    pub data_crc: u32,
+    pub data_crc: Option<u32>,
 }
 
 impl MDAHeader {
     pub fn new(region_size: Bytes) -> MDAHeader {
         MDAHeader {
             last_updated: None,
-            used: Bytes(0),
+            used: None,
             region_size: region_size,
-            data_crc: 0,
+            data_crc: None,
         }
     }
 
@@ -436,10 +436,18 @@ impl MDAHeader {
         };
 
         Ok(MDAHeader {
-            used: Bytes(LittleEndian::read_u64(&buf[8..16])),
+            used: if time.is_none() {
+                None
+            } else {
+                Some(Bytes(LittleEndian::read_u64(&buf[8..16])))
+            },
             last_updated: time,
             region_size: region_size,
-            data_crc: LittleEndian::read_u32(&buf[4..8]),
+            data_crc: if time.is_none() {
+                None
+            } else {
+                Some(LittleEndian::read_u32(&buf[4..8]))
+            },
         })
     }
 
@@ -468,21 +476,21 @@ impl MDAHeader {
     pub fn load_region<F>(&self, f: &mut F) -> EngineResult<Option<Vec<u8>>>
         where F: Read
     {
-        try!(check_mda_region_size(self.used, self.region_size));
-        if self.used == Bytes(0) {
-            Ok(None)
-        } else {
+        if let Some(used) = self.used {
+            try!(check_mda_region_size(used, self.region_size));
             // This cast could fail if running on a 32-bit machine and
             // size of metadata is greater than 2^32 - 1 bytes, which is
             // unlikely.
-            assert!(*self.used <= std::usize::MAX as u64);
-            let mut data_buf = vec![0u8; *self.used as usize];
+            assert!(*used <= std::usize::MAX as u64);
+            let mut data_buf = vec![0u8; *used as usize];
             try!(f.read_exact(&mut data_buf));
 
-            if self.data_crc != crc32::checksum_ieee(&data_buf) {
+            if self.data_crc.unwrap() != crc32::checksum_ieee(&data_buf) {
                 return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region data CRC".into()));
             }
             Ok(Some(data_buf))
+        } else {
+            Ok(None)
         }
     }
 }
@@ -594,7 +602,7 @@ mod tests {
                                   mda1.region_size == mda2.region_size &&
                                   mda1.data_crc == mda2.data_crc &&
                                   timestamp == mda1.last_updated.unwrap() &&
-                                  data_crc == mda1.data_crc)
+                                  data_crc == mda1.data_crc.unwrap())
         }
 
         QuickCheck::new()

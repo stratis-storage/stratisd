@@ -43,8 +43,14 @@ pub struct BDA {
 
 impl BDA {
     /// Initialize a blockdev with a Stratis BDA.
-    pub fn initialize(mut f: &mut File, header: StaticHeader) -> EngineResult<BDA> {
+    pub fn initialize(mut f: &mut File,
+                      pool_uuid: &Uuid,
+                      dev_uuid: &Uuid,
+                      mda_size: Sectors,
+                      blkdev_size: Sectors)
+                      -> EngineResult<BDA> {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
+        let header = StaticHeader::new(pool_uuid, dev_uuid, mda_size, blkdev_size);
         let hdr_buf = header.sigblock_to_buf();
 
         // Write 8K header. Static_Header copies go in sectors 1 and 9.
@@ -65,7 +71,8 @@ impl BDA {
         })
     }
 
-    pub fn load(f: &mut File, header: StaticHeader) -> EngineResult<BDA> {
+    pub fn load(f: &mut File) -> EngineResult<BDA> {
+        let header = try!(StaticHeader::setup(f));
         let regions = try!(MDARegions::load(&header, f));
 
         Ok(BDA {

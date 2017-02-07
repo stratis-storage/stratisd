@@ -66,8 +66,7 @@ pub fn find_all() -> EngineResult<BTreeMap<PoolUuid, BTreeMap<DevUuid, BlockDev>
             .read(true)
             .open(devnode));
 
-        let static_header = try!(StaticHeader::setup(&mut f));
-        let bda = try!(BDA::load(&mut f, static_header));
+        let bda = try!(BDA::load(&mut f));
 
         Ok(Some(BlockDev {
             dev: dev,
@@ -191,9 +190,11 @@ pub fn initialize(pool_uuid: &PoolUuid,
     let mut bds = BTreeMap::new();
     for (dev, (devnode, dev_size, mut f)) in add_devs {
 
-        let static_header =
-            StaticHeader::new(pool_uuid, &Uuid::new_v4(), mda_size, dev_size.sectors());
-        let bda = try!(BDA::initialize(&mut f, static_header));
+        let bda = try!(BDA::initialize(&mut f,
+                                       pool_uuid,
+                                       &Uuid::new_v4(),
+                                       mda_size,
+                                       dev_size.sectors()));
 
         let bd = BlockDev {
             dev: dev,

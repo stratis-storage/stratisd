@@ -89,13 +89,13 @@ pub fn test_create_and_delete(device_paths: &Vec<&Path>) -> TestResult<()> {
 
     let mut engine = StratEngine::new();
 
-    let blockdevs = try!(engine.create_pool(pool_name, &device_paths, None, true));
+    let blockdevs = engine.create_pool(pool_name, &device_paths, None, true).unwrap();
 
-    try!(validate_disks_init(&blockdevs));
+    validate_disks_init(&blockdevs).unwrap();
 
-    try!(engine.destroy_pool(pool_name));
+    engine.destroy_pool(pool_name).unwrap();
 
-    try!(validate_disks_released(&blockdevs));
+    validate_disks_released(&blockdevs).unwrap();
 
     Ok(())
 }
@@ -109,7 +109,7 @@ pub fn test_pools() {
     let safe_to_destroy_devs = match test_config.get_safe_to_destroy_devs() {
         Ok(devs) => {
             if devs.len() == 0 {
-                warn!("No devs availabe for testing.  Test not run");
+                warn!("No devs available for testing.  Test not run");
                 return;
             }
             devs
@@ -125,9 +125,5 @@ pub fn test_pools() {
 
     clean_blockdev_headers(&device_paths);
 
-    assert!(match test_create_and_delete(&device_paths) {
-        Ok(_) => true,
-        Err(_) => false,
-    });
-
+    assert!(test_create_and_delete(&device_paths).is_ok());
 }

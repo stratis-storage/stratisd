@@ -38,6 +38,7 @@ use dbus::tree::ObjectPath;
 use dbus::ConnectionItem;
 
 use super::stratis::VERSION;
+use super::types::Bytes;
 
 use dbus_consts::DbusErrorEnum;
 
@@ -366,8 +367,8 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                    default_return;
                                    return_message);
 
-    let specs = filesystems.map(|x| (x.0, x.1, tuple_to_option(x.2)))
-        .collect::<Vec<(&str, &str, Option<u64>)>>();
+    let specs = filesystems.map(|x| (x.0, x.1, tuple_to_option(x.2).map(|x| Bytes(x))))
+        .collect::<Vec<(&str, &str, Option<Bytes>)>>();
     let result = pool.create_filesystems(&specs);
 
     let msg = match result {

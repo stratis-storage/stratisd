@@ -4,6 +4,7 @@
 
 pub mod blockdev;
 pub mod engine;
+pub mod lineardev;
 pub mod metadata;
 pub mod filesystem;
 pub mod pool;

@@ -2,19 +2,19 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::io;
-use std::fmt;
-use std::error::Error;
-use std::borrow::Cow;
-use std::fmt::Display;
-use std::ops::{Div, Mul, Rem};
-
-use nix;
-use term;
-use dbus;
-use serde;
 
 use consts::SECTOR_SIZE;
+use dbus;
+
+use nix;
+use serde;
+use std::borrow::Cow;
+use std::error::Error;
+use std::fmt;
+use std::fmt::Display;
+use std::io;
+use std::ops::{Div, Mul, Rem};
+use term;
 
 pub type StratisResult<T> = Result<T, StratisError>;
 
@@ -147,7 +147,6 @@ impl serde::Deserialize for Sectors {
         Ok(Sectors(val))
     }
 }
-
 
 // An error type for errors generated within Stratis
 //

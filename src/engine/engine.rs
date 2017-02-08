@@ -83,6 +83,11 @@ pub trait Pool: Debug {
     fn blockdevs(&mut self) -> Vec<&mut Dev>;
     fn cachedevs(&mut self) -> Vec<&mut Dev>;
 
+    /// Destroy the pool.
+    /// Will fail if filesystems allocated from the pool are in use,
+    /// or even exist.
+    fn destroy(self) -> EngineResult<()>;
+
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
     /// This list will be a subset of the names passed in fs_names.

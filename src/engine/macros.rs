@@ -41,14 +41,7 @@ macro_rules! destroy_pool {
             return Err(EngineError::Engine(
                 ErrorEnum::Busy, "filesystems remaining on pool".into()));
         };
-        if !entry.get().block_devs.is_empty() {
-            return Err(EngineError::Engine(ErrorEnum::Busy, "devices remaining in pool".into()));
-        };
-        if !entry.get().cache_devs.is_empty() {
-            return Err(EngineError::Engine(ErrorEnum::Busy, "cache devices remaining in pool"
-                .into()));
-        };
-        entry.remove();
+        try!(entry.remove().destroy());
         Ok(true)
     }
 }

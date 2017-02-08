@@ -81,6 +81,11 @@ impl Pool for SimPool {
         destroy_filesystems!{self; fs_names}
     }
 
+    fn destroy(self) -> EngineResult<()> {
+        // Nothing to do here.
+        Ok(())
+    }
+
     fn create_filesystems<'a, 'b, 'c>(&'a mut self,
                                       specs: &[(&'b str, &'c str, Option<Bytes>)])
                                       -> EngineResult<Vec<&'b str>> {

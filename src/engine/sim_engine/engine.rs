@@ -160,6 +160,19 @@ mod tests {
     }
 
     #[test]
+    /// Destroying a pool with filesystems should fail
+    fn destroy_pool_w_filesystem() {
+        let name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(name, &[Path::new("/s/d")], None, false).unwrap();
+        {
+            let pool = engine.get_pool(name).unwrap();
+            pool.create_filesystems(&[("test", "/mnt/temp", None)]).unwrap();
+        }
+        assert!(engine.destroy_pool(name).is_err());
+    }
+
+    #[test]
     #[ignore]
     /// Creating a new pool identical to the previous should succeed
     fn create_new_pool_twice() {

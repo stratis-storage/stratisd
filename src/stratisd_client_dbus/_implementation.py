@@ -147,7 +147,7 @@ class FilesystemSpec(InterfaceSpec):
         Names of the methods of the Filesystem class.
         """
         CreateSnapshot = "CreateSnapshot"
-        Rename = "Rename"
+        SetName = "SetName"
         SetMountpoint = "SetMountpoint"
         SetQuota = "SetQuota"
 
@@ -161,13 +161,13 @@ class FilesystemSpec(InterfaceSpec):
 
     INPUT_SIGS = {
        MethodNames.CreateSnapshot: (("name", ), _FALSE, "s"),
-       MethodNames.Rename: (("name", ), _FALSE, "s"),
+       MethodNames.SetName: (("name", ), _FALSE, "s"),
        MethodNames.SetMountpoint: ((), _FALSE, ""),
        MethodNames.SetQuota: (("quota", ), _FALSE, "s")
     }
     OUTPUT_SIGS = {
        MethodNames.CreateSnapshot: "oqs",
-       MethodNames.Rename: "bqs",
+       MethodNames.SetName: "bqs",
        MethodNames.SetMountpoint: "oqs",
        MethodNames.SetQuota: "oqs"
     }
@@ -242,7 +242,7 @@ class PoolSpec(InterfaceSpec):
         DestroyFilesystems = "DestroyFilesystems"
         RemoveCacheDevs = "RemoveCacheDevs"
         RemoveDevs = "RemoveDevs"
-        Rename = "Rename"
+        SetName = "SetName"
 
     class PropertyNames(enum.Enum):
         """
@@ -265,7 +265,7 @@ class PoolSpec(InterfaceSpec):
        MethodNames.DestroyFilesystems: (("names", ), _FALSE, "as"),
        MethodNames.RemoveCacheDevs: (("devices", ), _FALSE, "as"),
        MethodNames.RemoveDevs: (("devices", ), _FALSE, "as"),
-       MethodNames.Rename: (("new_name", ), _FALSE, "s")
+       MethodNames.SetName: (("new_name", ), _FALSE, "s")
     }
     OUTPUT_SIGS = {
        MethodNames.AddCacheDevs: "asqs",
@@ -274,7 +274,7 @@ class PoolSpec(InterfaceSpec):
        MethodNames.DestroyFilesystems: "asqs",
        MethodNames.RemoveCacheDevs: "asqs",
        MethodNames.RemoveDevs: "asqs",
-       MethodNames.Rename: "bqs"
+       MethodNames.SetName: "bqs"
     }
     XFORMERS = _xformers(INPUT_SIGS)
 

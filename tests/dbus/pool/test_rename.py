@@ -40,7 +40,7 @@ _PN = PoolSpec.MethodNames
 _DEVICE_STRATEGY = _device_list(0)
 
 
-class RenameTestCase(unittest.TestCase):
+class SetNameTestCase(unittest.TestCase):
     """
     Set up a pool with a name.
     """
@@ -77,8 +77,8 @@ class RenameTestCase(unittest.TestCase):
         Test rename to same name.
         """
         (result, rc, _) = checked_call(
-           Pool.Rename(self._pool_object, new_name=self._POOLNAME),
-           PoolSpec.OUTPUT_SIGS[_PN.Rename]
+           Pool.SetName(self._pool_object, new_name=self._POOLNAME),
+           PoolSpec.OUTPUT_SIGS[_PN.SetName]
         )
 
         self.assertEqual(rc, self._errors.OK)
@@ -97,8 +97,8 @@ class RenameTestCase(unittest.TestCase):
         new_name = "new"
 
         (result, rc, _) = checked_call(
-           Pool.Rename(self._pool_object, new_name=new_name),
-           PoolSpec.OUTPUT_SIGS[_PN.Rename]
+           Pool.SetName(self._pool_object, new_name=new_name),
+           PoolSpec.OUTPUT_SIGS[_PN.SetName]
         )
 
         self.assertTrue(result)

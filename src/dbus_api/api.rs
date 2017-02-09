@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::borrow::Cow;
-use std::convert::From;
 use std::fmt::Display;
 use std::path::Path;
 use std::vec::Vec;
@@ -66,28 +65,27 @@ fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr>
 fn fs_name_to_object_path(dbus_context: &DbusContext,
                           pool_name: &str,
                           name: &str)
-                          -> Result<String, (MessageItem, MessageItem)> {
-    let object_path =
-        match dbus_context.filesystems.borrow().get_by_second(&(pool_name.into(), name.into())) {
-            Some(pool) => pool.clone(),
-            None => {
-                let items = code_to_message_items(DbusErrorEnum::FILESYSTEM_NOTFOUND,
-                                                  format!("no object path for filesystem {} \
-                                                           belonging to pool {}",
-                                                          name,
-                                                          pool_name));
-                return Err(items);
-            }
-        };
+                          -> Result<dbus::Path<'static>, (MessageItem, MessageItem)> {
+    let object_path = match dbus_context.filesystems.borrow().get_by_names(pool_name, name) {
+        Some(pool) => pool,
+        None => {
+            let items = code_to_message_items(DbusErrorEnum::FILESYSTEM_NOTFOUND,
+                                              format!("no object path for filesystem {} \
+                                                       belonging to pool {}",
+                                                      name,
+                                                      pool_name));
+            return Err(items);
+        }
+    };
     Ok(object_path)
 }
 
 /// Get filesystem name from object path
 fn object_path_to_pair(dbus_context: &DbusContext,
-                       fs_object_path: &str)
+                       fs_object_path: &dbus::Path<'static>)
                        -> Result<(String, String), (MessageItem, MessageItem)> {
-    let fs_pool_pair = match dbus_context.filesystems.borrow().get_by_first(fs_object_path) {
-        Some(fs_name) => fs_name.clone(),
+    let fs_pool_pair = match dbus_context.filesystems.borrow().get_by_path(fs_object_path) {
+        Some(fs_name) => fs_name,
         None => {
             let items = code_to_message_items(DbusErrorEnum::FILESYSTEM_NOTFOUND,
                                               format!("no filesystem for object path {}",
@@ -99,40 +97,12 @@ fn object_path_to_pair(dbus_context: &DbusContext,
     Ok(fs_pool_pair)
 }
 
-/// Get object path from pool name
-fn pool_name_to_object_path(dbus_context: &DbusContext,
-                            name: &str)
-                            -> Result<String, (MessageItem, MessageItem)> {
-    let object_path = match dbus_context.pools.borrow().get_by_second(name) {
-        Some(pool) => pool.clone(),
-        None => {
-            let items = code_to_message_items(DbusErrorEnum::POOL_NOTFOUND,
-                                              format!("no object path for pool name {}", name));
-            return Err(items);
-        }
-    };
-    Ok(object_path)
-}
-
-/// Convert a string from a object path/name map to an object path
-fn string_to_object_path<'a>(path: String) -> Result<dbus::Path<'a>, (MessageItem, MessageItem)> {
-    let object_path = match dbus::Path::new(path) {
-        Ok(p) => p,
-        Err(s) => {
-            let items = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
-                                              format!("malformed object path {} in table", s));
-            return Err(items);
-        }
-    };
-    Ok(object_path)
-}
-
 /// Get name for pool from object path
 fn object_path_to_pool_name(dbus_context: &DbusContext,
-                            path: &str)
+                            path: &dbus::Path)
                             -> Result<String, (MessageItem, MessageItem)> {
-    let pool_name = match dbus_context.pools.borrow().get_by_first(path) {
-        Some(pool) => pool.clone(),
+    let pool_name = match dbus_context.pools.borrow().get_by_path(path) {
+        Some(pool) => pool,
         None => {
             let items = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
                                               format!("no pool for object path {}", path));
@@ -318,10 +288,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let mut return_value = Vec::new();
             for name in names {
                 let fs_object_path: dbus::Path = create_dbus_filesystem(dbus_context);
-                dbus_context.filesystems
-                    .borrow_mut()
-                    .insert(fs_object_path.to_string(),
-                            (pool_name.clone(), (*name).into()));
+                dbus_context.filesystems.borrow_mut().insert(&fs_object_path, &pool_name, name);
                 return_value.push((fs_object_path, name));
             }
 
@@ -365,9 +332,7 @@ fn create_snapshot(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match pool.create_snapshot(snapshot_name, &filesystem_name) {
         Ok(_) => {
             let object_path: dbus::Path = create_dbus_filesystem(dbus_context);
-            dbus_context.filesystems.borrow_mut().insert(object_path.to_string(),
-                                                         ((&pool_name).clone(),
-                                                          String::from(snapshot_name)));
+            dbus_context.filesystems.borrow_mut().insert(&object_path, &pool_name, snapshot_name);
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
         }
@@ -426,13 +391,13 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let return_value = MessageItem::Bool(true);
             let removed = dbus_context.filesystems
                 .borrow_mut()
-                .remove_by_second(&(pool_name.clone(), filesystem_name.into()));
+                .remove_by_names(&pool_name, &filesystem_name);
             match removed {
                 Some((removed_object_path, _)) => {
-                    if object_path.to_string() == removed_object_path {
+                    if *object_path == removed_object_path {
                         dbus_context.filesystems
                             .borrow_mut()
-                            .insert(removed_object_path, (pool_name.into(), new_name.into()));
+                            .insert(&removed_object_path, &pool_name, &new_name);
                         let (rc, rs) = ok_message_items();
                         return_message.append3(return_value, rc, rs)
                     } else {
@@ -493,7 +458,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             for name in names {
                 match dbus_context.filesystems
                     .borrow_mut()
-                    .remove_by_second(&(pool_name.clone(), (*name).into())) {
+                    .remove_by_names(&pool_name, &name) {
                     Some((object_path, _)) => {
                         dbus_context.actions.borrow_mut().push_remove(object_path);
                     }
@@ -798,13 +763,13 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
         Ok(RenameAction::Renamed) => {
             let return_value = MessageItem::Bool(true);
-            let removed = dbus_context.pools.borrow_mut().remove_by_second(&old_name);
+            let removed = dbus_context.pools.borrow_mut().remove_by_name(&old_name);
             match removed {
                 Some((removed_object_path, _)) => {
-                    if object_path.to_string() == removed_object_path {
+                    if *object_path == removed_object_path {
                         dbus_context.pools
                             .borrow_mut()
-                            .insert(removed_object_path, new_name.into());
+                            .insert(&removed_object_path, new_name);
                         let (rc, rs) = ok_message_items();
                         return_message.append3(return_value, rc, rs)
                     } else {
@@ -940,7 +905,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match result {
         Ok(devnodes) => {
             let object_path: dbus::Path = create_dbus_pool(dbus_context);
-            dbus_context.pools.borrow_mut().insert(object_path.to_string(), String::from(name));
+            dbus_context.pools.borrow_mut().insert(&object_path, name);
             let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
             let paths = paths.map(|x| MessageItem::Str(x)).collect();
             let return_path = MessageItem::ObjectPath(object_path);
@@ -976,7 +941,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(action) => {
-            match dbus_context.pools.borrow_mut().remove_by_second(name.into()) {
+            match dbus_context.pools.borrow_mut().remove_by_name(name) {
                 Some((object_path, _)) => {
                     dbus_context.actions.borrow_mut().push_remove(object_path);
                 }
@@ -1003,12 +968,15 @@ fn get_pool_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let return_message = message.method_return();
     let default_return = MessageItem::ObjectPath(default_object_path());
-    let result = pool_name_to_object_path(dbus_context, name);
-    let object_path = dbus_try!(result; default_return; return_message);
-    let path =
-        dbus_try!(string_to_object_path(object_path.clone()); default_return; return_message);
-    let (rc, rs) = ok_message_items();
-    Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
+
+    if let Some(pool) = dbus_context.pools.borrow().get_by_name(name) {
+        let (rc, rs) = ok_message_items();
+        Ok(vec![return_message.append3(MessageItem::ObjectPath(pool.into()), rc, rs)])
+    } else {
+        let (rc, rs) = code_to_message_items(DbusErrorEnum::POOL_NOTFOUND,
+                                             format!("no object path for pool name {}", name));
+        Ok(vec![return_message.append3(default_return, rc, rs)])
+    }
 }
 
 fn get_filesystem_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -1022,10 +990,8 @@ fn get_filesystem_object_path(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResul
     let return_message = message.method_return();
     let default_return = MessageItem::ObjectPath(default_object_path());
     let result = fs_name_to_object_path(dbus_context, pool_name, name);
-    let object_path = dbus_try!(result; default_return; return_message);
+    let path = dbus_try!(result; default_return; return_message);
 
-    let path =
-        dbus_try!(string_to_object_path(object_path.clone()); default_return; return_message);
     let (rc, rs) = ok_message_items();
     Ok(vec![return_message.append3(MessageItem::ObjectPath(path), rc, rs)])
 }
@@ -1197,7 +1163,7 @@ pub fn run(engine: Box<Engine>) -> StratisResult<()> {
                     }
                     DeferredAction::Remove(path) => {
                         c.unregister_object_path(&path);
-                        tree.remove(&dbus::Path::new(path).unwrap());
+                        tree.remove(&path);
                     }
                 }
             }

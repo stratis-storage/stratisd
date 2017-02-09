@@ -460,9 +460,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                     .borrow_mut()
                     .remove_by_names(&pool_name, &name) {
                     Some((object_path, _)) => {
-                        dbus_context.actions
-                            .borrow_mut()
-                            .push_remove(object_path.as_cstr().to_str().unwrap().into());
+                        dbus_context.actions.borrow_mut().push_remove(object_path);
                     }
                     _ => {}
                 }
@@ -945,9 +943,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(action) => {
             match dbus_context.pools.borrow_mut().remove_by_name(name) {
                 Some((object_path, _)) => {
-                    dbus_context.actions
-                        .borrow_mut()
-                        .push_remove(object_path.as_cstr().to_str().unwrap().into());
+                    dbus_context.actions.borrow_mut().push_remove(object_path);
                 }
                 _ => {}
             };
@@ -1167,7 +1163,7 @@ pub fn run(engine: Box<Engine>) -> StratisResult<()> {
                     }
                     DeferredAction::Remove(path) => {
                         c.unregister_object_path(&path);
-                        tree.remove(&dbus::Path::new(path).unwrap());
+                        tree.remove(&path);
                     }
                 }
             }

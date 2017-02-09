@@ -1,16 +1,22 @@
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
 use libstratis::consts::SECTOR_SIZE;
+use libstratis::engine::strat_engine::blockdev::blkdev_size;
 use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::metadata::StaticHeader;
+use libstratis::types::Sectors;
+
+use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
+
 use util::test_result::TestError;
 use util::test_result::TestErrorEnum;
-
 use util::test_result::TestResult;
 
 
@@ -37,12 +43,28 @@ pub fn clean_blockdev_headers(blockdev_paths: &Vec<&Path>) {
     for path in blockdev_paths {
         match wipe_header(path) {
             Ok(_) => {}
-            Err(err) => {
-                panic!("Failed to clean signature on {:?} : {:?}", path, err);
+            Err(e) => {
+                panic!("Failed to clean signature on {:?} : {:?}", path, e);
             }
         }
     }
     info!("devices cleaned for test");
+}
+
+#[allow(dead_code)]
+pub fn get_size(path: &Path) -> TestResult<Sectors> {
+    let f = match File::open(path) {
+        Ok(file) => file,
+        Err(e) => panic!("Failed to open blockdev : {:?}", e),
+    };
+
+    match blkdev_size(&f) {
+        Ok(bytes) => return Ok(bytes.sectors()),
+        Err(e) => {
+            let error_message = format!("{:?} for device {:?}", e, path);
+            return Err(TestError::Framework(TestErrorEnum::Error(error_message)));
+        }
+    };
 }
 
 fn wipe_header(path: &Path) -> TestResult<()> {

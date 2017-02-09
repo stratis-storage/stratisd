@@ -190,7 +190,7 @@ fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let rename_method = f.method("Rename", (), rename_filesystem)
+    let rename_method = f.method("SetName", (), rename_filesystem)
         .in_arg(("name", "s"))
         .out_arg(("action", "b"))
         .out_arg(("return_code", "q"))
@@ -631,7 +631,7 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let rename_method = f.method("Rename", (), rename_pool)
+    let rename_method = f.method("SetName", (), rename_pool)
         .in_arg(("new_name", "s"))
         .out_arg(("action", "b"))
         .out_arg(("return_code", "q"))

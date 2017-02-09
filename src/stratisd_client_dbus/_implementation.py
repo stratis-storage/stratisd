@@ -240,8 +240,6 @@ class PoolSpec(InterfaceSpec):
         AddDevs = "AddDevs"
         CreateFilesystems = "CreateFilesystems"
         DestroyFilesystems = "DestroyFilesystems"
-        RemoveCacheDevs = "RemoveCacheDevs"
-        RemoveDevs = "RemoveDevs"
         SetName = "SetName"
 
     class PropertyNames(enum.Enum):
@@ -263,8 +261,6 @@ class PoolSpec(InterfaceSpec):
           "a(ss(bt))"
        ),
        MethodNames.DestroyFilesystems: (("names", ), _FALSE, "as"),
-       MethodNames.RemoveCacheDevs: (("devices", ), _FALSE, "as"),
-       MethodNames.RemoveDevs: (("devices", ), _FALSE, "as"),
        MethodNames.SetName: (("new_name", ), _FALSE, "s")
     }
     OUTPUT_SIGS = {
@@ -272,8 +268,6 @@ class PoolSpec(InterfaceSpec):
        MethodNames.AddDevs: "asqs",
        MethodNames.CreateFilesystems: "a(os)qs",
        MethodNames.DestroyFilesystems: "asqs",
-       MethodNames.RemoveCacheDevs: "asqs",
-       MethodNames.RemoveDevs: "asqs",
        MethodNames.SetName: "bqs"
     }
     XFORMERS = _xformers(INPUT_SIGS)

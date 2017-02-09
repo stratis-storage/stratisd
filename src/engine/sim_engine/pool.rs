@@ -139,36 +139,6 @@ impl Pool for SimPool {
         Ok(names[0])
     }
 
-    // Should verify that block devices are not required by pool, but does not.
-    fn remove_blockdevs(&mut self, paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
-        let devices = BTreeSet::from_iter(paths);
-
-        let mut removed = vec![];
-        for dev in devices {
-            let pathbuf = dev.to_path_buf();
-            match self.block_devs.remove(&pathbuf) {
-                Some(_) => removed.push(pathbuf),
-                _ => {}
-            }
-        }
-        Ok(removed)
-    }
-
-    // Should verify that block devices are not required by pool, but does not.
-    fn remove_cachedevs(&mut self, paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
-        let devices = BTreeSet::from_iter(paths);
-
-        let mut removed = vec![];
-        for dev in devices {
-            let pathbuf = dev.to_path_buf();
-            match self.cache_devs.remove(&pathbuf) {
-                Some(_) => removed.push(pathbuf),
-                _ => {}
-            }
-        }
-        Ok(removed)
-    }
-
     fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
         rename_filesystem!{self; old_name; new_name}
     }
@@ -377,47 +347,6 @@ mod tests {
         let mut pool = engine.get_pool(pool_name).unwrap();
         assert!(match pool.create_filesystems(&[(fs_name, "", None), (fs_name, "/", None)]) {
             Err(EngineError::Engine(ErrorEnum::Error, _)) => true,
-            _ => false,
-        });
-    }
-
-    #[test]
-    /// Removing an empty list of devices from an empty pool yields empty list.
-    fn remove_device_empty() {
-        let pool_name = "pool_name";
-        let mut engine = SimEngine::new();
-        engine.create_pool(pool_name, &[], None, false).unwrap();
-        let mut pool = engine.get_pool(pool_name).unwrap();
-        assert!(match pool.remove_blockdevs(&[]) {
-            Ok(devs) => devs.is_empty(),
-            _ => false,
-        });
-    }
-
-    #[test]
-    /// Removing a non-empyt list of devices from empty pool yields empty list.
-    fn remove_device_empty_2() {
-        let pool_name = "pool_name";
-        let mut engine = SimEngine::new();
-        engine.create_pool(pool_name, &[], None, false).unwrap();
-        let mut pool = engine.get_pool(pool_name).unwrap();
-        assert!(match pool.remove_blockdevs(&[Path::new("/s/b")]) {
-            Ok(devs) => devs.is_empty(),
-            _ => false,
-        });
-    }
-
-    #[test]
-    /// Removing a list of devices from non-empty pool yields intersection.
-    fn remove_device_intersection() {
-        let pool_name = "pool_name";
-        let mut engine = SimEngine::new();
-        let devices = [Path::new("/s/a"), Path::new("/s/b")];
-        engine.create_pool(pool_name, &devices, None, false).unwrap();
-        let mut pool = engine.get_pool(pool_name).unwrap();
-        let remove_devices = [Path::new("/s/a"), Path::new("/s/c")];
-        assert!(match pool.remove_blockdevs(&remove_devices) {
-            Ok(devs) => devs == [Path::new("/s/a")],
             _ => false,
         });
     }

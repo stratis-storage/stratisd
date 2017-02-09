@@ -44,7 +44,19 @@ class StratisdConstantsGen(abc.ABC):
         :rtype: type
         """
         values = cls._METHOD(get_object(TOP_OBJECT))
-        return type(cls._CLASSNAME, (object,), dict(values))
+
+        def iterator():
+            """
+            An iterator over the fields in the class.
+            """
+            the_map = dict(values)
+            for x in the_map:
+                yield x
+
+        fields = dict(values)
+        fields['fields'] = iterator
+
+        return type(cls._CLASSNAME, (object,), fields)
 
 
 class StratisdErrorsGen(StratisdConstantsGen):

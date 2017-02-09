@@ -84,7 +84,7 @@ pub struct DbusContext {
     pub pools: Rc<RefCell<PoolMap>>,
     pub engine: Rc<RefCell<Box<Engine>>>,
     pub actions: Rc<RefCell<ActionQueue>>,
-    pub filesystems: Rc<RefCell<BidirMap<String, (String, String)>>>,
+    pub filesystems: Rc<RefCell<FilesystemMap>>,
 }
 
 impl DbusContext {
@@ -92,7 +92,7 @@ impl DbusContext {
         DbusContext {
             actions: Rc::new(RefCell::new(ActionQueue::new())),
             engine: Rc::new(RefCell::new(engine)),
-            filesystems: Rc::new(RefCell::new(BidirMap::new())),
+            filesystems: Rc::new(RefCell::new(FilesystemMap::new())),
             next_index: Rc::new(Cell::new(0)),
             pools: Rc::new(RefCell::new(PoolMap::new())),
         }
@@ -190,5 +190,53 @@ impl PoolMap {
     /// Remove by name.
     pub fn remove_by_name(&mut self, name: &str) -> Option<(Path<'static>, String)> {
         self.map.remove_by_second(name).and_then(|x| Some((Path::new(&x.0 as &str).unwrap(), x.1)))
+    }
+}
+
+/// A map from filesystem object paths to pairs of pool name and fs name.
+/// The principals are the same as those for the PoolMap.
+#[derive(Debug)]
+pub struct FilesystemMap {
+    map: BidirMap<String, (String, String)>,
+}
+
+impl FilesystemMap {
+    pub fn new() -> FilesystemMap {
+        FilesystemMap { map: BidirMap::new() }
+    }
+
+    /// Get name pair by using the object path.
+    pub fn get_by_path(&self, path: &Path) -> Option<(String, String)> {
+        self.map.get_by_first(path as &str).map(|x| (x.0.clone(), x.1.clone()))
+    }
+
+    /// Get object path by using the name pair.
+    pub fn get_by_names(&self, pool_name: &str, fs_name: &str) -> Option<Path<'static>> {
+        self.map
+            .get_by_second(&(pool_name.into(), fs_name.into()))
+            .and_then(|x| Some(Path::new(x as &str).unwrap()))
+    }
+
+    /// Insert a key1/key2 pair.
+    /// Returns the supplanted pair, if one exists.
+    /// A pool rename might supplant the old entry for a path.
+    pub fn insert(&mut self,
+                  path: &Path,
+                  pool_name: &str,
+                  fs_name: &str)
+                  -> Option<(Path<'static>, (String, String))> {
+        self.map
+            .insert((**path).into(), (pool_name.into(), fs_name.into()))
+            .and_then(|x| Some((Path::new(&x.0 as &str).unwrap(), x.1)))
+    }
+
+    /// Remove by name pair.
+    pub fn remove_by_names(&mut self,
+                           pool_name: &str,
+                           fs_name: &str)
+                           -> Option<(Path<'static>, (String, String))> {
+        self.map
+            .remove_by_second(&(pool_name.into(), fs_name.into()))
+            .and_then(|x| Some((Path::new(&x.0 as &str).unwrap(), x.1)))
     }
 }

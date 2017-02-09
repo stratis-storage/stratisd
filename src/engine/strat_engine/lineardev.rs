@@ -50,7 +50,7 @@ impl LinearDev {
         try!(dm.device_create(&self.name, None, DmFlags::empty()));
         let table = self.dm_table(block_devs);
         let id = &DevId::Name(&self.name);
-        self.dev_info = Some(dm.table_load(id, &table).unwrap());
+        self.dev_info = Some(try!(dm.table_load(id, &table)));
 
         try!(dm.device_suspend(id, DmFlags::empty()));
 

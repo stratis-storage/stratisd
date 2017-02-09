@@ -177,14 +177,6 @@ impl Pool for StratPool {
         destroy_filesystems!{self; fs_names}
     }
 
-    fn remove_blockdevs(&mut self, _paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
-        unimplemented!()
-    }
-
-    fn remove_cachedevs(&mut self, _paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
-        unimplemented!()
-    }
-
     fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
         rename_filesystem!{self; old_name; new_name}
     }

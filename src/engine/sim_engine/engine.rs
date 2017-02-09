@@ -151,15 +151,25 @@ mod tests {
     }
 
     #[test]
-    /// Destroying a pool with devices should fail
+    /// Destroying a pool with devices should succeed
     fn destroy_pool_w_devices() {
         let name = "name";
         let mut engine = SimEngine::new();
         engine.create_pool(name, &[Path::new("/s/d")], None, false).unwrap();
-        assert!(match engine.destroy_pool(name) {
-            Err(EngineError::Engine(ErrorEnum::Busy, _)) => true,
-            _ => false,
-        });
+        assert!(engine.destroy_pool(name).is_ok());
+    }
+
+    #[test]
+    /// Destroying a pool with filesystems should fail
+    fn destroy_pool_w_filesystem() {
+        let name = "name";
+        let mut engine = SimEngine::new();
+        engine.create_pool(name, &[Path::new("/s/d")], None, false).unwrap();
+        {
+            let pool = engine.get_pool(name).unwrap();
+            pool.create_filesystems(&[("test", "/mnt/temp", None)]).unwrap();
+        }
+        assert!(engine.destroy_pool(name).is_err());
     }
 
     #[test]

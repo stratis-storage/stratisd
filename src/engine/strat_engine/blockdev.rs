@@ -222,6 +222,11 @@ impl BlockDev {
         }
     }
 
+    pub fn wipe_metadata(&mut self) -> EngineResult<()> {
+        let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
+        BDA::wipe(&mut f)
+    }
+
     /// Get the "x:y" device string for this blockdev
     pub fn dstr(&self) -> String {
         self.dev.dstr()

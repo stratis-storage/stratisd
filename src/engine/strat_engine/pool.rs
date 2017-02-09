@@ -157,6 +157,21 @@ impl Pool for StratPool {
         Ok(bdev_paths)
     }
 
+    fn destroy(mut self) -> EngineResult<()> {
+
+        // TODO: first, tear down DM mappings
+
+        for bd in self.block_devs.values_mut() {
+            try!(bd.wipe_metadata());
+        }
+
+        for bd in self.cache_devs.values_mut() {
+            try!(bd.wipe_metadata());
+        }
+
+        Ok(())
+    }
+
     fn destroy_filesystems<'a, 'b>(&'a mut self,
                                    fs_names: &[&'b str])
                                    -> EngineResult<Vec<&'b str>> {

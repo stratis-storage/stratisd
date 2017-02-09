@@ -460,50 +460,6 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn remove_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-
-    let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 0));
-
-    let mut device_paths = Vec::new();
-    for path in devs {
-        device_paths.push(Path::new(path));
-    }
-
-    let dbus_context = m.tree.get_data();
-    let object_path = m.path.get_name();
-    let return_message = message.method_return();
-    let return_sig = "s";
-    let default_return = MessageItem::Array(vec![], return_sig.into());
-
-    let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, object_path);
-        default_return; return_message);
-
-    let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = get_pool!(b_engine; pool_name; default_return; return_message);
-
-    let result = pool.remove_cachedevs(&device_paths);
-
-    let msg = match result {
-        Ok(ref paths) => {
-            let return_value = paths.iter()
-                .map(|p| MessageItem::Str((*p).to_string_lossy().into_owned()))
-                .collect();
-            let (rc, rs) = ok_message_items();
-            return_message.append3(MessageItem::Array(return_value, return_sig.into()), rc, rs)
-        }
-        Err(err) => {
-            let (rc, rs) = engine_to_dbus_err(&err);
-            let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append3(default_return, rc, rs)
-        }
-    };
-    Ok(vec![msg])
-}
-
-
 fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
@@ -578,49 +534,6 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
         Err(x) => {
             let (rc, rs) = engine_to_dbus_err(&x);
-            let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append3(default_return, rc, rs)
-        }
-    };
-    Ok(vec![msg])
-}
-
-fn remove_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-
-    let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 0));
-
-    let mut device_paths = Vec::new();
-    for path in devs {
-        device_paths.push(Path::new(path));
-    }
-
-    let dbus_context = m.tree.get_data();
-    let object_path = m.path.get_name();
-    let return_message = message.method_return();
-    let return_sig = "s";
-    let default_return = MessageItem::Array(vec![], return_sig.into());
-
-    let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, object_path);
-        default_return; return_message);
-
-    let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = get_pool!(b_engine; pool_name; default_return; return_message);
-
-    let result = pool.remove_blockdevs(&device_paths);
-
-    let msg = match result {
-        Ok(ref paths) => {
-            let return_value = paths.iter()
-                .map(|p| MessageItem::Str((*p).to_string_lossy().into_owned()))
-                .collect();
-            let (rc, rs) = ok_message_items();
-            return_message.append3(MessageItem::Array(return_value, return_sig.into()), rc, rs)
-        }
-        Err(err) => {
-            let (rc, rs) = engine_to_dbus_err(&err);
             let (rc, rs) = code_to_message_items(rc, rs);
             return_message.append3(default_return, rc, rs)
         }
@@ -739,20 +652,8 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let remove_cache_devs_method = f.method("RemoveCacheDevs", (), remove_cache_devs)
-        .in_arg(("cache_devs", "as"))
-        .out_arg(("results", "as"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
     let add_devs_method = f.method("AddDevs", (), add_devs)
         .in_arg(("force", "b"))
-        .in_arg(("devs", "as"))
-        .out_arg(("results", "as"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let remove_devs_method = f.method("RemoveDevs", (), remove_devs)
         .in_arg(("devs", "as"))
         .out_arg(("results", "as"))
         .out_arg(("return_code", "q"))
@@ -786,9 +687,7 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
             .add_m(create_filesystems_method)
             .add_m(destroy_filesystems_method)
             .add_m(add_cache_devs_method)
-            .add_m(remove_cache_devs_method)
             .add_m(add_devs_method)
-            .add_m(remove_devs_method)
             .add_m(rename_method)
             .add_p(name_property)
             .add_p(uuid_property));

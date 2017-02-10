@@ -80,14 +80,16 @@ class Create2TestCase(unittest.TestCase):
 
         managed_objects = get_managed_objects(self._proxy)
         pools = [x for x in managed_objects.pools()]
-        pool = managed_objects.get_pool_by_name(self._POOLNAME)
+        result = managed_objects.get_pool_by_name(self._POOLNAME)
 
         if rc == self._errors.OK:
+            self.assertIsNotNone(result)
+            (pool, _) = result
             self.assertEqual(pool, poolpath)
             self.assertEqual(len(pools), 1)
             self.assertLessEqual(len(devnodes), len(devs))
         else:
-            self.assertIsNone(pool)
+            self.assertIsNone(result)
             self.assertEqual(len(pools), 0)
 
     def testCreateBadRAID(self):

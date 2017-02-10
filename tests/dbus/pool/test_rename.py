@@ -85,7 +85,9 @@ class RenameTestCase(unittest.TestCase):
         self.assertFalse(result)
 
         managed_objects = get_managed_objects(self._proxy)
-        pool = managed_objects.get_pool_by_name(self._POOLNAME)
+        result = managed_objects.get_pool_by_name(self._POOLNAME)
+        self.assertIsNotNone(result)
+        (pool, _) = result
         self.assertEqual(pool, self._pool_object_path)
 
     def testNewName(self):
@@ -104,5 +106,7 @@ class RenameTestCase(unittest.TestCase):
 
         managed_objects = get_managed_objects(self._proxy)
         self.assertIsNone(managed_objects.get_pool_by_name(self._POOLNAME))
-        pool = managed_objects.get_pool_by_name(new_name)
+        result = managed_objects.get_pool_by_name(new_name)
+        self.assertIsNotNone(result)
+        (pool, _) = result
         self.assertEqual(pool, self._pool_object_path)

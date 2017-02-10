@@ -79,11 +79,11 @@ class ManagedObjects(object):
         Get a single pool for the given name.
 
         :param str name: the name of the pool
-        :returns: a pool object path or None if no pool
-        :rtype: str or NoneType
+        :returns: a pool object path and associated data or None if no pool
+        :rtype: (ObjectPath * dict) or NoneType
         """
         interface_name = _POOL_INTERFACE_NAME
-        pools = (obj_path for (obj_path, data) in self.pools() \
+        pools = ((obj_path, data) for (obj_path, data) in self.pools() \
            if data[interface_name]['Name'] == name)
         return next(pools, None)
 
@@ -92,11 +92,11 @@ class ManagedObjects(object):
         Get a single pool for the given uuid.
 
         :param str uuid: the name of the pool
-        :returns: a pool object path or None if no pool
-        :rtype: str or NoneType
+        :returns: a pool object path and associated data or None if no pool
+        :rtype: (ObjectPath * dict) or NoneType
         """
         interface_name = _POOL_INTERFACE_NAME
-        pools = (obj_path for (obj_path, data) in self.pools() \
+        pools = ((obj_path, data) for (obj_path, data) in self.pools() \
            if data[interface_name]['Uuid'] == name)
         return next(pools, None)
 

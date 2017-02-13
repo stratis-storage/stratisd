@@ -8,6 +8,8 @@ pub mod lineardev;
 pub mod metadata;
 pub mod filesystem;
 pub mod pool;
+// pub mod thindev;
+pub mod thinpooldev;
 
 mod serde_structs {
     include!(concat!(env!("OUT_DIR"), "/serde_structs.rs"));

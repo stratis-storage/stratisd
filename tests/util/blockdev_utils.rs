@@ -14,11 +14,12 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
+use std::thread;
+use std::time::Duration;
 
 use util::test_result::TestError;
 use util::test_result::TestErrorEnum;
 use util::test_result::TestResult;
-
 
 #[allow(dead_code)]
 pub fn get_ownership(path: &PathBuf) -> TestResult<DevOwnership> {
@@ -36,6 +37,13 @@ pub fn get_ownership(path: &PathBuf) -> TestResult<DevOwnership> {
     };
 
     Ok(ownership)
+}
+
+// The /dev/mapper/<name> device is not immediately available for use.
+// TODO: Implement wait for event or poll.
+#[allow(dead_code)]
+pub fn wait_for_dm() {
+    thread::sleep(Duration::from_millis(3000))
 }
 
 pub fn clean_blockdev_headers(blockdev_paths: &Vec<&Path>) {

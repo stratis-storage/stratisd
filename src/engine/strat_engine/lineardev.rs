@@ -5,6 +5,9 @@
 use devicemapper::{DM, DevId, DeviceInfo, DmFlags};
 
 use engine::{EngineError, EngineResult, ErrorEnum};
+
+use std::path::PathBuf;
+
 use super::blockdev::BlockDev;
 use types::Sectors;
 
@@ -60,6 +63,13 @@ impl LinearDev {
     pub fn name(&self) -> EngineResult<&str> {
         match self.dev_info {
             Some(ref di) => return Ok(di.name().clone()),
+            None => return Err(EngineError::Engine(ErrorEnum::Invalid, "No dev_info".into())),
+        }
+    }
+
+    pub fn path(&self) -> EngineResult<Option<PathBuf>> {
+        match self.dev_info {
+            Some(ref di) => return Ok(di.device().path().clone()),
             None => return Err(EngineError::Engine(ErrorEnum::Invalid, "No dev_info".into())),
         }
     }

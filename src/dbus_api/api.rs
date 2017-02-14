@@ -744,29 +744,32 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let name: &str = try!(get_next_arg(&mut iter, 0));
+    let object_path: dbus::Path<'static> = try!(get_next_arg(&mut iter, 0));
+    let object_path_str = object_path.as_cstr().to_str().unwrap();
 
     let dbus_context = m.tree.get_data();
     let ref engine = dbus_context.engine;
-    let result = engine.borrow_mut().destroy_pool(&name);
 
+    let default_return = MessageItem::Bool(false);
     let return_message = message.method_return();
+
+    let pool_name = dbus_try!(
+        object_path_to_pool_name(dbus_context, object_path_str);
+        default_return; return_message);
+
+    let result = engine.borrow_mut().destroy_pool(&pool_name);
 
     let msg = match result {
         Ok(action) => {
-            match dbus_context.pools.borrow_mut().remove_by_second(name.into()) {
-                Some((object_path, _)) => {
-                    dbus_context.actions.borrow_mut().push_remove(object_path);
-                }
-                _ => {}
-            };
+            dbus_context.pools.borrow_mut().remove_by_first(object_path_str);
+            dbus_context.actions.borrow_mut().push_remove(object_path_str.into());
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::Bool(action), rc, rs)
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err(&err);
             let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append3(MessageItem::Bool(false), rc, rs)
+            return_message.append3(default_return, rc, rs)
         }
     };
     Ok(vec![msg])
@@ -845,7 +848,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
         .out_arg(("return_string", "s"));
 
     let destroy_pool_method = f.method("DestroyPool", (), destroy_pool)
-        .in_arg(("pool_name", "s"))
+        .in_arg(("pool_object_path", "o"))
         .out_arg(("action", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

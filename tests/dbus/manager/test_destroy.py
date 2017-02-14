@@ -65,22 +65,11 @@ class Destroy1TestCase(unittest.TestCase):
 
     def testExecution(self):
         """
-        Destroy should succeed.
+        Destroy should succeed since there is nothing to pass to DestroyPool.
         """
-        (result, rc, _) = checked_call(
-           Manager.DestroyPool(self._proxy, name=self._POOLNAME),
-           ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
-        )
-        self.assertEqual(rc, self._errors.OK)
-        self.assertFalse(result)
-
         managed_objects = get_managed_objects(self._proxy)
-        pools = [x for x in managed_objects.pools()]
         pool = managed_objects.get_pool_by_name(self._POOLNAME)
-
-        self.assertEqual(len(pools), 0)
         self.assertIsNone(pool)
-
 
 
 class Destroy2TestCase(unittest.TestCase):
@@ -120,10 +109,10 @@ class Destroy2TestCase(unittest.TestCase):
         So, it may be possible to destroy it, or it may not be.
         """
         managed_objects = get_managed_objects(self._proxy)
-        pool1 = managed_objects.get_pool_by_name(self._POOLNAME)
+        (pool1, _) = managed_objects.get_pool_by_name(self._POOLNAME)
 
         (result, rc, _) = checked_call(
-           Manager.DestroyPool(self._proxy, name=self._POOLNAME),
+           Manager.DestroyPool(self._proxy, pool_object_path=pool1),
            ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
         )
 
@@ -184,8 +173,11 @@ class Destroy3TestCase(unittest.TestCase):
         """
         This should fail since the pool has a filesystem on it.
         """
+        managed_objects = get_managed_objects(self._proxy)
+        (pool, _) = managed_objects.get_pool_by_name(self._POOLNAME)
+
         (result, rc, _) = checked_call(
-           Manager.DestroyPool(self._proxy, name=self._POOLNAME),
+           Manager.DestroyPool(self._proxy, pool_object_path=pool),
            ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
         )
         self.assertEqual(rc, self._errors.BUSY)
@@ -230,8 +222,11 @@ class Destroy4TestCase(unittest.TestCase):
         The pool was just created and has no devices. It should always be
         possible to destroy it.
         """
+        managed_objects = get_managed_objects(self._proxy)
+        (pool, _) = managed_objects.get_pool_by_name(self._POOLNAME)
+
         (result, rc, _) = checked_call(
-           Manager.DestroyPool(self._proxy, name=self._POOLNAME),
+           Manager.DestroyPool(self._proxy, pool_object_path=pool),
            ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
         )
 

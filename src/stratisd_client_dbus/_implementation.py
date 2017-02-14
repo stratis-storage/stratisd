@@ -210,7 +210,7 @@ class ManagerSpec(InterfaceSpec):
                       if n == "redundancy" else (lambda x: x)),
                "s(bq)bas"
            ),
-        MethodNames.DestroyPool : (("name", ), _FALSE, "s"),
+        MethodNames.DestroyPool : (("pool_object_path", ), _FALSE, "o"),
     }
     OUTPUT_SIGS = {
         MethodNames.ConfigureSimulator : "qs",

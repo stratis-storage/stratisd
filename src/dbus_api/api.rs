@@ -81,9 +81,9 @@ fn object_path_to_pair(dbus_context: &DbusContext,
 
 /// Get name for pool from object path
 fn object_path_to_pool_name(dbus_context: &DbusContext,
-                            path: &str)
+                            path: &dbus::Path)
                             -> Result<String, (MessageItem, MessageItem)> {
-    let pool_name = match dbus_context.pools.borrow().get_by_first(path) {
+    let pool_name = match dbus_context.pools.borrow().get(path) {
         Some(pool) => pool.clone(),
         None => {
             let items = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
@@ -571,28 +571,14 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
         Ok(RenameAction::Renamed) => {
             let return_value = MessageItem::Bool(true);
-            let removed = dbus_context.pools.borrow_mut().remove_by_second(&old_name);
-            match removed {
-                Some((removed_object_path, _)) => {
-                    if object_path.to_string() == removed_object_path {
-                        dbus_context.pools
-                            .borrow_mut()
-                            .insert(removed_object_path, new_name.into());
-                        let (rc, rs) = ok_message_items();
-                        return_message.append3(return_value, rc, rs)
-                    } else {
-                        let error_message = format!("wrong dbus object_path for renamed pool");
-                        let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
-                                                             error_message);
-                        return_message.append3(return_value, rc, rs)
-                    }
-                }
-                None => {
-                    let error_message = format!("no dbus object path for renamed pool");
-                    let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
-                                                         error_message);
-                    return_message.append3(return_value, rc, rs)
-                }
+            if let Some(name) = dbus_context.pools.borrow_mut().get_mut(&object_path) {
+                *name = new_name.into();
+                let (rc, rs) = ok_message_items();
+                return_message.append3(return_value, rc, rs)
+            } else {
+                let error_message = format!("wrong dbus object_path for renamed pool");
+                let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, error_message);
+                return_message.append3(return_value, rc, rs)
             }
         }
         Err(err) => {
@@ -609,7 +595,7 @@ fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
     let object_path = p.path.get_name();
     i.append(try!(dbus_context.pools
         .borrow()
-        .get_by_first(object_path as &str)
+        .get(object_path)
         .ok_or(MethodErr::failed(&format!("no name for pool with object path {}", object_path)))));
     Ok(())
 }
@@ -618,7 +604,7 @@ fn get_pool_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
     let pools = dbus_context.pools.borrow();
-    let name = try!(pools.get_by_first(object_path as &str)
+    let name = try!(pools.get(object_path)
         .ok_or(MethodErr::failed(&format!("no name for pool with object path {}", object_path))));
 
     let mut engine = dbus_context.engine.borrow_mut();
@@ -718,7 +704,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match result {
         Ok(devnodes) => {
             let object_path: dbus::Path = create_dbus_pool(dbus_context);
-            dbus_context.pools.borrow_mut().insert(object_path.to_string(), String::from(name));
+            dbus_context.pools.borrow_mut().insert(object_path.clone(), String::from(name));
             let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
             let paths = paths.map(|x| MessageItem::Str(x)).collect();
             let return_path = MessageItem::ObjectPath(object_path);
@@ -745,7 +731,6 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut iter = message.iter_init();
 
     let object_path: dbus::Path<'static> = try!(get_next_arg(&mut iter, 0));
-    let object_path_str = object_path.as_cstr().to_str().unwrap();
 
     let dbus_context = m.tree.get_data();
     let ref engine = dbus_context.engine;
@@ -754,15 +739,17 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
 
     let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, object_path_str);
+        object_path_to_pool_name(dbus_context, &object_path);
         default_return; return_message);
 
     let result = engine.borrow_mut().destroy_pool(&pool_name);
 
     let msg = match result {
         Ok(action) => {
-            dbus_context.pools.borrow_mut().remove_by_first(object_path_str);
-            dbus_context.actions.borrow_mut().push_remove(object_path_str.into());
+            dbus_context.pools.borrow_mut().remove(&object_path);
+            dbus_context.actions
+                .borrow_mut()
+                .push_remove(object_path.as_cstr().to_str().unwrap().into());
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::Bool(action), rc, rs)
         }

@@ -10,17 +10,13 @@ extern crate libstratis;
 mod util;
 
 use devicemapper::DM;
-
 use libstratis::engine::strat_engine::blockdev;
-use libstratis::engine::strat_engine::blockdev::BlockDev;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 use libstratis::engine::strat_engine::thinpooldev::ThinPoolDev;
+use libstratis::types::DataBlocks;
 use libstratis::types::Sectors;
 
-use std::iter::FromIterator;
 use std::path::Path;
-use std::thread;
-use std::time::Duration;
 
 use util::blockdev_utils::clean_blockdev_headers;
 use util::blockdev_utils::get_size;
@@ -32,9 +28,58 @@ use util::test_result::TestResult;
 
 use uuid::Uuid;
 
-fn test_thinpool_setup(dm: &DM, blockdev_paths: &Vec<&Path>) -> TestResult<(ThinPoolDev)> {}
+/// Validate the blockdev_paths are unique
+/// Initialize the list for use with Stratis
+/// Create a thin-pool via ThinPoolDev
+/// Validate the resulting thin-pool dev and meta dev
+fn test_thinpool_setup(dm: &DM,
+                       thinpool_dev: &mut ThinPoolDev,
+                       blockdev_paths: &Vec<&Path>)
+                       -> TestResult<()> {
+
+    let uuid = Uuid::new_v4();
+
+    let unique_blockdevs = match blockdev::resolve_devices(blockdev_paths) {
+        Ok(devs) => devs,
+        Err(e) => {
+            let message = format!("Failed to resolve starting set of blockdevs:{:?}", e);
+            return Err(Framework(Error(message)));
+        }
+    };
+
+    let blockdev_map = match blockdev::initialize(&uuid, unique_blockdevs, MIN_MDA_SECTORS, true) {
+        Ok(blockdev_map) => blockdev_map,
+        Err(e) => {
+            let message = format!("Failed to initialize starting set of blockdevs {:?}", e);
+            return Err(Framework(Error(message)));
+        }
+    };
+
+    let (_first_key, metadata_blockdev) = blockdev_map.iter().next().unwrap();
+    let (_last_key, data_blockdev) = blockdev_map.iter().next_back().unwrap();
+    let (_start_sector, length) = data_blockdev.avail_range();
+
+    match thinpool_dev.setup(dm,
+                             &length,
+                             &Sectors(1024),
+                             &DataBlocks(256000),
+                             metadata_blockdev,
+                             data_blockdev) {
+        Ok(_) => info!("completed test on {:?}", thinpool_dev.name),
+        Err(e) => {
+            let message = format!("Failed to initialize starting set of blockdevs {:?}", e);
+            return Err(Framework(Error(message)));
+        }
+    }
+
+    Ok(())
+}
 
 #[test]
+/// Get list of safe to destroy devices.
+/// Clean any headers from the devices.
+/// Test creating a thin-pool device
+/// Teardown the DM device
 pub fn test_thinpoolsetup_setup() {
 
     let dm = DM::new().unwrap();
@@ -45,8 +90,9 @@ pub fn test_thinpoolsetup_setup() {
 
     let safe_to_destroy_devs = match test_config.get_safe_to_destroy_devs() {
         Ok(devs) => {
-            if devs.len() == 0 {
-                warn!("No devs availabe for testing.  Test not run");
+            if devs.len() < 2 {
+                warn!("test_thinpoolsetup_setup requires at least 2 devices to run.  Test not \
+                       run.");
                 return;
             }
             devs
@@ -63,24 +109,24 @@ pub fn test_thinpoolsetup_setup() {
     clean_blockdev_headers(&device_paths);
     info!("devices cleaned for test");
 
-    assert!(match test_thinpool_setup(&dm, &device_paths) {
-        Ok(thinpool_dev) => {
-            info!("Linear dev name : {:?}", thinpool_dev.name());
-            let name = match thinpool_dev.name() {
-                Ok(n) => n,
-                Err(e) => panic!("Failed to get lineardev name {:?} ", e),
-            };
-            info!("completed test on {}", name);
+    let name = "stratis_testing_thinpool";
 
-            match thinpool_dev.teardown(&dm) {
-                Ok(_) => info!("completed teardown of {}", name),
-                Err(e) => panic!("Failed to teardown {} : {:?}", name, e),
-            }
+    let mut thinpool_dev = ThinPoolDev::new(name);
+
+    match test_thinpool_setup(&dm, &mut thinpool_dev, &device_paths) {
+        Ok(_) => {
+            info!("completed test on {}", name);
             true
         }
         Err(e) => {
-            error!("Failed : test_lineardev_concat : {:?}", e);
+            error!("Failed : test_thinpoolsetup_setup : {:?}", e);
             false
         }
-    });
+    };
+
+    match thinpool_dev.teardown(&dm) {
+        Ok(_) => info!("completed teardown of {}", name),
+        Err(e) => panic!("Failed to teardown {} : {:?}", name, e),
+    }
+
 }

@@ -11,7 +11,7 @@ build:
 
 test:
 	cargo test -- --skip test_pools --skip test_blockdev_setup \
-		--skip test_lineardev_setup
+		--skip test_lineardev_setup --skip test_thinpoolsetup_setup
 
 docs:
 	cargo doc --no-deps

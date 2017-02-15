@@ -16,7 +16,6 @@ pub struct SimFilesystem {
     pub name: String,
     pub mount_point: String,
     pub quota_size: Bytes,
-    pub nearest_ancestor: Option<Uuid>,
 }
 
 impl SimFilesystem {
@@ -30,8 +29,13 @@ impl SimFilesystem {
             name: name.to_owned(),
             mount_point: mount_point.to_owned(),
             quota_size: quota_size.unwrap_or(DEFAULT_FILESYSTEM_QUOTA_SIZE),
-            nearest_ancestor: None,
         }
+    }
+}
+
+impl Filesystem for SimFilesystem {
+    fn rename(&mut self, name: &str) {
+        self.name = name.to_owned();
     }
 }
 
@@ -46,5 +50,3 @@ impl HasUuid for SimFilesystem {
         &self.fs_id
     }
 }
-
-impl Filesystem for SimFilesystem {}

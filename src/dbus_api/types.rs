@@ -2,8 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use bidir_map::BidirMap;
-
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::collections::vec_deque::{Drain, VecDeque};
@@ -12,6 +10,8 @@ use std::rc::Rc;
 
 use dbus::Path;
 use dbus::tree::{DataType, MTFn, ObjectPath};
+
+use uuid::Uuid;
 
 use engine::Engine;
 
@@ -82,10 +82,10 @@ pub enum DeferredAction {
 #[derive(Debug, Clone)]
 pub struct DbusContext {
     pub next_index: Rc<Cell<u64>>,
-    pub pools: Rc<RefCell<HashMap<Path<'static>, String>>>,
+    pub pools: Rc<RefCell<HashMap<Path<'static>, Uuid>>>,
     pub engine: Rc<RefCell<Box<Engine>>>,
     pub actions: Rc<RefCell<ActionQueue>>,
-    pub filesystems: Rc<RefCell<BidirMap<String, (String, String)>>>,
+    pub filesystems: Rc<RefCell<HashMap<Path<'static>, (Uuid, Uuid)>>>,
 }
 
 impl DbusContext {
@@ -93,7 +93,7 @@ impl DbusContext {
         DbusContext {
             actions: Rc::new(RefCell::new(ActionQueue::new())),
             engine: Rc::new(RefCell::new(engine)),
-            filesystems: Rc::new(RefCell::new(BidirMap::new())),
+            filesystems: Rc::new(RefCell::new(HashMap::new())),
             next_index: Rc::new(Cell::new(0)),
             pools: Rc::new(RefCell::new(HashMap::new())),
         }

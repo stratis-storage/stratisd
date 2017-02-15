@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::borrow::Cow;
-use std::convert::From;
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::path::Path;
 use std::vec::Vec;
@@ -29,6 +29,8 @@ use dbus::tree::MethodInfo;
 use dbus::tree::PropInfo;
 use dbus::tree::Tree;
 use dbus::ConnectionItem;
+
+use uuid::Uuid;
 
 use super::super::types::Bytes;
 use super::super::stratis::VERSION;
@@ -64,10 +66,10 @@ fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr>
 
 /// Get filesystem name from object path
 fn object_path_to_pair(dbus_context: &DbusContext,
-                       fs_object_path: &str)
-                       -> Result<(String, String), (MessageItem, MessageItem)> {
-    let fs_pool_pair = match dbus_context.filesystems.borrow().get_by_first(fs_object_path) {
-        Some(fs_name) => fs_name.clone(),
+                       fs_object_path: &dbus::Path)
+                       -> Result<(Uuid, Uuid), (MessageItem, MessageItem)> {
+    let fs_pool_pair = match dbus_context.filesystems.borrow().get(fs_object_path) {
+        Some(fs) => fs.clone(),
         None => {
             let items = code_to_message_items(DbusErrorEnum::FILESYSTEM_NOTFOUND,
                                               format!("no filesystem for object path {}",
@@ -80,10 +82,10 @@ fn object_path_to_pair(dbus_context: &DbusContext,
 }
 
 /// Get name for pool from object path
-fn object_path_to_pool_name(dbus_context: &DbusContext,
+fn object_path_to_pool_uuid(dbus_context: &DbusContext,
                             path: &dbus::Path)
-                            -> Result<String, (MessageItem, MessageItem)> {
-    let pool_name = match dbus_context.pools.borrow().get(path) {
+                            -> Result<Uuid, (MessageItem, MessageItem)> {
+    let uuid = match dbus_context.pools.borrow().get(path) {
         Some(pool) => pool.clone(),
         None => {
             let items = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
@@ -91,17 +93,17 @@ fn object_path_to_pool_name(dbus_context: &DbusContext,
             return Err(items);
         }
     };
-    Ok(pool_name)
+    Ok(uuid)
 }
 
 /// Macro for early return with Ok dbus message on failure to get pool.
 macro_rules! get_pool {
-    ( $engine:ident; $name:ident; $default:expr; $message:expr ) => {
-        match $engine.get_pool(&$name) {
+    ( $engine:ident; $uuid:ident; $default:expr; $message:expr ) => {
+        match $engine.get_pool(&$uuid) {
             Some(pool) => pool,
             None => {
                 let (rc, rs) = code_to_message_items(DbusErrorEnum::POOL_NOTFOUND,
-                                                     format!("no pool for name {}", $name));
+                                                     format!("no pool for uuid {}", $uuid));
                 return Ok(vec![$message.append3($default, rc, rs)]);
             }
         }
@@ -116,44 +118,6 @@ macro_rules! dbus_try {
                 return Ok(vec![$message.append3($default, rc, rs)]);
             }
         };
-    }
-}
-
-macro_rules! dbus_try_0 {
-    ( $val:expr; $message:expr ) => {
-        match $val {
-            Ok(v) => v,
-            Err((rc, rs)) => {
-                return Ok(vec![$message.append2(rc, rs)]);
-            }
-        };
-    }
-}
-
-/// Macros for early return with an Ok dbus message on an engine error
-macro_rules! engine_try {
-    ( $val:expr; $default:expr; $message:expr ) => {
-        match $val {
-            Ok(result) => result,
-            Err(x) => {
-                let (rc, rs) = engine_to_dbus_err(&x);
-                let (rc, rs) = code_to_message_items(rc, rs);
-                return Ok(vec![$message.append3($default, rc, rs)]);
-            }
-        }
-    }
-}
-
-macro_rules! engine_try_0 {
-    ( $val:expr; $message:expr ) => {
-        match $val {
-            Ok(result) => result,
-            Err(x) => {
-                let (rc, rs) = engine_to_dbus_err(&x);
-                let (rc, rs) = code_to_message_items(rc, rs);
-                return Ok(vec![$message.append2(rc, rs)]);
-            }
-        }
     }
 }
 
@@ -252,26 +216,25 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_sig = "(os)";
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
-    let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, object_path);
+    let pool_uuid = dbus_try!(
+        object_path_to_pool_uuid(dbus_context, object_path);
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = get_pool!(b_engine; pool_name; default_return; return_message);
+    let ref mut pool = get_pool!(b_engine; pool_uuid; default_return; return_message);
 
     let specs = filesystems.map(|x| (x.0, x.1, tuple_to_option(x.2).map(|x| Bytes(x))))
         .collect::<Vec<(&str, &str, Option<Bytes>)>>();
     let result = pool.create_filesystems(&specs);
 
     let msg = match result {
-        Ok(ref names) => {
+        Ok(ref infos) => {
             let mut return_value = Vec::new();
-            for name in names {
+            for &(name, uuid) in infos {
                 let fs_object_path: dbus::Path = create_dbus_filesystem(dbus_context);
                 dbus_context.filesystems
                     .borrow_mut()
-                    .insert(fs_object_path.to_string(),
-                            (pool_name.clone(), (*name).into()));
+                    .insert(fs_object_path.clone(), (pool_uuid.clone(), uuid));
                 return_value.push((fs_object_path, name));
             }
 
@@ -296,9 +259,8 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 }
 
 fn create_snapshot(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
+    let message = m.msg;
     let mut iter = message.iter_init();
-
     let snapshot_name: &str = try!(get_next_arg(&mut iter, 0));
 
     let dbus_context = m.tree.get_data();
@@ -306,20 +268,20 @@ fn create_snapshot(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = MessageItem::ObjectPath(default_object_path());
 
-    let (pool_name, filesystem_name) = dbus_try!(object_path_to_pair(dbus_context, object_path);
-		            default_return; return_message);
+    let (pool_uuid, fs_uuid) = dbus_try!(object_path_to_pair(dbus_context, object_path);
+                                         default_return; return_message);
 
-    let mut b_engine = dbus_context.engine.borrow_mut();
-    let pool = get_pool!(b_engine; pool_name; default_return; return_message);
+    let mut engine = dbus_context.engine.borrow_mut();
+    let pool = get_pool!(engine; pool_uuid; default_return; return_message);
 
-    let msg = match pool.create_snapshot(snapshot_name, &filesystem_name) {
-        Ok(_) => {
-            let object_path: dbus::Path = create_dbus_filesystem(dbus_context);
-            dbus_context.filesystems.borrow_mut().insert(object_path.to_string(),
-                                                         ((&pool_name).clone(),
-                                                          String::from(snapshot_name)));
+    let msg = match pool.create_snapshot(snapshot_name, &fs_uuid) {
+        Ok(sn_uuid) => {
+            let fs_object_path = create_dbus_filesystem(dbus_context);
+            dbus_context.filesystems
+                .borrow_mut()
+                .insert(fs_object_path.clone(), (pool_uuid, sn_uuid));
             let (rc, rs) = ok_message_items();
-            return_message.append3(MessageItem::ObjectPath(object_path), rc, rs)
+            return_message.append3(MessageItem::ObjectPath(fs_object_path), rc, rs)
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err(&err);
@@ -349,20 +311,20 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = MessageItem::Bool(false);
 
-    let (pool_name, filesystem_name) = dbus_try!(
+    let (pool_uuid, filesystem_uuid) = dbus_try!(
         object_path_to_pair(dbus_context, object_path);
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = get_pool!(b_engine; pool_name; default_return; return_message);
+    let ref mut pool = get_pool!(b_engine; pool_uuid; default_return; return_message);
 
-    let result = pool.rename_filesystem(&filesystem_name, &new_name);
+    let result = pool.rename_filesystem(&filesystem_uuid, &new_name);
 
     let msg = match result {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about filesystem {} on pool {}",
-                                        filesystem_name,
-                                        pool_name);
+                                        filesystem_uuid,
+                                        pool_uuid);
             let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, error_message);
             return_message.append3(default_return, rc, rs)
         }
@@ -371,33 +333,8 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return_message.append3(default_return, rc, rs)
         }
         Ok(RenameAction::Renamed) => {
-            let return_value = MessageItem::Bool(true);
-            let removed = dbus_context.filesystems
-                .borrow_mut()
-                .remove_by_second(&(pool_name.clone(), filesystem_name.into()));
-            match removed {
-                Some((removed_object_path, _)) => {
-                    if object_path.to_string() == removed_object_path {
-                        dbus_context.filesystems
-                            .borrow_mut()
-                            .insert(removed_object_path, (pool_name.into(), new_name.into()));
-                        let (rc, rs) = ok_message_items();
-                        return_message.append3(return_value, rc, rs)
-                    } else {
-                        let error_message = format!("wrong dbus object_path for renamed \
-                                                    filesystem");
-                        let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
-                                                             error_message);
-                        return_message.append3(return_value, rc, rs)
-                    }
-                }
-                None => {
-                    let error_message = format!("no dbus object path for renamed filesystem");
-                    let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
-                                                         error_message);
-                    return_message.append3(return_value, rc, rs)
-                }
-            }
+            let (rc, rs) = ok_message_items();
+            return_message.append3(MessageItem::Bool(true), rc, rs)
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err(&err);
@@ -413,12 +350,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let filesystems: Array<&str, _> = try!(get_next_arg(&mut iter, 0));
-
-    let mut filesystem_names = Vec::new();
-    for name in filesystems {
-        filesystem_names.push(name);
-    }
+    let filesystems: Array<dbus::Path<'static>, _> = try!(get_next_arg(&mut iter, 0));
 
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
@@ -426,28 +358,36 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_sig = "s";
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
-    let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, object_path);
+    let pool_uuid = dbus_try!(
+        object_path_to_pool_uuid(dbus_context, object_path);
         default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = get_pool!(b_engine; pool_name; default_return; return_message);
+    let ref mut pool = get_pool!(b_engine; pool_uuid; default_return; return_message);
 
-    let result = pool.destroy_filesystems(&filesystem_names);
+    let mut filesystem_map: HashMap<Uuid, dbus::Path<'static>> = HashMap::new();
+    let mut filesystem_uuids: Vec<Uuid> = Vec::new();
+    for op in filesystems {
+        let (_, filesystem_uuid) = dbus_try!(object_path_to_pair(dbus_context, object_path);
+		                                     default_return; return_message);
+        filesystem_map.insert(filesystem_uuid.clone(), op);
+        filesystem_uuids.push(filesystem_uuid);
+    }
+
+
+    let result = pool.destroy_filesystems(&filesystem_uuids);
     let msg = match result {
-        Ok(ref names) => {
-            for name in names {
-                match dbus_context.filesystems
+        Ok(ref uuids) => {
+            for uuid in uuids {
+                let op = filesystem_map.get(uuid).unwrap();
+                dbus_context.filesystems.borrow_mut().remove(op);
+                dbus_context.actions
                     .borrow_mut()
-                    .remove_by_second(&(pool_name.clone(), (*name).into())) {
-                    Some((object_path, _)) => {
-                        dbus_context.actions.borrow_mut().push_remove(object_path);
-                    }
-                    _ => {}
-                }
+                    .push_remove(op.as_cstr().to_str().unwrap().into());
             }
 
-            let return_value = names.iter().map(|n| MessageItem::Str((*n).into())).collect();
+            let return_value =
+                uuids.iter().map(|n| MessageItem::Str(format!("{}", n.simple()))).collect();
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::Array(return_value, return_sig.into()), rc, rs)
         }
@@ -474,7 +414,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, object_path);
+        object_path_to_pool_uuid(dbus_context, object_path);
         default_return;
         return_message);
 
@@ -515,7 +455,7 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, object_path);
+        object_path_to_pool_uuid(dbus_context, object_path);
         default_return;
         return_message);
 
@@ -552,16 +492,16 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = MessageItem::Bool(false);
 
-    let old_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, object_path);
+    let uuid = dbus_try!(
+        object_path_to_pool_uuid(dbus_context, object_path);
         default_return; return_message);
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let result = engine.rename_pool(&old_name, new_name);
+    let result = engine.rename_pool(&uuid, new_name);
 
     let msg = match result {
         Ok(RenameAction::NoSource) => {
-            let error_message = format!("engine doesn't know about pool {}", old_name);
+            let error_message = format!("engine doesn't know about pool {}", uuid);
             let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, error_message);
             return_message.append3(default_return, rc, rs)
         }
@@ -570,16 +510,8 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return_message.append3(MessageItem::Bool(false), rc, rs)
         }
         Ok(RenameAction::Renamed) => {
-            let return_value = MessageItem::Bool(true);
-            if let Some(name) = dbus_context.pools.borrow_mut().get_mut(&object_path) {
-                *name = new_name.into();
-                let (rc, rs) = ok_message_items();
-                return_message.append3(return_value, rc, rs)
-            } else {
-                let error_message = format!("wrong dbus object_path for renamed pool");
-                let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, error_message);
-                return_message.append3(return_value, rc, rs)
-            }
+            let (rc, rs) = ok_message_items();
+            return_message.append3(MessageItem::Bool(true), rc, rs)
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err(&err);
@@ -590,13 +522,30 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+fn get_pool_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
     i.append(try!(dbus_context.pools
         .borrow()
         .get(object_path)
-        .ok_or(MethodErr::failed(&format!("no name for pool with object path {}", object_path)))));
+        .map(|x| format!("{}", x.simple()))
+        .ok_or(MethodErr::failed(&format!("no uuid for pool with object path {}", object_path)))));
+    Ok(())
+}
+
+fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+    let dbus_context = p.tree.get_data();
+    let object_path = p.path.get_name();
+    let uuid = try!(dbus_context.pools
+        .borrow()
+        .get(object_path)
+        .map(|x| x.clone())
+        .ok_or(MethodErr::failed(&format!("no uuid for pool with object path {}", object_path))));
+    i.append(try!(dbus_context.engine
+        .borrow_mut()
+        .get_pool(&uuid)
+        .map(|x| x.name().to_owned())
+        .ok_or(MethodErr::failed(&format!("no name for pool with uuid {}", &uuid)))));
     Ok(())
 }
 
@@ -611,7 +560,7 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_string", "s"));
 
     let destroy_filesystems_method = f.method("DestroyFilesystems", (), destroy_filesystems)
-        .in_arg(("filesystems", "as"))
+        .in_arg(("filesystems", "ao"))
         .out_arg(("results", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
@@ -641,6 +590,11 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_pool_name);
 
+    let uuid_property = f.property::<&str, _>("Uuid", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_pool_uuid);
+
     let object_name = format!("{}/{}",
                               STRATIS_BASE_PATH,
                               dbus_context.get_next_id().to_string());
@@ -655,7 +609,8 @@ fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
             .add_m(add_cache_devs_method)
             .add_m(add_devs_method)
             .add_m(rename_method)
-            .add_p(name_property));
+            .add_p(name_property)
+            .add_p(uuid_property));
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
@@ -681,9 +636,9 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
 
     let msg = match result {
-        Ok(devnodes) => {
+        Ok((uuid, devnodes)) => {
             let object_path: dbus::Path = create_dbus_pool(dbus_context);
-            dbus_context.pools.borrow_mut().insert(object_path.clone(), String::from(name));
+            dbus_context.pools.borrow_mut().insert(object_path.clone(), uuid);
             let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
             let paths = paths.map(|x| MessageItem::Str(x)).collect();
             let return_path = MessageItem::ObjectPath(object_path);
@@ -718,7 +673,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
 
     let pool_name = dbus_try!(
-        object_path_to_pool_name(dbus_context, &object_path);
+        object_path_to_pool_uuid(dbus_context, &object_path);
         default_return; return_message);
 
     let result = engine.borrow_mut().destroy_pool(&pool_name);

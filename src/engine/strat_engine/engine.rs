@@ -17,6 +17,7 @@ use engine::RenameAction;
 
 use super::pool::StratPool;
 
+use super::super::engine::{HasName, HasUuid};
 use super::super::structures::Table;
 
 #[derive(Debug)]
@@ -47,7 +48,7 @@ impl Engine for StratEngine {
                    blockdev_paths: &[&Path],
                    redundancy: Option<u16>,
                    force: bool)
-                   -> EngineResult<Vec<PathBuf>> {
+                   -> EngineResult<(Uuid, Vec<PathBuf>)> {
 
         let redundancy = calculate_redundancy!(redundancy);
 
@@ -58,20 +59,21 @@ impl Engine for StratEngine {
         let pool = try!(StratPool::new(name, blockdev_paths, redundancy, force));
         let bdev_paths = pool.block_devs.iter().map(|p| p.1.devnode.clone()).collect();
 
+        let uuid = pool.uuid().clone();
         self.pools.insert(pool);
-        Ok(bdev_paths)
+        Ok((uuid, bdev_paths))
     }
 
     /// Destroy a pool, if the pool does not exist, return Ok.
-    fn destroy_pool(&mut self, name: &str) -> EngineResult<bool> {
-        destroy_pool!{self; name}
+    fn destroy_pool(&mut self, uuid: &Uuid) -> EngineResult<bool> {
+        destroy_pool!{self; uuid}
     }
 
-    fn rename_pool(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
-        rename_pool!{self; old_name; new_name}
+    fn rename_pool(&mut self, uuid: &Uuid, new_name: &str) -> EngineResult<RenameAction> {
+        rename_pool!{self; uuid; new_name}
     }
 
-    fn get_pool(&mut self, name: &str) -> Option<&mut Pool> {
-        get_pool!(self; name)
+    fn get_pool(&mut self, uuid: &Uuid) -> Option<&mut Pool> {
+        get_pool!(self; uuid)
     }
 }

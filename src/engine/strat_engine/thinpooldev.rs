@@ -80,6 +80,12 @@ impl ThinPoolDev {
         Ok(())
     }
 
+    pub fn message(&self, dm: &DM, message: &str) -> EngineResult<()> {
+        try!(dm.target_msg(&DevId::Name(&self.name), 0, message));
+
+        Ok(())
+    }
+
     pub fn teardown(&mut self, dm: &DM) -> EngineResult<()> {
         try!(dm.device_remove(&DevId::Name(&self.name), DmFlags::empty()));
 

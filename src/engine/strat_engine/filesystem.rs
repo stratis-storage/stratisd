@@ -11,12 +11,13 @@ use super::super::engine::{HasName, HasUuid};
 #[derive(Debug)]
 pub struct StratFilesystem {
     pub fs_id: Uuid,
+    pub name: String,
     pub thin_id: u32,
 }
 
 impl HasName for StratFilesystem {
     fn name(&self) -> &str {
-        "dummy"
+        &self.name
     }
 }
 
@@ -26,4 +27,8 @@ impl HasUuid for StratFilesystem {
     }
 }
 
-impl Filesystem for StratFilesystem {}
+impl Filesystem for StratFilesystem {
+    fn rename(&mut self, name: &str) {
+        self.name = name.to_owned();
+    }
+}

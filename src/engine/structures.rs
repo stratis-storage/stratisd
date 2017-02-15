@@ -54,7 +54,6 @@ impl<T: HasName + HasUuid> Table<T> {
     }
 
     /// Get item by uuid.
-    #[allow(dead_code)]
     pub fn get_by_uuid(&self, uuid: &Uuid) -> Option<&T> {
         self.uuid_map.get(uuid).map(|index| &self.items[*index])
     }
@@ -69,7 +68,6 @@ impl<T: HasName + HasUuid> Table<T> {
     }
 
     /// Get mutable item by uuid.
-    #[allow(dead_code)]
     pub fn get_mut_by_uuid(&mut self, uuid: &Uuid) -> Option<&mut T> {
         if let Some(index) = self.uuid_map.get(uuid) {
             Some(&mut self.items[*index])

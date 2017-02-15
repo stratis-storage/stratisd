@@ -9,8 +9,9 @@ they're testing).
 
 ## Running the tests
 
-Modify `tests/test_config.json` ok_to_destroy_dev_array_key to have a list of
-paths to scratch block devices. For example:
+Copy `tests/test_config.json.example` to `tests/test_config.json` and modify
+ok_to_destroy_dev_array_key to have a list of paths to scratch block
+devices. For example:
 
 ```
 {
@@ -30,10 +31,10 @@ devices, and to create device-mapper targets.)
 
 ## Logging
 
-Integration test logging is done via the crate env_logger.  See : 
-https://doc.rust-lang.org/log/env_logger/ for details.
+Integration test logging is done via the crate env_logger. See
+[here](https://doc.rust-lang.org/log/env_logger/) for details.
 
 Example: To enable logging for specific modules set:
 
-RUST_LOG=blockdev_tests=debug,pool_tests=debug,util::test_results=debug
+`RUST_LOG=blockdev_tests=debug,pool_tests=debug,util::test_results=debug`
 

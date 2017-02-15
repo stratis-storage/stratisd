@@ -150,9 +150,10 @@ impl serde::Deserialize for Sectors {
 
 // A type for Data Blocks as used by the thin pool.
 custom_derive! {
-    #[derive(NewtypeFrom, NewtypeAdd, NewtypeSub, NewtypeDeref,
-             NewtypeBitAnd, NewtypeNot, NewtypeDiv, NewtypeRem,
-             NewtypeMul,
+    #[derive(NewtypeAdd, NewtypeAddAssign,
+             NewtypeDeref,
+             NewtypeFrom,
+             NewtypeSub,
              Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
     pub struct DataBlocks(pub u64);
 }

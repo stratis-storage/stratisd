@@ -13,7 +13,6 @@ extern crate clap;
 #[macro_use]
 extern crate nix;
 extern crate crc;
-extern crate bidir_map;
 extern crate byteorder;
 extern crate uuid;
 extern crate time;

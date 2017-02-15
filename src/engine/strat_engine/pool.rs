@@ -15,6 +15,7 @@ use serde_json;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
+use engine::Filesystem;
 use engine::Pool;
 use engine::RenameAction;
 use engine::engine::Redundancy;
@@ -131,14 +132,14 @@ impl StratPool {
 impl Pool for StratPool {
     fn create_filesystems<'a, 'b, 'c>(&'a mut self,
                                       _specs: &[(&'b str, &'c str, Option<Bytes>)])
-                                      -> EngineResult<Vec<&'b str>> {
+                                      -> EngineResult<Vec<(&'b str, Uuid)>> {
         unimplemented!()
     }
 
     fn create_snapshot<'a, 'b, 'c>(&'a mut self,
                                    _snapshot_name: &'b str,
-                                   _source: &'c str)
-                                   -> EngineResult<&'b str> {
+                                   _source: &'c Uuid)
+                                   -> EngineResult<Uuid> {
         unimplemented!()
     }
 
@@ -174,14 +175,12 @@ impl Pool for StratPool {
         Ok(())
     }
 
-    fn destroy_filesystems<'a, 'b>(&'a mut self,
-                                   fs_names: &[&'b str])
-                                   -> EngineResult<Vec<&'b str>> {
-        destroy_filesystems!{self; fs_names}
+    fn destroy_filesystems<'a, 'b>(&'a mut self, fs_uuids: &'b [Uuid]) -> EngineResult<Vec<Uuid>> {
+        destroy_filesystems!{self; fs_uuids}
     }
 
-    fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
-        rename_filesystem!{self; old_name; new_name}
+    fn rename_filesystem(&mut self, uuid: &Uuid, new_name: &str) -> EngineResult<RenameAction> {
+        rename_filesystem!{self; uuid; new_name}
     }
 
     fn rename(&mut self, name: &str) {

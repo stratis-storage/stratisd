@@ -14,7 +14,7 @@ use types::Sectors;
 
 pub struct ThinPoolDev {
     pub name: String,
-    dev_info: Option<DeviceInfo>,
+    pub dev_info: Option<DeviceInfo>,
     data_block_size: Option<Sectors>,
     pub low_water_mark: Option<DataBlocks>, // How close to full before we are worried?
     pub meta_dev: Option<BlockDev>,

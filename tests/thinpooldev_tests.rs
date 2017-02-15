@@ -25,9 +25,6 @@ use util::blockdev_utils::clean_blockdev_headers;
 use util::blockdev_utils::wait_for_dm;
 use util::test_config::TestConfig;
 use util::test_consts::DEFAULT_CONFIG_FILE;
-use util::test_result::TestError::Framework;
-use util::test_result::TestErrorEnum::Error;
-use util::test_result::TestResult;
 
 use uuid::Uuid;
 
@@ -36,52 +33,21 @@ fn setup_supporting_devs(dm: &DM,
                          data_dev: &mut LinearDev,
                          metadata_blockdev: &BlockDev,
                          data_blockdev: &BlockDev)
-                         -> TestResult<(PathBuf, PathBuf)> {
+                         -> (PathBuf, PathBuf) {
 
-    let mut meta_blockdevs = Vec::new();
-    meta_blockdevs.push(metadata_blockdev);
+    let meta_blockdevs = vec![metadata_blockdev];
+    metadata_dev.concat(dm, &meta_blockdevs).unwrap();
 
-    match metadata_dev.concat(dm, &meta_blockdevs) {
-        Ok(_) => {}
-        Err(e) => {
-            let message = format!("metadata.concat failed : {:?}", e);
-            return Err(Framework(Error(message)));
-        }
+    let data_blockdevs = vec![data_blockdev];
+    data_dev.concat(dm, &data_blockdevs).unwrap();
 
-    }
+    let metadata_path = metadata_dev.path().unwrap().unwrap();
 
-    let mut data_blockdevs = Vec::new();
-    data_blockdevs.push(data_blockdev);
-
-
-    match data_dev.concat(dm, &data_blockdevs) {
-        Ok(_) => {}
-        Err(e) => {
-            let message = format!("datadev.concat failed : {:?}", e);
-            return Err(Framework(Error(message)));
-        }
-
-    }
-
-    let metadata_path = match metadata_dev.path() {
-        Ok(path) => path.unwrap().clone(),
-        Err(e) => {
-            let message = format!("Failed to get data path : {:?}", e);
-            return Err(Framework(Error(message)));
-        }
-    };
-
-    let data_path = match data_dev.path() {
-        Ok(path) => path.unwrap().clone(),
-        Err(e) => {
-            let message = format!("Failed to get data path : {:?}", e);
-            return Err(Framework(Error(message)));
-        }
-    };
+    let data_path = data_dev.path().unwrap().unwrap();
 
     wait_for_dm();
 
-    Ok((metadata_path, data_path))
+    (metadata_path, data_path)
 }
 /// Validate the blockdev_paths are unique
 /// Initialize the list for use with Stratis
@@ -91,56 +57,31 @@ fn test_thinpool_setup(dm: &DM,
                        thinpool_dev: &mut ThinPoolDev,
                        metadata_dev: &mut LinearDev,
                        data_dev: &mut LinearDev,
-                       blockdev_paths: &Vec<&Path>)
-                       -> TestResult<()> {
+                       blockdev_paths: &Vec<&Path>) {
 
     let uuid = Uuid::new_v4();
 
-    let unique_blockdevs = match blockdev::resolve_devices(blockdev_paths) {
-        Ok(devs) => devs,
-        Err(e) => {
-            let message = format!("Failed to resolve starting set of blockdevs:{:?}", e);
-            return Err(Framework(Error(message)));
-        }
-    };
+    let unique_blockdevs = blockdev::resolve_devices(blockdev_paths).unwrap();
 
-    let blockdev_map = match blockdev::initialize(&uuid, unique_blockdevs, MIN_MDA_SECTORS, true) {
-        Ok(blockdev_map) => blockdev_map,
-        Err(e) => {
-            let message = format!("Failed to initialize starting set of blockdevs {:?}", e);
-            return Err(Framework(Error(message)));
-        }
-    };
+    let blockdev_map = blockdev::initialize(&uuid, unique_blockdevs, MIN_MDA_SECTORS, true)
+        .unwrap();
 
     let (_first_key, metadata_blockdev) = blockdev_map.iter().next().unwrap();
     let (_last_key, data_blockdev) = blockdev_map.iter().next_back().unwrap();
     let (_start_sector, length) = data_blockdev.avail_range();
 
     let (metadata_path, data_path) =
-        match setup_supporting_devs(dm, metadata_dev, data_dev, metadata_blockdev, data_blockdev) {
-            Ok(tuple) => tuple,
-            Err(e) => {
-                let message = format!("Failed to setup_supporting_devs : {:?}", e);
-                return Err(Framework(Error(message)));
-            }
-        };
+        setup_supporting_devs(dm, metadata_dev, data_dev, metadata_blockdev, data_blockdev);
 
-    match thinpool_dev.setup(dm,
-                             &length,
-                             &Sectors(1024),
-                             &DataBlocks(256000),
-                             &metadata_path,
-                             &data_path) {
-        Ok(_) => info!("completed test on {:?}", thinpool_dev.name),
-        Err(e) => {
-            let message = format!("thinpool_dev.setup {:?}", e);
-            return Err(Framework(Error(message)));
-        }
-    }
+    thinpool_dev.setup(dm,
+               length,
+               Sectors(1024),
+               DataBlocks(256000),
+               &metadata_path,
+               &data_path)
+        .unwrap();
 
     wait_for_dm();
-
-    Ok(())
 }
 
 #[test]
@@ -187,31 +128,15 @@ pub fn test_thinpoolsetup_setup() {
     let data_name = "stratis_testing_thinpool_datadev";
     let mut data_dev = LinearDev::new(data_name);
 
-    match test_thinpool_setup(&dm,
-                              &mut thinpool_dev,
-                              &mut metadata_dev,
-                              &mut data_dev,
-                              &device_paths) {
-        Ok(_) => {
-            info!("completed test on {}", name);
-        }
-        Err(e) => {
-            error!("Failed : test_thinpoolsetup_setup : {:?}", e);
-        }
-    };
+    test_thinpool_setup(&dm,
+                        &mut thinpool_dev,
+                        &mut metadata_dev,
+                        &mut data_dev,
+                        &device_paths);
 
-    match thinpool_dev.teardown(&dm) {
-        Ok(_) => info!("completed teardown of {}", name),
-        Err(e) => error!("Failed to teardown {} : {:?}", name, e),
-    }
+    thinpool_dev.teardown(&dm).unwrap();
 
-    match data_dev.teardown(&dm) {
-        Ok(_) => info!("completed teardown of {}", data_name),
-        Err(_) => error!("failed teardown of {}", data_name),
-    }
+    data_dev.teardown(&dm).unwrap();
 
-    match metadata_dev.teardown(&dm) {
-        Ok(_) => info!("completed teardown of {}", meta_name),
-        Err(_) => error!("failed teardown of {}", meta_name),
-    }
+    metadata_dev.teardown(&dm).unwrap();
 }

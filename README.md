@@ -12,6 +12,8 @@ Stratis (which includes [stratisd](https://github.com/stratis-storage/stratisd) 
 
 Stratisd is written in [Rust](https://www.rust-lang.org), which helps the implementation be small, correct, and not require a large language runtime.
 
+Stratisd requires Rust 1.15.1 or later.
+
 ## Documentation
 
 Please see https://stratis-storage.github.io/ and [our documentation repo](https://github.com/stratis-storage/stratis-docs).

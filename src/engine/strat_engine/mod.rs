@@ -9,6 +9,7 @@ pub mod metadata;
 pub mod filesystem;
 pub mod pool;
 pub mod serde_structs;
+pub mod thinpooldev;
 
 pub use self::engine::StratEngine;
 pub use self::pool::StratPool;

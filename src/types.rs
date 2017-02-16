@@ -148,6 +148,33 @@ impl serde::Deserialize for Sectors {
     }
 }
 
+// A type for Data Blocks as used by the thin pool.
+custom_derive! {
+    #[derive(NewtypeAdd, NewtypeAddAssign,
+             NewtypeDeref,
+             NewtypeFrom,
+             NewtypeSub,
+             Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+    pub struct DataBlocks(pub u64);
+}
+
+impl serde::Serialize for DataBlocks {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: serde::Serializer
+    {
+        serializer.serialize_u64(**self)
+    }
+}
+
+impl serde::Deserialize for DataBlocks {
+    fn deserialize<D>(deserializer: D) -> Result<DataBlocks, D::Error>
+        where D: serde::de::Deserializer
+    {
+        let val = try!(serde::Deserialize::deserialize(deserializer));
+        Ok(DataBlocks(val))
+    }
+}
+
 // An error type for errors generated within Stratis
 //
 #[derive(Debug)]

@@ -379,11 +379,9 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match result {
         Ok(ref uuids) => {
             for uuid in uuids {
-                let op = filesystem_map.get(uuid).unwrap();
-                dbus_context.filesystems.borrow_mut().remove(op);
-                dbus_context.actions
-                    .borrow_mut()
-                    .push_remove(op.as_cstr().to_str().unwrap().into());
+                let op = filesystem_map.get(uuid).unwrap().clone();
+                dbus_context.filesystems.borrow_mut().remove(&op);
+                dbus_context.actions.borrow_mut().push_remove(op);
             }
 
             let return_value =
@@ -681,9 +679,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match result {
         Ok(action) => {
             dbus_context.pools.borrow_mut().remove(&object_path);
-            dbus_context.actions
-                .borrow_mut()
-                .push_remove(object_path.as_cstr().to_str().unwrap().into());
+            dbus_context.actions.borrow_mut().push_remove(object_path);
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::Bool(action), rc, rs)
         }
@@ -841,7 +837,7 @@ pub fn run(engine: Box<Engine>) -> StratisResult<()> {
                     }
                     DeferredAction::Remove(path) => {
                         c.unregister_object_path(&path);
-                        tree.remove(&dbus::Path::new(path).unwrap());
+                        tree.remove(&path);
                     }
                 }
             }

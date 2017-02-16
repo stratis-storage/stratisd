@@ -261,7 +261,7 @@ class PoolSpec(InterfaceSpec):
                 [(x, y, _option_to_tuple(quota, 0)) for (x, y, quota) in x]),
           "a(ss(bt))"
        ),
-       MethodNames.DestroyFilesystems: (("names", ), _FALSE, "as"),
+       MethodNames.DestroyFilesystems: (("filesystems", ), _FALSE, "ao"),
        MethodNames.SetName: (("new_name", ), _FALSE, "s")
     }
     OUTPUT_SIGS = {

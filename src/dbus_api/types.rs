@@ -82,7 +82,7 @@ pub enum DeferredAction {
 #[derive(Debug, Clone)]
 pub struct DbusContext {
     pub next_index: Rc<Cell<u64>>,
-    pub pools: Rc<RefCell<HashMap<Path<'static>, Uuid>>>,
+    pub pools: Rc<RefCell<HashMap<Path<'static>, (Path<'static>, Uuid)>>>,
     pub engine: Rc<RefCell<Box<Engine>>>,
     pub actions: Rc<RefCell<ActionQueue>>,
     pub filesystems: Rc<RefCell<HashMap<Path<'static>, (Uuid, Uuid)>>>,

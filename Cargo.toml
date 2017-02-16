@@ -2,10 +2,6 @@
 name = "libstratis"
 version = "0.1.0"
 authors = ["Andy Grover <agrover@redhat.com>", "Mulhern <amulhern@redhat.com>", "Todd Gill <tgill@redhat.com>"]
-build = "build.rs"
-
-[build-dependencies]
-serde_codegen = "0"
 
 [dependencies]
 dbus = "0.5"
@@ -22,6 +18,7 @@ term = "0.4"
 rand = "0.3"
 bidir-map = "0.3"
 serde = "0"
+serde_derive = "0"
 serde_json = "0"
 log = "0.3"
 env_logger="0.3.5"

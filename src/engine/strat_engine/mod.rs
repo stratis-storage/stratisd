@@ -8,10 +8,7 @@ pub mod lineardev;
 pub mod metadata;
 pub mod filesystem;
 pub mod pool;
-
-mod serde_structs {
-    include!(concat!(env!("OUT_DIR"), "/serde_structs.rs"));
-}
+pub mod serde_structs;
 
 pub use self::engine::StratEngine;
 pub use self::pool::StratPool;

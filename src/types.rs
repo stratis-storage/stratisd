@@ -132,7 +132,7 @@ impl Display for Sectors {
 }
 
 impl serde::Serialize for Sectors {
-    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: serde::Serializer
     {
         serializer.serialize_u64(**self)
@@ -140,7 +140,7 @@ impl serde::Serialize for Sectors {
 }
 
 impl serde::Deserialize for Sectors {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Sectors, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Sectors, D::Error>
         where D: serde::de::Deserializer
     {
         let val = try!(serde::Deserialize::deserialize(deserializer));

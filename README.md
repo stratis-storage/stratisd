@@ -13,11 +13,11 @@ RAID-style protection from data loss.
 
 Stratis (which includes [stratisd](https://github.com/stratis-storage/stratisd)
 as well as [stratis-cli](https://github.com/stratis-storage/stratis-cli)),
-attempts to provide VMF-style features by integrating layers of existing
-technology: Linux's devicemapper subsystem, and the non-VMF, high-performance
-XFS filesystem. `stratisd` manages collections of block devices, and exports a
-D-Bus API. Stratis-cli's `stratis` provides a command-line tool which itself
-uses the D-Bus API to communicate with `stratisd`.
+provides VMF-style features by integrating layers of existing technology:
+Linux's devicemapper subsystem, and the non-VMF, high-performance XFS
+filesystem. `stratisd` manages collections of block devices, and exports a D-Bus
+API. Stratis-cli's `stratis` provides a command-line tool which itself uses the
+D-Bus API to communicate with `stratisd`.
 
 ## Implementation
 

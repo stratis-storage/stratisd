@@ -76,7 +76,7 @@ impl DbusErrorEnum {
 #[derive(Debug)]
 pub enum DeferredAction {
     Add(ObjectPath<MTFn<TData>, TData>),
-    Remove(String),
+    Remove(Path<'static>),
 }
 
 #[derive(Debug, Clone)]
@@ -140,7 +140,7 @@ impl ActionQueue {
     }
 
     /// Push a Remove action onto the back of the queue.
-    pub fn push_remove(&mut self, object_path: String) {
+    pub fn push_remove(&mut self, object_path: Path<'static>) {
         self.queue.push_back(DeferredAction::Remove(object_path))
     }
 

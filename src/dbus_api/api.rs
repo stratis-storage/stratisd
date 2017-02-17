@@ -65,9 +65,9 @@ fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr>
 }
 
 /// Get filesystem name from object path
-fn object_path_to_pair(dbus_context: &DbusContext,
-                       fs_object_path: &dbus::Path)
-                       -> Result<(Uuid, Uuid), (MessageItem, MessageItem)> {
+fn fs_object_path_to_pair(dbus_context: &DbusContext,
+                          fs_object_path: &dbus::Path)
+                          -> Result<(dbus::Path<'static>, Uuid), (MessageItem, MessageItem)> {
     let fs_pool_pair = match dbus_context.filesystems.borrow().get(fs_object_path) {
         Some(fs) => fs.clone(),
         None => {
@@ -234,7 +234,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 let fs_object_path: dbus::Path = create_dbus_filesystem(dbus_context);
                 dbus_context.filesystems
                     .borrow_mut()
-                    .insert(fs_object_path.clone(), (pool_uuid.clone(), uuid));
+                    .insert(fs_object_path.clone(), (object_path.clone(), uuid));
                 return_value.push((fs_object_path, name));
             }
 
@@ -268,8 +268,11 @@ fn create_snapshot(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = MessageItem::ObjectPath(default_object_path());
 
-    let (pool_uuid, fs_uuid) = dbus_try!(object_path_to_pair(dbus_context, object_path);
+    let (pool_object_path, fs_uuid) = dbus_try!(fs_object_path_to_pair(dbus_context, object_path);
                                          default_return; return_message);
+
+    let (_, pool_uuid) = dbus_try!(pool_object_path_to_pair(dbus_context, &pool_object_path);
+                                   default_return; return_message);
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_pool!(engine; pool_uuid; default_return; return_message);
@@ -279,7 +282,7 @@ fn create_snapshot(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let fs_object_path = create_dbus_filesystem(dbus_context);
             dbus_context.filesystems
                 .borrow_mut()
-                .insert(fs_object_path.clone(), (pool_uuid, sn_uuid));
+                .insert(fs_object_path.clone(), (pool_object_path, sn_uuid));
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::ObjectPath(fs_object_path), rc, rs)
         }
@@ -311,9 +314,12 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = MessageItem::Bool(false);
 
-    let (pool_uuid, filesystem_uuid) = dbus_try!(
-        object_path_to_pair(dbus_context, object_path);
-        default_return; return_message);
+    let (pool_object_path, filesystem_uuid) =
+        dbus_try!(fs_object_path_to_pair(dbus_context, object_path);
+                                         default_return; return_message);
+
+    let (_, pool_uuid) = dbus_try!(pool_object_path_to_pair(dbus_context, &pool_object_path);
+                                   default_return; return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
     let ref mut pool = get_pool!(b_engine; pool_uuid; default_return; return_message);
@@ -368,7 +374,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut filesystem_map: HashMap<Uuid, dbus::Path<'static>> = HashMap::new();
     let mut filesystem_uuids: Vec<Uuid> = Vec::new();
     for op in filesystems {
-        let (_, filesystem_uuid) = dbus_try!(object_path_to_pair(dbus_context, object_path);
+        let (_, filesystem_uuid) = dbus_try!(fs_object_path_to_pair(dbus_context, object_path);
 		                                     default_return; return_message);
         filesystem_map.insert(filesystem_uuid.clone(), op);
         filesystem_uuids.push(filesystem_uuid);

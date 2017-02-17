@@ -16,7 +16,7 @@ pub struct ThinPoolDev {
     pub name: String,
     pub dev_info: Option<DeviceInfo>,
     data_block_size: Option<Sectors>,
-    pub low_water_mark: Option<DataBlocks>, // How close to full before we are worried?
+    pub low_water_mark: Option<DataBlocks>,
     pub meta_dev: Option<BlockDev>,
     pub data_dev: Option<BlockDev>,
 }

@@ -12,11 +12,9 @@ use time;
 use uuid::Uuid;
 use serde_json;
 
-use engine::Dev;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
-use engine::Filesystem;
 use engine::Pool;
 use engine::RenameAction;
 use engine::engine::Redundancy;
@@ -30,8 +28,8 @@ use super::metadata::MIN_MDA_SECTORS;
 
 #[derive(Debug)]
 pub struct StratPool {
-    pub name: String,
-    pub pool_uuid: Uuid,
+    name: String,
+    pool_uuid: Uuid,
     pub cache_devs: BTreeMap<PathBuf, BlockDev>,
     pub block_devs: BTreeMap<PathBuf, BlockDev>,
     pub filesystems: BTreeMap<String, StratFilesystem>,
@@ -44,8 +42,9 @@ impl StratPool {
                redundancy: Redundancy,
                force: bool)
                -> EngineResult<StratPool> {
-        let devices = try!(resolve_devices(paths));
         let pool_uuid = Uuid::new_v4();
+
+        let devices = try!(resolve_devices(paths));
         let bds = try!(initialize(&pool_uuid, devices, MIN_MDA_SECTORS, force));
 
         let mut pool = StratPool {
@@ -178,27 +177,19 @@ impl Pool for StratPool {
         destroy_filesystems!{self; fs_names}
     }
 
-    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem> {
-        unimplemented!()
-    }
-
-    fn remove_blockdevs(&mut self, _paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
-        unimplemented!()
-    }
-
-    fn remove_cachedevs(&mut self, _paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
-        unimplemented!()
-    }
-
-    fn blockdevs(&mut self) -> Vec<&mut Dev> {
-        unimplemented!()
-    }
-
-    fn cachedevs(&mut self) -> Vec<&mut Dev> {
-        unimplemented!()
-    }
-
     fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
         rename_filesystem!{self; old_name; new_name}
+    }
+
+    fn uuid(&self) -> &Uuid {
+        &self.pool_uuid
+    }
+
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn rename(&mut self, name: &str) {
+        self.name = name.to_owned();
     }
 }

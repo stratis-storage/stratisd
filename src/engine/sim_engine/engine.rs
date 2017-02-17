@@ -12,8 +12,6 @@ use engine::RenameAction;
 use engine::Redundancy;
 
 use std::cell::RefCell;
-use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
 use std::collections::BTreeSet;
 use std::iter::FromIterator;
 use std::path::Path;
@@ -23,18 +21,19 @@ use std::rc::Rc;
 use super::pool::SimPool;
 use super::randomization::Randomizer;
 
+use super::super::structures::PoolTable;
 
 
 #[derive(Debug)]
 pub struct SimEngine {
-    pools: BTreeMap<String, SimPool>,
+    pools: PoolTable<SimPool>,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
 impl SimEngine {
     pub fn new() -> SimEngine {
         SimEngine {
-            pools: BTreeMap::new(),
+            pools: PoolTable::new(),
             rdm: Rc::new(RefCell::new(Randomizer::new())),
         }
     }
@@ -50,21 +49,21 @@ impl Engine for SimEngine {
 
         let redundancy = calculate_redundancy!(redundancy);
 
-        if self.pools.contains_key(name) {
+        if self.pools.contains_name(name) {
             return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
         let devices =
             BTreeSet::from_iter(blockdev_paths).into_iter().map(|x| *x).collect::<Vec<&Path>>();
 
-        let pool = SimPool::new(self.rdm.clone(), &devices, redundancy);
+        let pool = SimPool::new(self.rdm.clone(), name, &devices, redundancy);
 
         if self.rdm.borrow_mut().throw_die() {
             return Err(EngineError::Engine(ErrorEnum::Error, "X".into()));
         }
 
         let bdev_paths = pool.block_devs.values().map(|p| p.devnode.clone()).collect();
-        self.pools.insert(name.to_owned(), pool);
+        self.pools.insert(pool);
 
         Ok(bdev_paths)
     }
@@ -78,13 +77,8 @@ impl Engine for SimEngine {
     }
 
     /// Looks up the pool by its unique name
-    fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool> {
+    fn get_pool(&mut self, name: &str) -> Option<&mut Pool> {
         get_pool!(self; name)
-    }
-
-    /// Returns a collection of the Pool objects that belong to this engine
-    fn pools(&mut self) -> BTreeMap<&str, &mut Pool> {
-        pools!(self)
     }
 
     /// Set properties of the simulator
@@ -123,16 +117,7 @@ mod tests {
     #[test]
     /// When an engine has no pools, any name lookup should fail
     fn get_pool_err() {
-        assert!(match SimEngine::new().get_pool("name") {
-            Err(EngineError::Engine(ErrorEnum::NotFound, _)) => true,
-            _ => false,
-        });
-    }
-
-    #[test]
-    /// When an engine has no pools, the thing returned by pools() is empty
-    fn pools_empty() {
-        assert!(SimEngine::new().pools().is_empty());
+        assert!(SimEngine::new().get_pool("name").is_none());
     }
 
     #[test]

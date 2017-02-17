@@ -2,9 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
+
+use uuid::Uuid;
 
 use super::super::types::Bytes;
 
@@ -69,20 +70,6 @@ pub trait Pool: Debug {
     /// or there was an error while reading or writing a blockdev.
     fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
 
-    /// Remove specified block devices from this pool.
-    /// Returns a list of the devices actually removed.
-    /// Returns an error if a device could not be removed.
-    fn remove_blockdevs(&mut self, path: &[&Path]) -> EngineResult<Vec<PathBuf>>;
-
-    /// Remove specified cache devices from this pool.
-    /// Returns a list of the devices actually removed.
-    /// Returns an error if a device could not be removed.
-    fn remove_cachedevs(&mut self, path: &[&Path]) -> EngineResult<Vec<PathBuf>>;
-
-    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem>;
-    fn blockdevs(&mut self) -> Vec<&mut Dev>;
-    fn cachedevs(&mut self) -> Vec<&mut Dev>;
-
     /// Destroy the pool.
     /// Will fail if filesystems allocated from the pool are in use,
     /// or even exist.
@@ -101,6 +88,15 @@ pub trait Pool: Debug {
     /// the names aren't equal and both are in use.
     /// The result indicate whether an action was performed, and if not, why.
     fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction>;
+
+    /// Get the uuid of this pool.
+    fn uuid(&self) -> &Uuid;
+
+    /// Get the name of this pool.
+    fn name(&self) -> &str;
+
+    /// Rename this pool.
+    fn rename(&mut self, name: &str) -> ();
 }
 
 pub trait Engine: Debug {
@@ -127,8 +123,7 @@ pub trait Engine: Debug {
     /// Returns true if it was necessary to perform an action, false if not.
     fn rename_pool(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction>;
 
-    fn get_pool(&mut self, name: &str) -> EngineResult<&mut Pool>;
-    fn pools(&mut self) -> BTreeMap<&str, &mut Pool>;
+    fn get_pool(&mut self, name: &str) -> Option<&mut Pool>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.

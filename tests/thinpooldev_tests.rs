@@ -6,6 +6,7 @@ extern crate log;
 extern crate uuid;
 extern crate devicemapper;
 extern crate libstratis;
+extern crate rand;
 #[macro_use]
 mod util;
 
@@ -15,6 +16,7 @@ use libstratis::engine::strat_engine::blockdev;
 use libstratis::engine::strat_engine::blockdev::BlockDev;
 use libstratis::engine::strat_engine::lineardev::LinearDev;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
+use libstratis::engine::strat_engine::thindev::ThinDev;
 use libstratis::engine::strat_engine::thinpooldev::ThinPoolDev;
 use libstratis::types::DataBlocks;
 use libstratis::types::Sectors;
@@ -89,7 +91,8 @@ fn test_thinpool_setup(dm: &DM,
 /// Clean any headers from the devices.
 /// Construct meta and data devices for use in the thin-pool
 /// Test creating a thin-pool device
-/// Teardown the DM device
+/// Test create a thin device provisioned from the pool
+/// Teardown the DM devices in the proper order
 pub fn test_thinpoolsetup_setup() {
 
     let dm = DM::new().unwrap();
@@ -133,6 +136,13 @@ pub fn test_thinpoolsetup_setup() {
                         &mut metadata_dev,
                         &mut data_dev,
                         &device_paths);
+
+    let thindev_name = "stratis_testing_thindev";
+    let mut thin_dev = ThinDev::new(thindev_name);
+    let thin_id = rand::random::<u16>();
+    thin_dev.setup(&dm, &mut thinpool_dev, thin_id as u32, &Sectors(300000)).unwrap();
+
+    thin_dev.teardown(&dm).unwrap();
 
     thinpool_dev.teardown(&dm).unwrap();
 

@@ -14,9 +14,9 @@ use types::Sectors;
 
 pub struct ThinPoolDev {
     pub name: String,
-    dev_info: Option<DeviceInfo>,
+    pub dev_info: Option<DeviceInfo>,
     data_block_size: Option<Sectors>,
-    pub low_water_mark: Option<DataBlocks>, // How close to full before we are worried?
+    pub low_water_mark: Option<DataBlocks>,
     pub meta_dev: Option<BlockDev>,
     pub data_dev: Option<BlockDev>,
 }
@@ -76,6 +76,12 @@ impl ThinPoolDev {
         let id = &DevId::Name(&self.name);
         self.dev_info = Some(try!(dm.table_load(id, &table)));
         try!(dm.device_suspend(id, DmFlags::empty()));
+
+        Ok(())
+    }
+
+    pub fn message(&self, dm: &DM, message: &str) -> EngineResult<()> {
+        try!(dm.target_msg(&DevId::Name(&self.name), 0, message));
 
         Ok(())
     }

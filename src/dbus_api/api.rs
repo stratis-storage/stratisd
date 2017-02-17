@@ -173,18 +173,6 @@ fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let set_mountpoint_method = f.method("SetMountpoint", (), set_filesystem_mountpoint)
-        .out_arg(("object_path", "o"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let set_quota_method = f.method("SetQuota", (), set_filesystem_quota)
-        .in_arg(("quota", "s"))
-        .out_arg(("object_path", "o"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-
     let object_name = format!("{}/{}",
                               STRATIS_BASE_PATH,
                               dbus_context.get_next_id().to_string());
@@ -195,9 +183,7 @@ fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .introspectable()
         .add(f.interface(interface_name, ())
             .add_m(create_snapshot_method)
-            .add_m(rename_method)
-            .add_m(set_mountpoint_method)
-            .add_m(set_quota_method));
+            .add_m(rename_method));
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
@@ -293,14 +279,6 @@ fn create_snapshot(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     };
     Ok(vec![msg])
-}
-
-fn set_filesystem_quota(_m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    unimplemented!()
-}
-
-fn set_filesystem_mountpoint(_m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    unimplemented!()
 }
 
 fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {

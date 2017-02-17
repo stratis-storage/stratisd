@@ -148,8 +148,6 @@ class FilesystemSpec(InterfaceSpec):
         """
         CreateSnapshot = "CreateSnapshot"
         SetName = "SetName"
-        SetMountpoint = "SetMountpoint"
-        SetQuota = "SetQuota"
 
     class PropertyNames(enum.Enum):
         """
@@ -162,14 +160,10 @@ class FilesystemSpec(InterfaceSpec):
     INPUT_SIGS = {
        MethodNames.CreateSnapshot: (("name", ), _FALSE, "s"),
        MethodNames.SetName: (("name", ), _FALSE, "s"),
-       MethodNames.SetMountpoint: ((), _FALSE, ""),
-       MethodNames.SetQuota: (("quota", ), _FALSE, "s")
     }
     OUTPUT_SIGS = {
        MethodNames.CreateSnapshot: "oqs",
        MethodNames.SetName: "bqs",
-       MethodNames.SetMountpoint: "oqs",
-       MethodNames.SetQuota: "oqs"
     }
     XFORMERS = _xformers(INPUT_SIGS)
 

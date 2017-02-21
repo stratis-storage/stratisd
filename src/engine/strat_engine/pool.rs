@@ -131,7 +131,7 @@ impl StratPool {
 
 impl Pool for StratPool {
     fn create_filesystems<'a, 'b, 'c>(&'a mut self,
-                                      _specs: &[(&'b str, &'c str, Option<Bytes>)])
+                                      _specs: &[(&'b str, &'c Path, Option<Bytes>)])
                                       -> EngineResult<Vec<(&'b str, Uuid)>> {
         unimplemented!()
     }

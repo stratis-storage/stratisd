@@ -60,8 +60,8 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut b_engine = dbus_context.engine.borrow_mut();
     let ref mut pool = get_pool!(b_engine; pool_uuid; default_return; return_message);
 
-    let specs = filesystems.map(|x| (x.0, x.1, tuple_to_option(x.2).map(|x| Bytes(x))))
-        .collect::<Vec<(&str, &str, Option<Bytes>)>>();
+    let specs = filesystems.map(|x| (x.0, Path::new(x.1), tuple_to_option(x.2).map(|x| Bytes(x))))
+        .collect::<Vec<(&str, &Path, Option<Bytes>)>>();
     let result = pool.create_filesystems(&specs);
 
     let msg = match result {

@@ -53,7 +53,7 @@ pub trait Filesystem: HasName + HasUuid {
     fn rename(&mut self, name: &str) -> ();
 
     /// Get this filesystem's mount point
-    fn mountpoint(&self) -> &String;
+    fn mountpoint(&self) -> &Path;
 
     /// Get this filesystem's quota
     fn quota(&self) -> &Bytes;
@@ -65,7 +65,7 @@ pub trait Pool: HasName + HasUuid {
     /// Returns an error if any of the specified names are already in use
     /// for filesystems in this pool.
     fn create_filesystems<'a, 'b, 'c>(&'a mut self,
-                                      specs: &[(&'b str, &'c str, Option<Bytes>)])
+                                      specs: &[(&'b str, &'c Path, Option<Bytes>)])
                                       -> EngineResult<Vec<(&'b str, Uuid)>>;
 
     /// Create a snapshot named snapshot_name from the given source filesystem.

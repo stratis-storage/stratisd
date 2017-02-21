@@ -5,10 +5,15 @@
 use dbus;
 use dbus::Message;
 use dbus::MessageItem;
+use dbus::arg::IterAppend;
+use dbus::tree::Access;
+use dbus::tree::EmitsChangedSignal;
 use dbus::tree::Factory;
 use dbus::tree::MTFn;
-use dbus::tree::MethodResult;
+use dbus::tree::MethodErr;
 use dbus::tree::MethodInfo;
+use dbus::tree::MethodResult;
+use dbus::tree::PropInfo;
 
 use engine::RenameAction;
 
@@ -40,6 +45,16 @@ pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> 
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
+    let name_property = f.property::<&str, _>("Name", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::False)
+        .on_get(get_filesystem_name);
+
+    let uuid_property = f.property::<&str, _>("Uuid", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_filesystem_uuid);
+
     let object_name = format!("{}/{}",
                               STRATIS_BASE_PATH,
                               dbus_context.get_next_id().to_string());
@@ -50,7 +65,9 @@ pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> 
         .introspectable()
         .add(f.interface(interface_name, ())
             .add_m(create_snapshot_method)
-            .add_m(rename_method));
+            .add_m(rename_method)
+            .add_p(name_property)
+            .add_p(uuid_property));
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
@@ -141,4 +158,48 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     };
 
     Ok(vec![msg])
+}
+
+
+fn get_filesystem_uuid(i: &mut IterAppend,
+                       p: &PropInfo<MTFn<TData>, TData>)
+                       -> Result<(), MethodErr> {
+    let dbus_context = p.tree.get_data();
+    let object_path = p.path.get_name();
+    i.append(try!(dbus_context.filesystems
+        .borrow()
+        .get(object_path)
+        .map(|x| MessageItem::Str(format!("{}", x.1.simple())))
+        .ok_or(MethodErr::failed(&format!("no uuid for filesystem with object path {}",
+                                          object_path)))));
+    Ok(())
+}
+
+
+fn get_filesystem_name(i: &mut IterAppend,
+                       p: &PropInfo<MTFn<TData>, TData>)
+                       -> Result<(), MethodErr> {
+    let dbus_context = p.tree.get_data();
+    let object_path = p.path.get_name();
+    let (pool_object_path, uuid) = try!(dbus_context.filesystems
+        .borrow()
+        .get(object_path)
+        .map(|x| x.clone())
+        .ok_or(MethodErr::failed(&format!("no uuid for filesystem with object path {}",
+                                          object_path))));
+
+    let &(_, pool_uuid) = try!(dbus_context.pools
+        .borrow()
+        .get(&pool_object_path)
+        .ok_or(MethodErr::failed(&format!("no pool uuid for filesystem with object path {}",
+                                          object_path))));
+
+    let mut engine = dbus_context.engine.borrow_mut();
+    let pool = try!(engine.get_pool(&pool_uuid)
+        .ok_or(MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))));
+
+    i.append(try!(pool.get_filesystem(&uuid)
+        .map(|x| MessageItem::Str(x.name().to_owned()))
+        .ok_or(MethodErr::failed(&format!("no name for filesystem with uuid {}", &uuid)))));
+    Ok(())
 }

@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::path::{Path, PathBuf};
+
 use uuid::Uuid;
 
 use engine::Filesystem;
@@ -14,7 +16,7 @@ pub struct StratFilesystem {
     pub fs_id: Uuid,
     pub name: String,
     pub thin_id: u32,
-    pub mount_point: String,
+    pub mount_point: PathBuf,
     pub quota_size: Bytes,
 }
 
@@ -35,7 +37,7 @@ impl Filesystem for StratFilesystem {
         self.name = name.to_owned();
     }
 
-    fn mountpoint(&self) -> &String {
+    fn mountpoint(&self) -> &Path {
         &self.mount_point
     }
 

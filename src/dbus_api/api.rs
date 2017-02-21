@@ -44,7 +44,6 @@ use super::util::default_object_path;
 use super::util::engine_to_dbus_err;
 use super::util::get_next_arg;
 use super::util::ok_message_items;
-use super::util::pool_object_path_to_pair;
 use super::util::tuple_to_option;
 
 fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -105,9 +104,8 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Bool(false);
     let return_message = message.method_return();
 
-    let (_, pool_uuid) = dbus_try!(
-        pool_object_path_to_pair(dbus_context, &object_path);
-        default_return; return_message);
+    let pool_uuid =
+        get_pool_uuid_not_found_error!(object_path; dbus_context; default_return; return_message);
 
     let result = engine.borrow_mut().destroy_pool(&pool_uuid);
 

@@ -13,11 +13,11 @@ use super::super::engine::{HasName, HasUuid};
 
 #[derive(Debug)]
 pub struct StratFilesystem {
-    pub fs_id: Uuid,
-    pub name: String,
-    pub thin_id: u32,
-    pub mount_point: PathBuf,
-    pub quota_size: Bytes,
+    fs_id: Uuid,
+    name: String,
+    thin_id: u32,
+    mount_point: PathBuf,
+    quota_size: Bytes,
 }
 
 impl HasName for StratFilesystem {

@@ -14,10 +14,10 @@ use super::consts::DEFAULT_FILESYSTEM_QUOTA_SIZE;
 
 #[derive(Debug)]
 pub struct SimFilesystem {
-    pub fs_id: Uuid,
-    pub name: String,
-    pub mount_point: PathBuf,
-    pub quota_size: Bytes,
+    fs_id: Uuid,
+    name: String,
+    mount_point: PathBuf,
+    quota_size: Bytes,
 }
 
 impl SimFilesystem {

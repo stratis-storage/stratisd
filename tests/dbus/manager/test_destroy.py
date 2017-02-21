@@ -71,6 +71,16 @@ class Destroy1TestCase(unittest.TestCase):
         pool = managed_objects.get_pool_by_name(self._POOLNAME)
         self.assertIsNone(pool)
 
+    def testBogusObjectPath(self):
+        """
+        Failure should occur on a bogus object path.
+        """
+        (_, rc, _) = checked_call(
+           Manager.DestroyPool(self._proxy, pool_object_path="/"),
+           ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
+        )
+        self.assertEqual(rc, self._errors.POOL_NOTFOUND)
+
 
 class Destroy2TestCase(unittest.TestCase):
     """

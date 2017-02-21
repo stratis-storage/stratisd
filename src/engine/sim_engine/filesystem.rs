@@ -37,6 +37,14 @@ impl Filesystem for SimFilesystem {
     fn rename(&mut self, name: &str) {
         self.name = name.to_owned();
     }
+
+    fn mountpoint(&self) -> &String {
+        &self.mount_point
+    }
+
+    fn quota(&self) -> &Bytes {
+        &self.quota_size
+    }
 }
 
 impl HasName for SimFilesystem {

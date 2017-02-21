@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use engine::Filesystem;
 
+use super::super::super::types::Bytes;
 use super::super::engine::{HasName, HasUuid};
 
 #[derive(Debug)]
@@ -13,6 +14,8 @@ pub struct StratFilesystem {
     pub fs_id: Uuid,
     pub name: String,
     pub thin_id: u32,
+    pub mount_point: String,
+    pub quota_size: Bytes,
 }
 
 impl HasName for StratFilesystem {
@@ -30,5 +33,13 @@ impl HasUuid for StratFilesystem {
 impl Filesystem for StratFilesystem {
     fn rename(&mut self, name: &str) {
         self.name = name.to_owned();
+    }
+
+    fn mountpoint(&self) -> &String {
+        &self.mount_point
+    }
+
+    fn quota(&self) -> &Bytes {
+        &self.quota_size
     }
 }

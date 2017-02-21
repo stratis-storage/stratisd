@@ -51,6 +51,12 @@ pub trait Dev: Debug {
 pub trait Filesystem: HasName + HasUuid {
     /// Rename this filesystem.
     fn rename(&mut self, name: &str) -> ();
+
+    /// Get this filesystem's mount point
+    fn mountpoint(&self) -> &String;
+
+    /// Get this filesystem's quota
+    fn quota(&self) -> &Bytes;
 }
 
 pub trait Pool: HasName + HasUuid {

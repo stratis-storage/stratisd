@@ -275,7 +275,7 @@ fn get_pool_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
     i.append(try!(dbus_context.pools
         .borrow()
         .get(object_path)
-        .map(|x| format!("{}", x.1.simple()))
+        .map(|x| MessageItem::Str(format!("{}", x.1.simple())))
         .ok_or(MethodErr::failed(&format!("no uuid for pool with object path {}", object_path)))));
     Ok(())
 }
@@ -291,7 +291,7 @@ fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
     i.append(try!(dbus_context.engine
         .borrow_mut()
         .get_pool(&uuid)
-        .map(|x| x.name().to_owned())
+        .map(|x| MessageItem::Str(x.name().to_owned()))
         .ok_or(MethodErr::failed(&format!("no name for pool with uuid {}", &uuid)))));
     Ok(())
 }

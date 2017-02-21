@@ -50,6 +50,11 @@ pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> 
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_filesystem_name);
 
+    let pool_property = f.property::<&dbus::Path, _>("Pool", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_filesystem_pool);
+
     let uuid_property = f.property::<&str, _>("Uuid", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
@@ -67,6 +72,7 @@ pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> 
             .add_m(create_snapshot_method)
             .add_m(rename_method)
             .add_p(name_property)
+            .add_p(pool_property)
             .add_p(uuid_property));
 
     let path = object_path.get_name().to_owned();
@@ -201,5 +207,20 @@ fn get_filesystem_name(i: &mut IterAppend,
     i.append(try!(pool.get_filesystem(&uuid)
         .map(|x| MessageItem::Str(x.name().to_owned()))
         .ok_or(MethodErr::failed(&format!("no name for filesystem with uuid {}", &uuid)))));
+    Ok(())
+}
+
+fn get_filesystem_pool(i: &mut IterAppend,
+                       p: &PropInfo<MTFn<TData>, TData>)
+                       -> Result<(), MethodErr> {
+    let dbus_context = p.tree.get_data();
+    let object_path = p.path.get_name();
+    i.append(try!(dbus_context.filesystems
+        .borrow()
+        .get(object_path)
+        .map(|x| MessageItem::ObjectPath(x.0.clone()))
+        .ok_or(MethodErr::failed(&format!("no pool object path for filesystem object path {}",
+                                          object_path)))));
+
     Ok(())
 }

@@ -142,6 +142,10 @@ impl Pool for SimPool {
     fn rename(&mut self, name: &str) {
         self.name = name.to_owned();
     }
+
+    fn get_filesystem(&mut self, uuid: &Uuid) -> Option<&mut Filesystem> {
+        get_filesystem!(self; uuid)
+    }
 }
 
 impl HasUuid for SimPool {

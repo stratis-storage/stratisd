@@ -101,6 +101,9 @@ pub trait Pool: HasName + HasUuid {
 
     /// Rename this pool.
     fn rename(&mut self, name: &str) -> ();
+
+    /// Get the filesystem in this pool with this UUID.
+    fn get_filesystem(&mut self, uuid: &Uuid) -> Option<&mut Filesystem>;
 }
 
 pub trait Engine: Debug {

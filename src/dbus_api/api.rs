@@ -99,7 +99,6 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let object_path: dbus::Path<'static> = try!(get_next_arg(&mut iter, 0));
 
     let dbus_context = m.tree.get_data();
-    let ref engine = dbus_context.engine;
 
     let default_return = MessageItem::Bool(false);
     let return_message = message.method_return();
@@ -107,9 +106,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid =
         get_pool_uuid_not_found_error!(object_path; dbus_context; default_return; return_message);
 
-    let result = engine.borrow_mut().destroy_pool(&pool_uuid);
-
-    let msg = match result {
+    let msg = match dbus_context.engine.borrow_mut().destroy_pool(&pool_uuid) {
         Ok(action) => {
             dbus_context.pools.borrow_mut().remove(&object_path);
             dbus_context.actions.borrow_mut().push_remove(object_path);
@@ -134,8 +131,7 @@ fn get_list_items<T, I>(i: &mut IterAppend, iter: I) -> Result<(), MethodErr>
                                      MessageItem::UInt16(item.into())])
         })
         .collect::<Vec<MessageItem>>();
-    let item_array = MessageItem::Array(msg_vec, Cow::Borrowed("(sq)"));
-    i.append(item_array);
+    i.append(MessageItem::Array(msg_vec, Cow::Borrowed("(sq)")));
     Ok(())
 }
 

@@ -115,16 +115,13 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let ref mut pool = get_pool!(b_engine; pool_uuid; default_return; return_message);
 
     let mut filesystem_map: HashMap<Uuid, dbus::Path<'static>> = HashMap::new();
-    let mut filesystem_uuids: Vec<Uuid> = Vec::new();
     for op in filesystems {
         let (_, filesystem_uuid) = dbus_try!(fs_object_path_to_pair(dbus_context, object_path);
 		                                     default_return; return_message);
         filesystem_map.insert(filesystem_uuid.clone(), op);
-        filesystem_uuids.push(filesystem_uuid);
     }
 
-
-    let result = pool.destroy_filesystems(&filesystem_uuids);
+    let result = pool.destroy_filesystems(&filesystem_map.keys().collect::<Vec<&Uuid>>());
     let msg = match result {
         Ok(ref uuids) => {
             for uuid in uuids {

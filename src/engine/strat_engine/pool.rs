@@ -175,7 +175,9 @@ impl Pool for StratPool {
         Ok(())
     }
 
-    fn destroy_filesystems<'a, 'b>(&'a mut self, fs_uuids: &'b [Uuid]) -> EngineResult<Vec<Uuid>> {
+    fn destroy_filesystems<'a, 'b>(&'a mut self,
+                                   fs_uuids: &[&'b Uuid])
+                                   -> EngineResult<Vec<&'b Uuid>> {
         destroy_filesystems!{self; fs_uuids}
     }
 

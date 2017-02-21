@@ -10,8 +10,8 @@ use super::super::engine::{HasName, HasUuid};
 
 #[derive(Debug)]
 pub struct SimFilesystem {
-    pub fs_id: Uuid,
-    pub name: String,
+    fs_id: Uuid,
+    name: String,
 }
 
 impl SimFilesystem {

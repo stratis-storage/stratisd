@@ -9,12 +9,10 @@ use dbus::MessageItem;
 use dbus::arg::{ArgType, Iter};
 use dbus::tree::MethodErr;
 
-use uuid::Uuid;
-
 use engine;
 use engine::EngineError;
 
-use super::types::{DbusContext, DbusErrorEnum};
+use super::types::DbusErrorEnum;
 
 pub const STRATIS_BASE_PATH: &'static str = "/org/storage/stratis1";
 pub const STRATIS_BASE_SERVICE: &'static str = "org.storage.stratis1";
@@ -35,39 +33,6 @@ pub fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr
     Ok(value)
 }
 
-/// Get filesystem name from object path
-pub fn fs_object_path_to_pair
-    (dbus_context: &DbusContext,
-     fs_object_path: &dbus::Path)
-     -> Result<(dbus::Path<'static>, Uuid), (MessageItem, MessageItem)> {
-    let fs_pool_pair = match dbus_context.filesystems.borrow().get(fs_object_path) {
-        Some(fs) => fs.clone(),
-        None => {
-            let items = code_to_message_items(DbusErrorEnum::FILESYSTEM_NOTFOUND,
-                                              format!("no filesystem for object path {}",
-                                                      fs_object_path));
-            return Err(items);
-        }
-    };
-
-    Ok(fs_pool_pair)
-}
-
-/// Get name for pool from object path
-pub fn pool_object_path_to_pair
-    (dbus_context: &DbusContext,
-     path: &dbus::Path)
-     -> Result<(dbus::Path<'static>, Uuid), (MessageItem, MessageItem)> {
-    let pair = match dbus_context.pools.borrow().get(path) {
-        Some(pool) => pool.clone(),
-        None => {
-            let items = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR,
-                                              format!("no pool for object path {}", path));
-            return Err(items);
-        }
-    };
-    Ok(pair)
-}
 
 /// Translates an engine error to a dbus error.
 pub fn engine_to_dbus_err(err: &EngineError) -> (DbusErrorEnum, String) {

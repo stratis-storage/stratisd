@@ -24,10 +24,8 @@ use super::util::STRATIS_BASE_SERVICE;
 use super::util::code_to_message_items;
 use super::util::default_object_path;
 use super::util::engine_to_dbus_err;
-use super::util::fs_object_path_to_pair;
 use super::util::get_next_arg;
 use super::util::ok_message_items;
-use super::util::pool_object_path_to_pair;
 
 
 pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
@@ -90,11 +88,15 @@ fn create_snapshot(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = MessageItem::ObjectPath(default_object_path());
 
-    let (pool_object_path, fs_uuid) = dbus_try!(fs_object_path_to_pair(dbus_context, object_path);
-                                         default_return; return_message);
+    let (pool_object_path, fs_uuid) = get_fs_tuple_internal_error!(object_path;
+                                       dbus_context;
+                                       default_return;
+                                       return_message);
 
-    let (_, pool_uuid) = dbus_try!(pool_object_path_to_pair(dbus_context, &pool_object_path);
-                                   default_return; return_message);
+    let pool_uuid = get_pool_uuid_internal_error!(pool_object_path;
+                                                  dbus_context;
+                                                  default_return;
+                                                  return_message);
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_pool!(engine; pool_uuid; default_return; return_message);
@@ -128,12 +130,15 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = MessageItem::Bool(false);
 
-    let (pool_object_path, filesystem_uuid) =
-        dbus_try!(fs_object_path_to_pair(dbus_context, object_path);
-                                         default_return; return_message);
+    let (pool_object_path, filesystem_uuid) = get_fs_tuple_internal_error!(object_path;
+                                       dbus_context;
+                                       default_return;
+                                       return_message);
 
-    let (_, pool_uuid) = dbus_try!(pool_object_path_to_pair(dbus_context, &pool_object_path);
-                                   default_return; return_message);
+    let pool_uuid = get_pool_uuid_internal_error!(pool_object_path;
+                                                  dbus_context;
+                                                  default_return;
+                                                  return_message);
 
     let mut b_engine = dbus_context.engine.borrow_mut();
     let ref mut pool = get_pool!(b_engine; pool_uuid; default_return; return_message);
@@ -142,9 +147,9 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(RenameAction::NoSource) => {
-            let error_message = format!("engine doesn't know about filesystem {} on pool {}",
-                                        filesystem_uuid,
-                                        pool_uuid);
+            let error_message = format!("pool {} doesn't know about filesystem {}",
+                                        pool_uuid,
+                                        filesystem_uuid);
             let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, error_message);
             return_message.append3(default_return, rc, rs)
         }

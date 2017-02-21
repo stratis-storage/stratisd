@@ -45,10 +45,20 @@ pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> 
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
+    let mountpoint_property = f.property::<&str, _>("Mountpoint", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_filesystem_mountpoint);
+
     let name_property = f.property::<&str, _>("Name", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_filesystem_name);
+
+    let quota_property = f.property::<&u64, _>("Quota", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_filesystem_quota);
 
     let uuid_property = f.property::<&str, _>("Uuid", ())
         .access(Access::Read)
@@ -66,7 +76,9 @@ pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> 
         .add(f.interface(interface_name, ())
             .add_m(create_snapshot_method)
             .add_m(rename_method)
+            .add_p(mountpoint_property)
             .add_p(name_property)
+            .add_p(quota_property)
             .add_p(uuid_property));
 
     let path = object_path.get_name().to_owned();
@@ -201,5 +213,63 @@ fn get_filesystem_name(i: &mut IterAppend,
     i.append(try!(pool.get_filesystem(&uuid)
         .map(|x| MessageItem::Str(x.name().to_owned()))
         .ok_or(MethodErr::failed(&format!("no name for filesystem with uuid {}", &uuid)))));
+    Ok(())
+}
+
+fn get_filesystem_mountpoint(i: &mut IterAppend,
+                             p: &PropInfo<MTFn<TData>, TData>)
+                             -> Result<(), MethodErr> {
+    let dbus_context = p.tree.get_data();
+    let object_path = p.path.get_name();
+    let (pool_object_path, uuid) = try!(dbus_context.filesystems
+        .borrow()
+        .get(object_path)
+        .map(|x| x.clone())
+        .ok_or(MethodErr::failed(&format!("no uuid for filesystem with object path {}",
+                                          object_path))));
+
+    let &(_, pool_uuid) = try!(dbus_context.pools
+        .borrow()
+        .get(&pool_object_path)
+        .ok_or(MethodErr::failed(&format!("no pool uuid for filesystem with object path {}",
+                                          object_path))));
+
+    let mut engine = dbus_context.engine.borrow_mut();
+    let pool = try!(engine.get_pool(&pool_uuid)
+        .ok_or(MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))));
+
+    i.append(try!(pool.get_filesystem(&uuid)
+        .map(|x| {
+            MessageItem::Str(x.mountpoint().to_path_buf().into_os_string().into_string().unwrap())
+        })
+        .ok_or(MethodErr::failed(&format!("no mountpoint for filesystem with uuid {}", &uuid)))));
+    Ok(())
+}
+
+fn get_filesystem_quota(i: &mut IterAppend,
+                        p: &PropInfo<MTFn<TData>, TData>)
+                        -> Result<(), MethodErr> {
+    let dbus_context = p.tree.get_data();
+    let object_path = p.path.get_name();
+    let (pool_object_path, uuid) = try!(dbus_context.filesystems
+        .borrow()
+        .get(object_path)
+        .map(|x| x.clone())
+        .ok_or(MethodErr::failed(&format!("no uuid for filesystem with object path {}",
+                                          object_path))));
+
+    let &(_, pool_uuid) = try!(dbus_context.pools
+        .borrow()
+        .get(&pool_object_path)
+        .ok_or(MethodErr::failed(&format!("no pool uuid for filesystem with object path {}",
+                                          object_path))));
+
+    let mut engine = dbus_context.engine.borrow_mut();
+    let pool = try!(engine.get_pool(&pool_uuid)
+        .ok_or(MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))));
+
+    i.append(try!(pool.get_filesystem(&uuid)
+        .map(|x| MessageItem::UInt64(**(x.quota())))
+        .ok_or(MethodErr::failed(&format!("no quota for filesystem with uuid {}", &uuid)))));
     Ok(())
 }

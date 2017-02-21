@@ -54,14 +54,13 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid =
         get_pool_uuid_internal_error!(object_path; dbus_context; default_return; return_message);
 
-    let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = get_pool!(b_engine; pool_uuid; default_return; return_message);
+    let mut engine = dbus_context.engine.borrow_mut();
+    let mut pool = get_pool!(engine; pool_uuid; default_return; return_message);
 
     let specs = filesystems.map(|x| (x.0, Path::new(x.1), tuple_to_option(x.2).map(|x| Bytes(x))))
         .collect::<Vec<(&str, &Path, Option<Bytes>)>>();
-    let result = pool.create_filesystems(&specs);
 
-    let msg = match result {
+    let msg = match pool.create_filesystems(&specs) {
         Ok(ref infos) => {
             let mut return_value = Vec::new();
             for &(name, uuid) in infos {
@@ -107,8 +106,8 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid =
         get_pool_uuid_internal_error!(object_path; dbus_context; default_return; return_message);
 
-    let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = get_pool!(b_engine; pool_uuid; default_return; return_message);
+    let mut engine = dbus_context.engine.borrow_mut();
+    let mut pool = get_pool!(engine; pool_uuid; default_return; return_message);
 
     let mut filesystem_map: HashMap<Uuid, dbus::Path<'static>> = HashMap::new();
     for op in filesystems {
@@ -156,13 +155,12 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid =
         get_pool_uuid_internal_error!(object_path; dbus_context; default_return; return_message);
 
-    let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = get_pool!(b_engine; pool_uuid; default_return; return_message);
+    let mut engine = dbus_context.engine.borrow_mut();
+    let mut pool = get_pool!(engine; pool_uuid; default_return; return_message);
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
-    let result = pool.add_blockdevs(&blockdevs, force);
 
-    let msg = match result {
+    let msg = match pool.add_blockdevs(&blockdevs, force) {
         Ok(devnodes) => {
             let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
             let paths = paths.map(|x| MessageItem::Str(x)).collect();
@@ -195,13 +193,12 @@ fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid =
         get_pool_uuid_internal_error!(object_path; dbus_context; default_return; return_message);
 
-    let mut b_engine = dbus_context.engine.borrow_mut();
-    let ref mut pool = get_pool!(b_engine; pool_uuid; default_return; return_message);
+    let mut engine = dbus_context.engine.borrow_mut();
+    let mut pool = get_pool!(engine; pool_uuid; default_return; return_message);
 
     let cachedevs = cache_devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
-    let result = pool.add_cachedevs(&cachedevs, force);
 
-    let msg = match result {
+    let msg = match pool.add_cachedevs(&cachedevs, force) {
         Ok(devnodes) => {
             let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
             let paths = paths.map(|x| MessageItem::Str(x)).collect();
@@ -231,10 +228,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let uuid =
         get_pool_uuid_internal_error!(object_path; dbus_context; default_return; return_message);
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let result = engine.rename_pool(&uuid, new_name);
-
-    let msg = match result {
+    let msg = match dbus_context.engine.borrow_mut().rename_pool(&uuid, new_name) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", uuid);
             let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, error_message);

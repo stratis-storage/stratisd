@@ -153,7 +153,9 @@ class FilesystemSpec(InterfaceSpec):
         """
         Names of the properties of the Filesystem interface.
         """
-        pass
+        Name = "Name"
+        Pool = "Pool"
+        Uuid = "Uuid"
 
     INTERFACE_NAME = 'org.storage.stratis1.filesystem'
 
@@ -167,7 +169,11 @@ class FilesystemSpec(InterfaceSpec):
     }
     XFORMERS = _xformers(INPUT_SIGS)
 
-    PROPERTY_SIGS = {}
+    PROPERTY_SIGS = {
+       PropertyNames.Name: "s",
+       PropertyNames.Pool: "o",
+       PropertyNames.Uuid: "s",
+    }
 
 
 class ManagerSpec(InterfaceSpec):

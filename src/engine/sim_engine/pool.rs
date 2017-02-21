@@ -82,7 +82,9 @@ impl Pool for SimPool {
         Ok(devices.iter().map(|d| d.to_path_buf()).collect())
     }
 
-    fn destroy_filesystems<'a, 'b>(&'a mut self, fs_uuids: &'b [Uuid]) -> EngineResult<Vec<Uuid>> {
+    fn destroy_filesystems<'a, 'b>(&'a mut self,
+                                   fs_uuids: &[&'b Uuid])
+                                   -> EngineResult<Vec<&'b Uuid>> {
         destroy_filesystems!{self; fs_uuids}
     }
 
@@ -233,7 +235,7 @@ mod tests {
         let mut engine = SimEngine::new();
         let (uuid, _) = engine.create_pool("name", &[], None, false).unwrap();
         let mut pool = engine.get_pool(&uuid).unwrap();
-        assert!(pool.destroy_filesystems(&[Uuid::new_v4()]).is_ok());
+        assert!(pool.destroy_filesystems(&[&Uuid::new_v4()]).is_ok());
     }
 
     #[test]
@@ -244,8 +246,8 @@ mod tests {
         let mut pool = engine.get_pool(&uuid).unwrap();
         let fs_results = pool.create_filesystems(&["fs_name"]).unwrap();
         let fs_uuid = fs_results[0].1;
-        assert!(match pool.destroy_filesystems(&[fs_uuid, Uuid::new_v4()]) {
-            Ok(filesystems) => filesystems == vec![fs_uuid],
+        assert!(match pool.destroy_filesystems(&[&fs_uuid, &Uuid::new_v4()]) {
+            Ok(filesystems) => filesystems == vec![&fs_uuid],
             _ => false,
         });
     }

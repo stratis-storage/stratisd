@@ -88,7 +88,9 @@ pub trait Pool: HasName + HasUuid {
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
     /// This list will be a subset of the uuids passed in fs_uuids.
-    fn destroy_filesystems<'a, 'b>(&'a mut self, fs_uuids: &'b [Uuid]) -> EngineResult<Vec<Uuid>>;
+    fn destroy_filesystems<'a, 'b>(&'a mut self,
+                                   fs_uuids: &[&'b Uuid])
+                                   -> EngineResult<Vec<&'b Uuid>>;
 
     /// Rename filesystem
     /// Rename pool with uuid to new_name.

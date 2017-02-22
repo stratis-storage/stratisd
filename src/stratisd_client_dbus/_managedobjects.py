@@ -22,29 +22,6 @@ _SERVICE_NAME = "org.storage.stratis1"
 _POOL_INTERFACE_NAME = "%s.%s" % (_SERVICE_NAME, "pool")
 _FILESYSTEM_INTERFACE_NAME = "%s.%s" % (_SERVICE_NAME, "filesystem")
 
-class GMOPool(object):
-    """
-    The D-Bus pool.
-    """
-
-    def __init__(self, table): #pragma: no cover
-        """
-        Initializes the pool with a table.
-        """
-        self._table = table
-
-    def name(self): #pragma: no cover
-        """
-        Get the pool name from the table.
-        """
-        return self._table[_POOL_INTERFACE_NAME]['Name']
-
-    def uuid(self): #pragma: no cover
-        """
-        Get the pool name from the table.
-        """
-        return self._table[_POOL_INTERFACE_NAME]['Uuid']
-
 class ManagedObjects(object):
     """
     Wraps the dict returned by GetManagedObjects() method with some

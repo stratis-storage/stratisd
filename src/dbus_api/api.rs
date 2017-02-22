@@ -185,10 +185,10 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
     let base_tree = f.tree(dbus_context);
 
     let create_pool_method = f.method("CreatePool", (), create_pool)
-        .in_arg(("pool_name", "s"))
+        .in_arg(("name", "s"))
         .in_arg(("redundancy", "(bq)"))
         .in_arg(("force", "b"))
-        .in_arg(("dev_list", "as"))
+        .in_arg(("devices", "as"))
         .out_arg(("result", "(oas)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

@@ -279,7 +279,7 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
     let create_filesystems_method = f.method("CreateFilesystems", (), create_filesystems)
-        .in_arg(("filesystems", "as"))
+        .in_arg(("specs", "as"))
         .out_arg(("filesystems", "a(os)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
@@ -292,14 +292,14 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
 
     let add_cache_devs_method = f.method("AddCacheDevs", (), add_cache_devs)
         .in_arg(("force", "b"))
-        .in_arg(("cache_devs", "as"))
+        .in_arg(("devices", "as"))
         .out_arg(("results", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
     let add_devs_method = f.method("AddDevs", (), add_devs)
         .in_arg(("force", "b"))
-        .in_arg(("devs", "as"))
+        .in_arg(("devices", "as"))
         .out_arg(("results", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

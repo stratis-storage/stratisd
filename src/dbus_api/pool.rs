@@ -111,9 +111,9 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let mut filesystem_map: HashMap<Uuid, dbus::Path<'static>> = HashMap::new();
     for op in filesystems {
-        let filesystem_uuid =
-            get_fs_uuid_not_found_error!(op; dbus_context; default_return; return_message);
-        filesystem_map.insert(filesystem_uuid.clone(), op);
+        if let Some(tuple) = dbus_context.filesystems.borrow().get(&op) {
+            filesystem_map.insert(tuple.1.clone(), op);
+        }
     }
 
     let result = pool.destroy_filesystems(&filesystem_map.keys().collect::<Vec<&Uuid>>());

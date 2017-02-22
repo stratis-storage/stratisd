@@ -112,7 +112,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut filesystem_map: HashMap<Uuid, dbus::Path<'static>> = HashMap::new();
     for op in filesystems {
         let filesystem_uuid =
-            get_fs_uuid_not_found_error!(object_path; dbus_context; default_return; return_message);
+            get_fs_uuid_not_found_error!(op; dbus_context; default_return; return_message);
         filesystem_map.insert(filesystem_uuid.clone(), op);
     }
 

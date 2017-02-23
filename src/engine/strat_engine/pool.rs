@@ -12,7 +12,6 @@ use time;
 use uuid::Uuid;
 use serde_json;
 
-use engine::Dev;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
@@ -21,7 +20,8 @@ use engine::Pool;
 use engine::RenameAction;
 use engine::engine::Redundancy;
 
-use super::super::super::types::Bytes;
+use super::super::engine::{HasName, HasUuid};
+use super::super::structures::Table;
 
 use super::serde_structs::StratSave;
 use super::blockdev::{BlockDev, initialize, resolve_devices};
@@ -30,11 +30,11 @@ use super::metadata::MIN_MDA_SECTORS;
 
 #[derive(Debug)]
 pub struct StratPool {
-    pub name: String,
-    pub pool_uuid: Uuid,
+    name: String,
+    pool_uuid: Uuid,
     pub cache_devs: BTreeMap<PathBuf, BlockDev>,
     pub block_devs: BTreeMap<PathBuf, BlockDev>,
-    pub filesystems: BTreeMap<String, StratFilesystem>,
+    pub filesystems: Table<StratFilesystem>,
     redundancy: Redundancy,
 }
 
@@ -44,8 +44,9 @@ impl StratPool {
                redundancy: Redundancy,
                force: bool)
                -> EngineResult<StratPool> {
-        let devices = try!(resolve_devices(paths));
         let pool_uuid = Uuid::new_v4();
+
+        let devices = try!(resolve_devices(paths));
         let bds = try!(initialize(&pool_uuid, devices, MIN_MDA_SECTORS, force));
 
         let mut pool = StratPool {
@@ -53,7 +54,7 @@ impl StratPool {
             pool_uuid: pool_uuid,
             cache_devs: BTreeMap::new(),
             block_devs: bds,
-            filesystems: BTreeMap::new(),
+            filesystems: Table::new(),
             redundancy: redundancy,
         };
 
@@ -127,16 +128,16 @@ impl StratPool {
 }
 
 impl Pool for StratPool {
-    fn create_filesystems<'a, 'b, 'c>(&'a mut self,
-                                      _specs: &[(&'b str, &'c str, Option<Bytes>)])
-                                      -> EngineResult<Vec<&'b str>> {
-        Ok(vec![])
+    fn create_filesystems<'a, 'b>(&'a mut self,
+                                  _specs: &[&'b str])
+                                  -> EngineResult<Vec<(&'b str, Uuid)>> {
+        unimplemented!()
     }
 
     fn create_snapshot<'a, 'b, 'c>(&'a mut self,
                                    _snapshot_name: &'b str,
-                                   _source: &'c str)
-                                   -> EngineResult<&'b str> {
+                                   _source: &'c Uuid)
+                                   -> EngineResult<Uuid> {
         unimplemented!()
     }
 
@@ -173,32 +174,32 @@ impl Pool for StratPool {
     }
 
     fn destroy_filesystems<'a, 'b>(&'a mut self,
-                                   fs_names: &[&'b str])
-                                   -> EngineResult<Vec<&'b str>> {
-        destroy_filesystems!{self; fs_names}
+                                   fs_uuids: &[&'b Uuid])
+                                   -> EngineResult<Vec<&'b Uuid>> {
+        destroy_filesystems!{self; fs_uuids}
     }
 
-    fn filesystems(&mut self) -> BTreeMap<&str, &mut Filesystem> {
-        unimplemented!()
+    fn rename_filesystem(&mut self, uuid: &Uuid, new_name: &str) -> EngineResult<RenameAction> {
+        rename_filesystem!{self; uuid; new_name}
     }
 
-    fn remove_blockdevs(&mut self, _paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
-        unimplemented!()
+    fn rename(&mut self, name: &str) {
+        self.name = name.to_owned();
     }
 
-    fn remove_cachedevs(&mut self, _paths: &[&Path]) -> EngineResult<Vec<PathBuf>> {
-        unimplemented!()
+    fn get_filesystem(&mut self, uuid: &Uuid) -> Option<&mut Filesystem> {
+        get_filesystem!(self; uuid)
     }
+}
 
-    fn blockdevs(&mut self) -> Vec<&mut Dev> {
-        unimplemented!()
+impl HasUuid for StratPool {
+    fn uuid(&self) -> &Uuid {
+        &self.pool_uuid
     }
+}
 
-    fn cachedevs(&mut self) -> Vec<&mut Dev> {
-        unimplemented!()
-    }
-
-    fn rename_filesystem(&mut self, old_name: &str, new_name: &str) -> EngineResult<RenameAction> {
-        rename_filesystem!{self; old_name; new_name}
+impl HasName for StratPool {
+    fn name(&self) -> &str {
+        &self.name
     }
 }

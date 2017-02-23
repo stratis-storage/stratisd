@@ -22,8 +22,6 @@ use dbus::tree::PropInfo;
 
 use uuid::Uuid;
 
-use super::super::types::Bytes;
-
 use engine::RenameAction;
 
 use super::filesystem::create_dbus_filesystem;
@@ -38,14 +36,13 @@ use super::util::fs_object_path_to_pair;
 use super::util::get_next_arg;
 use super::util::ok_message_items;
 use super::util::pool_object_path_to_pair;
-use super::util::tuple_to_option;
 
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let filesystems: Array<(&str, &str, (bool, u64)), _> = try!(get_next_arg(&mut iter, 0));
+    let filesystems: Array<&str, _> = try!(get_next_arg(&mut iter, 0));
     let dbus_context = m.tree.get_data();
 
     let object_path = m.path.get_name();
@@ -60,9 +57,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut b_engine = dbus_context.engine.borrow_mut();
     let ref mut pool = get_pool!(b_engine; pool_uuid; default_return; return_message);
 
-    let specs = filesystems.map(|x| (x.0, x.1, tuple_to_option(x.2).map(|x| Bytes(x))))
-        .collect::<Vec<(&str, &str, Option<Bytes>)>>();
-    let result = pool.create_filesystems(&specs);
+    let result = pool.create_filesystems(&filesystems.collect::<Vec<&str>>());
 
     let msg = match result {
         Ok(ref infos) => {
@@ -301,7 +296,7 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
     let create_filesystems_method = f.method("CreateFilesystems", (), create_filesystems)
-        .in_arg(("filesystems", "a(ss(bt))"))
+        .in_arg(("filesystems", "as"))
         .out_arg(("filesystems", "a(os)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

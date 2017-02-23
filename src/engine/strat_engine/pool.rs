@@ -20,8 +20,6 @@ use engine::Pool;
 use engine::RenameAction;
 use engine::engine::Redundancy;
 
-use super::super::super::types::Bytes;
-
 use super::super::engine::{HasName, HasUuid};
 use super::super::structures::Table;
 
@@ -130,9 +128,9 @@ impl StratPool {
 }
 
 impl Pool for StratPool {
-    fn create_filesystems<'a, 'b, 'c>(&'a mut self,
-                                      _specs: &[(&'b str, &'c str, Option<Bytes>)])
-                                      -> EngineResult<Vec<(&'b str, Uuid)>> {
+    fn create_filesystems<'a, 'b>(&'a mut self,
+                                  _specs: &[&'b str])
+                                  -> EngineResult<Vec<(&'b str, Uuid)>> {
         unimplemented!()
     }
 

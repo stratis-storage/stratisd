@@ -155,7 +155,7 @@ mod tests {
         let (uuid, _) = engine.create_pool("name", &[Path::new("/s/d")], None, false).unwrap();
         {
             let pool = engine.get_pool(&uuid).unwrap();
-            pool.create_filesystems(&[("test", "/mnt/temp", None)]).unwrap();
+            pool.create_filesystems(&["test"]).unwrap();
         }
         assert!(engine.destroy_pool(&uuid).is_err());
     }

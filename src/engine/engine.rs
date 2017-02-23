@@ -7,8 +7,6 @@ use std::path::{Path, PathBuf};
 
 use uuid::Uuid;
 
-use super::super::types::Bytes;
-
 use super::errors::EngineResult;
 
 #[derive(Debug)]
@@ -58,9 +56,9 @@ pub trait Pool: HasName + HasUuid {
     /// Returns a list of the names of filesystems actually created.
     /// Returns an error if any of the specified names are already in use
     /// for filesystems in this pool.
-    fn create_filesystems<'a, 'b, 'c>(&'a mut self,
-                                      specs: &[(&'b str, &'c str, Option<Bytes>)])
-                                      -> EngineResult<Vec<(&'b str, Uuid)>>;
+    fn create_filesystems<'a, 'b>(&'a mut self,
+                                  specs: &[&'b str])
+                                  -> EngineResult<Vec<(&'b str, Uuid)>>;
 
     /// Create a snapshot named snapshot_name from the given source filesystem.
     /// Return the UUID of the newly created filesystem.

@@ -250,12 +250,7 @@ class PoolSpec(InterfaceSpec):
           (("force", _IDENTITY, "b"), ("devices", _IDENTITY, "as"),),
        MethodNames.AddDevs:
           (("force", _IDENTITY, "b"), ("devices", _IDENTITY, "as"),),
-       MethodNames.CreateFilesystems: (
-          ("specs",
-           (lambda x:
-               [(x, y, _option_to_tuple(quota, 0)) for (x, y, quota) in x]),
-           "a(ss(bt))"),
-       ),
+       MethodNames.CreateFilesystems: (("specs", _IDENTITY, "as"),),
        MethodNames.DestroyFilesystems: (("filesystems", _IDENTITY, "ao"),),
        MethodNames.SetName: (("new_name", _IDENTITY, "s"),)
     }

@@ -69,7 +69,7 @@ class SetNameTestCase(unittest.TestCase):
         self._pool_object = get_object(self._pool_object_path)
         (filesystems, _, _) = Pool.CreateFilesystems(
            self._pool_object,
-           specs=[(self._fs_name, '', None)]
+           specs=[self._fs_name]
         )
         self._filesystem_object_path = filesystems[0][0]
         Manager.ConfigureSimulator(self._proxy, denominator=8)

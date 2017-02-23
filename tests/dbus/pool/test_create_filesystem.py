@@ -87,37 +87,16 @@ class CreateFSTestCase(unittest.TestCase):
         result = [x for x in get_managed_objects(self._proxy).filesystems()]
         self.assertEqual(len(result), 0)
 
-    def testConflictingSpecs(self):
-        """
-        Test calling with conflicting specification for same filesystem name.
-        """
-        fs_name = "name"
-
-        (result, rc, _) = checked_call(
-           Pool.CreateFilesystems(
-              self._pool_object,
-              specs=[(fs_name, "", None), (fs_name, "/", None)]
-           ),
-           PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
-        )
-
-        self.assertEqual(rc, self._errors.ERROR)
-        self.assertEqual(len(result), 0)
-
-        result = [x for x in get_managed_objects(self._proxy).filesystems()]
-        self.assertEqual(len(result), 0)
-
     def testDuplicateSpecs(self):
         """
         Test calling with duplicate specification for same filesystem name.
         """
         new_name = "name"
-        spec = (new_name, "", None)
 
         (result, rc, _) = checked_call(
            Pool.CreateFilesystems(
               self._pool_object,
-              specs=[spec, spec]
+              specs=[new_name, new_name]
            ),
            PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
         )
@@ -158,10 +137,7 @@ class CreateFSTestCase1(unittest.TestCase):
            devices=self._devs
         )
         self._pool_object = get_object(poolpath)
-        Pool.CreateFilesystems(
-           self._pool_object,
-           specs=[(self._VOLNAME, '', None)]
-        )
+        Pool.CreateFilesystems(self._pool_object, specs=[self._VOLNAME])
         Manager.ConfigureSimulator(self._proxy, denominator=8)
 
     def tearDown(self):
@@ -177,10 +153,7 @@ class CreateFSTestCase1(unittest.TestCase):
         fail, and no additional volume should be created.
         """
         (result, rc, _) = checked_call(
-           Pool.CreateFilesystems(
-              self._pool_object,
-              specs=[(self._VOLNAME, "", None)]
-           ),
+           Pool.CreateFilesystems(self._pool_object, specs=[self._VOLNAME]),
            PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
         )
 
@@ -198,10 +171,7 @@ class CreateFSTestCase1(unittest.TestCase):
         new_name = "newname"
 
         (result, rc, _) = checked_call(
-           Pool.CreateFilesystems(
-              self._pool_object,
-              specs=[(new_name, "", None)]
-           ),
+           Pool.CreateFilesystems(self._pool_object, specs=[new_name]),
            PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
         )
 
@@ -223,7 +193,7 @@ class CreateFSTestCase1(unittest.TestCase):
         (result, rc, _) = checked_call(
            Pool.CreateFilesystems(
               self._pool_object,
-              specs=[(self._VOLNAME, "", None), ("newname", "", None)]
+              specs=[self._VOLNAME, "newname"]
            ),
            PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
         )

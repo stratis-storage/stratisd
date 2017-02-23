@@ -12,7 +12,6 @@ use super::super::engine::{HasName, HasUuid};
 pub struct StratFilesystem {
     fs_id: Uuid,
     name: String,
-    thin_id: u32,
 }
 
 impl HasName for StratFilesystem {

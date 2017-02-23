@@ -80,7 +80,7 @@ class Create2TestCase(unittest.TestCase):
 
         managed_objects = get_managed_objects(self._proxy)
         pools = [x for x in managed_objects.pools()]
-        result = managed_objects.get_pool_by_name(self._POOLNAME)
+        result = next(managed_objects.pools({'Name': self._POOLNAME}), None)
 
         if rc == self._errors.OK:
             self.assertIsNotNone(result)
@@ -162,7 +162,7 @@ class Create3TestCase(unittest.TestCase):
 
         managed_objects = get_managed_objects(self._proxy)
         pools2 = [x for x in managed_objects.pools()]
-        pool = managed_objects.get_pool_by_name(self._POOLNAME)
+        pool = next(managed_objects.pools({'Name': self._POOLNAME}), None)
 
         self.assertIsNotNone(pool)
         self.assertEqual(

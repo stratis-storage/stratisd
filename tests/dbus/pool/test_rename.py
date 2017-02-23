@@ -85,7 +85,7 @@ class SetNameTestCase(unittest.TestCase):
         self.assertFalse(result)
 
         managed_objects = get_managed_objects(self._proxy)
-        result = managed_objects.get_pool_by_name(self._POOLNAME)
+        result = next(managed_objects.pools({'Name': self._POOLNAME}), None)
         self.assertIsNotNone(result)
         (pool, _) = result
         self.assertEqual(pool, self._pool_object_path)
@@ -105,8 +105,10 @@ class SetNameTestCase(unittest.TestCase):
         self.assertEqual(rc, self._errors.OK)
 
         managed_objects = get_managed_objects(self._proxy)
-        self.assertIsNone(managed_objects.get_pool_by_name(self._POOLNAME))
-        result = managed_objects.get_pool_by_name(new_name)
+        self.assertIsNone(
+           next(managed_objects.pools({'Name': self._POOLNAME}), None)
+        )
+        result = next(managed_objects.pools({'Name': new_name}), None)
         self.assertIsNotNone(result)
         (pool, _) = result
         self.assertEqual(pool, self._pool_object_path)

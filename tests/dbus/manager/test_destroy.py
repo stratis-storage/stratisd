@@ -68,7 +68,7 @@ class Destroy1TestCase(unittest.TestCase):
         Destroy should succeed since there is nothing to pass to DestroyPool.
         """
         managed_objects = get_managed_objects(self._proxy)
-        pool = managed_objects.get_pool_by_name(self._POOLNAME)
+        pool = next(managed_objects.pools({'Name': self._POOLNAME}), None)
         self.assertIsNone(pool)
 
     def testBogusObjectPath(self):
@@ -115,11 +115,10 @@ class Destroy2TestCase(unittest.TestCase):
 
     def testExecution(self):
         """
-        The pool was just created, and may or may not have devices.
-        So, it may be possible to destroy it, or it may not be.
+        The pool was just created, so it must always be possible to destroy it.
         """
         managed_objects = get_managed_objects(self._proxy)
-        (pool1, _) = managed_objects.get_pool_by_name(self._POOLNAME)
+        (pool1, _) = next(managed_objects.pools({'Name': self._POOLNAME}))
 
         (result, rc, _) = checked_call(
            Manager.DestroyPool(self._proxy, pool_object_path=pool1),
@@ -127,19 +126,11 @@ class Destroy2TestCase(unittest.TestCase):
         )
 
         managed_objects = get_managed_objects(self._proxy)
-        pool2 = managed_objects.get_pool_by_name(self._POOLNAME)
+        pool2 = next(managed_objects.pools({'Name': self._POOLNAME}), None)
 
-        if rc == self._errors.OK:
-            expected_pool = None
-            expected_result = True
-        elif rc == self._errors.BUSY:
-            expected_pool = pool1
-            expected_result = False
-        else:
-            self.fail("rc must be OK or BUSY, is %d" % rc)
-
-        self.assertEqual(pool2, expected_pool)
-        self.assertEqual(result, expected_result)
+        self.assertEqual(rc, self._errors.OK)
+        self.assertIsNone(pool2)
+        self.assertTrue(result)
 
 
 class Destroy3TestCase(unittest.TestCase):
@@ -167,10 +158,7 @@ class Destroy3TestCase(unittest.TestCase):
            force=False,
            devices=_DEVICE_STRATEGY.example()
         )
-        Pool.CreateFilesystems(
-           get_object(poolpath),
-           specs=[(self._VOLNAME, '', None)]
-        )
+        Pool.CreateFilesystems(get_object(poolpath), specs=[self._VOLNAME])
         Manager.ConfigureSimulator(self._proxy, denominator=8)
 
     def tearDown(self):
@@ -184,7 +172,7 @@ class Destroy3TestCase(unittest.TestCase):
         This should fail since the pool has a filesystem on it.
         """
         managed_objects = get_managed_objects(self._proxy)
-        (pool, _) = managed_objects.get_pool_by_name(self._POOLNAME)
+        (pool, _) = next(managed_objects.pools({'Name': self._POOLNAME}))
 
         (result, rc, _) = checked_call(
            Manager.DestroyPool(self._proxy, pool_object_path=pool),
@@ -194,7 +182,8 @@ class Destroy3TestCase(unittest.TestCase):
         self.assertEqual(result, False)
 
         managed_objects = get_managed_objects(self._proxy)
-        self.assertIsNotNone(managed_objects.get_pool_by_name(self._POOLNAME))
+        (pool1, _) = next(managed_objects.pools({'Name': self._POOLNAME}))
+        self.assertEqual(pool, pool1)
 
 
 class Destroy4TestCase(unittest.TestCase):
@@ -233,7 +222,7 @@ class Destroy4TestCase(unittest.TestCase):
         possible to destroy it.
         """
         managed_objects = get_managed_objects(self._proxy)
-        (pool, _) = managed_objects.get_pool_by_name(self._POOLNAME)
+        (pool, _) = next(managed_objects.pools({'Name': self._POOLNAME}))
 
         (result, rc, _) = checked_call(
            Manager.DestroyPool(self._proxy, pool_object_path=pool),
@@ -244,4 +233,6 @@ class Destroy4TestCase(unittest.TestCase):
         self.assertEqual(result, True)
 
         managed_objects = get_managed_objects(self._proxy)
-        self.assertIsNone(managed_objects.get_pool_by_name(self._POOLNAME))
+        self.assertIsNone(
+           next(managed_objects.pools({'Name': self._POOLNAME}), None)
+        )

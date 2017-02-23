@@ -22,6 +22,8 @@ _SERVICE_NAME = "org.storage.stratis1"
 _POOL_INTERFACE_NAME = "%s.%s" % (_SERVICE_NAME, "pool")
 _FILESYSTEM_INTERFACE_NAME = "%s.%s" % (_SERVICE_NAME, "filesystem")
 
+_POOL_INTERFACE_PROPS = frozenset(("Name", "Uuid"))
+
 class ManagedObjects(object):
     """
     Wraps the dict returned by GetManagedObjects() method with some
@@ -38,44 +40,26 @@ class ManagedObjects(object):
         """
         self._objects = objects
 
-    def pools(self): # pragma: no cover
+    def pools(self, spec=None): # pragma: no cover
         """
-        Get the subset of data corresponding to pools
+        Get the subset of data corresponding to pools and matching spec.
 
+        :param spec: a specification of properties to restrict values returned
+        :type spec: dict of str * object
         :returns: a list of pairs of object path/dict for pools only
         :rtype: list of tuple of ObjectPath * dict
+
+        A match requires a conjunction of all specified properties.
+        An empty spec results in all pool objects being returned.
         """
+        spec = dict() if spec is None else spec
         interface_name = _POOL_INTERFACE_NAME
         return (
-           (x, y) for (x, y) in self._objects.items() \
-               if interface_name in y.keys()
+           (op, data) for (op, data) in self._objects.items() \
+               if interface_name in data.keys() and \
+               all(data[interface_name][key] == value \
+                   for (key, value) in spec.items())
         )
-
-    def get_pool_by_name(self, name): # pragma: no cover
-        """
-        Get a single pool for the given name.
-
-        :param str name: the name of the pool
-        :returns: a pool object path and associated data or None if no pool
-        :rtype: (ObjectPath * dict) or NoneType
-        """
-        interface_name = _POOL_INTERFACE_NAME
-        pools = ((obj_path, data) for (obj_path, data) in self.pools() \
-           if data[interface_name]['Name'] == name)
-        return next(pools, None)
-
-    def get_pool_by_uuid(self, name): # pragma: no cover
-        """
-        Get a single pool for the given uuid.
-
-        :param str uuid: the name of the pool
-        :returns: a pool object path and associated data or None if no pool
-        :rtype: (ObjectPath * dict) or NoneType
-        """
-        interface_name = _POOL_INTERFACE_NAME
-        pools = ((obj_path, data) for (obj_path, data) in self.pools() \
-           if data[interface_name]['Uuid'] == name)
-        return next(pools, None)
 
     def filesystems(self): # pragma: no cover
         """

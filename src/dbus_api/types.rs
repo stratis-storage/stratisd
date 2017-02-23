@@ -2,14 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use bidir_map::BidirMap;
-
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::collections::vec_deque::{Drain, VecDeque};
 use std::convert::From;
 use std::rc::Rc;
 
+use dbus::Path;
 use dbus::tree::{DataType, MTFn, ObjectPath};
+
+use uuid::Uuid;
 
 use engine::Engine;
 
@@ -74,16 +76,16 @@ impl DbusErrorEnum {
 #[derive(Debug)]
 pub enum DeferredAction {
     Add(ObjectPath<MTFn<TData>, TData>),
-    Remove(String),
+    Remove(Path<'static>),
 }
 
 #[derive(Debug, Clone)]
 pub struct DbusContext {
     pub next_index: Rc<Cell<u64>>,
-    pub pools: Rc<RefCell<BidirMap<String, String>>>,
+    pub pools: Rc<RefCell<HashMap<Path<'static>, (Path<'static>, Uuid)>>>,
     pub engine: Rc<RefCell<Box<Engine>>>,
     pub actions: Rc<RefCell<ActionQueue>>,
-    pub filesystems: Rc<RefCell<BidirMap<String, (String, String)>>>,
+    pub filesystems: Rc<RefCell<HashMap<Path<'static>, (Path<'static>, Uuid)>>>,
 }
 
 impl DbusContext {
@@ -91,9 +93,9 @@ impl DbusContext {
         DbusContext {
             actions: Rc::new(RefCell::new(ActionQueue::new())),
             engine: Rc::new(RefCell::new(engine)),
-            filesystems: Rc::new(RefCell::new(BidirMap::new())),
+            filesystems: Rc::new(RefCell::new(HashMap::new())),
             next_index: Rc::new(Cell::new(0)),
-            pools: Rc::new(RefCell::new(BidirMap::new())),
+            pools: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
@@ -138,7 +140,7 @@ impl ActionQueue {
     }
 
     /// Push a Remove action onto the back of the queue.
-    pub fn push_remove(&mut self, object_path: String) {
+    pub fn push_remove(&mut self, object_path: Path<'static>) {
         self.queue.push_back(DeferredAction::Remove(object_path))
     }
 

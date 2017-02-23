@@ -22,9 +22,9 @@ macro_rules! calculate_redundancy {
 macro_rules! destroy_filesystems {
     ( $s:ident; $fs:expr ) => {
         let mut removed = Vec::new();
-        for name in $fs.iter().map(|x| *x) {
-            if $s.filesystems.remove(name.into()).is_some() {
-                removed.push(name);
+        for uuid in $fs.iter().map(|x| *x) {
+            if $s.filesystems.remove_by_uuid(&uuid).is_some() {
+                removed.push(uuid);
             };
         };
         Ok(removed)
@@ -32,70 +32,76 @@ macro_rules! destroy_filesystems {
 }
 
 macro_rules! destroy_pool {
-    ( $s:ident; $name: ident) => {
-        let entry = match $s.pools.entry($name.into()) {
-            Entry::Vacant(_) => return Ok(false),
-            Entry::Occupied(entry) => entry,
-        };
-        if !entry.get().filesystems.is_empty() {
-            return Err(EngineError::Engine(
-                ErrorEnum::Busy, "filesystems remaining on pool".into()));
-        };
-        try!(entry.remove().destroy());
+    ( $s:ident; $uuid: ident) => {
+        if let Some(ref pool) = $s.pools.get_by_uuid($uuid) {
+            if !pool.filesystems.is_empty() {
+                return Err(EngineError::Engine(
+                    ErrorEnum::Busy, "filesystems remaining on pool".into()));
+            };
+        } else {
+            return Ok(false);
+        }
+        try!($s.pools.remove_by_uuid($uuid).unwrap().destroy());
         Ok(true)
     }
 }
 
 macro_rules! get_pool {
-    ( $s:ident; $name:ident ) => {
-        Ok(try!($s.pools
-            .get_mut($name)
-            .ok_or(EngineError::Engine(ErrorEnum::NotFound, $name.into()))))
-    }
-}
-
-macro_rules! pools {
-    ( $s:ident ) => {
-        BTreeMap::from_iter($s.pools.iter_mut().map(|x| (x.0 as &str, x.1 as &mut Pool)))
+    ( $s:ident; $uuid:ident ) => {
+        $s.pools.get_mut_by_uuid($uuid).map(|p| p as &mut Pool)
     }
 }
 
 macro_rules! rename_pool {
-    ( $s:ident; $old_name:ident; $new_name:ident ) => {
-        if $old_name == $new_name {
+    ( $s:ident; $uuid:ident; $new_name:ident ) => {
+        let old_name;
+        if let Some(pool) = $s.pools.get_by_uuid($uuid) {
+            old_name = pool.name().to_owned();
+        } else {
+            return Ok(RenameAction::NoSource);
+        };
+
+        if old_name == $new_name {
             return Ok(RenameAction::Identity);
         }
 
-        if !$s.pools.contains_key($old_name) {
-            return Ok(RenameAction::NoSource);
+        if $s.pools.contains_name($new_name) {
+            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
         }
 
-        if $s.pools.contains_key($new_name) {
-            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
-        } else {
-            let pool = $s.pools.remove($old_name).unwrap();
-            $s.pools.insert($new_name.into(), pool);
-            return Ok(RenameAction::Renamed);
-        };
+        let mut pool = $s.pools.remove_by_uuid($uuid).unwrap();
+        pool.rename($new_name);
+        $s.pools.insert(pool);
+        return Ok(RenameAction::Renamed);
+    }
+}
+
+macro_rules! get_filesystem {
+    ( $s:ident; $uuid:ident ) => {
+        $s.filesystems.get_mut_by_uuid($uuid).map(|p| p as &mut Filesystem)
     }
 }
 
 macro_rules! rename_filesystem {
-    ( $s:ident; $old_name:ident; $new_name:ident ) => {
-        if $old_name == $new_name {
+    ( $s:ident; $uuid:ident; $new_name:ident ) => {
+        let old_name;
+        if let Some(fs) = $s.filesystems.get_by_uuid($uuid) {
+            old_name = fs.name().to_owned();
+        } else {
+            return Ok(RenameAction::NoSource);
+        };
+
+        if old_name == $new_name {
             return Ok(RenameAction::Identity);
         }
 
-        if !$s.filesystems.contains_key($old_name) {
-            return Ok(RenameAction::NoSource);
+        if $s.filesystems.contains_name($new_name) {
+            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
         }
 
-        if $s.filesystems.contains_key($new_name) {
-            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
-        } else {
-            let filesystem = $s.filesystems.remove($old_name).unwrap();
-            $s.filesystems.insert($new_name.into(), filesystem);
-            return Ok(RenameAction::Renamed);
-        };
+        let mut filesystem = $s.filesystems.remove_by_uuid($uuid).unwrap();
+        filesystem.rename($new_name);
+        $s.filesystems.insert(filesystem);
+        return Ok(RenameAction::Renamed);
     }
 }

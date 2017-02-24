@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #[macro_use]
-extern crate libstratis;
+extern crate stratis;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
@@ -40,11 +40,11 @@ use clap::{App, Arg};
 use log::LogLevelFilter;
 use env_logger::LogBuilder;
 
-use libstratis::engine::Engine;
-use libstratis::engine::sim_engine::SimEngine;
-use libstratis::engine::strat_engine::StratEngine;
-use libstratis::stratis::VERSION;
-use libstratis::types::{StratisResult, StratisError};
+use stratis::engine::Engine;
+use stratis::engine::sim_engine::SimEngine;
+use stratis::engine::strat_engine::StratEngine;
+use stratis::stratis::VERSION;
+use stratis::types::{StratisResult, StratisError};
 
 fn write_err(err: StratisError) -> StratisResult<()> {
     let mut out = term::stderr().expect("could not get stderr");
@@ -71,7 +71,7 @@ fn main() {
     let mut builder = LogBuilder::new();
     if matches.is_present("debug") {
         builder.filter(Some("stratisd"), LogLevelFilter::Debug);
-        builder.filter(Some("libstratis"), LogLevelFilter::Debug);
+        builder.filter(Some("stratis"), LogLevelFilter::Debug);
     } else {
         if let Ok(s) = env::var("RUST_LOG") {
             builder.parse(&s);
@@ -89,7 +89,7 @@ fn main() {
         }
     };
 
-    let r = libstratis::dbus_api::run(engine);
+    let r = stratis::dbus_api::run(engine);
 
     if let Err(r) = r {
         if let Err(e) = write_err(r) {

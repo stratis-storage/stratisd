@@ -3,11 +3,11 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
-use libstratis::consts::SECTOR_SIZE;
-use libstratis::engine::strat_engine::blockdev::blkdev_size;
-use libstratis::engine::strat_engine::engine::DevOwnership;
-use libstratis::engine::strat_engine::metadata::StaticHeader;
-use libstratis::types::Sectors;
+use stratis::consts::SECTOR_SIZE;
+use stratis::engine::strat_engine::blockdev::blkdev_size;
+use stratis::engine::strat_engine::engine::DevOwnership;
+use stratis::engine::strat_engine::metadata::StaticHeader;
+use stratis::types::Sectors;
 
 use std::fs::File;
 use std::fs::OpenOptions;

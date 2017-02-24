@@ -24,7 +24,7 @@ import dbus
 
 from into_dbus_python import xformers
 
-_FALSE = lambda n: lambda x: x
+_IDENTITY = lambda x: x # pragma: no cover
 
 def _option_to_tuple(value, default):
     """
@@ -38,24 +38,18 @@ def _option_to_tuple(value, default):
     return (False, default) if value is None else (True, value)
 
 
-def _info_to_xformer(names, inxform, sig):
+def _info_to_xformer(specs):
     """
     Function that yields a xformer function.
 
-    :param names: the names of the parameters for this function
-    :type names: list of str
-    :param inxform: a function that yields transformation functions
-    :type inform: str -> (object -> object)
-    :param str sig: a D-Bus signature
+    :param specs: specifications for this function
+    :type names: iterable of triples, name, inxform function, sig
     :return: a transformation function
     :rtype: (list of object) -> (list of object)
     """
-    inxforms = [inxform(name) for name in names]
-    outxforms = [f for (f, _) in xformers(sig)]
-    expected_length = len(names)
-
-    if len(outxforms) != expected_length:
-        raise ValueError("xformation functions do not match")
+    inxforms = [y for (_, y, _) in specs]
+    outxforms = [f for (f, _) in xformers("".join(z for (_, _, z) in specs))]
+    expected_length = len(specs)
 
     def xformer(objects):
         """
@@ -85,8 +79,9 @@ def _xformers(key_to_sig):
     :returns: a map from keys to functions
     :rtype: dict of object * xformation function
     """
-    return dict((method, (names, _info_to_xformer(names, inxform, sig))) for \
-       (method, (names, inxform, sig)) in key_to_sig.items())
+    return dict(
+       (method, ([n for (n, _, _) in specs], _info_to_xformer(specs))) for \
+       (method, specs) in key_to_sig.items())
 
 
 class InterfaceSpec(abc.ABC):
@@ -104,6 +99,38 @@ class InterfaceSpec(abc.ABC):
     PROPERTY_SIGS = abc.abstractproperty(doc="map from property names to sigs")
 
 
+class ObjectManagerSpec(InterfaceSpec):
+    """
+    org.freedesktop.DBus.ObjectManager interface
+    """
+    # pylint: disable=too-few-public-methods
+
+    class MethodNames(enum.Enum):
+        """
+        Method names.
+        """
+        GetManagedObjects = "GetManagedObjects"
+
+    class PropertyNames(enum.Enum):
+        """
+        Property names.
+        """
+        pass
+
+    INTERFACE_NAME = "org.freedesktop.DBus.ObjectManager"
+
+    INPUT_SIGS = {
+       MethodNames.GetManagedObjects: (),
+    }
+
+    OUTPUT_SIGS = {
+       MethodNames.GetManagedObjects: "a{oa{sa{sv}}}"
+    }
+    XFORMERS = _xformers(INPUT_SIGS)
+
+    PROPERTY_SIGS = {}
+
+
 class FilesystemSpec(InterfaceSpec):
     """
     Filesystem interface.
@@ -115,33 +142,33 @@ class FilesystemSpec(InterfaceSpec):
         Names of the methods of the Filesystem class.
         """
         CreateSnapshot = "CreateSnapshot"
-        Rename = "Rename"
-        SetMountpoint = "SetMountpoint"
-        SetQuota = "SetQuota"
+        SetName = "SetName"
 
     class PropertyNames(enum.Enum):
         """
         Names of the properties of the Filesystem interface.
         """
-        pass
+        Name = "Name"
+        Pool = "Pool"
+        Uuid = "Uuid"
 
     INTERFACE_NAME = 'org.storage.stratis1.filesystem'
 
     INPUT_SIGS = {
-       MethodNames.CreateSnapshot: (("name", ), _FALSE, "s"),
-       MethodNames.Rename: (("name", ), _FALSE, "s"),
-       MethodNames.SetMountpoint: ((), _FALSE, ""),
-       MethodNames.SetQuota: (("quota", ), _FALSE, "s")
+       MethodNames.CreateSnapshot: (("name", _IDENTITY, "s"),),
+       MethodNames.SetName: (("name", _IDENTITY, "s"),),
     }
     OUTPUT_SIGS = {
        MethodNames.CreateSnapshot: "oqs",
-       MethodNames.Rename: "bqs",
-       MethodNames.SetMountpoint: "oqs",
-       MethodNames.SetQuota: "oqs"
+       MethodNames.SetName: "bqs",
     }
     XFORMERS = _xformers(INPUT_SIGS)
 
-    PROPERTY_SIGS = {}
+    PROPERTY_SIGS = {
+       PropertyNames.Name: "s",
+       PropertyNames.Pool: "o",
+       PropertyNames.Uuid: "s",
+    }
 
 
 class ManagerSpec(InterfaceSpec):
@@ -157,9 +184,6 @@ class ManagerSpec(InterfaceSpec):
         ConfigureSimulator = "ConfigureSimulator"
         CreatePool = "CreatePool"
         DestroyPool = "DestroyPool"
-        GetFilesystemObjectPath = "GetFilesystemObjectPath"
-        GetPoolObjectPath = "GetPoolObjectPath"
-        ListPools = "ListPools"
 
     class PropertyNames(enum.Enum):
         """
@@ -172,28 +196,20 @@ class ManagerSpec(InterfaceSpec):
     INTERFACE_NAME = 'org.storage.stratis1.Manager'
 
     INPUT_SIGS = { # pragma: no cover
-        MethodNames.ConfigureSimulator : (("denominator", ), _FALSE, "u"),
+        MethodNames.ConfigureSimulator : (("denominator", _IDENTITY, "u"),),
         MethodNames.CreatePool :
            (
-               ("name", "redundancy", "force", "devices"),
-               (lambda n:
-                   (lambda x: _option_to_tuple(x, 0)) \
-                      if n == "redundancy" else (lambda x: x)),
-               "s(bq)bas"
+              ("name", _IDENTITY, "s"),
+              ("redundancy", (lambda x: _option_to_tuple(x, 0)), "(bq)"),
+              ("force", _IDENTITY, "b"),
+              ("devices", _IDENTITY, "as"),
            ),
-        MethodNames.DestroyPool : (("name", ), _FALSE, "s"),
-        MethodNames.GetFilesystemObjectPath :
-           (("pool_name", "filesystem_name"), _FALSE, "ss"),
-        MethodNames.GetPoolObjectPath : (("name", ), _FALSE, "s"),
-        MethodNames.ListPools : ((), _FALSE, ""),
+        MethodNames.DestroyPool : (("pool_object_path", _IDENTITY, "o"),),
     }
     OUTPUT_SIGS = {
         MethodNames.ConfigureSimulator : "qs",
         MethodNames.CreatePool : "(oas)qs",
         MethodNames.DestroyPool : "bqs",
-        MethodNames.GetFilesystemObjectPath : "oqs",
-        MethodNames.GetPoolObjectPath : "oqs",
-        MethodNames.ListPools : "asqs",
     }
     XFORMERS = _xformers(INPUT_SIGS)
 
@@ -218,54 +234,39 @@ class PoolSpec(InterfaceSpec):
         AddDevs = "AddDevs"
         CreateFilesystems = "CreateFilesystems"
         DestroyFilesystems = "DestroyFilesystems"
-        ListCacheDevs = "ListCacheDevs"
-        ListDevs = "ListDevs"
-        ListFilesystems = "ListFilesystems"
-        RemoveCacheDevs = "RemoveCacheDevs"
-        RemoveDevs = "RemoveDevs"
-        Rename = "Rename"
+        SetName = "SetName"
 
     class PropertyNames(enum.Enum):
         """
         Names of the properties of the manager interface.
         """
-        pass
+        Name = "Name"
+        Uuid = "Uuid"
 
     INTERFACE_NAME = 'org.storage.stratis1.pool'
 
     INPUT_SIGS = { # pragma: no cover
-       MethodNames.AddCacheDevs: (("force", "devices", ), _FALSE, "bas"),
-       MethodNames.AddDevs: (("force", "devices", ), _FALSE, "bas"),
-       MethodNames.CreateFilesystems: (
-          ("specs", ),
-          (lambda n: \
-             lambda x: \
-                [(x, y, _option_to_tuple(quota, 0)) for (x, y, quota) in x]),
-          "a(ss(bt))"
-       ),
-       MethodNames.DestroyFilesystems: (("names", ), _FALSE, "as"),
-       MethodNames.ListCacheDevs: ((), _FALSE, ""),
-       MethodNames.ListDevs: ((), _FALSE, ""),
-       MethodNames.ListFilesystems: ((), _FALSE, ""),
-       MethodNames.RemoveCacheDevs: (("devices", ), _FALSE, "as"),
-       MethodNames.RemoveDevs: (("devices", ), _FALSE, "as"),
-       MethodNames.Rename: (("new_name", ), _FALSE, "s")
+       MethodNames.AddCacheDevs:
+          (("force", _IDENTITY, "b"), ("devices", _IDENTITY, "as"),),
+       MethodNames.AddDevs:
+          (("force", _IDENTITY, "b"), ("devices", _IDENTITY, "as"),),
+       MethodNames.CreateFilesystems: (("specs", _IDENTITY, "as"),),
+       MethodNames.DestroyFilesystems: (("filesystems", _IDENTITY, "ao"),),
+       MethodNames.SetName: (("new_name", _IDENTITY, "s"),)
     }
     OUTPUT_SIGS = {
        MethodNames.AddCacheDevs: "asqs",
        MethodNames.AddDevs: "asqs",
        MethodNames.CreateFilesystems: "a(os)qs",
        MethodNames.DestroyFilesystems: "asqs",
-       MethodNames.ListCacheDevs: "asqs",
-       MethodNames.ListDevs: "asqs",
-       MethodNames.ListFilesystems: "asqs",
-       MethodNames.RemoveCacheDevs: "asqs",
-       MethodNames.RemoveDevs: "asqs",
-       MethodNames.Rename: "bqs"
+       MethodNames.SetName: "bqs"
     }
     XFORMERS = _xformers(INPUT_SIGS)
 
-    PROPERTY_SIGS = {}
+    PROPERTY_SIGS = {
+       PropertyNames.Name: "s",
+       PropertyNames.Uuid: "s",
+    }
 
 
 def _prop_builder(spec):
@@ -362,6 +363,11 @@ def _iface_builder(spec):
     return builder
 
 
+ObjectManager = types.new_class(
+   "ObjectManager",
+   bases=(object,),
+   exec_body=_iface_builder(ObjectManagerSpec)
+)
 Filesystem = types.new_class(
    "Filesystem",
    bases=(object,),

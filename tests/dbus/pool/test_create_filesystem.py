@@ -24,6 +24,7 @@ from stratisd_client_dbus import Manager
 from stratisd_client_dbus import Pool
 from stratisd_client_dbus import StratisdErrorsGen
 from stratisd_client_dbus import get_object
+from stratisd_client_dbus import get_managed_objects
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
@@ -83,35 +84,7 @@ class CreateFSTestCase(unittest.TestCase):
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, self._errors.OK)
 
-        (result, rc, _) = checked_call(
-           Pool.ListFilesystems(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
-        )
-        self.assertEqual(rc, self._errors.OK)
-        self.assertEqual(len(result), 0)
-
-    def testConflictingSpecs(self):
-        """
-        Test calling with conflicting specification for same filesystem name.
-        """
-        fs_name = "name"
-
-        (result, rc, _) = checked_call(
-           Pool.CreateFilesystems(
-              self._pool_object,
-              specs=[(fs_name, "", None), (fs_name, "/", None)]
-           ),
-           PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
-        )
-
-        self.assertEqual(rc, self._errors.ERROR)
-        self.assertEqual(len(result), 0)
-
-        (result, rc, _) = checked_call(
-           Pool.ListFilesystems(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
-        )
-        self.assertEqual(rc, self._errors.OK)
+        result = [x for x in get_managed_objects(self._proxy).filesystems()]
         self.assertEqual(len(result), 0)
 
     def testDuplicateSpecs(self):
@@ -119,12 +92,11 @@ class CreateFSTestCase(unittest.TestCase):
         Test calling with duplicate specification for same filesystem name.
         """
         new_name = "name"
-        spec = (new_name, "", None)
 
         (result, rc, _) = checked_call(
            Pool.CreateFilesystems(
               self._pool_object,
-              specs=[spec, spec]
+              specs=[new_name, new_name]
            ),
            PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
         )
@@ -135,11 +107,7 @@ class CreateFSTestCase(unittest.TestCase):
         (_, fs_name) = result[0]
         self.assertEqual(fs_name, new_name)
 
-        (result, rc, _) = checked_call(
-           Pool.ListFilesystems(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
-        )
-        self.assertEqual(rc, self._errors.OK)
+        result = [x for x in get_managed_objects(self._proxy).filesystems()]
         self.assertEqual(len(result), 1)
 
 
@@ -169,10 +137,7 @@ class CreateFSTestCase1(unittest.TestCase):
            devices=self._devs
         )
         self._pool_object = get_object(poolpath)
-        Pool.CreateFilesystems(
-           self._pool_object,
-           specs=[(self._VOLNAME, '', None)]
-        )
+        Pool.CreateFilesystems(self._pool_object, specs=[self._VOLNAME])
         Manager.ConfigureSimulator(self._proxy, denominator=8)
 
     def tearDown(self):
@@ -188,21 +153,14 @@ class CreateFSTestCase1(unittest.TestCase):
         fail, and no additional volume should be created.
         """
         (result, rc, _) = checked_call(
-           Pool.CreateFilesystems(
-              self._pool_object,
-              specs=[(self._VOLNAME, "", None)]
-           ),
+           Pool.CreateFilesystems(self._pool_object, specs=[self._VOLNAME]),
            PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
         )
 
         self.assertEqual(rc, self._errors.ALREADY_EXISTS)
         self.assertEqual(len(result), 0)
 
-        (result, rc, _) = checked_call(
-           Pool.ListFilesystems(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
-        )
-        self.assertEqual(rc, self._errors.OK)
+        result = [x for x in get_managed_objects(self._proxy).filesystems()]
         self.assertEqual(len(result), 1)
 
     def testCreateOne(self):
@@ -213,10 +171,7 @@ class CreateFSTestCase1(unittest.TestCase):
         new_name = "newname"
 
         (result, rc, _) = checked_call(
-           Pool.CreateFilesystems(
-              self._pool_object,
-              specs=[(new_name, "", None)]
-           ),
+           Pool.CreateFilesystems(self._pool_object, specs=[new_name]),
            PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
         )
 
@@ -226,11 +181,7 @@ class CreateFSTestCase1(unittest.TestCase):
         (_, fs_name) = result[0]
         self.assertEqual(fs_name, new_name)
 
-        (result, rc, _) = checked_call(
-           Pool.ListFilesystems(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
-        )
-        self.assertEqual(rc, self._errors.OK)
+        result = [x for x in get_managed_objects(self._proxy).filesystems()]
         self.assertEqual(len(result), 2)
 
     def testCreateWithConflict(self):
@@ -242,7 +193,7 @@ class CreateFSTestCase1(unittest.TestCase):
         (result, rc, _) = checked_call(
            Pool.CreateFilesystems(
               self._pool_object,
-              specs=[(self._VOLNAME, "", None), ("newname", "", None)]
+              specs=[self._VOLNAME, "newname"]
            ),
            PoolSpec.OUTPUT_SIGS[_PN.CreateFilesystems]
         )
@@ -250,9 +201,5 @@ class CreateFSTestCase1(unittest.TestCase):
         self.assertEqual(rc, self._errors.ALREADY_EXISTS)
         self.assertEqual(len(result), 0)
 
-        (result, rc, _) = checked_call(
-           Pool.ListFilesystems(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
-        )
-        self.assertEqual(rc, self._errors.OK)
+        result = [x for x in get_managed_objects(self._proxy).filesystems()]
         self.assertEqual(len(result), 1)

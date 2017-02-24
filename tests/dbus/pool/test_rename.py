@@ -22,6 +22,7 @@ import unittest
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import Pool
 from stratisd_client_dbus import StratisdErrorsGen
+from stratisd_client_dbus import get_managed_objects
 from stratisd_client_dbus import get_object
 
 from stratisd_client_dbus._constants import TOP_OBJECT
@@ -39,7 +40,7 @@ _PN = PoolSpec.MethodNames
 _DEVICE_STRATEGY = _device_list(0)
 
 
-class RenameTestCase(unittest.TestCase):
+class SetNameTestCase(unittest.TestCase):
     """
     Set up a pool with a name.
     """
@@ -76,20 +77,18 @@ class RenameTestCase(unittest.TestCase):
         Test rename to same name.
         """
         (result, rc, _) = checked_call(
-           Pool.Rename(self._pool_object, new_name=self._POOLNAME),
-           PoolSpec.OUTPUT_SIGS[_PN.Rename]
+           Pool.SetName(self._pool_object, new_name=self._POOLNAME),
+           PoolSpec.OUTPUT_SIGS[_PN.SetName]
         )
 
         self.assertEqual(rc, self._errors.OK)
         self.assertFalse(result)
 
-        (result, rc, _) = checked_call(
-           Manager.GetPoolObjectPath(self._proxy, name=self._POOLNAME),
-           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath],
-        )
-
-        self.assertEqual(rc, self._errors.OK)
-        self.assertEqual(result, self._pool_object_path)
+        managed_objects = get_managed_objects(self._proxy)
+        result = next(managed_objects.pools({'Name': self._POOLNAME}), None)
+        self.assertIsNotNone(result)
+        (pool, _) = result
+        self.assertEqual(pool, self._pool_object_path)
 
     def testNewName(self):
         """
@@ -98,24 +97,18 @@ class RenameTestCase(unittest.TestCase):
         new_name = "new"
 
         (result, rc, _) = checked_call(
-           Pool.Rename(self._pool_object, new_name=new_name),
-           PoolSpec.OUTPUT_SIGS[_PN.Rename]
+           Pool.SetName(self._pool_object, new_name=new_name),
+           PoolSpec.OUTPUT_SIGS[_PN.SetName]
         )
 
         self.assertTrue(result)
         self.assertEqual(rc, self._errors.OK)
 
-        (result, rc, _) = checked_call(
-           Manager.GetPoolObjectPath(self._proxy, name=self._POOLNAME),
-           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath],
+        managed_objects = get_managed_objects(self._proxy)
+        self.assertIsNone(
+           next(managed_objects.pools({'Name': self._POOLNAME}), None)
         )
-
-        self.assertEqual(rc, self._errors.POOL_NOTFOUND)
-
-        (result, rc, _) = checked_call(
-           Manager.GetPoolObjectPath(self._proxy, name=new_name),
-           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath],
-        )
-
-        self.assertEqual(rc, self._errors.OK)
-        self.assertEqual(result, self._pool_object_path)
+        result = next(managed_objects.pools({'Name': new_name}), None)
+        self.assertIsNotNone(result)
+        (pool, _) = result
+        self.assertEqual(pool, self._pool_object_path)

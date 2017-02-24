@@ -21,10 +21,10 @@ import unittest
 
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import StratisdErrorsGen
+from stratisd_client_dbus import get_managed_objects
 from stratisd_client_dbus import get_object
 
 from stratisd_client_dbus._implementation import ManagerSpec
-
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import checked_call
@@ -78,23 +78,18 @@ class Create2TestCase(unittest.TestCase):
            ManagerSpec.OUTPUT_SIGS[_MN.CreatePool]
         )
 
-        (pool, rc1, _) = checked_call(
-           Manager.GetPoolObjectPath(self._proxy, name=self._POOLNAME),
-           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath]
-        )
-
-        (pools, _, _) = checked_call(
-           Manager.ListPools(self._proxy),
-           ManagerSpec.OUTPUT_SIGS[_MN.ListPools]
-        )
+        managed_objects = get_managed_objects(self._proxy)
+        pools = [x for x in managed_objects.pools()]
+        result = next(managed_objects.pools({'Name': self._POOLNAME}), None)
 
         if rc == self._errors.OK:
+            self.assertIsNotNone(result)
+            (pool, _) = result
             self.assertEqual(pool, poolpath)
-            self.assertEqual(rc1, self._errors.OK)
             self.assertEqual(len(pools), 1)
             self.assertLessEqual(len(devnodes), len(devs))
         else:
-            self.assertEqual(rc1, self._errors.POOL_NOTFOUND)
+            self.assertIsNone(result)
             self.assertEqual(len(pools), 0)
 
     def testCreateBadRAID(self):
@@ -150,10 +145,7 @@ class Create3TestCase(unittest.TestCase):
         """
         Create should fail trying to create new pool with same name as previous.
         """
-        (pools1, _, _) = checked_call(
-           Manager.ListPools(self._proxy),
-           ManagerSpec.OUTPUT_SIGS[_MN.ListPools]
-        )
+        pools1 = get_managed_objects(self._proxy).pools()
 
         (_, rc, _) = checked_call(
            Manager.CreatePool(
@@ -168,15 +160,12 @@ class Create3TestCase(unittest.TestCase):
         expected_rc = self._errors.ALREADY_EXISTS
         self.assertEqual(rc, expected_rc)
 
-        (_, rc1, _) = checked_call(
-           Manager.GetPoolObjectPath(self._proxy, name=self._POOLNAME),
-           ManagerSpec.OUTPUT_SIGS[_MN.GetPoolObjectPath]
-        )
+        managed_objects = get_managed_objects(self._proxy)
+        pools2 = [x for x in managed_objects.pools()]
+        pool = next(managed_objects.pools({'Name': self._POOLNAME}), None)
 
-        (pools2, _, _) = checked_call(
-           Manager.ListPools(self._proxy),
-           ManagerSpec.OUTPUT_SIGS[_MN.ListPools]
+        self.assertIsNotNone(pool)
+        self.assertEqual(
+           frozenset(x for (x, y) in pools1),
+           frozenset(x for (x, y) in pools2)
         )
-
-        self.assertEqual(rc1, self._errors.OK)
-        self.assertEqual(pools1, pools2)

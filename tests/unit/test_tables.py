@@ -93,13 +93,13 @@ class XformerTestCase(unittest.TestCase):
         Test exception on bad data.
         """
         with self.assertRaises(Exception):
-            _info_to_xformer(["name"], lambda n: lambda x: x, "")
+            _info_to_xformer(("name", lambda x: x, ""),)
 
     def testResultException(self):
         """
         Verify that the resulting function raises an error on bad data.
         """
-        result = _info_to_xformer((), lambda n: lambda x: x, "")
+        result = _info_to_xformer(())
         with self.assertRaises(Exception):
             result([2])
 
@@ -108,9 +108,7 @@ class XformerTestCase(unittest.TestCase):
         Test result with tuple.
         """
         result = _info_to_xformer(
-           ("thing", ),
-           lambda n: lambda x: _option_to_tuple(x, 0),
-           "(bt)"
+           (("thing", (lambda x: _option_to_tuple(x, 0)), "(bt)"),)
         )
 
         self.assertEqual(

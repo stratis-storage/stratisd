@@ -22,4 +22,9 @@ from ._implementation import Filesystem
 from ._implementation import Manager
 from ._implementation import Pool
 
+from ._managedobjects import get_managed_objects
+from ._managedobjects import GMOFilesystem
+from ._managedobjects import GMOPool
+
 from ._stratisd_constants import StratisdErrorsGen
+from ._stratisd_constants import StratisdRaidGen

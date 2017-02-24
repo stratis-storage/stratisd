@@ -110,7 +110,7 @@ def _verify_methods(klass, klass_datum):
         method_datum = method_data[0]
 
         sig = _signature(method_datum, "in")
-        if sig != klass.INPUT_SIGS[method][2]:
+        if sig != "".join(s for (_, _, s) in klass.INPUT_SIGS[method]):
             return "in signatures for method %s in interface %s do not match" \
                % (method.name, klass.INTERFACE_NAME)
 

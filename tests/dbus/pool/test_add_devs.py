@@ -81,13 +81,13 @@ class AddDevsTestCase(unittest.TestCase):
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, self._errors.OK)
 
-        (result1, rc1, _) = checked_call(
-           Pool.ListDevs(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
-        )
+        #(result1, rc1, _) = checked_call(
+        #   Pool.ListDevs(self._pool_object),
+        #   PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
+        #)
 
-        self.assertEqual(rc1, self._errors.OK)
-        self.assertEqual(len(result1), len(result))
+        #self.assertEqual(rc1, self._errors.OK)
+        #self.assertEqual(len(result1), len(result))
 
     def testSomeDevs(self):
         """
@@ -103,14 +103,14 @@ class AddDevsTestCase(unittest.TestCase):
            PoolSpec.OUTPUT_SIGS[_PN.AddDevs]
         )
 
-        (result1, rc1, _) = checked_call(
-           Pool.ListDevs(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
-        )
-        self.assertEqual(rc1, self._errors.OK)
+        #(result1, rc1, _) = checked_call(
+        #   Pool.ListDevs(self._pool_object),
+        #   PoolSpec.OUTPUT_SIGS[_PN.ListDevs]
+        #)
+        #self.assertEqual(rc1, self._errors.OK)
 
         num_devices_added = len(result)
-        self.assertEqual(len(result1), num_devices_added)
+        #self.assertEqual(len(result1), num_devices_added)
 
         if rc == self._errors.OK:
             self.assertGreater(num_devices_added, 0)

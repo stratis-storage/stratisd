@@ -23,6 +23,7 @@ from stratisd_client_dbus import Manager
 from stratisd_client_dbus import Pool
 from stratisd_client_dbus import StratisdErrorsGen
 from stratisd_client_dbus import get_object
+from stratisd_client_dbus import get_managed_objects
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
@@ -77,37 +78,29 @@ class DestroyFSTestCase(unittest.TestCase):
         number of volumes.
         """
         (result, rc, _) = checked_call(
-           Pool.DestroyFilesystems(self._pool_object, names=[]),
+           Pool.DestroyFilesystems(self._pool_object, filesystems=[]),
            PoolSpec.OUTPUT_SIGS[_PN.DestroyFilesystems]
         )
 
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, self._errors.OK)
 
-        (result, rc, _) = checked_call(
-           Pool.ListFilesystems(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
-        )
-        self.assertEqual(rc, self._errors.OK)
+        result = [x for x in get_managed_objects(self._proxy).filesystems()]
         self.assertEqual(len(result), 0)
 
     def testDestroyOne(self):
         """
-        Test calling with a non-existant volume name. This should succeed,
-        because at the end the volume is not there.
+        Test calling with a non-existant object path. This should succeed,
+        because at the end the filesystem is not there.
         """
         (result, rc, _) = checked_call(
-           Pool.DestroyFilesystems(self._pool_object, names=['name']),
+           Pool.DestroyFilesystems(self._pool_object, filesystems=['/']),
            PoolSpec.OUTPUT_SIGS[_PN.DestroyFilesystems]
         )
+        self.assertEqual(rc, self._errors.OK)
         self.assertEqual(len(result), 0)
-        self.assertEqual(rc, self._errors.OK)
 
-        (result, rc, _) = checked_call(
-           Pool.ListFilesystems(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
-        )
-        self.assertEqual(rc, self._errors.OK)
+        result = [x for x in get_managed_objects(self._proxy).filesystems()]
         self.assertEqual(len(result), 0)
 
 
@@ -129,15 +122,15 @@ class DestroyFSTestCase1(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         self._errors = StratisdErrorsGen.get_object()
         self._devs = _DEVICE_STRATEGY.example()
-        ((poolpath, _), _, _) = Manager.CreatePool(
+        ((self._poolpath, _), _, _) = Manager.CreatePool(
            self._proxy,
            name=self._POOLNAME,
            redundancy=0,
            force=False,
            devices=self._devs
         )
-        self._pool_object = get_object(poolpath)
-        Pool.CreateFilesystems(
+        self._pool_object = get_object(self._poolpath)
+        (self._filesystems, _, _) = Pool.CreateFilesystems(
            self._pool_object,
            specs=[(self._VOLNAME, '', None)]
         )
@@ -151,23 +144,22 @@ class DestroyFSTestCase1(unittest.TestCase):
 
     def testDestroyOne(self):
         """
-        Test calling by specifying the volume name. Assume that destruction
+        Test calling by specifying the object path. Assume that destruction
         should always succeed.
         """
+        fs_object_path = self._filesystems[0][0]
         (result, rc, _) = checked_call(
-           Pool.DestroyFilesystems(self._pool_object, names=[self._VOLNAME]),
+           Pool.DestroyFilesystems(
+              self._pool_object,
+              filesystems=[fs_object_path]
+           ),
            PoolSpec.OUTPUT_SIGS[_PN.DestroyFilesystems]
         )
 
         self.assertEqual(len(result), 1)
         self.assertEqual(rc, self._errors.OK)
-        self.assertEqual(result[0], self._VOLNAME)
 
-        (result, rc, _) = checked_call(
-           Pool.ListFilesystems(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
-        )
-        self.assertEqual(rc, self._errors.OK)
+        result = [x for x in get_managed_objects(self._proxy).filesystems()]
         self.assertEqual(len(result), 0)
 
     def testDestroyTwo(self):
@@ -176,20 +168,17 @@ class DestroyFSTestCase1(unittest.TestCase):
         non-existing. Should succeed, but only the existing name should be
         returned.
         """
+        fs_object_path = self._filesystems[0][0]
         (result, rc, _) = checked_call(
            Pool.DestroyFilesystems(
-              self._pool_object, names=[self._VOLNAME, "bogus"]
+              self._pool_object,
+              filesystems=[fs_object_path, "/"]
            ),
            PoolSpec.OUTPUT_SIGS[_PN.DestroyFilesystems]
         )
 
         self.assertEqual(len(result), 1)
         self.assertEqual(rc, self._errors.OK)
-        self.assertEqual(result[0], self._VOLNAME)
 
-        (result, rc, _) = checked_call(
-           Pool.ListFilesystems(self._pool_object),
-           PoolSpec.OUTPUT_SIGS[_PN.ListFilesystems]
-        )
-        self.assertEqual(rc, self._errors.OK)
+        result = [x for x in get_managed_objects(self._proxy).filesystems()]
         self.assertEqual(len(result), 0)

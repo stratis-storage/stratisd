@@ -22,62 +22,84 @@ from ._implementation import FilesystemSpec
 from ._implementation import ObjectManager
 from ._implementation import PoolSpec
 
-_SERVICE_NAME = "org.storage.stratis1"
-_POOL_INTERFACE_NAME = "%s.%s" % (_SERVICE_NAME, "pool")
-_FILESYSTEM_INTERFACE_NAME = "%s.%s" % (_SERVICE_NAME, "filesystem")
 
-_POOL_INTERFACE_PROPS = frozenset(("Name", "Uuid"))
-
-class ManagedObjects(object):
+def _managed_objects_builder(specs):
     """
-    Wraps the dict returned by GetManagedObjects() method with some
-    methods.
+    Returns a function that builds a ManagedObjects class.
+    This class encapsulates the locating of various managed objects
+    according to the given specifications.
+
+    :param specs: a list of interface specs
+    :type specs: iterable of InterfaceSpec
     """
-    # pylint: disable=too-few-public-methods
 
-
-    def __init__(self, objects): # pragma: no cover
+    def builder(namespace):
         """
-        Initializer.
+        Adds properties to the class's namespace.
 
-        :param dict objects: the GetManagedObjects result.
+        :param namespace: the class's namespace
         """
-        self._objects = objects
 
-    def pools(self, spec=None): # pragma: no cover
-        """
-        Get the subset of data corresponding to pools and matching spec.
+        def build_function(spec):
+            """
+            Build a function for ManagedObject class that gets the appropriate
+            objects matching a list of property values.
+            """
 
-        :param spec: a specification of properties to restrict values returned
-        :type spec: dict of str * object
-        :returns: a list of pairs of object path/dict for pools only
-        :rtype: list of tuple of ObjectPath * dict
+            def the_func(self, props=None): # pragma: no cover
+                """
+                Takes a list of key/value pairs representing properties
+                and locates the corresponding objects which implement
+                the designated interface for the spec.
 
-        A match requires a conjunction of all specified properties.
-        An empty spec results in all pool objects being returned.
-        """
-        spec = dict() if spec is None else spec
-        interface_name = _POOL_INTERFACE_NAME
-        return (
-           (op, data) for (op, data) in self._objects.items() \
-               if interface_name in data.keys() and \
-               all(data[interface_name][key] == value \
-                   for (key, value) in spec.items())
-        )
+                :param props: a specification of properties to restrict values
+                :type props: dict of str * object or NoneType
+                :returns: a list of pairs of object path/dict for the interface
+                :rtype: list of tuple of ObjectPath * dict
 
-    def filesystems(self): # pragma: no cover
-        """
-        Get the subset of data corresponding to filesystems.
+                The function has conjunctive semantics, i.e., the object
+                must match for every item in props to be returned.
+                If props is None or an empty dict all objects that implement
+                the designated interface are returned.
 
-        :returns: a list of dictionaries for pools
-        :rtype: list of tuple of ObjectPath * dict
-        """
-        interface_name = _FILESYSTEM_INTERFACE_NAME
-        return (
-           (x, y) for (x, y) in self._objects.items() \
-               if interface_name in y.keys()
-        )
+                :raises KeyError: if any of keys is not a property name
+                """
+                props = dict() if props is None else props
+                interface_name = spec.INTERFACE_NAME
 
+                # pylint: disable=protected-access
+                return (
+                   (op, data) for (op, data) in self._objects.items() \
+                       if interface_name in data.keys() and \
+                       all(data[interface_name][key] == value \
+                           for (key, value) in props.items())
+                )
+
+            return the_func
+
+        for spec in specs:
+            (_, _, method_prefix) = spec.INTERFACE_NAME.rpartition(".")
+            method_name = method_prefix + "s"
+            namespace[method_name] = build_function(spec)
+
+        def __init__(self, objects): # pragma: no cover
+            """
+            The ManagedObjects initializer.
+
+            :param objects: the result returned by GetManagedObjects() call.
+            """
+            # pylint: disable=protected-access
+            self._objects = objects
+
+        namespace['__init__'] = __init__
+
+    return builder
+
+ManagedObjects = types.new_class(
+   "ManagedObjects",
+   bases=(object,),
+   exec_body=_managed_objects_builder([FilesystemSpec, PoolSpec])
+)
 
 def _gmo_builder(spec):
     """

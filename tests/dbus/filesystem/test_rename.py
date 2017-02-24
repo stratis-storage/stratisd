@@ -24,6 +24,7 @@ from stratisd_client_dbus import Manager
 from stratisd_client_dbus import Pool
 from stratisd_client_dbus import StratisdErrorsGen
 from stratisd_client_dbus import get_object
+from stratisd_client_dbus import get_managed_objects
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
@@ -105,3 +106,11 @@ class SetNameTestCase(unittest.TestCase):
 
         self.assertEqual(rc, self._errors.OK)
         self.assertTrue(result)
+
+        managed_objects = get_managed_objects(self._proxy)
+        (fs_object_path, _) = next(managed_objects.filesystems({'Name': 'new'}))
+        self.assertEqual(self._filesystem_object_path, fs_object_path)
+
+        fs_object_path = \
+           next(managed_objects.filesystems({'Name': self._fs_name}), None)
+        self.assertIsNone(fs_object_path)

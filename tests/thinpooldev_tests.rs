@@ -5,21 +5,21 @@
 extern crate log;
 extern crate uuid;
 extern crate devicemapper;
-extern crate libstratis;
+extern crate stratis;
 extern crate rand;
 #[macro_use]
 mod util;
 
 use devicemapper::DM;
 
-use libstratis::engine::strat_engine::blockdev;
-use libstratis::engine::strat_engine::blockdev::BlockDev;
-use libstratis::engine::strat_engine::lineardev::LinearDev;
-use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
-use libstratis::engine::strat_engine::thindev::ThinDev;
-use libstratis::engine::strat_engine::thinpooldev::ThinPoolDev;
-use libstratis::types::DataBlocks;
-use libstratis::types::Sectors;
+use stratis::engine::strat_engine::blockdev;
+use stratis::engine::strat_engine::blockdev::BlockDev;
+use stratis::engine::strat_engine::lineardev::LinearDev;
+use stratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
+use stratis::engine::strat_engine::thindev::ThinDev;
+use stratis::engine::strat_engine::thinpooldev::ThinPoolDev;
+use stratis::types::DataBlocks;
+use stratis::types::Sectors;
 
 use std::path::{Path, PathBuf};
 

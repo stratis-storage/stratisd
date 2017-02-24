@@ -5,17 +5,17 @@
 extern crate log;
 extern crate uuid;
 extern crate devicemapper;
-extern crate libstratis;
+extern crate stratis;
 #[macro_use]
 mod util;
 
 use devicemapper::DM;
 
-use libstratis::engine::strat_engine::blockdev;
-use libstratis::engine::strat_engine::blockdev::BlockDev;
-use libstratis::engine::strat_engine::lineardev::LinearDev;
-use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
-use libstratis::types::Sectors;
+use stratis::engine::strat_engine::blockdev;
+use stratis::engine::strat_engine::blockdev::BlockDev;
+use stratis::engine::strat_engine::lineardev::LinearDev;
+use stratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
+use stratis::types::Sectors;
 
 use std::iter::FromIterator;
 use std::path::Path;

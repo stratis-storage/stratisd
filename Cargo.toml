@@ -1,5 +1,5 @@
 [package]
-name = "libstratis"
+name = "stratis"
 version = "0.1.0"
 authors = ["Andy Grover <agrover@redhat.com>", "Mulhern <amulhern@redhat.com>", "Todd Gill <tgill@redhat.com>"]
 

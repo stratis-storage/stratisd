@@ -73,13 +73,6 @@ pub trait Pool: HasName + HasUuid {
     /// or there was an error while reading or writing a blockdev.
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
 
-
-    /// Adds blockdevs specified by paths to pool cache.
-    /// Returns a list of device nodes corresponding to devices actually added.
-    /// Returns an error if a blockdev can not be added because it is owned
-    /// or there was an error while reading or writing a blockdev.
-    fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
-
     /// Destroy the pool.
     /// Will fail if filesystems allocated from the pool are in use,
     /// or even exist.

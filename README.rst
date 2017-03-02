@@ -60,7 +60,8 @@ methods and ensure that the values returned conform to their signature
 specification.
 
 To run the existing D-Bus tests, ensure that your PYTHONPATH includes the
-src directory and then: ::
+src directory, set the environment variable STRATISD, to the location of your
+Stratis executable, and: ::
 
     > make dbus-tests
 

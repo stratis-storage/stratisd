@@ -230,7 +230,6 @@ class PoolSpec(InterfaceSpec):
         """
         Names of the methods of the Pool class.
         """
-        AddCacheDevs = "AddCacheDevs"
         AddDevs = "AddDevs"
         CreateFilesystems = "CreateFilesystems"
         DestroyFilesystems = "DestroyFilesystems"
@@ -246,8 +245,6 @@ class PoolSpec(InterfaceSpec):
     INTERFACE_NAME = 'org.storage.stratis1.pool'
 
     INPUT_SIGS = { # pragma: no cover
-       MethodNames.AddCacheDevs:
-          (("force", _IDENTITY, "b"), ("devices", _IDENTITY, "as"),),
        MethodNames.AddDevs:
           (("force", _IDENTITY, "b"), ("devices", _IDENTITY, "as"),),
        MethodNames.CreateFilesystems: (("specs", _IDENTITY, "as"),),
@@ -255,7 +252,6 @@ class PoolSpec(InterfaceSpec):
        MethodNames.SetName: (("new_name", _IDENTITY, "s"),)
     }
     OUTPUT_SIGS = {
-       MethodNames.AddCacheDevs: "asqs",
        MethodNames.AddDevs: "asqs",
        MethodNames.CreateFilesystems: "a(os)qs",
        MethodNames.DestroyFilesystems: "asqs",

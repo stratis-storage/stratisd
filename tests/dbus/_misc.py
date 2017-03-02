@@ -25,9 +25,7 @@ from hypothesis import strategies
 
 from into_dbus_python import signature
 
-from ._constants import _STRATISD
-from ._constants import _STRATISD_EXECUTABLE
-from ._constants import _STRATISD_RUST
+_STRATISD = '/home/mulhern/my-contributions/stratisd/target/debug/stratisd'
 
 
 def checked_call(value, sig):
@@ -91,32 +89,13 @@ class ServiceABC(abc.ABC):
         self._stratisd.wait()
 
 
-class ServiceC(ServiceABC):
-    """
-    Handle starting and stopping the C service.
-    """
-
-    def setUp(self):
-        env = dict(os.environ)
-        env['LD_LIBRARY_PATH'] = os.path.join(_STRATISD, 'lib')
-
-        bin_path = os.path.join(_STRATISD, 'bin')
-
-        self._stratisd = subprocess.Popen(
-           os.path.join(bin_path, _STRATISD_EXECUTABLE),
-           env=env
-        )
-
-
 class ServiceR(ServiceABC):
     """
     Handle starting and stopping the Rust service.
     """
 
     def setUp(self):
-        self._stratisd = subprocess.Popen(
-           [os.path.join(_STRATISD_RUST, 'target/debug/stratisd'), '--sim']
-        )
+        self._stratisd = subprocess.Popen([os.path.join(_STRATISD), '--sim'])
 
 
 Service = ServiceR

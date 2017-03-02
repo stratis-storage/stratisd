@@ -33,7 +33,6 @@ pub struct SimPool {
     name: String,
     pool_uuid: Uuid,
     pub block_devs: BTreeMap<PathBuf, SimDev>,
-    pub cache_devs: BTreeMap<PathBuf, SimDev>,
     pub filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
@@ -54,7 +53,6 @@ impl SimPool {
             pool_uuid: Uuid::new_v4(),
             block_devs: BTreeMap::from_iter(device_pairs),
             filesystems: Table::new(),
-            cache_devs: BTreeMap::new(),
             redundancy: redundancy,
             rdm: rdm.clone(),
         };
@@ -70,15 +68,6 @@ impl Pool for SimPool {
         let device_pairs = devices.iter()
             .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
         self.block_devs.extend(device_pairs);
-        Ok(devices.iter().map(|d| d.to_path_buf()).collect())
-    }
-
-    fn add_cachedevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
-        let rdm = self.rdm.clone();
-        let devices = BTreeSet::from_iter(paths);
-        let device_pairs = devices.iter()
-            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
-        self.cache_devs.extend(device_pairs);
         Ok(devices.iter().map(|d| d.to_path_buf()).collect())
     }
 

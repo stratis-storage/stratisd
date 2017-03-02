@@ -172,44 +172,6 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-
-fn add_cache_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-
-    let force: bool = try!(get_next_arg(&mut iter, 0));
-    let cache_devs: Array<&str, _> = try!(get_next_arg(&mut iter, 1));
-
-    let dbus_context = m.tree.get_data();
-    let object_path = m.path.get_name();
-    let return_message = message.method_return();
-    let return_sig = "s";
-    let default_return = MessageItem::Array(vec![], return_sig.into());
-
-    let pool_uuid =
-        get_pool_uuid_internal_error!(object_path; dbus_context; default_return; return_message);
-
-    let mut engine = dbus_context.engine.borrow_mut();
-    let mut pool = get_pool!(engine; pool_uuid; default_return; return_message);
-
-    let cachedevs = cache_devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
-
-    let msg = match pool.add_cachedevs(&cachedevs, force) {
-        Ok(devnodes) => {
-            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
-            let paths = paths.map(|x| MessageItem::Str(x)).collect();
-            let (rc, rs) = ok_message_items();
-            return_message.append3(MessageItem::Array(paths, return_sig.into()), rc, rs)
-        }
-        Err(x) => {
-            let (rc, rs) = engine_to_dbus_err(&x);
-            let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append3(default_return, rc, rs)
-        }
-    };
-    Ok(vec![msg])
-}
-
 fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
@@ -290,13 +252,6 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let add_cache_devs_method = f.method("AddCacheDevs", (), add_cache_devs)
-        .in_arg(("force", "b"))
-        .in_arg(("devices", "as"))
-        .out_arg(("results", "as"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
     let add_devs_method = f.method("AddDevs", (), add_devs)
         .in_arg(("force", "b"))
         .in_arg(("devices", "as"))
@@ -331,7 +286,6 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .add(f.interface(interface_name, ())
             .add_m(create_filesystems_method)
             .add_m(destroy_filesystems_method)
-            .add_m(add_cache_devs_method)
             .add_m(add_devs_method)
             .add_m(rename_method)
             .add_p(name_property)

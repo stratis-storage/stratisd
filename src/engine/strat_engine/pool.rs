@@ -32,7 +32,6 @@ use super::metadata::MIN_MDA_SECTORS;
 pub struct StratPool {
     name: String,
     pool_uuid: Uuid,
-    pub cache_devs: BTreeMap<PathBuf, BlockDev>,
     pub block_devs: BTreeMap<PathBuf, BlockDev>,
     pub filesystems: Table<StratFilesystem>,
     redundancy: Redundancy,
@@ -52,7 +51,6 @@ impl StratPool {
         let mut pool = StratPool {
             name: name.to_owned(),
             pool_uuid: pool_uuid,
-            cache_devs: BTreeMap::new(),
             block_devs: bds,
             filesystems: Table::new(),
             redundancy: redundancy,
@@ -150,23 +148,11 @@ impl Pool for StratPool {
         Ok(bdev_paths)
     }
 
-    fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
-        let devices = try!(resolve_devices(paths));
-        let mut bds = try!(initialize(&self.pool_uuid, devices, MIN_MDA_SECTORS, force));
-        let bdev_paths = bds.iter().map(|p| p.1.devnode.clone()).collect();
-        self.cache_devs.append(&mut bds);
-        Ok(bdev_paths)
-    }
-
     fn destroy(mut self) -> EngineResult<()> {
 
         // TODO: first, tear down DM mappings
 
         for bd in self.block_devs.values_mut() {
-            try!(bd.wipe_metadata());
-        }
-
-        for bd in self.cache_devs.values_mut() {
             try!(bd.wipe_metadata());
         }
 

@@ -25,7 +25,7 @@ from hypothesis import strategies
 
 from into_dbus_python import signature
 
-_STRATISD = '/home/mulhern/my-contributions/stratisd/target/debug/stratisd'
+_STRATISD = os.environ['STRATISD']
 
 
 def checked_call(value, sig):

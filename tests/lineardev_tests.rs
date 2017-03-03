@@ -156,7 +156,6 @@ pub fn test_lineardev_setup() {
     info!("safe_to_destroy_devs = {:?}", safe_to_destroy_devs);
     let device_paths = safe_to_destroy_devs.iter().map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
-    clean_blockdev_headers(&device_paths);
     assert_ok!(clean_blockdev_headers(&device_paths));
 
     info!("devices cleaned for test");

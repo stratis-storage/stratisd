@@ -121,7 +121,7 @@ pub fn test_pools() {
 
     let device_paths = safe_to_destroy_devs.iter().map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
-    clean_blockdev_headers(&device_paths);
+    assert_ok!(clean_blockdev_headers(&device_paths));
 
     assert!(test_create_and_delete(&device_paths).is_ok());
 }

@@ -103,13 +103,6 @@ impl Pool for SimPool {
         Ok(result)
     }
 
-    fn create_snapshot<'a, 'b, 'c>(&'a mut self,
-                                   _snapshot_name: &'b str,
-                                   _source: &'c Uuid)
-                                   -> EngineResult<Uuid> {
-        unimplemented!()
-    }
-
     fn rename_filesystem(&mut self, uuid: &Uuid, new_name: &str) -> EngineResult<RenameAction> {
         rename_filesystem!{self; uuid; new_name}
     }

@@ -60,13 +60,6 @@ pub trait Pool: HasName + HasUuid {
                                   specs: &[&'b str])
                                   -> EngineResult<Vec<(&'b str, Uuid)>>;
 
-    /// Create a snapshot named snapshot_name from the given source filesystem.
-    /// Return the UUID of the newly created filesystem.
-    fn create_snapshot<'a, 'b, 'c>(&'a mut self,
-                                   snapshot_name: &'b str,
-                                   source: &'c Uuid)
-                                   -> EngineResult<Uuid>;
-
     /// Adds blockdevs specified by paths to pool.
     /// Returns a list of device nodes corresponding to devices actually added.
     /// Returns an error if a blockdev can not be added because it is owned

@@ -132,13 +132,6 @@ impl Pool for StratPool {
         unimplemented!()
     }
 
-    fn create_snapshot<'a, 'b, 'c>(&'a mut self,
-                                   _snapshot_name: &'b str,
-                                   _source: &'c Uuid)
-                                   -> EngineResult<Uuid> {
-        unimplemented!()
-    }
-
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
         let devices = try!(resolve_devices(paths));
         let mut bds = try!(initialize(&self.pool_uuid, devices, MIN_MDA_SECTORS, force));

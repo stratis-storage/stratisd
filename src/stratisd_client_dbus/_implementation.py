@@ -201,7 +201,7 @@ class ManagerSpec(InterfaceSpec):
               ("force", _IDENTITY, "b"),
               ("devices", _IDENTITY, "as"),
            ),
-        MethodNames.DestroyPool : (("pool_object_path", _IDENTITY, "o"),),
+        MethodNames.DestroyPool : (("pool", _IDENTITY, "o"),),
     }
     OUTPUT_SIGS = {
         MethodNames.ConfigureSimulator : "qs",
@@ -246,7 +246,7 @@ class PoolSpec(InterfaceSpec):
           (("force", _IDENTITY, "b"), ("devices", _IDENTITY, "as"),),
        MethodNames.CreateFilesystems: (("specs", _IDENTITY, "as"),),
        MethodNames.DestroyFilesystems: (("filesystems", _IDENTITY, "ao"),),
-       MethodNames.SetName: (("new_name", _IDENTITY, "s"),)
+       MethodNames.SetName: (("name", _IDENTITY, "s"),)
     }
     OUTPUT_SIGS = {
        MethodNames.AddDevs: "asqs",

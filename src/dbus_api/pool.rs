@@ -260,7 +260,7 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
         .out_arg(("return_string", "s"));
 
     let rename_method = f.method("SetName", (), rename_pool)
-        .in_arg(("new_name", "s"))
+        .in_arg(("name", "s"))
         .out_arg(("action", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

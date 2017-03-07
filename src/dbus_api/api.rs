@@ -194,7 +194,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
         .out_arg(("return_string", "s"));
 
     let destroy_pool_method = f.method("DestroyPool", (), destroy_pool)
-        .in_arg(("pool_object_path", "o"))
+        .in_arg(("pool", "o"))
         .out_arg(("action", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));

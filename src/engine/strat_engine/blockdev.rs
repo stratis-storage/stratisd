@@ -63,9 +63,7 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>>
     /// struct. Otherwise, return None. Return an error if there was
     /// a problem inspecting the device.
     fn setup(devnode: &Path) -> EngineResult<Option<BlockDev>> {
-        let mut f = try!(OpenOptions::new()
-            .read(true)
-            .open(devnode));
+        let mut f = try!(OpenOptions::new().read(true).open(devnode));
 
         if let Some(bda) = BDA::load(&mut f).ok() {
             let dev = try!(Device::from_str(&devnode.to_string_lossy()));
@@ -74,11 +72,11 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>>
             let allocator = RangeAllocator::new_with_used(bda.dev_size(),
                                                           &[(Sectors(0), bda.size())]);
             Ok(Some(BlockDev {
-                dev: dev,
-                devnode: devnode.to_owned(),
-                bda: bda,
-                used: allocator,
-            }))
+                        dev: dev,
+                        devnode: devnode.to_owned(),
+                        bda: bda,
+                        used: allocator,
+                    }))
         } else {
             Ok(None)
         }
@@ -93,7 +91,8 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>>
 
         match setup(&devnode) {
             Ok(Some(blockdev)) => {
-                pool_map.entry(blockdev.pool_uuid().clone())
+                pool_map
+                    .entry(blockdev.pool_uuid().clone())
                     .or_insert_with(HashMap::new)
                     .insert(blockdev.uuid().clone(), blockdev);
             }
@@ -144,13 +143,14 @@ pub fn initialize(pool_uuid: &PoolUuid,
                            format!("could not get device node from dev {}", dev.dstr()))
         }));
         let mut f = try!(OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(&devnode)
-            .map_err(|_| {
-                io::Error::new(ErrorKind::PermissionDenied,
-                               format!("Could not open {}", devnode.display()))
-            }));
+                             .read(true)
+                             .write(true)
+                             .open(&devnode)
+                             .map_err(|_| {
+                                          io::Error::new(ErrorKind::PermissionDenied,
+                                                         format!("Could not open {}",
+                                                                 devnode.display()))
+                                      }));
 
         let dev_size = try!(blkdev_size(&f));
 

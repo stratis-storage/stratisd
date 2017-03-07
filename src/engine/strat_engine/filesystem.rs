@@ -50,10 +50,10 @@ impl StratFilesystem {
                                              Bytes(IEC::Gi).sectors()));
         try!(create_fs(new_thin_dev.devnode().unwrap().as_path()));
         Ok(StratFilesystem {
-            fs_id: fs_id,
-            name: name.to_owned(),
-            thin_dev: new_thin_dev,
-        })
+               fs_id: fs_id,
+               name: name.to_owned(),
+               thin_dev: new_thin_dev,
+           })
     }
 
     pub fn check(&self, dm: &DM) -> EngineResult<FilesystemStatus> {
@@ -99,9 +99,9 @@ pub fn create_fs(dev_path: &Path) -> EngineResult<()> {
 
     debug!("Create filesystem for : {:?}", dev_path);
     let output = try!(Command::new("mkfs.xfs")
-        .arg("-f")
-        .arg(&dev_path)
-        .output());
+                          .arg("-f")
+                          .arg(&dev_path)
+                          .output());
 
     if output.status.success() {
         debug!("Created xfs filesystem on {:?}", dev_path)
@@ -117,9 +117,9 @@ pub fn mount_fs(dev_path: &Path, mount_point: &Path) -> EngineResult<()> {
 
     debug!("Mount filesystem {:?} on : {:?}", dev_path, mount_point);
     let output = try!(Command::new("mount")
-        .arg(&dev_path)
-        .arg(mount_point)
-        .output());
+                          .arg(&dev_path)
+                          .arg(mount_point)
+                          .output());
 
     if output.status.success() {
         debug!("Mounted filesystem on {:?}", mount_point)

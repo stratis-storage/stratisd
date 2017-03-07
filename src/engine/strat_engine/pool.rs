@@ -80,7 +80,8 @@ impl StratPool {
                                                    short_bytes)));
         }
 
-        let meta_regions = block_mgr.alloc_space(INITIAL_META_SIZE)
+        let meta_regions = block_mgr
+            .alloc_space(INITIAL_META_SIZE)
             .expect("blockmgr must not fail, already checked for space");
         let meta_dev = try!(LinearDev::new(&format!("stratis_{}_meta", name), dm, &meta_regions));
 
@@ -94,7 +95,8 @@ impl StratPool {
         // have been passed.
         try!(wipe_sectors(&try!(meta_dev.devnode()), Sectors(0), INITIAL_META_SIZE));
 
-        let data_regions = block_mgr.alloc_space(INITIAL_DATA_SIZE)
+        let data_regions = block_mgr
+            .alloc_space(INITIAL_DATA_SIZE)
             .expect("blockmgr must not fail, already checked for space");
         let data_dev = try!(LinearDev::new(&format!("stratis_{}_data", name), dm, &data_regions));
         let length = try!(data_dev.size()).sectors();
@@ -132,7 +134,8 @@ impl StratPool {
     // alternate time value if earlier, as described in SWDD
     pub fn write_metadata(&mut self) -> EngineResult<()> {
         let data = try!(serde_json::to_string(&self.to_save()));
-        self.block_devs.save_state(&now().to_timespec(), data.as_bytes())
+        self.block_devs
+            .save_state(&now().to_timespec(), data.as_bytes())
     }
 
     pub fn to_save(&self) -> StratSave {

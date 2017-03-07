@@ -59,7 +59,9 @@ mod tests {
         /// Verify that if the denominator is 0 the result is always false,
         /// if 1, always true.
         fn denominator_result(denominator: u32) -> bool {
-            let result = Randomizer::new().set_probability(denominator).throw_die();
+            let result = Randomizer::new()
+                .set_probability(denominator)
+                .throw_die();
             if denominator > 1 {
                 true
             } else {
@@ -70,6 +72,8 @@ mod tests {
                 }
             }
         }
-        QuickCheck::new().tests(30).quickcheck(denominator_result as fn(u32) -> bool);
+        QuickCheck::new()
+            .tests(30)
+            .quickcheck(denominator_result as fn(u32) -> bool);
     }
 }

@@ -61,7 +61,8 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
-    let result = dbus_context.engine
+    let result = dbus_context
+        .engine
         .borrow_mut()
         .create_pool(name, &blockdevs, tuple_to_option(redundancy), force);
 
@@ -71,11 +72,13 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok((uuid, devnodes)) => {
             let pool_object_path: dbus::Path =
                 create_dbus_pool(dbus_context, object_path.clone(), uuid);
-            let paths = devnodes.iter().map(|d| {
-                d.to_str()
-                    .expect("'d' originated in the 'devs' D-Bus argument.")
-                    .into()
-            });
+            let paths = devnodes
+                .iter()
+                .map(|d| {
+                         d.to_str()
+                             .expect("'d' originated in the 'devs' D-Bus argument.")
+                             .into()
+                     });
             let paths = paths.map(|x| MessageItem::Str(x)).collect();
             let return_path = MessageItem::ObjectPath(pool_object_path);
             let return_list = MessageItem::Array(paths, "s".into());
@@ -115,9 +118,15 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     };
 
-    let msg = match dbus_context.engine.borrow_mut().destroy_pool(&pool_uuid) {
+    let msg = match dbus_context
+              .engine
+              .borrow_mut()
+              .destroy_pool(&pool_uuid) {
         Ok(action) => {
-            dbus_context.actions.borrow_mut().push_remove(object_path);
+            dbus_context
+                .actions
+                .borrow_mut()
+                .push_remove(object_path);
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::Bool(action), rc, rs)
         }
@@ -135,9 +144,9 @@ fn get_list_items<T, I>(i: &mut IterAppend, iter: I) -> Result<(), MethodErr>
           I: Iterator<Item = T>
 {
     let msg_vec = iter.map(|item| {
-            MessageItem::Struct(vec![MessageItem::Str(format!("{}", item)),
-                                     MessageItem::UInt16(item.into())])
-        })
+                               MessageItem::Struct(vec![MessageItem::Str(format!("{}", item)),
+                                                        MessageItem::UInt16(item.into())])
+                           })
         .collect::<Vec<MessageItem>>();
     i.append(MessageItem::Array(msg_vec, Cow::Borrowed("(sq)")));
     Ok(())
@@ -168,7 +177,10 @@ fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let denominator: u32 = try!(get_next_arg(&mut iter, 0));
 
     let dbus_context = m.tree.get_data();
-    let result = dbus_context.engine.borrow_mut().configure_simulator(denominator);
+    let result = dbus_context
+        .engine
+        .borrow_mut()
+        .configure_simulator(denominator);
 
     let return_message = message.method_return();
 
@@ -213,8 +225,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
         .out_arg(("return_string", "s"));
 
     let redundancy_values_property =
-        f.property::<Array<(&str, u16), &Iterator<Item = (&str, u16)>>, _>("RedundancyValues",
-                                                                              ())
+        f.property::<Array<(&str, u16), &Iterator<Item = (&str, u16)>>, _>("RedundancyValues", ())
             .access(Access::Read)
             .emits_changed(EmitsChangedSignal::Const)
             .on_get(get_redundancy_values);
@@ -236,12 +247,12 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
         .introspectable()
         .object_manager()
         .add(f.interface(interface_name, ())
-            .add_m(create_pool_method)
-            .add_m(destroy_pool_method)
-            .add_m(configure_simulator_method)
-            .add_p(error_values_property)
-            .add_p(redundancy_values_property)
-            .add_p(version_property));
+                 .add_m(create_pool_method)
+                 .add_m(destroy_pool_method)
+                 .add_m(configure_simulator_method)
+                 .add_p(error_values_property)
+                 .add_p(redundancy_values_property)
+                 .add_p(version_property));
 
     base_tree.add(obj_path)
 }

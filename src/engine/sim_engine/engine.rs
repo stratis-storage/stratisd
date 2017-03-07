@@ -56,7 +56,10 @@ impl Engine for SimEngine {
         }
 
         let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
-        let devices = device_set.into_iter().map(|x| *x).collect::<Vec<&Path>>();
+        let devices = device_set
+            .into_iter()
+            .map(|x| *x)
+            .collect::<Vec<&Path>>();
 
         let pool = SimPool::new(self.rdm.clone(), name, &devices, redundancy);
 
@@ -64,7 +67,10 @@ impl Engine for SimEngine {
             return Err(EngineError::Engine(ErrorEnum::Error, "X".into()));
         }
 
-        let bdev_paths = pool.block_devs.values().map(|p| p.devnode.clone()).collect();
+        let bdev_paths = pool.block_devs
+            .values()
+            .map(|p| p.devnode.clone())
+            .collect();
         let uuid = pool.uuid().clone();
         self.pools.insert(pool);
 
@@ -121,7 +127,9 @@ mod tests {
             SimEngine::new().configure_simulator(denominator).is_ok()
         }
 
-        QuickCheck::new().tests(10).quickcheck(configure_simulator_runs as fn(u32) -> bool);
+        QuickCheck::new()
+            .tests(10)
+            .quickcheck(configure_simulator_runs as fn(u32) -> bool);
     }
 
     #[test]
@@ -148,7 +156,9 @@ mod tests {
     /// Destroying a pool with devices should succeed
     fn destroy_pool_w_devices() {
         let mut engine = SimEngine::new();
-        let (uuid, _) = engine.create_pool("name", &[Path::new("/s/d")], None, false).unwrap();
+        let (uuid, _) = engine
+            .create_pool("name", &[Path::new("/s/d")], None, false)
+            .unwrap();
         assert!(engine.destroy_pool(&uuid).is_ok());
     }
 
@@ -156,7 +166,9 @@ mod tests {
     /// Destroying a pool with filesystems should fail
     fn destroy_pool_w_filesystem() {
         let mut engine = SimEngine::new();
-        let (uuid, _) = engine.create_pool("name", &[Path::new("/s/d")], None, false).unwrap();
+        let (uuid, _) = engine
+            .create_pool("name", &[Path::new("/s/d")], None, false)
+            .unwrap();
         {
             let pool = engine.get_pool(&uuid).unwrap();
             pool.create_filesystems(&["test"]).unwrap();
@@ -172,9 +184,9 @@ mod tests {
         let mut engine = SimEngine::new();
         engine.create_pool(name, &[], None, false).unwrap();
         assert!(match engine.create_pool(name, &[], None, false) {
-            Ok((_, devs)) => devs.is_empty(),
-            Err(_) => false,
-        });
+                    Ok((_, devs)) => devs.is_empty(),
+                    Err(_) => false,
+                });
     }
 
     #[test]
@@ -182,11 +194,13 @@ mod tests {
     fn create_pool_name_collision() {
         let name = "name";
         let mut engine = SimEngine::new();
-        engine.create_pool(name, &[Path::new("/s/d")], None, false).unwrap();
+        engine
+            .create_pool(name, &[Path::new("/s/d")], None, false)
+            .unwrap();
         assert!(match engine.create_pool(name, &[], None, false) {
-            Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
-            _ => false,
-        });
+                    Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
+                    _ => false,
+                });
     }
 
     #[test]
@@ -196,16 +210,18 @@ mod tests {
         let mut engine = SimEngine::new();
         let devices = vec![Path::new(path), Path::new(path)];
         assert!(match engine.create_pool("name", &devices, None, false) {
-            Ok((_, devs)) => devs.len() == 1,
-            _ => false,
-        });
+                    Ok((_, devs)) => devs.len() == 1,
+                    _ => false,
+                });
     }
 
     #[test]
     /// Creating a pool with an impossible raid level should fail
     fn create_pool_max_u16_raid() {
         let mut engine = SimEngine::new();
-        assert!(engine.create_pool("name", &[], Some(std::u16::MAX), false).is_err());
+        assert!(engine
+                    .create_pool("name", &[], Some(std::u16::MAX), false)
+                    .is_err());
     }
 
     #[test]
@@ -213,9 +229,9 @@ mod tests {
     fn rename_empty() {
         let mut engine = SimEngine::new();
         assert!(match engine.rename_pool(&Uuid::new_v4(), "new_name") {
-            Ok(RenameAction::NoSource) => true,
-            _ => false,
-        });
+                    Ok(RenameAction::NoSource) => true,
+                    _ => false,
+                });
     }
 
     #[test]
@@ -225,9 +241,9 @@ mod tests {
         let mut engine = SimEngine::new();
         let (uuid, _) = engine.create_pool(name, &[], None, false).unwrap();
         assert!(match engine.rename_pool(&uuid, name) {
-            Ok(RenameAction::Identity) => true,
-            _ => false,
-        });
+                    Ok(RenameAction::Identity) => true,
+                    _ => false,
+                });
     }
 
     #[test]
@@ -236,9 +252,9 @@ mod tests {
         let mut engine = SimEngine::new();
         let (uuid, _) = engine.create_pool("old_name", &[], None, false).unwrap();
         assert!(match engine.rename_pool(&uuid, "new_name") {
-            Ok(RenameAction::Renamed) => true,
-            _ => false,
-        });
+                    Ok(RenameAction::Renamed) => true,
+                    _ => false,
+                });
     }
 
     #[test]
@@ -249,9 +265,9 @@ mod tests {
         let (uuid, _) = engine.create_pool("old_name", &[], None, false).unwrap();
         engine.create_pool(new_name, &[], None, false).unwrap();
         assert!(match engine.rename_pool(&uuid, new_name) {
-            Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
-            _ => false,
-        });
+                    Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
+                    _ => false,
+                });
     }
 
     #[test]
@@ -261,9 +277,9 @@ mod tests {
         let mut engine = SimEngine::new();
         engine.create_pool(new_name, &[], None, false).unwrap();
         assert!(match engine.rename_pool(&Uuid::new_v4(), new_name) {
-            Ok(RenameAction::NoSource) => true,
-            _ => false,
-        });
+                    Ok(RenameAction::NoSource) => true,
+                    _ => false,
+                });
     }
 
 }

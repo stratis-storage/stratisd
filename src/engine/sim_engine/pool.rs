@@ -46,7 +46,8 @@ impl SimPool {
                -> SimPool {
 
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
-        let device_pairs = devices.iter()
+        let device_pairs = devices
+            .iter()
             .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
         let new_pool = SimPool {
             name: name.to_owned(),
@@ -67,7 +68,8 @@ impl Pool for SimPool {
     fn add_blockdevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
         let rdm = self.rdm.clone();
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
-        let device_pairs = devices.iter()
+        let device_pairs = devices
+            .iter()
             .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
         self.block_devs.extend(device_pairs);
         Ok(devices.iter().map(|d| d.to_path_buf()).collect())
@@ -155,9 +157,9 @@ mod tests {
         let (uuid, _) = engine.create_pool("name", &[], None, false).unwrap();
         let pool = engine.get_pool(&uuid).unwrap();
         assert!(match pool.rename_filesystem(&Uuid::new_v4(), "new_name") {
-            Ok(RenameAction::NoSource) => true,
-            _ => false,
-        });
+                    Ok(RenameAction::NoSource) => true,
+                    _ => false,
+                });
     }
 
     #[test]
@@ -168,9 +170,9 @@ mod tests {
         let pool = engine.get_pool(&uuid).unwrap();
         let infos = pool.create_filesystems(&["old_name"]).unwrap();
         assert!(match pool.rename_filesystem(&infos[0].1, "new_name") {
-            Ok(RenameAction::Renamed) => true,
-            _ => false,
-        });
+                    Ok(RenameAction::Renamed) => true,
+                    _ => false,
+                });
     }
 
     #[test]
@@ -181,13 +183,12 @@ mod tests {
         let mut engine = SimEngine::new();
         let (uuid, _) = engine.create_pool("name", &[], None, false).unwrap();
         let pool = engine.get_pool(&uuid).unwrap();
-        let results = pool.create_filesystems(&[old_name, new_name])
-            .unwrap();
+        let results = pool.create_filesystems(&[old_name, new_name]).unwrap();
         let old_uuid = results.iter().find(|x| x.0 == old_name).unwrap().1;
         assert!(match pool.rename_filesystem(&old_uuid, new_name) {
-            Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
-            _ => false,
-        });
+                    Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
+                    _ => false,
+                });
     }
 
     #[test]
@@ -199,9 +200,9 @@ mod tests {
         let pool = engine.get_pool(&uuid).unwrap();
         pool.create_filesystems(&[new_name]).unwrap();
         assert!(match pool.rename_filesystem(&Uuid::new_v4(), new_name) {
-            Ok(RenameAction::NoSource) => true,
-            _ => false,
-        });
+                    Ok(RenameAction::NoSource) => true,
+                    _ => false,
+                });
     }
 
     #[test]
@@ -211,9 +212,9 @@ mod tests {
         let (uuid, _) = engine.create_pool("name", &[], None, false).unwrap();
         let pool = engine.get_pool(&uuid).unwrap();
         assert!(match pool.destroy_filesystems(&[]) {
-            Ok(names) => names.is_empty(),
-            _ => false,
-        });
+                    Ok(names) => names.is_empty(),
+                    _ => false,
+                });
     }
 
     #[test]
@@ -234,33 +235,37 @@ mod tests {
         let fs_results = pool.create_filesystems(&["fs_name"]).unwrap();
         let fs_uuid = fs_results[0].1;
         assert!(match pool.destroy_filesystems(&[&fs_uuid, &Uuid::new_v4()]) {
-            Ok(filesystems) => filesystems == vec![&fs_uuid],
-            _ => false,
-        });
+                    Ok(filesystems) => filesystems == vec![&fs_uuid],
+                    _ => false,
+                });
     }
 
     #[test]
     /// Creating an empty list of filesystems should succeed, always
     fn create_fs_none() {
         let mut engine = SimEngine::new();
-        let (uuid, _) = engine.create_pool("pool_name", &[], None, false).unwrap();
+        let (uuid, _) = engine
+            .create_pool("pool_name", &[], None, false)
+            .unwrap();
         let pool = engine.get_pool(&uuid).unwrap();
         assert!(match pool.create_filesystems(&[]) {
-            Ok(names) => names.is_empty(),
-            _ => false,
-        });
+                    Ok(names) => names.is_empty(),
+                    _ => false,
+                });
     }
 
     #[test]
     /// Creating a non-empty list of filesystems always succeeds.
     fn create_fs_some() {
         let mut engine = SimEngine::new();
-        let (uuid, _) = engine.create_pool("pool_name", &[], None, false).unwrap();
+        let (uuid, _) = engine
+            .create_pool("pool_name", &[], None, false)
+            .unwrap();
         let pool = engine.get_pool(&uuid).unwrap();
         assert!(match pool.create_filesystems(&["name"]) {
-            Ok(names) => (names.len() == 1) & (names[0].0 == "name"),
-            _ => false,
-        });
+                    Ok(names) => (names.len() == 1) & (names[0].0 == "name"),
+                    _ => false,
+                });
     }
 
     #[test]
@@ -268,13 +273,15 @@ mod tests {
     fn create_fs_conflict() {
         let fs_name = "fs_name";
         let mut engine = SimEngine::new();
-        let (uuid, _) = engine.create_pool("pool_name", &[], None, false).unwrap();
+        let (uuid, _) = engine
+            .create_pool("pool_name", &[], None, false)
+            .unwrap();
         let pool = engine.get_pool(&uuid).unwrap();
         pool.create_filesystems(&[fs_name]).unwrap();
         assert!(match pool.create_filesystems(&[fs_name]) {
-            Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
-            _ => false,
-        });
+                    Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
+                    _ => false,
+                });
     }
 
     #[test]
@@ -282,24 +289,28 @@ mod tests {
     fn create_fs_dups() {
         let fs_name = "fs_name";
         let mut engine = SimEngine::new();
-        let (uuid, _) = engine.create_pool("pool_name", &[], None, false).unwrap();
+        let (uuid, _) = engine
+            .create_pool("pool_name", &[], None, false)
+            .unwrap();
         let pool = engine.get_pool(&uuid).unwrap();
         assert!(match pool.create_filesystems(&[fs_name, fs_name]) {
-            Ok(names) => (names.len() == 1) & (names[0].0 == fs_name),
-            _ => false,
-        });
+                    Ok(names) => (names.len() == 1) & (names[0].0 == fs_name),
+                    _ => false,
+                });
     }
 
     #[test]
     /// Adding a list of devices to an empty pool should yield list.
     fn add_device_empty() {
         let mut engine = SimEngine::new();
-        let (uuid, _) = engine.create_pool("pool_name", &[], None, false).unwrap();
+        let (uuid, _) = engine
+            .create_pool("pool_name", &[], None, false)
+            .unwrap();
         let pool = engine.get_pool(&uuid).unwrap();
         let devices = [Path::new("/s/a"), Path::new("/s/b")];
         assert!(match pool.add_blockdevs(&devices, false) {
-            Ok(devs) => devs.len() == devices.len(),
-            _ => false,
-        });
+                    Ok(devs) => devs.len() == devices.len(),
+                    _ => false,
+                });
     }
 }

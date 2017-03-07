@@ -60,11 +60,11 @@ pub fn test_force_flag_dirty(paths: &[&Path]) -> () {
 
     let uuid = Uuid::new_v4();
     assert!(initialize(&uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).is_err());
-    assert!(paths.iter().enumerate().all(|(i, path)| {
-        StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
+    assert!(paths
+                .iter()
+                .enumerate()
+                .all(|(i, path)| {
+        StaticHeader::determine_ownership(&mut OpenOptions::new().read(true).open(path).unwrap())
             .unwrap() ==
         if i == index {
             DevOwnership::Theirs
@@ -74,13 +74,15 @@ pub fn test_force_flag_dirty(paths: &[&Path]) -> () {
     }));
 
     assert!(initialize(&uuid, unique_devices.clone(), MIN_MDA_SECTORS, true).is_ok());
-    assert!(paths.iter().all(|path| {
-        StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-            .unwrap() == DevOwnership::Ours(uuid)
-    }));
+    assert!(paths
+                .iter()
+                .all(|path| {
+                         StaticHeader::determine_ownership(&mut OpenOptions::new()
+                                                                    .read(true)
+                                                                    .open(path)
+                                                                    .unwrap())
+                                 .unwrap() == DevOwnership::Ours(uuid)
+                     }));
 }
 
 
@@ -115,11 +117,13 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
                                  unique_devices.clone(),
                                  MIN_MDA_SECTORS,
                                  false)
-        .unwrap();
-    let total_blockdev_size = initialized.iter()
+            .unwrap();
+    let total_blockdev_size = initialized
+        .iter()
         .fold(Sectors(0), |s, i| s + i.avail_range_segment().range().1);
 
-    let segments = initialized.iter()
+    let segments = initialized
+        .iter()
         .map(|block_dev| block_dev.avail_range_segment())
         .collect::<Vec<Segment>>();
 
@@ -143,7 +147,7 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
                                  resolve_devices(&paths).unwrap(),
                                  MIN_MDA_SECTORS,
                                  false)
-        .unwrap();
+            .unwrap();
 
     let (metadata_blockdev, data_blockdev) = (initialized.first().unwrap(),
                                               initialized.last().unwrap());
@@ -152,11 +156,11 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
     let metadata_dev = LinearDev::new("stratis_testing_thinpool_metadata",
                                       &dm,
                                       &vec![metadata_blockdev.avail_range_segment()])
-        .unwrap();
+            .unwrap();
     let data_dev = LinearDev::new("stratis_testing_thinpool_datadev",
                                   &dm,
                                   &vec![data_blockdev.avail_range_segment()])
-        .unwrap();
+            .unwrap();
     let thinpool_dev = ThinPoolDev::new("stratis_testing_thinpool",
                                         &dm,
                                         data_dev.size().unwrap().sectors(),
@@ -164,13 +168,13 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
                                         DataBlocks(256000),
                                         metadata_dev,
                                         data_dev)
-        .unwrap();
+            .unwrap();
     let thin_dev = ThinDev::new("stratis_testing_thindev",
                                 &dm,
                                 &thinpool_dev,
                                 7,
                                 Sectors(300000))
-        .unwrap();
+            .unwrap();
 
     create_fs(&thin_dev.devnode().unwrap()).unwrap();
 
@@ -190,22 +194,28 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
 /// releases all blockdevs.
 pub fn test_pool_blockdevs(paths: &[&Path]) -> () {
     let mut engine = StratEngine::new();
-    let (uuid, blockdevs) = engine.create_pool("test_pool", paths, None, true).unwrap();
-    assert!(blockdevs.iter().all(|path| {
-        StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-            .unwrap() == DevOwnership::Ours(uuid)
-    }));
+    let (uuid, blockdevs) = engine
+        .create_pool("test_pool", paths, None, true)
+        .unwrap();
+    assert!(blockdevs
+                .iter()
+                .all(|path| {
+                         StaticHeader::determine_ownership(&mut OpenOptions::new()
+                                                                    .read(true)
+                                                                    .open(path)
+                                                                    .unwrap())
+                                 .unwrap() == DevOwnership::Ours(uuid)
+                     }));
     engine.destroy_pool(&uuid).unwrap();
-    assert!(blockdevs.iter().all(|path| {
-        StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-            .unwrap() == DevOwnership::Unowned
-    }));
+    assert!(blockdevs
+                .iter()
+                .all(|path| {
+                         StaticHeader::determine_ownership(&mut OpenOptions::new()
+                                                                    .read(true)
+                                                                    .open(path)
+                                                                    .unwrap())
+                                 .unwrap() == DevOwnership::Unowned
+                     }));
 }
 
 

@@ -141,7 +141,6 @@ class FilesystemSpec(InterfaceSpec):
         """
         Names of the methods of the Filesystem class.
         """
-        CreateSnapshot = "CreateSnapshot"
         SetName = "SetName"
 
     class PropertyNames(enum.Enum):
@@ -155,11 +154,9 @@ class FilesystemSpec(InterfaceSpec):
     INTERFACE_NAME = 'org.storage.stratis1.filesystem'
 
     INPUT_SIGS = {
-       MethodNames.CreateSnapshot: (("name", _IDENTITY, "s"),),
        MethodNames.SetName: (("name", _IDENTITY, "s"),),
     }
     OUTPUT_SIGS = {
-       MethodNames.CreateSnapshot: "oqs",
        MethodNames.SetName: "bqs",
     }
     XFORMERS = _xformers(INPUT_SIGS)

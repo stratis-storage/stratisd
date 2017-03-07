@@ -1,7 +1,7 @@
 check: fmt build test docs
 
 ${HOME}/.cargo/bin/cargo-fmt:
-	cargo install rustfmt --vers 0.6.3
+	cargo install rustfmt
 
 fmt: ${HOME}/.cargo/bin/cargo-fmt
 	PATH=${HOME}/.cargo/bin:${PATH} cargo fmt -- --write-mode=diff

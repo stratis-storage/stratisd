@@ -35,20 +35,12 @@ use uuid::Uuid;
 /// Return a LinearDev with concatenated BlockDevs
 fn concat_blockdevs(dm: &DM, name: &str, block_devs: &Vec<&BlockDev>) -> TestResult<LinearDev> {
 
-    let mut linear_dev = LinearDev::new(name);
-
-    match linear_dev.concat(dm, block_devs) {
-        Ok(_) => return Ok(linear_dev),
+    match LinearDev::new(name, dm, block_devs) {
+        Ok(ld) => return Ok(ld),
         Err(e) => {
-            // tear down a partially created DM device if it exists
-            match linear_dev.teardown(&dm) {
-                Ok(_) => info!("completed teardown of {}", name),
-                Err(_) => info!("failed teardown of {}", name),
-            }
             let message = format!("linear_dev.concat failed : {:?}", e);
             return Err(Framework(Error(message)));
         }
-
     }
 }
 
@@ -75,7 +67,10 @@ fn validate_sizes(name: &str, block_devs: &Vec<&BlockDev>) -> TestResult<()> {
 
     let dm_dev_size = match get_size(path) {
         Ok(s) => s,
-        Err(_) => panic!("Failed to get size for {} ", name),
+        Err(e) => {
+            error!("Failed to get size for {} ", name);
+            return Err(e);
+        }
     };
     debug!("size of dm device {:?} = {}", path, dm_dev_size);
 
@@ -123,7 +118,8 @@ fn test_lineardev_concat(dm: &DM, blockdev_paths: &Vec<&Path>) -> TestResult<(Li
     match validate_sizes(&name, &blockdev_vec) {
         Ok(_) => info!("validate_sizes Ok"),
         Err(e) => {
-            panic!("Failed : validate_sizes() : {:?}", e);
+            error!("Failed : validate_sizes() : {:?}", e);
+            return Err(e);
         }
     }
 
@@ -160,21 +156,17 @@ pub fn test_lineardev_setup() {
     info!("safe_to_destroy_devs = {:?}", safe_to_destroy_devs);
     let device_paths = safe_to_destroy_devs.iter().map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
-    clean_blockdev_headers(&device_paths);
+    assert_ok!(clean_blockdev_headers(&device_paths));
+
     info!("devices cleaned for test");
 
     assert!(match test_lineardev_concat(&dm, &device_paths) {
         Ok(linear_dev) => {
-            info!("Linear dev name : {:?}", linear_dev.name());
-            let name = match linear_dev.name() {
-                Ok(n) => n,
-                Err(e) => panic!("Failed to get lineardev name {:?} ", e),
-            };
-            info!("completed test on {}", name);
+            info!("completed test on {}", linear_dev.name());
 
             match linear_dev.teardown(&dm) {
-                Ok(_) => info!("completed teardown of {}", name),
-                Err(e) => panic!("Failed to teardown {} : {:?}", name, e),
+                Ok(_) => info!("completed teardown of {}", linear_dev.name()),
+                Err(e) => error!("Failed to teardown {} : {:?}", linear_dev.name(), e),
             }
             true
         }

@@ -7,6 +7,7 @@ extern crate uuid;
 extern crate devicemapper;
 extern crate libstratis;
 extern crate rand;
+extern crate tempdir;
 #[macro_use]
 mod util;
 
@@ -21,45 +22,47 @@ use libstratis::engine::strat_engine::thinpooldev::ThinPoolDev;
 use libstratis::types::DataBlocks;
 use libstratis::types::Sectors;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
+
+use tempdir::TempDir;
 
 use util::blockdev_utils::clean_blockdev_headers;
 use util::blockdev_utils::wait_for_dm;
+use util::blockdev_utils::wipe_header;
+use util::blockdev_utils::write_files_to_directory;
 use util::test_config::TestConfig;
 use util::test_consts::DEFAULT_CONFIG_FILE;
+use util::test_result::TestResult;
 
 use uuid::Uuid;
 
 fn setup_supporting_devs(dm: &DM,
-                         metadata_dev: &mut LinearDev,
-                         data_dev: &mut LinearDev,
                          metadata_blockdev: &BlockDev,
                          data_blockdev: &BlockDev)
-                         -> (PathBuf, PathBuf) {
+                         -> TestResult<(LinearDev, LinearDev)> {
 
     let meta_blockdevs = vec![metadata_blockdev];
-    metadata_dev.concat(dm, &meta_blockdevs).unwrap();
+    let metadata_dev =
+        try!(LinearDev::new("stratis_testing_thinpool_metadata", dm, &meta_blockdevs));
 
     let data_blockdevs = vec![data_blockdev];
-    data_dev.concat(dm, &data_blockdevs).unwrap();
-
-    let metadata_path = metadata_dev.path().unwrap().unwrap();
-
-    let data_path = data_dev.path().unwrap().unwrap();
+    let data_dev = try!(LinearDev::new("stratis_testing_thinpool_datadev", dm, &data_blockdevs));
 
     wait_for_dm();
 
-    (metadata_path, data_path)
+    let metadata_path = try!(metadata_dev.path());
+    let data_path = try!(data_dev.path());
+    try!(wipe_header(Path::new(&metadata_path)));
+    try!(wipe_header(Path::new(&data_path)));
+
+    Ok((metadata_dev, data_dev))
 }
+
 /// Validate the blockdev_paths are unique
 /// Initialize the list for use with Stratis
 /// Create a thin-pool via ThinPoolDev
 /// Validate the resulting thin-pool dev and meta dev
-fn test_thinpool_setup(dm: &DM,
-                       thinpool_dev: &mut ThinPoolDev,
-                       metadata_dev: &mut LinearDev,
-                       data_dev: &mut LinearDev,
-                       blockdev_paths: &Vec<&Path>) {
+fn test_thinpool_setup(dm: &DM, blockdev_paths: &Vec<&Path>) -> TestResult<ThinPoolDev> {
 
     let uuid = Uuid::new_v4();
 
@@ -72,18 +75,42 @@ fn test_thinpool_setup(dm: &DM,
     let (_last_key, data_blockdev) = blockdev_map.iter().next_back().unwrap();
     let (_start_sector, length) = data_blockdev.avail_range();
 
-    let (metadata_path, data_path) =
-        setup_supporting_devs(dm, metadata_dev, data_dev, metadata_blockdev, data_blockdev);
+    let (metadata_dev, data_dev) =
+        try!(setup_supporting_devs(dm, metadata_blockdev, data_blockdev));
 
-    thinpool_dev.setup(dm,
-               length,
-               Sectors(1024),
-               DataBlocks(256000),
-               &metadata_path,
-               &data_path)
-        .unwrap();
+    let mut thinpool_dev = try!(ThinPoolDev::new("stratis_testing_thinpool",
+                                                 dm,
+                                                 length,
+                                                 Sectors(1024),
+                                                 DataBlocks(256000),
+                                                 metadata_dev,
+                                                 data_dev));
 
     wait_for_dm();
+
+    try!(test_thindev_setup(&dm, &mut thinpool_dev));
+
+    Ok(thinpool_dev)
+}
+
+fn test_thindev_setup(dm: &DM, thinpool_dev: &mut ThinPoolDev) -> TestResult<()> {
+    let thin_id = rand::random::<u16>();
+    let mut thin_dev = try!(ThinDev::new("stratis_testing_thindev",
+                                         &dm,
+                                         thinpool_dev,
+                                         thin_id as u32,
+                                         Sectors(300000)));
+    wait_for_dm();
+
+    let tmp_dir = try!(TempDir::new("stratis_testing"));
+
+    try!(thin_dev.create_fs());
+    try!(thin_dev.mount_fs(tmp_dir.path()));
+    try!(write_files_to_directory(&tmp_dir, 100));
+
+    try!(thin_dev.unmount_fs(tmp_dir.path()));
+    try!(thin_dev.teardown(dm));
+    Ok(())
 }
 
 #[test]
@@ -98,7 +125,6 @@ pub fn test_thinpoolsetup_setup() {
     let dm = DM::new().unwrap();
 
     let mut test_config = TestConfig::new(DEFAULT_CONFIG_FILE);
-
     let _ = test_config.init();
 
     let safe_to_destroy_devs = match test_config.get_safe_to_destroy_devs() {
@@ -119,34 +145,10 @@ pub fn test_thinpoolsetup_setup() {
     info!("safe_to_destroy_devs = {:?}", safe_to_destroy_devs);
     let device_paths = safe_to_destroy_devs.iter().map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
-    clean_blockdev_headers(&device_paths);
+    assert_ok!(clean_blockdev_headers(&device_paths));
     info!("devices cleaned for test");
 
-    let meta_name = "stratis_testing_thinpool_metadata";
-    let mut metadata_dev = LinearDev::new(meta_name);
-
-    let name = "stratis_testing_thinpool";
-    let mut thinpool_dev = ThinPoolDev::new(name);
-
-    let data_name = "stratis_testing_thinpool_datadev";
-    let mut data_dev = LinearDev::new(data_name);
-
-    test_thinpool_setup(&dm,
-                        &mut thinpool_dev,
-                        &mut metadata_dev,
-                        &mut data_dev,
-                        &device_paths);
-
-    let thindev_name = "stratis_testing_thindev";
-    let mut thin_dev = ThinDev::new(thindev_name);
-    let thin_id = rand::random::<u16>();
-    thin_dev.setup(&dm, &mut thinpool_dev, thin_id as u32, &Sectors(300000)).unwrap();
-
-    thin_dev.teardown(&dm).unwrap();
+    let mut thinpool_dev = assert_ok!(test_thinpool_setup(&dm, &device_paths));
 
     thinpool_dev.teardown(&dm).unwrap();
-
-    data_dev.teardown(&dm).unwrap();
-
-    metadata_dev.teardown(&dm).unwrap();
 }

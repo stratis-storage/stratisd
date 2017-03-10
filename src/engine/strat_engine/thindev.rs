@@ -51,7 +51,7 @@ impl ThinDev {
         let id = &DevId::Name(name);
         let di = try!(dm.table_load(id, &table));
         try!(dm.device_suspend(id, DmFlags::empty()));
-
+        ThinPoolDev::wait_for_dm();
         Ok(ThinDev {
             name: name.to_owned(),
             dev_info: di,

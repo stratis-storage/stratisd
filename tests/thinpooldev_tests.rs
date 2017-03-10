@@ -27,7 +27,6 @@ use std::path::Path;
 use tempdir::TempDir;
 
 use util::blockdev_utils::clean_blockdev_headers;
-use util::blockdev_utils::wait_for_dm;
 use util::blockdev_utils::wipe_header;
 use util::blockdev_utils::write_files_to_directory;
 use util::test_config::TestConfig;
@@ -47,8 +46,6 @@ fn setup_supporting_devs(dm: &DM,
 
     let data_blockdevs = vec![data_blockdev];
     let data_dev = try!(LinearDev::new("stratis_testing_thinpool_datadev", dm, &data_blockdevs));
-
-    wait_for_dm();
 
     let metadata_path = try!(metadata_dev.path());
     let data_path = try!(data_dev.path());
@@ -86,7 +83,6 @@ fn test_thinpool_setup(dm: &DM, blockdev_paths: &Vec<&Path>) -> TestResult<ThinP
                                                  metadata_dev,
                                                  data_dev));
 
-    wait_for_dm();
 
     try!(test_thindev_setup(&dm, &mut thinpool_dev));
 
@@ -100,7 +96,7 @@ fn test_thindev_setup(dm: &DM, thinpool_dev: &mut ThinPoolDev) -> TestResult<()>
                                          thinpool_dev,
                                          thin_id as u32,
                                          Sectors(300000)));
-    wait_for_dm();
+
 
     let tmp_dir = try!(TempDir::new("stratis_testing"));
 

@@ -19,8 +19,6 @@ use libstratis::types::Sectors;
 
 use std::iter::FromIterator;
 use std::path::Path;
-use std::thread;
-use std::time::Duration;
 
 use util::blockdev_utils::clean_blockdev_headers;
 use util::blockdev_utils::get_size;
@@ -57,10 +55,6 @@ fn validate_sizes(name: &str, block_devs: &Vec<&BlockDev>) -> TestResult<()> {
     }
 
     debug!("available linear space = {} sectors", linear_sectors);
-
-    // The /dev/mapper/<name> device is not immediately available for use.
-    // TODO: Implement wait for event or poll.
-    thread::sleep(Duration::from_millis(1000));
 
     let path_name = format!("/dev/mapper/{}", name);
     let path = Path::new(&path_name);

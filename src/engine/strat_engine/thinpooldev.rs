@@ -9,6 +9,8 @@ use engine::strat_engine::lineardev::LinearDev;
 use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
+use std::thread;
+use std::time::Duration;
 
 use types::DataBlocks;
 use types::Sectors;
@@ -56,6 +58,7 @@ impl ThinPoolDev {
         let di = try!(dm.table_load(id, &table));
         try!(dm.device_suspend(id, DmFlags::empty()));
 
+        ThinPoolDev::wait_for_dm();
         Ok(ThinPoolDev {
             name: name.to_owned(),
             dev_info: di,
@@ -108,5 +111,11 @@ impl ThinPoolDev {
         try!(self.data_dev.teardown(dm));
         try!(self.meta_dev.teardown(dm));
         Ok(())
+    }
+
+    // The /dev/mapper/<name> device is not immediately available for use.
+    // TODO: Implement wait for event or poll.
+    pub fn wait_for_dm() {
+        thread::sleep(Duration::from_millis(500))
     }
 }

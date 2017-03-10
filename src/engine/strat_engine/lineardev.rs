@@ -5,6 +5,7 @@
 use devicemapper::{DM, DevId, DeviceInfo, DmFlags};
 
 use engine::{EngineError, EngineResult, ErrorEnum};
+use engine::strat_engine::blockdev::blkdev_size;
 use engine::strat_engine::thinpooldev::ThinPoolDev;
 
 use std::fmt;
@@ -12,7 +13,7 @@ use std::fs::File;
 use std::path::PathBuf;
 
 use super::blockdev::BlockDev;
-use types::Sectors;
+use types::{Bytes, Sectors};
 
 pub struct LinearDev {
     name: String,
@@ -68,6 +69,26 @@ impl LinearDev {
 
     pub fn name(&self) -> &str {
         self.dev_info.name().clone()
+    }
+
+    pub fn size(&self) -> EngineResult<Bytes> {
+
+        let blockdev_path = try!(self.path());
+        let f = match File::open(blockdev_path) {
+            Ok(file) => file,
+            Err(e) => {
+                let error_message = format!("{:?} Failed to open blockdev {:?}", e, self.path());
+                return Err(EngineError::Engine(ErrorEnum::FailedToOpen, error_message.into()));
+            }
+        };
+
+        match blkdev_size(&f) {
+            Ok(bytes) => return Ok(bytes),
+            Err(e) => {
+                let error_message = format!("{:?} for device {:?}", e, self.path());
+                return Err(EngineError::Engine(ErrorEnum::Error, error_message.into()));
+            }
+        };
     }
 
     pub fn path(&self) -> EngineResult<PathBuf> {

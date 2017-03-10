@@ -116,7 +116,7 @@ fn test_thindev_setup(dm: &DM, thinpool_dev: &mut ThinPoolDev) -> TestResult<()>
 /// Test creating a thin-pool device
 /// Test create a thin device provisioned from the pool
 /// Teardown the DM devices in the proper order
-pub fn test_thinpoolsetup_setup() {
+pub fn test_thinpool() {
 
     let dm = DM::new().unwrap();
 
@@ -126,7 +126,7 @@ pub fn test_thinpoolsetup_setup() {
     let safe_to_destroy_devs = match test_config.get_safe_to_destroy_devs() {
         Ok(devs) => {
             if devs.len() < 2 {
-                warn!("test_thinpoolsetup_setup requires at least 2 devices to run.  Test not \
+                warn!("test_thinpool requires at least 2 devices to run.  Test not \
                        run.");
                 return;
             }

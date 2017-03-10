@@ -141,7 +141,6 @@ class FilesystemSpec(InterfaceSpec):
         """
         Names of the methods of the Filesystem class.
         """
-        CreateSnapshot = "CreateSnapshot"
         SetName = "SetName"
 
     class PropertyNames(enum.Enum):
@@ -155,11 +154,9 @@ class FilesystemSpec(InterfaceSpec):
     INTERFACE_NAME = 'org.storage.stratis1.filesystem'
 
     INPUT_SIGS = {
-       MethodNames.CreateSnapshot: (("name", _IDENTITY, "s"),),
        MethodNames.SetName: (("name", _IDENTITY, "s"),),
     }
     OUTPUT_SIGS = {
-       MethodNames.CreateSnapshot: "oqs",
        MethodNames.SetName: "bqs",
     }
     XFORMERS = _xformers(INPUT_SIGS)
@@ -204,7 +201,7 @@ class ManagerSpec(InterfaceSpec):
               ("force", _IDENTITY, "b"),
               ("devices", _IDENTITY, "as"),
            ),
-        MethodNames.DestroyPool : (("pool_object_path", _IDENTITY, "o"),),
+        MethodNames.DestroyPool : (("pool", _IDENTITY, "o"),),
     }
     OUTPUT_SIGS = {
         MethodNames.ConfigureSimulator : "qs",
@@ -230,7 +227,6 @@ class PoolSpec(InterfaceSpec):
         """
         Names of the methods of the Pool class.
         """
-        AddCacheDevs = "AddCacheDevs"
         AddDevs = "AddDevs"
         CreateFilesystems = "CreateFilesystems"
         DestroyFilesystems = "DestroyFilesystems"
@@ -246,16 +242,13 @@ class PoolSpec(InterfaceSpec):
     INTERFACE_NAME = 'org.storage.stratis1.pool'
 
     INPUT_SIGS = { # pragma: no cover
-       MethodNames.AddCacheDevs:
-          (("force", _IDENTITY, "b"), ("devices", _IDENTITY, "as"),),
        MethodNames.AddDevs:
           (("force", _IDENTITY, "b"), ("devices", _IDENTITY, "as"),),
        MethodNames.CreateFilesystems: (("specs", _IDENTITY, "as"),),
        MethodNames.DestroyFilesystems: (("filesystems", _IDENTITY, "ao"),),
-       MethodNames.SetName: (("new_name", _IDENTITY, "s"),)
+       MethodNames.SetName: (("name", _IDENTITY, "s"),)
     }
     OUTPUT_SIGS = {
-       MethodNames.AddCacheDevs: "asqs",
        MethodNames.AddDevs: "asqs",
        MethodNames.CreateFilesystems: "a(os)qs",
        MethodNames.DestroyFilesystems: "asqs",

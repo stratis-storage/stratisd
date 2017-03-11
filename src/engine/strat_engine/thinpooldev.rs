@@ -6,6 +6,7 @@ use devicemapper::{DM, DevId, DeviceInfo, DmFlags};
 use engine::{EngineError, EngineResult, ErrorEnum};
 use engine::strat_engine::lineardev::LinearDev;
 
+use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -18,6 +19,13 @@ pub struct ThinPoolDev {
     meta_dev: LinearDev,
     data_dev: LinearDev,
 }
+
+impl fmt::Debug for ThinPoolDev {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{}", self.name())
+    }
+}
+
 
 /// Use DM to create a "thin-pool".  A "thin-pool" is shared space for
 /// other thin provisioned devices to use.

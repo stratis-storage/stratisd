@@ -6,6 +6,8 @@ use devicemapper::{DM, DevId, DeviceInfo, DmFlags};
 
 use engine::{EngineError, EngineResult, ErrorEnum};
 
+use std::fmt;
+use std::fs::File;
 use std::path::PathBuf;
 
 use super::blockdev::BlockDev;
@@ -14,6 +16,12 @@ use types::Sectors;
 pub struct LinearDev {
     name: String,
     dev_info: DeviceInfo,
+}
+
+impl fmt::Debug for LinearDev {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{}", self.name())
+    }
 }
 
 /// Use DM to concatenate a set of blockdevs together into a

@@ -12,6 +12,32 @@ use super::super::engine::{HasName, HasUuid};
 pub struct StratFilesystem {
     fs_id: Uuid,
     name: String,
+    thin_dev: ThinDev,
+}
+
+impl StratFilesystem {
+    pub fn new(fs_id: Uuid,
+               name: &str,
+               dm: &DM,
+               thin_pool: &mut ThinPoolDev)
+               -> EngineResult<StratFilesystem> {
+        // TODO should replace with proper id generation. DM takes a 24 bit
+        // number for the thin_id.  Generate a u16 to avoid the possibility of
+        // "too big". Should this be moved into the DM binding (or lower)?
+        // How can a client be expected to avoid collisions?
+        let thin_id = rand::random::<u16>();
+        // TODO We don't require a size to be provided for create_filesystems -
+        // but devicemapper requires an initial size for a thin provisioned
+        // device - currently hard coded to Sectors(300000).
+        let mut new_thin_dev =
+            try!(ThinDev::new(name, dm, thin_pool, thin_id as u32, Sectors(300000)));
+        try!(new_thin_dev.create_fs());
+        Ok(StratFilesystem {
+            fs_id: fs_id,
+            name: name.to_owned(),
+            thin_dev: new_thin_dev,
+        })
+    }
 }
 
 impl HasName for StratFilesystem {

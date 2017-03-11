@@ -3,7 +3,9 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use devicemapper::DM;
+
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::iter::FromIterator;
 use std::path::Path;
 use std::path::PathBuf;
@@ -166,9 +168,25 @@ impl StratPool {
 
 impl Pool for StratPool {
     fn create_filesystems<'a, 'b>(&'a mut self,
-                                  _specs: &[&'b str])
+                                  specs: &[&'b str])
                                   -> EngineResult<Vec<(&'b str, Uuid)>> {
-        unimplemented!()
+        let names = BTreeSet::from_iter(specs);
+        for name in names.iter() {
+            if self.filesystems.contains_name(name) {
+                return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
+            }
+        }
+
+        let mut result = Vec::new();
+        for name in names.iter() {
+            let uuid = Uuid::new_v4();
+            let dm = try!(DM::new());
+            let new_filesystem = try!(StratFilesystem::new(uuid, name, &dm, &mut self.thin_pool));
+            self.filesystems.insert(new_filesystem);
+            result.push((**name, uuid));
+        }
+
+        Ok(result)
     }
 
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {

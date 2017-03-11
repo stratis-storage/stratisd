@@ -83,7 +83,7 @@ impl ThinDev {
     }
 
     pub fn name(&self) -> &str {
-        self.dev_info.name().clone()
+        self.dev_info.name()
     }
 
     pub fn path(&self) -> EngineResult<PathBuf> {

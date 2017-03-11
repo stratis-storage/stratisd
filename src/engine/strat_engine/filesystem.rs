@@ -8,13 +8,12 @@ use uuid::Uuid;
 use devicemapper::DM;
 
 use consts::IEC;
+
 use engine::EngineResult;
 use engine::Filesystem;
 use engine::strat_engine::thindev::ThinDev;
 use engine::strat_engine::thinpooldev::ThinPoolDev;
-
 use super::super::engine::{HasName, HasUuid};
-
 use types::Bytes;
 
 

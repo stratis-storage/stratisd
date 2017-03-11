@@ -191,7 +191,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
 
     // TODO: Fix this code.  We should deal with any number of blockdevs
     //
-    if add_devs.len() <= 2 {
+    if add_devs.len() < 2 {
         return Err(EngineError::Engine(ErrorEnum::Error,
                                        "Need at least 2 blockdevs to create a pool".into()));
     }

@@ -68,4 +68,9 @@ impl Filesystem for StratFilesystem {
     fn rename(&mut self, name: &str) {
         self.name = name.to_owned();
     }
+
+    fn destroy(self) -> EngineResult<()> {
+        let dm = try!(DM::new());
+        self.thin_dev.teardown(&dm)
+    }
 }

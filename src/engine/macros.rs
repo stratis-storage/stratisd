@@ -23,10 +23,11 @@ macro_rules! destroy_filesystems {
     ( $s:ident; $fs:expr ) => {
         let mut removed = Vec::new();
         for uuid in $fs.iter().map(|x| *x) {
-            if $s.filesystems.remove_by_uuid(&uuid).is_some() {
+            if let Some(fs) = $s.filesystems.remove_by_uuid(&uuid) {
+                try!(fs.destroy());
                 removed.push(uuid);
-            };
-        };
+            }
+        }
         Ok(removed)
     }
 }

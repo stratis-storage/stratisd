@@ -5,6 +5,7 @@
 use std::path::Path;
 use std::path::PathBuf;
 
+use devicemapper::DM;
 use uuid::Uuid;
 
 use engine::Engine;
@@ -56,7 +57,8 @@ impl Engine for StratEngine {
             return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
-        let pool = try!(StratPool::new(name, blockdev_paths, redundancy, force));
+        let dm = try!(DM::new());
+        let pool = try!(StratPool::new(name, &dm, blockdev_paths, redundancy, force));
         let bdev_paths = pool.block_devs.iter().map(|p| p.1.devnode.clone()).collect();
 
         let uuid = pool.uuid().clone();

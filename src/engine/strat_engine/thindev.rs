@@ -4,6 +4,7 @@
 
 use devicemapper::{DM, DevId, DeviceInfo, DmFlags};
 use engine::{EngineError, EngineResult, ErrorEnum};
+use engine::strat_engine::blockdev::BlockDev;
 use engine::strat_engine::thinpooldev::ThinPoolDev;
 
 use std::fmt;
@@ -51,7 +52,7 @@ impl ThinDev {
         let id = &DevId::Name(name);
         let di = try!(dm.table_load(id, &table));
         try!(dm.device_suspend(id, DmFlags::empty()));
-        ThinPoolDev::wait_for_dm();
+        BlockDev::wait_for_dm();
         Ok(ThinDev {
             name: name.to_owned(),
             dev_info: di,

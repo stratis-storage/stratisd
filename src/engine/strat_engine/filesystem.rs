@@ -1,12 +1,22 @@
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
+extern crate rand;
 
 use uuid::Uuid;
 
+use devicemapper::DM;
+
+use consts::IEC;
+use engine::EngineResult;
 use engine::Filesystem;
+use engine::strat_engine::thindev::ThinDev;
+use engine::strat_engine::thinpooldev::ThinPoolDev;
 
 use super::super::engine::{HasName, HasUuid};
+
+use types::Bytes;
+
 
 #[derive(Debug)]
 pub struct StratFilesystem {
@@ -28,9 +38,12 @@ impl StratFilesystem {
         let thin_id = rand::random::<u16>();
         // TODO We don't require a size to be provided for create_filesystems -
         // but devicemapper requires an initial size for a thin provisioned
-        // device - currently hard coded to Sectors(300000).
-        let mut new_thin_dev =
-            try!(ThinDev::new(name, dm, thin_pool, thin_id as u32, Sectors(300000)));
+        // device - currently hard coded to 1GB.
+        let mut new_thin_dev = try!(ThinDev::new(name,
+                                                 dm,
+                                                 thin_pool,
+                                                 thin_id as u32,
+                                                 Bytes(IEC::Gi).sectors()));
         try!(new_thin_dev.create_fs());
         Ok(StratFilesystem {
             fs_id: fs_id,

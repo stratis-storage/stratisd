@@ -189,6 +189,13 @@ pub fn initialize(pool_uuid: &PoolUuid,
 
     let add_devs = try!(filter_devs(dev_infos, pool_uuid, force));
 
+    // TODO: Fix this code.  We should deal with any number of blockdevs
+    //
+    if add_devs.len() <= 2 {
+        return Err(EngineError::Engine(ErrorEnum::Error,
+                                       "Need at least 2 blockdevs to create a pool".into()));
+    }
+
     let mut bds = BTreeMap::new();
     for (dev, (devnode, dev_size, mut f)) in add_devs {
 

@@ -6,7 +6,6 @@ use devicemapper::{DM, DevId, DeviceInfo, DmFlags};
 
 use engine::{EngineError, EngineResult, ErrorEnum};
 use engine::strat_engine::blockdev::blkdev_size;
-use engine::strat_engine::thinpooldev::ThinPoolDev;
 
 use std::fmt;
 use std::fs::File;
@@ -40,7 +39,7 @@ impl LinearDev {
         let dev_info = try!(dm.table_load(id, &table));
         try!(dm.device_suspend(id, DmFlags::empty()));
 
-        ThinPoolDev::wait_for_dm();
+        BlockDev::wait_for_dm();
         Ok(LinearDev {
             name: name.to_owned(),
             dev_info: dev_info,

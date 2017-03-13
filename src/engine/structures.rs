@@ -179,6 +179,33 @@ mod tests {
         stuff: u32,
     }
 
+    // A global invariant checker for the table.
+    // Verifies proper relationship between internal data structures.
+    fn table_invariant<T>(table: &Table<T>) -> ()
+        where T: HasName + HasUuid
+    {
+        let ref items = table.items;
+        let ref name_map = table.name_map;
+        let ref uuid_map = table.uuid_map;
+        for i in 0..items.len() {
+            let name = items[i].name();
+            let uuid = items[i].uuid();
+            assert!(name_map.get(name).unwrap() == &i);
+            assert!(uuid_map.get(uuid).unwrap() == &i);
+        }
+
+        for name in name_map.keys() {
+            let index = name_map.get(name).unwrap();
+            assert!(items[*index].name() == name);
+        }
+
+        for uuid in uuid_map.keys() {
+            let index = uuid_map.get(uuid).unwrap();
+            assert!(items[*index].uuid() == uuid);
+        }
+
+    }
+
     impl TestThing {
         pub fn new(name: &str, uuid: &Uuid) -> TestThing {
             TestThing {
@@ -208,17 +235,24 @@ mod tests {
     /// no result.
     fn remove_existing_item() {
         let mut t: Table<TestThing> = Table::new();
+        table_invariant(&t);
+
         let uuid = Uuid::new_v4();
         let name = "name";
         t.insert(TestThing::new(&name, &uuid));
+        table_invariant(&t);
+
         assert!(t.get_by_name(&name).is_some());
         assert!(t.get_by_uuid(&uuid).is_some());
         let thing = t.remove_by_uuid(&uuid);
+        table_invariant(&t);
         assert!(thing.is_some());
         let mut thing = thing.unwrap();
         thing.stuff = 0;
         assert!(t.is_empty());
         assert!(t.remove_by_name(&name).is_none());
+        table_invariant(&t);
+
         assert!(t.get_by_name(&name).is_none());
         assert!(t.get_by_uuid(&uuid).is_none());
     }
@@ -231,11 +265,14 @@ mod tests {
     /// the table and not in the table.
     fn insert_same_keys() {
         let mut t: Table<TestThing> = Table::new();
+        table_invariant(&t);
+
         let uuid = Uuid::new_v4();
         let name = "name";
         let thing = TestThing::new(&name, &uuid);
         let thing_key = thing.stuff;
         let displaced = t.insert(thing);
+        table_invariant(&t);
 
         // There was nothing previously, so displaced must be empty.
         assert!(displaced.is_empty());
@@ -249,6 +286,7 @@ mod tests {
         let thing2 = TestThing::new(&name, &uuid);
         let thing_key2 = thing2.stuff;
         let displaced = t.insert(thing2);
+        table_invariant(&t);
 
         // It has displaced the old thing.
         assert!(displaced.len() == 1);
@@ -268,6 +306,8 @@ mod tests {
     /// The previously inserted thing should be returned.
     fn insert_same_name() {
         let mut t: Table<TestThing> = Table::new();
+        table_invariant(&t);
+
         let uuid = Uuid::new_v4();
         let name = "name";
         let thing = TestThing::new(&name, &uuid);
@@ -275,6 +315,7 @@ mod tests {
 
         // There was nothing in the table before, so displaced is empty.
         let displaced = t.insert(thing);
+        table_invariant(&t);
         assert!(displaced.is_empty());
 
         // t now contains thing.
@@ -286,6 +327,7 @@ mod tests {
         let thing2 = TestThing::new(&name, &uuid2);
         let thing_key2 = thing2.stuff;
         let displaced = t.insert(thing2);
+        table_invariant(&t);
 
         // The items displaced consist exactly of the first item.
         assert!(displaced.len() == 1);

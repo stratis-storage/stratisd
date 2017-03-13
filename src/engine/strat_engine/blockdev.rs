@@ -11,6 +11,8 @@ use std::fs::{OpenOptions, read_dir};
 use std::os::unix::prelude::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::thread;
+use std::time::Duration;
 
 use time::Timespec;
 use devicemapper::Device;
@@ -249,5 +251,11 @@ impl BlockDev {
         assert!(start <= self.bda.header.blkdev_size);
         let length = self.bda.header.blkdev_size - start;
         (start, length)
+    }
+
+    /// The /dev/mapper/<name> device is not immediately available for use.
+    /// TODO: Implement wait for event or poll.
+    pub fn wait_for_dm() {
+        thread::sleep(Duration::from_millis(500))
     }
 }

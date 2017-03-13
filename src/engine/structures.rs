@@ -161,3 +161,145 @@ impl<T: HasName + HasUuid> Table<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use rand;
+    use uuid::Uuid;
+
+    use super::super::engine::{HasName, HasUuid};
+
+    use super::Table;
+
+    #[derive(Debug)]
+    struct TestThing {
+        name: String,
+        uuid: Uuid,
+        stuff: u32,
+    }
+
+    impl TestThing {
+        pub fn new(name: &str, uuid: &Uuid) -> TestThing {
+            TestThing {
+                name: name.to_owned(),
+                uuid: uuid.clone(),
+                stuff: rand::random::<u32>(),
+            }
+        }
+    }
+
+    impl HasUuid for TestThing {
+        fn uuid(&self) -> &Uuid {
+            &self.uuid
+        }
+    }
+
+    impl HasName for TestThing {
+        fn name(&self) -> &str {
+            &self.name
+        }
+    }
+
+    #[test]
+    /// Remove a test object by its uuid.
+    /// Mutate the removed test object.
+    /// Verify that the table is now empty and that removing by name yields
+    /// no result.
+    fn remove_existing_item() {
+        let mut t: Table<TestThing> = Table::new();
+        let uuid = Uuid::new_v4();
+        let name = "name";
+        t.insert(TestThing::new(&name, &uuid));
+        assert!(t.get_by_name(&name).is_some());
+        assert!(t.get_by_uuid(&uuid).is_some());
+        let thing = t.remove_by_uuid(&uuid);
+        assert!(thing.is_some());
+        let mut thing = thing.unwrap();
+        thing.stuff = 0;
+        assert!(t.is_empty());
+        assert!(t.remove_by_name(&name).is_none());
+        assert!(t.get_by_name(&name).is_none());
+        assert!(t.get_by_uuid(&uuid).is_none());
+    }
+
+    #[test]
+    /// Insert a thing and then insert another thing with same keys.
+    /// The previously inserted thing should be returned.
+    /// You can't insert the identical thing, because that would be a move.
+    /// This is good, because then you can't have a thing that is both in
+    /// the table and not in the table.
+    fn insert_same_keys() {
+        let mut t: Table<TestThing> = Table::new();
+        let uuid = Uuid::new_v4();
+        let name = "name";
+        let thing = TestThing::new(&name, &uuid);
+        let thing_key = thing.stuff;
+        let displaced = t.insert(thing);
+
+        // There was nothing previously, so displaced must be empty.
+        assert!(displaced.is_empty());
+
+        // t now contains the inserted thing.
+        assert!(t.contains_name(&name));
+        assert!(t.contains_uuid(&uuid));
+        assert!(t.get_by_uuid(&uuid).unwrap().stuff == thing_key);
+
+        // Add another thing with the same keys.
+        let thing2 = TestThing::new(&name, &uuid);
+        let thing_key2 = thing2.stuff;
+        let displaced = t.insert(thing2);
+
+        // It has displaced the old thing.
+        assert!(displaced.len() == 1);
+        let ref displaced_item = displaced[0];
+        assert!(displaced_item.name() == name);
+        assert!(displaced_item.uuid() == &uuid);
+
+        // But it contains a thing with the same keys.
+        assert!(t.contains_name(&name));
+        assert!(t.contains_uuid(&uuid));
+        assert!(t.get_by_uuid(&uuid).unwrap().stuff == thing_key2);
+        assert!(t.len() == 1);
+    }
+
+    #[test]
+    /// Insert a thing and then insert another thing with the same name.
+    /// The previously inserted thing should be returned.
+    fn insert_same_name() {
+        let mut t: Table<TestThing> = Table::new();
+        let uuid = Uuid::new_v4();
+        let name = "name";
+        let thing = TestThing::new(&name, &uuid);
+        let thing_key = thing.stuff;
+
+        // There was nothing in the table before, so displaced is empty.
+        let displaced = t.insert(thing);
+        assert!(displaced.is_empty());
+
+        // t now contains thing.
+        assert!(t.contains_name(&name));
+        assert!(t.contains_uuid(&uuid));
+
+        // Insert new item with different UUID.
+        let uuid2 = Uuid::new_v4();
+        let thing2 = TestThing::new(&name, &uuid2);
+        let thing_key2 = thing2.stuff;
+        let displaced = t.insert(thing2);
+
+        // The items displaced consist exactly of the first item.
+        assert!(displaced.len() == 1);
+        let ref displaced_item = displaced[0];
+        assert!(displaced_item.name() == name);
+        assert!(displaced_item.uuid() == &uuid);
+        assert!(displaced_item.stuff == thing_key);
+
+        // The table contains the new item and has no memory of the old.
+        assert!(t.contains_name(&name));
+        assert!(t.contains_uuid(&uuid2));
+        assert!(!t.contains_uuid(&uuid));
+        assert!(t.get_by_uuid(&uuid2).unwrap().stuff == thing_key2);
+        assert!(t.get_by_name(&name).unwrap().stuff == thing_key2);
+        assert!(t.len() == 1);
+    }
+}

@@ -37,6 +37,10 @@ impl<T: HasName + HasUuid> Table<T> {
         self.items.is_empty()
     }
 
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
     /// Returns true if map has an item corresponding to this name, else false.
     pub fn contains_name(&self, name: &str) -> bool {
         self.name_map.contains_key(name)

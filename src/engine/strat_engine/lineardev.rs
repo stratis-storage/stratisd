@@ -5,15 +5,24 @@
 use devicemapper::{DM, DevId, DeviceInfo, DmFlags};
 
 use engine::{EngineError, EngineResult, ErrorEnum};
+use engine::strat_engine::blockdev::blkdev_size;
 
+use std::fmt;
+use std::fs::File;
 use std::path::PathBuf;
 
 use super::blockdev::BlockDev;
-use types::Sectors;
+use types::{Bytes, Sectors};
 
 pub struct LinearDev {
     name: String,
     dev_info: DeviceInfo,
+}
+
+impl fmt::Debug for LinearDev {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{}", self.name())
+    }
 }
 
 /// Use DM to concatenate a set of blockdevs together into a
@@ -30,6 +39,7 @@ impl LinearDev {
         let dev_info = try!(dm.table_load(id, &table));
         try!(dm.device_suspend(id, DmFlags::empty()));
 
+        BlockDev::wait_for_dm();
         Ok(LinearDev {
             name: name.to_owned(),
             dev_info: dev_info,
@@ -58,6 +68,26 @@ impl LinearDev {
 
     pub fn name(&self) -> &str {
         self.dev_info.name().clone()
+    }
+
+    pub fn size(&self) -> EngineResult<Bytes> {
+
+        let blockdev_path = try!(self.path());
+        let f = match File::open(blockdev_path) {
+            Ok(file) => file,
+            Err(e) => {
+                let error_message = format!("{:?} Failed to open blockdev {:?}", e, self.path());
+                return Err(EngineError::Engine(ErrorEnum::FailedToOpen, error_message.into()));
+            }
+        };
+
+        match blkdev_size(&f) {
+            Ok(bytes) => return Ok(bytes),
+            Err(e) => {
+                let error_message = format!("{:?} for device {:?}", e, self.path());
+                return Err(EngineError::Engine(ErrorEnum::Error, error_message.into()));
+            }
+        };
     }
 
     pub fn path(&self) -> EngineResult<PathBuf> {

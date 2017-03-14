@@ -49,6 +49,8 @@ pub trait Dev: Debug {
 pub trait Filesystem: HasName + HasUuid {
     /// Rename this filesystem.
     fn rename(&mut self, name: &str) -> ();
+    /// Destroy this filesystem
+    fn destroy(self) -> EngineResult<()>;
 }
 
 pub trait Pool: HasName + HasUuid {

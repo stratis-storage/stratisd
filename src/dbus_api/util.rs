@@ -44,6 +44,7 @@ pub fn engine_to_dbus_err(err: &EngineError) -> (DbusErrorEnum, String) {
                 engine::ErrorEnum::Busy => DbusErrorEnum::BUSY,
                 engine::ErrorEnum::Invalid => DbusErrorEnum::ERROR,
                 engine::ErrorEnum::NotFound => DbusErrorEnum::NOTFOUND,
+                engine::ErrorEnum::FailedToOpen => DbusErrorEnum::ERROR,
             }
         }
         EngineError::Io(_) => DbusErrorEnum::IO_ERROR,

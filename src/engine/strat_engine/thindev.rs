@@ -2,13 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-
 use devicemapper::{DM, DevId, DeviceInfo, DmFlags};
 use engine::{EngineError, EngineResult, ErrorEnum};
+use engine::strat_engine::blockdev::BlockDev;
 use engine::strat_engine::thinpooldev::ThinPoolDev;
+
+use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
+
 use types::Sectors;
 
 #[derive(Clone)]
@@ -17,6 +20,12 @@ pub struct ThinDev {
     pub dev_info: DeviceInfo,
     pub thin_id: u32,
     pub size: Sectors,
+}
+
+impl fmt::Debug for ThinDev {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{}", self.name())
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -43,7 +52,7 @@ impl ThinDev {
         let id = &DevId::Name(name);
         let di = try!(dm.table_load(id, &table));
         try!(dm.device_suspend(id, DmFlags::empty()));
-
+        BlockDev::wait_for_dm();
         Ok(ThinDev {
             name: name.to_owned(),
             dev_info: di,
@@ -68,9 +77,13 @@ impl ThinDev {
 
     }
 
-    pub fn teardown(&mut self, dm: &DM) -> EngineResult<()> {
+    pub fn teardown(&self, dm: &DM) -> EngineResult<()> {
         try!(dm.device_remove(&DevId::Name(&self.name), DmFlags::empty()));
         Ok(())
+    }
+
+    pub fn name(&self) -> &str {
+        self.dev_info.name()
     }
 
     pub fn path(&self) -> EngineResult<PathBuf> {

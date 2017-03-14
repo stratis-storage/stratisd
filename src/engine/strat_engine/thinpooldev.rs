@@ -4,8 +4,10 @@
 
 use devicemapper::{DM, DevId, DeviceInfo, DmFlags};
 use engine::{EngineError, EngineResult, ErrorEnum};
+use engine::strat_engine::blockdev::BlockDev;
 use engine::strat_engine::lineardev::LinearDev;
 
+use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -18,6 +20,13 @@ pub struct ThinPoolDev {
     meta_dev: LinearDev,
     data_dev: LinearDev,
 }
+
+impl fmt::Debug for ThinPoolDev {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{}", self.name())
+    }
+}
+
 
 /// Use DM to create a "thin-pool".  A "thin-pool" is shared space for
 /// other thin provisioned devices to use.
@@ -48,6 +57,7 @@ impl ThinPoolDev {
         let di = try!(dm.table_load(id, &table));
         try!(dm.device_suspend(id, DmFlags::empty()));
 
+        BlockDev::wait_for_dm();
         Ok(ThinPoolDev {
             name: name.to_owned(),
             dev_info: di,
@@ -82,7 +92,7 @@ impl ThinPoolDev {
     }
 
     pub fn name(&self) -> &str {
-        self.dev_info.name().clone()
+        self.dev_info.name()
     }
 
     pub fn path(&self) -> EngineResult<PathBuf> {
@@ -95,7 +105,7 @@ impl ThinPoolDev {
         }
     }
 
-    pub fn teardown(&mut self, dm: &DM) -> EngineResult<()> {
+    pub fn teardown(&self, dm: &DM) -> EngineResult<()> {
         try!(dm.device_remove(&DevId::Name(&self.name), DmFlags::empty()));
         try!(self.data_dev.teardown(dm));
         try!(self.meta_dev.teardown(dm));

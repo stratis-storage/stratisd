@@ -4,6 +4,7 @@
 
 use uuid::Uuid;
 
+use engine::EngineResult;
 use engine::Filesystem;
 
 use super::super::engine::{HasName, HasUuid};
@@ -26,6 +27,10 @@ impl SimFilesystem {
 impl Filesystem for SimFilesystem {
     fn rename(&mut self, name: &str) {
         self.name = name.to_owned();
+    }
+
+    fn destroy(self) -> EngineResult<()> {
+        Ok(())
     }
 }
 

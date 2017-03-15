@@ -92,7 +92,7 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                                   return_message);
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let mut pool = get_pool!(engine; pool_uuid; default_return; return_message);
+    let pool = get_pool!(engine; pool_uuid; default_return; return_message);
 
     let msg = match pool.rename_filesystem(&filesystem_uuid, &new_name) {
         Ok(RenameAction::NoSource) => {

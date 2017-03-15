@@ -67,7 +67,7 @@ impl LinearDev {
     }
 
     pub fn name(&self) -> &str {
-        self.dev_info.name().clone()
+        self.dev_info.name()
     }
 
     pub fn size(&self) -> EngineResult<Bytes> {

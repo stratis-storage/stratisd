@@ -17,9 +17,9 @@ use types::Sectors;
 #[derive(Clone)]
 pub struct ThinDev {
     name: String,
-    pub dev_info: DeviceInfo,
-    pub thin_id: u32,
-    pub size: Sectors,
+    dev_info: DeviceInfo,
+    thin_id: u32,
+    size: Sectors,
 }
 
 impl fmt::Debug for ThinDev {

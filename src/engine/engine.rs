@@ -118,6 +118,7 @@ pub trait Engine: Debug {
     /// Returns true if it was necessary to perform an action, false if not.
     fn rename_pool(&mut self, uuid: &Uuid, new_name: &str) -> EngineResult<RenameAction>;
 
+    /// Find the pool designated by uuid.
     fn get_pool(&mut self, uuid: &Uuid) -> Option<&mut Pool>;
 
     /// Configure the simulator, for the real engine, this is a null op.

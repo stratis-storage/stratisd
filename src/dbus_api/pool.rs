@@ -52,7 +52,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         get_pool_uuid_internal_error!(object_path; dbus_context; default_return; return_message);
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let mut pool = get_pool!(engine; pool_uuid; default_return; return_message);
+    let pool = get_pool!(engine; pool_uuid; default_return; return_message);
 
     let result = pool.create_filesystems(&filesystems.collect::<Vec<&str>>());
 
@@ -103,7 +103,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         get_pool_uuid_internal_error!(object_path; dbus_context; default_return; return_message);
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let mut pool = get_pool!(engine; pool_uuid; default_return; return_message);
+    let pool = get_pool!(engine; pool_uuid; default_return; return_message);
 
     let mut filesystem_map: HashMap<Uuid, dbus::Path<'static>> = HashMap::new();
     for op in filesystems {
@@ -152,7 +152,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         get_pool_uuid_internal_error!(object_path; dbus_context; default_return; return_message);
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let mut pool = get_pool!(engine; pool_uuid; default_return; return_message);
+    let pool = get_pool!(engine; pool_uuid; default_return; return_message);
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 

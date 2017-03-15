@@ -144,7 +144,7 @@ pub fn test_thinpool() {
     assert_ok!(clean_blockdev_headers(&device_paths));
     info!("devices cleaned for test");
 
-    let mut thinpool_dev = assert_ok!(test_thinpool_setup(&dm, &device_paths));
+    let thinpool_dev = assert_ok!(test_thinpool_setup(&dm, &device_paths));
 
     thinpool_dev.teardown(&dm).unwrap();
 }

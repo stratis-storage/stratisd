@@ -36,7 +36,7 @@ pub struct BlockDevSave {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StratSave {
+pub struct PoolSave {
     pub name: String,
     pub id: String,
     pub block_devs: BTreeMap<String, BlockDevSave>,

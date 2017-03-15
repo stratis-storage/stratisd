@@ -77,6 +77,8 @@ fn main() {
             builder.parse(&s);
         }
     };
+
+    // This is the first and only initialization of the logger; it must succeed.
     builder.init().unwrap();
 
     let engine: Box<Engine> = {

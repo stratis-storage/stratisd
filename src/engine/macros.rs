@@ -42,6 +42,8 @@ macro_rules! destroy_pool {
         } else {
             return Ok(false);
         }
+
+        // unwrap() must succeed because get_by_uuid() succeeded above.
         try!($s.pools.remove_by_uuid($uuid).unwrap().destroy());
         Ok(true)
     }
@@ -70,6 +72,7 @@ macro_rules! rename_pool {
             return Err(EngineError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
         }
 
+        // unwrap() must succeed because get_by_uuid() succeeded above.
         let mut pool = $s.pools.remove_by_uuid($uuid).unwrap();
         pool.rename($new_name);
         $s.pools.insert(pool);
@@ -100,6 +103,7 @@ macro_rules! rename_filesystem {
             return Err(EngineError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
         }
 
+        // unwrap() must succeed because get_by_uuid() succeeded above.
         let mut filesystem = $s.filesystems.remove_by_uuid($uuid).unwrap();
         filesystem.rename($new_name);
         $s.filesystems.insert(filesystem);

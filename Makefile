@@ -10,6 +10,7 @@ build:
 	RUSTFLAGS='-D warnings' cargo build
 
 test:
+	RUSTFLAGS='-D warnings' \
 	cargo test -- --skip test_pools --skip test_blockdev_setup \
 		--skip test_lineardev_setup --skip test_thinpool
 

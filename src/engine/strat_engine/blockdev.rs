@@ -24,7 +24,7 @@ use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
 use consts::*;
 use super::metadata::{StaticHeader, BDA, validate_mda_size};
 use super::engine::DevOwnership;
-pub use super::BlockDevSave;
+use super::serde_structs::BlockDevSave;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
 

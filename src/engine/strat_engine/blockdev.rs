@@ -153,6 +153,8 @@ pub fn initialize(pool_uuid: &PoolUuid,
             if dev_result.is_err() {
                 return Err(dev_result.unwrap_err());
             }
+
+            // dev_result is not an error, so it must be unwrappable.
             let (devnode, dev_size, ownership, f) = dev_result.unwrap();
             if dev_size < MIN_DEV_SIZE {
                 let error_message = format!("{} too small, minimum {} bytes",

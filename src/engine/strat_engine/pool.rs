@@ -111,6 +111,10 @@ impl StratPool {
             .filter(|bd| bd.bda.last_update_time().is_some())
             .collect();
 
+        // last_update_time().unwrap() succeeds in all following statements
+        // because all bds with no last_update_time() were filtered in
+        // statement above.
+
         bds.sort_by_key(|k| k.bda.last_update_time().unwrap());
 
         // Only try to read blockdevs with the latest metadata
@@ -147,8 +151,9 @@ impl StratPool {
 
         let time = time::now().to_timespec();
 
+        // TODO: do something better than panic when saving to blockdev fails.
         for (_, bd) in &mut self.block_devs {
-            bd.save_state(&time, data.as_bytes()).unwrap(); // ignoring failure
+            bd.save_state(&time, data.as_bytes()).unwrap();
         }
 
         Ok(())

@@ -116,6 +116,9 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match result {
         Ok(ref uuids) => {
             for uuid in uuids {
+                // unwrap() must succeed because filesystem_map was created
+                // from existing UUIDS in statement above. It can only fail
+                // if filesystems itself is corrupted.
                 let op = filesystem_map.get(uuid).unwrap().clone();
                 dbus_context.filesystems.borrow_mut().remove(&op);
                 dbus_context.actions.borrow_mut().push_remove(op);
@@ -158,6 +161,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match pool.add_blockdevs(&blockdevs, force) {
         Ok(devnodes) => {
+            // TODO: discover why this unwrap() is safe.
             let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
             let paths = paths.map(|x| MessageItem::Str(x)).collect();
             let (rc, rs) = ok_message_items();

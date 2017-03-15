@@ -71,6 +71,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             dbus_context.pools
                 .borrow_mut()
                 .insert(pool_object_path.clone(), (object_path.clone(), uuid));
+            // TODO: discover why it is safe to unwrap here, or don't.
             let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
             let paths = paths.map(|x| MessageItem::Str(x)).collect();
             let return_path = MessageItem::ObjectPath(pool_object_path);
@@ -245,6 +246,8 @@ pub fn run(engine: Box<Engine>) -> StratisResult<()> {
     let dbus_context = tree.get_data().clone();
     try!(tree.set_registered(&c, true));
 
+
+    // No recourse if D-Bus service won't start, so panic.
     c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32).unwrap();
 
     // ...and serve incoming requests.

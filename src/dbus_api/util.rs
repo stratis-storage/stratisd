@@ -69,5 +69,6 @@ pub fn ok_message_items() -> (MessageItem, MessageItem) {
 }
 
 pub fn default_object_path<'a>() -> dbus::Path<'a> {
+    // "/" is a valid path, so Path::new() must succeed.
     dbus::Path::new("/").unwrap()
 }

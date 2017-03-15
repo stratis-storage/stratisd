@@ -24,7 +24,7 @@ use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
 use consts::*;
 use super::metadata::{StaticHeader, BDA, validate_mda_size};
 use super::engine::DevOwnership;
-use super::serde_structs::BlockDevSave;
+use super::serde_structs::{BlockDevSave, DSerializable};
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
 
@@ -218,13 +218,6 @@ pub struct BlockDev {
 }
 
 impl BlockDev {
-    pub fn to_save(&self) -> BlockDevSave {
-        BlockDevSave {
-            devnode: self.devnode.clone(),
-            total_size: self.size(),
-        }
-    }
-
     pub fn wipe_metadata(&mut self) -> EngineResult<()> {
         let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
         BDA::wipe(&mut f)
@@ -282,5 +275,14 @@ impl BlockDev {
     /// Last time metadata was written to this device.
     pub fn last_update_time(&self) -> &Option<Timespec> {
         self.bda.last_update_time()
+    }
+}
+
+impl DSerializable<BlockDevSave> for BlockDev {
+    fn to_save(&self) -> BlockDevSave {
+        BlockDevSave {
+            devnode: self.devnode.clone(),
+            total_size: self.size(),
+        }
     }
 }

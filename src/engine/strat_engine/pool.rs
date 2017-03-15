@@ -28,7 +28,7 @@ use engine::strat_engine::thinpooldev::ThinPoolDev;
 use super::super::engine::{FilesystemUuid, HasName, HasUuid};
 use super::super::structures::Table;
 
-use super::serde_structs::StratSave;
+use super::serde_structs::{DSerializable, StratSave};
 use super::blockdev::{BlockDev, initialize, resolve_devices};
 use super::filesystem::StratFilesystem;
 use super::metadata::MIN_MDA_SECTORS;
@@ -147,17 +147,6 @@ impl StratPool {
 
         Ok(())
     }
-
-    pub fn to_save(&self) -> StratSave {
-        StratSave {
-            name: self.name.clone(),
-            id: self.pool_uuid.simple().to_string(),
-            block_devs: self.block_devs
-                .iter()
-                .map(|(_, bd)| (bd.uuid().simple().to_string(), bd.to_save()))
-                .collect(),
-        }
-    }
 }
 
 impl Pool for StratPool {
@@ -236,5 +225,18 @@ impl HasUuid for StratPool {
 impl HasName for StratPool {
     fn name(&self) -> &str {
         &self.name
+    }
+}
+
+impl DSerializable<StratSave> for StratPool {
+    fn to_save(&self) -> StratSave {
+        StratSave {
+            name: self.name.clone(),
+            id: self.pool_uuid.simple().to_string(),
+            block_devs: self.block_devs
+                .iter()
+                .map(|(_, bd)| (bd.uuid().simple().to_string(), bd.to_save()))
+                .collect(),
+        }
     }
 }

@@ -80,7 +80,6 @@ impl Engine for SimEngine {
         rename_pool!{self; uuid; new_name}
     }
 
-    /// Looks up the pool by its unique name
     fn get_pool(&mut self, uuid: &Uuid) -> Option<&mut Pool> {
         get_pool!(self; uuid)
     }

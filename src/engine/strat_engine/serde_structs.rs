@@ -18,8 +18,11 @@ use std::path::PathBuf;
 
 use devicemapper::Sectors;
 
-/// Implements saving and restoring from metadata.
-pub trait DSerializable<T> {
+/// Implements saving struct data to a serializable form and reconstructing
+/// a struct from that form.
+/// Assuming the context of the existing devices this must be an isomorphism,
+/// i.e., setup(x.to_save()) == x and setup(x).to_save() == x or it's a bug.
+pub trait Isomorphism<T> {
     fn to_save(&self) -> T;
     fn setup(T) -> Self
         where Self: Sized

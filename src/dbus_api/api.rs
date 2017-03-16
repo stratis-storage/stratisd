@@ -71,7 +71,11 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             dbus_context.pools
                 .borrow_mut()
                 .insert(pool_object_path.clone(), (object_path.clone(), uuid));
-            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
+            let paths = devnodes.iter().map(|d| {
+                d.to_str()
+                    .expect("'d' originated in the 'devs' D-Bus argument.")
+                    .into()
+            });
             let paths = paths.map(|x| MessageItem::Str(x)).collect();
             let return_path = MessageItem::ObjectPath(pool_object_path);
             let return_list = MessageItem::Array(paths, "s".into());
@@ -245,7 +249,7 @@ pub fn run(engine: Box<Engine>) -> StratisResult<()> {
     let dbus_context = tree.get_data().clone();
     try!(tree.set_registered(&c, true));
 
-    c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32).unwrap();
+    try!(c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32));
 
     // ...and serve incoming requests.
     for c_item in c.iter(10000) {

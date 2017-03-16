@@ -102,7 +102,8 @@ impl StratPool {
         Ok(pool)
     }
 
-    /// Read the latest data across all blockdevs
+    /// Return the metadata from the first blockdev with up-to-date, readable
+    /// metadata.
     pub fn read_metadata(&self) -> Option<Vec<u8>> {
 
         let mut bds: Vec<&BlockDev> = self.block_devs
@@ -111,17 +112,30 @@ impl StratPool {
             .filter(|bd| bd.bda.last_update_time().is_some())
             .collect();
 
-        bds.sort_by_key(|k| k.bda.last_update_time().unwrap());
+        if bds.is_empty() {
+            return None;
+        }
 
-        // Only try to read blockdevs with the latest metadata
-        let last_update_time = match bds.last() {
-            Some(bd) => bd.bda.last_update_time().unwrap(),
-            None => return None,
-        };
+        bds.sort_by_key(|k| {
+            k.bda
+                .last_update_time()
+                .expect("BDAs without some last update time filtered above.")
+        });
+
+        let last_update_time = bds.last()
+            .expect("There is a last bd, since bds.is_empty() was false.")
+            .bda
+            .last_update_time()
+            .expect("BDAs without some last update time filtered above.");
 
         for bd in bds.iter()
             .rev()
-            .take_while(|bd| bd.bda.last_update_time().unwrap() == last_update_time) {
+            .take_while(|bd| {
+                bd.bda
+                    .last_update_time()
+                    .expect("BDAs without some last update time filtered above.") ==
+                last_update_time
+            }) {
             let mut f = match OpenOptions::new()
                 .read(true)
                 .open(&bd.devnode) {
@@ -147,8 +161,9 @@ impl StratPool {
 
         let time = time::now().to_timespec();
 
+        // TODO: Do something better than panic when saving to blockdev fails.
         for (_, bd) in &mut self.block_devs {
-            bd.save_state(&time, data.as_bytes()).unwrap(); // ignoring failure
+            bd.save_state(&time, data.as_bytes()).unwrap();
         }
 
         Ok(())

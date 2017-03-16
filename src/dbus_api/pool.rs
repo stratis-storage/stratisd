@@ -116,7 +116,9 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match result {
         Ok(ref uuids) => {
             for uuid in uuids {
-                let op = filesystem_map.get(uuid).unwrap().clone();
+                let op = filesystem_map.get(uuid)
+                    .expect("'uuids' is a subset of filesystem_map.keys()")
+                    .clone();
                 dbus_context.filesystems.borrow_mut().remove(&op);
                 dbus_context.actions.borrow_mut().push_remove(op);
             }
@@ -158,7 +160,11 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match pool.add_blockdevs(&blockdevs, force) {
         Ok(devnodes) => {
-            let paths = devnodes.iter().map(|d| d.to_str().unwrap().into());
+            let paths = devnodes.iter().map(|d| {
+                d.to_str()
+                    .expect("'d' originated in the 'devs' D-Bus argument.")
+                    .into()
+            });
             let paths = paths.map(|x| MessageItem::Str(x)).collect();
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::Array(paths, return_sig.into()), rc, rs)

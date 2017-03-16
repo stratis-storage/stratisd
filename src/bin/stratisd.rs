@@ -77,7 +77,9 @@ fn main() {
             builder.parse(&s);
         }
     };
-    builder.init().unwrap();
+
+    builder.init()
+        .expect("This is the first and only initialization of the logger; it must succeed.");
 
     let engine: Box<Engine> = {
         if matches.is_present("sim") {
@@ -89,9 +91,7 @@ fn main() {
         }
     };
 
-    let r = libstratis::dbus_api::run(engine);
-
-    if let Err(r) = r {
+    if let Err(r) = libstratis::dbus_api::run(engine) {
         if let Err(e) = write_err(r) {
             panic!("Unable to write to stderr: {}", e)
         }

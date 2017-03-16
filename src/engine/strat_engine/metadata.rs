@@ -485,7 +485,9 @@ impl MDAHeader {
             let mut data_buf = vec![0u8; *used as usize];
             try!(f.read_exact(&mut data_buf));
 
-            if self.data_crc.unwrap() != crc32::checksum_ieee(&data_buf) {
+            if self.data_crc
+                .expect("Option constructors of 'data_crc' and 'used' are always the same.") !=
+               crc32::checksum_ieee(&data_buf) {
                 return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region data CRC".into()));
             }
             Ok(Some(data_buf))

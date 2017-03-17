@@ -150,10 +150,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
     {
         let mut add_devs = Vec::new();
         for (dev, dev_result) in dev_infos {
-            if dev_result.is_err() {
-                return Err(dev_result.unwrap_err());
-            }
-            let (devnode, dev_size, ownership, f) = dev_result.unwrap();
+            let (devnode, dev_size, ownership, f) = try!(dev_result);
             if dev_size < MIN_DEV_SIZE {
                 let error_message = format!("{} too small, minimum {} bytes",
                                             devnode.display(),

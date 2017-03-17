@@ -89,12 +89,11 @@ impl<T: HasName + HasUuid> Table<T> {
     /// Removes the Pool corresponding to name if there is one.
     pub fn remove_by_name(&mut self, name: &str) -> Option<T> {
         if let Some(index) = self.name_map.remove(name) {
-            // There is guaranteed to be a last because there is at least
-            // one index into the items.
-
             // Insert mappings for the about-to-be swapped element
             {
-                let last_item = &self.items.last().unwrap();
+                let last_item = &self.items
+                    .last()
+                    .expect("name_map is non-empty <-> items is non-empty");
                 self.name_map.insert(last_item.name().into(), index);
                 self.uuid_map.insert(last_item.uuid().clone(), index);
             }
@@ -115,12 +114,11 @@ impl<T: HasName + HasUuid> Table<T> {
     /// Removes the Pool corresponding to the uuid if there is one.
     pub fn remove_by_uuid(&mut self, uuid: &Uuid) -> Option<T> {
         if let Some(index) = self.uuid_map.remove(uuid) {
-            // There is guaranteed to be a last because there is at least
-            // one index into the items.
-
             // Insert mappings for the about-to-be swapped element
             {
-                let last_item = &self.items.last().unwrap();
+                let last_item = &self.items
+                    .last()
+                    .expect("uuid_map is non-empty <-> items is non-empty");
                 self.name_map.insert(last_item.name().into(), index);
                 self.uuid_map.insert(last_item.uuid().clone(), index);
             }

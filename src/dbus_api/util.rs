@@ -69,5 +69,5 @@ pub fn ok_message_items() -> (MessageItem, MessageItem) {
 }
 
 pub fn default_object_path<'a>() -> dbus::Path<'a> {
-    dbus::Path::new("/").unwrap()
+    dbus::Path::new("/").expect("'/' is guaranteed to be a valid Path.")
 }

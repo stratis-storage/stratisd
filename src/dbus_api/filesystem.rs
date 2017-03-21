@@ -62,7 +62,7 @@ pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext,
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "filesystem");
 
-    let object_path = f.object_path(object_name, Some(OPContext::new(parent, uuid)))
+    let object_path = f.object_path(object_name, OPContext::new(parent, uuid))
         .introspectable()
         .add(f.interface(interface_name, ())
             .add_m(rename_method)

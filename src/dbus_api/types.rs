@@ -130,7 +130,7 @@ impl DbusContext {
 #[derive(Default, Debug)]
 pub struct TData;
 impl DataType for TData {
-    type ObjectPath = Option<OPContext>;
+    type ObjectPath = OPContext;
     type Property = ();
     type Interface = ();
     type Method = ();

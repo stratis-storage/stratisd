@@ -291,7 +291,7 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "pool");
 
-    let object_path = f.object_path(object_name, Some(OPContext::new(parent, uuid)))
+    let object_path = f.object_path(object_name, OPContext::new(parent, uuid))
         .introspectable()
         .add(f.interface(interface_name, ())
             .add_m(create_filesystems_method)

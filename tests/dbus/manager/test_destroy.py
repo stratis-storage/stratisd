@@ -73,13 +73,13 @@ class Destroy1TestCase(unittest.TestCase):
 
     def testBogusObjectPath(self):
         """
-        Failure should occur on a bogus object path.
+        Success should occur on a bogus object path.
         """
         (_, rc, _) = checked_call(
            Manager.DestroyPool(self._proxy, pool="/"),
            ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
         )
-        self.assertEqual(rc, self._errors.POOL_NOTFOUND)
+        self.assertEqual(rc, self._errors.OK)
 
 
 class Destroy2TestCase(unittest.TestCase):

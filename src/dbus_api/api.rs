@@ -69,9 +69,6 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok((uuid, devnodes)) => {
             let pool_object_path: dbus::Path =
                 create_dbus_pool(dbus_context, object_path.clone(), uuid);
-            dbus_context.pools
-                .borrow_mut()
-                .insert(pool_object_path.clone(), (object_path.clone(), uuid));
             let paths = devnodes.iter().map(|d| {
                 d.to_str()
                     .expect("'d' originated in the 'devs' D-Bus argument.")
@@ -108,12 +105,16 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Bool(false);
     let return_message = message.method_return();
 
-    let pool_uuid =
-        get_pool_uuid_not_found_error!(object_path; dbus_context; default_return; return_message);
+    let pool_uuid = match m.tree.get(&object_path) {
+        Some(pool_path) => get_data!(pool_path; default_return; return_message).uuid,
+        None => {
+            let (rc, rs) = ok_message_items();
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
+        }
+    };
 
     let msg = match dbus_context.engine.borrow_mut().destroy_pool(&pool_uuid) {
         Ok(action) => {
-            dbus_context.pools.borrow_mut().remove(&object_path);
             dbus_context.actions.borrow_mut().push_remove(object_path);
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::Bool(action), rc, rs)

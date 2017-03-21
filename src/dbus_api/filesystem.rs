@@ -27,6 +27,7 @@ use super::util::code_to_message_items;
 use super::util::engine_to_dbus_err;
 use super::util::get_next_arg;
 use super::util::ok_message_items;
+use super::util::ref_ok_or;
 
 
 pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext,
@@ -86,24 +87,20 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = MessageItem::Bool(false);
 
-    let (pool_object_path, filesystem_uuid) = get_fs_tuple_internal_error!(object_path;
-                                       dbus_context;
-                                       default_return;
-                                       return_message);
+    let filesystem_path = m.tree.get(&object_path).expect("implicit argument must be in tree");
+    let filesystem_data = get_data!(filesystem_path; default_return; return_message);
 
-    let pool_uuid = get_pool_uuid_internal_error!(pool_object_path;
-                                                  dbus_context;
-                                                  default_return;
-                                                  return_message);
+    let pool_path = get_parent!(m; filesystem_data; default_return; return_message);
+    let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_pool!(engine; pool_uuid; default_return; return_message);
 
-    let msg = match pool.rename_filesystem(&filesystem_uuid, &new_name) {
+    let msg = match pool.rename_filesystem(&filesystem_data.uuid, &new_name) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("pool {} doesn't know about filesystem {}",
                                         pool_uuid,
-                                        filesystem_uuid);
+                                        filesystem_data.uuid);
             let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, error_message);
             return_message.append3(default_return, rc, rs)
         }
@@ -129,14 +126,12 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 fn get_filesystem_uuid(i: &mut IterAppend,
                        p: &PropInfo<MTFn<TData>, TData>)
                        -> Result<(), MethodErr> {
-    let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
-    i.append(try!(dbus_context.filesystems
-        .borrow()
-        .get(object_path)
-        .map(|x| MessageItem::Str(format!("{}", x.1.simple())))
-        .ok_or(MethodErr::failed(&format!("no uuid for filesystem with object path {}",
-                                          object_path)))));
+    let filesystem_path = p.tree.get(&object_path).expect("implicit argument must be in tree");
+    let data = try!(ref_ok_or(filesystem_path.get_data(),
+                              MethodErr::failed(&format!("no data for object path {}",
+                                                         &object_path))));
+    i.append(MessageItem::Str(format!("{}", data.uuid.simple())));
     Ok(())
 }
 
@@ -146,40 +141,41 @@ fn get_filesystem_name(i: &mut IterAppend,
                        -> Result<(), MethodErr> {
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
-    let (pool_object_path, uuid) = try!(dbus_context.filesystems
-        .borrow()
-        .get(object_path)
-        .map(|x| x.clone())
-        .ok_or(MethodErr::failed(&format!("no uuid for filesystem with object path {}",
-                                          object_path))));
 
-    let &(_, pool_uuid) = try!(dbus_context.pools
-        .borrow()
-        .get(&pool_object_path)
-        .ok_or(MethodErr::failed(&format!("no pool uuid for filesystem with object path {}",
-                                          object_path))));
+    let filesystem_path = p.tree.get(&object_path).expect("tree must contain implicit argument");
+    let filesystem_data =
+        try!(ref_ok_or(filesystem_path.get_data(),
+                       MethodErr::failed(&format!("no data for object path {}", &object_path))));
+
+    let pool_path = try!(p.tree
+        .get(&filesystem_data.parent)
+        .ok_or(MethodErr::failed(&format!("no path for parent object path {}",
+                                          &filesystem_data.parent))));
+    let pool_uuid = try!(ref_ok_or(pool_path.get_data(),
+                                   MethodErr::failed(&format!("no data for object path {}",
+                                                              &object_path))))
+        .uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = try!(engine.get_pool(&pool_uuid)
         .ok_or(MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))));
 
-    i.append(try!(pool.get_filesystem(&uuid)
+    let filesystem_uuid = &filesystem_data.uuid;
+    i.append(try!(pool.get_filesystem(filesystem_uuid)
         .map(|x| MessageItem::Str(x.name().to_owned()))
-        .ok_or(MethodErr::failed(&format!("no name for filesystem with uuid {}", &uuid)))));
+        .ok_or(MethodErr::failed(&format!("no name for filesystem with uuid {}",
+                                          &filesystem_uuid)))));
     Ok(())
 }
 
 fn get_filesystem_pool(i: &mut IterAppend,
                        p: &PropInfo<MTFn<TData>, TData>)
                        -> Result<(), MethodErr> {
-    let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
-    i.append(try!(dbus_context.filesystems
-        .borrow()
-        .get(object_path)
-        .map(|x| MessageItem::ObjectPath(x.0.clone()))
-        .ok_or(MethodErr::failed(&format!("no pool object path for filesystem object path {}",
-                                          object_path)))));
-
+    let filesystem_path = p.tree.get(&object_path).expect("implicit argument must be in tree");
+    let data = try!(ref_ok_or(filesystem_path.get_data(),
+                              MethodErr::failed(&format!("no data for object path {}",
+                                                         &object_path))));
+    i.append(MessageItem::ObjectPath(data.parent.clone()));
     Ok(())
 }

@@ -71,3 +71,11 @@ pub fn ok_message_items() -> (MessageItem, MessageItem) {
 pub fn default_object_path<'a>() -> dbus::Path<'a> {
     dbus::Path::new("/").expect("'/' is guaranteed to be a valid Path.")
 }
+
+/// Similar to Option::ok_or, but unpacks a reference to a reference.
+pub fn ref_ok_or<'a, E, T>(opt: &'a Option<T>, err: E) -> Result<&'a T, E> {
+    match opt {
+        &Some(ref t) => Ok(t),
+        &None => Err(err),
+    }
+}

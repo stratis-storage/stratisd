@@ -34,6 +34,7 @@ use super::util::code_to_message_items;
 use super::util::engine_to_dbus_err;
 use super::util::get_next_arg;
 use super::util::ok_message_items;
+use super::util::ref_ok_or;
 
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -48,8 +49,8 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_sig = "(os)";
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
-    let pool_uuid =
-        get_pool_uuid_internal_error!(object_path; dbus_context; default_return; return_message);
+    let pool_path = m.tree.get(&object_path).expect("implicit argument must be in tree");
+    let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_pool!(engine; pool_uuid; default_return; return_message);
@@ -62,9 +63,6 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             for &(name, uuid) in infos {
                 let fs_object_path: dbus::Path =
                     create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
-                dbus_context.filesystems
-                    .borrow_mut()
-                    .insert(fs_object_path.clone(), (object_path.clone(), uuid));
                 return_value.push((fs_object_path, name));
             }
 
@@ -100,16 +98,17 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_sig = "s";
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
-    let pool_uuid =
-        get_pool_uuid_internal_error!(object_path; dbus_context; default_return; return_message);
+    let pool_path = m.tree.get(&object_path).expect("implicit argument must be in tree");
+    let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_pool!(engine; pool_uuid; default_return; return_message);
 
     let mut filesystem_map: HashMap<Uuid, dbus::Path<'static>> = HashMap::new();
     for op in filesystems {
-        if let Some(tuple) = dbus_context.filesystems.borrow().get(&op) {
-            filesystem_map.insert(tuple.1.clone(), op);
+        if let Some(filesystem_path) = m.tree.get(&op) {
+            let filesystem_uuid = get_data!(filesystem_path; default_return; return_message).uuid;
+            filesystem_map.insert(filesystem_uuid.clone(), op);
         }
     }
 
@@ -120,7 +119,6 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 let op = filesystem_map.get(uuid)
                     .expect("'uuids' is a subset of filesystem_map.keys()")
                     .clone();
-                dbus_context.filesystems.borrow_mut().remove(&op);
                 dbus_context.actions.borrow_mut().push_remove(op);
             }
 
@@ -151,8 +149,8 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_sig = "s";
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
-    let pool_uuid =
-        get_pool_uuid_internal_error!(object_path; dbus_context; default_return; return_message);
+    let pool_path = m.tree.get(&object_path).expect("implicit argument must be in tree");
+    let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_pool!(engine; pool_uuid; default_return; return_message);
@@ -190,12 +188,12 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = MessageItem::Bool(false);
 
-    let uuid =
-        get_pool_uuid_internal_error!(object_path; dbus_context; default_return; return_message);
+    let pool_path = m.tree.get(&object_path).expect("implicit argument must be in tree");
+    let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
-    let msg = match dbus_context.engine.borrow_mut().rename_pool(&uuid, new_name) {
+    let msg = match dbus_context.engine.borrow_mut().rename_pool(&pool_uuid, new_name) {
         Ok(RenameAction::NoSource) => {
-            let error_message = format!("engine doesn't know about pool {}", uuid);
+            let error_message = format!("engine doesn't know about pool {}", pool_uuid);
             let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, error_message);
             return_message.append3(default_return, rc, rs)
         }
@@ -217,29 +215,27 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 }
 
 fn get_pool_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
-    let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
-    i.append(try!(dbus_context.pools
-        .borrow()
-        .get(object_path)
-        .map(|x| MessageItem::Str(format!("{}", x.1.simple())))
-        .ok_or(MethodErr::failed(&format!("no uuid for pool with object path {}", object_path)))));
+    let pool_path = p.tree.get(&object_path).expect("implicit argument must be in tree");
+    let data = try!(ref_ok_or(pool_path.get_data(),
+                              MethodErr::failed(&format!("no data for object path {}",
+                                                         &object_path))));
+    i.append(MessageItem::Str(format!("{}", data.uuid.simple())));
     Ok(())
 }
 
 fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
-    let (_, uuid) = try!(dbus_context.pools
-        .borrow()
-        .get(object_path)
-        .map(|x| x.clone())
-        .ok_or(MethodErr::failed(&format!("no uuid for pool with object path {}", object_path))));
+    let pool_path = p.tree.get(&object_path).expect("implicit argument must be in tree");
+    let data = try!(ref_ok_or(pool_path.get_data(),
+                              MethodErr::failed(&format!("no data for object path {}",
+                                                         &object_path))));
     i.append(try!(dbus_context.engine
         .borrow_mut()
-        .get_pool(&uuid)
+        .get_pool(&data.uuid)
         .map(|x| MessageItem::Str(x.name().to_owned()))
-        .ok_or(MethodErr::failed(&format!("no name for pool with uuid {}", &uuid)))));
+        .ok_or(MethodErr::failed(&format!("no name for pool with uuid {}", &data.uuid)))));
     Ok(())
 }
 

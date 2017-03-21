@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
 use std::collections::vec_deque::{Drain, VecDeque};
 use std::convert::From;
 use std::rc::Rc;
@@ -100,10 +99,8 @@ impl OPContext {
 #[derive(Debug, Clone)]
 pub struct DbusContext {
     pub next_index: Rc<Cell<u64>>,
-    pub pools: Rc<RefCell<HashMap<Path<'static>, (Path<'static>, Uuid)>>>,
     pub engine: Rc<RefCell<Box<Engine>>>,
     pub actions: Rc<RefCell<ActionQueue>>,
-    pub filesystems: Rc<RefCell<HashMap<Path<'static>, (Path<'static>, Uuid)>>>,
 }
 
 impl DbusContext {
@@ -111,9 +108,7 @@ impl DbusContext {
         DbusContext {
             actions: Rc::new(RefCell::new(ActionQueue::new())),
             engine: Rc::new(RefCell::new(engine)),
-            filesystems: Rc::new(RefCell::new(HashMap::new())),
             next_index: Rc::new(Cell::new(0)),
-            pools: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 

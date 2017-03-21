@@ -79,6 +79,24 @@ pub enum DeferredAction {
     Remove(Path<'static>),
 }
 
+/// Context for an object path.
+/// Contains the object path of the parent as a Path and the UUID of the
+/// object itself.
+#[derive(Debug)]
+pub struct OPContext {
+    pub parent: Path<'static>,
+    pub uuid: Uuid,
+}
+
+impl OPContext {
+    pub fn new(parent: Path<'static>, uuid: Uuid) -> OPContext {
+        OPContext {
+            parent: parent,
+            uuid: uuid,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DbusContext {
     pub next_index: Rc<Cell<u64>>,
@@ -112,7 +130,7 @@ impl DbusContext {
 #[derive(Default, Debug)]
 pub struct TData;
 impl DataType for TData {
-    type ObjectPath = ();
+    type ObjectPath = OPContext;
     type Property = ();
     type Interface = ();
     type Method = ();

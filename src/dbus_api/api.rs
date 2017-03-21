@@ -26,6 +26,8 @@ use dbus::tree::PropInfo;
 use dbus::tree::Tree;
 use dbus::ConnectionItem;
 
+use uuid::Uuid;
+
 use super::super::stratis::VERSION;
 
 use engine::Engine;
@@ -35,7 +37,7 @@ use types::StratisResult;
 
 use super::pool::create_dbus_pool;
 
-use super::types::{DeferredAction, DbusContext, DbusErrorEnum, TData};
+use super::types::{DeferredAction, DbusContext, DbusErrorEnum, OPContext, TData};
 
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
@@ -67,7 +69,8 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok((uuid, devnodes)) => {
-            let pool_object_path: dbus::Path = create_dbus_pool(dbus_context);
+            let pool_object_path: dbus::Path =
+                create_dbus_pool(dbus_context, object_path.clone(), uuid);
             dbus_context.pools
                 .borrow_mut()
                 .insert(pool_object_path.clone(), (object_path.clone(), uuid));
@@ -228,7 +231,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "Manager");
 
-    let obj_path = f.object_path(STRATIS_BASE_PATH, ())
+    let obj_path = f.object_path(STRATIS_BASE_PATH, OPContext::new(default_object_path(), Uuid::new_v4()))
         .introspectable()
         .object_manager()
         .add(f.interface(interface_name, ())

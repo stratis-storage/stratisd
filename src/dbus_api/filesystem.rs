@@ -15,9 +15,11 @@ use dbus::tree::MethodInfo;
 use dbus::tree::MethodResult;
 use dbus::tree::PropInfo;
 
+use uuid::Uuid;
+
 use engine::RenameAction;
 
-use super::types::{DbusContext, DbusErrorEnum, TData};
+use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
@@ -27,7 +29,10 @@ use super::util::get_next_arg;
 use super::util::ok_message_items;
 
 
-pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
+pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext,
+                                  parent: dbus::Path<'static>,
+                                  uuid: Uuid)
+                                  -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
     let rename_method = f.method("SetName", (), rename_filesystem)
@@ -57,7 +62,7 @@ pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> 
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "filesystem");
 
-    let object_path = f.object_path(object_name, ())
+    let object_path = f.object_path(object_name, OPContext::new(parent, uuid))
         .introspectable()
         .add(f.interface(interface_name, ())
             .add_m(rename_method)

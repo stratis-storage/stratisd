@@ -26,7 +26,7 @@ use engine::RenameAction;
 
 use super::filesystem::create_dbus_filesystem;
 
-use super::types::{DbusContext, DbusErrorEnum, TData};
+use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
@@ -60,7 +60,8 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(ref infos) => {
             let mut return_value = Vec::new();
             for &(name, uuid) in infos {
-                let fs_object_path: dbus::Path = create_dbus_filesystem(dbus_context);
+                let fs_object_path: dbus::Path =
+                    create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
                 dbus_context.filesystems
                     .borrow_mut()
                     .insert(fs_object_path.clone(), (object_path.clone(), uuid));
@@ -242,7 +243,10 @@ fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
     Ok(())
 }
 
-pub fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
+pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,
+                            parent: dbus::Path<'static>,
+                            uuid: Uuid)
+                            -> dbus::Path<'a> {
 
     let f = Factory::new_fn();
 
@@ -287,7 +291,7 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext) -> dbus::Path<'a> {
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "pool");
 
-    let object_path = f.object_path(object_name, ())
+    let object_path = f.object_path(object_name, Some(OPContext::new(parent, uuid)))
         .introspectable()
         .add(f.interface(interface_name, ())
             .add_m(create_filesystems_method)

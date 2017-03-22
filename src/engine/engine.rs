@@ -97,6 +97,9 @@ pub trait Pool: HasName + HasUuid {
 
     /// Get the filesystem in this pool with this UUID.
     fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem>;
+
+    /// Get the blockdev in this pool with this UUID.
+    fn get_blockdev(&mut self, uuid: &DevUuid) -> Option<&mut Dev>;
 }
 
 pub trait Engine: Debug {

@@ -18,6 +18,7 @@ use serde_json;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
+use engine::Dev;
 use engine::Filesystem;
 use engine::Pool;
 use engine::RenameAction;
@@ -223,6 +224,10 @@ impl Pool for StratPool {
 
     fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
         get_filesystem!(self; uuid)
+    }
+
+    fn get_blockdev(&mut self, _uuid: &DevUuid) -> Option<&mut Dev> {
+        unimplemented!()
     }
 }
 

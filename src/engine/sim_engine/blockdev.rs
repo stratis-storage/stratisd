@@ -2,8 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::fmt;
-
 use engine::Dev;
 
 use std::cell::RefCell;
@@ -28,22 +26,7 @@ pub struct SimDev {
     pub state: State,
 }
 
-impl fmt::Display for SimDev {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "{}", self.get_id())
-    }
-}
-
-impl Dev for SimDev {
-    fn get_id(&self) -> String {
-        let id = self.devnode.to_str();
-
-        match id {
-            Some(x) => return String::from(x),
-            None => return String::from("Conversion Failure"),
-        }
-    }
-}
+impl Dev for SimDev {}
 
 impl SimDev {
     /// Generates a new device from any devnode.

@@ -24,7 +24,7 @@ pub enum State {
 #[derive(Debug)]
 /// A simulated device.
 pub struct SimDev {
-    pub devnode: PathBuf,
+    devnode: PathBuf,
     rdm: Rc<RefCell<Randomizer>>,
     state: State,
     uuid: Uuid,

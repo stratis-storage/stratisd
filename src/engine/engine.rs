@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::fmt::Debug;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use uuid::Uuid;
 
@@ -68,7 +68,7 @@ pub trait Pool: HasName + HasUuid {
     /// Returns a list of device nodes corresponding to devices actually added.
     /// Returns an error if a blockdev can not be added because it is owned
     /// or there was an error while reading or writing a blockdev.
-    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
+    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>>;
 
     /// Destroy the pool.
     /// Will fail if filesystems allocated from the pool are in use,
@@ -110,7 +110,7 @@ pub trait Engine: Debug {
                    blockdev_paths: &[&Path],
                    redundancy: Option<u16>,
                    force: bool)
-                   -> EngineResult<(PoolUuid, Vec<PathBuf>)>;
+                   -> EngineResult<(PoolUuid, Vec<DevUuid>)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.

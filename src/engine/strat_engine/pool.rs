@@ -25,7 +25,7 @@ use engine::engine::Redundancy;
 use engine::strat_engine::lineardev::LinearDev;
 use engine::strat_engine::thinpooldev::ThinPoolDev;
 
-use super::super::engine::{FilesystemUuid, HasName, HasUuid};
+use super::super::engine::{DevUuid, FilesystemUuid, HasName, HasUuid};
 use super::super::structures::Table;
 
 use super::serde_structs::StratSave;
@@ -180,15 +180,15 @@ impl Pool for StratPool {
         Ok(result)
     }
 
-    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
+    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
         let devices = try!(resolve_devices(paths));
         let bds = try!(initialize(&self.pool_uuid, devices, MIN_MDA_SECTORS, force));
-        let bdev_paths = bds.iter().map(|p| p.devnode.clone()).collect();
+        let bdev_uuids = bds.iter().map(|p| p.uuid().clone()).collect();
         for bd in bds {
             self.block_devs.insert(bd.devnode.clone(), bd);
         }
         try!(self.write_metadata());
-        Ok(bdev_paths)
+        Ok(bdev_uuids)
     }
 
     fn destroy(mut self) -> EngineResult<()> {

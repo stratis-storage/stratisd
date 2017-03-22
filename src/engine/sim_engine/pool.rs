@@ -23,7 +23,7 @@ use engine::RenameAction;
 use engine::engine::Redundancy;
 
 use super::blockdev::SimDev;
-use super::super::engine::{FilesystemUuid, HasName, HasUuid, PoolUuid};
+use super::super::engine::{DevUuid, FilesystemUuid, HasName, HasUuid, PoolUuid};
 use super::super::structures::Table;
 use super::filesystem::SimFilesystem;
 use super::randomization::Randomizer;
@@ -62,13 +62,15 @@ impl SimPool {
 }
 
 impl Pool for SimPool {
-    fn add_blockdevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
+    fn add_blockdevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<DevUuid>> {
         let rdm = self.rdm.clone();
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs = devices.iter()
-            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
+            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)))
+            .collect::<Vec<(PathBuf, SimDev)>>();
+        let uuids = device_pairs.iter().map(|p| (p.1.uuid().clone())).collect();
         self.block_devs.extend(device_pairs);
-        Ok(devices.iter().map(|d| d.to_path_buf()).collect())
+        Ok(uuids)
     }
 
     fn destroy_filesystems<'a, 'b>(&'a mut self,

@@ -16,13 +16,12 @@ use std::collections::HashSet;
 use std::collections::hash_map::RandomState;
 use std::iter::FromIterator;
 use std::path::Path;
-use std::path::PathBuf;
 use std::rc::Rc;
 
 use super::pool::SimPool;
 use super::randomization::Randomizer;
 
-use super::super::engine::{HasName, HasUuid, PoolUuid};
+use super::super::engine::{DevUuid, HasName, HasUuid, PoolUuid};
 use super::super::structures::Table;
 
 
@@ -47,7 +46,7 @@ impl Engine for SimEngine {
                    blockdev_paths: &[&Path],
                    redundancy: Option<u16>,
                    _force: bool)
-                   -> EngineResult<(PoolUuid, Vec<PathBuf>)> {
+                   -> EngineResult<(PoolUuid, Vec<DevUuid>)> {
 
         let redundancy = calculate_redundancy!(redundancy);
 
@@ -64,11 +63,11 @@ impl Engine for SimEngine {
             return Err(EngineError::Engine(ErrorEnum::Error, "X".into()));
         }
 
-        let bdev_paths = pool.block_devs.values().map(|p| p.devnode.clone()).collect();
+        let bdev_uuids = pool.block_devs.values().map(|p| p.uuid().clone()).collect();
         let uuid = pool.uuid().clone();
         self.pools.insert(pool);
 
-        Ok((uuid, bdev_paths))
+        Ok((uuid, bdev_uuids))
     }
 
     fn destroy_pool(&mut self, uuid: &PoolUuid) -> EngineResult<bool> {

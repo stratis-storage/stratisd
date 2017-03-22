@@ -26,6 +26,7 @@ use super::util::STRATIS_BASE_SERVICE;
 use super::util::code_to_message_items;
 use super::util::engine_to_dbus_err;
 use super::util::get_next_arg;
+use super::util::get_parent;
 use super::util::get_uuid;
 use super::util::ok_message_items;
 use super::util::ref_ok_or;
@@ -51,7 +52,7 @@ pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext,
     let pool_property = f.property::<&dbus::Path, _>("Pool", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
-        .on_get(get_filesystem_pool);
+        .on_get(get_parent);
 
     let uuid_property = f.property::<&str, _>("Uuid", ())
         .access(Access::Read)
@@ -153,17 +154,5 @@ fn get_filesystem_name(i: &mut IterAppend,
         .map(|x| MessageItem::Str(x.name().to_owned()))
         .ok_or(MethodErr::failed(&format!("no name for filesystem with uuid {}",
                                           &filesystem_uuid)))));
-    Ok(())
-}
-
-fn get_filesystem_pool(i: &mut IterAppend,
-                       p: &PropInfo<MTFn<TData>, TData>)
-                       -> Result<(), MethodErr> {
-    let object_path = p.path.get_name();
-    let filesystem_path = p.tree.get(&object_path).expect("implicit argument must be in tree");
-    let data = try!(ref_ok_or(filesystem_path.get_data(),
-                              MethodErr::failed(&format!("no data for object path {}",
-                                                         &object_path))));
-    i.append(MessageItem::ObjectPath(data.parent.clone()));
     Ok(())
 }

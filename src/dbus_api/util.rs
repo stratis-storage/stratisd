@@ -90,3 +90,14 @@ pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<
     i.append(MessageItem::Str(format!("{}", data.uuid.simple())));
     Ok(())
 }
+
+
+pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+    let object_path = p.path.get_name();
+    let path = p.tree.get(&object_path).expect("implicit argument must be in tree");
+    let data = try!(ref_ok_or(path.get_data(),
+                              MethodErr::failed(&format!("no data for object path {}",
+                                                         &object_path))));
+    i.append(MessageItem::ObjectPath(data.parent.clone()));
+    Ok(())
+}

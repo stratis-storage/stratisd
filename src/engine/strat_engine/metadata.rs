@@ -414,7 +414,7 @@ impl MDARegions {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct MDAHeader {
     last_updated: Option<Timespec>,
 

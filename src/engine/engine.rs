@@ -49,8 +49,8 @@ pub trait HasName: Debug {
 pub trait Dev: Debug {}
 
 pub trait Filesystem: HasName + HasUuid {
-    /// Rename this filesystem.
-    fn rename(&mut self, name: &str) -> ();
+    /// Unconditionally sets the name of this filesystem to name.
+    fn set_name(&mut self, name: &str) -> ();
     /// Destroy this filesystem
     fn destroy(self) -> EngineResult<()>;
 }
@@ -92,8 +92,8 @@ pub trait Pool: HasName + HasUuid {
                          new_name: &str)
                          -> EngineResult<RenameAction>;
 
-    /// Rename this pool.
-    fn rename(&mut self, name: &str) -> ();
+    /// Unconditionally sets the name of this pool to name.
+    fn set_name(&mut self, name: &str) -> ();
 
     /// Get the filesystem in this pool with this UUID.
     fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem>;

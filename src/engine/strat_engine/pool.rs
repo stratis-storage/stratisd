@@ -175,7 +175,7 @@ impl StratPool {
             id: self.pool_uuid.simple().to_string(),
             block_devs: self.block_devs
                 .iter()
-                .map(|(_, bd)| (bd.bda.header.dev_uuid.simple().to_string(), bd.to_save()))
+                .map(|(_, bd)| (bd.uuid().simple().to_string(), bd.to_save()))
                 .collect(),
         }
     }

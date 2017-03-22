@@ -13,6 +13,7 @@ use std::vec::Vec;
 
 use uuid::Uuid;
 
+use engine::Dev;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
@@ -118,6 +119,10 @@ impl Pool for SimPool {
 
     fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
         get_filesystem!(self; uuid)
+    }
+
+    fn get_blockdev(&mut self, _uuid: &DevUuid) -> Option<&mut Dev> {
+        unimplemented!()
     }
 }
 

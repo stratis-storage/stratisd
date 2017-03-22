@@ -214,7 +214,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
 pub struct BlockDev {
     dev: Device,
     pub devnode: PathBuf,
-    pub bda: BDA,
+    bda: BDA,
 }
 
 impl BlockDev {
@@ -277,5 +277,10 @@ impl BlockDev {
     /// The device's size.
     pub fn size(&self) -> Sectors {
         self.bda.dev_size()
+    }
+
+    /// Last time metadata was written to this device.
+    pub fn last_update_time(&self) -> &Option<Timespec> {
+        self.bda.last_update_time()
     }
 }

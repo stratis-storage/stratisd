@@ -3,11 +3,65 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::collections::HashMap;
+use std::collections::hash_map::ValuesMut;
 use std::slice::IterMut;
 
 use uuid::Uuid;
 
 use super::engine::{HasName, HasUuid};
+
+
+/// Map UUID to T items.
+#[allow(dead_code)]
+pub struct Table1<T: HasUuid> {
+    map: HashMap<Uuid, T>,
+}
+
+/// All operations are O(1).
+#[allow(dead_code)]
+impl<T: HasUuid> Table1<T> {
+    pub fn new() -> Self {
+        Table1 { map: HashMap::new() }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    /// Returns true if map has an item corresponding to this uuid, else false.
+    pub fn contains_uuid(&self, uuid: &Uuid) -> bool {
+        self.map.contains_key(uuid)
+    }
+
+    /// Get item by uuid.
+    pub fn get_by_uuid(&self, uuid: &Uuid) -> Option<&T> {
+        self.map.get(uuid)
+    }
+
+    /// Get mutable item by uuid.
+    pub fn get_mut_by_uuid(&mut self, uuid: &Uuid) -> Option<&mut T> {
+        self.map.get_mut(uuid)
+    }
+
+    /// Removes the item corresponding to the uuid if there is one.
+    pub fn remove_by_uuid(&mut self, uuid: &Uuid) -> Option<T> {
+        self.map.remove(uuid)
+    }
+
+    /// Inserts an item for given uuid.
+    pub fn insert(&mut self, item: T) -> Option<T> {
+        self.map.insert(item.uuid().clone(), item)
+    }
+
+    /// A mutable iterator.
+    pub fn iter_mut(&mut self) -> ValuesMut<Uuid, T> {
+        self.map.values_mut()
+    }
+}
 
 
 /// Map UUID and name to T items.

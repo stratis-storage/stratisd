@@ -33,6 +33,7 @@ use super::util::STRATIS_BASE_SERVICE;
 use super::util::code_to_message_items;
 use super::util::engine_to_dbus_err;
 use super::util::get_next_arg;
+use super::util::get_uuid;
 use super::util::ok_message_items;
 use super::util::ref_ok_or;
 
@@ -214,16 +215,6 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn get_pool_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
-    let object_path = p.path.get_name();
-    let pool_path = p.tree.get(&object_path).expect("implicit argument must be in tree");
-    let data = try!(ref_ok_or(pool_path.get_data(),
-                              MethodErr::failed(&format!("no data for object path {}",
-                                                         &object_path))));
-    i.append(MessageItem::Str(format!("{}", data.uuid.simple())));
-    Ok(())
-}
-
 fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
@@ -279,7 +270,7 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,
     let uuid_property = f.property::<&str, _>("Uuid", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
-        .on_get(get_pool_uuid);
+        .on_get(get_uuid);
 
     let object_name = format!("{}/{}",
                               STRATIS_BASE_PATH,

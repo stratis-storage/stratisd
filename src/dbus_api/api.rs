@@ -66,17 +66,13 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
 
     let msg = match result {
-        Ok((uuid, devnodes)) => {
+        Ok((uuid, devuuids)) => {
             let pool_object_path: dbus::Path =
                 create_dbus_pool(dbus_context, object_path.clone(), uuid);
-            let paths = devnodes.iter().map(|d| {
-                d.to_str()
-                    .expect("'d' originated in the 'devs' D-Bus argument.")
-                    .into()
-            });
-            let paths = paths.map(|x| MessageItem::Str(x)).collect();
+            let uuids =
+                devuuids.iter().map(|x| MessageItem::Str(format!("{}", x.simple()))).collect();
             let return_path = MessageItem::ObjectPath(pool_object_path);
-            let return_list = MessageItem::Array(paths, "s".into());
+            let return_list = MessageItem::Array(uuids, "s".into());
             let return_value = MessageItem::Struct(vec![return_path, return_list]);
             let (rc, rs) = ok_message_items();
             return_message.append3(return_value, rc, rs)

@@ -87,13 +87,9 @@ pub fn test_create_and_delete(device_paths: &Vec<&Path>) -> TestResult<()> {
 
     let mut engine = StratEngine::new();
 
-    let (uuid, blockdevs) = engine.create_pool("test_pool", &device_paths, None, true).unwrap();
-
-    validate_disks_init(&blockdevs).unwrap();
+    let (uuid, _) = engine.create_pool("test_pool", &device_paths, None, true).unwrap();
 
     engine.destroy_pool(&uuid).unwrap();
-
-    validate_disks_released(&blockdevs).unwrap();
 
     Ok(())
 }

@@ -159,15 +159,11 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
     let msg = match pool.add_blockdevs(&blockdevs, force) {
-        Ok(devnodes) => {
-            let paths = devnodes.iter().map(|d| {
-                d.to_str()
-                    .expect("'d' originated in the 'devs' D-Bus argument.")
-                    .into()
-            });
-            let paths = paths.map(|x| MessageItem::Str(x)).collect();
+        Ok(devuuids) => {
+            let uuids =
+                devuuids.iter().map(|x| MessageItem::Str(format!("{}", x.simple()))).collect();
             let (rc, rs) = ok_message_items();
-            return_message.append3(MessageItem::Array(paths, return_sig.into()), rc, rs)
+            return_message.append3(MessageItem::Array(uuids, return_sig.into()), rc, rs)
         }
         Err(x) => {
             let (rc, rs) = engine_to_dbus_err(&x);

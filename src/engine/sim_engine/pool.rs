@@ -110,7 +110,7 @@ impl Pool for SimPool {
         rename_filesystem!{self; uuid; new_name}
     }
 
-    fn rename(&mut self, name: &str) {
+    fn set_name(&mut self, name: &str) {
         self.name = name.to_owned();
     }
 

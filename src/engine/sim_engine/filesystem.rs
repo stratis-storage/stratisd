@@ -24,7 +24,7 @@ impl SimFilesystem {
 }
 
 impl Filesystem for SimFilesystem {
-    fn rename(&mut self, name: &str) {
+    fn set_name(&mut self, name: &str) {
         self.name = name.to_owned();
     }
 

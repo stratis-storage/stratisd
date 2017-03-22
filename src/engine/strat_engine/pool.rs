@@ -108,7 +108,7 @@ impl StratPool {
         let mut bds: Vec<&BlockDev> = self.block_devs
             .iter()
             .map(|(_, bd)| bd)
-            .filter(|bd| bd.bda.last_update_time().is_some())
+            .filter(|bd| bd.last_update_time().is_some())
             .collect();
 
         if bds.is_empty() {
@@ -116,23 +116,19 @@ impl StratPool {
         }
 
         bds.sort_by_key(|k| {
-            k.bda
-                .last_update_time()
-                .expect("BDAs without some last update time filtered above.")
+            k.last_update_time().expect("devs without some last update time filtered above.")
         });
 
         let last_update_time = bds.last()
             .expect("There is a last bd, since bds.is_empty() was false.")
-            .bda
             .last_update_time()
-            .expect("BDAs without some last update time filtered above.");
+            .expect("devs without some last update time filtered above.");
 
         for bd in bds.iter()
             .rev()
             .take_while(|bd| {
-                bd.bda
-                    .last_update_time()
-                    .expect("BDAs without some last update time filtered above.") ==
+                bd.last_update_time()
+                    .expect("devs without some last update time filtered above.") ==
                 last_update_time
             }) {
             match bd.load_state() {

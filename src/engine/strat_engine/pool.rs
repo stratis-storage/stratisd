@@ -10,7 +10,6 @@ use std::iter::FromIterator;
 use std::path::Path;
 use std::path::PathBuf;
 use std::vec::Vec;
-use std::fs::OpenOptions;
 
 use time;
 use uuid::Uuid;
@@ -136,13 +135,7 @@ impl StratPool {
                     .expect("BDAs without some last update time filtered above.") ==
                 last_update_time
             }) {
-            let mut f = match OpenOptions::new()
-                .read(true)
-                .open(&bd.devnode) {
-                Ok(f) => f,
-                Err(_) => continue,
-            };
-            match bd.bda.load_state(&mut f) {
+            match bd.load_state() {
                 Ok(Some(data)) => return Some(data),
                 _ => continue,
             }

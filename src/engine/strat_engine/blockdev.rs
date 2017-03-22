@@ -212,7 +212,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
 
 #[derive(Debug)]
 pub struct BlockDev {
-    pub dev: Device,
+    dev: Device,
     pub devnode: PathBuf,
     pub bda: BDA,
 }
@@ -240,6 +240,11 @@ impl BlockDev {
         try!(self.bda.save_state(time, metadata, &mut f));
 
         Ok(())
+    }
+
+    pub fn load_state(&self) -> EngineResult<Option<Vec<u8>>> {
+        let mut f = try!(OpenOptions::new().read(true).open(&self.devnode));
+        self.bda.load_state(&mut f)
     }
 
     /// List the available-for-upper-layer-use range in this blockdev.

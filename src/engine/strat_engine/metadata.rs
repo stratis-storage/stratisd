@@ -16,7 +16,7 @@ use uuid::Uuid;
 use types::{Bytes, Sectors};
 use super::engine::DevOwnership;
 use consts::{SECTOR_SIZE, IEC};
-use engine::{EngineResult, EngineError, ErrorEnum};
+use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
 
 const _BDA_STATIC_HDR_SECTORS: usize = 16;
 pub const BDA_STATIC_HDR_SECTORS: Sectors = Sectors(_BDA_STATIC_HDR_SECTORS as u64);
@@ -126,16 +126,16 @@ impl BDA {
 #[derive(Debug)]
 pub struct StaticHeader {
     pub blkdev_size: Sectors,
-    pub pool_uuid: Uuid,
-    pub dev_uuid: Uuid,
+    pub pool_uuid: PoolUuid,
+    pub dev_uuid: DevUuid,
     pub mda_size: Sectors,
     pub reserved_size: Sectors,
     pub flags: u64,
 }
 
 impl StaticHeader {
-    pub fn new(pool_uuid: &Uuid,
-               dev_uuid: &Uuid,
+    pub fn new(pool_uuid: &PoolUuid,
+               dev_uuid: &DevUuid,
                mda_size: Sectors,
                blkdev_size: Sectors)
                -> StaticHeader {

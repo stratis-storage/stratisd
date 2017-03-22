@@ -2,21 +2,20 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use uuid::Uuid;
 
 use engine::EngineResult;
 use engine::Filesystem;
 
-use super::super::engine::{HasName, HasUuid};
+use super::super::engine::{HasName, HasUuid, FilesystemUuid};
 
 #[derive(Debug)]
 pub struct SimFilesystem {
-    fs_id: Uuid,
+    fs_id: FilesystemUuid,
     name: String,
 }
 
 impl SimFilesystem {
-    pub fn new(fs_id: Uuid, name: &str) -> SimFilesystem {
+    pub fn new(fs_id: FilesystemUuid, name: &str) -> SimFilesystem {
         SimFilesystem {
             fs_id: fs_id,
             name: name.to_owned(),
@@ -41,7 +40,7 @@ impl HasName for SimFilesystem {
 }
 
 impl HasUuid for SimFilesystem {
-    fn uuid(&self) -> &Uuid {
+    fn uuid(&self) -> &FilesystemUuid {
         &self.fs_id
     }
 }

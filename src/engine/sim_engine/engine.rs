@@ -21,19 +21,19 @@ use super::pool::SimPool;
 use super::randomization::Randomizer;
 
 use super::super::engine::{DevUuid, HasName, HasUuid, PoolUuid};
-use super::super::structures::Table;
+use super::super::structures::Table2;
 
 
 #[derive(Debug)]
 pub struct SimEngine {
-    pools: Table<SimPool>,
+    pools: Table2<SimPool>,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
 impl SimEngine {
     pub fn new() -> SimEngine {
         SimEngine {
-            pools: Table::new(),
+            pools: Table2::new(),
             rdm: Rc::new(RefCell::new(Randomizer::new())),
         }
     }

@@ -3,9 +3,12 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 pub use self::engine::Dev;
+pub use self::engine::DevUuid;
 pub use self::engine::Engine;
 pub use self::engine::Filesystem;
+pub use self::engine::FilesystemUuid;
 pub use self::engine::Pool;
+pub use self::engine::PoolUuid;
 pub use self::engine::Redundancy;
 pub use self::engine::RenameAction;
 

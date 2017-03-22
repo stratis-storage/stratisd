@@ -23,7 +23,7 @@ pub enum State {
 pub struct SimDev {
     pub devnode: PathBuf,
     rdm: Rc<RefCell<Randomizer>>,
-    pub state: State,
+    state: State,
 }
 
 impl Dev for SimDev {}

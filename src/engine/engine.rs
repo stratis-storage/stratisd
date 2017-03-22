@@ -46,7 +46,7 @@ pub trait HasName: Debug {
     fn name(&self) -> &str;
 }
 
-pub trait Dev: Debug {}
+pub trait Dev: HasUuid {}
 
 pub trait Filesystem: HasName + HasUuid {
     /// Unconditionally sets the name of this filesystem to name.

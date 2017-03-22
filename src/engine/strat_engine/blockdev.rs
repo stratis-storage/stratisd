@@ -19,11 +19,12 @@ use devicemapper::Device;
 use uuid::Uuid;
 
 use types::{Bytes, Sectors};
-use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
+use engine::{Dev, DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
 
 use consts::*;
 use super::metadata::{StaticHeader, BDA, validate_mda_size};
 use super::engine::DevOwnership;
+use super::super::engine::HasUuid;
 pub use super::BlockDevSave;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
@@ -265,11 +266,6 @@ impl BlockDev {
         thread::sleep(Duration::from_millis(500))
     }
 
-    /// The device's UUID.
-    pub fn uuid(&self) -> &DevUuid {
-        self.bda.dev_uuid()
-    }
-
     /// The device's pool's UUID.
     pub fn pool_uuid(&self) -> &PoolUuid {
         self.bda.pool_uuid()
@@ -283,5 +279,13 @@ impl BlockDev {
     /// Last time metadata was written to this device.
     pub fn last_update_time(&self) -> &Option<Timespec> {
         self.bda.last_update_time()
+    }
+}
+
+impl Dev for BlockDev {}
+
+impl HasUuid for BlockDev {
+    fn uuid(&self) -> &DevUuid {
+        self.bda.dev_uuid()
     }
 }

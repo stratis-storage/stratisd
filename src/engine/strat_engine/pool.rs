@@ -27,7 +27,7 @@ use engine::strat_engine::lineardev::LinearDev;
 use engine::strat_engine::thinpooldev::ThinPoolDev;
 
 use super::super::engine::{DevUuid, FilesystemUuid, HasName, HasUuid};
-use super::super::structures::Table;
+use super::super::structures::Table2;
 
 use super::serde_structs::StratSave;
 use super::blockdev::{BlockDev, initialize, resolve_devices};
@@ -42,7 +42,7 @@ pub struct StratPool {
     name: String,
     pool_uuid: Uuid,
     pub block_devs: HashMap<PathBuf, BlockDev>,
-    pub filesystems: Table<StratFilesystem>,
+    pub filesystems: Table2<StratFilesystem>,
     redundancy: Redundancy,
     thin_pool: ThinPoolDev,
 }
@@ -89,7 +89,7 @@ impl StratPool {
             name: name.to_owned(),
             pool_uuid: pool_uuid,
             block_devs: blockdevs,
-            filesystems: Table::new(),
+            filesystems: Table2::new(),
             redundancy: redundancy,
             thin_pool: thinpool_dev,
         };

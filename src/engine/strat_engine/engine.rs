@@ -18,7 +18,7 @@ use engine::RenameAction;
 use super::pool::StratPool;
 
 use super::super::engine::{DevUuid, HasName, HasUuid, PoolUuid};
-use super::super::structures::Table;
+use super::super::structures::Table2;
 
 #[derive(Debug)]
 pub enum DevOwnership {
@@ -29,12 +29,12 @@ pub enum DevOwnership {
 
 #[derive(Debug)]
 pub struct StratEngine {
-    pools: Table<StratPool>,
+    pools: Table2<StratPool>,
 }
 
 impl StratEngine {
     pub fn new() -> StratEngine {
-        StratEngine { pools: Table::new() }
+        StratEngine { pools: Table2::new() }
     }
 }
 

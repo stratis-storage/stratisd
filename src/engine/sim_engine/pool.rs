@@ -25,7 +25,7 @@ use engine::engine::Redundancy;
 
 use super::blockdev::SimDev;
 use super::super::engine::{DevUuid, FilesystemUuid, HasName, HasUuid, PoolUuid};
-use super::super::structures::Table;
+use super::super::structures::Table2;
 use super::filesystem::SimFilesystem;
 use super::randomization::Randomizer;
 
@@ -34,7 +34,7 @@ pub struct SimPool {
     name: String,
     pool_uuid: PoolUuid,
     pub block_devs: HashMap<PathBuf, SimDev>,
-    pub filesystems: Table<SimFilesystem>,
+    pub filesystems: Table2<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
 }
@@ -53,7 +53,7 @@ impl SimPool {
             name: name.to_owned(),
             pool_uuid: Uuid::new_v4(),
             block_devs: HashMap::from_iter(device_pairs),
-            filesystems: Table::new(),
+            filesystems: Table2::new(),
             redundancy: redundancy,
             rdm: rdm.clone(),
         };

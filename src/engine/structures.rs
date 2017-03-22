@@ -12,7 +12,7 @@ use super::engine::{HasName, HasUuid};
 
 /// Map UUID and name to T items.
 #[derive(Debug)]
-pub struct Table<T: HasName + HasUuid> {
+pub struct Table2<T: HasName + HasUuid> {
     items: Vec<T>,
     name_map: HashMap<String, usize>,
     uuid_map: HashMap<Uuid, usize>,
@@ -23,9 +23,9 @@ pub struct Table<T: HasName + HasUuid> {
 /// in any way. They are both treated as constants once the item has been
 /// inserted. In order to rename a T item, it must be removed, renamed, and
 /// reinserted under the new name.
-impl<T: HasName + HasUuid> Table<T> {
+impl<T: HasName + HasUuid> Table2<T> {
     pub fn new() -> Self {
-        Table {
+        Table2 {
             items: Vec::new(),
             name_map: HashMap::new(),
             uuid_map: HashMap::new(),
@@ -168,7 +168,7 @@ mod tests {
 
     use super::super::engine::{HasName, HasUuid};
 
-    use super::Table;
+    use super::Table2;
 
     #[derive(Debug)]
     struct TestThing {
@@ -179,7 +179,7 @@ mod tests {
 
     // A global invariant checker for the table.
     // Verifies proper relationship between internal data structures.
-    fn table_invariant<T>(table: &Table<T>) -> ()
+    fn table_invariant<T>(table: &Table2<T>) -> ()
         where T: HasName + HasUuid
     {
         let ref items = table.items;
@@ -232,7 +232,7 @@ mod tests {
     /// Verify that the table is now empty and that removing by name yields
     /// no result.
     fn remove_existing_item() {
-        let mut t: Table<TestThing> = Table::new();
+        let mut t: Table2<TestThing> = Table2::new();
         table_invariant(&t);
 
         let uuid = Uuid::new_v4();
@@ -262,7 +262,7 @@ mod tests {
     /// This is good, because then you can't have a thing that is both in
     /// the table and not in the table.
     fn insert_same_keys() {
-        let mut t: Table<TestThing> = Table::new();
+        let mut t: Table2<TestThing> = Table2::new();
         table_invariant(&t);
 
         let uuid = Uuid::new_v4();
@@ -303,7 +303,7 @@ mod tests {
     /// Insert a thing and then insert another thing with the same name.
     /// The previously inserted thing should be returned.
     fn insert_same_name() {
-        let mut t: Table<TestThing> = Table::new();
+        let mut t: Table2<TestThing> = Table2::new();
         table_invariant(&t);
 
         let uuid = Uuid::new_v4();

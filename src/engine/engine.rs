@@ -46,9 +46,7 @@ pub trait HasName: Debug {
     fn name(&self) -> &str;
 }
 
-pub trait Dev: Debug {
-    fn get_id(&self) -> String;
-}
+pub trait Dev: Debug {}
 
 pub trait Filesystem: HasName + HasUuid {
     /// Rename this filesystem.

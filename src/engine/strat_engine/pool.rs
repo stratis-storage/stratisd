@@ -10,7 +10,6 @@ use std::iter::FromIterator;
 use std::path::Path;
 use std::path::PathBuf;
 use std::vec::Vec;
-use std::fs::OpenOptions;
 
 use time;
 use uuid::Uuid;
@@ -26,7 +25,7 @@ use engine::engine::Redundancy;
 use engine::strat_engine::lineardev::LinearDev;
 use engine::strat_engine::thinpooldev::ThinPoolDev;
 
-use super::super::engine::{HasName, HasUuid};
+use super::super::engine::{FilesystemUuid, HasName, HasUuid};
 use super::super::structures::Table;
 
 use super::serde_structs::StratSave;
@@ -104,49 +103,29 @@ impl StratPool {
 
     /// Return the metadata from the first blockdev with up-to-date, readable
     /// metadata.
-    pub fn read_metadata(&self) -> Option<Vec<u8>> {
-
-        let mut bds: Vec<&BlockDev> = self.block_devs
-            .iter()
-            .map(|(_, bd)| bd)
-            .filter(|bd| bd.bda.last_update_time().is_some())
-            .collect();
-
-        if bds.is_empty() {
+    /// Precondition: All Blockdevs in blockdevs must belong to the same pool.
+    pub fn read_metadata(blockdevs: &[&BlockDev]) -> Option<Vec<u8>> {
+        if blockdevs.is_empty() {
             return None;
         }
 
-        bds.sort_by_key(|k| {
-            k.bda
-                .last_update_time()
-                .expect("BDAs without some last update time filtered above.")
-        });
+        let most_recent_blockdev = blockdevs.iter()
+            .max_by_key(|bd| bd.last_update_time())
+            .expect("must be a maximum since bds is non-empty");
 
-        let last_update_time = bds.last()
-            .expect("There is a last bd, since bds.is_empty() was false.")
-            .bda
-            .last_update_time()
-            .expect("BDAs without some last update time filtered above.");
+        let most_recent_time = most_recent_blockdev.last_update_time();
 
-        for bd in bds.iter()
-            .rev()
-            .take_while(|bd| {
-                bd.bda
-                    .last_update_time()
-                    .expect("BDAs without some last update time filtered above.") ==
-                last_update_time
-            }) {
-            let mut f = match OpenOptions::new()
-                .read(true)
-                .open(&bd.devnode) {
-                Ok(f) => f,
-                Err(_) => continue,
-            };
-            match bd.bda.load_state(&mut f) {
+        if most_recent_time.is_none() {
+            return None;
+        }
+
+        for bd in blockdevs.iter().filter(|b| b.last_update_time() == most_recent_time) {
+            match bd.load_state() {
                 Ok(Some(data)) => return Some(data),
                 _ => continue,
             }
         }
+
         None
     }
 
@@ -175,7 +154,7 @@ impl StratPool {
             id: self.pool_uuid.simple().to_string(),
             block_devs: self.block_devs
                 .iter()
-                .map(|(_, bd)| (bd.bda.header.dev_uuid.simple().to_string(), bd.to_save()))
+                .map(|(_, bd)| (bd.uuid().simple().to_string(), bd.to_save()))
                 .collect(),
         }
     }
@@ -184,7 +163,7 @@ impl StratPool {
 impl Pool for StratPool {
     fn create_filesystems<'a, 'b>(&'a mut self,
                                   specs: &[&'b str])
-                                  -> EngineResult<Vec<(&'b str, Uuid)>> {
+                                  -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
         let names = BTreeSet::from_iter(specs);
         for name in names.iter() {
             if self.filesystems.contains_name(name) {
@@ -227,12 +206,15 @@ impl Pool for StratPool {
     }
 
     fn destroy_filesystems<'a, 'b>(&'a mut self,
-                                   fs_uuids: &[&'b Uuid])
-                                   -> EngineResult<Vec<&'b Uuid>> {
+                                   fs_uuids: &[&'b FilesystemUuid])
+                                   -> EngineResult<Vec<&'b FilesystemUuid>> {
         destroy_filesystems!{self; fs_uuids}
     }
 
-    fn rename_filesystem(&mut self, uuid: &Uuid, new_name: &str) -> EngineResult<RenameAction> {
+    fn rename_filesystem(&mut self,
+                         uuid: &FilesystemUuid,
+                         new_name: &str)
+                         -> EngineResult<RenameAction> {
         rename_filesystem!{self; uuid; new_name}
     }
 
@@ -240,13 +222,13 @@ impl Pool for StratPool {
         self.name = name.to_owned();
     }
 
-    fn get_filesystem(&mut self, uuid: &Uuid) -> Option<&mut Filesystem> {
+    fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
         get_filesystem!(self; uuid)
     }
 }
 
 impl HasUuid for StratPool {
-    fn uuid(&self) -> &Uuid {
+    fn uuid(&self) -> &FilesystemUuid {
         &self.pool_uuid
     }
 }

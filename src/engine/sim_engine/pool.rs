@@ -23,7 +23,7 @@ use engine::RenameAction;
 use engine::engine::Redundancy;
 
 use super::blockdev::SimDev;
-use super::super::engine::{HasName, HasUuid};
+use super::super::engine::{FilesystemUuid, HasName, HasUuid, PoolUuid};
 use super::super::structures::Table;
 use super::filesystem::SimFilesystem;
 use super::randomization::Randomizer;
@@ -31,7 +31,7 @@ use super::randomization::Randomizer;
 #[derive(Debug)]
 pub struct SimPool {
     name: String,
-    pool_uuid: Uuid,
+    pool_uuid: PoolUuid,
     pub block_devs: BTreeMap<PathBuf, SimDev>,
     pub filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
@@ -72,8 +72,8 @@ impl Pool for SimPool {
     }
 
     fn destroy_filesystems<'a, 'b>(&'a mut self,
-                                   fs_uuids: &[&'b Uuid])
-                                   -> EngineResult<Vec<&'b Uuid>> {
+                                   fs_uuids: &[&'b FilesystemUuid])
+                                   -> EngineResult<Vec<&'b FilesystemUuid>> {
         destroy_filesystems!{self; fs_uuids}
     }
 
@@ -84,7 +84,7 @@ impl Pool for SimPool {
 
     fn create_filesystems<'a, 'b>(&'a mut self,
                                   specs: &[&'b str])
-                                  -> EngineResult<Vec<(&'b str, Uuid)>> {
+                                  -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
         let names = BTreeSet::from_iter(specs);
         for name in names.iter() {
             if self.filesystems.contains_name(name) {
@@ -103,7 +103,10 @@ impl Pool for SimPool {
         Ok(result)
     }
 
-    fn rename_filesystem(&mut self, uuid: &Uuid, new_name: &str) -> EngineResult<RenameAction> {
+    fn rename_filesystem(&mut self,
+                         uuid: &FilesystemUuid,
+                         new_name: &str)
+                         -> EngineResult<RenameAction> {
         rename_filesystem!{self; uuid; new_name}
     }
 
@@ -111,13 +114,13 @@ impl Pool for SimPool {
         self.name = name.to_owned();
     }
 
-    fn get_filesystem(&mut self, uuid: &Uuid) -> Option<&mut Filesystem> {
+    fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
         get_filesystem!(self; uuid)
     }
 }
 
 impl HasUuid for SimPool {
-    fn uuid(&self) -> &Uuid {
+    fn uuid(&self) -> &PoolUuid {
         &self.pool_uuid
     }
 }

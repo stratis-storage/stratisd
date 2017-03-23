@@ -19,15 +19,12 @@ use devicemapper::Device;
 use uuid::Uuid;
 
 use types::{Bytes, Sectors};
-use engine::{EngineResult, EngineError, ErrorEnum};
+use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
 
 use consts::*;
-use super::metadata::{StaticHeader, BDA, validate_mda_size, BDA_STATIC_HDR_SECTORS};
+use super::metadata::{StaticHeader, BDA, validate_mda_size};
 use super::engine::DevOwnership;
 pub use super::BlockDevSave;
-
-type DevUuid = Uuid;
-type PoolUuid = Uuid;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
 
@@ -86,9 +83,9 @@ pub fn find_all() -> EngineResult<BTreeMap<PoolUuid, BTreeMap<DevUuid, BlockDev>
 
         match setup(&devnode) {
             Ok(Some(blockdev)) => {
-                pool_map.entry(blockdev.bda.header.pool_uuid)
+                pool_map.entry(blockdev.pool_uuid().clone())
                     .or_insert_with(BTreeMap::new)
-                    .insert(blockdev.bda.header.dev_uuid, blockdev);
+                    .insert(blockdev.uuid().clone(), blockdev);
             }
             _ => continue,
         };
@@ -215,16 +212,16 @@ pub fn initialize(pool_uuid: &PoolUuid,
 
 #[derive(Debug)]
 pub struct BlockDev {
-    pub dev: Device,
+    dev: Device,
     pub devnode: PathBuf,
-    pub bda: BDA,
+    bda: BDA,
 }
 
 impl BlockDev {
     pub fn to_save(&self) -> BlockDevSave {
         BlockDevSave {
             devnode: self.devnode.clone(),
-            total_size: self.bda.header.blkdev_size,
+            total_size: self.size(),
         }
     }
 
@@ -245,21 +242,45 @@ impl BlockDev {
         Ok(())
     }
 
+    pub fn load_state(&self) -> EngineResult<Option<Vec<u8>>> {
+        let mut f = try!(OpenOptions::new().read(true).open(&self.devnode));
+        self.bda.load_state(&mut f)
+    }
+
     /// List the available-for-upper-layer-use range in this blockdev.
     pub fn avail_range(&self) -> (Sectors, Sectors) {
-        let start = BDA_STATIC_HDR_SECTORS + self.bda.header.mda_size +
-                    self.bda.header.reserved_size;
+        let start = self.bda.size();
+        let size = self.size();
         // Blockdev size is at least MIN_DEV_SIZE, so this can fail only if
         // size of metadata area exceeds 1 GiB. Initial metadata area size
         // is 4 MiB.
-        assert!(start <= self.bda.header.blkdev_size);
-        let length = self.bda.header.blkdev_size - start;
-        (start, length)
+        assert!(start <= size);
+        (start, size - start)
     }
 
     /// The /dev/mapper/<name> device is not immediately available for use.
     /// TODO: Implement wait for event or poll.
     pub fn wait_for_dm() {
         thread::sleep(Duration::from_millis(500))
+    }
+
+    /// The device's UUID.
+    pub fn uuid(&self) -> &DevUuid {
+        self.bda.dev_uuid()
+    }
+
+    /// The device's pool's UUID.
+    pub fn pool_uuid(&self) -> &PoolUuid {
+        self.bda.pool_uuid()
+    }
+
+    /// The device's size.
+    pub fn size(&self) -> Sectors {
+        self.bda.dev_size()
+    }
+
+    /// Last time metadata was written to this device.
+    pub fn last_update_time(&self) -> &Option<Timespec> {
+        self.bda.last_update_time()
     }
 }

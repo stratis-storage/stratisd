@@ -3,8 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 extern crate rand;
 
-use uuid::Uuid;
-
 use devicemapper::DM;
 
 use consts::IEC;
@@ -13,19 +11,19 @@ use engine::EngineResult;
 use engine::Filesystem;
 use engine::strat_engine::thindev::ThinDev;
 use engine::strat_engine::thinpooldev::ThinPoolDev;
-use super::super::engine::{HasName, HasUuid};
+use super::super::engine::{FilesystemUuid, HasName, HasUuid};
 use types::Bytes;
 
 
 #[derive(Debug)]
 pub struct StratFilesystem {
-    fs_id: Uuid,
+    fs_id: FilesystemUuid,
     name: String,
     thin_dev: ThinDev,
 }
 
 impl StratFilesystem {
-    pub fn new(fs_id: Uuid,
+    pub fn new(fs_id: FilesystemUuid,
                name: &str,
                dm: &DM,
                thin_pool: &mut ThinPoolDev)
@@ -59,13 +57,13 @@ impl HasName for StratFilesystem {
 }
 
 impl HasUuid for StratFilesystem {
-    fn uuid(&self) -> &Uuid {
+    fn uuid(&self) -> &FilesystemUuid {
         &self.fs_id
     }
 }
 
 impl Filesystem for StratFilesystem {
-    fn rename(&mut self, name: &str) {
+    fn set_name(&mut self, name: &str) {
         self.name = name.to_owned();
     }
 

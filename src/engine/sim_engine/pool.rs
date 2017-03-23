@@ -13,6 +13,7 @@ use std::vec::Vec;
 
 use uuid::Uuid;
 
+use engine::Dev;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
@@ -23,17 +24,17 @@ use engine::RenameAction;
 use engine::engine::Redundancy;
 
 use super::blockdev::SimDev;
-use super::super::engine::{HasName, HasUuid};
-use super::super::structures::Table;
+use super::super::engine::{DevUuid, FilesystemUuid, HasName, HasUuid, PoolUuid};
+use super::super::structures::Table2;
 use super::filesystem::SimFilesystem;
 use super::randomization::Randomizer;
 
 #[derive(Debug)]
 pub struct SimPool {
     name: String,
-    pool_uuid: Uuid,
+    pool_uuid: PoolUuid,
     pub block_devs: BTreeMap<PathBuf, SimDev>,
-    pub filesystems: Table<SimFilesystem>,
+    pub filesystems: Table2<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
 }
@@ -52,7 +53,7 @@ impl SimPool {
             name: name.to_owned(),
             pool_uuid: Uuid::new_v4(),
             block_devs: BTreeMap::from_iter(device_pairs),
-            filesystems: Table::new(),
+            filesystems: Table2::new(),
             redundancy: redundancy,
             rdm: rdm.clone(),
         };
@@ -62,18 +63,20 @@ impl SimPool {
 }
 
 impl Pool for SimPool {
-    fn add_blockdevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
+    fn add_blockdevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<DevUuid>> {
         let rdm = self.rdm.clone();
         let devices = BTreeSet::from_iter(paths);
         let device_pairs = devices.iter()
-            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
+            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)))
+            .collect::<Vec<(PathBuf, SimDev)>>();
+        let uuids = device_pairs.iter().map(|p| (p.1.uuid().clone())).collect();
         self.block_devs.extend(device_pairs);
-        Ok(devices.iter().map(|d| d.to_path_buf()).collect())
+        Ok(uuids)
     }
 
     fn destroy_filesystems<'a, 'b>(&'a mut self,
-                                   fs_uuids: &[&'b Uuid])
-                                   -> EngineResult<Vec<&'b Uuid>> {
+                                   fs_uuids: &[&'b FilesystemUuid])
+                                   -> EngineResult<Vec<&'b FilesystemUuid>> {
         destroy_filesystems!{self; fs_uuids}
     }
 
@@ -84,7 +87,7 @@ impl Pool for SimPool {
 
     fn create_filesystems<'a, 'b>(&'a mut self,
                                   specs: &[&'b str])
-                                  -> EngineResult<Vec<(&'b str, Uuid)>> {
+                                  -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
         let names = BTreeSet::from_iter(specs);
         for name in names.iter() {
             if self.filesystems.contains_name(name) {
@@ -103,21 +106,28 @@ impl Pool for SimPool {
         Ok(result)
     }
 
-    fn rename_filesystem(&mut self, uuid: &Uuid, new_name: &str) -> EngineResult<RenameAction> {
+    fn rename_filesystem(&mut self,
+                         uuid: &FilesystemUuid,
+                         new_name: &str)
+                         -> EngineResult<RenameAction> {
         rename_filesystem!{self; uuid; new_name}
     }
 
-    fn rename(&mut self, name: &str) {
+    fn set_name(&mut self, name: &str) {
         self.name = name.to_owned();
     }
 
-    fn get_filesystem(&mut self, uuid: &Uuid) -> Option<&mut Filesystem> {
+    fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
         get_filesystem!(self; uuid)
+    }
+
+    fn get_blockdev(&mut self, _uuid: &DevUuid) -> Option<&mut Dev> {
+        unimplemented!()
     }
 }
 
 impl HasUuid for SimPool {
-    fn uuid(&self) -> &Uuid {
+    fn uuid(&self) -> &PoolUuid {
         &self.pool_uuid
     }
 }
@@ -292,9 +302,6 @@ mod tests {
         let (uuid, _) = engine.create_pool("pool_name", &[], None, false).unwrap();
         let pool = engine.get_pool(&uuid).unwrap();
         let devices = [Path::new("/s/a"), Path::new("/s/b")];
-        assert!(match pool.add_blockdevs(&devices, false) {
-            Ok(devs) => devs == devices,
-            _ => false,
-        });
+        assert!(pool.add_blockdevs(&devices, false).is_ok());
     }
 }

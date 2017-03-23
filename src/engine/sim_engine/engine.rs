@@ -15,28 +15,25 @@ use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::iter::FromIterator;
 use std::path::Path;
-use std::path::PathBuf;
 use std::rc::Rc;
-
-use uuid::Uuid;
 
 use super::pool::SimPool;
 use super::randomization::Randomizer;
 
-use super::super::engine::{HasName, HasUuid};
-use super::super::structures::Table;
+use super::super::engine::{DevUuid, HasName, HasUuid, PoolUuid};
+use super::super::structures::Table2;
 
 
 #[derive(Debug)]
 pub struct SimEngine {
-    pools: Table<SimPool>,
+    pools: Table2<SimPool>,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
 impl SimEngine {
     pub fn new() -> SimEngine {
         SimEngine {
-            pools: Table::new(),
+            pools: Table2::new(),
             rdm: Rc::new(RefCell::new(Randomizer::new())),
         }
     }
@@ -48,7 +45,7 @@ impl Engine for SimEngine {
                    blockdev_paths: &[&Path],
                    redundancy: Option<u16>,
                    _force: bool)
-                   -> EngineResult<(Uuid, Vec<PathBuf>)> {
+                   -> EngineResult<(PoolUuid, Vec<DevUuid>)> {
 
         let redundancy = calculate_redundancy!(redundancy);
 
@@ -65,22 +62,22 @@ impl Engine for SimEngine {
             return Err(EngineError::Engine(ErrorEnum::Error, "X".into()));
         }
 
-        let bdev_paths = pool.block_devs.values().map(|p| p.devnode.clone()).collect();
+        let bdev_uuids = pool.block_devs.values().map(|p| p.uuid().clone()).collect();
         let uuid = pool.uuid().clone();
         self.pools.insert(pool);
 
-        Ok((uuid, bdev_paths))
+        Ok((uuid, bdev_uuids))
     }
 
-    fn destroy_pool(&mut self, uuid: &Uuid) -> EngineResult<bool> {
+    fn destroy_pool(&mut self, uuid: &PoolUuid) -> EngineResult<bool> {
         destroy_pool!{self; uuid}
     }
 
-    fn rename_pool(&mut self, uuid: &Uuid, new_name: &str) -> EngineResult<RenameAction> {
+    fn rename_pool(&mut self, uuid: &PoolUuid, new_name: &str) -> EngineResult<RenameAction> {
         rename_pool!{self; uuid; new_name}
     }
 
-    fn get_pool(&mut self, uuid: &Uuid) -> Option<&mut Pool> {
+    fn get_pool(&mut self, uuid: &PoolUuid) -> Option<&mut Pool> {
         get_pool!(self; uuid)
     }
 

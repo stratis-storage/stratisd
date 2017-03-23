@@ -3,11 +3,15 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::fmt::Debug;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use uuid::Uuid;
 
 use super::errors::EngineResult;
+
+pub type DevUuid = Uuid;
+pub type FilesystemUuid = Uuid;
+pub type PoolUuid = Uuid;
 
 #[derive(Debug)]
 pub enum RenameAction {
@@ -42,13 +46,11 @@ pub trait HasName: Debug {
     fn name(&self) -> &str;
 }
 
-pub trait Dev: Debug {
-    fn get_id(&self) -> String;
-}
+pub trait Dev: HasUuid {}
 
 pub trait Filesystem: HasName + HasUuid {
-    /// Rename this filesystem.
-    fn rename(&mut self, name: &str) -> ();
+    /// Unconditionally sets the name of this filesystem to name.
+    fn set_name(&mut self, name: &str) -> ();
     /// Destroy this filesystem
     fn destroy(self) -> EngineResult<()>;
 }
@@ -60,13 +62,13 @@ pub trait Pool: HasName + HasUuid {
     /// for filesystems in this pool.
     fn create_filesystems<'a, 'b>(&'a mut self,
                                   specs: &[&'b str])
-                                  -> EngineResult<Vec<(&'b str, Uuid)>>;
+                                  -> EngineResult<Vec<(&'b str, FilesystemUuid)>>;
 
     /// Adds blockdevs specified by paths to pool.
     /// Returns a list of device nodes corresponding to devices actually added.
     /// Returns an error if a blockdev can not be added because it is owned
     /// or there was an error while reading or writing a blockdev.
-    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
+    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>>;
 
     /// Destroy the pool.
     /// Will fail if filesystems allocated from the pool are in use,
@@ -77,21 +79,27 @@ pub trait Pool: HasName + HasUuid {
     /// Returns a list of the filesystems found, and actually destroyed.
     /// This list will be a subset of the uuids passed in fs_uuids.
     fn destroy_filesystems<'a, 'b>(&'a mut self,
-                                   fs_uuids: &[&'b Uuid])
-                                   -> EngineResult<Vec<&'b Uuid>>;
+                                   fs_uuids: &[&'b FilesystemUuid])
+                                   -> EngineResult<Vec<&'b FilesystemUuid>>;
 
     /// Rename filesystem
     /// Rename pool with uuid to new_name.
     /// Raises an error if the mapping can't be applied because
     /// new_name is already in use.
     /// The result indicate whether an action was performed, and if not, why.
-    fn rename_filesystem(&mut self, uuid: &Uuid, new_name: &str) -> EngineResult<RenameAction>;
+    fn rename_filesystem(&mut self,
+                         uuid: &FilesystemUuid,
+                         new_name: &str)
+                         -> EngineResult<RenameAction>;
 
-    /// Rename this pool.
-    fn rename(&mut self, name: &str) -> ();
+    /// Unconditionally sets the name of this pool to name.
+    fn set_name(&mut self, name: &str) -> ();
 
     /// Get the filesystem in this pool with this UUID.
-    fn get_filesystem(&mut self, uuid: &Uuid) -> Option<&mut Filesystem>;
+    fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem>;
+
+    /// Get the blockdev in this pool with this UUID.
+    fn get_blockdev(&mut self, uuid: &DevUuid) -> Option<&mut Dev>;
 }
 
 pub trait Engine: Debug {
@@ -105,21 +113,21 @@ pub trait Engine: Debug {
                    blockdev_paths: &[&Path],
                    redundancy: Option<u16>,
                    force: bool)
-                   -> EngineResult<(Uuid, Vec<PathBuf>)>;
+                   -> EngineResult<(PoolUuid, Vec<DevUuid>)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.
     /// Returns true if some action was necessary, otherwise false.
-    fn destroy_pool(&mut self, uuid: &Uuid) -> EngineResult<bool>;
+    fn destroy_pool(&mut self, uuid: &PoolUuid) -> EngineResult<bool>;
 
     /// Rename pool with uuid to new_name.
     /// Raises an error if the mapping can't be applied because
     /// new_name is already in use.
     /// Returns true if it was necessary to perform an action, false if not.
-    fn rename_pool(&mut self, uuid: &Uuid, new_name: &str) -> EngineResult<RenameAction>;
+    fn rename_pool(&mut self, uuid: &PoolUuid, new_name: &str) -> EngineResult<RenameAction>;
 
     /// Find the pool designated by uuid.
-    fn get_pool(&mut self, uuid: &Uuid) -> Option<&mut Pool>;
+    fn get_pool(&mut self, uuid: &PoolUuid) -> Option<&mut Pool>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.

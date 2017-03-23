@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
 use std::collections::vec_deque::{Drain, VecDeque};
 use std::convert::From;
 use std::rc::Rc;
@@ -79,13 +78,29 @@ pub enum DeferredAction {
     Remove(Path<'static>),
 }
 
+/// Context for an object path.
+/// Contains the object path of the parent as a Path and the UUID of the
+/// object itself.
+#[derive(Debug)]
+pub struct OPContext {
+    pub parent: Path<'static>,
+    pub uuid: Uuid,
+}
+
+impl OPContext {
+    pub fn new(parent: Path<'static>, uuid: Uuid) -> OPContext {
+        OPContext {
+            parent: parent,
+            uuid: uuid,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DbusContext {
     pub next_index: Rc<Cell<u64>>,
-    pub pools: Rc<RefCell<HashMap<Path<'static>, (Path<'static>, Uuid)>>>,
     pub engine: Rc<RefCell<Box<Engine>>>,
     pub actions: Rc<RefCell<ActionQueue>>,
-    pub filesystems: Rc<RefCell<HashMap<Path<'static>, (Path<'static>, Uuid)>>>,
 }
 
 impl DbusContext {
@@ -93,9 +108,7 @@ impl DbusContext {
         DbusContext {
             actions: Rc::new(RefCell::new(ActionQueue::new())),
             engine: Rc::new(RefCell::new(engine)),
-            filesystems: Rc::new(RefCell::new(HashMap::new())),
             next_index: Rc::new(Cell::new(0)),
-            pools: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
@@ -112,7 +125,7 @@ impl DbusContext {
 #[derive(Default, Debug)]
 pub struct TData;
 impl DataType for TData {
-    type ObjectPath = ();
+    type ObjectPath = Option<OPContext>;
     type Property = ();
     type Interface = ();
     type Method = ();

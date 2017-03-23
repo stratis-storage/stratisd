@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::collections::HashMap;
+use std::collections::hash_map::ValuesMut;
 use std::slice::IterMut;
 
 use uuid::Uuid;
@@ -10,9 +11,62 @@ use uuid::Uuid;
 use super::engine::{HasName, HasUuid};
 
 
+/// Map UUID to T items.
+#[allow(dead_code)]
+pub struct Table1<T: HasUuid> {
+    map: HashMap<Uuid, T>,
+}
+
+/// All operations are O(1).
+#[allow(dead_code)]
+impl<T: HasUuid> Table1<T> {
+    pub fn new() -> Self {
+        Table1 { map: HashMap::new() }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    /// Returns true if map has an item corresponding to this uuid, else false.
+    pub fn contains_uuid(&self, uuid: &Uuid) -> bool {
+        self.map.contains_key(uuid)
+    }
+
+    /// Get item by uuid.
+    pub fn get_by_uuid(&self, uuid: &Uuid) -> Option<&T> {
+        self.map.get(uuid)
+    }
+
+    /// Get mutable item by uuid.
+    pub fn get_mut_by_uuid(&mut self, uuid: &Uuid) -> Option<&mut T> {
+        self.map.get_mut(uuid)
+    }
+
+    /// Removes the item corresponding to the uuid if there is one.
+    pub fn remove_by_uuid(&mut self, uuid: &Uuid) -> Option<T> {
+        self.map.remove(uuid)
+    }
+
+    /// Inserts an item for given uuid.
+    pub fn insert(&mut self, item: T) -> Option<T> {
+        self.map.insert(item.uuid().clone(), item)
+    }
+
+    /// A mutable iterator.
+    pub fn iter_mut(&mut self) -> ValuesMut<Uuid, T> {
+        self.map.values_mut()
+    }
+}
+
+
 /// Map UUID and name to T items.
 #[derive(Debug)]
-pub struct Table<T: HasName + HasUuid> {
+pub struct Table2<T: HasName + HasUuid> {
     items: Vec<T>,
     name_map: HashMap<String, usize>,
     uuid_map: HashMap<Uuid, usize>,
@@ -23,9 +77,9 @@ pub struct Table<T: HasName + HasUuid> {
 /// in any way. They are both treated as constants once the item has been
 /// inserted. In order to rename a T item, it must be removed, renamed, and
 /// reinserted under the new name.
-impl<T: HasName + HasUuid> Table<T> {
+impl<T: HasName + HasUuid> Table2<T> {
     pub fn new() -> Self {
-        Table {
+        Table2 {
             items: Vec::new(),
             name_map: HashMap::new(),
             uuid_map: HashMap::new(),
@@ -168,7 +222,7 @@ mod tests {
 
     use super::super::engine::{HasName, HasUuid};
 
-    use super::Table;
+    use super::Table2;
 
     #[derive(Debug)]
     struct TestThing {
@@ -179,7 +233,7 @@ mod tests {
 
     // A global invariant checker for the table.
     // Verifies proper relationship between internal data structures.
-    fn table_invariant<T>(table: &Table<T>) -> ()
+    fn table_invariant<T>(table: &Table2<T>) -> ()
         where T: HasName + HasUuid
     {
         let ref items = table.items;
@@ -232,7 +286,7 @@ mod tests {
     /// Verify that the table is now empty and that removing by name yields
     /// no result.
     fn remove_existing_item() {
-        let mut t: Table<TestThing> = Table::new();
+        let mut t: Table2<TestThing> = Table2::new();
         table_invariant(&t);
 
         let uuid = Uuid::new_v4();
@@ -262,7 +316,7 @@ mod tests {
     /// This is good, because then you can't have a thing that is both in
     /// the table and not in the table.
     fn insert_same_keys() {
-        let mut t: Table<TestThing> = Table::new();
+        let mut t: Table2<TestThing> = Table2::new();
         table_invariant(&t);
 
         let uuid = Uuid::new_v4();
@@ -303,7 +357,7 @@ mod tests {
     /// Insert a thing and then insert another thing with the same name.
     /// The previously inserted thing should be returned.
     fn insert_same_name() {
-        let mut t: Table<TestThing> = Table::new();
+        let mut t: Table2<TestThing> = Table2::new();
         table_invariant(&t);
 
         let uuid = Uuid::new_v4();

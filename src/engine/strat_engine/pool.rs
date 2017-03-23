@@ -10,7 +10,6 @@ use std::iter::FromIterator;
 use std::path::Path;
 use std::path::PathBuf;
 use std::vec::Vec;
-use std::fs::OpenOptions;
 
 use time;
 use uuid::Uuid;
@@ -19,6 +18,7 @@ use serde_json;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
+use engine::Dev;
 use engine::Filesystem;
 use engine::Pool;
 use engine::RenameAction;
@@ -26,8 +26,8 @@ use engine::engine::Redundancy;
 use engine::strat_engine::lineardev::LinearDev;
 use engine::strat_engine::thinpooldev::ThinPoolDev;
 
-use super::super::engine::{HasName, HasUuid};
-use super::super::structures::Table;
+use super::super::engine::{DevUuid, FilesystemUuid, HasName, HasUuid};
+use super::super::structures::Table2;
 
 use super::serde_structs::StratSave;
 use super::blockdev::{BlockDev, initialize, resolve_devices};
@@ -42,7 +42,7 @@ pub struct StratPool {
     name: String,
     pool_uuid: Uuid,
     pub block_devs: BTreeMap<PathBuf, BlockDev>,
-    pub filesystems: Table<StratFilesystem>,
+    pub filesystems: Table2<StratFilesystem>,
     redundancy: Redundancy,
     thin_pool: ThinPoolDev,
 }
@@ -92,7 +92,7 @@ impl StratPool {
             name: name.to_owned(),
             pool_uuid: pool_uuid,
             block_devs: bds,
-            filesystems: Table::new(),
+            filesystems: Table2::new(),
             redundancy: redundancy,
             thin_pool: thinpool_dev,
         };
@@ -109,7 +109,7 @@ impl StratPool {
         let mut bds: Vec<&BlockDev> = self.block_devs
             .iter()
             .map(|(_, bd)| bd)
-            .filter(|bd| bd.bda.last_update_time().is_some())
+            .filter(|bd| bd.last_update_time().is_some())
             .collect();
 
         if bds.is_empty() {
@@ -117,32 +117,22 @@ impl StratPool {
         }
 
         bds.sort_by_key(|k| {
-            k.bda
-                .last_update_time()
-                .expect("BDAs without some last update time filtered above.")
+            k.last_update_time().expect("devs without some last update time filtered above.")
         });
 
         let last_update_time = bds.last()
             .expect("There is a last bd, since bds.is_empty() was false.")
-            .bda
             .last_update_time()
-            .expect("BDAs without some last update time filtered above.");
+            .expect("devs without some last update time filtered above.");
 
         for bd in bds.iter()
             .rev()
             .take_while(|bd| {
-                bd.bda
-                    .last_update_time()
-                    .expect("BDAs without some last update time filtered above.") ==
+                bd.last_update_time()
+                    .expect("devs without some last update time filtered above.") ==
                 last_update_time
             }) {
-            let mut f = match OpenOptions::new()
-                .read(true)
-                .open(&bd.devnode) {
-                Ok(f) => f,
-                Err(_) => continue,
-            };
-            match bd.bda.load_state(&mut f) {
+            match bd.load_state() {
                 Ok(Some(data)) => return Some(data),
                 _ => continue,
             }
@@ -175,7 +165,7 @@ impl StratPool {
             id: self.pool_uuid.simple().to_string(),
             block_devs: self.block_devs
                 .iter()
-                .map(|(_, bd)| (bd.bda.header.dev_uuid.simple().to_string(), bd.to_save()))
+                .map(|(_, bd)| (bd.uuid().simple().to_string(), bd.to_save()))
                 .collect(),
         }
     }
@@ -184,7 +174,7 @@ impl StratPool {
 impl Pool for StratPool {
     fn create_filesystems<'a, 'b>(&'a mut self,
                                   specs: &[&'b str])
-                                  -> EngineResult<Vec<(&'b str, Uuid)>> {
+                                  -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
         let names = BTreeSet::from_iter(specs);
         for name in names.iter() {
             if self.filesystems.contains_name(name) {
@@ -204,13 +194,13 @@ impl Pool for StratPool {
         Ok(result)
     }
 
-    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
+    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
         let devices = try!(resolve_devices(paths));
         let mut bds = try!(initialize(&self.pool_uuid, devices, MIN_MDA_SECTORS, force));
-        let bdev_paths = bds.iter().map(|p| p.1.devnode.clone()).collect();
+        let bdev_uuids = bds.iter().map(|p| p.1.uuid().clone()).collect();
         self.block_devs.append(&mut bds);
         try!(self.write_metadata());
-        Ok(bdev_paths)
+        Ok(bdev_uuids)
     }
 
     fn destroy(mut self) -> EngineResult<()> {
@@ -227,26 +217,33 @@ impl Pool for StratPool {
     }
 
     fn destroy_filesystems<'a, 'b>(&'a mut self,
-                                   fs_uuids: &[&'b Uuid])
-                                   -> EngineResult<Vec<&'b Uuid>> {
+                                   fs_uuids: &[&'b FilesystemUuid])
+                                   -> EngineResult<Vec<&'b FilesystemUuid>> {
         destroy_filesystems!{self; fs_uuids}
     }
 
-    fn rename_filesystem(&mut self, uuid: &Uuid, new_name: &str) -> EngineResult<RenameAction> {
+    fn rename_filesystem(&mut self,
+                         uuid: &FilesystemUuid,
+                         new_name: &str)
+                         -> EngineResult<RenameAction> {
         rename_filesystem!{self; uuid; new_name}
     }
 
-    fn rename(&mut self, name: &str) {
+    fn set_name(&mut self, name: &str) {
         self.name = name.to_owned();
     }
 
-    fn get_filesystem(&mut self, uuid: &Uuid) -> Option<&mut Filesystem> {
+    fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
         get_filesystem!(self; uuid)
+    }
+
+    fn get_blockdev(&mut self, _uuid: &DevUuid) -> Option<&mut Dev> {
+        unimplemented!()
     }
 }
 
 impl HasUuid for StratPool {
-    fn uuid(&self) -> &Uuid {
+    fn uuid(&self) -> &FilesystemUuid {
         &self.pool_uuid
     }
 }

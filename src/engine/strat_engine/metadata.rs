@@ -16,7 +16,7 @@ use uuid::Uuid;
 use types::{Bytes, Sectors};
 use super::engine::DevOwnership;
 use consts::{SECTOR_SIZE, IEC};
-use engine::{EngineResult, EngineError, ErrorEnum};
+use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
 
 const _BDA_STATIC_HDR_SECTORS: usize = 16;
 pub const BDA_STATIC_HDR_SECTORS: Sectors = Sectors(_BDA_STATIC_HDR_SECTORS as u64);
@@ -36,8 +36,8 @@ const STRAT_MAGIC: &'static [u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
 #[derive(Debug)]
 pub struct BDA {
-    pub header: StaticHeader,
-    pub regions: MDARegions,
+    header: StaticHeader,
+    regions: MDARegions,
 }
 
 impl BDA {
@@ -121,21 +121,41 @@ impl BDA {
     pub fn last_update_time(&self) -> &Option<Timespec> {
         &self.regions.mdas[self.regions.newer()].last_updated
     }
+
+    /// The UUID of the device.
+    pub fn dev_uuid(&self) -> &DevUuid {
+        &self.header.dev_uuid
+    }
+
+    /// The UUID of the device's pool.
+    pub fn pool_uuid(&self) -> &PoolUuid {
+        &self.header.pool_uuid
+    }
+
+    /// The size of the device.
+    pub fn dev_size(&self) -> Sectors {
+        self.header.blkdev_size
+    }
+
+    /// The number of sectors the BDA itself occupies.
+    pub fn size(&self) -> Sectors {
+        BDA_STATIC_HDR_SECTORS + self.header.mda_size + self.header.reserved_size
+    }
 }
 
 #[derive(Debug)]
 pub struct StaticHeader {
-    pub blkdev_size: Sectors,
-    pub pool_uuid: Uuid,
-    pub dev_uuid: Uuid,
-    pub mda_size: Sectors,
-    pub reserved_size: Sectors,
-    pub flags: u64,
+    blkdev_size: Sectors,
+    pool_uuid: PoolUuid,
+    dev_uuid: DevUuid,
+    mda_size: Sectors,
+    reserved_size: Sectors,
+    flags: u64,
 }
 
 impl StaticHeader {
-    pub fn new(pool_uuid: &Uuid,
-               dev_uuid: &Uuid,
+    pub fn new(pool_uuid: &PoolUuid,
+               dev_uuid: &DevUuid,
                mda_size: Sectors,
                blkdev_size: Sectors)
                -> StaticHeader {
@@ -255,8 +275,8 @@ impl StaticHeader {
 #[derive(Debug)]
 pub struct MDARegions {
     // Spec defines 4 regions, but regions 2 & 3 are duplicates of 0 and 1 respectively
-    pub region_size: Sectors,
-    pub mdas: [MDAHeader; NUM_PRIMARY_MDA_REGIONS],
+    region_size: Sectors,
+    mdas: [MDAHeader; NUM_PRIMARY_MDA_REGIONS],
 }
 
 impl MDARegions {
@@ -394,18 +414,18 @@ impl MDARegions {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct MDAHeader {
-    pub last_updated: Option<Timespec>,
+    last_updated: Option<Timespec>,
 
     /// Size of region used for pool metadata.
-    pub used: Option<Bytes>,
+    used: Option<Bytes>,
 
     /// Total size of region, including both the header and space used for
     /// pool metadata.
-    pub region_size: Bytes,
+    region_size: Bytes,
 
-    pub data_crc: Option<u32>,
+    data_crc: Option<u32>,
 }
 
 impl MDAHeader {

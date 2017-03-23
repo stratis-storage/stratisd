@@ -2,15 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::fmt;
-
-use engine::Dev;
-
 use std::cell::RefCell;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use uuid::Uuid;
+
+use engine::Dev;
+
+use super::super::engine::{DevUuid, HasUuid};
 use super::randomization::Randomizer;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -23,25 +24,17 @@ pub enum State {
 #[derive(Debug)]
 /// A simulated device.
 pub struct SimDev {
-    pub devnode: PathBuf,
+    devnode: PathBuf,
     rdm: Rc<RefCell<Randomizer>>,
-    pub state: State,
+    state: State,
+    uuid: Uuid,
 }
 
-impl fmt::Display for SimDev {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "{}", self.get_id())
-    }
-}
+impl Dev for SimDev {}
 
-impl Dev for SimDev {
-    fn get_id(&self) -> String {
-        let id = self.devnode.to_str();
-
-        match id {
-            Some(x) => return String::from(x),
-            None => return String::from("Conversion Failure"),
-        }
+impl HasUuid for SimDev {
+    fn uuid(&self) -> &DevUuid {
+        &self.uuid
     }
 }
 
@@ -52,6 +45,7 @@ impl SimDev {
             devnode: devnode.to_owned(),
             rdm: rdm,
             state: State::OK,
+            uuid: Uuid::new_v4(),
         }
     }
 

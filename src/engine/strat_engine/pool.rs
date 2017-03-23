@@ -105,36 +105,27 @@ impl StratPool {
     /// metadata.
     /// Precondition: All Blockdevs in blockdevs must belong to the same pool.
     pub fn read_metadata(blockdevs: &[&BlockDev]) -> Option<Vec<u8>> {
-
-        let mut bds: Vec<_> = blockdevs.iter()
-            .filter(|bd| bd.last_update_time().is_some())
-            .collect();
-
-        if bds.is_empty() {
+        if blockdevs.is_empty() {
             return None;
         }
 
-        bds.sort_by_key(|k| {
-            k.last_update_time().expect("devs without some last update time filtered above.")
-        });
+        let most_recent_blockdev = blockdevs.iter()
+            .max_by_key(|bd| bd.last_update_time())
+            .expect("must be a maximum since bds is non-empty");
 
-        let last_update_time = bds.last()
-            .expect("There is a last bd, since bds.is_empty() was false.")
-            .last_update_time()
-            .expect("devs without some last update time filtered above.");
+        let most_recent_time = most_recent_blockdev.last_update_time();
 
-        for bd in bds.iter()
-            .rev()
-            .take_while(|bd| {
-                bd.last_update_time()
-                    .expect("devs without some last update time filtered above.") ==
-                last_update_time
-            }) {
+        if most_recent_time.is_none() {
+            return None;
+        }
+
+        for bd in blockdevs.iter().filter(|b| b.last_update_time() == most_recent_time) {
             match bd.load_state() {
                 Ok(Some(data)) => return Some(data),
                 _ => continue,
             }
         }
+
         None
     }
 

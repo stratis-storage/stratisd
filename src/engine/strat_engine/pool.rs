@@ -103,11 +103,10 @@ impl StratPool {
 
     /// Return the metadata from the first blockdev with up-to-date, readable
     /// metadata.
-    pub fn read_metadata(&self) -> Option<Vec<u8>> {
+    /// Precondition: All Blockdevs in blockdevs must belong to the same pool.
+    pub fn read_metadata(blockdevs: &[&BlockDev]) -> Option<Vec<u8>> {
 
-        let mut bds: Vec<&BlockDev> = self.block_devs
-            .iter()
-            .map(|(_, bd)| bd)
+        let mut bds: Vec<_> = blockdevs.iter()
             .filter(|bd| bd.last_update_time().is_some())
             .collect();
 

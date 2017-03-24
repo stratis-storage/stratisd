@@ -3,8 +3,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 extern crate tempdir;
 
-use libstratis::engine::strat_engine::blockdev::blkdev_size;
-use libstratis::engine::strat_engine::blockdev::wipe_sectors;
+use libstratis::engine::strat_engine::device::wipe_sectors;
+use libstratis::engine::strat_engine::device::blkdev_size;
 use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::metadata::StaticHeader;
 use libstratis::types::Sectors;

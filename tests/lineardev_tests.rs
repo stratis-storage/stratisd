@@ -13,6 +13,7 @@ use devicemapper::DM;
 
 use libstratis::engine::strat_engine::blockdev;
 use libstratis::engine::strat_engine::blockdev::BlockDev;
+use libstratis::engine::strat_engine::device::resolve_devices;
 use libstratis::engine::strat_engine::lineardev::LinearDev;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 use libstratis::types::Sectors;
@@ -81,7 +82,7 @@ fn test_lineardev_concat(dm: &DM, blockdev_paths: &[&Path]) -> TestResult<(Linea
 
     let uuid = Uuid::new_v4();
 
-    let unique_blockdevs = match blockdev::resolve_devices(blockdev_paths) {
+    let unique_blockdevs = match resolve_devices(blockdev_paths) {
         Ok(devs) => devs,
         Err(e) => {
             let message = format!("Failed to resolve starting set of blockdevs:{:?}", e);

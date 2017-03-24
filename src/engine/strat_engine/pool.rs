@@ -4,8 +4,8 @@
 
 use devicemapper::DM;
 
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
+use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::RandomState;
 use std::iter::FromIterator;
 use std::path::Path;
 use std::path::PathBuf;
@@ -40,7 +40,7 @@ use types::Sectors;
 pub struct StratPool {
     name: String,
     pool_uuid: Uuid,
-    pub block_devs: BTreeMap<PathBuf, BlockDev>,
+    pub block_devs: HashMap<PathBuf, BlockDev>,
     pub filesystems: Table<StratFilesystem>,
     redundancy: Redundancy,
     thin_pool: ThinPoolDev,
@@ -80,7 +80,7 @@ impl StratPool {
                                                  meta_dev,
                                                  data_dev));
 
-        let mut blockdevs = BTreeMap::new();
+        let mut blockdevs = HashMap::new();
         for bd in bds {
             blockdevs.insert(bd.devnode.clone(), bd);
         }
@@ -161,7 +161,7 @@ impl Pool for StratPool {
     fn create_filesystems<'a, 'b>(&'a mut self,
                                   specs: &[&'b str])
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
-        let names = BTreeSet::from_iter(specs);
+        let names: HashSet<_, RandomState> = HashSet::from_iter(specs);
         for name in names.iter() {
             if self.filesystems.contains_name(name) {
                 return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.to_string()));

@@ -4,7 +4,7 @@
 
 use std::io;
 use std::collections::BTreeSet;
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::ErrorKind;
 use std::fs::{OpenOptions, read_dir};
@@ -41,6 +41,7 @@ pub fn blkdev_size(file: &File) -> EngineResult<Bytes> {
 
 /// Resolve a list of Paths of some sort to a set of unique Devices.
 /// Return an IOError if there was a problem resolving any particular device.
+// FIXME: BTreeSet -> HashSet once Device is hashable
 pub fn resolve_devices(paths: &[&Path]) -> io::Result<BTreeSet<Device>> {
     let mut devices = BTreeSet::new();
     for path in paths {
@@ -53,7 +54,7 @@ pub fn resolve_devices(paths: &[&Path]) -> io::Result<BTreeSet<Device>> {
 /// Find all Stratis Blockdevs.
 ///
 /// Returns a map of pool uuids to maps of blockdev uuids to blockdevs.
-pub fn find_all() -> EngineResult<BTreeMap<PoolUuid, BTreeMap<DevUuid, BlockDev>>> {
+pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>> {
 
     /// If a Path refers to a valid Stratis blockdev, return a BlockDev
     /// struct. Otherwise, return None. Return an error if there was
@@ -74,7 +75,7 @@ pub fn find_all() -> EngineResult<BTreeMap<PoolUuid, BTreeMap<DevUuid, BlockDev>
         }))
     }
 
-    let mut pool_map = BTreeMap::new();
+    let mut pool_map = HashMap::new();
     for dir_e in try!(read_dir("/dev")) {
         let devnode = match dir_e {
             Ok(d) => d.path(),
@@ -84,7 +85,7 @@ pub fn find_all() -> EngineResult<BTreeMap<PoolUuid, BTreeMap<DevUuid, BlockDev>
         match setup(&devnode) {
             Ok(Some(blockdev)) => {
                 pool_map.entry(blockdev.pool_uuid().clone())
-                    .or_insert_with(BTreeMap::new)
+                    .or_insert_with(HashMap::new)
                     .insert(blockdev.uuid().clone(), blockdev);
             }
             _ => continue,
@@ -98,12 +99,12 @@ pub fn find_all() -> EngineResult<BTreeMap<PoolUuid, BTreeMap<DevUuid, BlockDev>
 
 /// Initialize multiple blockdevs at once. This allows all of them
 /// to be checked for usability before writing to any of them.
+// FIXME: BTreeSet -> HashSet once Device is hashable
 pub fn initialize(pool_uuid: &PoolUuid,
                   devices: BTreeSet<Device>,
                   mda_size: Sectors,
                   force: bool)
                   -> EngineResult<Vec<BlockDev>> {
-
     /// Gets device information, returns an error if problem with obtaining
     /// that information.
     /// Returns a tuple with the blockdev's path, its size in bytes,

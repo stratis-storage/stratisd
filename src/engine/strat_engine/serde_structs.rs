@@ -16,7 +16,7 @@
 // the below structs as parameters.
 
 
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use types::Sectors;
@@ -31,5 +31,5 @@ pub struct BlockDevSave {
 pub struct StratSave {
     pub name: String,
     pub id: String,
-    pub block_devs: BTreeMap<String, BlockDevSave>,
+    pub block_devs: HashMap<String, BlockDevSave>,
 }

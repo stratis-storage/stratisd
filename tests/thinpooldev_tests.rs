@@ -15,6 +15,7 @@ use devicemapper::DM;
 
 use libstratis::engine::strat_engine::blockdev;
 use libstratis::engine::strat_engine::blockdev::BlockDev;
+use libstratis::engine::strat_engine::blockdev::wipe_sectors;
 use libstratis::engine::strat_engine::lineardev::LinearDev;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 use libstratis::engine::strat_engine::thindev::ThinDev;
@@ -27,7 +28,6 @@ use std::path::Path;
 use tempdir::TempDir;
 
 use util::blockdev_utils::clean_blockdev_headers;
-use util::blockdev_utils::wipe_header;
 use util::blockdev_utils::write_files_to_directory;
 use util::test_config::TestConfig;
 use util::test_consts::DEFAULT_CONFIG_FILE;
@@ -49,8 +49,8 @@ fn setup_supporting_devs(dm: &DM,
 
     let metadata_path = try!(metadata_dev.path());
     let data_path = try!(data_dev.path());
-    try!(wipe_header(Path::new(&metadata_path)));
-    try!(wipe_header(Path::new(&data_path)));
+    try!(wipe_sectors(Path::new(&metadata_path), Sectors(0), Sectors(16)));
+    try!(wipe_sectors(Path::new(&data_path), Sectors(0), Sectors(16)));
 
     Ok((metadata_dev, data_dev))
 }

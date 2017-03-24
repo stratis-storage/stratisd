@@ -67,13 +67,15 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>>
             .read(true)
             .open(devnode));
 
-        let bda = try!(BDA::load(&mut f));
-
-        Ok(Some(BlockDev {
-            dev: dev,
-            devnode: devnode.to_owned(),
-            bda: bda,
-        }))
+        if let Some(bda) = BDA::load(&mut f).ok() {
+            Ok(Some(BlockDev {
+                dev: dev,
+                devnode: devnode.to_owned(),
+                bda: bda,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 
     let mut pool_map = HashMap::new();

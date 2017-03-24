@@ -102,7 +102,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
                   devices: BTreeSet<Device>,
                   mda_size: Sectors,
                   force: bool)
-                  -> EngineResult<BTreeMap<PathBuf, BlockDev>> {
+                  -> EngineResult<Vec<BlockDev>> {
 
     /// Gets device information, returns an error if problem with obtaining
     /// that information.
@@ -190,7 +190,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
                                        "Need at least 2 blockdevs to create a pool".into()));
     }
 
-    let mut bds = BTreeMap::new();
+    let mut bds = Vec::new();
     for (dev, (devnode, dev_size, mut f)) in add_devs {
 
         let bda = try!(BDA::initialize(&mut f,
@@ -204,7 +204,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
             devnode: devnode.clone(),
             bda: bda,
         };
-        bds.insert(devnode, bd);
+        bds.push(bd);
     }
     Ok(bds)
 }

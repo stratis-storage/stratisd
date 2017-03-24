@@ -29,7 +29,8 @@ use super::super::engine::{FilesystemUuid, HasName, HasUuid};
 use super::super::structures::Table;
 
 use super::serde_structs::StratSave;
-use super::blockdev::{BlockDev, initialize, resolve_devices};
+use super::blockdev::{BlockDev, initialize};
+use super::device::resolve_devices;
 use super::filesystem::StratFilesystem;
 use super::metadata::MIN_MDA_SECTORS;
 

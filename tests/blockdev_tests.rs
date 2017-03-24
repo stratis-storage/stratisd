@@ -10,6 +10,7 @@ extern crate libstratis;
 mod util;
 
 use libstratis::engine::strat_engine::blockdev;
+use libstratis::engine::strat_engine::device::resolve_devices;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 
 use std::path::Path;
@@ -27,7 +28,7 @@ use uuid::Uuid;
 // the force flag.
 pub fn test_blockdev_force_flag(blockdev_paths: &[&Path]) -> TestResult<()> {
 
-    let unique_devices = match blockdev::resolve_devices(blockdev_paths) {
+    let unique_devices = match resolve_devices(blockdev_paths) {
         Ok(devs) => devs,
         Err(e) => {
             let message = format!("Failed to resolve blockdevs: {:?}", e);

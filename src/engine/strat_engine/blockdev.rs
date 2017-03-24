@@ -242,7 +242,7 @@ impl BlockDev {
         }
     }
 
-    pub fn wipe_metadata(&mut self) -> EngineResult<()> {
+    pub fn wipe_metadata(&self) -> EngineResult<()> {
         let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
         BDA::wipe(&mut f)
     }

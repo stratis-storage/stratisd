@@ -203,13 +203,13 @@ impl Pool for StratPool {
         Ok(bdev_paths)
     }
 
-    fn destroy(mut self) -> EngineResult<()> {
+    fn destroy(self) -> EngineResult<()> {
 
         // TODO Do we want to create a new File each time we interact with DM?
         let dm = try!(DM::new());
         try!(self.thin_pool.teardown(&dm));
 
-        for bd in self.block_devs.values_mut() {
+        for bd in self.block_devs.values() {
             try!(bd.wipe_metadata());
         }
 

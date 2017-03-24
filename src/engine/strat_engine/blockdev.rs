@@ -61,13 +61,12 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>>
     /// struct. Otherwise, return None. Return an error if there was
     /// a problem inspecting the device.
     fn setup(devnode: &Path) -> EngineResult<Option<BlockDev>> {
-        let dev = try!(Device::from_str(&devnode.to_string_lossy()));
-
         let mut f = try!(OpenOptions::new()
             .read(true)
             .open(devnode));
 
         if let Some(bda) = BDA::load(&mut f).ok() {
+            let dev = try!(Device::from_str(&devnode.to_string_lossy()));
             Ok(Some(BlockDev {
                 dev: dev,
                 devnode: devnode.to_owned(),

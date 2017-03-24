@@ -27,9 +27,9 @@ use self::uuid::Uuid;
 
 use libstratis::engine::Engine;
 use libstratis::engine::strat_engine::StratEngine;
-use libstratis::engine::strat_engine::blockdev::{blkdev_size, initialize, resolve_devices,
-                                                 write_sectors};
+use libstratis::engine::strat_engine::blockdev::initialize;
 use libstratis::engine::strat_engine::blockdevmgr::BlockDevMgr;
+use libstratis::engine::strat_engine::device::{blkdev_size, resolve_devices, write_sectors};
 use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_fs};
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,

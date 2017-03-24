@@ -8,15 +8,12 @@ use std::io;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::ErrorKind;
-use std::io::{Seek, Write, SeekFrom};
 use std::fs::{OpenOptions, read_dir};
-use std::os::unix::prelude::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 
-use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::Device;
 use devicemapper::Segment;
 use devicemapper::{Bytes, Sectors};
@@ -25,6 +22,7 @@ use uuid::Uuid;
 
 use consts::IEC;
 use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
+use super::device::blkdev_size;
 use super::metadata::{StaticHeader, BDA, validate_mda_size};
 use super::engine::DevOwnership;
 pub use super::BlockDevSave;
@@ -32,27 +30,6 @@ use engine::strat_engine::range_alloc::RangeAllocator;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
 
-ioctl!(read blkgetsize64 with 0x12, 114; u64);
-
-pub fn blkdev_size(file: &File) -> EngineResult<Bytes> {
-    let mut val: u64 = 0;
-
-    match unsafe { blkgetsize64(file.as_raw_fd(), &mut val) } {
-        Err(x) => Err(EngineError::Nix(x)),
-        Ok(_) => Ok(Bytes(val)),
-    }
-}
-
-/// Resolve a list of Paths of some sort to a set of unique Devices.
-/// Return an IOError if there was a problem resolving any particular device.
-pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
-    let mut devices = HashSet::new();
-    for path in paths {
-        let dev = try!(Device::from_str(&path.to_string_lossy()));
-        devices.insert(dev);
-    }
-    Ok(devices)
-}
 
 /// Find all Stratis Blockdevs.
 ///
@@ -102,28 +79,6 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>>
     }
 
     Ok(pool_map)
-}
-
-/// Write buf at offset length times.
-pub fn write_sectors(path: &Path,
-                     offset: Sectors,
-                     length: Sectors,
-                     buf: &[u8; SECTOR_SIZE])
-                     -> EngineResult<()> {
-    let mut f = try!(OpenOptions::new().write(true).open(path));
-
-    try!(f.seek(SeekFrom::Start(*offset)));
-    for _ in 0..*length {
-        try!(f.write_all(buf));
-    }
-
-    try!(f.flush());
-    Ok(())
-}
-
-/// Zero sectors at the given offset for length sectors.
-pub fn wipe_sectors(path: &Path, offset: Sectors, length: Sectors) -> EngineResult<()> {
-    write_sectors(path, offset, length, &[0u8; SECTOR_SIZE])
 }
 
 /// Initialize multiple blockdevs at once. This allows all of them

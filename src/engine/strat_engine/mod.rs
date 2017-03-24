@@ -4,6 +4,7 @@
 
 pub mod blockdev;
 pub mod blockdevmgr;
+pub mod device;
 pub mod engine;
 pub mod metadata;
 pub mod filesystem;

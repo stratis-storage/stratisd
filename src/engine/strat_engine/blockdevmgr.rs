@@ -13,7 +13,8 @@ use time::Timespec;
 use engine::{EngineResult, PoolUuid};
 use super::metadata::MIN_MDA_SECTORS;
 pub use super::BlockDevSave;
-use engine::strat_engine::blockdev::{BlockDev, resolve_devices, initialize};
+use engine::strat_engine::blockdev::{BlockDev, initialize};
+use engine::strat_engine::device::resolve_devices;
 
 #[derive(Debug)]
 pub struct BlockDevMgr {

@@ -18,6 +18,8 @@ use time::now;
 use uuid::Uuid;
 use serde_json;
 
+use consts::IEC;
+
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
@@ -25,15 +27,15 @@ use engine::Filesystem;
 use engine::Pool;
 use engine::RenameAction;
 use engine::engine::Redundancy;
-use engine::strat_engine::blockdev::wipe_sectors;
-use consts::IEC::Mi;
+use engine::strat_engine::device::wipe_sectors;
 
 use super::super::engine::{FilesystemUuid, HasName, HasUuid};
 use super::super::structures::Table;
 
 use super::serde_structs::StratSave;
-use super::blockdev::{initialize, resolve_devices};
+use super::blockdev::initialize;
 use super::blockdevmgr::BlockDevMgr;
+use super::device::resolve_devices;
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::metadata::MIN_MDA_SECTORS;
 
@@ -41,8 +43,8 @@ pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 pub const META_LOWATER: u64 = 512;
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
 
-pub const INITIAL_META_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
-pub const INITIAL_DATA_SIZE: Sectors = Sectors(512 * Mi / SECTOR_SIZE as u64);
+pub const INITIAL_META_SIZE: Sectors = Sectors(16 * IEC::Mi / SECTOR_SIZE as u64);
+pub const INITIAL_DATA_SIZE: Sectors = Sectors(512 * IEC::Mi / SECTOR_SIZE as u64);
 
 #[derive(Debug)]
 pub struct StratPool {

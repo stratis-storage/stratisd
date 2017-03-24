@@ -22,7 +22,7 @@ use engine::Filesystem;
 use engine::Pool;
 use engine::RenameAction;
 use engine::engine::Redundancy;
-use engine::strat_engine::blockdev::wipe_sectors;
+use engine::strat_engine::device::wipe_sectors;
 use engine::strat_engine::lineardev::LinearDev;
 use engine::strat_engine::thinpooldev::ThinPoolDev;
 
@@ -30,7 +30,8 @@ use super::super::engine::{FilesystemUuid, HasName, HasUuid};
 use super::super::structures::Table;
 
 use super::serde_structs::StratSave;
-use super::blockdev::{BlockDev, initialize, resolve_devices};
+use super::blockdev::{BlockDev, initialize};
+use super::device::resolve_devices;
 use super::filesystem::StratFilesystem;
 use super::metadata::MIN_MDA_SECTORS;
 

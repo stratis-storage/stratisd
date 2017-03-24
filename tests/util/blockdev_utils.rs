@@ -7,7 +7,7 @@ use std::path::Path;
 
 use devicemapper::types::Sectors;
 
-use libstratis::engine::strat_engine::blockdev::wipe_sectors;
+use libstratis::engine::strat_engine::device::wipe_sectors;
 
 use util::test_result::TestError;
 use util::test_result::TestErrorEnum;

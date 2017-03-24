@@ -10,7 +10,7 @@ use devicemapper::{DM, DevId, DeviceInfo, DmFlags};
 use devicemapper::types::{Bytes, Sectors};
 
 use engine::{EngineError, EngineResult, ErrorEnum};
-use engine::strat_engine::blockdev::blkdev_size;
+use engine::strat_engine::device::blkdev_size;
 
 use super::blockdev::BlockDev;
 

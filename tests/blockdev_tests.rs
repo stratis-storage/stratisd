@@ -25,7 +25,7 @@ use uuid::Uuid;
 
 // Test to make sure an initialized blockdev can't be re-initialized without
 // the force flag.
-pub fn test_blockdev_force_flag(blockdev_paths: &Vec<&Path>) -> TestResult<()> {
+pub fn test_blockdev_force_flag(blockdev_paths: &[&Path]) -> TestResult<()> {
 
     let unique_devices = match blockdev::resolve_devices(blockdev_paths) {
         Ok(devs) => devs,

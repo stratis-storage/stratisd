@@ -77,7 +77,7 @@ fn validate_sizes(name: &str, block_devs: &[&BlockDev]) -> TestResult<()> {
 /// Initialize the list for use with Stratis
 /// Concatenate the list via LinearDev
 /// Validate the size of the resulting DM device
-fn test_lineardev_concat(dm: &DM, blockdev_paths: &Vec<&Path>) -> TestResult<(LinearDev)> {
+fn test_lineardev_concat(dm: &DM, blockdev_paths: &[&Path]) -> TestResult<(LinearDev)> {
 
     let uuid = Uuid::new_v4();
 

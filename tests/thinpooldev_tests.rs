@@ -59,7 +59,7 @@ fn setup_supporting_devs(dm: &DM,
 /// Initialize the list for use with Stratis
 /// Create a thin-pool via ThinPoolDev
 /// Validate the resulting thin-pool dev and meta dev
-fn test_thinpool_setup(dm: &DM, blockdev_paths: &Vec<&Path>) -> TestResult<ThinPoolDev> {
+fn test_thinpool_setup(dm: &DM, blockdev_paths: &[&Path]) -> TestResult<ThinPoolDev> {
 
     let uuid = Uuid::new_v4();
 

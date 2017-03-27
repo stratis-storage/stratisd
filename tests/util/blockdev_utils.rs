@@ -13,7 +13,6 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
-use std::path::PathBuf;
 
 use util::blockdev_utils::tempdir::TempDir;
 use util::test_result::TestError;
@@ -21,7 +20,7 @@ use util::test_result::TestErrorEnum;
 use util::test_result::TestResult;
 
 #[allow(dead_code)]
-pub fn get_ownership(path: &PathBuf) -> TestResult<DevOwnership> {
+pub fn get_ownership(path: &Path) -> TestResult<DevOwnership> {
 
     let mut f = try!(OpenOptions::new()
         .read(true)
@@ -38,7 +37,7 @@ pub fn get_ownership(path: &PathBuf) -> TestResult<DevOwnership> {
     Ok(ownership)
 }
 
-pub fn clean_blockdev_headers(blockdev_paths: &Vec<&Path>) -> TestResult<()> {
+pub fn clean_blockdev_headers(blockdev_paths: &[&Path]) -> TestResult<()> {
 
     for path in blockdev_paths {
         match wipe_header(path) {

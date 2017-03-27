@@ -23,10 +23,9 @@ use util::test_result::TestResult;
 
 // Check to make sure the disks in blockdev_paths are no longer "Owned" by
 // Stratis
-pub fn validate_disks_released(blockdev_paths: &Vec<PathBuf>) -> TestResult<()> {
+pub fn validate_disks_released(blockdev_paths: &[PathBuf]) -> TestResult<()> {
 
-    for path_name in blockdev_paths {
-        let path = PathBuf::from(path_name);
+    for path in blockdev_paths {
 
         match get_ownership(&path) {
             Ok(ownership) => {
@@ -56,10 +55,9 @@ pub fn validate_disks_released(blockdev_paths: &Vec<PathBuf>) -> TestResult<()> 
 }
 
 // Validate that disks are "owned" by Stratis
-pub fn validate_disks_init(blockdev_paths: &Vec<PathBuf>) -> TestResult<()> {
+pub fn validate_disks_init(blockdev_paths: &[PathBuf]) -> TestResult<()> {
 
-    for path_name in blockdev_paths {
-        let path = PathBuf::from(path_name);
+    for path in blockdev_paths {
 
         match get_ownership(&path) {
             Ok(ownership) => {
@@ -83,11 +81,11 @@ pub fn validate_disks_init(blockdev_paths: &Vec<PathBuf>) -> TestResult<()> {
     Ok(())
 }
 
-pub fn test_create_and_delete(device_paths: &Vec<&Path>) -> TestResult<()> {
+pub fn test_create_and_delete(device_paths: &[&Path]) -> TestResult<()> {
 
     let mut engine = StratEngine::new();
 
-    let (uuid, blockdevs) = engine.create_pool("test_pool", &device_paths, None, true).unwrap();
+    let (uuid, blockdevs) = engine.create_pool("test_pool", device_paths, None, true).unwrap();
 
     validate_disks_init(&blockdevs).unwrap();
 

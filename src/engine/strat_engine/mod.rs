@@ -14,4 +14,3 @@ pub mod thinpooldev;
 
 pub use self::engine::StratEngine;
 pub use self::pool::StratPool;
-pub use self::serde_structs::BlockDevSave;

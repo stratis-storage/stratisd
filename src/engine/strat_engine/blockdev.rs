@@ -217,9 +217,7 @@ impl BlockDev {
 
     pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
         let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
-        try!(self.bda.save_state(time, metadata, &mut f));
-
-        Ok(())
+        self.bda.save_state(time, metadata, &mut f)
     }
 
     pub fn load_state(&self) -> EngineResult<Option<Vec<u8>>> {

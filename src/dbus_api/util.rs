@@ -6,13 +6,13 @@ use std::error::Error;
 
 use dbus;
 use dbus::MessageItem;
-use dbus::arg::{ArgType, Iter};
-use dbus::tree::MethodErr;
+use dbus::arg::{ArgType, Iter, IterAppend};
+use dbus::tree::{MethodErr, MTFn, PropInfo};
 
 use engine;
 use engine::EngineError;
 
-use super::types::DbusErrorEnum;
+use super::types::{DbusErrorEnum, TData};
 
 pub const STRATIS_BASE_PATH: &'static str = "/org/storage/stratis1";
 pub const STRATIS_BASE_SERVICE: &'static str = "org.storage.stratis1";
@@ -70,4 +70,35 @@ pub fn ok_message_items() -> (MessageItem, MessageItem) {
 
 pub fn default_object_path<'a>() -> dbus::Path<'a> {
     dbus::Path::new("/").expect("'/' is guaranteed to be a valid Path.")
+}
+
+/// Similar to Option::ok_or, but unpacks a reference to a reference.
+pub fn ref_ok_or<'a, E, T>(opt: &'a Option<T>, err: E) -> Result<&'a T, E> {
+    match opt {
+        &Some(ref t) => Ok(t),
+        &None => Err(err),
+    }
+}
+
+/// Get the UUID for an object path.
+pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+    let object_path = p.path.get_name();
+    let path = p.tree.get(&object_path).expect("implicit argument must be in tree");
+    let data = try!(ref_ok_or(path.get_data(),
+                              MethodErr::failed(&format!("no data for object path {}",
+                                                         &object_path))));
+    i.append(MessageItem::Str(format!("{}", data.uuid.simple())));
+    Ok(())
+}
+
+
+/// Get the parent object path for an object path.
+pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+    let object_path = p.path.get_name();
+    let path = p.tree.get(&object_path).expect("implicit argument must be in tree");
+    let data = try!(ref_ok_or(path.get_data(),
+                              MethodErr::failed(&format!("no data for object path {}",
+                                                         &object_path))));
+    i.append(MessageItem::ObjectPath(data.parent.clone()));
+    Ok(())
 }

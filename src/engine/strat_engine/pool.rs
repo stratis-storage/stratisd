@@ -4,8 +4,8 @@
 
 use devicemapper::DM;
 
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
+use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::RandomState;
 use std::iter::FromIterator;
 use std::path::Path;
 use std::path::PathBuf;
@@ -40,7 +40,7 @@ use types::Sectors;
 pub struct StratPool {
     name: String,
     pool_uuid: Uuid,
-    pub block_devs: BTreeMap<PathBuf, BlockDev>,
+    pub block_devs: HashMap<PathBuf, BlockDev>,
     pub filesystems: Table<StratFilesystem>,
     redundancy: Redundancy,
     thin_pool: ThinPoolDev,
@@ -64,20 +64,13 @@ impl StratPool {
         // single blockdev.  When that code is added to use a single blockdev,
         // the check for 2 devs in BlockDev::initialize should be removed.
         assert!(bds.len() >= 2);
-        let meta_dev;
-        let data_dev;
-        let length;
-        {
-            let mut data_devs = Vec::from_iter(bds.values());
 
-            meta_dev = try!(LinearDev::new(&format!("stratis_{}_meta", name),
+        let meta_dev = try!(LinearDev::new(&format!("stratis_{}_meta", name), dm, &vec![&bds[0]]));
+        let data_dev = try!(LinearDev::new(&format!("stratis_{}_data", name),
                                            dm,
-                                           &vec![data_devs.remove(0)]));
+                                           &Vec::from_iter(bds[1..].iter())));
+        let length = try!(data_dev.size()).sectors();
 
-            data_dev = try!(LinearDev::new(&format!("stratis_{}_data", name), dm, &data_devs));
-            length = try!(data_dev.size()).sectors();
-
-        }
         // TODO Fix hard coded data blocksize and low water mark.
         let thinpool_dev = try!(ThinPoolDev::new(&format!("stratis_{}_thinpool", name),
                                                  dm,
@@ -87,10 +80,14 @@ impl StratPool {
                                                  meta_dev,
                                                  data_dev));
 
+        let mut blockdevs = HashMap::new();
+        for bd in bds {
+            blockdevs.insert(bd.devnode.clone(), bd);
+        }
         let mut pool = StratPool {
             name: name.to_owned(),
             pool_uuid: pool_uuid,
-            block_devs: bds,
+            block_devs: blockdevs,
             filesystems: Table::new(),
             redundancy: redundancy,
             thin_pool: thinpool_dev,
@@ -164,7 +161,7 @@ impl Pool for StratPool {
     fn create_filesystems<'a, 'b>(&'a mut self,
                                   specs: &[&'b str])
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
-        let names = BTreeSet::from_iter(specs);
+        let names: HashSet<_, RandomState> = HashSet::from_iter(specs);
         for name in names.iter() {
             if self.filesystems.contains_name(name) {
                 return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
@@ -185,9 +182,11 @@ impl Pool for StratPool {
 
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
         let devices = try!(resolve_devices(paths));
-        let mut bds = try!(initialize(&self.pool_uuid, devices, MIN_MDA_SECTORS, force));
-        let bdev_paths = bds.iter().map(|p| p.1.devnode.clone()).collect();
-        self.block_devs.append(&mut bds);
+        let bds = try!(initialize(&self.pool_uuid, devices, MIN_MDA_SECTORS, force));
+        let bdev_paths = bds.iter().map(|p| p.devnode.clone()).collect();
+        for bd in bds {
+            self.block_devs.insert(bd.devnode.clone(), bd);
+        }
         try!(self.write_metadata());
         Ok(bdev_paths)
     }

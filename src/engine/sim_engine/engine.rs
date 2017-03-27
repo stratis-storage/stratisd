@@ -12,7 +12,8 @@ use engine::RenameAction;
 use engine::Redundancy;
 
 use std::cell::RefCell;
-use std::collections::BTreeSet;
+use std::collections::HashSet;
+use std::collections::hash_map::RandomState;
 use std::iter::FromIterator;
 use std::path::Path;
 use std::path::PathBuf;
@@ -54,8 +55,8 @@ impl Engine for SimEngine {
             return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
-        let devices =
-            BTreeSet::from_iter(blockdev_paths).into_iter().map(|x| *x).collect::<Vec<&Path>>();
+        let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
+        let devices = device_set.into_iter().map(|x| *x).collect::<Vec<&Path>>();
 
         let pool = SimPool::new(self.rdm.clone(), name, &devices, redundancy);
 

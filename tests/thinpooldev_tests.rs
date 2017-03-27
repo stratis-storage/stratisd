@@ -59,25 +59,22 @@ fn setup_supporting_devs(dm: &DM,
 /// Initialize the list for use with Stratis
 /// Create a thin-pool via ThinPoolDev
 /// Validate the resulting thin-pool dev and meta dev
-fn test_thinpool_setup(dm: &DM, blockdev_paths: &Vec<&Path>) -> TestResult<ThinPoolDev> {
+fn test_thinpool_setup(dm: &DM, blockdev_paths: &[&Path]) -> TestResult<ThinPoolDev> {
 
     let uuid = Uuid::new_v4();
 
     let unique_blockdevs = blockdev::resolve_devices(blockdev_paths).unwrap();
 
-    let blockdev_map = blockdev::initialize(&uuid, unique_blockdevs, MIN_MDA_SECTORS, true)
-        .unwrap();
-
-    let (_first_key, metadata_blockdev) = blockdev_map.iter().next().unwrap();
-    let (_last_key, data_blockdev) = blockdev_map.iter().next_back().unwrap();
-    let (_start_sector, length) = data_blockdev.avail_range();
+    let blockdevs = blockdev::initialize(&uuid, unique_blockdevs, MIN_MDA_SECTORS, true).unwrap();
+    let (metadata_blockdev, data_blockdev) = (blockdevs.first().unwrap(),
+                                              blockdevs.last().unwrap());
 
     let (metadata_dev, data_dev) =
         try!(setup_supporting_devs(dm, metadata_blockdev, data_blockdev));
 
     let mut thinpool_dev = try!(ThinPoolDev::new("stratis_testing_thinpool",
                                                  dm,
-                                                 length,
+                                                 data_blockdev.avail_range().1,
                                                  Sectors(1024),
                                                  DataBlocks(256000),
                                                  metadata_dev,

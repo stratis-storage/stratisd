@@ -31,7 +31,7 @@ impl LinearDev {
     /// Construct a new block device by concatenating the given block_devs
     /// into linear space.  Use DM to reserve enough space for the stratis
     /// metadata on each BlockDev.
-    pub fn new(name: &str, dm: &DM, block_devs: &Vec<&BlockDev>) -> EngineResult<LinearDev> {
+    pub fn new(name: &str, dm: &DM, block_devs: &[&BlockDev]) -> EngineResult<LinearDev> {
 
         try!(dm.device_create(&name, None, DmFlags::empty()));
         let table = LinearDev::dm_table(block_devs);
@@ -48,7 +48,7 @@ impl LinearDev {
 
     /// Generate a Vec<> to be passed to DM.  The format of the Vec entries is:
     /// <logical start sec> <length> "linear" /dev/xxx <start offset>
-    fn dm_table(block_devs: &Vec<&BlockDev>) -> Vec<(u64, u64, String, String)> {
+    fn dm_table(block_devs: &[&BlockDev]) -> Vec<(u64, u64, String, String)> {
         let mut table = Vec::new();
         let mut logical_start_sector = Sectors(0);
         for block_dev in block_devs {

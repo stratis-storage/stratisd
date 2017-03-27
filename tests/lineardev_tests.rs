@@ -31,7 +31,7 @@ use util::test_result::TestResult;
 use uuid::Uuid;
 
 /// Return a LinearDev with concatenated BlockDevs
-fn concat_blockdevs(dm: &DM, name: &str, block_devs: &Vec<&BlockDev>) -> TestResult<LinearDev> {
+fn concat_blockdevs(dm: &DM, name: &str, block_devs: &[&BlockDev]) -> TestResult<LinearDev> {
 
     match LinearDev::new(name, dm, block_devs) {
         Ok(ld) => return Ok(ld),
@@ -45,7 +45,7 @@ fn concat_blockdevs(dm: &DM, name: &str, block_devs: &Vec<&BlockDev>) -> TestRes
 /// Get the usable sector lengths for each dev
 /// Wait for the DM device to be created
 /// Validate the size of the DM device with the sum of the sector lengths
-fn validate_sizes(name: &str, block_devs: &Vec<&BlockDev>) -> TestResult<()> {
+fn validate_sizes(name: &str, block_devs: &[&BlockDev]) -> TestResult<()> {
 
     let mut linear_sectors = Sectors(0);
 
@@ -77,7 +77,7 @@ fn validate_sizes(name: &str, block_devs: &Vec<&BlockDev>) -> TestResult<()> {
 /// Initialize the list for use with Stratis
 /// Concatenate the list via LinearDev
 /// Validate the size of the resulting DM device
-fn test_lineardev_concat(dm: &DM, blockdev_paths: &Vec<&Path>) -> TestResult<(LinearDev)> {
+fn test_lineardev_concat(dm: &DM, blockdev_paths: &[&Path]) -> TestResult<(LinearDev)> {
 
     let uuid = Uuid::new_v4();
 
@@ -89,19 +89,17 @@ fn test_lineardev_concat(dm: &DM, blockdev_paths: &Vec<&Path>) -> TestResult<(Li
         }
     };
 
-    let blockdev_map = match blockdev::initialize(&uuid, unique_blockdevs, MIN_MDA_SECTORS, true) {
-        Ok(blockdev_map) => blockdev_map,
+    let blockdevs = match blockdev::initialize(&uuid, unique_blockdevs, MIN_MDA_SECTORS, true) {
+        Ok(blockdevs) => blockdevs,
         Err(e) => {
             let message = format!("Failed to initialize starting set of blockdevs {:?}", e);
             return Err(Framework(Error(message)));
         }
     };
 
+    let blockdev_refs = Vec::from_iter(blockdevs.iter());
     let name = "stratis_testing_linear";
-
-    let blockdev_vec = Vec::from_iter(blockdev_map.values());
-
-    let linear_dev = match concat_blockdevs(dm, &name, &blockdev_vec) {
+    let linear_dev = match concat_blockdevs(dm, &name, &blockdev_refs) {
         Ok(dev) => dev,
         Err(e) => {
             let message = format!("Failed to concat_blockdevs {:?}", e);
@@ -109,7 +107,7 @@ fn test_lineardev_concat(dm: &DM, blockdev_paths: &Vec<&Path>) -> TestResult<(Li
         }
     };
 
-    match validate_sizes(&name, &blockdev_vec) {
+    match validate_sizes(&name, &blockdev_refs) {
         Ok(_) => info!("validate_sizes Ok"),
         Err(e) => {
             error!("Failed : validate_sizes() : {:?}", e);

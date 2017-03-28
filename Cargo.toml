@@ -30,4 +30,5 @@ features = ["v4"]
 quickcheck = "0.4"
 rustc-serialize = "0.3.21"
 tempdir = "0.3.5"
-
+libudev = "0"
+loopdev = "0"

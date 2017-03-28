@@ -8,3 +8,4 @@ pub mod test_config;
 #[macro_use]
 pub mod test_utils;
 pub mod blockdev_utils;
+pub mod loopbacked;

@@ -4,7 +4,7 @@
 extern crate tempdir;
 
 use libstratis::consts::SECTOR_SIZE;
-use libstratis::engine::strat_engine::blockdev::blkdev_size;
+use libstratis::engine::strat_engine::device::blkdev_size;
 use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::metadata::StaticHeader;
 use libstratis::types::Sectors;

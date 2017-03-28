@@ -22,6 +22,7 @@ use engine::Filesystem;
 use engine::Pool;
 use engine::RenameAction;
 use engine::engine::Redundancy;
+use engine::strat_engine::blockdev::wipe_sectors;
 use engine::strat_engine::lineardev::LinearDev;
 use engine::strat_engine::thinpooldev::ThinPoolDev;
 
@@ -33,8 +34,9 @@ use super::blockdev::{BlockDev, initialize, resolve_devices};
 use super::filesystem::StratFilesystem;
 use super::metadata::MIN_MDA_SECTORS;
 
-use types::DataBlocks;
-use types::Sectors;
+use types::{DataBlocks, Sectors};
+
+pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 
 #[derive(Debug)]
 pub struct StratPool {
@@ -66,16 +68,26 @@ impl StratPool {
         assert!(bds.len() >= 2);
 
         let meta_dev = try!(LinearDev::new(&format!("stratis_{}_meta", name), dm, &vec![&bds[0]]));
+        // When constructing a thin-pool, Stratis reserves the first N
+        // sectors on a block device by creating a linear device with a
+        // starting offset. DM writes the super block in the first block.
+        // DM requires this first block to be zeros when the meta data for
+        // the thin-pool is initially created. If we don't zero the
+        // superblock DM issue error messages because it triggers code paths
+        // that are trying to re-adopt the device with the attributes that
+        // have been passed.
+        try!(wipe_sectors(&try!(meta_dev.path()), Sectors(0), DATA_BLOCK_SIZE));
         let data_dev = try!(LinearDev::new(&format!("stratis_{}_data", name),
                                            dm,
                                            &Vec::from_iter(bds[1..].iter())));
+        try!(wipe_sectors(&try!(data_dev.path()), Sectors(0), DATA_BLOCK_SIZE));
         let length = try!(data_dev.size()).sectors();
 
         // TODO Fix hard coded data blocksize and low water mark.
         let thinpool_dev = try!(ThinPoolDev::new(&format!("stratis_{}_thinpool", name),
                                                  dm,
                                                  length,
-                                                 Sectors(1024),
+                                                 DATA_BLOCK_SIZE,
                                                  DataBlocks(256000),
                                                  meta_dev,
                                                  data_dev));
@@ -191,13 +203,13 @@ impl Pool for StratPool {
         Ok(bdev_paths)
     }
 
-    fn destroy(mut self) -> EngineResult<()> {
+    fn destroy(self) -> EngineResult<()> {
 
         // TODO Do we want to create a new File each time we interact with DM?
         let dm = try!(DM::new());
         try!(self.thin_pool.teardown(&dm));
 
-        for bd in self.block_devs.values_mut() {
+        for bd in self.block_devs.values() {
             try!(bd.wipe_metadata());
         }
 

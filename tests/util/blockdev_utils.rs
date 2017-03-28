@@ -3,8 +3,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 extern crate tempdir;
 
-use libstratis::consts::SECTOR_SIZE;
 use libstratis::engine::strat_engine::blockdev::blkdev_size;
+use libstratis::engine::strat_engine::blockdev::wipe_sectors;
 use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::metadata::StaticHeader;
 use libstratis::types::Sectors;
@@ -40,11 +40,11 @@ pub fn get_ownership(path: &Path) -> TestResult<DevOwnership> {
 pub fn clean_blockdev_headers(blockdev_paths: &[&Path]) -> TestResult<()> {
 
     for path in blockdev_paths {
-        match wipe_header(path) {
+        match wipe_sectors(path, Sectors(0), Sectors(16)) {
             Ok(_) => {}
             Err(e) => {
-                error!("Failed to clean signature on {:?} : {:?}", path, e);
-                return Err(e);
+                let error_message = format!("{:?} for device {:?}", e, path);
+                return Err(TestError::Framework(TestErrorEnum::Error(error_message)));
             }
         }
     }
@@ -66,15 +66,6 @@ pub fn get_size(path: &Path) -> TestResult<Sectors> {
             return Err(TestError::Framework(TestErrorEnum::Error(error_message)));
         }
     };
-}
-
-pub fn wipe_header(path: &Path) -> TestResult<()> {
-    let mut f = try!(OpenOptions::new().write(true).open(path));
-    let zeroed = [0u8; SECTOR_SIZE * 16];
-
-    try!(f.write_all(&zeroed[..SECTOR_SIZE * 16]));
-
-    Ok(())
 }
 
 #[allow(dead_code)]

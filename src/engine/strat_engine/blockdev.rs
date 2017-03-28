@@ -7,6 +7,7 @@ use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::ErrorKind;
+use std::io::{Seek, Write, SeekFrom};
 use std::fs::{OpenOptions, read_dir};
 use std::os::unix::prelude::AsRawFd;
 use std::path::{Path, PathBuf};
@@ -95,7 +96,22 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>>
     Ok(pool_map)
 }
 
+/// Zero sectors at the given offset
+pub fn wipe_sectors(path: &Path, offset: Sectors, sector_count: Sectors) -> EngineResult<()> {
+    let mut f = try!(OpenOptions::new()
+        .write(true)
+        .open(path));
 
+    let zeroed = [0u8; SECTOR_SIZE];
+
+    // set the start point to the offset
+    try!(f.seek(SeekFrom::Start(*offset)));
+    for _ in 0..*sector_count {
+        try!(f.write_all(&zeroed));
+    }
+    try!(f.flush());
+    Ok(())
+}
 
 /// Initialize multiple blockdevs at once. This allows all of them
 /// to be checked for usability before writing to any of them.
@@ -226,7 +242,7 @@ impl BlockDev {
         }
     }
 
-    pub fn wipe_metadata(&mut self) -> EngineResult<()> {
+    pub fn wipe_metadata(&self) -> EngineResult<()> {
         let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
         BDA::wipe(&mut f)
     }

@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::fmt::Debug;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use uuid::Uuid;
 
@@ -46,11 +46,11 @@ pub trait HasName: Debug {
     fn name(&self) -> &str;
 }
 
-pub trait Dev: Debug {}
+pub trait Dev: HasUuid {}
 
 pub trait Filesystem: HasName + HasUuid {
-    /// Rename this filesystem.
-    fn rename(&mut self, name: &str) -> ();
+    /// Unconditionally sets the name of this filesystem to name.
+    fn set_name(&mut self, name: &str) -> ();
     /// Destroy this filesystem
     fn destroy(self) -> EngineResult<()>;
 }
@@ -68,7 +68,7 @@ pub trait Pool: HasName + HasUuid {
     /// Returns a list of device nodes corresponding to devices actually added.
     /// Returns an error if a blockdev can not be added because it is owned
     /// or there was an error while reading or writing a blockdev.
-    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
+    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>>;
 
     /// Destroy the pool.
     /// Will fail if filesystems allocated from the pool are in use,
@@ -92,11 +92,14 @@ pub trait Pool: HasName + HasUuid {
                          new_name: &str)
                          -> EngineResult<RenameAction>;
 
-    /// Rename this pool.
-    fn rename(&mut self, name: &str) -> ();
+    /// Unconditionally sets the name of this pool to name.
+    fn set_name(&mut self, name: &str) -> ();
 
     /// Get the filesystem in this pool with this UUID.
     fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem>;
+
+    /// Get the blockdev in this pool with this UUID.
+    fn get_blockdev(&mut self, uuid: &DevUuid) -> Option<&mut Dev>;
 }
 
 pub trait Engine: Debug {
@@ -110,7 +113,7 @@ pub trait Engine: Debug {
                    blockdev_paths: &[&Path],
                    redundancy: Option<u16>,
                    force: bool)
-                   -> EngineResult<(PoolUuid, Vec<PathBuf>)>;
+                   -> EngineResult<(PoolUuid, Vec<DevUuid>)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.

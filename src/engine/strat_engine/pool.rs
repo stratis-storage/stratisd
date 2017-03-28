@@ -18,6 +18,7 @@ use serde_json;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
+use engine::Dev;
 use engine::Filesystem;
 use engine::Pool;
 use engine::RenameAction;
@@ -26,8 +27,8 @@ use engine::strat_engine::blockdev::wipe_sectors;
 use engine::strat_engine::lineardev::LinearDev;
 use engine::strat_engine::thinpooldev::ThinPoolDev;
 
-use super::super::engine::{FilesystemUuid, HasName, HasUuid};
-use super::super::structures::Table;
+use super::super::engine::{DevUuid, FilesystemUuid, HasName, HasUuid};
+use super::super::structures::Table2;
 
 use super::serde_structs::StratSave;
 use super::blockdev::{BlockDev, initialize, resolve_devices};
@@ -43,7 +44,7 @@ pub struct StratPool {
     name: String,
     pool_uuid: Uuid,
     pub block_devs: HashMap<PathBuf, BlockDev>,
-    pub filesystems: Table<StratFilesystem>,
+    pub filesystems: Table2<StratFilesystem>,
     redundancy: Redundancy,
     thin_pool: ThinPoolDev,
 }
@@ -100,7 +101,7 @@ impl StratPool {
             name: name.to_owned(),
             pool_uuid: pool_uuid,
             block_devs: blockdevs,
-            filesystems: Table::new(),
+            filesystems: Table2::new(),
             redundancy: redundancy,
             thin_pool: thinpool_dev,
         };
@@ -192,15 +193,15 @@ impl Pool for StratPool {
         Ok(result)
     }
 
-    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
+    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
         let devices = try!(resolve_devices(paths));
         let bds = try!(initialize(&self.pool_uuid, devices, MIN_MDA_SECTORS, force));
-        let bdev_paths = bds.iter().map(|p| p.devnode.clone()).collect();
+        let bdev_uuids = bds.iter().map(|p| p.uuid().clone()).collect();
         for bd in bds {
             self.block_devs.insert(bd.devnode.clone(), bd);
         }
         try!(self.write_metadata());
-        Ok(bdev_paths)
+        Ok(bdev_uuids)
     }
 
     fn destroy(self) -> EngineResult<()> {
@@ -229,12 +230,16 @@ impl Pool for StratPool {
         rename_filesystem!{self; uuid; new_name}
     }
 
-    fn rename(&mut self, name: &str) {
+    fn set_name(&mut self, name: &str) {
         self.name = name.to_owned();
     }
 
     fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
         get_filesystem!(self; uuid)
+    }
+
+    fn get_blockdev(&mut self, _uuid: &DevUuid) -> Option<&mut Dev> {
+        unimplemented!()
     }
 }
 

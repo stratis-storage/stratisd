@@ -2,13 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use engine::Dev;
-
 use std::cell::RefCell;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use uuid::Uuid;
+
+use engine::Dev;
+
+use super::super::engine::{DevUuid, HasUuid};
 use super::randomization::Randomizer;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -21,12 +24,19 @@ pub enum State {
 #[derive(Debug)]
 /// A simulated device.
 pub struct SimDev {
-    pub devnode: PathBuf,
+    devnode: PathBuf,
     rdm: Rc<RefCell<Randomizer>>,
-    pub state: State,
+    state: State,
+    uuid: Uuid,
 }
 
 impl Dev for SimDev {}
+
+impl HasUuid for SimDev {
+    fn uuid(&self) -> &DevUuid {
+        &self.uuid
+    }
+}
 
 impl SimDev {
     /// Generates a new device from any devnode.
@@ -35,6 +45,7 @@ impl SimDev {
             devnode: devnode.to_owned(),
             rdm: rdm,
             state: State::OK,
+            uuid: Uuid::new_v4(),
         }
     }
 

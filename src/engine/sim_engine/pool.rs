@@ -13,6 +13,7 @@ use std::vec::Vec;
 
 use uuid::Uuid;
 
+use engine::Dev;
 use engine::EngineError;
 use engine::EngineResult;
 use engine::ErrorEnum;
@@ -23,8 +24,8 @@ use engine::RenameAction;
 use engine::engine::Redundancy;
 
 use super::blockdev::SimDev;
-use super::super::engine::{FilesystemUuid, HasName, HasUuid, PoolUuid};
-use super::super::structures::Table;
+use super::super::engine::{DevUuid, FilesystemUuid, HasName, HasUuid, PoolUuid};
+use super::super::structures::Table2;
 use super::filesystem::SimFilesystem;
 use super::randomization::Randomizer;
 
@@ -33,7 +34,7 @@ pub struct SimPool {
     name: String,
     pool_uuid: PoolUuid,
     pub block_devs: HashMap<PathBuf, SimDev>,
-    pub filesystems: Table<SimFilesystem>,
+    pub filesystems: Table2<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
 }
@@ -52,7 +53,7 @@ impl SimPool {
             name: name.to_owned(),
             pool_uuid: Uuid::new_v4(),
             block_devs: HashMap::from_iter(device_pairs),
-            filesystems: Table::new(),
+            filesystems: Table2::new(),
             redundancy: redundancy,
             rdm: rdm.clone(),
         };
@@ -62,13 +63,15 @@ impl SimPool {
 }
 
 impl Pool for SimPool {
-    fn add_blockdevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
+    fn add_blockdevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<DevUuid>> {
         let rdm = self.rdm.clone();
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs = devices.iter()
-            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
+            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)))
+            .collect::<Vec<(PathBuf, SimDev)>>();
+        let uuids = device_pairs.iter().map(|p| (p.1.uuid().clone())).collect();
         self.block_devs.extend(device_pairs);
-        Ok(devices.iter().map(|d| d.to_path_buf()).collect())
+        Ok(uuids)
     }
 
     fn destroy_filesystems<'a, 'b>(&'a mut self,
@@ -110,12 +113,16 @@ impl Pool for SimPool {
         rename_filesystem!{self; uuid; new_name}
     }
 
-    fn rename(&mut self, name: &str) {
+    fn set_name(&mut self, name: &str) {
         self.name = name.to_owned();
     }
 
     fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
         get_filesystem!(self; uuid)
+    }
+
+    fn get_blockdev(&mut self, _uuid: &DevUuid) -> Option<&mut Dev> {
+        unimplemented!()
     }
 }
 

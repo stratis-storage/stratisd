@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::path::Path;
-use std::path::PathBuf;
 
 use devicemapper::DM;
 use uuid::Uuid;
@@ -18,8 +17,8 @@ use engine::RenameAction;
 
 use super::pool::StratPool;
 
-use super::super::engine::{HasName, HasUuid, PoolUuid};
-use super::super::structures::Table;
+use super::super::engine::{DevUuid, HasName, HasUuid, PoolUuid};
+use super::super::structures::Table2;
 
 #[derive(Debug)]
 pub enum DevOwnership {
@@ -30,12 +29,12 @@ pub enum DevOwnership {
 
 #[derive(Debug)]
 pub struct StratEngine {
-    pools: Table<StratPool>,
+    pools: Table2<StratPool>,
 }
 
 impl StratEngine {
     pub fn new() -> StratEngine {
-        StratEngine { pools: Table::new() }
+        StratEngine { pools: Table2::new() }
     }
 }
 
@@ -49,7 +48,7 @@ impl Engine for StratEngine {
                    blockdev_paths: &[&Path],
                    redundancy: Option<u16>,
                    force: bool)
-                   -> EngineResult<(PoolUuid, Vec<PathBuf>)> {
+                   -> EngineResult<(PoolUuid, Vec<DevUuid>)> {
 
         let redundancy = calculate_redundancy!(redundancy);
 
@@ -59,11 +58,11 @@ impl Engine for StratEngine {
 
         let dm = try!(DM::new());
         let pool = try!(StratPool::new(name, &dm, blockdev_paths, redundancy, force));
-        let bdev_paths = pool.block_devs.iter().map(|p| p.1.devnode.clone()).collect();
+        let bdev_uuids = pool.block_devs.iter().map(|p| p.1.uuid().clone()).collect();
 
         let uuid = pool.uuid().clone();
         self.pools.insert(pool);
-        Ok((uuid, bdev_paths))
+        Ok((uuid, bdev_uuids))
     }
 
     /// Destroy a pool, if the pool does not exist, return Ok.

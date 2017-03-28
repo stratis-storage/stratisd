@@ -74,7 +74,7 @@ macro_rules! rename_pool {
 
         let mut pool = $s.pools.remove_by_uuid($uuid)
             .expect("Must succeed since $s.pools.get_by_uuid() returned a value.");
-        pool.rename($new_name);
+        pool.set_name($new_name);
         $s.pools.insert(pool);
         return Ok(RenameAction::Renamed);
     }
@@ -105,7 +105,7 @@ macro_rules! rename_filesystem {
 
         let mut filesystem = $s.filesystems.remove_by_uuid($uuid)
             .expect("Must succeed since $s.filesystems.get_by_uuid() returned a value.");
-        filesystem.rename($new_name);
+        filesystem.set_name($new_name);
         $s.filesystems.insert(filesystem);
         return Ok(RenameAction::Renamed);
     }

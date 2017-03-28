@@ -63,7 +63,7 @@ impl HasUuid for StratFilesystem {
 }
 
 impl Filesystem for StratFilesystem {
-    fn rename(&mut self, name: &str) {
+    fn set_name(&mut self, name: &str) {
         self.name = name.to_owned();
     }
 

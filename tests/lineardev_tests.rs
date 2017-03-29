@@ -13,16 +13,17 @@ use devicemapper::DM;
 
 use libstratis::engine::strat_engine::blockdev;
 use libstratis::engine::strat_engine::blockdev::BlockDev;
+use libstratis::engine::strat_engine::device::blkdev_size;
 use libstratis::engine::strat_engine::device::resolve_devices;
 use libstratis::engine::strat_engine::lineardev::LinearDev;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 use libstratis::types::Sectors;
 
+use std::fs::File;
 use std::iter::FromIterator;
 use std::path::Path;
 
 use util::blockdev_utils::clean_blockdev_headers;
-use util::blockdev_utils::get_size;
 use util::test_config::TestConfig;
 use util::test_consts::DEFAULT_CONFIG_FILE;
 use util::test_result::TestError::Framework;
@@ -30,6 +31,22 @@ use util::test_result::TestErrorEnum::Error;
 use util::test_result::TestResult;
 
 use uuid::Uuid;
+
+
+fn get_size(path: &Path) -> TestResult<Sectors> {
+    let f = match File::open(path) {
+        Ok(file) => file,
+        Err(e) => panic!("Failed to open blockdev : {:?}", e),
+    };
+
+    match blkdev_size(&f) {
+        Ok(bytes) => return Ok(bytes.sectors()),
+        Err(e) => {
+            let error_message = format!("{:?} for device {:?}", e, path);
+            return Err(Framework(Error(error_message)));
+        }
+    };
+}
 
 /// Return a LinearDev with concatenated BlockDevs
 fn concat_blockdevs(dm: &DM, name: &str, block_devs: &[&BlockDev]) -> TestResult<LinearDev> {

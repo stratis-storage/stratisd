@@ -4,12 +4,10 @@
 
 use std::io;
 use std::collections::BTreeSet;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::ErrorKind;
-use std::fs::{OpenOptions, read_dir};
+use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 
@@ -28,51 +26,6 @@ pub use super::BlockDevSave;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
 
-
-/// Find all Stratis Blockdevs.
-///
-/// Returns a map of pool uuids to maps of blockdev uuids to blockdevs.
-pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>> {
-
-    /// If a Path refers to a valid Stratis blockdev, return a BlockDev
-    /// struct. Otherwise, return None. Return an error if there was
-    /// a problem inspecting the device.
-    fn setup(devnode: &Path) -> EngineResult<Option<BlockDev>> {
-        let mut f = try!(OpenOptions::new()
-            .read(true)
-            .open(devnode));
-
-        if let Some(bda) = BDA::load(&mut f).ok() {
-            let dev = try!(Device::from_str(&devnode.to_string_lossy()));
-            Ok(Some(BlockDev {
-                dev: dev,
-                devnode: devnode.to_owned(),
-                bda: bda,
-            }))
-        } else {
-            Ok(None)
-        }
-    }
-
-    let mut pool_map = HashMap::new();
-    for dir_e in try!(read_dir("/dev")) {
-        let devnode = match dir_e {
-            Ok(d) => d.path(),
-            Err(_) => continue,
-        };
-
-        match setup(&devnode) {
-            Ok(Some(blockdev)) => {
-                pool_map.entry(blockdev.pool_uuid().clone())
-                    .or_insert_with(HashMap::new)
-                    .insert(blockdev.uuid().clone(), blockdev);
-            }
-            _ => continue,
-        };
-    }
-
-    Ok(pool_map)
-}
 
 /// Initialize multiple blockdevs at once. This allows all of them
 /// to be checked for usability before writing to any of them.
@@ -200,6 +153,14 @@ pub struct BlockDev {
 }
 
 impl BlockDev {
+    pub fn new(dev: Device, devnode: &Path, bda: BDA) -> BlockDev {
+        BlockDev {
+            dev: dev,
+            devnode: devnode.to_owned(),
+            bda: bda,
+        }
+    }
+
     pub fn to_save(&self) -> BlockDevSave {
         BlockDevSave {
             devnode: self.devnode.clone(),

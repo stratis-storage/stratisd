@@ -12,12 +12,14 @@ build:
 test-loop:
 	RUSTFLAGS='-D warnings' cargo test -- --test test_force_flag
 	RUSTFLAGS='-D warnings' cargo test -- --test test_new_blockdevs
+	RUSTFLAGS='-D warnings' cargo test -- --test test_setup
 
 test:
 	RUSTFLAGS='-D warnings' \
 	cargo test -- --skip test_pools \
 		--skip test_lineardev_setup --skip test_thinpool \
-		--skip test_force_flag --skip test_new_blockdevs
+		--skip test_force_flag --skip test_new_blockdevs \
+		--skip test_setup
 
 docs:
 	cargo doc --no-deps

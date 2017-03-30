@@ -22,6 +22,7 @@ use libstratis::engine::strat_engine::blockdev::{initialize, BlockDev};
 use libstratis::engine::strat_engine::device::{resolve_devices, wipe_sectors};
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 use libstratis::engine::strat_engine::pool::StratPool;
+// use libstratis::engine::strat_engine::setup::find_all;
 use libstratis::types::{Bytes, Sectors};
 
 
@@ -137,4 +138,28 @@ pub fn test_new_blockdevs() {
     let spec = LoopDeviceSpec {};
     test_with_spec(&[&spec, &spec], property);
     test_with_spec(&[&spec, &spec, &spec], property);
+}
+
+/// Verify that find_all function locates and assigns pools appropriately.
+#[test]
+pub fn test_setup() {
+    fn property(paths: &[&Path]) -> () {
+        let (paths1, paths2) = paths.split_at(2);
+
+        let unique_devices = resolve_devices(paths1).unwrap();
+        let uuid1 = Uuid::new_v4();
+        initialize(&uuid1, unique_devices, MIN_MDA_SECTORS, false).unwrap();
+        // let pools = find_all().unwrap();
+        // assert!(pools.len() == 1);
+        // assert!(pools.contains_key(&uuid1));
+        // let devices = pools.get(&uuid1).expect("pools.contains_key(&uuid) was true");
+        // assert!(devices.len() == 2);
+
+        let unique_devices = resolve_devices(paths2).unwrap();
+        let uuid2 = Uuid::new_v4();
+        initialize(&uuid2, unique_devices, MIN_MDA_SECTORS, false).unwrap();
+    }
+
+    let spec = LoopDeviceSpec {};
+    test_with_spec(&[&spec, &spec, &spec, &spec], property);
 }

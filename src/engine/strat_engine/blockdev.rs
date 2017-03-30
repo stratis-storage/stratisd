@@ -296,7 +296,7 @@ impl BlockDev {
     }
 
     /// Last time metadata was written to this device.
-    pub fn last_update_time(&self) -> &Option<Timespec> {
+    pub fn last_update_time(&self) -> Option<&Timespec> {
         self.bda.last_update_time()
     }
 }

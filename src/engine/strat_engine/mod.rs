@@ -3,12 +3,14 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 pub mod blockdev;
+pub mod device;
 pub mod engine;
 pub mod lineardev;
 pub mod metadata;
 pub mod filesystem;
 pub mod pool;
 pub mod serde_structs;
+pub mod setup;
 pub mod thindev;
 pub mod thinpooldev;
 

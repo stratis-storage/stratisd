@@ -118,8 +118,8 @@ impl BDA {
 
     /// The time when the most recent metadata was written to the BDA,
     /// if any.
-    pub fn last_update_time(&self) -> &Option<Timespec> {
-        &self.regions.mdas[self.regions.newer()].last_updated
+    pub fn last_update_time(&self) -> Option<&Timespec> {
+        self.regions.last_update_time()
     }
 
     /// The UUID of the device.
@@ -359,14 +359,11 @@ impl MDARegions {
             Ok(())
         };
 
-        let older_region = self.older();
-
-        if let Some(updated) = self.mdas[older_region].last_updated {
-            if updated >= *time {
-                return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                               "Overwriting newer data".into()));
-            }
+        if self.last_update_time() >= Some(time) {
+            return Err(EngineError::Engine(ErrorEnum::Invalid, "Overwriting newer data".into()));
         }
+
+        let older_region = self.older();
 
         // Save to primary and backup regions
         // TODO: Should we ignore errors?
@@ -412,6 +409,11 @@ impl MDARegions {
             _ => panic!("invalid val from older()"),
         }
     }
+
+    /// The last update time for these MDA regions
+    pub fn last_update_time(&self) -> Option<&Timespec> {
+        self.mdas[self.newer()].last_updated.as_ref()
+    }
 }
 
 #[derive(Debug)]
@@ -438,6 +440,9 @@ impl MDAHeader {
         }
     }
 
+    /// Get an MDAHeader from the buffer.
+    /// Return an error for a bad checksum.
+    /// Return an error if the size of the region used is too large for the given region_size.
     pub fn from_buf(buf: &[u8; _MDA_REGION_HDR_SIZE],
                     region_size: Bytes)
                     -> EngineResult<MDAHeader> {
@@ -455,20 +460,23 @@ impl MDAHeader {
             }
         };
 
-        Ok(MDAHeader {
-            used: if time.is_none() {
-                None
-            } else {
-                Some(Bytes(LittleEndian::read_u64(&buf[8..16])))
-            },
-            last_updated: time,
-            region_size: region_size,
-            data_crc: if time.is_none() {
-                None
-            } else {
-                Some(LittleEndian::read_u32(&buf[4..8]))
-            },
-        })
+        if let Some(time) = time {
+            let used = Bytes(LittleEndian::read_u64(&buf[8..16]));
+            try!(check_mda_region_size(used, region_size));
+            Ok(MDAHeader {
+                used: Some(used),
+                last_updated: Some(time),
+                data_crc: Some(LittleEndian::read_u32(&buf[4..8])),
+                region_size: region_size,
+            })
+        } else {
+            Ok(MDAHeader {
+                used: None,
+                last_updated: None,
+                data_crc: None,
+                region_size: region_size,
+            })
+        }
     }
 
     pub fn to_buf(data_len: usize,
@@ -497,7 +505,8 @@ impl MDAHeader {
         where F: Read
     {
         if let Some(used) = self.used {
-            try!(check_mda_region_size(used, self.region_size));
+            // This should never fail, since the property is checked when the MDAHeader is loaded
+            assert!(MDA_REGION_HDR_SIZE + used <= self.region_size);
             // This cast could fail if running on a 32-bit machine and
             // size of metadata is greater than 2^32 - 1 bytes, which is
             // unlikely.
@@ -673,8 +682,8 @@ mod tests {
             bda.save_state(&current_time, &state, &mut buf).unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();
 
-            if let &Some(t) = bda.last_update_time() {
-                if t != current_time {
+            if let Some(t) = bda.last_update_time() {
+                if *t != current_time {
                     return TestResult::failed();
                 }
             } else {
@@ -700,8 +709,8 @@ mod tests {
                 return TestResult::failed();
             }
 
-            if let &Some(t) = bda.last_update_time() {
-                if t != current_time {
+            if let Some(t) = bda.last_update_time() {
+                if *t != current_time {
                     return TestResult::failed();
                 }
             } else {
@@ -720,8 +729,8 @@ mod tests {
                 return TestResult::failed();
             }
 
-            if let &Some(t) = bda.last_update_time() {
-                if t != current_time {
+            if let Some(t) = bda.last_update_time() {
+                if *t != current_time {
                     return TestResult::failed();
                 }
             } else {
@@ -792,5 +801,26 @@ mod tests {
         QuickCheck::new()
             .tests(50)
             .quickcheck(mda_header as fn(Vec<u8>, i64, i32, u32) -> TestResult);
+    }
+
+    /// Verify that bad crc causes an error.
+    #[test]
+    fn test_from_buf_crc_error() {
+        let data = [0u8; 3];
+        let timestamp = now().to_timespec();
+        let data_crc = crc32::checksum_ieee(&data);
+        let mut buf = MDAHeader::to_buf(data.len(), data_crc, &timestamp);
+        LittleEndian::write_u32(&mut buf[..4], 0u32);
+        assert!(MDAHeader::from_buf(&buf, Bytes(data.len() as u64) + MDA_REGION_HDR_SIZE).is_err());
+    }
+
+    /// Verify that too small region_size causes an error.
+    #[test]
+    fn test_from_buf_size_error() {
+        let data = [0u8; 3];
+        let timestamp = now().to_timespec();
+        let data_crc = crc32::checksum_ieee(&data);
+        let buf = MDAHeader::to_buf(data.len(), data_crc, &timestamp);
+        assert!(MDAHeader::from_buf(&buf, MDA_REGION_HDR_SIZE).is_err());
     }
 }

@@ -5,7 +5,7 @@
 use devicemapper::{DM, DevId, DeviceInfo, DmFlags};
 
 use engine::{EngineError, EngineResult, ErrorEnum};
-use engine::strat_engine::blockdev::blkdev_size;
+use engine::strat_engine::device::blkdev_size;
 
 use std::fmt;
 use std::fs::File;

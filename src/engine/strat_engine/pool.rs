@@ -11,7 +11,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::vec::Vec;
 
-use time;
+use time::{now, Timespec};
 use uuid::Uuid;
 use serde_json;
 
@@ -22,7 +22,7 @@ use engine::Filesystem;
 use engine::Pool;
 use engine::RenameAction;
 use engine::engine::Redundancy;
-use engine::strat_engine::blockdev::wipe_sectors;
+use engine::strat_engine::device::wipe_sectors;
 use engine::strat_engine::lineardev::LinearDev;
 use engine::strat_engine::thinpooldev::ThinPoolDev;
 
@@ -30,7 +30,8 @@ use super::super::engine::{FilesystemUuid, HasName, HasUuid};
 use super::super::structures::Table;
 
 use super::serde_structs::StratSave;
-use super::blockdev::{BlockDev, initialize, resolve_devices};
+use super::blockdev::{BlockDev, initialize};
+use super::device::resolve_devices;
 use super::filesystem::StratFilesystem;
 use super::metadata::MIN_MDA_SECTORS;
 
@@ -113,7 +114,7 @@ impl StratPool {
     /// Return the metadata from the first blockdev with up-to-date, readable
     /// metadata.
     /// Precondition: All Blockdevs in blockdevs must belong to the same pool.
-    pub fn read_metadata(blockdevs: &[&BlockDev]) -> Option<Vec<u8>> {
+    pub fn load_state(blockdevs: &[&BlockDev]) -> Option<Vec<u8>> {
         if blockdevs.is_empty() {
             return None;
         }
@@ -138,23 +139,31 @@ impl StratPool {
         None
     }
 
-    /// Write the given data to all blockdevs
-    pub fn write_metadata(&mut self) -> EngineResult<()> {
-
-        let data = try!(serde_json::to_string(&self.to_save()));
-
-        // TODO: Cap # of blockdevs written to, as described in SWDD
-        // TODO: Check current time against global last updated, and use
-        // alternate time value if earlier, as described in SWDD
-
-        let time = time::now().to_timespec();
-
+    /// Write the given data to all blockdevs marking with specified time.
+    pub fn save_state(devs: &mut [&mut BlockDev],
+                      time: &Timespec,
+                      metadata: &[u8])
+                      -> EngineResult<()> {
         // TODO: Do something better than panic when saving to blockdev fails.
-        for (_, bd) in &mut self.block_devs {
-            bd.save_state(&time, data.as_bytes()).unwrap();
+        // Panic can occur for a the usual IO reasons, but also:
+        // 1. If the timestamp is older than a previously written timestamp.
+        // 2. If the variable length metadata is too large.
+        for bd in devs {
+            bd.save_state(time, metadata).unwrap();
         }
-
         Ok(())
+    }
+
+    /// Write pool metadata to all its blockdevs marking with current time.
+
+    // TODO: Cap # of blockdevs written to, as described in SWDD
+
+    // TODO: Check current time against global last updated, and use
+    // alternate time value if earlier, as described in SWDD
+    pub fn write_metadata(&mut self) -> EngineResult<()> {
+        let data = try!(serde_json::to_string(&self.to_save()));
+        let mut blockdevs: Vec<&mut BlockDev> = self.block_devs.values_mut().collect();
+        StratPool::save_state(&mut blockdevs, &now().to_timespec(), data.as_bytes())
     }
 
     pub fn to_save(&self) -> StratSave {

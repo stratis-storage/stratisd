@@ -11,15 +11,34 @@ mod util;
 use libstratis::engine::Engine;
 use libstratis::engine::strat_engine::StratEngine;
 use libstratis::engine::strat_engine::engine::DevOwnership;
+use libstratis::engine::strat_engine::metadata::StaticHeader;
 
+use std::fs::OpenOptions;
 use std::path::Path;
 use std::path::PathBuf;
 
 use util::blockdev_utils::clean_blockdev_headers;
-use util::blockdev_utils::get_ownership;
 use util::test_config::TestConfig;
 use util::test_consts::DEFAULT_CONFIG_FILE;
-use util::test_result::TestResult;
+use util::test_result::{TestError, TestErrorEnum, TestResult};
+
+
+fn get_ownership(path: &Path) -> TestResult<DevOwnership> {
+
+    let mut f = try!(OpenOptions::new()
+        .read(true)
+        .open(&path));
+
+    let ownership = match StaticHeader::determine_ownership(&mut f) {
+        Ok(ownership) => ownership,
+        Err(err) => {
+            let error_message = format!("{} for device {:?}", err, path);
+            return Err(TestError::Framework(TestErrorEnum::Error(error_message)));
+        }
+    };
+
+    Ok(ownership)
+}
 
 // Check to make sure the disks in blockdev_paths are no longer "Owned" by
 // Stratis

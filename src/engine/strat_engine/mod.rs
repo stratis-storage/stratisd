@@ -10,6 +10,7 @@ pub mod metadata;
 pub mod filesystem;
 pub mod pool;
 pub mod serde_structs;
+pub mod setup;
 pub mod thindev;
 pub mod thinpooldev;
 

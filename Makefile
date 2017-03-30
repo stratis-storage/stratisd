@@ -19,7 +19,7 @@ test:
 	cargo test -- --skip test_pools \
 		--skip test_force_flag_dirty --skip test_force_flag_stratis \
 		--skip test_lineardev_setup --skip test_new_blockdevs \
-		--skip test_thinpool
+		--skip test_setup --skip test_thinpool
 
 docs:
 	cargo doc --no-deps

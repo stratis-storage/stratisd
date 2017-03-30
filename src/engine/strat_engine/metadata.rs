@@ -118,8 +118,8 @@ impl BDA {
 
     /// The time when the most recent metadata was written to the BDA,
     /// if any.
-    pub fn last_update_time(&self) -> &Option<Timespec> {
-        &self.regions.mdas[self.regions.newer()].last_updated
+    pub fn last_update_time(&self) -> Option<&Timespec> {
+        self.regions.last_update_time()
     }
 
     /// The UUID of the device.
@@ -359,14 +359,11 @@ impl MDARegions {
             Ok(())
         };
 
-        let older_region = self.older();
-
-        if let Some(updated) = self.mdas[older_region].last_updated {
-            if updated >= *time {
-                return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                               "Overwriting newer data".into()));
-            }
+        if self.last_update_time() >= Some(time) {
+            return Err(EngineError::Engine(ErrorEnum::Invalid, "Overwriting newer data".into()));
         }
+
+        let older_region = self.older();
 
         // Save to primary and backup regions
         // TODO: Should we ignore errors?
@@ -411,6 +408,11 @@ impl MDARegions {
             1 => 0,
             _ => panic!("invalid val from older()"),
         }
+    }
+
+    /// The last update time for these MDA regions
+    pub fn last_update_time(&self) -> Option<&Timespec> {
+        self.mdas[self.newer()].last_updated.as_ref()
     }
 }
 
@@ -673,8 +675,8 @@ mod tests {
             bda.save_state(&current_time, &state, &mut buf).unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();
 
-            if let &Some(t) = bda.last_update_time() {
-                if t != current_time {
+            if let Some(t) = bda.last_update_time() {
+                if *t != current_time {
                     return TestResult::failed();
                 }
             } else {
@@ -700,8 +702,8 @@ mod tests {
                 return TestResult::failed();
             }
 
-            if let &Some(t) = bda.last_update_time() {
-                if t != current_time {
+            if let Some(t) = bda.last_update_time() {
+                if *t != current_time {
                     return TestResult::failed();
                 }
             } else {
@@ -720,8 +722,8 @@ mod tests {
                 return TestResult::failed();
             }
 
-            if let &Some(t) = bda.last_update_time() {
-                if t != current_time {
+            if let Some(t) = bda.last_update_time() {
+                if *t != current_time {
                     return TestResult::failed();
                 }
             } else {

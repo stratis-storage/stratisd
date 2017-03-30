@@ -657,6 +657,43 @@ mod tests {
     }
 
     #[test]
+    /// Construct a BDA and verify that an error is returned if timestamp
+    /// of saved data is older than timestamp of most recently written data.
+    fn test_early_times_err() {
+        let data = [0u8; 3];
+
+        // Construct a BDA.
+        let sh = random_static_header(0, 0);
+        let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+        let mut bda = BDA::initialize(&mut buf,
+                                      &sh.pool_uuid,
+                                      &sh.dev_uuid,
+                                      sh.mda_size,
+                                      sh.blkdev_size)
+            .unwrap();
+
+        let timestamp0 = now().to_timespec();
+        let timestamp1 = now().to_timespec();
+        assert!(timestamp0 != timestamp1);
+
+        let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+        bda.save_state(&timestamp1, &data, &mut buf).unwrap();
+
+        // Error, because current timestamp is older than written to newer.
+        assert!(bda.save_state(&timestamp0, &data, &mut buf).is_err());
+
+        let timestamp2 = now().to_timespec();
+        let timestamp3 = now().to_timespec();
+        assert!(timestamp2 != timestamp3);
+
+        bda.save_state(&timestamp3, &data, &mut buf).unwrap();
+
+        // Error, because current timestamp is older than written to newer.
+        assert!(bda.save_state(&timestamp2, &data, &mut buf).is_err());
+    }
+
+
+    #[test]
     /// Construct an arbitrary StaticHeader object.
     /// Initialize a BDA.
     /// Save metadata and verify correct update time and state.
@@ -800,5 +837,26 @@ mod tests {
         QuickCheck::new()
             .tests(50)
             .quickcheck(mda_header as fn(Vec<u8>, i64, i32, u32) -> TestResult);
+    }
+
+    /// Verify that bad crc causes an error.
+    #[test]
+    fn test_from_buf_crc_error() {
+        let data = [0u8; 3];
+        let timestamp = now().to_timespec();
+        let data_crc = crc32::checksum_ieee(&data);
+        let mut buf = MDAHeader::to_buf(data.len(), data_crc, &timestamp);
+        LittleEndian::write_u32(&mut buf[..4], 0u32);
+        assert!(MDAHeader::from_buf(&buf, Bytes(data.len() as u64) + MDA_REGION_HDR_SIZE).is_err());
+    }
+
+    /// Verify that too small region_size causes an error.
+    #[test]
+    fn test_from_buf_size_error() {
+        let data = [0u8; 3];
+        let timestamp = now().to_timespec();
+        let data_crc = crc32::checksum_ieee(&data);
+        let buf = MDAHeader::to_buf(data.len(), data_crc, &timestamp);
+        assert!(MDAHeader::from_buf(&buf, MDA_REGION_HDR_SIZE).is_err());
     }
 }

@@ -802,4 +802,25 @@ mod tests {
             .tests(50)
             .quickcheck(mda_header as fn(Vec<u8>, i64, i32, u32) -> TestResult);
     }
+
+    /// Verify that bad crc causes an error.
+    #[test]
+    fn test_from_buf_crc_error() {
+        let data = [0u8; 3];
+        let timestamp = now().to_timespec();
+        let data_crc = crc32::checksum_ieee(&data);
+        let mut buf = MDAHeader::to_buf(data.len(), data_crc, &timestamp);
+        LittleEndian::write_u32(&mut buf[..4], 0u32);
+        assert!(MDAHeader::from_buf(&buf, Bytes(data.len() as u64) + MDA_REGION_HDR_SIZE).is_err());
+    }
+
+    /// Verify that too small region_size causes an error.
+    #[test]
+    fn test_from_buf_size_error() {
+        let data = [0u8; 3];
+        let timestamp = now().to_timespec();
+        let data_crc = crc32::checksum_ieee(&data);
+        let buf = MDAHeader::to_buf(data.len(), data_crc, &timestamp);
+        assert!(MDAHeader::from_buf(&buf, MDA_REGION_HDR_SIZE).is_err());
+    }
 }

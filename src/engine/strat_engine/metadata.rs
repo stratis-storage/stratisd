@@ -10,12 +10,13 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
 use crc::crc32;
+use devicemapper::types::{Bytes, Sectors};
+use devicemapper::consts::SECTOR_SIZE;
 use time::Timespec;
 use uuid::Uuid;
 
-use types::{Bytes, Sectors};
 use super::engine::DevOwnership;
-use consts::{SECTOR_SIZE, IEC};
+use consts::IEC;
 use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
 
 const _BDA_STATIC_HDR_SECTORS: usize = 16;
@@ -556,16 +557,14 @@ mod tests {
     use std::io::Cursor;
 
     use crc::crc32;
+    use devicemapper::types::{Bytes, Sectors};
+    use quickcheck::{QuickCheck, TestResult};
     use time::{now, Timespec};
     use uuid::Uuid;
 
-    use quickcheck::{QuickCheck, TestResult};
-
     use consts::IEC;
-    use types::{Bytes, Sectors};
 
     use super::super::engine::DevOwnership;
-
     use super::*;
 
     /// Return a static header with random block device and MDA size.

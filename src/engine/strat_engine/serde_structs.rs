@@ -15,11 +15,10 @@
 // Look for "to_save" and "setup" methods, that either return or take
 // the below structs as parameters.
 
-
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use types::Sectors;
+use devicemapper::types::Sectors;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockDevSave {

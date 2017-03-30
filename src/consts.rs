@@ -13,5 +13,3 @@ pub mod IEC {
     pub const Ei: u64 = 1024 * Pi;
     // Ei is the maximum IEC unit expressible in u64.
 }
-
-pub const SECTOR_SIZE: usize = 512;

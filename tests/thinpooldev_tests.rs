@@ -11,7 +11,11 @@ extern crate tempdir;
 #[macro_use]
 mod util;
 
+use std::path::Path;
+
 use devicemapper::DM;
+use devicemapper::types::DataBlocks;
+use devicemapper::types::Sectors;
 
 use libstratis::engine::strat_engine::blockdev;
 use libstratis::engine::strat_engine::blockdev::BlockDev;
@@ -20,10 +24,6 @@ use libstratis::engine::strat_engine::lineardev::LinearDev;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 use libstratis::engine::strat_engine::thindev::ThinDev;
 use libstratis::engine::strat_engine::thinpooldev::ThinPoolDev;
-use libstratis::types::DataBlocks;
-use libstratis::types::Sectors;
-
-use std::path::Path;
 
 use tempdir::TempDir;
 

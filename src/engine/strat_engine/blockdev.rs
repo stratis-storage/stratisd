@@ -15,14 +15,15 @@ use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 
-use time::Timespec;
+
 use devicemapper::Device;
+use devicemapper::types::{Bytes, Sectors};
+use devicemapper::consts::SECTOR_SIZE;
+use time::Timespec;
 use uuid::Uuid;
 
-use types::{Bytes, Sectors};
+use consts::IEC;
 use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
-
-use consts::*;
 use super::metadata::{StaticHeader, BDA, validate_mda_size};
 use super::engine::DevOwnership;
 pub use super::BlockDevSave;

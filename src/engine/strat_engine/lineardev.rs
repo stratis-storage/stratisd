@@ -2,17 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use devicemapper::{DM, DevId, DeviceInfo, DmFlags};
-
-use engine::{EngineError, EngineResult, ErrorEnum};
-use engine::strat_engine::blockdev::blkdev_size;
-
 use std::fmt;
 use std::fs::File;
 use std::path::PathBuf;
 
+use devicemapper::{DM, DevId, DeviceInfo, DmFlags};
+use devicemapper::types::{Bytes, Sectors};
+
+use engine::{EngineError, EngineResult, ErrorEnum};
+use engine::strat_engine::blockdev::blkdev_size;
+
 use super::blockdev::BlockDev;
-use types::{Bytes, Sectors};
 
 pub struct LinearDev {
     name: String,

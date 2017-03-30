@@ -2,17 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use devicemapper::{DM, DevId, DeviceInfo, DmFlags};
-use engine::{EngineError, EngineResult, ErrorEnum};
-use engine::strat_engine::blockdev::BlockDev;
-use engine::strat_engine::thinpooldev::ThinPoolDev;
-
 use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 
-use types::Sectors;
+use devicemapper::{DM, DevId, DeviceInfo, DmFlags};
+use devicemapper::types::Sectors;
+
+use engine::{EngineError, EngineResult, ErrorEnum};
+use engine::strat_engine::blockdev::BlockDev;
+use engine::strat_engine::thinpooldev::ThinPoolDev;
 
 #[derive(Clone)]
 pub struct ThinDev {

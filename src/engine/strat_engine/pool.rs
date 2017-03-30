@@ -143,6 +143,9 @@ impl StratPool {
                       metadata: &[u8])
                       -> EngineResult<()> {
         // TODO: Do something better than panic when saving to blockdev fails.
+        // Panic can occur for a the usual IO reasons, but also:
+        // 1. If the timestamp is older than a previously written timestamp.
+        // 2. If the variable length metadata is too large.
         for bd in devs {
             bd.save_state(time, metadata).unwrap();
         }

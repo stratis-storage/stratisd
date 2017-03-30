@@ -11,6 +11,7 @@ pub mod filesystem;
 pub mod pool;
 pub mod serde_structs;
 pub mod range_alloc;
+pub mod setup;
 
 pub use self::engine::StratEngine;
 pub use self::pool::StratPool;

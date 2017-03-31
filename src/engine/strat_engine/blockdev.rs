@@ -3,8 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::io;
-use std::collections::BTreeSet;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::ErrorKind;
 use std::io::{Seek, Write, SeekFrom};
@@ -43,9 +42,8 @@ pub fn blkdev_size(file: &File) -> EngineResult<Bytes> {
 
 /// Resolve a list of Paths of some sort to a set of unique Devices.
 /// Return an IOError if there was a problem resolving any particular device.
-// FIXME: BTreeSet -> HashSet once Device is hashable
-pub fn resolve_devices(paths: &[&Path]) -> io::Result<BTreeSet<Device>> {
-    let mut devices = BTreeSet::new();
+pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
+    let mut devices = HashSet::new();
     for path in paths {
         let dev = try!(Device::from_str(&path.to_string_lossy()));
         devices.insert(dev);
@@ -116,9 +114,8 @@ pub fn wipe_sectors(path: &Path, offset: Sectors, sector_count: Sectors) -> Engi
 
 /// Initialize multiple blockdevs at once. This allows all of them
 /// to be checked for usability before writing to any of them.
-// FIXME: BTreeSet -> HashSet once Device is hashable
 pub fn initialize(pool_uuid: &PoolUuid,
-                  devices: BTreeSet<Device>,
+                  devices: HashSet<Device>,
                   mda_size: Sectors,
                   force: bool)
                   -> EngineResult<Vec<BlockDev>> {

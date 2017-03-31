@@ -11,11 +11,14 @@ extern crate tempdir;
 #[macro_use]
 mod util;
 
+use std::fs::File;
+use std::io::Write;
 use std::path::Path;
 
 use devicemapper::DM;
-use devicemapper::types::DataBlocks;
-use devicemapper::types::Sectors;
+use devicemapper::types::{DataBlocks, Sectors};
+use tempdir::TempDir;
+use uuid::Uuid;
 
 use libstratis::engine::strat_engine::blockdev;
 use libstratis::engine::strat_engine::blockdev::BlockDev;
@@ -25,15 +28,23 @@ use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 use libstratis::engine::strat_engine::thindev::ThinDev;
 use libstratis::engine::strat_engine::thinpooldev::ThinPoolDev;
 
-use tempdir::TempDir;
-
 use util::blockdev_utils::clean_blockdev_headers;
-use util::blockdev_utils::write_files_to_directory;
 use util::test_config::TestConfig;
 use util::test_consts::DEFAULT_CONFIG_FILE;
 use util::test_result::TestResult;
 
-use uuid::Uuid;
+
+fn write_files_to_directory(tmp_dir: &TempDir, number_of_files: u32) -> TestResult<()> {
+    for i in 0..number_of_files {
+        {
+            let file_path = tmp_dir.path().join(format!("stratis_test{}.txt", i));
+            let mut tmp_file = File::create(file_path)
+                .expect("failed to create temp file on filesystem");
+            writeln!(tmp_file, "Write some data to file.").expect("failed to write temp file");
+        }
+    }
+    Ok(())
+}
 
 fn setup_supporting_devs(dm: &DM,
                          metadata_blockdev: &BlockDev,

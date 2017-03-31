@@ -19,7 +19,6 @@ extern crate rand;
 extern crate serde;
 
 extern crate custom_derive;
-extern crate newtype_derive;
 extern crate enum_derive;
 
 #[cfg(test)]

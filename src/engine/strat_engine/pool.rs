@@ -2,8 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use devicemapper::DM;
-
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::RandomState;
 use std::iter::FromIterator;
@@ -11,6 +9,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::vec::Vec;
 
+use devicemapper::DM;
+use devicemapper::types::{DataBlocks, Sectors};
 use time;
 use uuid::Uuid;
 use serde_json;
@@ -33,8 +33,6 @@ use super::serde_structs::StratSave;
 use super::blockdev::{BlockDev, initialize, resolve_devices};
 use super::filesystem::StratFilesystem;
 use super::metadata::MIN_MDA_SECTORS;
-
-use types::{DataBlocks, Sectors};
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 

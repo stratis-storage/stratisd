@@ -3,17 +3,16 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 extern crate rand;
 
-use devicemapper::DM;
-
 use consts::IEC;
+
+use devicemapper::DM;
+use devicemapper::types::Bytes;
 
 use engine::EngineResult;
 use engine::Filesystem;
 use engine::strat_engine::thindev::ThinDev;
 use engine::strat_engine::thinpooldev::ThinPoolDev;
 use super::super::engine::{FilesystemUuid, HasName, HasUuid};
-use types::Bytes;
-
 
 #[derive(Debug)]
 pub struct StratFilesystem {

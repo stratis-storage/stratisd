@@ -2,17 +2,19 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 extern crate tempdir;
-
-use libstratis::engine::strat_engine::blockdev::blkdev_size;
-use libstratis::engine::strat_engine::blockdev::wipe_sectors;
-use libstratis::engine::strat_engine::engine::DevOwnership;
-use libstratis::engine::strat_engine::metadata::StaticHeader;
-use libstratis::types::Sectors;
+extern crate devicemapper;
 
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
+
+use devicemapper::types::Sectors;
+
+use libstratis::engine::strat_engine::blockdev::blkdev_size;
+use libstratis::engine::strat_engine::blockdev::wipe_sectors;
+use libstratis::engine::strat_engine::engine::DevOwnership;
+use libstratis::engine::strat_engine::metadata::StaticHeader;
 
 use util::blockdev_utils::tempdir::TempDir;
 use util::test_result::TestError;

@@ -9,16 +9,16 @@ extern crate libstratis;
 #[macro_use]
 mod util;
 
+use std::iter::FromIterator;
+use std::path::Path;
+
 use devicemapper::DM;
+use devicemapper::types::Sectors;
 
 use libstratis::engine::strat_engine::blockdev;
 use libstratis::engine::strat_engine::blockdev::BlockDev;
 use libstratis::engine::strat_engine::lineardev::LinearDev;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
-use libstratis::types::Sectors;
-
-use std::iter::FromIterator;
-use std::path::Path;
 
 use util::blockdev_utils::clean_blockdev_headers;
 use util::blockdev_utils::get_size;

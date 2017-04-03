@@ -41,6 +41,11 @@ licensed under the MPL 2.0 to be merged by us.
 
 ### Setting up for development
 
+Stratisd runs as root, and requires access to the D-Bus system bus. Thus in
+order to work properly, a D-Bus conf file must exist to grant access, either
+installed by distribution packaging; or manually, by copying `stratisd.conf`
+to `/etc/dbus-1/system.d/`.
+
 Stratisd requires Rust 1.15.1+ and Cargo to build. These may be available via
 your distribution's package manager. If not, [Rustup](https://www.rustup.rs/)
 is available to install and update the Rust toolchain.

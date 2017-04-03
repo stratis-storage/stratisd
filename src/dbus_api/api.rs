@@ -245,7 +245,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
 }
 
 pub fn run(engine: Box<Engine>) -> StratisResult<()> {
-    let c = try!(Connection::get_private(BusType::Session));
+    let c = try!(Connection::get_private(BusType::System));
 
     let mut tree = get_base_tree(DbusContext::new(engine));
     let dbus_context = tree.get_data().clone();

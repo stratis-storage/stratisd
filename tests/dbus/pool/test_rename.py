@@ -77,7 +77,7 @@ class SetNameTestCase(unittest.TestCase):
         Test rename to same name.
         """
         (result, rc, _) = checked_call(
-           Pool.SetName(self._pool_object, new_name=self._POOLNAME),
+           Pool.SetName(self._pool_object, name=self._POOLNAME),
            PoolSpec.OUTPUT_SIGS[_PN.SetName]
         )
 
@@ -97,7 +97,7 @@ class SetNameTestCase(unittest.TestCase):
         new_name = "new"
 
         (result, rc, _) = checked_call(
-           Pool.SetName(self._pool_object, new_name=new_name),
+           Pool.SetName(self._pool_object, name=new_name),
            PoolSpec.OUTPUT_SIGS[_PN.SetName]
         )
 

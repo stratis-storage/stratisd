@@ -73,13 +73,13 @@ class Destroy1TestCase(unittest.TestCase):
 
     def testBogusObjectPath(self):
         """
-        Failure should occur on a bogus object path.
+        Success should occur on a bogus object path.
         """
         (_, rc, _) = checked_call(
-           Manager.DestroyPool(self._proxy, pool_object_path="/"),
+           Manager.DestroyPool(self._proxy, pool="/"),
            ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
         )
-        self.assertEqual(rc, self._errors.POOL_NOTFOUND)
+        self.assertEqual(rc, self._errors.OK)
 
 
 class Destroy2TestCase(unittest.TestCase):
@@ -121,7 +121,7 @@ class Destroy2TestCase(unittest.TestCase):
         (pool1, _) = next(managed_objects.pools({'Name': self._POOLNAME}))
 
         (result, rc, _) = checked_call(
-           Manager.DestroyPool(self._proxy, pool_object_path=pool1),
+           Manager.DestroyPool(self._proxy, pool=pool1),
            ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
         )
 
@@ -175,7 +175,7 @@ class Destroy3TestCase(unittest.TestCase):
         (pool, _) = next(managed_objects.pools({'Name': self._POOLNAME}))
 
         (result, rc, _) = checked_call(
-           Manager.DestroyPool(self._proxy, pool_object_path=pool),
+           Manager.DestroyPool(self._proxy, pool=pool),
            ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
         )
         self.assertEqual(rc, self._errors.BUSY)
@@ -225,7 +225,7 @@ class Destroy4TestCase(unittest.TestCase):
         (pool, _) = next(managed_objects.pools({'Name': self._POOLNAME}))
 
         (result, rc, _) = checked_call(
-           Manager.DestroyPool(self._proxy, pool_object_path=pool),
+           Manager.DestroyPool(self._proxy, pool=pool),
            ManagerSpec.OUTPUT_SIGS[_MN.DestroyPool]
         )
 

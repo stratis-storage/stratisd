@@ -35,7 +35,7 @@ class Bus(object):
         Get our bus.
         """
         if Bus._BUS is None:
-            Bus._BUS = dbus.SessionBus()
+            Bus._BUS = dbus.SystemBus()
 
         return Bus._BUS
 

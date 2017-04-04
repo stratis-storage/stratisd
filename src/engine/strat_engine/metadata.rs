@@ -587,6 +587,35 @@ mod tests {
     }
 
     #[test]
+    /// Verify that the file is theirs, if there are any non-zero bits in BDA.
+    /// Unowned if all bits are 0.
+    fn test_other_ownership() {
+        fn property(offset: u8, length: u8, value: u8) -> TestResult {
+            if value == 0 || length == 0 {
+                return TestResult::discard();
+            }
+            let mut buf = Cursor::new(vec![0; _BDA_STATIC_HDR_SIZE]);
+            match StaticHeader::determine_ownership(&mut buf).unwrap() {
+                DevOwnership::Unowned => {}
+                _ => return TestResult::failed(),
+            }
+
+            let data = vec![value; length as usize];
+            buf.seek(SeekFrom::Start(offset as u64)).unwrap();
+            buf.write(&data).unwrap();
+            match StaticHeader::determine_ownership(&mut buf).unwrap() {
+                DevOwnership::Theirs => {}
+                _ => return TestResult::failed(),
+            }
+            TestResult::passed()
+
+        }
+        QuickCheck::new()
+            .tests(50)
+            .quickcheck(property as fn(u8, u8, u8) -> TestResult);
+    }
+
+    #[test]
     /// Construct an arbitrary StaticHeader object.
     /// Verify that the "file" is unowned.
     /// Initialize a BDA.

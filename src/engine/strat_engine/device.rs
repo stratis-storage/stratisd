@@ -38,20 +38,24 @@ pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
     Ok(devices)
 }
 
-
-/// Zero sectors at the given offset
-pub fn wipe_sectors(path: &Path, offset: Sectors, length: Sectors) -> EngineResult<()> {
-    let mut f = try!(OpenOptions::new()
-        .write(true)
-        .open(path));
-
-    let zeroed = [0u8; SECTOR_SIZE];
-
+/// Write buf at offset length times.
+pub fn write_sectors(path: &Path,
+                     offset: Sectors,
+                     length: Sectors,
+                     buf: &[u8; SECTOR_SIZE])
+                     -> EngineResult<()> {
+    let mut f = try!(OpenOptions::new().write(true).open(path));
     // set the start point to the offset
     try!(f.seek(SeekFrom::Start(*offset)));
     for _ in 0..*length {
-        try!(f.write_all(&zeroed));
+        try!(f.write_all(buf));
     }
     try!(f.flush());
     Ok(())
+}
+
+
+/// Zero sectors at the given offset for length sectors.
+pub fn wipe_sectors(path: &Path, offset: Sectors, length: Sectors) -> EngineResult<()> {
+    write_sectors(path, offset, length, &[0u8; SECTOR_SIZE])
 }

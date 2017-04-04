@@ -19,6 +19,8 @@ use uuid::Uuid;
 
 use libstratis::engine::strat_engine::blockdev;
 use libstratis::engine::strat_engine::blockdev::BlockDev;
+use libstratis::engine::strat_engine::device::blkdev_size;
+use libstratis::engine::strat_engine::device::resolve_devices;
 use libstratis::engine::strat_engine::lineardev::LinearDev;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 
@@ -36,7 +38,7 @@ fn get_size(path: &Path) -> TestResult<Sectors> {
         Err(e) => panic!("Failed to open blockdev : {:?}", e),
     };
 
-    match blockdev::blkdev_size(&f) {
+    match blkdev_size(&f) {
         Ok(bytes) => return Ok(bytes.sectors()),
         Err(e) => {
             let error_message = format!("{:?} for device {:?}", e, path);
@@ -96,7 +98,7 @@ fn test_lineardev_concat(dm: &DM, blockdev_paths: &[&Path]) -> TestResult<(Linea
 
     let uuid = Uuid::new_v4();
 
-    let unique_blockdevs = match blockdev::resolve_devices(blockdev_paths) {
+    let unique_blockdevs = match resolve_devices(blockdev_paths) {
         Ok(devs) => devs,
         Err(e) => {
             let message = format!("Failed to resolve starting set of blockdevs:{:?}", e);

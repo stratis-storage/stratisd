@@ -22,7 +22,8 @@ use uuid::Uuid;
 
 use libstratis::engine::strat_engine::blockdev;
 use libstratis::engine::strat_engine::blockdev::BlockDev;
-use libstratis::engine::strat_engine::blockdev::wipe_sectors;
+use libstratis::engine::strat_engine::device::resolve_devices;
+use libstratis::engine::strat_engine::device::wipe_sectors;
 use libstratis::engine::strat_engine::lineardev::LinearDev;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 use libstratis::engine::strat_engine::thindev::ThinDev;
@@ -74,7 +75,7 @@ fn test_thinpool_setup(dm: &DM, blockdev_paths: &[&Path]) -> TestResult<ThinPool
 
     let uuid = Uuid::new_v4();
 
-    let unique_blockdevs = blockdev::resolve_devices(blockdev_paths).unwrap();
+    let unique_blockdevs = resolve_devices(blockdev_paths).unwrap();
 
     let blockdevs = blockdev::initialize(&uuid, unique_blockdevs, MIN_MDA_SECTORS, true).unwrap();
     let (metadata_blockdev, data_blockdev) = (blockdevs.first().unwrap(),

@@ -99,11 +99,11 @@ fn test_thinpool_setup(dm: &DM, blockdev_paths: &[&Path]) -> TestResult<ThinPool
 
 fn test_thindev_setup(dm: &DM, thinpool_dev: &mut ThinPoolDev) -> TestResult<()> {
     let thin_id = rand::random::<u16>();
-    let mut thin_dev = try!(ThinDev::new("stratis_testing_thindev",
-                                         &dm,
-                                         thinpool_dev,
-                                         thin_id as u32,
-                                         Sectors(300000)));
+    let thin_dev = try!(ThinDev::new("stratis_testing_thindev",
+                                     &dm,
+                                     thinpool_dev,
+                                     thin_id as u32,
+                                     Sectors(300000)));
 
 
     let tmp_dir = try!(TempDir::new("stratis_testing"));

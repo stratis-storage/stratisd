@@ -40,7 +40,7 @@ impl ThinDev {
     /// thin provisioned ThinDev returned by new().
     pub fn new(name: &str,
                dm: &DM,
-               thin_pool: &mut ThinPoolDev,
+               thin_pool: &ThinPoolDev,
                thin_id: u32,
                length: Sectors)
                -> EngineResult<ThinDev> {
@@ -96,7 +96,7 @@ impl ThinDev {
         }
     }
 
-    pub fn create_fs(&mut self) -> EngineResult<()> {
+    pub fn create_fs(&self) -> EngineResult<()> {
         let dev_path = try!(self.path());
 
         debug!("Create filesystem for : {:?}", dev_path);
@@ -115,7 +115,7 @@ impl ThinDev {
         Ok(())
     }
 
-    pub fn mount_fs(&mut self, mount_point: &Path) -> EngineResult<()> {
+    pub fn mount_fs(&self, mount_point: &Path) -> EngineResult<()> {
         let dev_path = try!(self.path());
 
         debug!("Mount filesystem {:?} on : {:?}", dev_path, mount_point);
@@ -134,7 +134,7 @@ impl ThinDev {
         Ok(())
     }
 
-    pub fn unmount_fs(&mut self, mount_point: &Path) -> EngineResult<()> {
+    pub fn unmount_fs(&self, mount_point: &Path) -> EngineResult<()> {
         debug!("Unount filesystem {:?}", mount_point);
 
         let output = try!(Command::new("umount")

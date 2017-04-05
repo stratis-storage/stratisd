@@ -35,11 +35,11 @@ impl StratFilesystem {
         // TODO We don't require a size to be provided for create_filesystems -
         // but devicemapper requires an initial size for a thin provisioned
         // device - currently hard coded to 1GB.
-        let mut new_thin_dev = try!(ThinDev::new(name,
-                                                 dm,
-                                                 thin_pool,
-                                                 thin_id as u32,
-                                                 Bytes(IEC::Gi).sectors()));
+        let new_thin_dev = try!(ThinDev::new(name,
+                                             dm,
+                                             thin_pool,
+                                             thin_id as u32,
+                                             Bytes(IEC::Gi).sectors()));
         try!(new_thin_dev.create_fs());
         Ok(StratFilesystem {
             fs_id: fs_id,

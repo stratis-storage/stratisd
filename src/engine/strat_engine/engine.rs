@@ -21,7 +21,7 @@ use super::pool::StratPool;
 use super::super::engine::{HasName, HasUuid, PoolUuid};
 use super::super::structures::Table;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum DevOwnership {
     Ours(Uuid),
     Unowned,

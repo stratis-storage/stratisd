@@ -97,13 +97,12 @@ impl ThinDev {
     }
 
     pub fn create_fs(&mut self) -> EngineResult<()> {
-        let path_result = try!(self.path());
-        let dev_path = Path::new(&path_result);
+        let dev_path = try!(self.path());
 
         debug!("Create filesystem for : {:?}", dev_path);
         let output = try!(Command::new("mkfs.xfs")
             .arg("-f")
-            .arg(dev_path)
+            .arg(&dev_path)
             .output());
 
         if output.status.success() {
@@ -117,12 +116,11 @@ impl ThinDev {
     }
 
     pub fn mount_fs(&mut self, mount_point: &Path) -> EngineResult<()> {
-        let path_result = try!(self.path());
-        let dev_path = Path::new(&path_result);
+        let dev_path = try!(self.path());
 
         debug!("Mount filesystem {:?} on : {:?}", dev_path, mount_point);
         let output = try!(Command::new("mount")
-            .arg(dev_path)
+            .arg(&dev_path)
             .arg(mount_point)
             .output());
 

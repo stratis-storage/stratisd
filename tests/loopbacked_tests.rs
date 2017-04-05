@@ -31,26 +31,21 @@ use libstratis::engine::strat_engine::metadata::{StaticHeader, MIN_MDA_SECTORS};
 use libstratis::engine::strat_engine::thindev::ThinDev;
 use libstratis::engine::strat_engine::thinpooldev::ThinPoolDev;
 
-///
-/// Specification for loop device backing store.
-#[derive(Default)]
-pub struct LoopDeviceSpec {
-}
 
-/// Create a backing store from a specification and a path.
-fn make_device(_spec: &LoopDeviceSpec, path: &Path) -> () {
+/// Create a backing store from a path.
+fn make_device(path: &Path) -> () {
     OpenOptions::new().read(true).write(true).create(true).open(path).unwrap();
     wipe_sectors(path, Sectors(0), Bytes(IEC::Gi as u64).sectors()).unwrap();
 }
 
-/// Setup a bunch of loop backed devices in tempdir according to specification.
-fn setup_loopbacked_devices(specs: &[&LoopDeviceSpec], dir: &TempDir) -> Vec<LoopDevice> {
+/// Setup count loop backed devices in tempdir.
+fn setup_loopbacked_devices(count: u8, dir: &TempDir) -> Vec<LoopDevice> {
     let lc = LoopControl::open().unwrap();
     let mut loop_devices = Vec::new();
-    for (index, spec) in specs.iter().enumerate() {
+    for index in 0..count {
         let subdir = TempDir::new_in(dir, &index.to_string()).unwrap();
         let tmppath = subdir.path().join("store");
-        make_device(&spec, &tmppath);
+        make_device(&tmppath);
         let ld = lc.next_free().unwrap();
         ld.attach(tmppath, 0).unwrap();
         loop_devices.push(ld);
@@ -59,16 +54,13 @@ fn setup_loopbacked_devices(specs: &[&LoopDeviceSpec], dir: &TempDir) -> Vec<Loo
 }
 
 
-/// Set up a bunch of loop backed devices based on the specification.
+/// Set up count loopbacked devices.
 /// Then, run the designated test.
-/// Precondition: specification length must be no more than u8::MAX.
-pub fn test_with_spec<F>(specs: &[&LoopDeviceSpec], test: F) -> ()
+pub fn test_with_spec<F>(count: u8, test: F) -> ()
     where F: Fn(&[&Path]) -> ()
 {
-    assert!(specs.len() <= u8::MAX as usize);
-
     let tmpdir = TempDir::new("stratis").unwrap();
-    let loop_devices: Vec<LoopDevice> = setup_loopbacked_devices(specs, &tmpdir);
+    let loop_devices: Vec<LoopDevice> = setup_loopbacked_devices(count, &tmpdir);
     let device_paths: Vec<PathBuf> = loop_devices.iter().map(|x| x.get_path().unwrap()).collect();
     let device_paths: Vec<&Path> = device_paths.iter().map(|x| x.as_path()).collect();
 
@@ -108,9 +100,8 @@ pub fn test_force_flag_stratis() {
         assert!(initialize(&uuid2, unique_devices.clone(), MIN_MDA_SECTORS, true).is_err());
     }
 
-    let spec = LoopDeviceSpec::default();
-    test_with_spec(&[&spec, &spec], property);
-    test_with_spec(&[&spec, &spec, &spec], property);
+    test_with_spec(2, property);
+    test_with_spec(3, property);
 }
 
 
@@ -140,9 +131,8 @@ pub fn test_linear_device() {
         lineardev.teardown(&dm).unwrap();
     }
 
-    let spec = LoopDeviceSpec::default();
-    test_with_spec(&[&spec, &spec], property);
-    test_with_spec(&[&spec, &spec, &spec], property);
+    test_with_spec(2, property);
+    test_with_spec(3, property);
 }
 
 
@@ -197,8 +187,7 @@ pub fn test_thinpool_device() {
         thinpool_dev.teardown(&dm).unwrap();
     }
 
-    let spec = LoopDeviceSpec::default();
-    test_with_spec(&[&spec, &spec, &spec], property);
+    test_with_spec(3, property);
 }
 
 
@@ -226,6 +215,5 @@ pub fn test_pool_blockdevs() {
         }));
     }
 
-    let spec = LoopDeviceSpec::default();
-    test_with_spec(&[&spec, &spec, &spec], property);
+    test_with_spec(3, property);
 }

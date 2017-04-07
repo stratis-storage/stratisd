@@ -77,7 +77,7 @@ impl ThinDev {
 
     }
 
-    pub fn teardown(&self, dm: &DM) -> EngineResult<()> {
+    pub fn teardown(self, dm: &DM) -> EngineResult<()> {
         try!(dm.device_remove(&DevId::Name(&self.name), DmFlags::empty()));
         Ok(())
     }

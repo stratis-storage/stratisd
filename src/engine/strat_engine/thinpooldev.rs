@@ -105,7 +105,7 @@ impl ThinPoolDev {
         }
     }
 
-    pub fn teardown(&self, dm: &DM) -> EngineResult<()> {
+    pub fn teardown(self, dm: &DM) -> EngineResult<()> {
         try!(dm.device_remove(&DevId::Name(&self.name), DmFlags::empty()));
         try!(self.data_dev.teardown(dm));
         try!(self.meta_dev.teardown(dm));

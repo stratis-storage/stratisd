@@ -53,3 +53,12 @@ is available to install and update the Rust toolchain.
 Once toolchain is in place, run `cargo build` to build, and then run the
 `stratisd` executable in `./target/debug/` as root. Pass the `--help` option
 for more information on additional developer options.
+
+### Testing
+Stratisd incorporates two testing modalities: unit tests, which are defined
+in the source code, and integration tests which can be found in a separate
+tests directory. To run the unit tests:
+
+> make test
+
+A description of the integration tests can be found in the tests directory.

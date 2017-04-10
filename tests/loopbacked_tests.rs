@@ -19,10 +19,12 @@ use tempdir::TempDir;
 use libstratis::consts::IEC;
 use libstratis::engine::strat_engine::blockdev::wipe_sectors;
 
+use util::simple_tests::test_force_flag_dirty;
 use util::simple_tests::test_force_flag_stratis;
 use util::simple_tests::test_linear_device;
 use util::simple_tests::test_pool_blockdevs;
 use util::simple_tests::test_thinpool_device;
+use util::simple_tests::test_variable_length_metadata_times;
 
 
 /// Setup count loop backed devices in dir.
@@ -87,4 +89,14 @@ pub fn loop_test_thinpool_device() {
 #[test]
 pub fn loop_test_pool_blockdevs() {
     test_with_spec(3, test_pool_blockdevs);
+}
+
+#[test]
+pub fn loop_test_force_flag_dirty() {
+    test_with_spec(3, test_force_flag_dirty);
+}
+
+#[test]
+pub fn loop_test_variable_length_metadata_times() {
+    test_with_spec(3, test_variable_length_metadata_times);
 }

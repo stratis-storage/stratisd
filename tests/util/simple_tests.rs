@@ -27,8 +27,8 @@ use self::uuid::Uuid;
 
 use libstratis::engine::Engine;
 use libstratis::engine::strat_engine::StratEngine;
-use libstratis::engine::strat_engine::blockdev::{blkdev_size, initialize, resolve_devices,
-                                                 write_sectors};
+use libstratis::engine::strat_engine::blockdev::{blkdev_size, find_all, initialize,
+                                                 resolve_devices, write_sectors};
 use libstratis::engine::strat_engine::blockdevmgr::BlockDevMgr;
 use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_fs};
@@ -251,4 +251,43 @@ pub fn test_teardown(paths: &[&Path]) -> () {
         .create_pool("test_pool", paths, None, true)
         .unwrap();
     assert!(engine.teardown().is_ok())
+}
+
+/// Verify that find_all function locates and assigns pools appropriately.
+/// 1. Split available paths into 2 discrete sets.
+/// 2. Initialize the block devices in the first set with a pool uuid.
+/// 3. Run find_all() and verify that it has found the initialized devices
+/// and no others.
+/// 4. Initialize the block devices in the second set with a different pool
+/// uuid.
+/// 5. Run find_all() again and verify that both sets of devices are found.
+pub fn test_setup(paths: &[&Path]) -> () {
+    assert!(paths.len() > 2);
+
+    let (paths1, paths2) = paths.split_at(2);
+
+    let unique_devices = resolve_devices(paths1).unwrap();
+    let uuid1 = Uuid::new_v4();
+    initialize(&uuid1, unique_devices, MIN_MDA_SECTORS, false).unwrap();
+
+    let pools = find_all().unwrap();
+    assert!(pools.len() == 1);
+    assert!(pools.contains_key(&uuid1));
+    let devices = pools.get(&uuid1).expect("pools.contains_key() was true");
+    assert!(devices.len() == paths1.len());
+
+    let unique_devices = resolve_devices(paths2).unwrap();
+    let uuid2 = Uuid::new_v4();
+    initialize(&uuid2, unique_devices, MIN_MDA_SECTORS, false).unwrap();
+
+    let pools = find_all().unwrap();
+    assert!(pools.len() == 2);
+
+    assert!(pools.contains_key(&uuid1));
+    let devices1 = pools.get(&uuid1).expect("pools.contains_key() was true");
+    assert!(devices1.len() == paths1.len());
+
+    assert!(pools.contains_key(&uuid2));
+    let devices2 = pools.get(&uuid2).expect("pools.contains_key() was true");
+    assert!(devices2.len() == paths2.len());
 }

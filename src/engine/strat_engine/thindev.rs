@@ -125,7 +125,7 @@ impl ThinDev {
             .output());
 
         if output.status.success() {
-            debug!("Mounted xfs filesystem on {:?}", mount_point)
+            debug!("Mounted filesystem on {:?}", mount_point)
         } else {
             let message = String::from_utf8_lossy(&output.stderr);
             debug!("stderr: {}", message);
@@ -134,8 +134,8 @@ impl ThinDev {
         Ok(())
     }
 
-    pub fn unmount_fs(&self, mount_point: &Path) -> EngineResult<()> {
-        debug!("Unount filesystem {:?}", mount_point);
+    pub fn unmount_fs(mount_point: &Path) -> EngineResult<()> {
+        debug!("Unmount filesystem {:?}", mount_point);
 
         let output = try!(Command::new("umount")
             .arg(mount_point)

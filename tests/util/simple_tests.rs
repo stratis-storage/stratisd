@@ -117,7 +117,7 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
 
     let tmp_dir = TempDir::new("stratis_testing").unwrap();
     thin_dev.mount_fs(tmp_dir.path()).unwrap();
-    thin_dev.unmount_fs(tmp_dir.path()).unwrap();
+    ThinDev::unmount_fs(tmp_dir.path()).unwrap();
     for i in 0..100 {
         let file_path = tmp_dir.path().join(format!("stratis_test{}.txt", i));
         writeln!(&File::create(file_path).unwrap(), "data").unwrap();

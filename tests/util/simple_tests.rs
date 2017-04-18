@@ -4,7 +4,9 @@
 
 extern crate devicemapper;
 extern crate libstratis;
+extern crate rand;
 extern crate tempdir;
+extern crate time;
 extern crate uuid;
 
 use std::fs::{File, OpenOptions};
@@ -12,19 +14,71 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use self::devicemapper::DM;
+use self::devicemapper::consts::SECTOR_SIZE;
 use self::devicemapper::types::{DataBlocks, Sectors};
 use self::tempdir::TempDir;
+use self::time::now;
 use self::uuid::Uuid;
 
 use libstratis::engine::Engine;
 use libstratis::engine::strat_engine::StratEngine;
 use libstratis::engine::strat_engine::blockdev::{blkdev_size, initialize, resolve_devices,
-                                                 BlockDev};
+                                                 write_sectors, BlockDev};
 use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::lineardev::LinearDev;
 use libstratis::engine::strat_engine::thindev::ThinDev;
 use libstratis::engine::strat_engine::thinpooldev::ThinPoolDev;
-use libstratis::engine::strat_engine::metadata::{StaticHeader, MIN_MDA_SECTORS};
+use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
+                                                 MIN_MDA_SECTORS};
+use libstratis::engine::strat_engine::pool::StratPool;
+
+
+/// Dirty sectors where specified, with 1s.
+fn dirty_sectors(path: &Path, offset: Sectors, length: Sectors) {
+    write_sectors(path, offset, length, &[1u8; SECTOR_SIZE]).unwrap();
+}
+
+/// Verify that it is impossible to initialize a set of disks of which
+/// even one is dirty, i.e, has some data written within BDA_STATIC_HDR_SECTORS
+/// of start of disk. Choose the dirty disk randomly. This means that even
+/// if our code is broken with respect to this property, this test might
+/// sometimes succeed.
+/// FIXME: Consider enriching device specs so that this test will fail
+/// consistently.
+/// Verify that force flag allows all dirty disks to be initialized.
+pub fn test_force_flag_dirty(paths: &[&Path]) -> () {
+
+    let index = rand::random::<u8>() as usize % paths.len();
+    dirty_sectors(paths[index],
+                  Sectors(index as u64 % *BDA_STATIC_HDR_SECTORS),
+                  Sectors(1));
+
+    let unique_devices = resolve_devices(&paths).unwrap();
+
+    let uuid = Uuid::new_v4();
+    assert!(initialize(&uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).is_err());
+    assert!(paths.iter().enumerate().all(|(i, path)| {
+        StaticHeader::determine_ownership(&mut OpenOptions::new()
+                .read(true)
+                .open(path)
+                .unwrap())
+            .unwrap() ==
+        if i == index {
+            DevOwnership::Theirs
+        } else {
+            DevOwnership::Unowned
+        }
+    }));
+
+    assert!(initialize(&uuid, unique_devices.clone(), MIN_MDA_SECTORS, true).is_ok());
+    assert!(paths.iter().all(|path| {
+        StaticHeader::determine_ownership(&mut OpenOptions::new()
+                .read(true)
+                .open(path)
+                .unwrap())
+            .unwrap() == DevOwnership::Ours(uuid)
+    }));
+}
 
 
 /// Verify that it is impossible to steal blockdevs from another Stratis
@@ -147,4 +201,37 @@ pub fn test_pool_blockdevs(paths: &[&Path]) -> () {
                 .unwrap())
             .unwrap() == DevOwnership::Unowned
     }));
+}
+
+
+/// Test reading and writing metadata on a set of blockdevs sharing one pool
+/// UUID.
+/// 1. Verify that it is impossible to read variable length metadata off new
+/// devices.
+/// 2. Write metadata and verify that it is now available.
+/// 3. Write different metadata, with a newer time, and verify that the new
+/// metadata is now available.
+/// FIXME: it would be best if StratPool::save_state() returned an error when
+/// writing with an early time, currently it just panics.
+pub fn test_variable_length_metadata_times(paths: &[&Path]) -> () {
+    let unique_devices = resolve_devices(&paths).unwrap();
+    let uuid = Uuid::new_v4();
+    let mut blockdevs = initialize(&uuid, unique_devices, MIN_MDA_SECTORS, false).unwrap();
+    assert!(StratPool::load_state(&blockdevs.iter().collect::<Vec<&BlockDev>>()).is_none());
+
+    let (state1, state2) = (vec![1u8, 2u8, 3u8, 4u8], vec![5u8, 6u8, 7u8, 8u8]);
+    let current_time = now().to_timespec();
+    StratPool::save_state(&mut blockdevs.iter_mut().collect::<Vec<&mut BlockDev>>(),
+                          &current_time,
+                          &state1)
+        .unwrap();
+    assert!(StratPool::load_state(&blockdevs.iter().collect::<Vec<&BlockDev>>()).unwrap() ==
+            state1);
+
+    StratPool::save_state(&mut blockdevs.iter_mut().collect::<Vec<&mut BlockDev>>(),
+                          &now().to_timespec(),
+                          &state2)
+        .unwrap();
+    assert!(StratPool::load_state(&blockdevs.iter().collect::<Vec<&BlockDev>>()).unwrap() ==
+            state2);
 }

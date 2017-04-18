@@ -60,19 +60,20 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>>
     /// struct. Otherwise, return None. Return an error if there was
     /// a problem inspecting the device.
     fn setup(devnode: &Path) -> EngineResult<Option<BlockDev>> {
-        let dev = try!(Device::from_str(&devnode.to_string_lossy()));
-
         let mut f = try!(OpenOptions::new()
             .read(true)
             .open(devnode));
 
-        let bda = try!(BDA::load(&mut f));
-
-        Ok(Some(BlockDev {
-            dev: dev,
-            devnode: devnode.to_owned(),
-            bda: bda,
-        }))
+        if let Some(bda) = BDA::load(&mut f).ok() {
+            let dev = try!(Device::from_str(&devnode.to_string_lossy()));
+            Ok(Some(BlockDev {
+                dev: dev,
+                devnode: devnode.to_owned(),
+                bda: bda,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 
     let mut pool_map = HashMap::new();
@@ -95,21 +96,26 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>>
     Ok(pool_map)
 }
 
-/// Zero sectors at the given offset
-pub fn wipe_sectors(path: &Path, offset: Sectors, sector_count: Sectors) -> EngineResult<()> {
-    let mut f = try!(OpenOptions::new()
-        .write(true)
-        .open(path));
+/// Write buf at offset length times.
+pub fn write_sectors(path: &Path,
+                     offset: Sectors,
+                     length: Sectors,
+                     buf: &[u8; SECTOR_SIZE])
+                     -> EngineResult<()> {
+    let mut f = try!(OpenOptions::new().write(true).open(path));
 
-    let zeroed = [0u8; SECTOR_SIZE];
-
-    // set the start point to the offset
     try!(f.seek(SeekFrom::Start(*offset)));
-    for _ in 0..*sector_count {
-        try!(f.write_all(&zeroed));
+    for _ in 0..*length {
+        try!(f.write_all(buf));
     }
+
     try!(f.flush());
     Ok(())
+}
+
+/// Zero sectors at the given offset for length sectors.
+pub fn wipe_sectors(path: &Path, offset: Sectors, length: Sectors) -> EngineResult<()> {
+    write_sectors(path, offset, length, &[0u8; SECTOR_SIZE])
 }
 
 /// Initialize multiple blockdevs at once. This allows all of them

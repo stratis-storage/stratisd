@@ -44,19 +44,13 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>>
 
     let mut pool_map = HashMap::new();
     for dir_e in try!(read_dir("/dev")) {
-        let devnode = match dir_e {
-            Ok(d) => d.path(),
-            Err(_) => continue,
-        };
+        let devnode = try!(dir_e.map(|d| d.path()));
 
-        match setup(&devnode) {
-            Ok(Some(blockdev)) => {
-                pool_map.entry(blockdev.pool_uuid().clone())
-                    .or_insert_with(HashMap::new)
-                    .insert(blockdev.uuid().clone(), blockdev);
-            }
-            _ => continue,
-        };
+        if let Some(blockdev) = try!(setup(&devnode)) {
+            pool_map.entry(blockdev.pool_uuid().clone())
+                .or_insert_with(HashMap::new)
+                .insert(blockdev.uuid().clone(), blockdev);
+        }
     }
 
     Ok(pool_map)

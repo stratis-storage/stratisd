@@ -4,12 +4,17 @@
 
 use std::collections::HashMap;
 use std::fs::{OpenOptions, read_dir};
+use std::io::ErrorKind;
+use std::os::linux::fs::MetadataExt;
 use std::path::Path;
 use std::str::FromStr;
 
+use nix::sys::stat::{S_IFBLK, S_IFMT};
+use nix::Errno;
+
 use devicemapper::{Device, Sectors};
 
-use engine::{DevUuid, EngineResult, PoolUuid};
+use engine::{DevUuid, EngineError, EngineResult, PoolUuid};
 
 use super::blockdev::BlockDev;
 use super::metadata::BDA;
@@ -25,9 +30,32 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>>
     /// struct. Otherwise, return None. Return an error if there was
     /// a problem inspecting the device.
     fn setup(devnode: &Path) -> EngineResult<Option<BlockDev>> {
-        let mut f = try!(OpenOptions::new()
-            .read(true)
-            .open(devnode));
+        let f = OpenOptions::new().read(true).open(devnode);
+
+        // There are some reasons for OpenOptions::open() to return an error
+        // which are not reasons for this method to return an error.
+        // Try to distinguish between these in case there is an error.
+        // Non-error conditions are:
+        // 1. The device is not found.
+        if f.is_err() {
+            let err = f.unwrap_err();
+            return match err.kind() {
+                ErrorKind::NotFound => Ok(None),
+                _ => {
+                    if let Some(errno) = err.raw_os_error() {
+                        if Errno::from_i32(errno) == Errno::ENXIO {
+                            Ok(None)
+                        } else {
+                            Err(EngineError::Io(err))
+                        }
+                    } else {
+                        Err(EngineError::Io(err))
+                    }
+                }
+            };
+        }
+
+        let mut f = f.expect("f must be ok, since method returns if f is err");
 
         if let Some(bda) = BDA::load(&mut f).ok() {
             let dev = try!(Device::from_str(&devnode.to_string_lossy()));
@@ -44,9 +72,15 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>>
 
     let mut pool_map = HashMap::new();
     for dir_e in try!(read_dir("/dev")) {
-        let devnode = try!(dir_e.map(|d| d.path()));
+        let dir_e = try!(dir_e);
+        let mode = try!(dir_e.metadata()).st_mode();
 
-        if let Some(blockdev) = try!(setup(&devnode)) {
+        // Device node can't belong to Stratis if it is not a block device
+        if mode & S_IFMT.bits() != S_IFBLK.bits() {
+            continue;
+        }
+
+        if let Some(blockdev) = try!(setup(&dir_e.path())) {
             pool_map.entry(blockdev.pool_uuid().clone())
                 .or_insert_with(HashMap::new)
                 .insert(blockdev.uuid().clone(), blockdev);

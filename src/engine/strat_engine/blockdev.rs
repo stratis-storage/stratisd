@@ -14,10 +14,10 @@ use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 
+use devicemapper::consts::SECTOR_SIZE;
 
 use devicemapper::Device;
 use devicemapper::types::{Bytes, Sectors};
-use devicemapper::consts::SECTOR_SIZE;
 use time::Timespec;
 use uuid::Uuid;
 

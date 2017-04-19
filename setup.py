@@ -40,5 +40,5 @@ setuptools.setup(
     ],
     package_dir={"": "src"},
     packages=setuptools.find_packages("src"),
-    url="https://github.com/mulkieran/stratisd-client-dbus"
+    url="https://github.com/stratis-storage/stratisd-client-dbus"
     )

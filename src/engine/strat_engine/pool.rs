@@ -184,6 +184,12 @@ impl StratPool {
                 .collect(),
         }
     }
+
+    pub fn check(&mut self) -> () {
+        // TODO: Get status from applicable DM targets
+        // TODO: Get fullness of MDV, thin meta&data devs, and extend if needed,
+        //       or handle NOSPC
+    }
 }
 
 impl Pool for StratPool {

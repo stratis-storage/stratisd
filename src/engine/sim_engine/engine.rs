@@ -88,6 +88,12 @@ impl Engine for SimEngine {
         self.rdm.borrow_mut().set_probability(denominator);
         Ok(())
     }
+
+    fn check(&mut self) -> () {
+        for pool in self.pools.iter_mut() {
+            pool.check();
+        }
+    }
 }
 
 #[cfg(test)]

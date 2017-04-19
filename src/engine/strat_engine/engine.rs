@@ -78,4 +78,10 @@ impl Engine for StratEngine {
     fn get_pool(&mut self, uuid: &PoolUuid) -> Option<&mut Pool> {
         get_pool!(self; uuid)
     }
+
+    fn check(&mut self) -> () {
+        for pool in self.pools.iter_mut() {
+            pool.check();
+        }
+    }
 }

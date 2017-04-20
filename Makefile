@@ -1,7 +1,7 @@
 # Do test-loop last, since the tests for that target require sudo.
 # Using sudo changes permissions on various directories. It is less trouble
 # not to have to fix up permissions after every sudo'd test.
-check: fmt build docs test test-loop
+check: test-loop
 
 ${HOME}/.cargo/bin/cargo-fmt:
 	cargo install rustfmt --vers 0.6.3

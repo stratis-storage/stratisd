@@ -3,7 +3,9 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 extern crate devicemapper;
+extern crate env_logger;
 extern crate libstratis;
+extern crate log;
 extern crate loopdev;
 extern crate tempdir;
 
@@ -13,6 +15,8 @@ use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
 use devicemapper::types::{Bytes, Sectors};
+use env_logger::LogBuilder;
+use log::LogLevelFilter;
 use loopdev::{LoopControl, LoopDevice};
 use tempdir::TempDir;
 
@@ -68,6 +72,7 @@ fn test_with_spec<F>(count: u8, test: F) -> ()
 
 #[test]
 pub fn loop_test_force_flag_stratis() {
+    LogBuilder::new().filter(None, LogLevelFilter::Debug).init().unwrap();
     test_with_spec(2, test_force_flag_stratis);
     test_with_spec(3, test_force_flag_stratis);
 }
@@ -75,6 +80,7 @@ pub fn loop_test_force_flag_stratis() {
 
 #[test]
 pub fn loop_test_linear_device() {
+    LogBuilder::new().filter(None, LogLevelFilter::Debug).init().unwrap();
     test_with_spec(2, test_linear_device);
     test_with_spec(3, test_linear_device);
 }
@@ -82,12 +88,14 @@ pub fn loop_test_linear_device() {
 
 #[test]
 pub fn loop_test_thinpool_device() {
+    LogBuilder::new().filter(None, LogLevelFilter::Debug).init().unwrap();
     test_with_spec(3, test_thinpool_device);
 }
 
 
 #[test]
 pub fn loop_test_pool_blockdevs() {
+    LogBuilder::new().filter(None, LogLevelFilter::Debug).init().unwrap();
     test_with_spec(3, test_pool_blockdevs);
 }
 

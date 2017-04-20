@@ -9,7 +9,6 @@ pub mod metadata;
 pub mod filesystem;
 pub mod pool;
 pub mod serde_structs;
-pub mod thindev;
 pub mod thinpooldev;
 
 pub use self::engine::StratEngine;

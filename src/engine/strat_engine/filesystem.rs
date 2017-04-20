@@ -3,15 +3,18 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 extern crate rand;
 
+use std::error::Error;
+use std::path::Path;
+use std::process::Command;
+
 use consts::IEC;
 
 use devicemapper::DM;
 use devicemapper::types::Bytes;
+use devicemapper::thindev::ThinDev;
+use devicemapper::thinpooldev::ThinPoolDev;
 
-use engine::EngineResult;
-use engine::Filesystem;
-use engine::strat_engine::thindev::ThinDev;
-use engine::strat_engine::thinpooldev::ThinPoolDev;
+use engine::{EngineError, EngineResult, ErrorEnum, Filesystem};
 use super::super::engine::{FilesystemUuid, HasName, HasUuid};
 
 #[derive(Debug)]
@@ -25,7 +28,7 @@ impl StratFilesystem {
     pub fn new(fs_id: FilesystemUuid,
                name: &str,
                dm: &DM,
-               thin_pool: &mut ThinPoolDev)
+               thin_pool: &ThinPoolDev)
                -> EngineResult<StratFilesystem> {
         // TODO should replace with proper id generation. DM takes a 24 bit
         // number for the thin_id.  Generate a u16 to avoid the possibility of
@@ -40,7 +43,7 @@ impl StratFilesystem {
                                              thin_pool,
                                              thin_id as u32,
                                              Bytes(IEC::Gi).sectors()));
-        try!(new_thin_dev.create_fs());
+        try!(create_fs(new_thin_dev.devnode().unwrap().as_path()));
         Ok(StratFilesystem {
             fs_id: fs_id,
             name: name.to_owned(),
@@ -68,6 +71,60 @@ impl Filesystem for StratFilesystem {
 
     fn destroy(self) -> EngineResult<()> {
         let dm = try!(DM::new());
-        self.thin_dev.teardown(&dm)
+        match self.thin_dev.teardown(&dm) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(EngineError::Engine(ErrorEnum::Error, e.description().into())),
+        }
     }
+}
+
+pub fn create_fs(dev_path: &Path) -> EngineResult<()> {
+
+    debug!("Create filesystem for : {:?}", dev_path);
+    let output = try!(Command::new("mkfs.xfs")
+        .arg("-f")
+        .arg(&dev_path)
+        .output());
+
+    if output.status.success() {
+        debug!("Created xfs filesystem on {:?}", dev_path)
+    } else {
+        let message = String::from_utf8_lossy(&output.stderr);
+        debug!("stderr: {}", message);
+        return Err(EngineError::Engine(ErrorEnum::Error, message.into()));
+    }
+    Ok(())
+}
+
+pub fn mount_fs(dev_path: &Path, mount_point: &Path) -> EngineResult<()> {
+
+    debug!("Mount filesystem {:?} on : {:?}", dev_path, mount_point);
+    let output = try!(Command::new("mount")
+        .arg(&dev_path)
+        .arg(mount_point)
+        .output());
+
+    if output.status.success() {
+        debug!("Mounted filesystem on {:?}", mount_point)
+    } else {
+        let message = String::from_utf8_lossy(&output.stderr);
+        debug!("stderr: {}", message);
+        return Err(EngineError::Engine(ErrorEnum::Error, message.into()));
+    }
+    Ok(())
+}
+
+pub fn unmount_fs(mount_point: &Path) -> EngineResult<()> {
+    debug!("Unmount filesystem {:?}", mount_point);
+
+    let output = try!(Command::new("umount").arg(mount_point).output());
+
+    if output.status.success() {
+        debug!("Unmounted filesystem {:?}", mount_point)
+    } else {
+        let message = String::from_utf8_lossy(&output.stderr);
+        debug!("stderr: {}", message);
+        return Err(EngineError::Engine(ErrorEnum::Error, message.into()));
+    }
+    Ok(())
 }

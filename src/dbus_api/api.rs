@@ -6,6 +6,8 @@ use std::borrow::Cow;
 use std::fmt::Display;
 use std::path::Path;
 use std::vec::Vec;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use dbus;
 use dbus::Connection;
@@ -244,7 +246,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
     base_tree.add(obj_path)
 }
 
-pub fn connect(engine: Box<Engine>)
+pub fn connect(engine: Rc<RefCell<Engine>>)
                -> StratisResult<(Connection, Tree<MTFn<TData>, TData>, DbusContext)> {
     let c = try!(Connection::get_private(BusType::System));
 

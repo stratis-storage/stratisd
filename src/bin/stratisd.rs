@@ -28,6 +28,8 @@ extern crate quickcheck;
 use std::io::Write;
 use std::env;
 use std::error::Error;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use clap::{App, Arg};
 use log::LogLevelFilter;
@@ -75,17 +77,17 @@ fn main() {
     builder.init()
         .expect("This is the first and only initialization of the logger; it must succeed.");
 
-    let engine: Box<Engine> = {
+    let engine: Rc<RefCell<Engine>> = {
         if matches.is_present("sim") {
             info!("Using SimEngine");
-            Box::new(SimEngine::new())
+            Rc::new(RefCell::new(SimEngine::new()))
         } else {
             info!("Using StratEngine");
-            Box::new(StratEngine::new())
+            Rc::new(RefCell::new(StratEngine::new()))
         }
     };
 
-    let (dbus_conn, mut tree, dbus_context) = libstratis::dbus_api::connect(engine)
+    let (dbus_conn, mut tree, dbus_context) = libstratis::dbus_api::connect(engine.clone())
         .expect("Could not connect to D-Bus");
 
     // Get a list of fds to poll for
@@ -112,5 +114,8 @@ fn main() {
                 }
             }
         }
+
+        // Ask the engine to check its pools
+        engine.borrow_mut().check()
     }
 }

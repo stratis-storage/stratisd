@@ -99,15 +99,15 @@ impl OPContext {
 #[derive(Debug, Clone)]
 pub struct DbusContext {
     pub next_index: Rc<Cell<u64>>,
-    pub engine: Rc<RefCell<Box<Engine>>>,
+    pub engine: Rc<RefCell<Engine>>,
     pub actions: Rc<RefCell<ActionQueue>>,
 }
 
 impl DbusContext {
-    pub fn new(engine: Box<Engine>) -> DbusContext {
+    pub fn new(engine: Rc<RefCell<Engine>>) -> DbusContext {
         DbusContext {
             actions: Rc::new(RefCell::new(ActionQueue::new())),
-            engine: Rc::new(RefCell::new(engine)),
+            engine: engine,
             next_index: Rc::new(Cell::new(0)),
         }
     }

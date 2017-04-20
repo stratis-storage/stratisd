@@ -88,7 +88,7 @@ impl StratPool {
         let data_dev = try!(LinearDev::new(&format!("stratis_{}_data", name),
                                            dm,
                                            segments_refs.as_slice()));
-        try!(wipe_sectors(&try!(data_dev.path()), Sectors(0), DATA_BLOCK_SIZE));
+        try!(wipe_sectors(&try!(data_dev.devnode()), Sectors(0), DATA_BLOCK_SIZE));
         let length = try!(data_dev.size()).sectors();
 
         // TODO Fix hard coded data blocksize and low water mark.

@@ -131,7 +131,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
     /// its ownership as determined by calling determine_ownership(),
     /// and an open File handle, all of which are needed later.
     fn dev_info(dev: &Device) -> EngineResult<(PathBuf, Bytes, DevOwnership, File)> {
-        let devnode = try!(dev.path().ok_or_else(|| {
+        let devnode = try!(dev.devnode().ok_or_else(|| {
             io::Error::new(ErrorKind::InvalidInput,
                            format!("could not get device node from dev {}", dev.dstr()))
         }));

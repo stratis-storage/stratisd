@@ -17,6 +17,7 @@ extern crate dbus;
 extern crate term;
 extern crate rand;
 extern crate serde;
+extern crate libc;
 
 extern crate custom_derive;
 extern crate enum_derive;
@@ -27,11 +28,11 @@ extern crate quickcheck;
 use std::io::Write;
 use std::env;
 use std::error::Error;
-use std::process::exit;
 
 use clap::{App, Arg};
 use log::LogLevelFilter;
 use env_logger::LogBuilder;
+use dbus::WatchEvent;
 
 use libstratis::engine::Engine;
 use libstratis::engine::sim_engine::SimEngine;
@@ -84,11 +85,32 @@ fn main() {
         }
     };
 
-    if let Err(r) = libstratis::dbus_api::run(engine) {
-        if let Err(e) = write_err(r) {
-            panic!("Unable to write to stderr: {}", e)
-        }
+    let (dbus_conn, mut tree, dbus_context) = libstratis::dbus_api::connect(engine)
+        .expect("Could not connect to D-Bus");
 
-        exit(1);
+    // Get a list of fds to poll for
+    let mut fds: Vec<_> = dbus_conn.watch_fds()
+        .iter()
+        .map(|w| w.to_pollfd())
+        .collect();
+
+    loop {
+        // Poll them with a 10 s timeout
+        let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, 10000) };
+        assert!(r >= 0);
+
+        // And handle incoming events
+        for pfd in fds.iter().filter(|pfd| pfd.revents != 0) {
+            for item in dbus_conn.watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents)) {
+                if let Err(r) = libstratis::dbus_api::handle(&dbus_conn,
+                                                             item,
+                                                             &mut tree,
+                                                             &dbus_context) {
+                    if let Err(e) = write_err(r) {
+                        panic!("Unable to write to stderr: {}", e)
+                    }
+                }
+            }
+        }
     }
 }

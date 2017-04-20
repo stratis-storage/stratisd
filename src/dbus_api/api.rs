@@ -244,39 +244,47 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
     base_tree.add(obj_path)
 }
 
-pub fn run(engine: Box<Engine>) -> StratisResult<()> {
+pub fn connect(engine: Box<Engine>)
+               -> StratisResult<(Connection, Tree<MTFn<TData>, TData>, DbusContext)> {
     let c = try!(Connection::get_private(BusType::System));
 
-    let mut tree = get_base_tree(DbusContext::new(engine));
+    let tree = get_base_tree(DbusContext::new(engine));
     let dbus_context = tree.get_data().clone();
     try!(tree.set_registered(&c, true));
 
     try!(c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32));
 
-    // ...and serve incoming requests.
-    for c_item in c.iter(10000) {
-        if let ConnectionItem::MethodCall(ref msg) = c_item {
-            if let Some(v) = tree.handle(&msg) {
-                // Probably the wisest is to ignore any send errors here -
-                // maybe the remote has disconnected during our processing.
-                for m in v {
-                    let _ = c.send(m);
-                }
+    Ok((c, tree, dbus_context))
+}
+
+pub fn handle(c: &Connection,
+              item: ConnectionItem,
+              tree: &mut Tree<MTFn<TData>, TData>,
+              dbus_context: &DbusContext)
+              -> StratisResult<()> {
+    if let ConnectionItem::MethodCall(ref msg) = item {
+        if let Some(v) = tree.handle(&msg) {
+            // Probably the wisest is to ignore any send errors here -
+            // maybe the remote has disconnected during our processing.
+            for m in v {
+                let _ = c.send(m);
             }
-            let mut b_actions = dbus_context.actions.borrow_mut();
-            for action in b_actions.drain() {
-                match action {
-                    DeferredAction::Add(path) => {
-                        try!(c.register_object_path(path.get_name()));
-                        tree.insert(path);
-                    }
-                    DeferredAction::Remove(path) => {
-                        c.unregister_object_path(&path);
-                        tree.remove(&path);
-                    }
+        }
+
+        let mut b_actions = dbus_context.actions.borrow_mut();
+        for action in b_actions.drain() {
+            match action {
+                DeferredAction::Add(path) => {
+                    try!(c.register_object_path(path.get_name()));
+                    tree.insert(path);
+                }
+                DeferredAction::Remove(path) => {
+                    c.unregister_object_path(&path);
+                    tree.remove(&path);
                 }
             }
         }
     }
+
     Ok(())
 }

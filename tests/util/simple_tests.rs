@@ -15,7 +15,12 @@ use std::path::{Path, PathBuf};
 
 use self::devicemapper::DM;
 use self::devicemapper::consts::SECTOR_SIZE;
+use self::devicemapper::lineardev::LinearDev;
+use self::devicemapper::segment::Segment;
 use self::devicemapper::types::{DataBlocks, Sectors};
+use self::devicemapper::thindev::ThinDev;
+use self::devicemapper::thinpooldev::ThinPoolDev;
+
 use self::tempdir::TempDir;
 use self::time::now;
 use self::uuid::Uuid;
@@ -25,9 +30,7 @@ use libstratis::engine::strat_engine::StratEngine;
 use libstratis::engine::strat_engine::blockdev::{blkdev_size, initialize, resolve_devices,
                                                  write_sectors, BlockDev};
 use libstratis::engine::strat_engine::engine::DevOwnership;
-use libstratis::engine::strat_engine::lineardev::LinearDev;
-use libstratis::engine::strat_engine::thindev::ThinDev;
-use libstratis::engine::strat_engine::thinpooldev::ThinPoolDev;
+use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_fs};
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
                                                  MIN_MDA_SECTORS};
 use libstratis::engine::strat_engine::pool::StratPool;
@@ -115,12 +118,17 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
                                  MIN_MDA_SECTORS,
                                  false)
         .unwrap();
-    let total_blockdev_size = initialized.iter().fold(Sectors(0), |s, i| s + i.avail_range().1);
+    let total_blockdev_size = initialized.iter()
+        .fold(Sectors(0), |s, i| s + i.avail_range_segment().range().1);
 
-    let initialized_refs: Vec<&BlockDev> = initialized.iter().collect();
+    let segments = initialized.iter()
+        .map(|block_dev| block_dev.avail_range_segment())
+        .collect::<Vec<Segment>>();
+
+    let segments_refs: Vec<&Segment> = segments.iter().collect();
     let device_name = "stratis_testing_linear";
     let dm = DM::new().unwrap();
-    let lineardev = LinearDev::new(&device_name, &dm, &initialized_refs).unwrap();
+    let lineardev = LinearDev::new(&device_name, &dm, &segments_refs).unwrap();
 
     let mut linear_dev_path = PathBuf::from("/dev/mapper");
     linear_dev_path.push(device_name);
@@ -146,11 +154,11 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
     let dm = DM::new().unwrap();
     let metadata_dev = LinearDev::new("stratis_testing_thinpool_metadata",
                                       &dm,
-                                      &vec![metadata_blockdev])
+                                      &vec![&metadata_blockdev.avail_range_segment()])
         .unwrap();
     let data_dev = LinearDev::new("stratis_testing_thinpool_datadev",
                                   &dm,
-                                  &vec![data_blockdev])
+                                  &vec![&data_blockdev.avail_range_segment()])
         .unwrap();
     let thinpool_dev = ThinPoolDev::new("stratis_testing_thinpool",
                                         &dm,
@@ -167,11 +175,11 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
                                 Sectors(300000))
         .unwrap();
 
-    thin_dev.create_fs().unwrap();
+    create_fs(&thin_dev.devnode().unwrap()).unwrap();
 
     let tmp_dir = TempDir::new("stratis_testing").unwrap();
-    thin_dev.mount_fs(tmp_dir.path()).unwrap();
-    ThinDev::unmount_fs(tmp_dir.path()).unwrap();
+    mount_fs(&thin_dev.devnode().unwrap(), tmp_dir.path()).unwrap();
+    unmount_fs(tmp_dir.path()).unwrap();
     for i in 0..100 {
         let file_path = tmp_dir.path().join(format!("stratis_test{}.txt", i));
         writeln!(&File::create(file_path).unwrap(), "data").unwrap();

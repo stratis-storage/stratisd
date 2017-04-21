@@ -11,6 +11,9 @@ use std::vec::Vec;
 
 use devicemapper::DM;
 use devicemapper::types::{DataBlocks, Sectors};
+use devicemapper::lineardev::LinearDev;
+use devicemapper::segment::Segment;
+use devicemapper::thinpooldev::ThinPoolDev;
 use time::{now, Timespec};
 use uuid::Uuid;
 use serde_json;
@@ -23,8 +26,6 @@ use engine::Pool;
 use engine::RenameAction;
 use engine::engine::Redundancy;
 use engine::strat_engine::blockdev::wipe_sectors;
-use engine::strat_engine::lineardev::LinearDev;
-use engine::strat_engine::thinpooldev::ThinPoolDev;
 
 use super::super::engine::{FilesystemUuid, HasName, HasUuid};
 use super::super::structures::Table;
@@ -65,7 +66,9 @@ impl StratPool {
         // the check for 2 devs in BlockDev::initialize should be removed.
         assert!(bds.len() >= 2);
 
-        let meta_dev = try!(LinearDev::new(&format!("stratis_{}_meta", name), dm, &vec![&bds[0]]));
+        let meta_dev = try!(LinearDev::new(&format!("stratis_{}_meta", name),
+                                           dm,
+                                           &vec![&(bds[0].avail_range_segment())]));
         // When constructing a thin-pool, Stratis reserves the first N
         // sectors on a block device by creating a linear device with a
         // starting offset. DM writes the super block in the first block.
@@ -74,11 +77,18 @@ impl StratPool {
         // superblock DM issue error messages because it triggers code paths
         // that are trying to re-adopt the device with the attributes that
         // have been passed.
-        try!(wipe_sectors(&try!(meta_dev.path()), Sectors(0), DATA_BLOCK_SIZE));
+        try!(wipe_sectors(&try!(meta_dev.devnode()), Sectors(0), DATA_BLOCK_SIZE));
+
+        let segments = bds[1..]
+            .iter()
+            .map(|block_dev| block_dev.avail_range_segment())
+            .collect::<Vec<Segment>>();
+
+        let segments_refs: Vec<&Segment> = segments.iter().collect();
         let data_dev = try!(LinearDev::new(&format!("stratis_{}_data", name),
                                            dm,
-                                           &Vec::from_iter(bds[1..].iter())));
-        try!(wipe_sectors(&try!(data_dev.path()), Sectors(0), DATA_BLOCK_SIZE));
+                                           segments_refs.as_slice()));
+        try!(wipe_sectors(&try!(data_dev.devnode()), Sectors(0), DATA_BLOCK_SIZE));
         let length = try!(data_dev.size()).sectors();
 
         // TODO Fix hard coded data blocksize and low water mark.
@@ -126,7 +136,8 @@ impl StratPool {
             return None;
         }
 
-        for bd in blockdevs.iter().filter(|b| b.last_update_time() == most_recent_time) {
+        for bd in blockdevs.iter()
+            .filter(|b| b.last_update_time() == most_recent_time) {
             match bd.load_state() {
                 Ok(Some(data)) => return Some(data),
                 _ => continue,

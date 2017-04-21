@@ -52,6 +52,7 @@ pub fn engine_to_dbus_err(err: &EngineError) -> (DbusErrorEnum, String) {
         EngineError::Uuid(_) => DbusErrorEnum::INTERNAL_ERROR,
         EngineError::Utf8(_) => DbusErrorEnum::INTERNAL_ERROR,
         EngineError::Serde(_) => DbusErrorEnum::INTERNAL_ERROR,
+        EngineError::DM(_) => DbusErrorEnum::INTERNAL_ERROR,
     };
     (error, err.description().to_owned())
 }

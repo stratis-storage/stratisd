@@ -14,10 +14,10 @@ use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 
-
-use devicemapper::Device;
-use devicemapper::types::{Bytes, Sectors};
 use devicemapper::consts::SECTOR_SIZE;
+use devicemapper::Device;
+use devicemapper::segment::Segment;
+use devicemapper::types::{Bytes, Sectors};
 use time::Timespec;
 use uuid::Uuid;
 
@@ -131,7 +131,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
     /// its ownership as determined by calling determine_ownership(),
     /// and an open File handle, all of which are needed later.
     fn dev_info(dev: &Device) -> EngineResult<(PathBuf, Bytes, DevOwnership, File)> {
-        let devnode = try!(dev.path().ok_or_else(|| {
+        let devnode = try!(dev.devnode().ok_or_else(|| {
             io::Error::new(ErrorKind::InvalidInput,
                            format!("could not get device node from dev {}", dev.dstr()))
         }));
@@ -267,7 +267,7 @@ impl BlockDev {
     }
 
     /// List the available-for-upper-layer-use range in this blockdev.
-    pub fn avail_range(&self) -> (Sectors, Sectors) {
+    fn avail_range(&self) -> (Sectors, Sectors) {
         let start = self.bda.size();
         let size = self.size();
         // Blockdev size is at least MIN_DEV_SIZE, so this can fail only if
@@ -275,6 +275,12 @@ impl BlockDev {
         // is 4 MiB.
         assert!(start <= size);
         (start, size - start)
+    }
+
+    /// Return the available range as a segment
+    pub fn avail_range_segment(&self) -> Segment {
+        let (start, length) = self.avail_range();
+        Segment::new(self.dev, start, length)
     }
 
     /// The /dev/mapper/<name> device is not immediately available for use.

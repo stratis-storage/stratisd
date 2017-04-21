@@ -7,6 +7,7 @@ use std::fmt;
 use std::error;
 use std::str;
 
+use devicemapper;
 use nix;
 use uuid;
 use serde_json;
@@ -30,6 +31,7 @@ pub enum EngineError {
     Uuid(uuid::ParseError),
     Utf8(str::Utf8Error),
     Serde(serde_json::error::Error),
+    DM(devicemapper::result::DmError),
 }
 
 impl fmt::Display for EngineError {
@@ -41,6 +43,7 @@ impl fmt::Display for EngineError {
             EngineError::Uuid(ref err) => write!(f, "Uuid error: {}", err),
             EngineError::Utf8(ref err) => write!(f, "Utf8 error: {}", err),
             EngineError::Serde(ref err) => write!(f, "Serde error: {}", err),
+            EngineError::DM(ref err) => write!(f, "DM error: {}", err),
         }
     }
 }
@@ -54,6 +57,7 @@ impl error::Error for EngineError {
             EngineError::Uuid(_) => "Uuid::ParseError",
             EngineError::Utf8(ref err) => err.description(),
             EngineError::Serde(ref err) => err.description(),
+            EngineError::DM(ref err) => err.description(),
         }
     }
 }
@@ -87,5 +91,11 @@ impl From<str::Utf8Error> for EngineError {
 impl From<serde_json::error::Error> for EngineError {
     fn from(err: serde_json::error::Error) -> EngineError {
         EngineError::Serde(err)
+    }
+}
+
+impl From<devicemapper::result::DmError> for EngineError {
+    fn from(err: devicemapper::result::DmError) -> EngineError {
+        EngineError::DM(err)
     }
 }

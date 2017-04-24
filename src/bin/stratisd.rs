@@ -17,6 +17,7 @@ extern crate dbus;
 extern crate term;
 extern crate rand;
 extern crate serde;
+extern crate libc;
 
 extern crate custom_derive;
 extern crate enum_derive;
@@ -27,11 +28,13 @@ extern crate quickcheck;
 use std::io::Write;
 use std::env;
 use std::error::Error;
-use std::process::exit;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use clap::{App, Arg};
 use log::LogLevelFilter;
 use env_logger::LogBuilder;
+use dbus::WatchEvent;
 
 use libstratis::engine::Engine;
 use libstratis::engine::sim_engine::SimEngine;
@@ -74,21 +77,45 @@ fn main() {
     builder.init()
         .expect("This is the first and only initialization of the logger; it must succeed.");
 
-    let engine: Box<Engine> = {
+    let engine: Rc<RefCell<Engine>> = {
         if matches.is_present("sim") {
             info!("Using SimEngine");
-            Box::new(SimEngine::new())
+            Rc::new(RefCell::new(SimEngine::new()))
         } else {
             info!("Using StratEngine");
-            Box::new(StratEngine::new())
+            Rc::new(RefCell::new(StratEngine::new()))
         }
     };
 
-    if let Err(r) = libstratis::dbus_api::run(engine) {
-        if let Err(e) = write_err(r) {
-            panic!("Unable to write to stderr: {}", e)
+    let (dbus_conn, mut tree, dbus_context) = libstratis::dbus_api::connect(engine.clone())
+        .expect("Could not connect to D-Bus");
+
+    // Get a list of fds to poll for
+    let mut fds: Vec<_> = dbus_conn.watch_fds()
+        .iter()
+        .map(|w| w.to_pollfd())
+        .collect();
+
+    loop {
+        // Poll them with a 10 s timeout
+        let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, 10000) };
+        assert!(r >= 0);
+
+        // And handle incoming events
+        for pfd in fds.iter().filter(|pfd| pfd.revents != 0) {
+            for item in dbus_conn.watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents)) {
+                if let Err(r) = libstratis::dbus_api::handle(&dbus_conn,
+                                                             item,
+                                                             &mut tree,
+                                                             &dbus_context) {
+                    if let Err(e) = write_err(r) {
+                        panic!("Unable to write to stderr: {}", e)
+                    }
+                }
+            }
         }
 
-        exit(1);
+        // Ask the engine to check its pools
+        engine.borrow_mut().check()
     }
 }

@@ -11,7 +11,7 @@ use consts::IEC;
 
 use devicemapper::DM;
 use devicemapper::types::Bytes;
-use devicemapper::thindev::ThinDev;
+use devicemapper::thindev::{ThinDev, ThinStatus};
 use devicemapper::thinpooldev::ThinPoolDev;
 
 use engine::{EngineError, EngineResult, ErrorEnum, Filesystem};
@@ -22,6 +22,11 @@ pub struct StratFilesystem {
     fs_id: FilesystemUuid,
     name: String,
     thin_dev: ThinDev,
+}
+
+pub enum FilesystemStatus {
+    Good,
+    Failed,
 }
 
 impl StratFilesystem {
@@ -49,6 +54,18 @@ impl StratFilesystem {
             name: name.to_owned(),
             thin_dev: new_thin_dev,
         })
+    }
+
+    pub fn check(&self, dm: &DM) -> EngineResult<FilesystemStatus> {
+        match try!(self.thin_dev.status(dm)) {
+            ThinStatus::Good((_mapped, _highest)) => {
+                // TODO: check if filesystem is getting full and might need to
+                // be extended (hint: use statfs(2))
+                // TODO: periodically kick off fstrim?
+            }
+            ThinStatus::Fail => return Ok(FilesystemStatus::Failed),
+        }
+        Ok(FilesystemStatus::Good)
     }
 }
 

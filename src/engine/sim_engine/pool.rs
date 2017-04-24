@@ -59,6 +59,8 @@ impl SimPool {
 
         new_pool
     }
+
+    pub fn check(&mut self) -> () {}
 }
 
 impl Pool for SimPool {

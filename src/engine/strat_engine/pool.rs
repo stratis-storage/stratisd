@@ -13,7 +13,7 @@ use devicemapper::DM;
 use devicemapper::types::{DataBlocks, Sectors};
 use devicemapper::lineardev::LinearDev;
 use devicemapper::segment::Segment;
-use devicemapper::thinpooldev::ThinPoolDev;
+use devicemapper::thinpooldev::{ThinPoolDev, ThinPoolStatus, ThinPoolWorkingStatus};
 use time::{now, Timespec};
 use uuid::Uuid;
 use serde_json;
@@ -32,10 +32,12 @@ use super::super::structures::Table;
 
 use super::serde_structs::StratSave;
 use super::blockdev::{BlockDev, initialize, resolve_devices};
-use super::filesystem::StratFilesystem;
+use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::metadata::MIN_MDA_SECTORS;
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
+pub const META_LOWATER: u64 = 512;
+pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
 
 #[derive(Debug)]
 pub struct StratPool {
@@ -186,9 +188,60 @@ impl StratPool {
     }
 
     pub fn check(&mut self) -> () {
-        // TODO: Get status from applicable DM targets
-        // TODO: Get fullness of MDV, thin meta&data devs, and extend if needed,
-        //       or handle NOSPC
+        let dm = DM::new().expect("Could not get DM handle");
+
+        let result = match self.thin_pool.status(&dm) {
+            Ok(r) => r,
+            Err(_) => {
+                error!("Could not get thinpool status");
+                // TODO: Take pool offline?
+                return;
+            }
+        };
+
+        match result {
+            ThinPoolStatus::Good((wstatus, usage)) => {
+                match wstatus {
+                    ThinPoolWorkingStatus::Good => {}
+                    ThinPoolWorkingStatus::ReadOnly => {
+                        // TODO: why is pool r/o and how do we get it
+                        // rw again?
+                    }
+                    ThinPoolWorkingStatus::OutOfSpace => {
+                        // TODO: Add more space if possible, or
+                        // prevent further usage
+                        // Should never happen -- we should be extending first!
+                    }
+                    ThinPoolWorkingStatus::NeedsCheck => {
+                        // TODO: Take pool offline?
+                        // TODO: run thin_check
+                    }
+                }
+
+                if usage.used_meta > usage.total_meta - META_LOWATER {
+                    // TODO: Extend meta device
+                }
+
+                if usage.used_data > usage.total_data - DATA_LOWATER {
+                    // TODO: Extend data device
+                }
+            }
+            ThinPoolStatus::Fail => {
+                // TODO: Take pool offline?
+                // TODO: Run thin_check
+            }
+        }
+
+        for fs in self.filesystems.iter_mut() {
+            match fs.check(&dm) {
+                Ok(f_status) => {
+                    if let FilesystemStatus::Failed = f_status {
+                        // TODO: recover fs? (how?)
+                    }
+                }
+                Err(_e) => error!("fs.check() failed"),
+            }
+        }
     }
 }
 

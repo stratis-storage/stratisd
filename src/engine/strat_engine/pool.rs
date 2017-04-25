@@ -200,7 +200,7 @@ impl StratPool {
         };
 
         match result {
-            ThinPoolStatus::Good((wstatus, usage)) => {
+            ThinPoolStatus::Good(wstatus, usage) => {
                 match wstatus {
                     ThinPoolWorkingStatus::Good => {}
                     ThinPoolWorkingStatus::ReadOnly => {

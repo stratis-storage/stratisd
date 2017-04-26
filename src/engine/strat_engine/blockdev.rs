@@ -26,6 +26,7 @@ use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
 use super::metadata::{StaticHeader, BDA, validate_mda_size};
 use super::engine::DevOwnership;
 pub use super::BlockDevSave;
+use engine::strat_engine::range_alloc::RangeAllocator;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
 
@@ -66,10 +67,15 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>>
 
         if let Some(bda) = BDA::load(&mut f).ok() {
             let dev = try!(Device::from_str(&devnode.to_string_lossy()));
+            // TODO: Parse MDA and also initialize RangeAllocator with
+            // in-use regions
+            let allocator = RangeAllocator::new_with_used(bda.dev_size(),
+                                                          &[(Sectors(0), bda.size())]);
             Ok(Some(BlockDev {
                 dev: dev,
                 devnode: devnode.to_owned(),
                 bda: bda,
+                used: allocator,
             }))
         } else {
             Ok(None)
@@ -219,11 +225,13 @@ pub fn initialize(pool_uuid: &PoolUuid,
                                        &Uuid::new_v4(),
                                        mda_size,
                                        dev_size.sectors()));
+        let allocator = RangeAllocator::new_with_used(bda.dev_size(), &[(Sectors(0), bda.size())]);
 
         let bd = BlockDev {
             dev: dev,
             devnode: devnode.clone(),
             bda: bda,
+            used: allocator,
         };
         bds.push(bd);
     }
@@ -236,6 +244,7 @@ pub struct BlockDev {
     dev: Device,
     pub devnode: PathBuf,
     bda: BDA,
+    used: RangeAllocator,
 }
 
 impl BlockDev {
@@ -307,5 +316,15 @@ impl BlockDev {
     /// Last time metadata was written to this device.
     pub fn last_update_time(&self) -> Option<&Timespec> {
         self.bda.last_update_time()
+    }
+
+    pub fn available(&self) -> Sectors {
+        self.used.available()
+    }
+
+    // Find some sector ranges that could be allocated. If more
+    // sectors are needed than our capacity, return partial results.
+    pub fn request_space(&mut self, size: Sectors) -> (Sectors, Vec<(Sectors, Sectors)>) {
+        self.used.request(size)
     }
 }

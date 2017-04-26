@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::collections::hash_map::RandomState;
 use std::iter::FromIterator;
 use std::path::Path;
@@ -14,7 +14,7 @@ use devicemapper::{DataBlocks, Sectors};
 use devicemapper::LinearDev;
 use devicemapper::Segment;
 use devicemapper::{ThinPoolDev, ThinPoolStatus, ThinPoolWorkingStatus};
-use time::{now, Timespec};
+use time::now;
 use uuid::Uuid;
 use serde_json;
 
@@ -31,7 +31,8 @@ use super::super::engine::{FilesystemUuid, HasName, HasUuid};
 use super::super::structures::Table;
 
 use super::serde_structs::StratSave;
-use super::blockdev::{BlockDev, initialize, resolve_devices};
+use super::blockdev::{initialize, resolve_devices};
+use super::blockdevmgr::BlockDevMgr;
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::metadata::MIN_MDA_SECTORS;
 
@@ -43,7 +44,7 @@ pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
 pub struct StratPool {
     name: String,
     pool_uuid: Uuid,
-    pub block_devs: HashMap<PathBuf, BlockDev>,
+    pub block_devs: BlockDevMgr,
     pub filesystems: Table<StratFilesystem>,
     redundancy: Redundancy,
     thin_pool: ThinPoolDev,
@@ -102,14 +103,10 @@ impl StratPool {
                                                  meta_dev,
                                                  data_dev));
 
-        let mut blockdevs = HashMap::new();
-        for bd in bds {
-            blockdevs.insert(bd.devnode.clone(), bd);
-        }
         let mut pool = StratPool {
             name: name.to_owned(),
             pool_uuid: pool_uuid,
-            block_devs: blockdevs,
+            block_devs: BlockDevMgr::new(bds),
             filesystems: Table::new(),
             redundancy: redundancy,
             thin_pool: thinpool_dev,
@@ -122,68 +119,22 @@ impl StratPool {
 
     /// Return the metadata from the first blockdev with up-to-date, readable
     /// metadata.
-    /// Precondition: All Blockdevs in blockdevs must belong to the same pool.
-    pub fn load_state(blockdevs: &[&BlockDev]) -> Option<Vec<u8>> {
-        if blockdevs.is_empty() {
-            return None;
-        }
-
-        let most_recent_blockdev = blockdevs.iter()
-            .max_by_key(|bd| bd.last_update_time())
-            .expect("must be a maximum since bds is non-empty");
-
-        let most_recent_time = most_recent_blockdev.last_update_time();
-
-        if most_recent_time.is_none() {
-            return None;
-        }
-
-        for bd in blockdevs.iter()
-            .filter(|b| b.last_update_time() == most_recent_time) {
-            match bd.load_state() {
-                Ok(Some(data)) => return Some(data),
-                _ => continue,
-            }
-        }
-
-        None
+    pub fn load_state(&self) -> Option<Vec<u8>> {
+        self.block_devs.load_state()
     }
-
-    /// Write the given data to all blockdevs marking with specified time.
-    pub fn save_state(devs: &mut [&mut BlockDev],
-                      time: &Timespec,
-                      metadata: &[u8])
-                      -> EngineResult<()> {
-        // TODO: Do something better than panic when saving to blockdev fails.
-        // Panic can occur for a the usual IO reasons, but also:
-        // 1. If the timestamp is older than a previously written timestamp.
-        // 2. If the variable length metadata is too large.
-        for bd in devs {
-            bd.save_state(time, metadata).unwrap();
-        }
-        Ok(())
-    }
-
-    /// Write pool metadata to all its blockdevs marking with current time.
-
-    // TODO: Cap # of blockdevs written to, as described in SWDD
 
     // TODO: Check current time against global last updated, and use
     // alternate time value if earlier, as described in SWDD
     pub fn write_metadata(&mut self) -> EngineResult<()> {
         let data = try!(serde_json::to_string(&self.to_save()));
-        let mut blockdevs: Vec<&mut BlockDev> = self.block_devs.values_mut().collect();
-        StratPool::save_state(&mut blockdevs, &now().to_timespec(), data.as_bytes())
+        self.block_devs.save_state(&now().to_timespec(), data.as_bytes())
     }
 
     pub fn to_save(&self) -> StratSave {
         StratSave {
             name: self.name.clone(),
             id: self.pool_uuid.simple().to_string(),
-            block_devs: self.block_devs
-                .iter()
-                .map(|(_, bd)| (bd.uuid().simple().to_string(), bd.to_save()))
-                .collect(),
+            block_devs: self.block_devs.to_save(),
         }
     }
 
@@ -269,23 +220,15 @@ impl Pool for StratPool {
     }
 
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
-        let devices = try!(resolve_devices(paths));
-        let bds = try!(initialize(&self.pool_uuid, devices, MIN_MDA_SECTORS, force));
-        let bdev_paths = bds.iter().map(|p| p.devnode.clone()).collect();
-        for bd in bds {
-            self.block_devs.insert(bd.devnode.clone(), bd);
-        }
+        let bdev_paths = try!(self.block_devs.add(&self.pool_uuid, paths, force));
         try!(self.write_metadata());
         Ok(bdev_paths)
     }
 
-    fn destroy(mut self) -> EngineResult<()> {
+    fn destroy(self) -> EngineResult<()> {
         let dm = try!(DM::new());
         try!(self.thin_pool.teardown(&dm));
-
-        for (_, bd) in self.block_devs.drain() {
-            try!(bd.wipe_metadata());
-        }
+        try!(self.block_devs.destroy_all());
 
         Ok(())
     }

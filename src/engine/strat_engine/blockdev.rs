@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+// Code to handle a single block device.
+
 use std::io;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -241,7 +243,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
 
 #[derive(Debug)]
 pub struct BlockDev {
-    dev: Device,
+    pub dev: Device,
     pub devnode: PathBuf,
     bda: BDA,
     used: RangeAllocator,

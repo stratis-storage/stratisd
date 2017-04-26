@@ -59,11 +59,11 @@ impl Engine for StratEngine {
 
         let dm = try!(DM::new());
         let pool = try!(StratPool::initialize(name, &dm, blockdev_paths, redundancy, force));
-        let bdev_paths = pool.block_devs.iter().map(|p| p.1.devnode.clone()).collect();
+        let bdev_devnodes = pool.block_devs.devnodes();
 
         let uuid = pool.uuid().clone();
         self.pools.insert(pool);
-        Ok((uuid, bdev_paths))
+        Ok((uuid, bdev_devnodes))
     }
 
     fn destroy_pool(&mut self, uuid: &PoolUuid) -> EngineResult<bool> {

@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 pub mod blockdev;
+pub mod blockdevmgr;
 pub mod engine;
 pub mod metadata;
 pub mod filesystem;

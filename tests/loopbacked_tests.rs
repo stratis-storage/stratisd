@@ -12,7 +12,7 @@ mod util;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
-use devicemapper::types::{Bytes, Sectors};
+use devicemapper::{Bytes, Sectors};
 use loopdev::{LoopControl, LoopDevice};
 use tempdir::TempDir;
 

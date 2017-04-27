@@ -10,10 +10,10 @@ use std::path::PathBuf;
 use std::vec::Vec;
 
 use devicemapper::DM;
-use devicemapper::types::{DataBlocks, Sectors};
-use devicemapper::lineardev::LinearDev;
-use devicemapper::segment::Segment;
-use devicemapper::thinpooldev::{ThinPoolDev, ThinPoolStatus, ThinPoolWorkingStatus};
+use devicemapper::{DataBlocks, Sectors};
+use devicemapper::LinearDev;
+use devicemapper::Segment;
+use devicemapper::{ThinPoolDev, ThinPoolStatus, ThinPoolWorkingStatus};
 use time::{now, Timespec};
 use uuid::Uuid;
 use serde_json;
@@ -70,7 +70,7 @@ impl StratPool {
 
         let meta_dev = try!(LinearDev::new(&format!("stratis_{}_meta", name),
                                            dm,
-                                           &vec![&(bds[0].avail_range_segment())]));
+                                           &[bds[0].avail_range_segment()]));
         // When constructing a thin-pool, Stratis reserves the first N
         // sectors on a block device by creating a linear device with a
         // starting offset. DM writes the super block in the first block.
@@ -86,10 +86,7 @@ impl StratPool {
             .map(|block_dev| block_dev.avail_range_segment())
             .collect::<Vec<Segment>>();
 
-        let segments_refs: Vec<&Segment> = segments.iter().collect();
-        let data_dev = try!(LinearDev::new(&format!("stratis_{}_data", name),
-                                           dm,
-                                           segments_refs.as_slice()));
+        let data_dev = try!(LinearDev::new(&format!("stratis_{}_data", name), dm, &segments));
         try!(wipe_sectors(&try!(data_dev.devnode()), Sectors(0), DATA_BLOCK_SIZE));
         let length = try!(data_dev.size()).sectors();
 

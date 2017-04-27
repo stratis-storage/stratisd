@@ -11,7 +11,7 @@ mod util;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
-use self::devicemapper::types::{Bytes, Sectors};
+use self::devicemapper::{Bytes, Sectors};
 use self::rustc_serialize::json::Json;
 
 use libstratis::consts::IEC;

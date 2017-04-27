@@ -31,7 +31,7 @@ pub enum EngineError {
     Uuid(uuid::ParseError),
     Utf8(str::Utf8Error),
     Serde(serde_json::error::Error),
-    DM(devicemapper::result::DmError),
+    DM(devicemapper::DmError),
 }
 
 impl fmt::Display for EngineError {
@@ -94,8 +94,8 @@ impl From<serde_json::error::Error> for EngineError {
     }
 }
 
-impl From<devicemapper::result::DmError> for EngineError {
-    fn from(err: devicemapper::result::DmError) -> EngineError {
+impl From<devicemapper::DmError> for EngineError {
+    fn from(err: devicemapper::DmError) -> EngineError {
         EngineError::DM(err)
     }
 }

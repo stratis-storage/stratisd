@@ -10,7 +10,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
 use crc::crc32;
-use devicemapper::types::{Bytes, Sectors};
+use devicemapper::{Bytes, Sectors};
 use devicemapper::consts::SECTOR_SIZE;
 use time::Timespec;
 use uuid::Uuid;
@@ -566,7 +566,7 @@ mod tests {
     use std::io::Cursor;
 
     use crc::crc32;
-    use devicemapper::types::{Bytes, Sectors};
+    use devicemapper::{Bytes, Sectors};
     use quickcheck::{QuickCheck, TestResult};
     use time::{now, Timespec};
     use uuid::Uuid;

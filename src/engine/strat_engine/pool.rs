@@ -9,10 +9,10 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::vec::Vec;
 
+use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::DM;
 use devicemapper::{DataBlocks, Sectors};
 use devicemapper::LinearDev;
-use devicemapper::Segment;
 use devicemapper::{ThinPoolDev, ThinPoolStatus, ThinPoolWorkingStatus};
 use time::now;
 use uuid::Uuid;
@@ -26,6 +26,7 @@ use engine::Pool;
 use engine::RenameAction;
 use engine::engine::Redundancy;
 use engine::strat_engine::blockdev::wipe_sectors;
+use consts::IEC::Mi;
 
 use super::super::engine::{FilesystemUuid, HasName, HasUuid};
 use super::super::structures::Table;
@@ -39,6 +40,9 @@ use super::metadata::MIN_MDA_SECTORS;
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 pub const META_LOWATER: u64 = 512;
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
+
+pub const INITIAL_META_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
+pub const INITIAL_DATA_SIZE: Sectors = Sectors(512 * Mi / SECTOR_SIZE as u64);
 
 #[derive(Debug)]
 pub struct StratPool {
@@ -63,18 +67,23 @@ impl StratPool {
         let pool_uuid = Uuid::new_v4();
 
         let devices = try!(resolve_devices(paths));
-        let bds = try!(initialize(&pool_uuid, devices, MIN_MDA_SECTORS, force));
+        let mut block_mgr =
+            BlockDevMgr::new(try!(initialize(&pool_uuid, devices, MIN_MDA_SECTORS, force)));
 
-        // TODO: We've got some temporary code in BlockDev::initialize that
-        // makes sure we've got at least 2 blockdevs supplied - one for a meta
-        // and one for data.  In the future, we will be able to deal with a
-        // single blockdev.  When that code is added to use a single blockdev,
-        // the check for 2 devs in BlockDev::initialize should be removed.
-        assert!(bds.len() >= 2);
+        if block_mgr.avail_space() < INITIAL_META_SIZE + INITIAL_DATA_SIZE {
+            let short_bytes = *(INITIAL_META_SIZE + INITIAL_DATA_SIZE - block_mgr.avail_space()) *
+                              SECTOR_SIZE as u64;
+            try!(block_mgr.destroy_all());
+            return Err(EngineError::Engine(ErrorEnum::Invalid,
+                                           format!("Initial total usable pool capacity too \
+                                                    small by {} bytes",
+                                                   short_bytes)));
+        }
 
-        let meta_dev = try!(LinearDev::new(&format!("stratis_{}_meta", name),
-                                           dm,
-                                           &[bds[0].avail_range_segment()]));
+        let meta_regions = block_mgr.alloc_space(INITIAL_META_SIZE)
+            .expect("blockmgr must not fail, already checked for space");
+        let meta_dev = try!(LinearDev::new(&format!("stratis_{}_meta", name), dm, &meta_regions));
+
         // When constructing a thin-pool, Stratis reserves the first N
         // sectors on a block device by creating a linear device with a
         // starting offset. DM writes the super block in the first block.
@@ -83,14 +92,11 @@ impl StratPool {
         // superblock DM issue error messages because it triggers code paths
         // that are trying to re-adopt the device with the attributes that
         // have been passed.
-        try!(wipe_sectors(&try!(meta_dev.devnode()), Sectors(0), DATA_BLOCK_SIZE));
+        try!(wipe_sectors(&try!(meta_dev.devnode()), Sectors(0), INITIAL_META_SIZE));
 
-        let segments = bds[1..]
-            .iter()
-            .map(|block_dev| block_dev.avail_range_segment())
-            .collect::<Vec<Segment>>();
-
-        let data_dev = try!(LinearDev::new(&format!("stratis_{}_data", name), dm, &segments));
+        let data_regions = block_mgr.alloc_space(INITIAL_DATA_SIZE)
+            .expect("blockmgr must not fail, already checked for space");
+        let data_dev = try!(LinearDev::new(&format!("stratis_{}_data", name), dm, &data_regions));
         try!(wipe_sectors(&try!(data_dev.devnode()), Sectors(0), DATA_BLOCK_SIZE));
         let length = try!(data_dev.size()).sectors();
 
@@ -106,7 +112,7 @@ impl StratPool {
         let mut pool = StratPool {
             name: name.to_owned(),
             pool_uuid: pool_uuid,
-            block_devs: BlockDevMgr::new(bds),
+            block_devs: block_mgr,
             filesystems: Table::new(),
             redundancy: redundancy,
             thin_pool: thinpool_dev,

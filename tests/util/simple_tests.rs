@@ -86,10 +86,10 @@ pub fn test_force_flag_dirty(paths: &[&Path]) -> () {
 
 /// Verify that it is impossible to steal blockdevs from another Stratis
 /// pool.
-/// 1. Initialize devices with uuid.
+/// 1. Initialize devices with pool uuid.
 /// 2. Initializing again with different uuid must fail.
-/// 3. Initializing again with same uuid must fail, because all the
-/// devices already belong.
+/// 3. Initializing again with same pool uuid must succeed, because all the
+/// devices already belong so there's nothing to do.
 /// 4. Initializing again with different uuid and force = true also fails.
 pub fn test_force_flag_stratis(paths: &[&Path]) -> () {
     let unique_devices = resolve_devices(&paths).unwrap();
@@ -100,9 +100,7 @@ pub fn test_force_flag_stratis(paths: &[&Path]) -> () {
     initialize(&uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).unwrap();
     assert!(initialize(&uuid2, unique_devices.clone(), MIN_MDA_SECTORS, false).is_err());
 
-    // FIXME: once requirement that number of devices added be at least 2 is removed
-    // this should succeed.
-    assert!(initialize(&uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).is_err());
+    assert!(initialize(&uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).is_ok());
 
     // FIXME: this should succeed, but currently it fails, to be extra safe.
     // See: https://github.com/stratis-storage/stratisd/pull/292

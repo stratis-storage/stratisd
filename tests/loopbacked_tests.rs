@@ -74,6 +74,7 @@ fn test_with_spec<F>(count: u8, test: F) -> ()
 
 #[test]
 pub fn loop_test_force_flag_stratis() {
+    test_with_spec(1, test_force_flag_stratis);
     test_with_spec(2, test_force_flag_stratis);
     test_with_spec(3, test_force_flag_stratis);
 }

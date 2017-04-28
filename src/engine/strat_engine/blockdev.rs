@@ -199,6 +199,10 @@ pub fn initialize(pool_uuid: &PoolUuid,
                                                 devnode.display(),
                                                 uuid);
                         return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
+                    } else {
+                        // Already in this pool (according to its header)
+                        // TODO: Check we already know about it
+                        // if yes, ignore. If no, add it w/o initializing?
                     }
                 }
             }

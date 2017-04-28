@@ -18,7 +18,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use devicemapper::types::Sectors;
+use devicemapper::Sectors;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockDevSave {

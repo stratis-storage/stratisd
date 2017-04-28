@@ -16,8 +16,8 @@ use std::time::Duration;
 
 use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::Device;
-use devicemapper::segment::Segment;
-use devicemapper::types::{Bytes, Sectors};
+use devicemapper::Segment;
+use devicemapper::{Bytes, Sectors};
 use time::Timespec;
 use uuid::Uuid;
 

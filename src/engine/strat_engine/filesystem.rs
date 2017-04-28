@@ -10,9 +10,9 @@ use std::process::Command;
 use consts::IEC;
 
 use devicemapper::DM;
-use devicemapper::types::Bytes;
-use devicemapper::thindev::{ThinDev, ThinStatus};
-use devicemapper::thinpooldev::ThinPoolDev;
+use devicemapper::Bytes;
+use devicemapper::{ThinDev, ThinStatus};
+use devicemapper::ThinPoolDev;
 
 use engine::{EngineError, EngineResult, ErrorEnum, Filesystem};
 use super::super::engine::{FilesystemUuid, HasName, HasUuid};

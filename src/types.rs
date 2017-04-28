@@ -40,7 +40,7 @@ pub enum StratisError {
     Nix(nix::Error),
     Dbus(dbus::Error),
     Term(term::Error),
-    DM(devicemapper::result::DmError),
+    DM(devicemapper::DmError),
 }
 
 impl fmt::Display for StratisError {
@@ -114,8 +114,8 @@ impl From<term::Error> for StratisError {
     }
 }
 
-impl From<devicemapper::result::DmError> for StratisError {
-    fn from(err: devicemapper::result::DmError) -> StratisError {
+impl From<devicemapper::DmError> for StratisError {
+    fn from(err: devicemapper::DmError) -> StratisError {
         StratisError::DM(err)
     }
 }

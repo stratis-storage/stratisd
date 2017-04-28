@@ -15,11 +15,11 @@ use std::path::{Path, PathBuf};
 
 use self::devicemapper::DM;
 use self::devicemapper::consts::SECTOR_SIZE;
-use self::devicemapper::lineardev::LinearDev;
-use self::devicemapper::segment::Segment;
-use self::devicemapper::types::{DataBlocks, Sectors};
-use self::devicemapper::thindev::ThinDev;
-use self::devicemapper::thinpooldev::ThinPoolDev;
+use self::devicemapper::LinearDev;
+use self::devicemapper::Segment;
+use self::devicemapper::{DataBlocks, Sectors};
+use self::devicemapper::ThinDev;
+use self::devicemapper::ThinPoolDev;
 
 use self::tempdir::TempDir;
 use self::time::now;
@@ -125,10 +125,9 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
         .map(|block_dev| block_dev.avail_range_segment())
         .collect::<Vec<Segment>>();
 
-    let segments_refs: Vec<&Segment> = segments.iter().collect();
     let device_name = "stratis_testing_linear";
     let dm = DM::new().unwrap();
-    let lineardev = LinearDev::new(&device_name, &dm, &segments_refs).unwrap();
+    let lineardev = LinearDev::new(&device_name, &dm, &segments).unwrap();
 
     let mut linear_dev_path = PathBuf::from("/dev/mapper");
     linear_dev_path.push(device_name);
@@ -154,11 +153,11 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
     let dm = DM::new().unwrap();
     let metadata_dev = LinearDev::new("stratis_testing_thinpool_metadata",
                                       &dm,
-                                      &vec![&metadata_blockdev.avail_range_segment()])
+                                      &vec![metadata_blockdev.avail_range_segment()])
         .unwrap();
     let data_dev = LinearDev::new("stratis_testing_thinpool_datadev",
                                   &dm,
-                                  &vec![&data_blockdev.avail_range_segment()])
+                                  &vec![data_blockdev.avail_range_segment()])
         .unwrap();
     let thinpool_dev = ThinPoolDev::new("stratis_testing_thinpool",
                                         &dm,

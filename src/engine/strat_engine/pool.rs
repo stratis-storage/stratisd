@@ -97,7 +97,6 @@ impl StratPool {
         let data_regions = block_mgr.alloc_space(INITIAL_DATA_SIZE)
             .expect("blockmgr must not fail, already checked for space");
         let data_dev = try!(LinearDev::new(&format!("stratis_{}_data", name), dm, &data_regions));
-        try!(wipe_sectors(&try!(data_dev.devnode()), Sectors(0), DATA_BLOCK_SIZE));
         let length = try!(data_dev.size()).sectors();
 
         // TODO Fix hard coded data blocksize and low water mark.

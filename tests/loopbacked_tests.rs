@@ -10,14 +10,14 @@ extern crate tempdir;
 mod util;
 
 use std::fs::OpenOptions;
+use std::io::{Seek, Write, SeekFrom};
 use std::path::{Path, PathBuf};
 
-use devicemapper::{Bytes, Sectors};
+use devicemapper::Bytes;
 use loopdev::{LoopControl, LoopDevice};
 use tempdir::TempDir;
 
 use libstratis::consts::IEC;
-use libstratis::engine::strat_engine::blockdev::wipe_sectors;
 
 use util::simple_tests::test_force_flag_dirty;
 use util::simple_tests::test_force_flag_stratis;
@@ -33,12 +33,18 @@ fn get_devices(count: u8, dir: &TempDir) -> Vec<LoopDevice> {
     let lc = LoopControl::open().unwrap();
     let mut loop_devices = Vec::new();
 
-    let length = Bytes(IEC::Gi as u64).sectors();
+    let length = Bytes(IEC::Gi as u64);
     for index in 0..count {
         let subdir = TempDir::new_in(dir, &index.to_string()).unwrap();
         let path = subdir.path().join("store");
-        OpenOptions::new().read(true).write(true).create(true).open(&path).unwrap();
-        wipe_sectors(&path, Sectors(0), length).unwrap();
+        let mut f = OpenOptions::new().read(true).write(true).create(true).open(&path).unwrap();
+
+        // the proper way to do this is fallocate, but nix doesn't implement yet.
+        // TODO: see https://github.com/nix-rust/nix/issues/596
+        f.seek(SeekFrom::Start(*length)).unwrap();
+        f.write(&[0]).unwrap();
+        f.flush().unwrap();
+
         let ld = lc.next_free().unwrap();
         ld.attach(path, 0).unwrap();
         loop_devices.push(ld);

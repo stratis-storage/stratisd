@@ -28,6 +28,6 @@ features = ["v4"]
 
 [dev-dependencies]
 quickcheck = "0.4"
-rustc-serialize = "0.3.21"
+serde_json = "0"
 tempdir = "0.3.5"
 loopdev = "0.1.1"

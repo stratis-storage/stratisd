@@ -3,7 +3,9 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 extern crate devicemapper;
+extern crate env_logger;
 extern crate libstratis;
+extern crate log;
 extern crate rustc_serialize;
 
 mod util;

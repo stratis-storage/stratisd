@@ -1,9 +1,10 @@
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
 extern crate devicemapper;
+extern crate env_logger;
 extern crate libstratis;
+extern crate log;
 extern crate loopdev;
 extern crate tempdir;
 
@@ -19,6 +20,7 @@ use tempdir::TempDir;
 
 use libstratis::consts::IEC;
 
+use util::logger::init_logger;
 use util::simple_tests::test_force_flag_dirty;
 use util::simple_tests::test_force_flag_stratis;
 use util::simple_tests::test_linear_device;

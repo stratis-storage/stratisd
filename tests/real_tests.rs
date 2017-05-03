@@ -21,6 +21,7 @@ use libstratis::consts::IEC;
 use libstratis::engine::strat_engine::device::wipe_sectors;
 
 use util::logger::init_logger;
+use util::simple_tests::test_basic_metadata;
 use util::simple_tests::test_force_flag_dirty;
 use util::simple_tests::test_force_flag_stratis;
 use util::simple_tests::test_linear_device;
@@ -101,4 +102,9 @@ pub fn real_test_variable_length_metadata_times() {
 #[test]
 pub fn real_test_setup() {
     test_with_spec(4, test_setup);
+}
+
+#[test]
+pub fn real_test_basic_metadata() {
+    test_with_spec(4, test_basic_metadata);
 }

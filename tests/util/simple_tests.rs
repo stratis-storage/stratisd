@@ -284,6 +284,7 @@ pub fn test_setup(paths: &[&Path]) -> () {
 /// number of paths. There are device-mapper block devices associated with the
 /// pool, but it is not possible to read their BDAs.
 /// 7. Repeat, with an additional pool.
+/// 8. Teardown the engine, and repeat once more.
 pub fn test_basic_metadata(paths: &[&Path]) {
     assert!(paths.len() > 2);
 
@@ -308,5 +309,14 @@ pub fn test_basic_metadata(paths: &[&Path]) {
     assert!(metadata.len() == 2);
     assert!(metadata.get(&uuid1).unwrap().name == name1);
     assert!(metadata.get(&uuid2).unwrap().name == name2);
+    assert!(pools.get(&uuid2).unwrap().len() == paths2.len());
+
+    engine.teardown().unwrap();
+    let pools = find_all().unwrap();
+    let metadata = load_metadata(&pools).unwrap();
+    assert!(metadata.len() == 2);
+    assert!(metadata.get(&uuid1).unwrap().name == name1);
+    assert!(metadata.get(&uuid2).unwrap().name == name2);
+    assert!(pools.get(&uuid1).unwrap().len() == paths1.len());
     assert!(pools.get(&uuid2).unwrap().len() == paths2.len());
 }

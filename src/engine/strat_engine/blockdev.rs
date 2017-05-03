@@ -24,8 +24,7 @@ use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
 use super::device::blkdev_size;
 use super::metadata::{StaticHeader, BDA, validate_mda_size};
 use super::engine::DevOwnership;
-pub use super::BlockDevSave;
-use engine::strat_engine::range_alloc::RangeAllocator;
+use super::range_alloc::RangeAllocator;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
 
@@ -157,13 +156,6 @@ impl BlockDev {
             devnode: devnode.to_owned(),
             bda: bda,
             used: allocator,
-        }
-    }
-
-    pub fn to_save(&self) -> BlockDevSave {
-        BlockDevSave {
-            devnode: self.devnode.clone(),
-            total_size: self.size(),
         }
     }
 

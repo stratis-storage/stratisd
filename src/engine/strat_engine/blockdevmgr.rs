@@ -12,7 +12,6 @@ use time::Timespec;
 
 use engine::{EngineResult, PoolUuid};
 use super::metadata::MIN_MDA_SECTORS;
-pub use super::BlockDevSave;
 use engine::strat_engine::blockdev::{BlockDev, initialize};
 use engine::strat_engine::device::resolve_devices;
 
@@ -82,13 +81,6 @@ impl BlockDevMgr {
 
     pub fn devnodes(&self) -> Vec<PathBuf> {
         self.block_devs.keys().map(|p| p.clone()).collect()
-    }
-
-    pub fn to_save(&self) -> HashMap<String, BlockDevSave> {
-        self.block_devs
-            .iter()
-            .map(|(_, bd)| (bd.uuid().simple().to_string(), bd.to_save()))
-            .collect()
     }
 
     /// Write the given data to all blockdevs marking with specified time.

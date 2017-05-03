@@ -15,4 +15,3 @@ pub mod setup;
 
 pub use self::engine::StratEngine;
 pub use self::pool::StratPool;
-pub use self::serde_structs::BlockDevSave;

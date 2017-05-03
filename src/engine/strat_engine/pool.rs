@@ -32,7 +32,7 @@ use engine::strat_engine::device::wipe_sectors;
 use super::super::engine::{FilesystemUuid, HasName, HasUuid};
 use super::super::structures::Table;
 
-use super::serde_structs::StratSave;
+use super::serde_structs::{DSerializable, PoolSave};
 use super::blockdev::initialize;
 use super::blockdevmgr::BlockDevMgr;
 use super::device::resolve_devices;
@@ -135,14 +135,6 @@ impl StratPool {
     pub fn write_metadata(&mut self) -> EngineResult<()> {
         let data = try!(serde_json::to_string(&self.to_save()));
         self.block_devs.save_state(&now().to_timespec(), data.as_bytes())
-    }
-
-    pub fn to_save(&self) -> StratSave {
-        StratSave {
-            name: self.name.clone(),
-            id: self.pool_uuid.simple().to_string(),
-            block_devs: self.block_devs.to_save(),
-        }
     }
 
     pub fn check(&mut self) -> () {
@@ -271,5 +263,11 @@ impl HasUuid for StratPool {
 impl HasName for StratPool {
     fn name(&self) -> &str {
         &self.name
+    }
+}
+
+impl DSerializable<PoolSave> for StratPool {
+    fn to_save(&self) -> PoolSave {
+        PoolSave { name: self.name.clone() }
     }
 }

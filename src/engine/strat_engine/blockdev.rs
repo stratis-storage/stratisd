@@ -27,8 +27,7 @@ use consts::IEC;
 use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
 use super::metadata::{StaticHeader, BDA, validate_mda_size};
 use super::engine::DevOwnership;
-pub use super::BlockDevSave;
-use engine::strat_engine::range_alloc::RangeAllocator;
+use super::range_alloc::RangeAllocator;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
 
@@ -199,13 +198,6 @@ pub struct BlockDev {
 }
 
 impl BlockDev {
-    pub fn to_save(&self) -> BlockDevSave {
-        BlockDevSave {
-            devnode: self.devnode.clone(),
-            total_size: self.size(),
-        }
-    }
-
     pub fn wipe_metadata(self) -> EngineResult<()> {
         let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
         BDA::wipe(&mut f)

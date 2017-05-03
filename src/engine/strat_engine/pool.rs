@@ -31,8 +31,8 @@ use consts::IEC::Mi;
 use super::super::engine::{FilesystemUuid, HasName, HasUuid};
 use super::super::structures::Table;
 
-use super::serde_structs::StratSave;
 use super::blockdev::{initialize, resolve_devices};
+use super::serde_structs::{Isomorphism, PoolSave};
 use super::blockdevmgr::BlockDevMgr;
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::metadata::MIN_MDA_SECTORS;
@@ -143,14 +143,6 @@ impl StratPool {
         let data = try!(serde_json::to_string(&self.to_save()));
         self.block_devs
             .save_state(&now().to_timespec(), data.as_bytes())
-    }
-
-    pub fn to_save(&self) -> StratSave {
-        StratSave {
-            name: self.name.clone(),
-            id: self.pool_uuid.simple().to_string(),
-            block_devs: self.block_devs.to_save(),
-        }
     }
 
     pub fn check(&mut self) -> () {
@@ -296,5 +288,11 @@ impl HasUuid for StratPool {
 impl HasName for StratPool {
     fn name(&self) -> &str {
         &self.name
+    }
+}
+
+impl Isomorphism<PoolSave> for StratPool {
+    fn to_save(&self) -> PoolSave {
+        PoolSave { name: self.name.clone() }
     }
 }

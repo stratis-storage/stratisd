@@ -280,8 +280,6 @@ impl Pool for StratPool {
     }
 
     fn destroy(mut self) -> EngineResult<()> {
-
-        // TODO Do we want to create a new File each time we interact with DM?
         let dm = try!(DM::new());
         try!(self.thin_pool.teardown(&dm));
 

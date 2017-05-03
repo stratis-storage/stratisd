@@ -193,6 +193,16 @@ impl StratPool {
             }
         }
     }
+
+    /// Teardown a pool.
+    /// Take down the device mapper devices belonging to the pool.
+    /// This method and destroy() must keep their teardown operations
+    /// in sync.
+    pub fn teardown(self) -> EngineResult<()> {
+        let dm = try!(DM::new());
+        try!(self.thin_pool.teardown(&dm));
+        Ok(())
+    }
 }
 
 impl Pool for StratPool {
@@ -225,6 +235,8 @@ impl Pool for StratPool {
     }
 
     fn destroy(self) -> EngineResult<()> {
+        // Ensure that teardown operations in this method are in sync
+        // with operations in teardown().
         let dm = try!(DM::new());
         try!(self.thin_pool.teardown(&dm));
         try!(self.block_devs.destroy_all());

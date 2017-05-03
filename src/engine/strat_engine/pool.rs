@@ -199,6 +199,21 @@ impl StratPool {
             }
         }
     }
+
+    /// Teardown a pool.
+    /// Take down the device mapper devices belonging to the pool.
+    /// This method and destroy() must keep their DM teardown operations
+    /// in sync.
+    pub fn teardown(self) -> EngineResult<()> {
+        // TODO: any necessary clean up of filesystems
+        if !self.filesystems.is_empty() {
+            return Err(EngineError::Engine(ErrorEnum::Busy,
+                                           format!("May be unsynced files on device.")));
+        }
+        let dm = try!(DM::new());
+        try!(self.thin_pool.teardown(&dm));
+        Ok(())
+    }
 }
 
 impl Pool for StratPool {
@@ -231,6 +246,8 @@ impl Pool for StratPool {
     }
 
     fn destroy(self) -> EngineResult<()> {
+        // Ensure that DM teardown operations in this method are in sync
+        // with operations in teardown().
         let dm = try!(DM::new());
         try!(self.thin_pool.teardown(&dm));
         try!(self.block_devs.destroy_all());

@@ -81,7 +81,6 @@ impl<T: HasName + HasUuid> Table<T> {
     }
 
     /// A mutable iterator through Pools.
-    #[allow(dead_code)]
     pub fn iter_mut(&mut self) -> IterMut<T> {
         self.items.iter_mut()
     }

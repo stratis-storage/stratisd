@@ -66,7 +66,6 @@ impl Engine for StratEngine {
         Ok((uuid, bdev_paths))
     }
 
-    /// Destroy a pool, if the pool does not exist, return Ok.
     fn destroy_pool(&mut self, uuid: &PoolUuid) -> EngineResult<bool> {
         destroy_pool!{self; uuid}
     }

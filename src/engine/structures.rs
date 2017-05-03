@@ -33,6 +33,11 @@ impl<T: HasName + HasUuid> Table<T> {
 
     }
 
+    /// Empty this table of all its items, returning them in a vector.
+    pub fn empty(self) -> Vec<T> {
+        self.items
+    }
+
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
     }

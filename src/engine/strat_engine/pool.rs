@@ -50,12 +50,15 @@ pub struct StratPool {
 }
 
 impl StratPool {
-    pub fn new(name: &str,
-               dm: &DM,
-               paths: &[&Path],
-               redundancy: Redundancy,
-               force: bool)
-               -> EngineResult<StratPool> {
+    /// Initialize a Stratis Pool.
+    /// 1. Initialize the block devices specified by paths.
+    /// 2. Set up thinpool device to back filesystems.
+    pub fn initialize(name: &str,
+                      dm: &DM,
+                      paths: &[&Path],
+                      redundancy: Redundancy,
+                      force: bool)
+                      -> EngineResult<StratPool> {
         let pool_uuid = Uuid::new_v4();
 
         let devices = try!(resolve_devices(paths));

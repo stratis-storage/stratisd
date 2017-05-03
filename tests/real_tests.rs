@@ -4,15 +4,16 @@
 
 extern crate devicemapper;
 extern crate libstratis;
-extern crate rustc_serialize;
+extern crate serde_json;
 
 mod util;
 
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
+use serde_json::{Value, from_reader};
+
 use self::devicemapper::{Bytes, Sectors};
-use self::rustc_serialize::json::Json;
 
 use libstratis::consts::IEC;
 use libstratis::engine::strat_engine::blockdev::wipe_sectors;
@@ -28,15 +29,15 @@ use util::simple_tests::test_variable_length_metadata_times;
 /// Set up count devices from configuration file.
 /// Wipe first GiB on each device.
 fn get_devices(count: u8) -> Option<Vec<PathBuf>> {
-    let mut file = OpenOptions::new().read(true).open("tests/test_config.json").unwrap();
-    let config = Json::from_reader(&mut file).unwrap();
-    let devpaths = config.find("ok_to_destroy_dev_array_key").unwrap().as_array().unwrap();
+    let file = OpenOptions::new().read(true).open("tests/test_config.json").unwrap();
+    let config: Value = from_reader(&file).unwrap();
+    let devpaths = config.get("ok_to_destroy_dev_array_key").unwrap().as_array().unwrap();
     if devpaths.len() < count as usize {
         return None;
     }
     let devices: Vec<PathBuf> = devpaths.iter()
         .take(count as usize)
-        .map(|x| PathBuf::from(x.as_string().unwrap()))
+        .map(|x| PathBuf::from(x.as_str().unwrap()))
         .collect();
 
     let length = Bytes(IEC::Gi as u64).sectors();

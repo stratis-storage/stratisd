@@ -11,6 +11,7 @@ use std::str::FromStr;
 
 use nix::sys::stat::{S_IFBLK, S_IFMT};
 use nix::Errno;
+use serde_json;
 
 use devicemapper::{Device, Sectors};
 
@@ -19,6 +20,7 @@ use engine::{DevUuid, EngineError, EngineResult, PoolUuid};
 use super::blockdev::BlockDev;
 use super::metadata::BDA;
 use super::range_alloc::RangeAllocator;
+use super::serde_structs::PoolSave;
 
 
 /// Find all Stratis Blockdevs.
@@ -117,4 +119,20 @@ pub fn load_state(blockdevs: &[&BlockDev]) -> Option<Vec<u8>> {
     }
 
     None
+}
+
+/// Get the metadata for every pool.
+pub fn load_metadata(setup_data: &HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>)
+                     -> EngineResult<HashMap<PoolUuid, PoolSave>> {
+    let mut metadata = HashMap::new();
+
+    for (pool_uuid, blockdev_map) in setup_data {
+        let blockdevs: Vec<&BlockDev> = blockdev_map.values().collect();
+        if let Some(state) = load_state(&blockdevs) {
+            let pool_metadata: PoolSave = try!(serde_json::from_slice(&state));
+            metadata.insert(pool_uuid.clone(), pool_metadata);
+        }
+    }
+
+    Ok(metadata)
 }

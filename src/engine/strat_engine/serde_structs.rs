@@ -12,11 +12,7 @@
 // can convert to or from them when saving our current state, or
 // restoring state from saved metadata.
 
-use std::collections::HashMap;
 use std::marker::Sized;
-use std::path::PathBuf;
-
-use devicemapper::Sectors;
 
 /// Implements saving and restoring from metadata.
 pub trait DSerializable<T> {
@@ -29,14 +25,6 @@ pub trait DSerializable<T> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BlockDevSave {
-    pub devnode: PathBuf,
-    pub total_size: Sectors,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StratSave {
+pub struct PoolSave {
     pub name: String,
-    pub id: String,
-    pub block_devs: HashMap<String, BlockDevSave>,
 }

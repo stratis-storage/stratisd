@@ -15,6 +15,8 @@ use super::metadata::MIN_MDA_SECTORS;
 use engine::strat_engine::blockdev::{BlockDev, initialize};
 use engine::strat_engine::device::resolve_devices;
 
+use super::setup;
+
 #[derive(Debug)]
 pub struct BlockDevMgr {
     pub block_devs: HashMap<PathBuf, BlockDev>,
@@ -99,30 +101,7 @@ impl BlockDevMgr {
     /// Return the metadata from the first blockdev with up-to-date, readable
     /// metadata.
     pub fn load_state(&self) -> Option<Vec<u8>> {
-        if self.block_devs.is_empty() {
-            return None;
-        }
-
-        let most_recent_blockdev = self.block_devs
-            .values()
-            .max_by_key(|bd| bd.last_update_time())
-            .expect("must be a maximum since bds is non-empty");
-
-        let most_recent_time = most_recent_blockdev.last_update_time();
-
-        if most_recent_time.is_none() {
-            return None;
-        }
-
-        for bd in self.block_devs
-            .values()
-            .filter(|b| b.last_update_time() == most_recent_time) {
-            match bd.load_state() {
-                Ok(Some(data)) => return Some(data),
-                _ => continue,
-            }
-        }
-
-        None
+        let blockdevs: Vec<&BlockDev> = self.block_devs.values().collect();
+        setup::load_state(&blockdevs)
     }
 }

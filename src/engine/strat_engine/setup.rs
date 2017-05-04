@@ -89,3 +89,32 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>>
 
     Ok(pool_map)
 }
+
+/// Return the metadata from the first blockdev with up-to-date, readable
+/// metadata.
+/// Precondition: All BlockDevs in blockdevs must belong to the same pool.
+pub fn load_state(blockdevs: &[&BlockDev]) -> Option<Vec<u8>> {
+    if blockdevs.is_empty() {
+        return None;
+    }
+
+    let most_recent_blockdev = blockdevs.iter()
+        .max_by_key(|bd| bd.last_update_time())
+        .expect("must be a maximum since bds is non-empty");
+
+    let most_recent_time = most_recent_blockdev.last_update_time();
+
+    if most_recent_time.is_none() {
+        return None;
+    }
+
+    for bd in blockdevs.iter()
+        .filter(|b| b.last_update_time() == most_recent_time) {
+        match bd.load_state() {
+            Ok(Some(data)) => return Some(data),
+            _ => continue,
+        }
+    }
+
+    None
+}

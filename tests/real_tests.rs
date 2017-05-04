@@ -3,7 +3,9 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 extern crate devicemapper;
+extern crate env_logger;
 extern crate libstratis;
+extern crate log;
 extern crate serde_json;
 
 mod util;
@@ -18,6 +20,7 @@ use self::devicemapper::{Bytes, Sectors};
 use libstratis::consts::IEC;
 use libstratis::engine::strat_engine::blockdev::wipe_sectors;
 
+use util::logger::init_logger;
 use util::simple_tests::test_force_flag_dirty;
 use util::simple_tests::test_force_flag_stratis;
 use util::simple_tests::test_linear_device;
@@ -52,6 +55,7 @@ fn get_devices(count: u8) -> Option<Vec<PathBuf>> {
 fn test_with_spec<F>(count: u8, test: F) -> ()
     where F: Fn(&[&Path]) -> ()
 {
+    init_logger();
     let devices = get_devices(count).unwrap();
     let device_paths: Vec<&Path> = devices.iter().map(|x| x.as_path()).collect();
     test(&device_paths);

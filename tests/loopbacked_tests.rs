@@ -69,6 +69,12 @@ fn test_with_spec<F>(count: u8, test: F) -> ()
     for dev in loop_devices {
         dev.detach().unwrap();
     }
+
+    // Explicitly delete the temporary directory with all its contents.
+    // Allowing it to be deleted on drop will cause any errors to be suppressed.
+    // This may alert us to some problem with the underlying infrastructure
+    // of the tests.
+    tmpdir.close().unwrap();
 }
 
 

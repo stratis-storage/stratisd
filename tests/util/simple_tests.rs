@@ -28,12 +28,12 @@ use self::uuid::Uuid;
 use libstratis::engine::Engine;
 use libstratis::engine::strat_engine::StratEngine;
 use libstratis::engine::strat_engine::blockdev::{blkdev_size, initialize, resolve_devices,
-                                                 write_sectors, BlockDev};
+                                                 write_sectors};
+use libstratis::engine::strat_engine::blockdevmgr::BlockDevMgr;
 use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_fs};
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
                                                  MIN_MDA_SECTORS};
-use libstratis::engine::strat_engine::pool::StratPool;
 
 
 /// Dirty sectors where specified, with 1s.
@@ -86,10 +86,10 @@ pub fn test_force_flag_dirty(paths: &[&Path]) -> () {
 
 /// Verify that it is impossible to steal blockdevs from another Stratis
 /// pool.
-/// 1. Initialize devices with uuid.
+/// 1. Initialize devices with pool uuid.
 /// 2. Initializing again with different uuid must fail.
-/// 3. Initializing again with same uuid must fail, because all the
-/// devices already belong.
+/// 3. Initializing again with same pool uuid must succeed, because all the
+/// devices already belong so there's nothing to do.
 /// 4. Initializing again with different uuid and force = true also fails.
 pub fn test_force_flag_stratis(paths: &[&Path]) -> () {
     let unique_devices = resolve_devices(&paths).unwrap();
@@ -100,9 +100,7 @@ pub fn test_force_flag_stratis(paths: &[&Path]) -> () {
     initialize(&uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).unwrap();
     assert!(initialize(&uuid2, unique_devices.clone(), MIN_MDA_SECTORS, false).is_err());
 
-    // FIXME: once requirement that number of devices added be at least 2 is removed
-    // this should succeed.
-    assert!(initialize(&uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).is_err());
+    assert!(initialize(&uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).is_ok());
 
     // FIXME: this should succeed, but currently it fails, to be extra safe.
     // See: https://github.com/stratis-storage/stratisd/pull/292
@@ -223,22 +221,15 @@ pub fn test_pool_blockdevs(paths: &[&Path]) -> () {
 pub fn test_variable_length_metadata_times(paths: &[&Path]) -> () {
     let unique_devices = resolve_devices(&paths).unwrap();
     let uuid = Uuid::new_v4();
-    let mut blockdevs = initialize(&uuid, unique_devices, MIN_MDA_SECTORS, false).unwrap();
-    assert!(StratPool::load_state(&blockdevs.iter().collect::<Vec<&BlockDev>>()).is_none());
+    let blockdevs = initialize(&uuid, unique_devices, MIN_MDA_SECTORS, false).unwrap();
+    let mut mgr = BlockDevMgr::new(blockdevs);
+    assert!(mgr.load_state().is_none());
 
     let (state1, state2) = (vec![1u8, 2u8, 3u8, 4u8], vec![5u8, 6u8, 7u8, 8u8]);
-    let current_time = now().to_timespec();
-    StratPool::save_state(&mut blockdevs.iter_mut().collect::<Vec<&mut BlockDev>>(),
-                          &current_time,
-                          &state1)
-        .unwrap();
-    assert!(StratPool::load_state(&blockdevs.iter().collect::<Vec<&BlockDev>>()).unwrap() ==
-            state1);
 
-    StratPool::save_state(&mut blockdevs.iter_mut().collect::<Vec<&mut BlockDev>>(),
-                          &now().to_timespec(),
-                          &state2)
-        .unwrap();
-    assert!(StratPool::load_state(&blockdevs.iter().collect::<Vec<&BlockDev>>()).unwrap() ==
-            state2);
+    mgr.save_state(&now().to_timespec(), &state1).unwrap();
+    assert!(mgr.load_state().unwrap() == state1);
+
+    mgr.save_state(&now().to_timespec(), &state2).unwrap();
+    assert!(mgr.load_state().unwrap() == state2);
 }

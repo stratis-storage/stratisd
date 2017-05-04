@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+// Code to handle a single block device.
+
 use std::io;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
@@ -26,6 +28,7 @@ use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
 use super::metadata::{StaticHeader, BDA, validate_mda_size};
 use super::engine::DevOwnership;
 pub use super::BlockDevSave;
+use engine::strat_engine::range_alloc::RangeAllocator;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
 
@@ -66,10 +69,15 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>>
 
         if let Some(bda) = BDA::load(&mut f).ok() {
             let dev = try!(Device::from_str(&devnode.to_string_lossy()));
+            // TODO: Parse MDA and also initialize RangeAllocator with
+            // in-use regions
+            let allocator = RangeAllocator::new_with_used(bda.dev_size(),
+                                                          &[(Sectors(0), bda.size())]);
             Ok(Some(BlockDev {
                 dev: dev,
                 devnode: devnode.to_owned(),
                 bda: bda,
+                used: allocator,
             }))
         } else {
             Ok(None)
@@ -191,6 +199,10 @@ pub fn initialize(pool_uuid: &PoolUuid,
                                                 devnode.display(),
                                                 uuid);
                         return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
+                    } else {
+                        // Already in this pool (according to its header)
+                        // TODO: Check we already know about it
+                        // if yes, ignore. If no, add it w/o initializing?
                     }
                 }
             }
@@ -204,13 +216,6 @@ pub fn initialize(pool_uuid: &PoolUuid,
 
     let add_devs = try!(filter_devs(dev_infos, pool_uuid, force));
 
-    // TODO: Fix this code.  We should deal with any number of blockdevs
-    //
-    if add_devs.len() < 2 {
-        return Err(EngineError::Engine(ErrorEnum::Error,
-                                       "Need at least 2 blockdevs to create a pool".into()));
-    }
-
     let mut bds = Vec::new();
     for (dev, (devnode, dev_size, mut f)) in add_devs {
 
@@ -219,11 +224,13 @@ pub fn initialize(pool_uuid: &PoolUuid,
                                        &Uuid::new_v4(),
                                        mda_size,
                                        dev_size.sectors()));
+        let allocator = RangeAllocator::new_with_used(bda.dev_size(), &[(Sectors(0), bda.size())]);
 
         let bd = BlockDev {
             dev: dev,
             devnode: devnode.clone(),
             bda: bda,
+            used: allocator,
         };
         bds.push(bd);
     }
@@ -233,9 +240,10 @@ pub fn initialize(pool_uuid: &PoolUuid,
 
 #[derive(Debug)]
 pub struct BlockDev {
-    dev: Device,
+    pub dev: Device,
     pub devnode: PathBuf,
     bda: BDA,
+    used: RangeAllocator,
 }
 
 impl BlockDev {
@@ -307,5 +315,15 @@ impl BlockDev {
     /// Last time metadata was written to this device.
     pub fn last_update_time(&self) -> Option<&Timespec> {
         self.bda.last_update_time()
+    }
+
+    pub fn available(&self) -> Sectors {
+        self.used.available()
+    }
+
+    // Find some sector ranges that could be allocated. If more
+    // sectors are needed than our capacity, return partial results.
+    pub fn request_space(&mut self, size: Sectors) -> (Sectors, Vec<(Sectors, Sectors)>) {
+        self.used.request(size)
     }
 }

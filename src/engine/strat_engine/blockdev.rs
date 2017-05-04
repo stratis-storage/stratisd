@@ -187,10 +187,14 @@ pub fn initialize(pool_uuid: &PoolUuid,
                 }
                 DevOwnership::Ours(uuid) => {
                     if *pool_uuid != uuid {
-                        let error_str = format!("Device {} already belongs to Stratis pool {}",
-                                                devnode.display(),
-                                                uuid);
-                        return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
+                        if !force {
+                            let error_str = format!("Device {} already belongs to Stratis pool {}",
+                                                    devnode.display(),
+                                                    uuid);
+                            return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
+                        } else {
+                            add_devs.push((dev, (devnode, dev_size, f)))
+                        }
                     }
                 }
             }

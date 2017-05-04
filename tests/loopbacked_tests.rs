@@ -3,7 +3,9 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 extern crate devicemapper;
+extern crate env_logger;
 extern crate libstratis;
+extern crate log;
 extern crate loopdev;
 extern crate tempdir;
 
@@ -19,6 +21,7 @@ use tempdir::TempDir;
 
 use libstratis::consts::IEC;
 
+use util::logger::init_logger;
 use util::simple_tests::test_force_flag_dirty;
 use util::simple_tests::test_force_flag_stratis;
 use util::simple_tests::test_linear_device;
@@ -59,6 +62,7 @@ fn get_devices(count: u8, dir: &TempDir) -> Vec<LoopDevice> {
 fn test_with_spec<F>(count: u8, test: F) -> ()
     where F: Fn(&[&Path]) -> ()
 {
+    init_logger();
     let tmpdir = TempDir::new("stratis").unwrap();
     let loop_devices: Vec<LoopDevice> = get_devices(count, &tmpdir);
     let device_paths: Vec<PathBuf> = loop_devices.iter().map(|x| x.get_path().unwrap()).collect();

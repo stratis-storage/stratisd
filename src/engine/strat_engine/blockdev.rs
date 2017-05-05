@@ -5,18 +5,14 @@
 // Code to handle a single block device.
 
 use std::io;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::ErrorKind;
-use std::io::{Seek, Write, SeekFrom};
-use std::fs::{OpenOptions, read_dir};
-use std::os::unix::prelude::AsRawFd;
+use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 
-use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::Device;
 use devicemapper::Segment;
 use devicemapper::{Bytes, Sectors};
@@ -25,106 +21,13 @@ use uuid::Uuid;
 
 use consts::IEC;
 use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
+use super::device::blkdev_size;
 use super::metadata::{StaticHeader, BDA, validate_mda_size};
 use super::engine::DevOwnership;
-pub use super::BlockDevSave;
-use engine::strat_engine::range_alloc::RangeAllocator;
+use super::range_alloc::RangeAllocator;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
 
-ioctl!(read blkgetsize64 with 0x12, 114; u64);
-
-pub fn blkdev_size(file: &File) -> EngineResult<Bytes> {
-    let mut val: u64 = 0;
-
-    match unsafe { blkgetsize64(file.as_raw_fd(), &mut val) } {
-        Err(x) => Err(EngineError::Nix(x)),
-        Ok(_) => Ok(Bytes(val)),
-    }
-}
-
-/// Resolve a list of Paths of some sort to a set of unique Devices.
-/// Return an IOError if there was a problem resolving any particular device.
-pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
-    let mut devices = HashSet::new();
-    for path in paths {
-        let dev = try!(Device::from_str(&path.to_string_lossy()));
-        devices.insert(dev);
-    }
-    Ok(devices)
-}
-
-/// Find all Stratis Blockdevs.
-///
-/// Returns a map of pool uuids to maps of blockdev uuids to blockdevs.
-pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>> {
-
-    /// If a Path refers to a valid Stratis blockdev, return a BlockDev
-    /// struct. Otherwise, return None. Return an error if there was
-    /// a problem inspecting the device.
-    fn setup(devnode: &Path) -> EngineResult<Option<BlockDev>> {
-        let mut f = try!(OpenOptions::new()
-            .read(true)
-            .open(devnode));
-
-        if let Some(bda) = BDA::load(&mut f).ok() {
-            let dev = try!(Device::from_str(&devnode.to_string_lossy()));
-            // TODO: Parse MDA and also initialize RangeAllocator with
-            // in-use regions
-            let allocator = RangeAllocator::new_with_used(bda.dev_size(),
-                                                          &[(Sectors(0), bda.size())]);
-            Ok(Some(BlockDev {
-                dev: dev,
-                devnode: devnode.to_owned(),
-                bda: bda,
-                used: allocator,
-            }))
-        } else {
-            Ok(None)
-        }
-    }
-
-    let mut pool_map = HashMap::new();
-    for dir_e in try!(read_dir("/dev")) {
-        let devnode = match dir_e {
-            Ok(d) => d.path(),
-            Err(_) => continue,
-        };
-
-        match setup(&devnode) {
-            Ok(Some(blockdev)) => {
-                pool_map.entry(blockdev.pool_uuid().clone())
-                    .or_insert_with(HashMap::new)
-                    .insert(blockdev.uuid().clone(), blockdev);
-            }
-            _ => continue,
-        };
-    }
-
-    Ok(pool_map)
-}
-
-/// Write buf at offset length times.
-pub fn write_sectors(path: &Path,
-                     offset: Sectors,
-                     length: Sectors,
-                     buf: &[u8; SECTOR_SIZE])
-                     -> EngineResult<()> {
-    let mut f = try!(OpenOptions::new().write(true).open(path));
-
-    try!(f.seek(SeekFrom::Start(*offset)));
-    for _ in 0..*length {
-        try!(f.write_all(buf));
-    }
-
-    try!(f.flush());
-    Ok(())
-}
-
-/// Zero sectors at the given offset for length sectors.
-pub fn wipe_sectors(path: &Path, offset: Sectors, length: Sectors) -> EngineResult<()> {
-    write_sectors(path, offset, length, &[0u8; SECTOR_SIZE])
-}
 
 /// Initialize multiple blockdevs at once. This allows all of them
 /// to be checked for usability before writing to any of them.
@@ -247,10 +150,12 @@ pub struct BlockDev {
 }
 
 impl BlockDev {
-    pub fn to_save(&self) -> BlockDevSave {
-        BlockDevSave {
-            devnode: self.devnode.clone(),
-            total_size: self.size(),
+    pub fn new(dev: Device, devnode: &Path, bda: BDA, allocator: RangeAllocator) -> BlockDev {
+        BlockDev {
+            dev: dev,
+            devnode: devnode.to_owned(),
+            bda: bda,
+            used: allocator,
         }
     }
 

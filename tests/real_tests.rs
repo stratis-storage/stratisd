@@ -18,13 +18,15 @@ use serde_json::{Value, from_reader};
 use self::devicemapper::{Bytes, Sectors};
 
 use libstratis::consts::IEC;
-use libstratis::engine::strat_engine::blockdev::wipe_sectors;
+use libstratis::engine::strat_engine::device::wipe_sectors;
 
 use util::logger::init_logger;
+use util::simple_tests::test_basic_metadata;
 use util::simple_tests::test_force_flag_dirty;
 use util::simple_tests::test_force_flag_stratis;
 use util::simple_tests::test_linear_device;
 use util::simple_tests::test_pool_blockdevs;
+use util::simple_tests::test_setup;
 use util::simple_tests::test_thinpool_device;
 use util::simple_tests::test_variable_length_metadata_times;
 
@@ -95,4 +97,14 @@ pub fn real_test_force_flag_dirty() {
 #[test]
 pub fn real_test_variable_length_metadata_times() {
     test_with_spec(3, test_variable_length_metadata_times);
+}
+
+#[test]
+pub fn real_test_setup() {
+    test_with_spec(4, test_setup);
+}
+
+#[test]
+pub fn real_test_basic_metadata() {
+    test_with_spec(4, test_basic_metadata);
 }

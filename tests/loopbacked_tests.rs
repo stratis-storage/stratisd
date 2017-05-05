@@ -22,10 +22,12 @@ use tempdir::TempDir;
 use libstratis::consts::IEC;
 
 use util::logger::init_logger;
+use util::simple_tests::test_basic_metadata;
 use util::simple_tests::test_force_flag_dirty;
 use util::simple_tests::test_force_flag_stratis;
 use util::simple_tests::test_linear_device;
 use util::simple_tests::test_pool_blockdevs;
+use util::simple_tests::test_setup;
 use util::simple_tests::test_thinpool_device;
 use util::simple_tests::test_variable_length_metadata_times;
 
@@ -116,4 +118,14 @@ pub fn loop_test_force_flag_dirty() {
 #[test]
 pub fn loop_test_variable_length_metadata_times() {
     test_with_spec(3, test_variable_length_metadata_times);
+}
+
+#[test]
+pub fn loop_test_setup() {
+    test_with_spec(4, test_setup);
+}
+
+#[test]
+pub fn loop_test_basic_metadata() {
+    test_with_spec(4, test_basic_metadata);
 }

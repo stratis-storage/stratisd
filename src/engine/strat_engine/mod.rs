@@ -4,13 +4,14 @@
 
 pub mod blockdev;
 pub mod blockdevmgr;
+pub mod device;
 pub mod engine;
 pub mod metadata;
 pub mod filesystem;
 pub mod pool;
 pub mod serde_structs;
 pub mod range_alloc;
+pub mod setup;
 
 pub use self::engine::StratEngine;
 pub use self::pool::StratPool;
-pub use self::serde_structs::BlockDevSave;

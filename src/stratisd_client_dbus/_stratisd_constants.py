@@ -66,7 +66,7 @@ class StratisdErrorsGen(StratisdConstantsGen):
     # pylint: disable=too-few-public-methods
 
     _CLASSNAME = 'StratisdErrors'
-    _METHOD = Manager.Properties.ErrorValues
+    _METHOD = Manager.Properties.ErrorValues.Get
 
 
 class StratisdRaidGen(StratisdConstantsGen):
@@ -76,4 +76,4 @@ class StratisdRaidGen(StratisdConstantsGen):
     # pylint: disable=too-few-public-methods
 
     _CLASSNAME = 'StratisdRedundancies'
-    _METHOD = Manager.Properties.RedundancyValues
+    _METHOD = Manager.Properties.RedundancyValues.Get

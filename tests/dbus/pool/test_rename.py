@@ -20,22 +20,16 @@ import time
 import unittest
 
 from stratisd_client_dbus import Manager
+from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import Pool
 from stratisd_client_dbus import StratisdErrorsGen
-from stratisd_client_dbus import get_managed_objects
 from stratisd_client_dbus import get_object
+from stratisd_client_dbus import pools
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from stratisd_client_dbus._implementation import ManagerSpec
-from stratisd_client_dbus._implementation import PoolSpec
-
-from .._misc import checked_call
 from .._misc import _device_list
 from .._misc import Service
-
-_MN = ManagerSpec.MethodNames
-_PN = PoolSpec.MethodNames
 
 _DEVICE_STRATEGY = _device_list(0)
 
@@ -56,15 +50,15 @@ class SetNameTestCase(unittest.TestCase):
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         self._errors = StratisdErrorsGen.get_object()
-        ((self._pool_object_path, _), _, _) = Manager.CreatePool(
+        ((self._pool_object_path, _), _, _) = Manager.Methods.CreatePool(
            self._proxy,
            name=self._POOLNAME,
-           redundancy=0,
+           redundancy=(True, 0),
            force=False,
            devices=_DEVICE_STRATEGY.example()
         )
         self._pool_object = get_object(self._pool_object_path)
-        Manager.ConfigureSimulator(self._proxy, denominator=8)
+        Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
 
     def tearDown(self):
         """
@@ -76,16 +70,16 @@ class SetNameTestCase(unittest.TestCase):
         """
         Test rename to same name.
         """
-        (result, rc, _) = checked_call(
-           Pool.SetName(self._pool_object, name=self._POOLNAME),
-           PoolSpec.OUTPUT_SIGS[_PN.SetName]
+        (result, rc, _) = Pool.Methods.SetName(
+           self._pool_object,
+           name=self._POOLNAME
         )
 
         self.assertEqual(rc, self._errors.OK)
         self.assertFalse(result)
 
-        managed_objects = get_managed_objects(self._proxy)
-        result = next(managed_objects.pools({'Name': self._POOLNAME}), None)
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
+        result = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
         self.assertIsNotNone(result)
         (pool, _) = result
         self.assertEqual(pool, self._pool_object_path)
@@ -96,19 +90,19 @@ class SetNameTestCase(unittest.TestCase):
         """
         new_name = "new"
 
-        (result, rc, _) = checked_call(
-           Pool.SetName(self._pool_object, name=new_name),
-           PoolSpec.OUTPUT_SIGS[_PN.SetName]
+        (result, rc, _) = Pool.Methods.SetName(
+           self._pool_object,
+           name=new_name
         )
 
         self.assertTrue(result)
         self.assertEqual(rc, self._errors.OK)
 
-        managed_objects = get_managed_objects(self._proxy)
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
         self.assertIsNone(
-           next(managed_objects.pools({'Name': self._POOLNAME}), None)
+           next(pools(managed_objects, {'Name': self._POOLNAME}), None)
         )
-        result = next(managed_objects.pools({'Name': new_name}), None)
+        result = next(pools(managed_objects, {'Name': new_name}), None)
         self.assertIsNotNone(result)
         (pool, _) = result
         self.assertEqual(pool, self._pool_object_path)

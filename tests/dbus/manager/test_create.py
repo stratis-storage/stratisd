@@ -19,21 +19,17 @@ Test 'CreatePool'.
 import time
 import unittest
 
-from stratisd_client_dbus import GMOPool
+from stratisd_client_dbus import MOPool
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import StratisdErrorsGen
-from stratisd_client_dbus import get_managed_objects
+from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import get_object
+from stratisd_client_dbus import pools
 
-from stratisd_client_dbus._implementation import ManagerSpec
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._misc import checked_call
 from .._misc import _device_list
 from .._misc import Service
-
-_MN = ManagerSpec.MethodNames
-_MP = ManagerSpec.PropertyNames
 
 _DEVICE_STRATEGY = _device_list(0)
 
@@ -53,7 +49,7 @@ class Create2TestCase(unittest.TestCase):
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         self._errors = StratisdErrorsGen.get_object()
-        Manager.ConfigureSimulator(self._proxy, denominator=8)
+        Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
 
     def tearDown(self):
         """
@@ -68,53 +64,47 @@ class Create2TestCase(unittest.TestCase):
         If rc is OK, then pool must exist.
         """
         devs = _DEVICE_STRATEGY.example()
-        ((poolpath, devnodes), rc, _) = checked_call(
-           Manager.CreatePool(
-              self._proxy,
-              name=self._POOLNAME,
-              redundancy=0,
-              force=False,
-              devices=devs
-           ),
-           ManagerSpec.OUTPUT_SIGS[_MN.CreatePool]
+        ((poolpath, devnodes), rc, _) = Manager.Methods.CreatePool(
+           self._proxy,
+           name=self._POOLNAME,
+           redundancy=(True, 0),
+           force=False,
+           devices=devs
         )
 
-        managed_objects = get_managed_objects(self._proxy)
-        pools = [x for x in managed_objects.pools()]
-        result = next(managed_objects.pools({'Name': self._POOLNAME}), None)
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
+        all_pools = [x for x in pools(managed_objects)]
+        result = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
 
         if rc == self._errors.OK:
             self.assertIsNotNone(result)
             (pool, table) = result
             self.assertEqual(pool, poolpath)
-            self.assertEqual(len(pools), 1)
+            self.assertEqual(len(all_pools), 1)
             self.assertLessEqual(len(devnodes), len(devs))
 
-            pool_info = GMOPool(table)
+            pool_info = MOPool(table)
             self.assertLessEqual(
                 int(pool_info.TotalPhysicalUsed()),
                 int(pool_info.TotalPhysicalSize())
             )
         else:
             self.assertIsNone(result)
-            self.assertEqual(len(pools), 0)
+            self.assertEqual(len(all_pools), 0)
 
     def testCreateBadRAID(self):
         """
         Creation should always fail if RAID value is wrong.
         """
-        redundancy_values = Manager.Properties.RedundancyValues(self._proxy)
+        redundancy_values = Manager.Properties.RedundancyValues.Get(self._proxy)
 
         devs = _DEVICE_STRATEGY.example()
-        (_, rc, _) = checked_call(
-           Manager.CreatePool(
-              self._proxy,
-              name=self._POOLNAME,
-              redundancy=len(redundancy_values),
-              force=False,
-              devices=devs
-           ),
-           ManagerSpec.OUTPUT_SIGS[_MN.CreatePool]
+        (_, rc, _) = Manager.Methods.CreatePool(
+           self._proxy,
+           name=self._POOLNAME,
+           redundancy=(True, len(redundancy_values)),
+           force=False,
+           devices=devs
         )
         self.assertEqual(rc, self._errors.ERROR)
 
@@ -133,14 +123,14 @@ class Create3TestCase(unittest.TestCase):
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         self._errors = StratisdErrorsGen.get_object()
-        Manager.CreatePool(
+        Manager.Methods.CreatePool(
            self._proxy,
            name=self._POOLNAME,
-           redundancy=0,
+           redundancy=(True, 0),
            force=False,
            devices=_DEVICE_STRATEGY.example()
         )
-        Manager.ConfigureSimulator(self._proxy, denominator=8)
+        Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
 
     def tearDown(self):
         """
@@ -152,24 +142,21 @@ class Create3TestCase(unittest.TestCase):
         """
         Create should fail trying to create new pool with same name as previous.
         """
-        pools1 = get_managed_objects(self._proxy).pools()
+        pools1 = pools(ObjectManager.Methods.GetManagedObjects(self._proxy))
 
-        (_, rc, _) = checked_call(
-           Manager.CreatePool(
-              self._proxy,
-              name=self._POOLNAME,
-              redundancy=0,
-              force=False,
-              devices=_DEVICE_STRATEGY.example()
-           ),
-           ManagerSpec.OUTPUT_SIGS[_MN.CreatePool]
+        (_, rc, _) = Manager.Methods.CreatePool(
+           self._proxy,
+           name=self._POOLNAME,
+           redundancy=(True, 0),
+           force=False,
+           devices=_DEVICE_STRATEGY.example()
         )
         expected_rc = self._errors.ALREADY_EXISTS
         self.assertEqual(rc, expected_rc)
 
-        managed_objects = get_managed_objects(self._proxy)
-        pools2 = [x for x in managed_objects.pools()]
-        pool = next(managed_objects.pools({'Name': self._POOLNAME}), None)
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
+        pools2 = [x for x in pools(managed_objects)]
+        pool = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
 
         self.assertIsNotNone(pool)
         self.assertEqual(

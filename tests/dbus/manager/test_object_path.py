@@ -20,12 +20,9 @@ import unittest
 
 from stratisd_client_dbus import get_object
 
-from stratisd_client_dbus._implementation import ManagerSpec
-
 from .._misc import _device_list
 from .._misc import Service
 
-_MN = ManagerSpec.MethodNames
 
 _DEVICE_STRATEGY = _device_list(0)
 

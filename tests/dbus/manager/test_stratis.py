@@ -23,12 +23,9 @@ from stratisd_client_dbus import Manager
 from stratisd_client_dbus import get_object
 
 from stratisd_client_dbus._constants import TOP_OBJECT
-from stratisd_client_dbus._implementation import ManagerSpec
 
-from .._misc import checked_property
 from .._misc import Service
 
-_PN = ManagerSpec.PropertyNames
 
 class StratisTestCase(unittest.TestCase):
     """
@@ -43,7 +40,7 @@ class StratisTestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        Manager.ConfigureSimulator(self._proxy, denominator=8)
+        Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
 
     def tearDown(self):
         """
@@ -57,9 +54,6 @@ class StratisTestCase(unittest.TestCase):
 
         Major version number should be 0.
         """
-        version = checked_property(
-           Manager.Properties.Version(get_object(TOP_OBJECT)),
-           ManagerSpec.PROPERTY_SIGS[_PN.Version]
-        )
+        version = Manager.Properties.Version.Get(get_object(TOP_OBJECT))
         (major, _, _) = version.split(".")
         self.assertEqual(major, "0")

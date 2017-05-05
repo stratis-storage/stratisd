@@ -21,24 +21,16 @@ import unittest
 
 from stratisd_client_dbus import Filesystem
 from stratisd_client_dbus import Manager
+from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import Pool
 from stratisd_client_dbus import StratisdErrorsGen
+from stratisd_client_dbus import filesystems
 from stratisd_client_dbus import get_object
-from stratisd_client_dbus import get_managed_objects
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from stratisd_client_dbus._implementation import FilesystemSpec
-from stratisd_client_dbus._implementation import ManagerSpec
-from stratisd_client_dbus._implementation import PoolSpec
-
-from .._misc import checked_call
 from .._misc import _device_list
 from .._misc import Service
-
-_FN = FilesystemSpec.MethodNames
-_MN = ManagerSpec.MethodNames
-_PN = PoolSpec.MethodNames
 
 _DEVICE_STRATEGY = _device_list(0)
 
@@ -60,20 +52,20 @@ class SetNameTestCase(unittest.TestCase):
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         self._errors = StratisdErrorsGen.get_object()
-        ((self._pool_object_path, _), _, _) = Manager.CreatePool(
+        ((self._pool_object_path, _), _, _) = Manager.Methods.CreatePool(
            self._proxy,
            name=self._POOLNAME,
-           redundancy=0,
+           redundancy=(True, 0),
            force=False,
            devices=_DEVICE_STRATEGY.example()
         )
         self._pool_object = get_object(self._pool_object_path)
-        (filesystems, _, _) = Pool.CreateFilesystems(
+        (created, _, _) = Pool.Methods.CreateFilesystems(
            self._pool_object,
            specs=[self._fs_name]
         )
-        self._filesystem_object_path = filesystems[0][0]
-        Manager.ConfigureSimulator(self._proxy, denominator=8)
+        self._filesystem_object_path = created[0][0]
+        Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
 
     def tearDown(self):
         """
@@ -86,9 +78,9 @@ class SetNameTestCase(unittest.TestCase):
         Test rename to same name.
         """
         filesystem = get_object(self._filesystem_object_path)
-        (result, rc, _) = checked_call(
-           Filesystem.SetName(filesystem, name=self._fs_name),
-           FilesystemSpec.OUTPUT_SIGS[_FN.SetName]
+        (result, rc, _) = Filesystem.Methods.SetName(
+           filesystem,
+           name=self._fs_name
         )
 
         self.assertEqual(rc, self._errors.OK)
@@ -99,18 +91,15 @@ class SetNameTestCase(unittest.TestCase):
         Test rename to new name.
         """
         filesystem = get_object(self._filesystem_object_path)
-        (result, rc, _) = checked_call(
-           Filesystem.SetName(filesystem, name="new"),
-           FilesystemSpec.OUTPUT_SIGS[_FN.SetName]
-        )
+        (result, rc, _) = Filesystem.Methods.SetName(filesystem, name="new")
 
         self.assertEqual(rc, self._errors.OK)
         self.assertTrue(result)
 
-        managed_objects = get_managed_objects(self._proxy)
-        (fs_object_path, _) = next(managed_objects.filesystems({'Name': 'new'}))
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
+        (fs_object_path, _) = next(filesystems(managed_objects, {'Name': 'new'}))
         self.assertEqual(self._filesystem_object_path, fs_object_path)
 
         fs_object_path = \
-           next(managed_objects.filesystems({'Name': self._fs_name}), None)
+           next(filesystems(managed_objects, {'Name': self._fs_name}), None)
         self.assertIsNone(fs_object_path)

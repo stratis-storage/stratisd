@@ -146,6 +146,15 @@ mod tests {
     use super::*;
 
     #[test]
+    /// Test proper operation of RangeAllocator.
+    /// 1. Instantiate a RangeAllocator.
+    /// 2. Verify that no sectors are used (all are available).
+    /// 3. Insert range (10, 100) into the allocator.
+    /// 4. Verify that 100 sectors are taken and 28 remain.
+    /// 5. Request 50 sectors from the allocator.
+    /// 6. Verify that the maximum available, 28, were returned in two ranges.
+    /// 7. Remove two adjacent ranges of total length 60 sectors.
+    /// 8. Verify that number of available sectors is 60, used is 68.
     fn test_allocator_allocations() {
         let mut allocator = RangeAllocator::new(Sectors(128));
 
@@ -171,6 +180,8 @@ mod tests {
 
     #[test]
     #[should_panic]
+    /// Verify that remove_ranges() panics if ranges to be removed share
+    /// elements.
     fn test_allocator_failures_alloc_overlap() {
         let mut allocator = RangeAllocator::new(Sectors(128));
 
@@ -183,12 +194,14 @@ mod tests {
 
     #[test]
     #[should_panic]
+    /// Verify that insert_ranges() panics when all sectors have already been
+    /// allocated.
     fn test_allocator_failures_range_overwrite() {
         let mut allocator = RangeAllocator::new(Sectors(128));
 
-        let _request = allocator.request(Sectors(128));
-        assert_eq!(_request.0, Sectors(128));
-        assert_eq!(_request.1, &[(Sectors(0), Sectors(128))]);
+        let request = allocator.request(Sectors(128));
+        assert_eq!(request.0, Sectors(128));
+        assert_eq!(request.1, &[(Sectors(0), Sectors(128))]);
 
         // overwriting a used range
         allocator.insert_ranges(&[(Sectors(1), Sectors(1))]);
@@ -196,6 +209,8 @@ mod tests {
 
     #[test]
     #[should_panic]
+    /// Verify that remove_ranges() panics when an element in the specified
+    /// range is not in use.
     fn test_allocator_failures_removing_unused() {
         let mut allocator = RangeAllocator::new(Sectors(128));
 
@@ -205,6 +220,8 @@ mod tests {
 
     #[test]
     #[should_panic]
+    /// Verify that insert_ranges() panics when an element outside the range
+    /// limit is requested.
     fn test_allocator_failures_overflow_limit() {
         let mut allocator = RangeAllocator::new(Sectors(128));
 
@@ -214,6 +231,8 @@ mod tests {
 
     #[test]
     #[should_panic]
+    /// Verify that insert_ranges() panics when an element in a requested range
+    /// exceeds u64::MAX.
     fn test_allocator_failures_overflow_max() {
         use std::u64::MAX;
 

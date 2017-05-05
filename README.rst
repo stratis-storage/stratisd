@@ -59,6 +59,9 @@ D-Bus API. They test basic functionality and behavior of the various D-Bus
 methods and ensure that the values returned conform to their signature
 specification.
 
+It is necessary to run these tests as root, since root permissions are
+required to start stratisd.
+
 To run the existing D-Bus tests, ensure that your PYTHONPATH includes the
 src directory, set the environment variable STRATISD, to the location of your
 Stratis executable, and: ::

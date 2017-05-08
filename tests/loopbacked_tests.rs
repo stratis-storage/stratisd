@@ -15,11 +15,12 @@ use std::fs::OpenOptions;
 use std::io::{Seek, Write, SeekFrom};
 use std::path::{Path, PathBuf};
 
-use devicemapper::Bytes;
+use devicemapper::{Bytes, Sectors};
 use loopdev::{LoopControl, LoopDevice};
 use tempdir::TempDir;
 
 use libstratis::consts::IEC;
+use libstratis::engine::strat_engine::blockdev::wipe_sectors;
 
 use util::logger::init_logger;
 use util::simple_tests::test_force_flag_dirty;
@@ -32,11 +33,13 @@ use util::simple_tests::test_variable_length_metadata_times;
 
 /// Setup count loop backed devices in dir.
 /// Make sure each loop device is backed by a 1 GiB file.
+/// Wipe the first 1 MiB of the file.
 fn get_devices(count: u8, dir: &TempDir) -> Vec<LoopDevice> {
     let lc = LoopControl::open().unwrap();
     let mut loop_devices = Vec::new();
 
     let length = Bytes(IEC::Gi as u64);
+    let wipe_length = Bytes(IEC::Mi as u64).sectors();
     for index in 0..count {
         let subdir = TempDir::new_in(dir, &index.to_string()).unwrap();
         let path = subdir.path().join("store");
@@ -52,6 +55,11 @@ fn get_devices(count: u8, dir: &TempDir) -> Vec<LoopDevice> {
         f.seek(SeekFrom::Start(*length)).unwrap();
         f.write(&[0]).unwrap();
         f.flush().unwrap();
+
+        // Wipe 1 MiB at the beginning, as data sits around on the files.
+        OpenOptions::new().read(true).write(true).create(true).open(&path).unwrap();
+        wipe_sectors(&path, Sectors(0), wipe_length).unwrap();
+
 
         let ld = lc.next_free().unwrap();
         ld.attach(path, 0).unwrap();

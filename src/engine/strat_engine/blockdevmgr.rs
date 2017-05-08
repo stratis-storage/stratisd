@@ -23,7 +23,10 @@ pub struct BlockDevMgr {
 impl BlockDevMgr {
     pub fn new(block_devs: Vec<BlockDev>) -> BlockDevMgr {
         BlockDevMgr {
-            block_devs: block_devs.into_iter().map(|bd| (bd.devnode.clone(), bd)).collect(),
+            block_devs: block_devs
+                .into_iter()
+                .map(|bd| (bd.devnode.clone(), bd))
+                .collect(),
         }
     }
 
@@ -69,8 +72,9 @@ impl BlockDevMgr {
             }
 
             let (gotten, r_segs) = bd.request_space(needed);
-            segs.extend(r_segs.iter()
-                .map(|&(start, len)| Segment::new(bd.dev, start, len)));
+            segs.extend(r_segs
+                            .iter()
+                            .map(|&(start, len)| Segment::new(bd.dev, start, len)));
             needed = needed - gotten;
         }
 
@@ -122,8 +126,8 @@ impl BlockDevMgr {
         }
 
         for bd in self.block_devs
-            .values()
-            .filter(|b| b.last_update_time() == most_recent_time) {
+                .values()
+                .filter(|b| b.last_update_time() == most_recent_time) {
             match bd.load_state() {
                 Ok(Some(data)) => return Some(data),
                 _ => continue,

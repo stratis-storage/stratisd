@@ -68,9 +68,9 @@ impl BDA {
         let regions = try!(MDARegions::initialize(&header, &mut f));
 
         Ok(BDA {
-            header: header,
-            regions: regions,
-        })
+               header: header,
+               regions: regions,
+           })
     }
 
     pub fn load<F>(f: &mut F) -> EngineResult<BDA>
@@ -80,9 +80,9 @@ impl BDA {
         let regions = try!(MDARegions::load(&header, f));
 
         Ok(BDA {
-            header: header,
-            regions: regions,
-        })
+               header: header,
+               regions: regions,
+           })
     }
 
     /// Zero out Static Header on the blockdev. This causes it to no
@@ -263,13 +263,13 @@ impl StaticHeader {
         try!(validate_mda_size(mda_size));
 
         Ok(StaticHeader {
-            pool_uuid: pool_uuid,
-            dev_uuid: dev_uuid,
-            blkdev_size: blkdev_size,
-            mda_size: mda_size,
-            reserved_size: Sectors(LittleEndian::read_u64(&buf[104..112])),
-            flags: 0,
-        })
+               pool_uuid: pool_uuid,
+               dev_uuid: dev_uuid,
+               blkdev_size: blkdev_size,
+               mda_size: mda_size,
+               reserved_size: Sectors(LittleEndian::read_u64(&buf[104..112])),
+               flags: 0,
+           })
     }
 }
 
@@ -301,9 +301,10 @@ impl MDARegions {
         try!(f.flush());
 
         Ok(MDARegions {
-            region_size: region_size,
-            mdas: [MDAHeader::new(per_region_size), MDAHeader::new(per_region_size)],
-        })
+               region_size: region_size,
+               mdas: [MDAHeader::new(per_region_size),
+                      MDAHeader::new(per_region_size)],
+           })
     }
 
     // Construct MDARegions based on on-disk info
@@ -335,9 +336,9 @@ impl MDARegions {
             });
 
         Ok(MDARegions {
-            region_size: region_size,
-            mdas: [mda0, mda1],
-        })
+               region_size: region_size,
+               mdas: [mda0, mda1],
+           })
     }
 
     // Write data to the older region
@@ -391,8 +392,10 @@ impl MDARegions {
             mda.load_region(f)
         };
 
-        Ok(load_region(newer_region)
-            .unwrap_or_else(|_| load_region(newer_region + 2).unwrap_or_else(|_| None)))
+        Ok(load_region(newer_region).unwrap_or_else(|_| {
+                                                        load_region(newer_region + 2)
+                                                            .unwrap_or_else(|_| None)
+                                                    }))
     }
 
     pub fn older(&self) -> usize {
@@ -454,11 +457,11 @@ impl MDAHeader {
         match LittleEndian::read_u64(&buf[16..24]) {
             0 => {
                 Ok(MDAHeader {
-                    used: None,
-                    last_updated: None,
-                    data_crc: None,
-                    region_size: region_size,
-                })
+                       used: None,
+                       last_updated: None,
+                       data_crc: None,
+                       region_size: region_size,
+                   })
             }
             secs => {
                 let used = Bytes(LittleEndian::read_u64(&buf[8..16]));
@@ -471,11 +474,11 @@ impl MDAHeader {
                 assert!(secs <= std::i64::MAX as u64);
 
                 Ok(MDAHeader {
-                    used: Some(used),
-                    last_updated: Some(Timespec::new(secs as i64, nsecs as i32)),
-                    data_crc: Some(LittleEndian::read_u32(&buf[4..8])),
-                    region_size: region_size,
-                })
+                       used: Some(used),
+                       last_updated: Some(Timespec::new(secs as i64, nsecs as i32)),
+                       data_crc: Some(LittleEndian::read_u32(&buf[4..8])),
+                       region_size: region_size,
+                   })
             }
         }
     }
@@ -516,7 +519,7 @@ impl MDAHeader {
             try!(f.read_exact(&mut data_buf));
 
             if self.data_crc
-                .expect("Option constructors of 'data_crc' and 'used' are always the same.") !=
+                   .expect("Option constructors of 'data_crc' and 'used' are always the same.") !=
                crc32::checksum_ieee(&data_buf) {
                 return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region data CRC".into()));
             }
@@ -537,7 +540,7 @@ fn check_mda_region_size(used: Bytes, available: Bytes) -> EngineResult<()> {
                                                used,
                                                // available region > header size
                                                available - MDA_REGION_HDR_SIZE)
-                                           .into()));
+                                               .into()));
     };
     Ok(())
 }
@@ -638,7 +641,7 @@ mod tests {
                             &sh.dev_uuid,
                             sh.mda_size,
                             sh.blkdev_size)
-                .unwrap();
+                    .unwrap();
             let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
             match ownership {
                 DevOwnership::Ours(uuid) => {
@@ -676,7 +679,7 @@ mod tests {
                                       &sh.dev_uuid,
                                       sh.mda_size,
                                       sh.blkdev_size)
-                .unwrap();
+                    .unwrap();
             TestResult::from_bool(bda.last_update_time().is_none())
         }
 
@@ -699,7 +702,7 @@ mod tests {
                                       &sh.dev_uuid,
                                       sh.mda_size,
                                       sh.blkdev_size)
-            .unwrap();
+                .unwrap();
 
         let timestamp0 = now().to_timespec();
         let timestamp1 = now().to_timespec();
@@ -742,7 +745,7 @@ mod tests {
                                           &sh.dev_uuid,
                                           sh.mda_size,
                                           sh.blkdev_size)
-                .unwrap();
+                    .unwrap();
             let current_time = now().to_timespec();
             bda.save_state(&current_time, &state, &mut buf).unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();
@@ -783,7 +786,8 @@ mod tests {
             }
 
             let current_time = now().to_timespec();
-            bda.save_state(&current_time, &next_state, &mut buf).unwrap();
+            bda.save_state(&current_time, &next_state, &mut buf)
+                .unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();
 
             if let Some(s) = loaded_state {

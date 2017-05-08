@@ -68,12 +68,16 @@ impl RangeAllocator {
 
     /// Available sectors
     pub fn available(&self) -> Sectors {
-        Sectors((0..*self.limit).filter(|val| !self.used.contains(val)).count() as u64)
+        Sectors((0..*self.limit)
+                    .filter(|val| !self.used.contains(val))
+                    .count() as u64)
     }
 
     /// Allocated sectors
     pub fn used(&self) -> Sectors {
-        Sectors((0..*self.limit).filter(|val| self.used.contains(val)).count() as u64)
+        Sectors((0..*self.limit)
+                    .filter(|val| self.used.contains(val))
+                    .count() as u64)
     }
 
     /// Get a list of (offset, length) segments that are in use
@@ -82,17 +86,16 @@ impl RangeAllocator {
 
         // iterate one *past* limit. This ensures a used range extending
         // up to limit will end and be added to used_ranges properly.
-        (0..*self.limit + 1).fold(None, |curr_range, val| {
-            match (curr_range, self.used.contains(&val)) {
-                (None, true) => Some((val, 1)),
-                (None, false) => None,
-                (Some((off, len)), true) => Some((off, len + 1)),
-                (Some((off, len)), false) => {
-                    used.push((Sectors(off), Sectors(len)));
-                    None
-                }
-            }
-        });
+        (0..*self.limit + 1).fold(None,
+                                  |curr_range, val| match (curr_range, self.used.contains(&val)) {
+                                      (None, true) => Some((val, 1)),
+                                      (None, false) => None,
+                                      (Some((off, len)), true) => Some((off, len + 1)),
+                                      (Some((off, len)), false) => {
+            used.push((Sectors(off), Sectors(len)));
+            None
+        }
+                                  });
 
         used
     }

@@ -68,10 +68,10 @@ pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext,
     let object_path = f.object_path(object_name, Some(OPContext::new(parent, uuid)))
         .introspectable()
         .add(f.interface(interface_name, ())
-            .add_m(rename_method)
-            .add_p(name_property)
-            .add_p(pool_property)
-            .add_p(uuid_property));
+                 .add_m(rename_method)
+                 .add_p(name_property)
+                 .add_p(pool_property)
+                 .add_p(uuid_property));
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
@@ -89,7 +89,9 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = MessageItem::Bool(false);
 
-    let filesystem_path = m.tree.get(&object_path).expect("implicit argument must be in tree");
+    let filesystem_path = m.tree
+        .get(&object_path)
+        .expect("implicit argument must be in tree");
     let filesystem_data = get_data!(filesystem_path; default_return; return_message);
 
     let pool_path = get_parent!(m; filesystem_data; default_return; return_message);
@@ -131,28 +133,32 @@ fn get_filesystem_name(i: &mut IterAppend,
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
 
-    let filesystem_path = p.tree.get(&object_path).expect("tree must contain implicit argument");
-    let filesystem_data =
-        try!(ref_ok_or(filesystem_path.get_data(),
-                       MethodErr::failed(&format!("no data for object path {}", &object_path))));
+    let filesystem_path = p.tree
+        .get(&object_path)
+        .expect("tree must contain implicit argument");
+    let filesystem_data = try!(ref_ok_or(filesystem_path.get_data(),
+                                         MethodErr::failed(&format!("no data for object path {}",
+                                                                    &object_path))));
 
     let pool_path = try!(p.tree
-        .get(&filesystem_data.parent)
-        .ok_or(MethodErr::failed(&format!("no path for parent object path {}",
-                                          &filesystem_data.parent))));
+                             .get(&filesystem_data.parent)
+                             .ok_or(MethodErr::failed(&format!("no path for parent object path {}",
+                                                               &filesystem_data.parent))));
     let pool_uuid = try!(ref_ok_or(pool_path.get_data(),
                                    MethodErr::failed(&format!("no data for object path {}",
                                                               &object_path))))
-        .uuid;
+            .uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let pool = try!(engine.get_pool(&pool_uuid)
-        .ok_or(MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))));
+    let pool = try!(engine
+                        .get_pool(&pool_uuid)
+                        .ok_or(MethodErr::failed(&format!("no pool corresponding to uuid {}",
+                                                          &pool_uuid))));
 
     let filesystem_uuid = &filesystem_data.uuid;
     i.append(try!(pool.get_filesystem(filesystem_uuid)
-        .map(|x| MessageItem::Str(x.name().to_owned()))
-        .ok_or(MethodErr::failed(&format!("no name for filesystem with uuid {}",
-                                          &filesystem_uuid)))));
+                      .map(|x| MessageItem::Str(x.name().to_owned()))
+                      .ok_or(MethodErr::failed(&format!("no name for filesystem with uuid {}",
+                                                        &filesystem_uuid)))));
     Ok(())
 }

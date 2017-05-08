@@ -57,11 +57,11 @@ fn main() {
         .version(VERSION)
         .about("Stratis storage management")
         .arg(Arg::with_name("debug")
-            .long("debug")
-            .help("Print additional output for debugging"))
+                 .long("debug")
+                 .help("Print additional output for debugging"))
         .arg(Arg::with_name("sim")
-            .long("sim")
-            .help("Use simulator engine"))
+                 .long("sim")
+                 .help("Use simulator engine"))
         .get_matches();
 
     let mut builder = LogBuilder::new();
@@ -74,7 +74,8 @@ fn main() {
         }
     };
 
-    builder.init()
+    builder
+        .init()
         .expect("This is the first and only initialization of the logger; it must succeed.");
 
     let engine: Rc<RefCell<Engine>> = {
@@ -91,7 +92,8 @@ fn main() {
         .expect("Could not connect to D-Bus");
 
     // Get a list of fds to poll for
-    let mut fds: Vec<_> = dbus_conn.watch_fds()
+    let mut fds: Vec<_> = dbus_conn
+        .watch_fds()
         .iter()
         .map(|w| w.to_pollfd())
         .collect();

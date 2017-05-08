@@ -91,8 +91,8 @@ impl<T: HasName + HasUuid> Table<T> {
             // Insert mappings for the about-to-be swapped element
             {
                 let last_item = &self.items
-                    .last()
-                    .expect("name_map is non-empty <-> items is non-empty");
+                                     .last()
+                                     .expect("name_map is non-empty <-> items is non-empty");
                 self.name_map.insert(last_item.name().into(), index);
                 self.uuid_map.insert(last_item.uuid().clone(), index);
             }
@@ -116,8 +116,8 @@ impl<T: HasName + HasUuid> Table<T> {
             // Insert mappings for the about-to-be swapped element
             {
                 let last_item = &self.items
-                    .last()
-                    .expect("uuid_map is non-empty <-> items is non-empty");
+                                     .last()
+                                     .expect("uuid_map is non-empty <-> items is non-empty");
                 self.name_map.insert(last_item.name().into(), index);
                 self.uuid_map.insert(last_item.uuid().clone(), index);
             }
@@ -145,8 +145,10 @@ impl<T: HasName + HasUuid> Table<T> {
         let uuid_item = self.remove_by_uuid(item.uuid());
 
         let future_last_index = self.items.len();
-        self.name_map.insert(item.name().into(), future_last_index);
-        self.uuid_map.insert(item.uuid().clone(), future_last_index);
+        self.name_map
+            .insert(item.name().into(), future_last_index);
+        self.uuid_map
+            .insert(item.uuid().clone(), future_last_index);
 
         self.items.push(item);
 

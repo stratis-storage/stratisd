@@ -32,13 +32,21 @@ use util::simple_tests::test_variable_length_metadata_times;
 /// Set up count devices from configuration file.
 /// Wipe first GiB on each device.
 fn get_devices(count: u8) -> Option<Vec<PathBuf>> {
-    let file = OpenOptions::new().read(true).open("tests/test_config.json").unwrap();
+    let file = OpenOptions::new()
+        .read(true)
+        .open("tests/test_config.json")
+        .unwrap();
     let config: Value = from_reader(&file).unwrap();
-    let devpaths = config.get("ok_to_destroy_dev_array_key").unwrap().as_array().unwrap();
+    let devpaths = config
+        .get("ok_to_destroy_dev_array_key")
+        .unwrap()
+        .as_array()
+        .unwrap();
     if devpaths.len() < count as usize {
         return None;
     }
-    let devices: Vec<PathBuf> = devpaths.iter()
+    let devices: Vec<PathBuf> = devpaths
+        .iter()
         .take(count as usize)
         .map(|x| PathBuf::from(x.as_str().unwrap()))
         .collect();

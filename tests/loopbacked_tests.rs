@@ -40,7 +40,12 @@ fn get_devices(count: u8, dir: &TempDir) -> Vec<LoopDevice> {
     for index in 0..count {
         let subdir = TempDir::new_in(dir, &index.to_string()).unwrap();
         let path = subdir.path().join("store");
-        let mut f = OpenOptions::new().read(true).write(true).create(true).open(&path).unwrap();
+        let mut f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&path)
+            .unwrap();
 
         // the proper way to do this is fallocate, but nix doesn't implement yet.
         // TODO: see https://github.com/nix-rust/nix/issues/596
@@ -65,7 +70,10 @@ fn test_with_spec<F>(count: u8, test: F) -> ()
     init_logger();
     let tmpdir = TempDir::new("stratis").unwrap();
     let loop_devices: Vec<LoopDevice> = get_devices(count, &tmpdir);
-    let device_paths: Vec<PathBuf> = loop_devices.iter().map(|x| x.get_path().unwrap()).collect();
+    let device_paths: Vec<PathBuf> = loop_devices
+        .iter()
+        .map(|x| x.get_path().unwrap())
+        .collect();
     let device_paths: Vec<&Path> = device_paths.iter().map(|x| x.as_path()).collect();
 
     test(&device_paths);

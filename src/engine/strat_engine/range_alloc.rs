@@ -3,25 +3,23 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::cmp::min;
-use std::u64::MAX;
+use std::collections::Bound::{Included, Unbounded};
+use std::collections::BTreeMap;
 
 use devicemapper::Sectors;
-use ranged_set::RangedSet;
 
 #[derive(Debug)]
 pub struct RangeAllocator {
     limit: Sectors,
-    used: RangedSet<u64>,
+    used: BTreeMap<Sectors, Sectors>,
 }
 
 impl RangeAllocator {
     /// Create a new RangeAllocator with all entries in the range unused.
     pub fn new(limit: Sectors) -> RangeAllocator {
-        // Implementation of used_ranges means we can't handle limit=MAX
-        assert!(*limit < MAX, "limit must be less than 2^64");
         RangeAllocator {
             limit: limit,
-            used: RangedSet::new(),
+            used: BTreeMap::new(),
         }
     }
 
@@ -43,10 +41,52 @@ impl RangeAllocator {
         for &(off, len) in ranges {
             self.check_for_overflow(off, len);
 
-            for val in *off..*off + *len {
-                let inserted = self.used.insert(val);
-                if inserted == false {
-                    panic!(format!("inserted value {} already present", val));
+            let contig_prev = self.used
+                .range(..off)
+                .rev()
+                .next()
+                .map(|(k, v)| (*k, *v))
+                .and_then(|(prev_off, prev_len)| {
+                    assert!(off >= prev_off + prev_len,
+                            "given range must not overlap previous range");
+                    if off == prev_off + prev_len {
+                        Some((prev_off, prev_len))
+                    } else {
+                        None
+                    }
+                });
+
+            let contig_next = self.used
+                .range(off..)
+                .next()
+                .map(|(k, v)| (*k, *v))
+                .and_then(|(next_off, next_len)| {
+                    assert!(off + len <= next_off,
+                            "given range must not overlap next range");
+                    if off + len == next_off {
+                        Some((next_off, next_len))
+                    } else {
+                        None
+                    }
+                });
+
+            match (contig_prev, contig_next) {
+                (None, None) => {
+                    self.used.insert(off, len);
+                }
+                (None, Some((next_off, next_len))) => {
+                    // Contig with next, make new entry
+                    self.used.insert(off, len + next_len);
+                    self.used.remove(&next_off).expect("must exist");
+                }
+                (Some((prev_off, prev_len)), None) => {
+                    // Contig with prev, just extend prev
+                    *self.used.get_mut(&prev_off).expect("must exist") = prev_len + len;
+                }
+                (Some((prev_off, prev_len)), Some((next_off, next_len))) => {
+                    // Contig with both, remove next and extend prev
+                    self.used.remove(&next_off);
+                    *self.used.get_mut(&prev_off).expect("must exist") = prev_len + len + next_len;
                 }
             }
         }
@@ -57,10 +97,44 @@ impl RangeAllocator {
         for &(off, len) in to_free {
             self.check_for_overflow(off, len);
 
-            for val in *off..*off + *len {
-                let removed = self.used.remove(&val);
-                if removed == false {
-                    panic!(format!("tried to remove value {} not present in RangedSet", val));
+            let maybe_prev = self.used
+                .range((Unbounded, Included(off)))
+                .rev()
+                .next()
+                .map(|(k, v)| (*k, *v));
+
+            let (prev_off, prev_len) = match maybe_prev {
+                Some(range) => range,
+                None => panic!("Existing matching allocated range not found"),
+            };
+
+            assert!(prev_off + prev_len >= off + len,
+                    "must not extend past existing range");
+
+            // switch based on if the to-remove range starts or ends
+            // at the same point as the existing range
+            match (prev_off == off, prev_off + prev_len == off + len) {
+                (true, true) => {
+                    // Exactly matches existing range
+                    self.used.remove(&prev_off);
+                }
+                (true, false) => {
+                    // A tail segment remains
+                    self.used.remove(&prev_off).expect("must exist");
+                    self.used.insert(prev_off + len, prev_len - len);
+                }
+                (false, true) => {
+                    // Head segment remains
+                    *self.used.get_mut(&prev_off).expect("must exist") = prev_len - len;
+                }
+                (false, false) => {
+                    // Head and tail segments both remain
+                    let prev_end = prev_off + prev_len;
+                    let tail_off = off + len;
+                    let tail_len = prev_end - tail_off;
+                    let head_len = prev_len - len - tail_len;
+                    *self.used.get_mut(&prev_off).expect("must exist") = head_len;
+                    self.used.insert(tail_off, tail_len);
                 }
             }
         }
@@ -68,36 +142,17 @@ impl RangeAllocator {
 
     /// Available sectors
     pub fn available(&self) -> Sectors {
-        Sectors((0..*self.limit)
-                    .filter(|val| !self.used.contains(val))
-                    .count() as u64)
+        self.limit - self.used()
     }
 
     /// Allocated sectors
     pub fn used(&self) -> Sectors {
-        Sectors((0..*self.limit)
-                    .filter(|val| self.used.contains(val))
-                    .count() as u64)
+        self.used.values().cloned().sum()
     }
 
     /// Get a list of (offset, length) segments that are in use
     fn used_ranges(&self) -> Vec<(Sectors, Sectors)> {
-        let mut used = Vec::new();
-
-        // iterate one *past* limit. This ensures a used range extending
-        // up to limit will end and be added to used_ranges properly.
-        (0..*self.limit + 1).fold(None,
-                                  |curr_range, val| match (curr_range, self.used.contains(&val)) {
-                                      (None, true) => Some((val, 1)),
-                                      (None, false) => None,
-                                      (Some((off, len)), true) => Some((off, len + 1)),
-                                      (Some((off, len)), false) => {
-            used.push((Sectors(off), Sectors(len)));
-            None
-        }
-                                  });
-
-        used
+        self.used.iter().map(|(k, v)| (*k, *v)).collect()
     }
 
     /// Get a list of (offset, length) segments that are not in use
@@ -182,6 +237,80 @@ mod tests {
     }
 
     #[test]
+    /// Verify insert_ranges properly coalesces adjacent allocations.
+    fn test_allocator_insert_ranges_contig() {
+        let mut allocator = RangeAllocator::new(Sectors(128));
+
+        allocator.insert_ranges(&[(Sectors(20), Sectors(10))]);
+        allocator.insert_ranges(&[(Sectors(10), Sectors(10))]);
+        allocator.insert_ranges(&[(Sectors(30), Sectors(10))]);
+
+        let used = allocator.used_ranges();
+        assert_eq!(used.len(), 1);
+        assert_eq!(used[0], (Sectors(10), Sectors(30)));
+    }
+
+    #[test]
+    /// Verify remove_ranges properly handles different cases.
+    /// 1. Removing a range from the start of an existing range
+    /// 2. Removing a range from the end of an existing range
+    /// 3. Removing a range from the middle of an existing range
+    /// 4. Removing an entire range
+    fn test_allocator_remove_ranges_contig() {
+        let mut allocator = RangeAllocator::new(Sectors(128));
+
+        allocator.insert_ranges(&[(Sectors(20), Sectors(20))]);
+
+        allocator.remove_ranges(&[(Sectors(20), Sectors(3))]);
+        let used = allocator.used_ranges();
+        assert_eq!(used.len(), 1);
+        assert_eq!(used[0], (Sectors(23), Sectors(17)));
+
+        allocator.remove_ranges(&[(Sectors(36), Sectors(4))]);
+        let used = allocator.used_ranges();
+        assert_eq!(used.len(), 1);
+        assert_eq!(used[0], (Sectors(23), Sectors(13)));
+
+        allocator.remove_ranges(&[(Sectors(24), Sectors(2))]);
+        let used = allocator.used_ranges();
+        assert_eq!(used.len(), 2);
+        assert_eq!(used[0], (Sectors(23), Sectors(1)));
+        assert_eq!(used[1], (Sectors(26), Sectors(10)));
+
+        allocator.remove_ranges(&[(Sectors(26), Sectors(10))]);
+        let used = allocator.used_ranges();
+        assert_eq!(used.len(), 1);
+        assert_eq!(used[0], (Sectors(23), Sectors(1)));
+    }
+
+    #[test]
+    /// Verify that the largest possible limit may be used for the
+    /// allocator.
+    fn test_max_allocator_range() {
+        use std::u64::MAX;
+
+        RangeAllocator::new(Sectors(MAX));
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_allocator_insert_prev_overlap() {
+        let mut allocator = RangeAllocator::new(Sectors(128));
+
+        let bad_insert_ranges = [(Sectors(21), Sectors(20)), (Sectors(40), Sectors(40))];
+        allocator.insert_ranges(&bad_insert_ranges)
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_allocator_insert_next_overlap() {
+        let mut allocator = RangeAllocator::new(Sectors(128));
+
+        let bad_insert_ranges = [(Sectors(40), Sectors(1)), (Sectors(39), Sectors(2))];
+        allocator.insert_ranges(&bad_insert_ranges)
+    }
+
+    #[test]
     #[should_panic]
     /// Verify that remove_ranges() panics if ranges to be removed share
     /// elements.
@@ -190,7 +319,6 @@ mod tests {
 
         let _request = allocator.request(Sectors(128));
 
-        // overlap
         let bad_remove_ranges = [(Sectors(21), Sectors(20)), (Sectors(40), Sectors(40))];
         allocator.remove_ranges(&bad_remove_ranges);
     }
@@ -206,19 +334,39 @@ mod tests {
         assert_eq!(request.0, Sectors(128));
         assert_eq!(request.1, &[(Sectors(0), Sectors(128))]);
 
-        // overwriting a used range
         allocator.insert_ranges(&[(Sectors(1), Sectors(1))]);
     }
 
     #[test]
     #[should_panic]
-    /// Verify that remove_ranges() panics when an element in the specified
+    /// Verify that remove_ranges() panics when an element at the
+    /// beginning of the specified range is not in use.
+    fn test_allocator_failures_removing_unused_beginning() {
+        let mut allocator = RangeAllocator::new(Sectors(128));
+
+        allocator.insert_ranges(&[(Sectors(20), Sectors(20))]);
+        allocator.remove_ranges(&[(Sectors(19), Sectors(2))]);
+    }
+
+    #[test]
+    #[should_panic]
+    /// Verify that remove_ranges() panics when an element at the
+    /// end of the specified range is not in use.
+    fn test_allocator_failures_removing_unused_end() {
+        let mut allocator = RangeAllocator::new(Sectors(128));
+
+        allocator.insert_ranges(&[(Sectors(20), Sectors(20))]);
+        allocator.remove_ranges(&[(Sectors(39), Sectors(2))]);
+    }
+
+    #[test]
+    #[should_panic]
+    /// Verify that remove_ranges() panics when the entire specified
     /// range is not in use.
     fn test_allocator_failures_removing_unused() {
         let mut allocator = RangeAllocator::new(Sectors(128));
 
-        // removing an unused range
-        allocator.remove_ranges(&[(Sectors(1), Sectors(1))]);
+        allocator.remove_ranges(&[(Sectors(39), Sectors(2))]);
     }
 
     #[test]

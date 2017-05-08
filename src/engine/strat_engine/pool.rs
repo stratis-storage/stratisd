@@ -70,14 +70,16 @@ impl StratPool {
         let mut block_mgr =
             BlockDevMgr::new(try!(initialize(&pool_uuid, devices, MIN_MDA_SECTORS, force)));
 
-        if block_mgr.avail_space() < INITIAL_META_SIZE + INITIAL_DATA_SIZE {
-            let short_bytes = *(INITIAL_META_SIZE + INITIAL_DATA_SIZE - block_mgr.avail_space()) *
-                              SECTOR_SIZE as u64;
+        if block_mgr.avail_space() < StratPool::min_initial_size() {
+            let avail_size = block_mgr.avail_space().bytes();
             try!(block_mgr.destroy_all());
             return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                           format!("Initial total usable pool capacity too \
-                                                    small by {} bytes",
-                                                   short_bytes)));
+                                           format!("Space on pool must be at least {} bytes, \
+                                                   available space is only {} bytes",
+                                                   StratPool::min_initial_size().bytes(),
+                                                   avail_size)));
+
+
         }
 
         let meta_regions = block_mgr
@@ -122,6 +124,11 @@ impl StratPool {
         try!(pool.write_metadata());
 
         Ok(pool)
+    }
+
+    /// Minimum initial size for a pool.
+    pub fn min_initial_size() -> Sectors {
+        INITIAL_META_SIZE + INITIAL_DATA_SIZE
     }
 
     /// Return the metadata from the first blockdev with up-to-date, readable

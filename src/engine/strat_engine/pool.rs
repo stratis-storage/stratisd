@@ -37,12 +37,12 @@ use super::blockdevmgr::BlockDevMgr;
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::metadata::MIN_MDA_SECTORS;
 
-pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
-pub const META_LOWATER: u64 = 512;
-pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
+const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
+const META_LOWATER: u64 = 512;
+const DATA_LOWATER: DataBlocks = DataBlocks(512);
 
-pub const INITIAL_META_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
-pub const INITIAL_DATA_SIZE: Sectors = Sectors(512 * Mi / SECTOR_SIZE as u64);
+const INITIAL_META_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
+const INITIAL_DATA_SIZE: Sectors = Sectors(512 * Mi / SECTOR_SIZE as u64);
 
 #[derive(Debug)]
 pub struct StratPool {

@@ -233,3 +233,12 @@ pub fn test_variable_length_metadata_times(paths: &[&Path]) -> () {
     mgr.save_state(&now().to_timespec(), &state2).unwrap();
     assert!(mgr.load_state().unwrap() == state2);
 }
+
+/// Verify that tearing down an engine doesn't fail if no filesystems on it.
+pub fn test_teardown(paths: &[&Path]) -> () {
+    let mut engine = StratEngine::new();
+    engine
+        .create_pool("test_pool", paths, None, true)
+        .unwrap();
+    assert!(engine.teardown().is_ok())
+}

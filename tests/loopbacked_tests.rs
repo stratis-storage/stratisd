@@ -57,7 +57,12 @@ fn get_devices(count: u8, dir: &TempDir) -> Vec<LoopDevice> {
         f.flush().unwrap();
 
         // Wipe 1 MiB at the beginning, as data sits around on the files.
-        OpenOptions::new().read(true).write(true).create(true).open(&path).unwrap();
+        OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&path)
+            .unwrap();
         wipe_sectors(&path, Sectors(0), wipe_length).unwrap();
 
 

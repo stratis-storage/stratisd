@@ -37,6 +37,14 @@ impl StratEngine {
     pub fn new() -> StratEngine {
         StratEngine { pools: Table::new() }
     }
+
+    /// Teardown Stratis, preparatory to a shutdown.
+    pub fn teardown(self) -> EngineResult<()> {
+        for pool in self.pools.empty() {
+            try!(pool.teardown());
+        }
+        Ok(())
+    }
 }
 
 impl Engine for StratEngine {

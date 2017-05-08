@@ -23,6 +23,7 @@ use libstratis::consts::IEC;
 use libstratis::engine::strat_engine::blockdev::wipe_sectors;
 
 use util::logger::init_logger;
+use util::simple_tests::test_empty_pool;
 use util::simple_tests::test_force_flag_dirty;
 use util::simple_tests::test_force_flag_stratis;
 use util::simple_tests::test_linear_device;
@@ -149,4 +150,9 @@ pub fn loop_test_teardown() {
 #[test]
 pub fn loop_test_setup() {
     test_with_spec(4, test_setup);
+}
+
+#[test]
+pub fn loop_test_empty_pool() {
+    test_with_spec(0, test_empty_pool);
 }

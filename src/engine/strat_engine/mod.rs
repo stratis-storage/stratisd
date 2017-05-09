@@ -9,6 +9,7 @@ pub mod metadata;
 pub mod filesystem;
 pub mod pool;
 pub mod serde_structs;
+pub mod setup;
 pub mod range_alloc;
 
 pub use self::engine::StratEngine;

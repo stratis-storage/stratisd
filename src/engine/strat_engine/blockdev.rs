@@ -10,6 +10,7 @@ use std::fs::File;
 use std::io::ErrorKind;
 use std::io::{Seek, Write, SeekFrom};
 use std::fs::{OpenOptions, read_dir};
+use std::os::linux::fs::MetadataExt;
 use std::os::unix::prelude::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -20,6 +21,8 @@ use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::Device;
 use devicemapper::Segment;
 use devicemapper::{Bytes, Sectors};
+use nix::Errno;
+use nix::sys::stat::{S_IFBLK, S_IFMT};
 use time::Timespec;
 use uuid::Uuid;
 
@@ -54,47 +57,55 @@ pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
     Ok(devices)
 }
 
-/// Find all Stratis Blockdevs.
+/// Find all Stratis devices.
 ///
-/// Returns a map of pool uuids to maps of blockdev uuids to blockdevs.
-pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<DevUuid, BlockDev>>> {
-
-    /// If a Path refers to a valid Stratis blockdev, return a BlockDev
-    /// struct. Otherwise, return None. Return an error if there was
-    /// a problem inspecting the device.
-    fn setup(devnode: &Path) -> EngineResult<Option<BlockDev>> {
-        let mut f = try!(OpenOptions::new().read(true).open(devnode));
-
-        if let Some(bda) = BDA::load(&mut f).ok() {
-            let dev = try!(Device::from_str(&devnode.to_string_lossy()));
-            // TODO: Parse MDA and also initialize RangeAllocator with
-            // in-use regions
-            let allocator = RangeAllocator::new_with_used(bda.dev_size(),
-                                                          &[(Sectors(0), bda.size())]);
-            Ok(Some(BlockDev {
-                        dev: dev,
-                        devnode: devnode.to_owned(),
-                        bda: bda,
-                        used: allocator,
-                    }))
-        } else {
-            Ok(None)
-        }
-    }
+/// Returns a map of pool uuids to a vector of devices for each pool.
+pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<Device>>> {
 
     let mut pool_map = HashMap::new();
     for dir_e in try!(read_dir("/dev")) {
-        let devnode = match dir_e {
-            Ok(d) => d.path(),
-            Err(_) => continue,
-        };
+        let dir_e = try!(dir_e);
+        let mode = try!(dir_e.metadata()).st_mode();
 
-        match setup(&devnode) {
-            Ok(Some(blockdev)) => {
-                pool_map
-                    .entry(blockdev.pool_uuid().clone())
-                    .or_insert_with(HashMap::new)
-                    .insert(blockdev.uuid().clone(), blockdev);
+        // Device node can't belong to Stratis if it is not a block device
+        if mode & S_IFMT.bits() != S_IFBLK.bits() {
+            continue;
+        }
+
+        let devnode = dir_e.path();
+
+        let f = OpenOptions::new().read(true).open(&devnode);
+
+        // There are some reasons for OpenOptions::open() to return an error
+        // which are not reasons for this method to return an error.
+        // Try to distinguish. Non-error conditions are:
+        // 1. The device does not exist anymore.
+        if f.is_err() {
+            let err = f.unwrap_err();
+            match err.kind() {
+                ErrorKind::NotFound => {
+                    continue;
+                }
+                _ => {
+                    if let Some(errno) = err.raw_os_error() {
+                        if Errno::from_i32(errno) == Errno::ENXIO {
+                            continue;
+                        } else {
+                            return Err(EngineError::Io(err));
+                        }
+                    } else {
+                        return Err(EngineError::Io(err));
+                    }
+                }
+            }
+        }
+
+        let mut f = f.expect("unreachable if f is err");
+
+        match try!(StaticHeader::determine_ownership(&mut f)) {
+            DevOwnership::Ours(uuid) => {
+                let dev = try!(Device::from_str(&devnode.to_string_lossy()));
+                pool_map.entry(uuid).or_insert_with(Vec::new).push(dev)
             }
             _ => continue,
         };

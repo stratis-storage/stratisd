@@ -27,6 +27,7 @@ use util::simple_tests::test_force_flag_dirty;
 use util::simple_tests::test_force_flag_stratis;
 use util::simple_tests::test_linear_device;
 use util::simple_tests::test_pool_blockdevs;
+use util::simple_tests::test_setup;
 use util::simple_tests::test_teardown;
 use util::simple_tests::test_thinpool_device;
 use util::simple_tests::test_variable_length_metadata_times;
@@ -143,4 +144,9 @@ pub fn loop_test_variable_length_metadata_times() {
 #[test]
 pub fn loop_test_teardown() {
     test_with_spec(2, test_teardown);
+}
+
+#[test]
+pub fn loop_test_setup() {
+    test_with_spec(4, test_setup);
 }

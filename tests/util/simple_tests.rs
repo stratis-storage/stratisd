@@ -25,7 +25,7 @@ use self::tempdir::TempDir;
 use self::time::now;
 use self::uuid::Uuid;
 
-use libstratis::engine::Engine;
+use libstratis::engine::{Engine, EngineError, ErrorEnum};
 use libstratis::engine::strat_engine::StratEngine;
 use libstratis::engine::strat_engine::blockdev::{blkdev_size, find_all, initialize,
                                                  resolve_devices, write_sectors};
@@ -290,4 +290,17 @@ pub fn test_setup(paths: &[&Path]) -> () {
     assert!(pools.contains_key(&uuid2));
     let devices2 = pools.get(&uuid2).expect("pools.contains_key() was true");
     assert!(devices2.len() == paths2.len());
+}
+
+/// Verify that a pool with no devices does not have the minimum amount of
+/// space required.
+pub fn test_empty_pool(paths: &[&Path]) -> () {
+    assert!(paths.len() == 0);
+    let mut engine = StratEngine::new();
+    assert!(match engine
+                      .create_pool("test_pool", paths, None, true)
+                      .unwrap_err() {
+                EngineError::Engine(ErrorEnum::Invalid, _) => true,
+                _ => false,
+            });
 }

@@ -14,7 +14,7 @@ use devicemapper::Device;
 use nix::Errno;
 use nix::sys::stat::{S_IFBLK, S_IFMT};
 
-use engine::{EngineResult, EngineError, PoolUuid};
+use engine::{EngineResult, EngineError, ErrorEnum, PoolUuid};
 use super::metadata::StaticHeader;
 use super::engine::DevOwnership;
 
@@ -74,4 +74,28 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<Device>>> {
     }
 
     Ok(pool_map)
+}
+
+/// Get the most recent metadata from a set of Devices.
+/// Precondition: All devices belong to the same pool.
+pub fn get_metadata(pool_uuid: &PoolUuid, devices: &[Device]) -> Option<Vec<u8>> {
+    unimplemented!()
+}
+
+
+/// Get the most recent metadata for each pool.
+/// Since the metadata is written immediately after a pool is created, it
+/// is considered an error for a pool to be w/out metadata.
+pub fn get_pool_metadata(pool_table: &HashMap<PoolUuid, Vec<Device>>)
+                         -> EngineResult<HashMap<PoolUuid, Vec<u8>>> {
+    let mut metadata = HashMap::new();
+    for (pool_uuid, devices) in pool_table.iter() {
+        if let Some(bytes) = get_metadata(pool_uuid, devices.as_slice()) {
+            metadata.insert(pool_uuid.clone(), bytes);
+        } else {
+            return Err(EngineError::Engine(ErrorEnum::NotFound,
+                                           format!("no metadata for pool {}", pool_uuid)));
+        }
+    }
+    Ok(metadata)
 }

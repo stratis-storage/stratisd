@@ -8,9 +8,8 @@ use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::fs::{OpenOptions, read_dir};
 use std::os::linux::fs::MetadataExt;
-use std::str::FromStr;
+use std::path::PathBuf;
 
-use devicemapper::Device;
 use nix::Errno;
 use nix::sys::stat::{S_IFBLK, S_IFMT};
 
@@ -22,7 +21,7 @@ use super::engine::DevOwnership;
 /// Find all Stratis devices.
 ///
 /// Returns a map of pool uuids to a vector of devices for each pool.
-pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<Device>>> {
+pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<PathBuf>>> {
 
     let mut pool_map = HashMap::new();
     for dir_e in try!(read_dir("/dev")) {
@@ -66,8 +65,10 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<Device>>> {
 
         match try!(StaticHeader::determine_ownership(&mut f)) {
             DevOwnership::Ours(uuid) => {
-                let dev = try!(Device::from_str(&devnode.to_string_lossy()));
-                pool_map.entry(uuid).or_insert_with(Vec::new).push(dev)
+                pool_map
+                    .entry(uuid)
+                    .or_insert_with(Vec::new)
+                    .push(devnode)
             }
             _ => continue,
         };

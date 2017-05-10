@@ -131,12 +131,6 @@ impl StratPool {
         INITIAL_META_SIZE + INITIAL_DATA_SIZE
     }
 
-    /// Return the metadata from the first blockdev with up-to-date, readable
-    /// metadata.
-    pub fn load_state(&self) -> Option<Vec<u8>> {
-        self.block_devs.load_state()
-    }
-
     // TODO: Check current time against global last updated, and use
     // alternate time value if earlier, as described in SWDD
     pub fn write_metadata(&mut self) -> EngineResult<()> {

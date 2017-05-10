@@ -34,7 +34,7 @@ use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_fs};
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
                                                  MIN_MDA_SECTORS};
-use libstratis::engine::strat_engine::setup::{get_metadata, find_all};
+use libstratis::engine::strat_engine::setup::{find_all, get_metadata, get_pool_metadata};
 
 
 /// Dirty sectors where specified, with 1s.
@@ -263,6 +263,8 @@ pub fn test_teardown(paths: &[&Path]) -> () {
 /// 4. Initialize the block devices in the second set with a different pool
 /// uuid.
 /// 5. Run find_all() again and verify that both sets of devices are found.
+/// 6. Verify that get_pool_metadata() return an error. initialize() only
+/// initializes block devices, it does not write metadata.
 pub fn test_setup(paths: &[&Path]) -> () {
     assert!(paths.len() > 2);
 
@@ -292,6 +294,8 @@ pub fn test_setup(paths: &[&Path]) -> () {
     assert!(pools.contains_key(&uuid2));
     let devices2 = pools.get(&uuid2).expect("pools.contains_key() was true");
     assert!(devices2.len() == paths2.len());
+
+    assert!(get_pool_metadata(&pools).is_err());
 }
 
 /// Verify that a pool with no devices does not have the minimum amount of

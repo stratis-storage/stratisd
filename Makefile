@@ -4,7 +4,7 @@
 check: fmt build docs test test-loop
 
 ${HOME}/.cargo/bin/cargo-fmt:
-	cargo install rustfmt
+	cargo install rustfmt --vers 0.8.3
 
 fmt: ${HOME}/.cargo/bin/cargo-fmt
 	PATH=${HOME}/.cargo/bin:${PATH} cargo fmt -- --write-mode=diff

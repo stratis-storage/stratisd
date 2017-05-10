@@ -310,3 +310,43 @@ pub fn test_empty_pool(paths: &[&Path]) -> () {
                 _ => false,
             });
 }
+
+/// Verify that metadata can be read from pools.
+/// 1. Split paths into two separate sets.
+/// 2. Create a pool from the first set.
+/// 3. Use find_all() to get the devices in the pool.
+/// 4. Use get_pool_metadata to find metadata for all pools.
+/// 5. Verify that metadata name is correct.
+/// 6. Create a second pool and repeat.
+/// 7. Teardown the engine and repeat.
+pub fn test_basic_metadata(paths: &[&Path]) {
+    assert!(paths.len() > 2);
+
+    let (paths1, paths2) = paths.split_at(2);
+
+    let mut engine = StratEngine::new();
+
+    let name1 = "name1";
+    let (uuid1, _) = engine.create_pool(&name1, paths1, None, false).unwrap();
+
+    let pools = find_all().unwrap();
+    let metadata = get_pool_metadata(&pools).unwrap();
+    assert!(metadata.len() == 1);
+    assert!(metadata.get(&uuid1).unwrap().name == name1);
+
+    let name2 = "name2";
+    let (uuid2, _) = engine.create_pool(&name2, paths2, None, false).unwrap();
+
+    let pools = find_all().unwrap();
+    let metadata = get_pool_metadata(&pools).unwrap();
+    assert!(metadata.len() == 2);
+    assert!(metadata.get(&uuid1).unwrap().name == name1);
+    assert!(metadata.get(&uuid2).unwrap().name == name2);
+
+    engine.teardown().unwrap();
+    let pools = find_all().unwrap();
+    let metadata = get_pool_metadata(&pools).unwrap();
+    assert!(metadata.len() == 2);
+    assert!(metadata.get(&uuid1).unwrap().name == name1);
+    assert!(metadata.get(&uuid2).unwrap().name == name2);
+}

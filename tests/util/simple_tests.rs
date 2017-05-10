@@ -34,7 +34,7 @@ use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_fs};
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
                                                  MIN_MDA_SECTORS};
-use libstratis::engine::strat_engine::setup::find_all;
+use libstratis::engine::strat_engine::setup::{get_metadata, find_all};
 
 
 /// Dirty sectors where specified, with 1s.
@@ -233,16 +233,17 @@ pub fn test_variable_length_metadata_times(paths: &[&Path]) -> () {
     let unique_devices = resolve_devices(&paths).unwrap();
     let uuid = Uuid::new_v4();
     let blockdevs = initialize(&uuid, unique_devices, MIN_MDA_SECTORS, false).unwrap();
+    let devnodes: Vec<PathBuf> = blockdevs.iter().map(|bd| bd.devnode.clone()).collect();
     let mut mgr = BlockDevMgr::new(blockdevs);
-    assert!(mgr.load_state().is_none());
+    assert!(get_metadata(&uuid, &devnodes).unwrap().is_none());
 
     let (state1, state2) = (vec![1u8, 2u8, 3u8, 4u8], vec![5u8, 6u8, 7u8, 8u8]);
 
     mgr.save_state(&now().to_timespec(), &state1).unwrap();
-    assert!(mgr.load_state().unwrap() == state1);
+    assert!(get_metadata(&uuid, &devnodes).unwrap().unwrap() == state1);
 
     mgr.save_state(&now().to_timespec(), &state2).unwrap();
-    assert!(mgr.load_state().unwrap() == state2);
+    assert!(get_metadata(&uuid, &devnodes).unwrap().unwrap() == state2);
 }
 
 /// Verify that tearing down an engine doesn't fail if no filesystems on it.

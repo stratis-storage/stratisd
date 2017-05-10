@@ -4,40 +4,52 @@ A daemon that manages a pool of block devices to create flexible filesystems.
 
 ## Background
 
-There are many benefits to volume-managing filesystems (VMFs) like ZFS and
-Btrfs. In contrast to traditional Unix filesystems, VMFs can span multiple block
-devices, and support multiple independent filesystem trees. (ZFS calls these
-datasets, Btrfs calls these subvolumes.)  VMFs can share space between trees
-using copy-on-write, and support using their multiple block devices to provide
-RAID-style protection from data loss.
-
 Stratis (which includes [stratisd](https://github.com/stratis-storage/stratisd)
 as well as [stratis-cli](https://github.com/stratis-storage/stratis-cli)),
-provides VMF-style features by integrating layers of existing technology:
-Linux's devicemapper subsystem, and the non-VMF, high-performance XFS
-filesystem. `stratisd` manages collections of block devices, and exports a D-Bus
-API. Stratis-cli's `stratis` provides a command-line tool which itself uses the
-D-Bus API to communicate with `stratisd`.
-
-## Implementation
-
-Stratisd is written in [Rust](https://www.rust-lang.org), which helps the
-implementation be small, correct, and not require a large language runtime.
+provides ZFS/Btrfs-style features by integrating layers of existing technology:
+Linux's devicemapper subsystem, and the XFS filesystem. `stratisd` manages
+collections of block devices, and exports a D-Bus API. Stratis-cli's `stratis`
+provides a command-line tool which itself uses the D-Bus API to communicate
+with `stratisd`.
 
 ## Documentation
 
-Please see https://stratis-storage.github.io/ and [our documentation
-repo](https://github.com/stratis-storage/stratis-docs).
+https://stratis-storage.github.io/ currently has links to the
+[main internal design doc](https://stratis-storage.github.io/StratisSoftwareDesign.pdf),
+the [D-Bus API Reference manual](https://stratis-storage.github.io/DBusAPIReference.pdf),
+and [some coding style guidelines](https://stratis-storage.github.io/StratisStyleGuidelines.pdf).
 
-## Contributing
+## Getting involved
 
-Stratisd development uses GitHub tools for development and issue tracking. We
-don't have mailing lists yet, so please feel free to open an issue, even for a
-question.
+### Status
 
-It is licensed under the [MPL 2.0](https://www.mozilla.org/en-US/MPL/2.0/). All
-contributions retain ownership by their original author, but must also be
-licensed under the MPL 2.0 to be merged by us.
+Stratis is currently in early stages of development and is a few months away from being
+ready for initial testing by users.
+
+### Communication channels
+
+If you have questions, please don't hesitate to ask them, either on the mailing list or
+IRC! :smiley:
+
+#### Mailing list
+
+Development mailing list: stratis-devel@lists.fedorahosted.org, -- subscribe
+[here](https://lists.fedoraproject.org/admin/lists/stratis-devel.lists.fedorahosted.org/).
+
+#### IRC
+
+irc.freenode.net #stratis-storage. 
+
+## For Developers
+
+Stratisd is written in [Rust](https://www.rust-lang.org), which helps the
+implementation be small, correct, and avoid requiring shipping with a large
+language runtime.
+
+### Issue tracking and Development
+
+Stratisd development uses GitHub issue tracking, and new development occurs via
+GitHub pull requests (PRs).
 
 ### Setting up for development
 
@@ -62,3 +74,9 @@ tests directory. To run the unit tests:
 > make test
 
 A description of the integration tests can be found in the tests directory.
+
+## Licensing
+
+[MPL 2.0](https://www.mozilla.org/en-US/MPL/2.0/). All
+contributions retain ownership by their original author, but must also be
+licensed under the MPL 2.0 to be merged.

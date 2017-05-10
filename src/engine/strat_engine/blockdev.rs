@@ -5,12 +5,11 @@
 // Code to handle a single block device.
 
 use std::io;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::ErrorKind;
 use std::io::{Seek, Write, SeekFrom};
-use std::fs::{OpenOptions, read_dir};
-use std::os::linux::fs::MetadataExt;
+use std::fs::OpenOptions;
 use std::os::unix::prelude::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -21,8 +20,6 @@ use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::Device;
 use devicemapper::Segment;
 use devicemapper::{Bytes, Sectors};
-use nix::Errno;
-use nix::sys::stat::{S_IFBLK, S_IFMT};
 use time::Timespec;
 use uuid::Uuid;
 
@@ -30,8 +27,7 @@ use consts::IEC;
 use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
 use super::metadata::{StaticHeader, BDA, validate_mda_size};
 use super::engine::DevOwnership;
-pub use super::BlockDevSave;
-use engine::strat_engine::range_alloc::RangeAllocator;
+use super::range_alloc::RangeAllocator;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
 
@@ -57,62 +53,6 @@ pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
     Ok(devices)
 }
 
-/// Find all Stratis devices.
-///
-/// Returns a map of pool uuids to a vector of devices for each pool.
-pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<Device>>> {
-
-    let mut pool_map = HashMap::new();
-    for dir_e in try!(read_dir("/dev")) {
-        let dir_e = try!(dir_e);
-        let mode = try!(dir_e.metadata()).st_mode();
-
-        // Device node can't belong to Stratis if it is not a block device
-        if mode & S_IFMT.bits() != S_IFBLK.bits() {
-            continue;
-        }
-
-        let devnode = dir_e.path();
-
-        let f = OpenOptions::new().read(true).open(&devnode);
-
-        // There are some reasons for OpenOptions::open() to return an error
-        // which are not reasons for this method to return an error.
-        // Try to distinguish. Non-error conditions are:
-        // 1. The device does not exist anymore.
-        if f.is_err() {
-            let err = f.unwrap_err();
-            match err.kind() {
-                ErrorKind::NotFound => {
-                    continue;
-                }
-                _ => {
-                    if let Some(errno) = err.raw_os_error() {
-                        if Errno::from_i32(errno) == Errno::ENXIO {
-                            continue;
-                        } else {
-                            return Err(EngineError::Io(err));
-                        }
-                    } else {
-                        return Err(EngineError::Io(err));
-                    }
-                }
-            }
-        }
-
-        let mut f = f.expect("unreachable if f is err");
-
-        match try!(StaticHeader::determine_ownership(&mut f)) {
-            DevOwnership::Ours(uuid) => {
-                let dev = try!(Device::from_str(&devnode.to_string_lossy()));
-                pool_map.entry(uuid).or_insert_with(Vec::new).push(dev)
-            }
-            _ => continue,
-        };
-    }
-
-    Ok(pool_map)
-}
 
 /// Write buf at offset length times.
 pub fn write_sectors(path: &Path,
@@ -258,13 +198,6 @@ pub struct BlockDev {
 }
 
 impl BlockDev {
-    pub fn to_save(&self) -> BlockDevSave {
-        BlockDevSave {
-            devnode: self.devnode.clone(),
-            total_size: self.size(),
-        }
-    }
-
     pub fn wipe_metadata(self) -> EngineResult<()> {
         let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
         BDA::wipe(&mut f)

@@ -27,13 +27,14 @@ use self::uuid::Uuid;
 
 use libstratis::engine::{Engine, EngineError, ErrorEnum};
 use libstratis::engine::strat_engine::StratEngine;
-use libstratis::engine::strat_engine::blockdev::{blkdev_size, find_all, initialize,
-                                                 resolve_devices, write_sectors};
+use libstratis::engine::strat_engine::blockdev::{blkdev_size, initialize, resolve_devices,
+                                                 write_sectors};
 use libstratis::engine::strat_engine::blockdevmgr::BlockDevMgr;
 use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_fs};
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
                                                  MIN_MDA_SECTORS};
+use libstratis::engine::strat_engine::setup::find_all;
 
 
 /// Dirty sectors where specified, with 1s.

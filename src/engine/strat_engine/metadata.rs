@@ -226,13 +226,14 @@ impl StaticHeader {
         // etc!
         match StaticHeader::setup_from_buf(&buf) {
             Ok(Some(sh)) => Ok(DevOwnership::Ours(sh.pool_uuid)),
-            _ => {
+            Ok(None) => {
                 if buf.iter().any(|x| *x != 0) {
                     Ok(DevOwnership::Theirs)
                 } else {
                     Ok(DevOwnership::Unowned)
                 }
             }
+            Err(err) => Err(err),
         }
     }
 

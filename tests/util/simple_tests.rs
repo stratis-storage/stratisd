@@ -22,18 +22,17 @@ use self::devicemapper::ThinDev;
 use self::devicemapper::ThinPoolDev;
 
 use self::tempdir::TempDir;
-use self::time::now;
 use self::uuid::Uuid;
 
 use libstratis::engine::{Engine, EngineError, ErrorEnum};
 use libstratis::engine::strat_engine::StratEngine;
-use libstratis::engine::strat_engine::blockdev::{blkdev_size, find_all, initialize,
-                                                 resolve_devices, write_sectors};
-use libstratis::engine::strat_engine::blockdevmgr::BlockDevMgr;
+use libstratis::engine::strat_engine::blockdev::{blkdev_size, initialize, resolve_devices,
+                                                 write_sectors};
 use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_fs};
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
                                                  MIN_MDA_SECTORS};
+use libstratis::engine::strat_engine::setup::{find_all, get_pool_metadata};
 
 
 /// Dirty sectors where specified, with 1s.
@@ -219,31 +218,6 @@ pub fn test_pool_blockdevs(paths: &[&Path]) -> () {
 }
 
 
-/// Test reading and writing metadata on a set of blockdevs sharing one pool
-/// UUID.
-/// 1. Verify that it is impossible to read variable length metadata off new
-/// devices.
-/// 2. Write metadata and verify that it is now available.
-/// 3. Write different metadata, with a newer time, and verify that the new
-/// metadata is now available.
-/// FIXME: it would be best if StratPool::save_state() returned an error when
-/// writing with an early time, currently it just panics.
-pub fn test_variable_length_metadata_times(paths: &[&Path]) -> () {
-    let unique_devices = resolve_devices(&paths).unwrap();
-    let uuid = Uuid::new_v4();
-    let blockdevs = initialize(&uuid, unique_devices, MIN_MDA_SECTORS, false).unwrap();
-    let mut mgr = BlockDevMgr::new(blockdevs);
-    assert!(mgr.load_state().is_none());
-
-    let (state1, state2) = (vec![1u8, 2u8, 3u8, 4u8], vec![5u8, 6u8, 7u8, 8u8]);
-
-    mgr.save_state(&now().to_timespec(), &state1).unwrap();
-    assert!(mgr.load_state().unwrap() == state1);
-
-    mgr.save_state(&now().to_timespec(), &state2).unwrap();
-    assert!(mgr.load_state().unwrap() == state2);
-}
-
 /// Verify that tearing down an engine doesn't fail if no filesystems on it.
 pub fn test_teardown(paths: &[&Path]) -> () {
     let mut engine = StratEngine::new();
@@ -261,6 +235,8 @@ pub fn test_teardown(paths: &[&Path]) -> () {
 /// 4. Initialize the block devices in the second set with a different pool
 /// uuid.
 /// 5. Run find_all() again and verify that both sets of devices are found.
+/// 6. Verify that get_pool_metadata() return an error. initialize() only
+/// initializes block devices, it does not write metadata.
 pub fn test_setup(paths: &[&Path]) -> () {
     assert!(paths.len() > 2);
 
@@ -290,6 +266,8 @@ pub fn test_setup(paths: &[&Path]) -> () {
     assert!(pools.contains_key(&uuid2));
     let devices2 = pools.get(&uuid2).expect("pools.contains_key() was true");
     assert!(devices2.len() == paths2.len());
+
+    assert!(get_pool_metadata(&pools).is_err());
 }
 
 /// Verify that a pool with no devices does not have the minimum amount of
@@ -303,4 +281,44 @@ pub fn test_empty_pool(paths: &[&Path]) -> () {
                 EngineError::Engine(ErrorEnum::Invalid, _) => true,
                 _ => false,
             });
+}
+
+/// Verify that metadata can be read from pools.
+/// 1. Split paths into two separate sets.
+/// 2. Create a pool from the first set.
+/// 3. Use find_all() to get the devices in the pool.
+/// 4. Use get_pool_metadata to find metadata for all pools.
+/// 5. Verify that metadata name is correct.
+/// 6. Create a second pool and repeat.
+/// 7. Teardown the engine and repeat.
+pub fn test_basic_metadata(paths: &[&Path]) {
+    assert!(paths.len() > 2);
+
+    let (paths1, paths2) = paths.split_at(2);
+
+    let mut engine = StratEngine::new();
+
+    let name1 = "name1";
+    let (uuid1, _) = engine.create_pool(&name1, paths1, None, false).unwrap();
+
+    let pools = find_all().unwrap();
+    let metadata = get_pool_metadata(&pools).unwrap();
+    assert!(metadata.len() == 1);
+    assert!(metadata.get(&uuid1).unwrap().name == name1);
+
+    let name2 = "name2";
+    let (uuid2, _) = engine.create_pool(&name2, paths2, None, false).unwrap();
+
+    let pools = find_all().unwrap();
+    let metadata = get_pool_metadata(&pools).unwrap();
+    assert!(metadata.len() == 2);
+    assert!(metadata.get(&uuid1).unwrap().name == name1);
+    assert!(metadata.get(&uuid2).unwrap().name == name2);
+
+    engine.teardown().unwrap();
+    let pools = find_all().unwrap();
+    let metadata = get_pool_metadata(&pools).unwrap();
+    assert!(metadata.len() == 2);
+    assert!(metadata.get(&uuid1).unwrap().name == name1);
+    assert!(metadata.get(&uuid2).unwrap().name == name2);
 }

@@ -73,16 +73,21 @@ impl BDA {
            })
     }
 
-    pub fn load<F>(f: &mut F) -> EngineResult<BDA>
+    pub fn load<F>(f: &mut F) -> EngineResult<Option<BDA>>
         where F: Read + Seek
     {
         let header = try!(StaticHeader::setup(f));
+        if header.is_none() {
+            return Ok(None);
+        }
+        let header = header.expect("must have exited if None");
+
         let regions = try!(MDARegions::load(&header, f));
 
-        Ok(BDA {
-               header: header,
-               regions: regions,
-           })
+        Ok(Some(BDA {
+                    header: header,
+                    regions: regions,
+                }))
     }
 
     /// Zero out Static Header on the blockdev. This causes it to no
@@ -171,26 +176,34 @@ impl StaticHeader {
     }
 
     /// Try to find a valid StaticHeader on a device.
-    pub fn setup<F>(f: &mut F) -> EngineResult<StaticHeader>
+    /// If there is no StaticHeader on the device, return None.
+    /// If there is a problem reading a header, return an error.
+    fn setup<F>(f: &mut F) -> EngineResult<Option<StaticHeader>>
         where F: Read + Seek
     {
         try!(f.seek(SeekFrom::Start(0)));
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
         try!(f.read(&mut buf));
 
+        // TODO: repair static header if one incorrect?
+        // Note: this would require some adjustment or some revision to
+        // setup_from_buf().
         StaticHeader::setup_from_buf(&buf)
     }
 
     /// Try to find a valid StaticHeader in a buffer.
-    pub fn setup_from_buf(buf: &[u8; _BDA_STATIC_HDR_SIZE]) -> EngineResult<StaticHeader> {
+    /// If there is an error in reading the first, try the next. If there is
+    /// no error in reading the first, assume it is correct, i.e., do not
+    /// verify that it matches the next.
+    /// Return None if the static header's magic number is wrong.
+    fn setup_from_buf(buf: &[u8; _BDA_STATIC_HDR_SIZE]) -> EngineResult<Option<StaticHeader>> {
         let sigblock_spots = [&buf[SECTOR_SIZE..2 * SECTOR_SIZE],
                               &buf[9 * SECTOR_SIZE..10 * SECTOR_SIZE]];
 
-        // Check both copies of sigblock for validity
         for buf in &sigblock_spots {
             match StaticHeader::sigblock_from_buf(buf) {
-                Ok(sh) => return Ok(sh),
-                Err(_) => continue,
+                Ok(val) => return Ok(val),
+                _ => continue,
             }
         }
 
@@ -212,14 +225,15 @@ impl StaticHeader {
         // it must also have correct CRC, no weird stuff in fields,
         // etc!
         match StaticHeader::setup_from_buf(&buf) {
-            Ok(sh) => Ok(DevOwnership::Ours(sh.pool_uuid)),
-            Err(_) => {
+            Ok(Some(sh)) => Ok(DevOwnership::Ours(sh.pool_uuid)),
+            Ok(None) => {
                 if buf.iter().any(|x| *x != 0) {
                     Ok(DevOwnership::Theirs)
                 } else {
                     Ok(DevOwnership::Unowned)
                 }
             }
+            Err(err) => Err(err),
         }
     }
 
@@ -240,12 +254,12 @@ impl StaticHeader {
 
     /// Build a StaticHeader from a SECTOR_SIZE buf that was read from
     /// a blockdev.
-    pub fn sigblock_from_buf(buf: &[u8]) -> EngineResult<StaticHeader> {
+    fn sigblock_from_buf(buf: &[u8]) -> EngineResult<Option<StaticHeader>> {
 
         assert_eq!(buf.len(), SECTOR_SIZE);
 
         if &buf[4..20] != STRAT_MAGIC {
-            return Err(EngineError::Engine(ErrorEnum::Invalid, "No Stratis magic".into()));
+            return Ok(None);
         }
 
         let crc = crc32::checksum_ieee(&buf[4..SECTOR_SIZE]);
@@ -262,14 +276,14 @@ impl StaticHeader {
 
         try!(validate_mda_size(mda_size));
 
-        Ok(StaticHeader {
-               pool_uuid: pool_uuid,
-               dev_uuid: dev_uuid,
-               blkdev_size: blkdev_size,
-               mda_size: mda_size,
-               reserved_size: Sectors(LittleEndian::read_u64(&buf[104..112])),
-               flags: 0,
-           })
+        Ok(Some(StaticHeader {
+                    pool_uuid: pool_uuid,
+                    dev_uuid: dev_uuid,
+                    blkdev_size: blkdev_size,
+                    mda_size: mda_size,
+                    reserved_size: Sectors(LittleEndian::read_u64(&buf[104..112])),
+                    flags: 0,
+                }))
     }
 }
 
@@ -766,7 +780,7 @@ mod tests {
                 return TestResult::failed();
             }
 
-            let mut bda = BDA::load(&mut buf).unwrap();
+            let mut bda = BDA::load(&mut buf).unwrap().unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();
 
             if let Some(s) = loaded_state {
@@ -821,7 +835,7 @@ mod tests {
         fn static_header(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
             let sh1 = random_static_header(blkdev_size, mda_size_factor);
             let buf = sh1.sigblock_to_buf();
-            let sh2 = StaticHeader::sigblock_from_buf(&buf).unwrap();
+            let sh2 = StaticHeader::sigblock_from_buf(&buf).unwrap().unwrap();
             TestResult::from_bool(sh1.pool_uuid == sh2.pool_uuid && sh1.dev_uuid == sh2.dev_uuid &&
                                   sh1.blkdev_size == sh2.blkdev_size &&
                                   sh1.mda_size == sh2.mda_size &&

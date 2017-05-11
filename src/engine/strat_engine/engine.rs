@@ -87,8 +87,10 @@ impl Engine for StratEngine {
     }
 
     fn check(&mut self) -> () {
-        for pool in self.pools.iter_mut() {
-            pool.check();
-        }
+        check_engine!(self);
+    }
+
+    fn setup(&mut self) -> EngineResult<()> {
+        unimplemented!()
     }
 }

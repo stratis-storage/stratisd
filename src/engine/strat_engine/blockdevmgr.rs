@@ -12,7 +12,6 @@ use time::Timespec;
 
 use engine::{EngineResult, PoolUuid};
 use super::metadata::MIN_MDA_SECTORS;
-pub use super::BlockDevSave;
 use engine::strat_engine::blockdev::{BlockDev, resolve_devices, initialize};
 
 #[derive(Debug)]
@@ -87,13 +86,6 @@ impl BlockDevMgr {
         self.block_devs.keys().map(|p| p.clone()).collect()
     }
 
-    pub fn to_save(&self) -> HashMap<String, BlockDevSave> {
-        self.block_devs
-            .iter()
-            .map(|(_, bd)| (bd.uuid().simple().to_string(), bd.to_save()))
-            .collect()
-    }
-
     /// Write the given data to all blockdevs marking with specified time.
     // TODO: Cap # of blockdevs written to, as described in SWDD
     pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
@@ -105,35 +97,5 @@ impl BlockDevMgr {
             bd.save_state(time, metadata).unwrap();
         }
         Ok(())
-    }
-
-    /// Return the metadata from the first blockdev with up-to-date, readable
-    /// metadata.
-    pub fn load_state(&self) -> Option<Vec<u8>> {
-        if self.block_devs.is_empty() {
-            return None;
-        }
-
-        let most_recent_blockdev = self.block_devs
-            .values()
-            .max_by_key(|bd| bd.last_update_time())
-            .expect("must be a maximum since bds is non-empty");
-
-        let most_recent_time = most_recent_blockdev.last_update_time();
-
-        if most_recent_time.is_none() {
-            return None;
-        }
-
-        for bd in self.block_devs
-                .values()
-                .filter(|b| b.last_update_time() == most_recent_time) {
-            match bd.load_state() {
-                Ok(Some(data)) => return Some(data),
-                _ => continue,
-            }
-        }
-
-        None
     }
 }

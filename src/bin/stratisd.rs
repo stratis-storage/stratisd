@@ -51,6 +51,13 @@ fn write_err(err: StratisError) -> StratisResult<()> {
     Ok(())
 }
 
+/// If writing a program error to stderr fails, panic.
+fn write_or_panic(err: StratisError) -> () {
+    if let Err(e) = write_err(err) {
+        panic!("Unable to write to stderr: {}", e)
+    }
+}
+
 fn main() {
 
     let matches = App::new("stratis")
@@ -110,9 +117,7 @@ fn main() {
                                                              item,
                                                              &mut tree,
                                                              &dbus_context) {
-                    if let Err(e) = write_err(r) {
-                        panic!("Unable to write to stderr: {}", e)
-                    }
+                    write_or_panic(r);
                 }
             }
         }

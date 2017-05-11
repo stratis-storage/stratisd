@@ -118,7 +118,7 @@ fn run() -> StratisResult<()> {
                                                              item,
                                                              &mut tree,
                                                              &dbus_context) {
-                    write_or_panic(r);
+                    write_or_panic(From::from(r));
                 }
             }
         }

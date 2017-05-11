@@ -96,8 +96,7 @@ fn run() -> StratisResult<()> {
         }
     };
 
-    let (dbus_conn, mut tree, dbus_context) = libstratis::dbus_api::connect(engine.clone())
-        .expect("Could not connect to D-Bus");
+    let (dbus_conn, mut tree, dbus_context) = try!(libstratis::dbus_api::connect(engine.clone()));
 
     // Get a list of fds to poll for
     let mut fds: Vec<_> = dbus_conn

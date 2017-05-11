@@ -110,3 +110,11 @@ macro_rules! rename_filesystem {
         return Ok(RenameAction::Renamed);
     }
 }
+
+macro_rules! check_engine {
+    ( $s:ident ) => {
+        for pool in $s.pools.iter_mut() {
+            pool.check();
+        }
+    }
+}

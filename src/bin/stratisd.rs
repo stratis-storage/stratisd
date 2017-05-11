@@ -30,6 +30,7 @@ use std::env;
 use std::error::Error;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::process::exit;
 
 use clap::{App, Arg};
 use log::LogLevelFilter;
@@ -58,7 +59,7 @@ fn write_or_panic(err: StratisError) -> () {
     }
 }
 
-fn main() {
+fn run() -> StratisResult<()> {
 
     let matches = App::new("stratis")
         .version(VERSION)
@@ -125,4 +126,15 @@ fn main() {
         // Ask the engine to check its pools
         engine.borrow_mut().check()
     }
+}
+
+fn main() {
+    let error_code = match run() {
+        Ok(_) => 0,
+        Err(err) => {
+            write_or_panic(err);
+            1
+        }
+    };
+    exit(error_code);
 }

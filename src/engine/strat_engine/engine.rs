@@ -89,4 +89,8 @@ impl Engine for StratEngine {
     fn check(&mut self) -> () {
         check_engine!(self);
     }
+
+    fn setup(&mut self) -> EngineResult<()> {
+        unimplemented!()
+    }
 }

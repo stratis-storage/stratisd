@@ -132,4 +132,7 @@ pub trait Engine: Debug {
 
     /// Check pools' current state and take appropriate actions
     fn check(&mut self) -> ();
+
+    /// Setup a newly created engine from the environment.
+    fn setup(&mut self) -> EngineResult<()>;
 }

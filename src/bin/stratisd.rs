@@ -40,11 +40,12 @@ use libstratis::engine::Engine;
 use libstratis::engine::sim_engine::SimEngine;
 use libstratis::engine::strat_engine::StratEngine;
 use libstratis::stratis::VERSION;
-use libstratis::types::{StratisResult, StratisError};
+use libstratis::types::{InternalError, StratisResult, StratisError};
 
+/// Try to write the error from the program to stderr, vehemently.
+/// Return an error if stderr unavailable or writing was a failure.
 fn write_err(err: StratisError) -> StratisResult<()> {
-    let mut out = term::stderr().expect("could not get stderr");
-
+    let mut out = try!(term::stderr().ok_or(InternalError("stderr has gone missing".into())));
     try!(out.fg(term::color::RED));
     try!(writeln!(out, "{}", err.description()));
     try!(out.reset());

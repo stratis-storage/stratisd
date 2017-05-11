@@ -20,7 +20,6 @@ pub enum ErrorEnum {
     Busy,
     Invalid,
     NotFound,
-    FailedToOpen,
 }
 
 #[derive(Debug)]

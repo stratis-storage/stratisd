@@ -43,9 +43,10 @@ use libstratis::engine::strat_engine::StratEngine;
 use libstratis::stratis::VERSION;
 use libstratis::types::{StratisResult, StratisError};
 
+/// Try to write the error from the program to stderr, vehemently.
+/// Return an error if stderr unavailable or writing was a failure.
 fn write_err(err: StratisError) -> StratisResult<()> {
-    let mut out = term::stderr().expect("could not get stderr");
-
+    let mut out = try!(term::stderr().ok_or(StratisError::StderrNotFound));
     try!(out.fg(term::color::RED));
     try!(writeln!(out, "{}", err.description()));
     try!(out.reset());

@@ -2,7 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::borrow::Cow;
 use std::error::Error;
 use std::fmt;
 use std::io;
@@ -14,26 +13,9 @@ use term;
 
 pub type StratisResult<T> = Result<T, StratisError>;
 
-// An error type for errors generated within Stratis
-//
-#[derive(Debug)]
-pub struct InternalError(pub Cow<'static, str>);
-
-impl fmt::Display for InternalError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl Error for InternalError {
-    fn description(&self) -> &str {
-        &self.0
-    }
-}
-
 #[derive(Debug)]
 pub enum StratisError {
-    Stratis(InternalError),
+    StderrNotFound,
     Io(io::Error),
     Nix(nix::Error),
     Dbus(dbus::Error),
@@ -44,7 +26,7 @@ pub enum StratisError {
 impl fmt::Display for StratisError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            StratisError::Stratis(ref err) => write!(f, "Stratis error: {}", err.0),
+            StratisError::StderrNotFound => write!(f, "stderr not found"),
             StratisError::Io(ref err) => write!(f, "IO error: {}", err),
             StratisError::Nix(ref err) => write!(f, "Nix error: {}", err.errno().desc()),
             StratisError::Dbus(ref err) => {
@@ -59,7 +41,7 @@ impl fmt::Display for StratisError {
 impl Error for StratisError {
     fn description(&self) -> &str {
         match *self {
-            StratisError::Stratis(ref err) => &err.0,
+            StratisError::StderrNotFound => "stderr not found",
             StratisError::Io(ref err) => err.description(),
             StratisError::Nix(ref err) => err.errno().desc(),
             StratisError::Dbus(ref err) => err.message().unwrap_or("D-Bus Error"),
@@ -70,19 +52,13 @@ impl Error for StratisError {
 
     fn cause(&self) -> Option<&Error> {
         match *self {
-            StratisError::Stratis(ref err) => Some(err),
+            StratisError::StderrNotFound => None,
             StratisError::Io(ref err) => Some(err),
             StratisError::Nix(ref err) => Some(err),
             StratisError::Dbus(ref err) => Some(err),
             StratisError::Term(ref err) => Some(err),
             StratisError::DM(ref err) => Some(err),
         }
-    }
-}
-
-impl From<InternalError> for StratisError {
-    fn from(err: InternalError) -> StratisError {
-        StratisError::Stratis(err)
     }
 }
 

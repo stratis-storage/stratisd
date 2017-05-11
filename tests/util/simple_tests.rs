@@ -22,19 +22,17 @@ use self::devicemapper::ThinDev;
 use self::devicemapper::ThinPoolDev;
 
 use self::tempdir::TempDir;
-use self::time::now;
 use self::uuid::Uuid;
 
 use libstratis::engine::{Engine, EngineError, ErrorEnum};
 use libstratis::engine::strat_engine::StratEngine;
 use libstratis::engine::strat_engine::blockdev::{blkdev_size, initialize, resolve_devices,
                                                  write_sectors};
-use libstratis::engine::strat_engine::blockdevmgr::BlockDevMgr;
 use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_fs};
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
                                                  MIN_MDA_SECTORS};
-use libstratis::engine::strat_engine::setup::{find_all, get_metadata, get_pool_metadata};
+use libstratis::engine::strat_engine::setup::{find_all, get_pool_metadata};
 
 
 /// Dirty sectors where specified, with 1s.
@@ -219,32 +217,6 @@ pub fn test_pool_blockdevs(paths: &[&Path]) -> () {
                      }));
 }
 
-
-/// Test reading and writing metadata on a set of blockdevs sharing one pool
-/// UUID.
-/// 1. Verify that it is impossible to read variable length metadata off new
-/// devices.
-/// 2. Write metadata and verify that it is now available.
-/// 3. Write different metadata, with a newer time, and verify that the new
-/// metadata is now available.
-/// FIXME: it would be best if StratPool::save_state() returned an error when
-/// writing with an early time, currently it just panics.
-pub fn test_variable_length_metadata_times(paths: &[&Path]) -> () {
-    let unique_devices = resolve_devices(&paths).unwrap();
-    let uuid = Uuid::new_v4();
-    let blockdevs = initialize(&uuid, unique_devices, MIN_MDA_SECTORS, false).unwrap();
-    let devnodes: Vec<PathBuf> = blockdevs.iter().map(|bd| bd.devnode.clone()).collect();
-    let mut mgr = BlockDevMgr::new(blockdevs);
-    assert!(get_metadata(&uuid, &devnodes).unwrap().is_none());
-
-    let (state1, state2) = (vec![1u8, 2u8, 3u8, 4u8], vec![5u8, 6u8, 7u8, 8u8]);
-
-    mgr.save_state(&now().to_timespec(), &state1).unwrap();
-    assert!(get_metadata(&uuid, &devnodes).unwrap().unwrap() == state1);
-
-    mgr.save_state(&now().to_timespec(), &state2).unwrap();
-    assert!(get_metadata(&uuid, &devnodes).unwrap().unwrap() == state2);
-}
 
 /// Verify that tearing down an engine doesn't fail if no filesystems on it.
 pub fn test_teardown(paths: &[&Path]) -> () {

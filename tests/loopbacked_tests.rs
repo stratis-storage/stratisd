@@ -32,7 +32,6 @@ use util::simple_tests::test_pool_blockdevs;
 use util::simple_tests::test_setup;
 use util::simple_tests::test_teardown;
 use util::simple_tests::test_thinpool_device;
-use util::simple_tests::test_variable_length_metadata_times;
 
 
 /// Setup count loop backed devices in dir.
@@ -136,11 +135,6 @@ pub fn loop_test_pool_blockdevs() {
 #[test]
 pub fn loop_test_force_flag_dirty() {
     test_with_spec(3, test_force_flag_dirty);
-}
-
-#[test]
-pub fn loop_test_variable_length_metadata_times() {
-    test_with_spec(3, test_variable_length_metadata_times);
 }
 
 #[test]

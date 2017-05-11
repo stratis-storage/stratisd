@@ -7,8 +7,6 @@ use std::fmt;
 use std::io;
 
 use dbus;
-use devicemapper;
-use nix;
 use term;
 
 pub type StratisResult<T> = Result<T, StratisError>;
@@ -17,10 +15,8 @@ pub type StratisResult<T> = Result<T, StratisError>;
 pub enum StratisError {
     StderrNotFound,
     Io(io::Error),
-    Nix(nix::Error),
     Dbus(dbus::Error),
     Term(term::Error),
-    DM(devicemapper::DmError),
 }
 
 impl fmt::Display for StratisError {
@@ -28,12 +24,10 @@ impl fmt::Display for StratisError {
         match *self {
             StratisError::StderrNotFound => write!(f, "stderr not found"),
             StratisError::Io(ref err) => write!(f, "IO error: {}", err),
-            StratisError::Nix(ref err) => write!(f, "Nix error: {}", err.errno().desc()),
             StratisError::Dbus(ref err) => {
                 write!(f, "Dbus error: {}", err.message().unwrap_or("Unknown"))
             }
             StratisError::Term(ref err) => write!(f, "Term error: {}", err),
-            StratisError::DM(ref err) => write!(f, "DM error: {}", err),
         }
     }
 }
@@ -43,10 +37,8 @@ impl Error for StratisError {
         match *self {
             StratisError::StderrNotFound => "stderr not found",
             StratisError::Io(ref err) => err.description(),
-            StratisError::Nix(ref err) => err.errno().desc(),
             StratisError::Dbus(ref err) => err.message().unwrap_or("D-Bus Error"),
             StratisError::Term(ref err) => Error::description(err),
-            StratisError::DM(ref err) => Error::description(err),
         }
     }
 
@@ -54,10 +46,8 @@ impl Error for StratisError {
         match *self {
             StratisError::StderrNotFound => None,
             StratisError::Io(ref err) => Some(err),
-            StratisError::Nix(ref err) => Some(err),
             StratisError::Dbus(ref err) => Some(err),
             StratisError::Term(ref err) => Some(err),
-            StratisError::DM(ref err) => Some(err),
         }
     }
 }
@@ -65,14 +55,6 @@ impl Error for StratisError {
 impl From<io::Error> for StratisError {
     fn from(err: io::Error) -> StratisError {
         StratisError::Io(err)
-    }
-}
-
-
-
-impl From<nix::Error> for StratisError {
-    fn from(err: nix::Error) -> StratisError {
-        StratisError::Nix(err)
     }
 }
 
@@ -85,11 +67,5 @@ impl From<dbus::Error> for StratisError {
 impl From<term::Error> for StratisError {
     fn from(err: term::Error) -> StratisError {
         StratisError::Term(err)
-    }
-}
-
-impl From<devicemapper::DmError> for StratisError {
-    fn from(err: devicemapper::DmError) -> StratisError {
-        StratisError::DM(err)
     }
 }

@@ -96,9 +96,7 @@ impl Engine for SimEngine {
     }
 
     fn check(&mut self) -> () {
-        for pool in &mut self.pools {
-            pool.check();
-        }
+        check_engine!(self)
     }
 }
 

@@ -12,10 +12,12 @@ use std::path::{Path, PathBuf};
 
 use nix::Errno;
 use nix::sys::stat::{S_IFBLK, S_IFMT};
+use serde_json;
 
 use engine::{EngineResult, EngineError, ErrorEnum, PoolUuid};
 use super::metadata::{BDA, StaticHeader};
 use super::engine::DevOwnership;
+use super::serde_structs::PoolSave;
 
 
 /// Find all Stratis devices.
@@ -79,7 +81,7 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<PathBuf>>> {
 
 /// Get the most recent metadata from a set of Devices for a given pool UUID.
 /// Returns None if no metadata found for this pool.
-pub fn get_metadata(pool_uuid: &PoolUuid, devnodes: &[PathBuf]) -> EngineResult<Option<Vec<u8>>> {
+pub fn get_metadata(pool_uuid: &PoolUuid, devnodes: &[PathBuf]) -> EngineResult<Option<PoolSave>> {
 
     // No device nodes means no metadata
     if devnodes.is_empty() {
@@ -143,7 +145,12 @@ pub fn get_metadata(pool_uuid: &PoolUuid, devnodes: &[PathBuf]) -> EngineResult<
         let mut f = f.expect("f is not err");
 
         if let Ok(Some(data)) = bda.load_state(&mut f) {
-            return Ok(Some(data));
+            let json: serde_json::Result<PoolSave> = serde_json::from_slice(&data);
+            if let Ok(pool) = json {
+                return Ok(Some(pool));
+            } else {
+                continue;
+            }
         } else {
             continue;
         }
@@ -161,11 +168,11 @@ pub fn get_metadata(pool_uuid: &PoolUuid, devnodes: &[PathBuf]) -> EngineResult<
 /// Since the metadata is written immediately after a pool is created, it
 /// is considered an error for a pool to be w/out metadata.
 pub fn get_pool_metadata(pool_table: &HashMap<PoolUuid, Vec<PathBuf>>)
-                         -> EngineResult<HashMap<PoolUuid, Vec<u8>>> {
+                         -> EngineResult<HashMap<PoolUuid, PoolSave>> {
     let mut metadata = HashMap::new();
     for (pool_uuid, devices) in pool_table.iter() {
-        if let Ok(Some(bytes)) = get_metadata(pool_uuid, &devices) {
-            metadata.insert(pool_uuid.clone(), bytes);
+        if let Ok(Some(pool)) = get_metadata(pool_uuid, &devices) {
+            metadata.insert(pool_uuid.clone(), pool);
         } else {
             return Err(EngineError::Engine(ErrorEnum::NotFound,
                                            format!("no metadata for pool {}", pool_uuid)));

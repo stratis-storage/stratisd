@@ -31,8 +31,6 @@ impl Error for InternalError {
     }
 }
 
-// Define a common error enum.
-// See http://blog.burntsushi.net/rust-error-handling/
 #[derive(Debug)]
 pub enum StratisError {
     Stratis(InternalError),

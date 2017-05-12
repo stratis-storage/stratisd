@@ -184,7 +184,7 @@ impl StratPool {
             }
         }
 
-        for fs in self.filesystems.iter_mut() {
+        for fs in &mut self.filesystems {
             match fs.check(&dm) {
                 Ok(f_status) => {
                     if let FilesystemStatus::Failed = f_status {

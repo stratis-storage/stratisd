@@ -11,24 +11,23 @@
 // structs. These contain simple, serde-friendly data types, and we
 // can convert to or from them when saving our current state, or
 // restoring state from saved metadata.
-//
-// Look for "to_save" and "setup" methods, that either return or take
-// the below structs as parameters.
 
-use std::collections::HashMap;
-use std::path::PathBuf;
+use std::marker::Sized;
 
-use devicemapper::Sectors;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BlockDevSave {
-    pub devnode: PathBuf,
-    pub total_size: Sectors,
+/// Implements saving struct data to a serializable form and reconstructing
+/// a struct from that form.
+/// Assuming the context of the existing devices this must be an isomorphism,
+/// i.e., setup(x.to_save()) == x and setup(x).to_save() == x or it's a bug.
+pub trait Isomorphism<T> {
+    fn to_save(&self) -> T;
+    fn setup(T) -> Self
+        where Self: Sized
+    {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StratSave {
+pub struct PoolSave {
     pub name: String,
-    pub id: String,
-    pub block_devs: HashMap<String, BlockDevSave>,
 }

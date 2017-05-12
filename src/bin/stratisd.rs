@@ -40,8 +40,7 @@ use dbus::WatchEvent;
 use libstratis::engine::Engine;
 use libstratis::engine::sim_engine::SimEngine;
 use libstratis::engine::strat_engine::StratEngine;
-use libstratis::stratis::VERSION;
-use libstratis::types::{StratisResult, StratisError};
+use libstratis::stratis::{StratisResult, StratisError, VERSION};
 
 /// Try to write the error from the program to stderr, vehemently.
 /// Return an error if stderr unavailable or writing was a failure.

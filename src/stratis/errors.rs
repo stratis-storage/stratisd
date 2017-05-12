@@ -9,10 +9,13 @@ use std::io;
 use dbus;
 use term;
 
+use super::super::engine::EngineError;
+
 pub type StratisResult<T> = Result<T, StratisError>;
 
 #[derive(Debug)]
 pub enum StratisError {
+    Engine(EngineError),
     StderrNotFound,
     Io(io::Error),
     Dbus(dbus::Error),
@@ -22,6 +25,9 @@ pub enum StratisError {
 impl fmt::Display for StratisError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            StratisError::Engine(ref err) => {
+                write!(f, "Engine error: {}", err.description().to_owned())
+            }
             StratisError::StderrNotFound => write!(f, "stderr not found"),
             StratisError::Io(ref err) => write!(f, "IO error: {}", err),
             StratisError::Dbus(ref err) => {
@@ -35,6 +41,7 @@ impl fmt::Display for StratisError {
 impl Error for StratisError {
     fn description(&self) -> &str {
         match *self {
+            StratisError::Engine(ref err) => Error::description(err),
             StratisError::StderrNotFound => "stderr not found",
             StratisError::Io(ref err) => err.description(),
             StratisError::Dbus(ref err) => err.message().unwrap_or("D-Bus Error"),
@@ -44,6 +51,7 @@ impl Error for StratisError {
 
     fn cause(&self) -> Option<&Error> {
         match *self {
+            StratisError::Engine(ref err) => Some(err),
             StratisError::StderrNotFound => None,
             StratisError::Io(ref err) => Some(err),
             StratisError::Dbus(ref err) => Some(err),
@@ -67,5 +75,11 @@ impl From<dbus::Error> for StratisError {
 impl From<term::Error> for StratisError {
     fn from(err: term::Error) -> StratisError {
         StratisError::Term(err)
+    }
+}
+
+impl From<EngineError> for StratisError {
+    fn from(err: EngineError) -> StratisError {
+        StratisError::Engine(err)
     }
 }

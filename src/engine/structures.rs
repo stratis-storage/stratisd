@@ -95,7 +95,7 @@ impl<T: HasName + HasUuid> Table<T> {
         }
     }
 
-    /// Removes the Pool corresponding to name if there is one.
+    /// Removes the item corresponding to name if there is one.
     pub fn remove_by_name(&mut self, name: &str) -> Option<T> {
         if let Some(index) = self.name_map.remove(name) {
             // Insert mappings for the about-to-be swapped element
@@ -120,7 +120,7 @@ impl<T: HasName + HasUuid> Table<T> {
         }
     }
 
-    /// Removes the Pool corresponding to the uuid if there is one.
+    /// Removes the item corresponding to the uuid if there is one.
     pub fn remove_by_uuid(&mut self, uuid: &Uuid) -> Option<T> {
         if let Some(index) = self.uuid_map.remove(uuid) {
             // Insert mappings for the about-to-be swapped element

@@ -4,15 +4,36 @@
 
 // Code to handle a collection of block devices.
 
-use std::collections::HashMap;
+use std::io;
+use std::collections::{HashMap, HashSet};
+use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
-use devicemapper::{Sectors, Segment};
+use devicemapper::{Bytes, Device, Sectors, Segment};
 use time::Timespec;
+use uuid::Uuid;
 
-use engine::{EngineResult, PoolUuid};
-use super::metadata::MIN_MDA_SECTORS;
-use engine::strat_engine::blockdev::{BlockDev, resolve_devices, initialize};
+use consts::IEC;
+use engine::{EngineError, EngineResult, ErrorEnum, PoolUuid};
+use engine::strat_engine::blockdev::BlockDev;
+
+use super::device::blkdev_size;
+use super::engine::DevOwnership;
+use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};
+use super::range_alloc::RangeAllocator;
+
+const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
+
+/// Resolve a list of Paths of some sort to a set of unique Devices.
+/// Return an IOError if there was a problem resolving any particular device.
+pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
+    let mut devices = HashSet::new();
+    for path in paths {
+        devices.insert(try!(Device::from_str(&path.to_string_lossy())));
+    }
+    Ok(devices)
+}
 
 #[derive(Debug)]
 pub struct BlockDevMgr {
@@ -98,4 +119,98 @@ impl BlockDevMgr {
         }
         Ok(())
     }
+}
+
+
+/// Initialize multiple blockdevs at once. This allows all of them
+/// to be checked for usability before writing to any of them.
+pub fn initialize(pool_uuid: &PoolUuid,
+                  devices: HashSet<Device>,
+                  mda_size: Sectors,
+                  force: bool)
+                  -> EngineResult<Vec<BlockDev>> {
+
+    /// Get device information, returns an error if problem with obtaining
+    /// that information.
+    /// Returns a tuple with the device's path, its size in bytes,
+    /// its ownership as determined by calling determine_ownership(),
+    /// and an open File handle, all of which are needed later.
+    pub fn dev_info(dev: &Device) -> EngineResult<(PathBuf, Bytes, DevOwnership, File)> {
+        let devnode = try!(dev.devnode().ok_or_else(|| {
+            EngineError::Engine(ErrorEnum::NotFound,
+                                format!("could not get device node from dev {}", dev.dstr()))
+        }));
+
+        let mut f = try!(OpenOptions::new().read(true).write(true).open(&devnode));
+        let dev_size = try!(blkdev_size(&f));
+        let ownership = try!(StaticHeader::determine_ownership(&mut f));
+
+        Ok((devnode, dev_size, ownership, f))
+    }
+
+    /// Filter devices for admission to pool based on dev_infos.
+    /// If there is an error finding out the info, return that error.
+    /// Also, return an error if a device is not appropriate for this pool.
+    fn filter_devs<I>(dev_infos: I,
+                      pool_uuid: &PoolUuid,
+                      force: bool)
+                      -> EngineResult<Vec<(Device, (PathBuf, Bytes, File))>>
+        where I: Iterator<Item = (Device, EngineResult<(PathBuf, Bytes, DevOwnership, File)>)>
+    {
+        let mut add_devs = Vec::new();
+        for (dev, dev_result) in dev_infos {
+            let (devnode, dev_size, ownership, f) = try!(dev_result);
+            if dev_size < MIN_DEV_SIZE {
+                let error_message = format!("{} too small, minimum {} bytes",
+                                            devnode.display(),
+                                            MIN_DEV_SIZE);
+                return Err(EngineError::Engine(ErrorEnum::Invalid, error_message));
+            };
+            match ownership {
+                DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, f))),
+                DevOwnership::Theirs => {
+                    if !force {
+                        let err_str = format!("Device {} appears to belong to another application",
+                                              devnode.display());
+                        return Err(EngineError::Engine(ErrorEnum::Invalid, err_str));
+                    } else {
+                        add_devs.push((dev, (devnode, dev_size, f)))
+                    }
+                }
+                DevOwnership::Ours(uuid) => {
+                    if *pool_uuid != uuid {
+                        let error_str = format!("Device {} already belongs to Stratis pool {}",
+                                                devnode.display(),
+                                                uuid);
+                        return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
+                    } else {
+                        // Already in this pool (according to its header)
+                        // TODO: Check we already know about it
+                        // if yes, ignore. If no, add it w/o initializing?
+                    }
+                }
+            }
+        }
+        Ok(add_devs)
+    }
+
+    try!(validate_mda_size(mda_size));
+
+    let dev_infos = devices.into_iter().map(|d: Device| (d, dev_info(&d)));
+
+    let add_devs = try!(filter_devs(dev_infos, pool_uuid, force));
+
+    let mut bds = Vec::new();
+    for (dev, (devnode, dev_size, mut f)) in add_devs {
+
+        let bda = try!(BDA::initialize(&mut f,
+                                       pool_uuid,
+                                       &Uuid::new_v4(),
+                                       mda_size,
+                                       dev_size.sectors()));
+        let allocator = RangeAllocator::new_with_used(bda.dev_size(), &[(Sectors(0), bda.size())]);
+
+        bds.push(BlockDev::new(dev, devnode, bda, allocator));
+    }
+    Ok(bds)
 }

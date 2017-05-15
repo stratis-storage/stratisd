@@ -25,15 +25,14 @@ use engine::Filesystem;
 use engine::Pool;
 use engine::RenameAction;
 use engine::engine::Redundancy;
-use engine::strat_engine::blockdev::wipe_sectors;
+use engine::strat_engine::device::wipe_sectors;
 use consts::IEC::Mi;
 
 use super::super::engine::{FilesystemUuid, HasName, HasUuid};
 use super::super::structures::Table;
 
-use super::blockdev::{initialize, resolve_devices};
 use super::serde_structs::{Isomorphism, PoolSave};
-use super::blockdevmgr::BlockDevMgr;
+use super::blockdevmgr::{BlockDevMgr, initialize, resolve_devices};
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::metadata::MIN_MDA_SECTORS;
 

@@ -50,6 +50,16 @@ impl BlockDevMgr {
         }
     }
 
+    /// Initialize a new BlockDevMgr with specified pool and devices.
+    pub fn initialize(pool_uuid: &PoolUuid,
+                      paths: &[&Path],
+                      mda_size: Sectors,
+                      force: bool)
+                      -> EngineResult<BlockDevMgr> {
+        let devices = try!(resolve_devices(paths));
+        Ok(BlockDevMgr::new(try!(initialize(pool_uuid, devices, mda_size, force))))
+    }
+
     pub fn add(&mut self,
                pool_uuid: &PoolUuid,
                paths: &[&Path],

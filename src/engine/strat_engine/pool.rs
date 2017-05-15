@@ -32,7 +32,7 @@ use super::super::engine::{FilesystemUuid, HasName, HasUuid};
 use super::super::structures::Table;
 
 use super::serde_structs::{Isomorphism, PoolSave};
-use super::blockdevmgr::{BlockDevMgr, initialize, resolve_devices};
+use super::blockdevmgr::BlockDevMgr;
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::metadata::MIN_MDA_SECTORS;
 
@@ -65,9 +65,8 @@ impl StratPool {
                       -> EngineResult<StratPool> {
         let pool_uuid = Uuid::new_v4();
 
-        let devices = try!(resolve_devices(paths));
         let mut block_mgr =
-            BlockDevMgr::new(try!(initialize(&pool_uuid, devices, MIN_MDA_SECTORS, force)));
+            try!(BlockDevMgr::initialize(&pool_uuid, paths, MIN_MDA_SECTORS, force));
 
         if block_mgr.avail_space() < StratPool::min_initial_size() {
             let avail_size = block_mgr.avail_space().bytes();

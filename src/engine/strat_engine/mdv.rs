@@ -66,7 +66,7 @@ impl MetadataVol {
     // ensure file contents are not truncated if operation is
     // interrupted.
     pub fn save_fs(&self, fs: &StratFilesystem) -> EngineResult<()> {
-        let data = try!(serde_json::to_string(&fs.to_save()));
+        let data = try!(serde_json::to_string(&try!(fs.to_save())));
         let path = self.mount_pt
             .join("filesystems")
             .join(fs.uuid().simple().to_string())

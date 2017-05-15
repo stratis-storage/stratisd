@@ -5,7 +5,7 @@
 // Code to handle a collection of block devices.
 
 use std::io;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -23,6 +23,7 @@ use super::device::blkdev_size;
 use super::engine::DevOwnership;
 use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};
 use super::range_alloc::RangeAllocator;
+use super::serde_structs::{BlockDevSave, Isomorphism};
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
 
@@ -35,6 +36,7 @@ pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
     }
     Ok(devices)
 }
+
 
 #[derive(Debug)]
 pub struct BlockDevMgr {
@@ -138,6 +140,28 @@ impl BlockDevMgr {
     }
 }
 
+impl Isomorphism<HashMap<String, BlockDevSave>> for BlockDevMgr {
+    fn to_save(&self) -> EngineResult<HashMap<String, BlockDevSave>> {
+
+        // This function exists to assist the type-checker. The type-checker
+        // was unable to infer the type of the apparently equivalent anonymous
+        // closure in Rust version 1.17.0.
+        fn mapper(bd: &BlockDev) -> EngineResult<(String, BlockDevSave)> {
+            Ok((bd.uuid().simple().to_string(), try!(bd.to_save())))
+        }
+
+        let mut result: HashMap<String, BlockDevSave> = HashMap::new();
+        for item in self.block_devs.iter().map(mapper) {
+            match item {
+                Ok((uuid, save)) => {
+                    result.insert(uuid, save);
+                }
+                Err(err) => return Err(err),
+            }
+        }
+        Ok(result)
+    }
+}
 
 /// Initialize multiple blockdevs at once. This allows all of them
 /// to be checked for usability before writing to any of them.

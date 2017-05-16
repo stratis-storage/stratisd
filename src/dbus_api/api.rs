@@ -33,8 +33,6 @@ use super::super::stratis::VERSION;
 use engine::Engine;
 use engine::Redundancy;
 
-use types::StratisResult;
-
 use super::pool::create_dbus_pool;
 
 use super::types::{DeferredAction, DbusContext, DbusErrorEnum, TData};
@@ -258,7 +256,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
 }
 
 pub fn connect(engine: Rc<RefCell<Engine>>)
-               -> StratisResult<(Connection, Tree<MTFn<TData>, TData>, DbusContext)> {
+               -> Result<(Connection, Tree<MTFn<TData>, TData>, DbusContext), dbus::Error> {
     let c = try!(Connection::get_private(BusType::System));
 
     let tree = get_base_tree(DbusContext::new(engine));
@@ -274,7 +272,7 @@ pub fn handle(c: &Connection,
               item: ConnectionItem,
               tree: &mut Tree<MTFn<TData>, TData>,
               dbus_context: &DbusContext)
-              -> StratisResult<()> {
+              -> Result<(), dbus::Error> {
     if let ConnectionItem::MethodCall(ref msg) = item {
         if let Some(v) = tree.handle(&msg) {
             // Probably the wisest is to ignore any send errors here -

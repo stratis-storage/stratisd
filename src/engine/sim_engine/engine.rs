@@ -96,9 +96,13 @@ impl Engine for SimEngine {
     }
 
     fn check(&mut self) -> () {
-        for pool in &mut self.pools {
-            pool.check();
-        }
+        check_engine!(self)
+    }
+
+    fn setup(&mut self) -> EngineResult<()> {
+        // do nothing, as currently the sim engine does not interact w/ the
+        // environment, other than D-Bus.
+        Ok(())
     }
 }
 

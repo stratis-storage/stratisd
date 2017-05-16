@@ -17,6 +17,7 @@ use engine::Redundancy;
 use engine::RenameAction;
 
 use super::pool::StratPool;
+use super::setup::find_all;
 
 use super::super::engine::{HasName, HasUuid, PoolUuid};
 use super::super::structures::Table;
@@ -87,8 +88,16 @@ impl Engine for StratEngine {
     }
 
     fn check(&mut self) -> () {
-        for pool in &mut self.pools {
-            pool.check();
+        check_engine!(self);
+    }
+
+    // TODO: Fix this method so that it actually sets up the engine.
+    fn setup(&mut self) -> EngineResult<()> {
+        let pools = try!(find_all());
+        if !pools.is_empty() {
+            let err_msg = "Stratis was already run once, can not yet reconstruct state";
+            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, err_msg.into()));
         }
+        Ok(())
     }
 }

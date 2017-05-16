@@ -15,7 +15,8 @@ use devicemapper::{ThinDev, ThinStatus};
 use devicemapper::ThinPoolDev;
 
 use engine::{EngineError, EngineResult, ErrorEnum, Filesystem};
-use super::super::engine::{FilesystemUuid, HasName, HasUuid};
+use super::super::engine::{FilesystemUuid, HasName, HasUuid, PoolUuid};
+use super::dmdevice::{ThinRole, format_thin_name};
 
 #[derive(Debug)]
 pub struct StratFilesystem {
@@ -30,20 +31,22 @@ pub enum FilesystemStatus {
 }
 
 impl StratFilesystem {
-    pub fn new(fs_id: FilesystemUuid,
-               name: &str,
-               dm: &DM,
-               thin_pool: &ThinPoolDev)
-               -> EngineResult<StratFilesystem> {
+    pub fn initialize(pool_id: &PoolUuid,
+                      fs_id: FilesystemUuid,
+                      name: &str,
+                      dm: &DM,
+                      thin_pool: &ThinPoolDev)
+                      -> EngineResult<StratFilesystem> {
         // TODO should replace with proper id generation. DM takes a 24 bit
         // number for the thin_id.  Generate a u16 to avoid the possibility of
         // "too big". Should this be moved into the DM binding (or lower)?
         // How can a client be expected to avoid collisions?
         let thin_id = rand::random::<u16>();
+        let device_name = format_thin_name(pool_id, ThinRole::Filesystem(fs_id));
         // TODO We don't require a size to be provided for create_filesystems -
         // but devicemapper requires an initial size for a thin provisioned
         // device - currently hard coded to 1GB.
-        let new_thin_dev = try!(ThinDev::new(name,
+        let new_thin_dev = try!(ThinDev::new(&device_name,
                                              dm,
                                              thin_pool,
                                              thin_id as u32,

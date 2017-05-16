@@ -33,6 +33,7 @@ use super::super::structures::Table;
 
 use super::serde_structs::{Isomorphism, PoolSave};
 use super::blockdevmgr::BlockDevMgr;
+use super::dmdevice::{FlexRole, ThinPoolRole, format_flex_name, format_thinpool_name};
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::metadata::MIN_MDA_SECTORS;
 
@@ -83,7 +84,8 @@ impl StratPool {
         let meta_regions = block_mgr
             .alloc_space(INITIAL_META_SIZE)
             .expect("blockmgr must not fail, already checked for space");
-        let meta_dev = try!(LinearDev::new(&format!("stratis_{}_meta", name), dm, &meta_regions));
+        let device_name = format_flex_name(&pool_uuid, FlexRole::ThinMeta);
+        let meta_dev = try!(LinearDev::new(&device_name, dm, &meta_regions));
 
         // When constructing a thin-pool, Stratis reserves the first N
         // sectors on a block device by creating a linear device with a
@@ -98,11 +100,13 @@ impl StratPool {
         let data_regions = block_mgr
             .alloc_space(INITIAL_DATA_SIZE)
             .expect("blockmgr must not fail, already checked for space");
-        let data_dev = try!(LinearDev::new(&format!("stratis_{}_data", name), dm, &data_regions));
+        let device_name = format_flex_name(&pool_uuid, FlexRole::ThinData);
+        let data_dev = try!(LinearDev::new(&device_name, dm, &data_regions));
         let length = try!(data_dev.size()).sectors();
 
+        let device_name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
         // TODO Fix hard coded data blocksize and low water mark.
-        let thinpool_dev = try!(ThinPoolDev::new(&format!("stratis_{}_thinpool", name),
+        let thinpool_dev = try!(ThinPoolDev::new(&device_name,
                                                  dm,
                                                  length,
                                                  DATA_BLOCK_SIZE,
@@ -221,11 +225,13 @@ impl Pool for StratPool {
             }
         }
 
+        let pool_uuid = &self.pool_uuid;
         let mut result = Vec::new();
         for name in names.iter() {
             let uuid = Uuid::new_v4();
             let dm = try!(DM::new());
-            let new_filesystem = try!(StratFilesystem::new(uuid, name, &dm, &mut self.thin_pool));
+            let new_filesystem =
+                try!(StratFilesystem::initialize(pool_uuid, uuid, name, &dm, &mut self.thin_pool));
             self.filesystems.insert(new_filesystem);
             result.push((**name, uuid));
         }

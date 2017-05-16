@@ -3,19 +3,4 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
-#[derive(Debug)]
-pub enum StratisRunningState {
-    Good,
-    Degraded(u8),
-}
-
-#[derive(Debug)]
-pub enum StratisState {
-    Initializing,
-    Good(StratisRunningState),
-    RaidFailed,
-    ThinPoolFailed,
-    ThinFailed,
-}
-
 pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");

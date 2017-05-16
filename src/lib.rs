@@ -19,12 +19,10 @@ extern crate log;
 #[cfg(test)]
 extern crate quickcheck;
 
-pub mod types;
 pub mod consts;
-#[macro_use]
-pub mod stratis;
 pub mod engine;
 pub mod dbus_api;
+pub mod stratis;
 
 
 #[macro_use]

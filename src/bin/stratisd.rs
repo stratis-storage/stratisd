@@ -30,6 +30,7 @@ use std::env;
 use std::error::Error;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::process::exit;
 
 use clap::{App, Arg};
 use log::LogLevelFilter;
@@ -39,19 +40,26 @@ use dbus::WatchEvent;
 use libstratis::engine::Engine;
 use libstratis::engine::sim_engine::SimEngine;
 use libstratis::engine::strat_engine::StratEngine;
-use libstratis::stratis::VERSION;
-use libstratis::types::{StratisResult, StratisError};
+use libstratis::stratis::{StratisResult, StratisError, VERSION};
 
+/// Try to write the error from the program to stderr, vehemently.
+/// Return an error if stderr unavailable or writing was a failure.
 fn write_err(err: StratisError) -> StratisResult<()> {
-    let mut out = term::stderr().expect("could not get stderr");
-
+    let mut out = try!(term::stderr().ok_or(StratisError::StderrNotFound));
     try!(out.fg(term::color::RED));
     try!(writeln!(out, "{}", err.description()));
     try!(out.reset());
     Ok(())
 }
 
-fn main() {
+/// If writing a program error to stderr fails, panic.
+fn write_or_panic(err: StratisError) -> () {
+    if let Err(e) = write_err(err) {
+        panic!("Unable to write to stderr: {}", e)
+    }
+}
+
+fn run() -> StratisResult<()> {
 
     let matches = App::new("stratis")
         .version(VERSION)
@@ -88,8 +96,7 @@ fn main() {
         }
     };
 
-    let (dbus_conn, mut tree, dbus_context) = libstratis::dbus_api::connect(engine.clone())
-        .expect("Could not connect to D-Bus");
+    let (dbus_conn, mut tree, dbus_context) = try!(libstratis::dbus_api::connect(engine.clone()));
 
     // Get a list of fds to poll for
     let mut fds: Vec<_> = dbus_conn
@@ -110,9 +117,7 @@ fn main() {
                                                              item,
                                                              &mut tree,
                                                              &dbus_context) {
-                    if let Err(e) = write_err(r) {
-                        panic!("Unable to write to stderr: {}", e)
-                    }
+                    write_or_panic(From::from(r));
                 }
             }
         }
@@ -120,4 +125,15 @@ fn main() {
         // Ask the engine to check its pools
         engine.borrow_mut().check()
     }
+}
+
+fn main() {
+    let error_code = match run() {
+        Ok(_) => 0,
+        Err(err) => {
+            write_or_panic(err);
+            1
+        }
+    };
+    exit(error_code);
 }

@@ -207,7 +207,8 @@ impl StaticHeader {
             }
         }
 
-        Err(EngineError::Engine(ErrorEnum::Invalid, "not a Stratis device".into()))
+        let err_str = "Appeared to be a Stratis device, but no valid sigblock found";
+        Err(EngineError::Engine(ErrorEnum::Invalid, err_str.into()))
     }
 
     /// Determine the ownership of a device.

@@ -4,189 +4,19 @@
 
 // Code to handle a single block device.
 
-use std::io;
-use std::collections::HashSet;
-use std::fs::File;
-use std::io::ErrorKind;
-use std::io::{Seek, Write, SeekFrom};
 use std::fs::OpenOptions;
-use std::os::unix::prelude::AsRawFd;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
-use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::Device;
 use devicemapper::Segment;
-use devicemapper::{Bytes, Sectors};
+use devicemapper::Sectors;
 use time::Timespec;
-use uuid::Uuid;
 
-use consts::IEC;
-use engine::{DevUuid, EngineResult, EngineError, ErrorEnum, PoolUuid};
-use super::metadata::{StaticHeader, BDA, validate_mda_size};
-use super::engine::DevOwnership;
+use engine::{DevUuid, EngineResult, PoolUuid};
+use super::metadata::BDA;
 use super::range_alloc::RangeAllocator;
-
-const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
-
-ioctl!(read blkgetsize64 with 0x12, 114; u64);
-
-pub fn blkdev_size(file: &File) -> EngineResult<Bytes> {
-    let mut val: u64 = 0;
-
-    match unsafe { blkgetsize64(file.as_raw_fd(), &mut val) } {
-        Err(x) => Err(EngineError::Nix(x)),
-        Ok(_) => Ok(Bytes(val)),
-    }
-}
-
-/// Resolve a list of Paths of some sort to a set of unique Devices.
-/// Return an IOError if there was a problem resolving any particular device.
-pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
-    let mut devices = HashSet::new();
-    for path in paths {
-        let dev = try!(Device::from_str(&path.to_string_lossy()));
-        devices.insert(dev);
-    }
-    Ok(devices)
-}
-
-
-/// Write buf at offset length times.
-pub fn write_sectors(path: &Path,
-                     offset: Sectors,
-                     length: Sectors,
-                     buf: &[u8; SECTOR_SIZE])
-                     -> EngineResult<()> {
-    let mut f = try!(OpenOptions::new().write(true).open(path));
-
-    try!(f.seek(SeekFrom::Start(*offset)));
-    for _ in 0..*length {
-        try!(f.write_all(buf));
-    }
-
-    try!(f.flush());
-    Ok(())
-}
-
-/// Zero sectors at the given offset for length sectors.
-pub fn wipe_sectors(path: &Path, offset: Sectors, length: Sectors) -> EngineResult<()> {
-    write_sectors(path, offset, length, &[0u8; SECTOR_SIZE])
-}
-
-/// Initialize multiple blockdevs at once. This allows all of them
-/// to be checked for usability before writing to any of them.
-pub fn initialize(pool_uuid: &PoolUuid,
-                  devices: HashSet<Device>,
-                  mda_size: Sectors,
-                  force: bool)
-                  -> EngineResult<Vec<BlockDev>> {
-    /// Gets device information, returns an error if problem with obtaining
-    /// that information.
-    /// Returns a tuple with the blockdev's path, its size in bytes,
-    /// its ownership as determined by calling determine_ownership(),
-    /// and an open File handle, all of which are needed later.
-    fn dev_info(dev: &Device) -> EngineResult<(PathBuf, Bytes, DevOwnership, File)> {
-        let devnode = try!(dev.devnode().ok_or_else(|| {
-            io::Error::new(ErrorKind::InvalidInput,
-                           format!("could not get device node from dev {}", dev.dstr()))
-        }));
-        let mut f = try!(OpenOptions::new()
-                             .read(true)
-                             .write(true)
-                             .open(&devnode)
-                             .map_err(|_| {
-                                          io::Error::new(ErrorKind::PermissionDenied,
-                                                         format!("Could not open {}",
-                                                                 devnode.display()))
-                                      }));
-
-        let dev_size = try!(blkdev_size(&f));
-
-        let ownership = match StaticHeader::determine_ownership(&mut f) {
-            Ok(ownership) => ownership,
-            Err(err) => {
-                let error_message = format!("{} for device {}", err, devnode.display());
-                return Err(EngineError::Engine(ErrorEnum::Invalid, error_message));
-            }
-        };
-
-        Ok((devnode, dev_size, ownership, f))
-    }
-
-    /// Filter devices for admission to pool based on dev_infos.
-    /// If there is an error finding out the info, return that error.
-    /// Also, return an error if a device is not appropriate for this pool.
-    fn filter_devs<I>(dev_infos: I,
-                      pool_uuid: &PoolUuid,
-                      force: bool)
-                      -> EngineResult<Vec<(Device, (PathBuf, Bytes, File))>>
-        where I: Iterator<Item = (Device, EngineResult<(PathBuf, Bytes, DevOwnership, File)>)>
-    {
-        let mut add_devs = Vec::new();
-        for (dev, dev_result) in dev_infos {
-            let (devnode, dev_size, ownership, f) = try!(dev_result);
-            if dev_size < MIN_DEV_SIZE {
-                let error_message = format!("{} too small, minimum {} bytes",
-                                            devnode.display(),
-                                            MIN_DEV_SIZE);
-                return Err(EngineError::Engine(ErrorEnum::Invalid, error_message));
-            };
-            match ownership {
-                DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, f))),
-                DevOwnership::Theirs => {
-                    if !force {
-                        let error_str = format!("First 8K of {} not zeroed", devnode.display());
-                        return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
-                    } else {
-                        add_devs.push((dev, (devnode, dev_size, f)))
-                    }
-                }
-                DevOwnership::Ours(uuid) => {
-                    if *pool_uuid != uuid {
-                        let error_str = format!("Device {} already belongs to Stratis pool {}",
-                                                devnode.display(),
-                                                uuid);
-                        return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
-                    } else {
-                        // Already in this pool (according to its header)
-                        // TODO: Check we already know about it
-                        // if yes, ignore. If no, add it w/o initializing?
-                    }
-                }
-            }
-        }
-        Ok(add_devs)
-    }
-
-    try!(validate_mda_size(mda_size));
-
-    let dev_infos = devices.into_iter().map(|d: Device| (d, dev_info(&d)));
-
-    let add_devs = try!(filter_devs(dev_infos, pool_uuid, force));
-
-    let mut bds = Vec::new();
-    for (dev, (devnode, dev_size, mut f)) in add_devs {
-
-        let bda = try!(BDA::initialize(&mut f,
-                                       pool_uuid,
-                                       &Uuid::new_v4(),
-                                       mda_size,
-                                       dev_size.sectors()));
-        let allocator = RangeAllocator::new_with_used(bda.dev_size(), &[(Sectors(0), bda.size())]);
-
-        let bd = BlockDev {
-            dev: dev,
-            devnode: devnode.clone(),
-            bda: bda,
-            used: allocator,
-        };
-        bds.push(bd);
-    }
-    Ok(bds)
-}
 
 
 #[derive(Debug)]
@@ -198,6 +28,14 @@ pub struct BlockDev {
 }
 
 impl BlockDev {
+    pub fn new(dev: Device, devnode: PathBuf, bda: BDA, allocator: RangeAllocator) -> BlockDev {
+        BlockDev {
+            dev: dev,
+            devnode: devnode,
+            bda: bda,
+            used: allocator,
+        }
+    }
     pub fn wipe_metadata(self) -> EngineResult<()> {
         let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
         BDA::wipe(&mut f)

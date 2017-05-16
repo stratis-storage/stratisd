@@ -20,7 +20,7 @@ use loopdev::{LoopControl, LoopDevice};
 use tempdir::TempDir;
 
 use libstratis::consts::IEC;
-use libstratis::engine::strat_engine::blockdev::wipe_sectors;
+use libstratis::engine::strat_engine::device::wipe_sectors;
 
 use util::logger::init_logger;
 use util::simple_tests::test_basic_metadata;

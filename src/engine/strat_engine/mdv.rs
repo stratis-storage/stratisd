@@ -128,6 +128,7 @@ impl MetadataVol {
         Ok(())
     }
 
+    #[allow(dead_code)]
     /// Get list of filesystems stored on the MDV.
     pub fn filesystems(&self) -> EngineResult<Vec<FilesystemSave>> {
         let mut filesystems = Vec::new();

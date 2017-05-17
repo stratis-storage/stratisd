@@ -22,10 +22,9 @@ use dbus::tree::PropInfo;
 
 use uuid::Uuid;
 
-use engine::RenameAction;
+use super::super::engine::RenameAction;
 
 use super::filesystem::create_dbus_filesystem;
-
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
 use super::util::STRATIS_BASE_PATH;

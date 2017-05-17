@@ -14,10 +14,12 @@ use devicemapper::{Bytes, Device, Sectors, Segment};
 use time::Timespec;
 use uuid::Uuid;
 
-use consts::IEC;
-use engine::{EngineError, EngineResult, ErrorEnum, PoolUuid};
-use engine::strat_engine::blockdev::BlockDev;
+use super::super::super::consts::IEC;
 
+use super::super::engine::PoolUuid;
+use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+
+use super::blockdev::BlockDev;
 use super::device::blkdev_size;
 use super::engine::DevOwnership;
 use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};

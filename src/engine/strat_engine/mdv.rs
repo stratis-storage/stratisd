@@ -16,9 +16,9 @@ use devicemapper::{LinearDev, DM};
 use serde_json;
 use nix::unistd::fsync;
 
-use engine::engine::{HasUuid, FilesystemUuid};
-use engine::EngineResult;
-use engine::PoolUuid;
+use super::super::engine::{FilesystemUuid, HasUuid, PoolUuid};
+use super::super::errors::EngineResult;
+
 use super::filesystem::{create_fs, mount_fs, unmount_fs, StratFilesystem};
 use super::serde_structs::{Isomorphism, FilesystemSave};
 

@@ -12,7 +12,7 @@ use dbus::tree::{DataType, MTFn, ObjectPath};
 
 use uuid::Uuid;
 
-use engine::Engine;
+use super::super::engine::Engine;
 
 custom_derive! {
     #[derive(Copy, Clone, EnumDisplay,

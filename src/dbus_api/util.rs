@@ -9,8 +9,8 @@ use dbus::MessageItem;
 use dbus::arg::{ArgType, Iter, IterAppend};
 use dbus::tree::{MethodErr, MTFn, PropInfo};
 
-use engine;
-use engine::EngineError;
+use super::super::engine;
+use super::super::engine::EngineError;
 
 use super::types::{DbusErrorEnum, TData};
 

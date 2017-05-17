@@ -28,15 +28,11 @@ use dbus::tree::PropInfo;
 use dbus::tree::Tree;
 use dbus::ConnectionItem;
 
+use super::super::engine::{Engine, Redundancy};
 use super::super::stratis::VERSION;
 
-use engine::Engine;
-use engine::Redundancy;
-
 use super::pool::create_dbus_pool;
-
 use super::types::{DeferredAction, DbusContext, DbusErrorEnum, TData};
-
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
 use super::util::code_to_message_items;

@@ -2,15 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use engine::Engine;
-use engine::EngineError;
-use engine::EngineResult;
-use engine::ErrorEnum;
-
-use engine::Pool;
-use engine::RenameAction;
-use engine::Redundancy;
-
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::collections::hash_map::RandomState;
@@ -19,11 +10,12 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use super::super::engine::{Engine, HasName, HasUuid, Pool, PoolUuid, Redundancy, RenameAction};
+use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::structures::Table;
+
 use super::pool::SimPool;
 use super::randomization::Randomizer;
-
-use super::super::engine::{HasName, HasUuid, PoolUuid};
-use super::super::structures::Table;
 
 
 #[derive(Debug)]

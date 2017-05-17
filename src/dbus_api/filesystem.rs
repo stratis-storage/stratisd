@@ -17,7 +17,7 @@ use dbus::tree::PropInfo;
 
 use uuid::Uuid;
 
-use engine::RenameAction;
+use super::super::engine::RenameAction;
 
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 

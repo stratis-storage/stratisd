@@ -18,25 +18,20 @@ use time::now;
 use uuid::Uuid;
 use serde_json;
 
-use engine::EngineError;
-use engine::EngineResult;
-use engine::ErrorEnum;
-use engine::Filesystem;
-use engine::Pool;
-use engine::RenameAction;
-use engine::engine::Redundancy;
-use engine::strat_engine::device::wipe_sectors;
-use consts::IEC::Mi;
+use super::super::super::consts::IEC::Mi;
 
-use super::super::engine::{FilesystemUuid, HasName, HasUuid};
+use super::super::engine::{Filesystem, FilesystemUuid, HasName, HasUuid, Pool, RenameAction,
+                           Redundancy};
+use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 
 use super::serde_structs::{Isomorphism, PoolSave};
 use super::blockdevmgr::BlockDevMgr;
+use super::device::wipe_sectors;
 use super::dmdevice::{FlexRole, ThinPoolRole, format_flex_name, format_thinpool_name};
 use super::filesystem::{StratFilesystem, FilesystemStatus};
-use super::metadata::MIN_MDA_SECTORS;
 use super::mdv::MetadataVol;
+use super::metadata::MIN_MDA_SECTORS;
 
 const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 const META_LOWATER: u64 = 512;

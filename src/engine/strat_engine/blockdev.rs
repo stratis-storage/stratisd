@@ -88,11 +88,10 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<Device>>> {
                 }
                 _ => {
                     if let Some(errno) = err.raw_os_error() {
-                        if Errno::from_i32(errno) == Errno::ENXIO {
-                            continue;
-                        } else {
-                            return Err(EngineError::Io(err));
-                        }
+                        match Errno::from_i32(errno) {
+                            Errno::ENXIO | Errno::ENOMEDIUM => continue,
+                            _ => return Err(EngineError::Io(err)),
+                        };
                     } else {
                         return Err(EngineError::Io(err));
                     }

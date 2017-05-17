@@ -17,8 +17,8 @@ use uuid::Uuid;
 
 use super::super::super::consts::IEC;
 
-use super::super::engine::{DevUuid, PoolUuid};
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
+use super::super::types::{DevUuid, PoolUuid};
 
 use super::engine::DevOwnership;
 

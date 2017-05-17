@@ -20,10 +20,10 @@ use serde_json;
 
 use super::super::super::consts::IEC::Mi;
 
-use super::super::engine::{Filesystem, FilesystemUuid, HasName, HasUuid, Pool, RenameAction,
-                           Redundancy};
+use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
+use super::super::types::{FilesystemUuid, RenameAction, Redundancy};
 
 use super::serde_structs::{Isomorphism, PoolSave};
 use super::blockdevmgr::BlockDevMgr;

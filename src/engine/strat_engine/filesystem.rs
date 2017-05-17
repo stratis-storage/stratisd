@@ -14,8 +14,9 @@ use devicemapper::ThinPoolDev;
 
 use super::super::super::consts::IEC;
 
-use super::super::engine::{Filesystem, FilesystemUuid, HasName, HasUuid, PoolUuid};
+use super::super::engine::{Filesystem, HasName, HasUuid};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::types::{FilesystemUuid, PoolUuid};
 
 use super::dmdevice::{ThinRole, format_thin_name};
 use super::serde_structs::{Isomorphism, FilesystemSave};

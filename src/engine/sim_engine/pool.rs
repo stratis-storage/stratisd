@@ -13,10 +13,10 @@ use std::vec::Vec;
 
 use uuid::Uuid;
 
-use super::super::engine::{Filesystem, FilesystemUuid, HasName, HasUuid, Pool, PoolUuid,
-                           RenameAction, Redundancy};
+use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
+use super::super::types::{FilesystemUuid, PoolUuid, RenameAction, Redundancy};
 
 use super::blockdev::SimDev;
 use super::filesystem::SimFilesystem;

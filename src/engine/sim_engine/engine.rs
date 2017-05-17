@@ -10,9 +10,10 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use super::super::engine::{Engine, HasName, HasUuid, Pool, PoolUuid, Redundancy, RenameAction};
+use super::super::engine::{Engine, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
+use super::super::types::{PoolUuid, Redundancy, RenameAction};
 
 use super::pool::SimPool;
 use super::randomization::Randomizer;

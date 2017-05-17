@@ -16,8 +16,8 @@ use uuid::Uuid;
 
 use super::super::super::consts::IEC;
 
-use super::super::engine::PoolUuid;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::types::PoolUuid;
 
 use super::blockdev::BlockDev;
 use super::device::blkdev_size;

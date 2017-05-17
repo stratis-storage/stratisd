@@ -14,8 +14,8 @@ use devicemapper::Segment;
 use devicemapper::Sectors;
 use time::Timespec;
 
-use super::super::engine::{DevUuid, PoolUuid};
 use super::super::errors::EngineResult;
+use super::super::types::{DevUuid, PoolUuid};
 
 use super::metadata::BDA;
 use super::range_alloc::RangeAllocator;

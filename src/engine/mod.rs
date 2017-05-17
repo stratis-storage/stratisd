@@ -3,18 +3,19 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 pub use self::engine::Dev;
-pub use self::engine::DevUuid;
 pub use self::engine::Engine;
 pub use self::engine::Filesystem;
-pub use self::engine::FilesystemUuid;
 pub use self::engine::Pool;
-pub use self::engine::PoolUuid;
-pub use self::engine::Redundancy;
-pub use self::engine::RenameAction;
 
 pub use self::errors::EngineError;
 pub use self::errors::EngineResult;
 pub use self::errors::ErrorEnum;
+
+pub use self::types::DevUuid;
+pub use self::types::FilesystemUuid;
+pub use self::types::PoolUuid;
+pub use self::types::Redundancy;
+pub use self::types::RenameAction;
 
 #[macro_use]
 mod macros;
@@ -25,3 +26,4 @@ pub mod strat_engine;
 mod engine;
 mod errors;
 mod structures;
+mod types;

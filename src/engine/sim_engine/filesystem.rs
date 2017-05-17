@@ -3,8 +3,9 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
-use super::super::engine::{HasName, HasUuid, Filesystem, FilesystemUuid};
+use super::super::engine::{HasName, HasUuid, Filesystem};
 use super::super::errors::EngineResult;
+use super::super::types::FilesystemUuid;
 
 #[derive(Debug)]
 pub struct SimFilesystem {

@@ -14,8 +14,8 @@ use nix::Errno;
 use nix::sys::stat::{S_IFBLK, S_IFMT};
 use serde_json;
 
-use super::super::engine::PoolUuid;
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
+use super::super::types::PoolUuid;
 
 use super::metadata::{BDA, StaticHeader};
 use super::engine::DevOwnership;

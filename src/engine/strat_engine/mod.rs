@@ -15,4 +15,3 @@ pub mod setup;
 pub mod range_alloc;
 
 pub use self::engine::StratEngine;
-pub use self::pool::StratPool;

@@ -11,19 +11,11 @@ use std::rc::Rc;
 
 use super::randomization::Randomizer;
 
-#[derive(Debug, Eq, PartialEq)]
-/// A list of very basic states a SimDev can be in.
-pub enum State {
-    OK,
-    FAILED,
-}
-
 #[derive(Debug)]
 /// A simulated device.
 pub struct SimDev {
     pub devnode: PathBuf,
     rdm: Rc<RefCell<Randomizer>>,
-    pub state: State,
 }
 
 impl Dev for SimDev {}
@@ -34,19 +26,6 @@ impl SimDev {
         SimDev {
             devnode: devnode.to_owned(),
             rdm: rdm,
-            state: State::OK,
         }
-    }
-
-    /// Function that causes self to progress probabilistically to a new state.
-    pub fn update(&mut self) {
-        if self.rdm.borrow_mut().throw_die() {
-            self.state = State::FAILED;
-        }
-    }
-
-    /// Checks usability of a SimDev
-    pub fn usable(&self) -> bool {
-        self.state == State::OK
     }
 }

@@ -15,6 +15,7 @@ use devicemapper::{ThinDev, ThinStatus};
 use devicemapper::ThinPoolDev;
 
 use engine::{EngineError, EngineResult, ErrorEnum, Filesystem};
+use super::serde_structs::{Isomorphism, FilesystemSave};
 use super::super::engine::{FilesystemUuid, HasName, HasUuid, PoolUuid};
 use super::dmdevice::{ThinRole, format_thin_name};
 
@@ -94,6 +95,17 @@ impl Filesystem for StratFilesystem {
         match self.thin_dev.teardown(&dm) {
             Ok(_) => Ok(()),
             Err(e) => Err(EngineError::Engine(ErrorEnum::Error, e.description().into())),
+        }
+    }
+}
+
+impl Isomorphism<FilesystemSave> for StratFilesystem {
+    fn to_save(&self) -> FilesystemSave {
+        FilesystemSave {
+            name: self.name.clone(),
+            uuid: self.fs_id.simple().to_string(),
+            thin_id: self.thin_dev.id(),
+            size: self.thin_dev.size(),
         }
     }
 }

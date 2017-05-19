@@ -42,9 +42,13 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<PathBuf>>> {
         // There are some reasons for OpenOptions::open() to return an error
         // which are not reasons for this method to return an error.
         // Try to distinguish. Non-error conditions are:
-        // 1. The device does not exist anymore. This means that the device
+        //
+        // 1. ENXIO: The device does not exist anymore. This means that the device
         // was volatile for some reason; in that case it can not belong to
         // Stratis so it is safe to ignore it.
+        //
+        // 2. ENOMEDIUM: The device has no medium. An example of this case is an
+        // empty optical drive.
         //
         // Note that it is better to be conservative and return with an
         // error in any case where failure to read the device could result
@@ -58,11 +62,10 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<PathBuf>>> {
                 }
                 _ => {
                     if let Some(errno) = err.raw_os_error() {
-                        if Errno::from_i32(errno) == Errno::ENXIO {
-                            continue;
-                        } else {
-                            return Err(EngineError::Io(err));
-                        }
+                        match Errno::from_i32(errno) {
+                            Errno::ENXIO | Errno::ENOMEDIUM => continue,
+                            _ => return Err(EngineError::Io(err)),
+                        };
                     } else {
                         return Err(EngineError::Io(err));
                     }

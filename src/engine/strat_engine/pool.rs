@@ -85,7 +85,7 @@ impl StratPool {
             .alloc_space(INITIAL_META_SIZE)
             .expect("blockmgr must not fail, already checked for space");
         let device_name = format_flex_name(&pool_uuid, FlexRole::ThinMeta);
-        let meta_dev = try!(LinearDev::new(&device_name, dm, &meta_regions));
+        let meta_dev = try!(LinearDev::new(&device_name, dm, meta_regions));
 
         // When constructing a thin-pool, Stratis reserves the first N
         // sectors on a block device by creating a linear device with a
@@ -101,7 +101,7 @@ impl StratPool {
             .alloc_space(INITIAL_DATA_SIZE)
             .expect("blockmgr must not fail, already checked for space");
         let device_name = format_flex_name(&pool_uuid, FlexRole::ThinData);
-        let data_dev = try!(LinearDev::new(&device_name, dm, &data_regions));
+        let data_dev = try!(LinearDev::new(&device_name, dm, data_regions));
         let length = try!(data_dev.size()).sectors();
 
         let device_name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);

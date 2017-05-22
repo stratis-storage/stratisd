@@ -225,13 +225,16 @@ impl Pool for StratPool {
             }
         }
 
-        let pool_uuid = &self.pool_uuid;
+        // TODO: Roll back on filesystem initialization failure.
+        let dm = try!(DM::new());
         let mut result = Vec::new();
         for name in names.iter() {
             let uuid = Uuid::new_v4();
-            let dm = try!(DM::new());
-            let new_filesystem =
-                try!(StratFilesystem::initialize(pool_uuid, uuid, name, &dm, &mut self.thin_pool));
+            let new_filesystem = try!(StratFilesystem::initialize(&self.pool_uuid,
+                                                                  uuid,
+                                                                  name,
+                                                                  &dm,
+                                                                  &mut self.thin_pool));
             self.filesystems.insert(new_filesystem);
             result.push((**name, uuid));
         }

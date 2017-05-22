@@ -36,6 +36,7 @@ use super::blockdevmgr::BlockDevMgr;
 use super::dmdevice::{FlexRole, ThinPoolRole, format_flex_name, format_thinpool_name};
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::metadata::MIN_MDA_SECTORS;
+use super::mdv::MetadataVol;
 
 const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 const META_LOWATER: u64 = 512;
@@ -43,6 +44,7 @@ const DATA_LOWATER: DataBlocks = DataBlocks(512);
 
 const INITIAL_META_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
 const INITIAL_DATA_SIZE: Sectors = Sectors(512 * Mi / SECTOR_SIZE as u64);
+const INITIAL_MDV_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
 
 #[derive(Debug)]
 pub struct StratPool {
@@ -52,6 +54,7 @@ pub struct StratPool {
     pub filesystems: Table<StratFilesystem>,
     redundancy: Redundancy,
     thin_pool: ThinPoolDev,
+    mdv: MetadataVol,
 }
 
 impl StratPool {
@@ -114,6 +117,13 @@ impl StratPool {
                                                  meta_dev,
                                                  data_dev));
 
+        let mdv_regions = block_mgr
+            .alloc_space(INITIAL_MDV_SIZE)
+            .expect("blockmgr must not fail, already checked for space");
+        let device_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
+        let mdv_dev = try!(LinearDev::new(&device_name, dm, mdv_regions));
+        let mdv = try!(MetadataVol::initialize(&pool_uuid, mdv_dev));
+
         let mut pool = StratPool {
             name: name.to_owned(),
             pool_uuid: pool_uuid,
@@ -121,6 +131,7 @@ impl StratPool {
             filesystems: Table::new(),
             redundancy: redundancy,
             thin_pool: thinpool_dev,
+            mdv: mdv,
         };
 
         try!(pool.write_metadata());
@@ -130,7 +141,7 @@ impl StratPool {
 
     /// Minimum initial size for a pool.
     pub fn min_initial_size() -> Sectors {
-        INITIAL_META_SIZE + INITIAL_DATA_SIZE
+        INITIAL_META_SIZE + INITIAL_DATA_SIZE + INITIAL_MDV_SIZE
     }
 
     // TODO: Check current time against global last updated, and use
@@ -143,6 +154,11 @@ impl StratPool {
 
     pub fn check(&mut self) -> () {
         let dm = DM::new().expect("Could not get DM handle");
+
+        if let Err(e) = self.mdv.check() {
+            error!("MDV error: {}", e);
+            return;
+        }
 
         let result = match self.thin_pool.status(&dm) {
             Ok(r) => r,
@@ -210,6 +226,7 @@ impl StratPool {
         }
         let dm = try!(DM::new());
         try!(self.thin_pool.teardown(&dm));
+        try!(self.mdv.teardown(&dm));
         Ok(())
     }
 }
@@ -235,6 +252,7 @@ impl Pool for StratPool {
                                                                   name,
                                                                   &dm,
                                                                   &mut self.thin_pool));
+            try!(self.mdv.save_fs(&new_filesystem));
             self.filesystems.insert(new_filesystem);
             result.push((**name, uuid));
         }
@@ -253,6 +271,7 @@ impl Pool for StratPool {
         // with operations in teardown().
         let dm = try!(DM::new());
         try!(self.thin_pool.teardown(&dm));
+        try!(self.mdv.teardown(&dm));
         try!(self.block_devs.destroy_all());
 
         Ok(())
@@ -261,6 +280,9 @@ impl Pool for StratPool {
     fn destroy_filesystems<'a, 'b>(&'a mut self,
                                    fs_uuids: &[&'b FilesystemUuid])
                                    -> EngineResult<Vec<&'b FilesystemUuid>> {
+        for fsid in fs_uuids {
+            try!(self.mdv.rm_fs(fsid));
+        }
         destroy_filesystems!{self; fs_uuids}
     }
 

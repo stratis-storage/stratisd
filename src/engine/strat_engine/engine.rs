@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::fs::create_dir;
+use std::io::ErrorKind;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -35,8 +37,14 @@ pub struct StratEngine {
 }
 
 impl StratEngine {
-    pub fn new() -> StratEngine {
-        StratEngine { pools: Table::new() }
+    pub fn initialize() -> EngineResult<StratEngine> {
+        if let Err(err) = create_dir("/dev/stratis") {
+            if err.kind() != ErrorKind::AlreadyExists {
+                return Err(From::from(err));
+            }
+        }
+
+        Ok(StratEngine { pools: Table::new() })
     }
 
     /// Teardown Stratis, preparatory to a shutdown.

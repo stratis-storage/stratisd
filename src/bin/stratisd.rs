@@ -92,7 +92,7 @@ fn run() -> StratisResult<()> {
             Rc::new(RefCell::new(SimEngine::new()))
         } else {
             info!("Using StratEngine");
-            Rc::new(RefCell::new(StratEngine::new()))
+            Rc::new(RefCell::new(try!(StratEngine::initialize())))
         }
     };
 

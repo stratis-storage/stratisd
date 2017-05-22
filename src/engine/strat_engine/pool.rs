@@ -225,6 +225,7 @@ impl Pool for StratPool {
             }
         }
 
+        // TODO: Roll back on filesystem initialization failure.
         let pool_uuid = &self.pool_uuid;
         let mut result = Vec::new();
         for name in names.iter() {

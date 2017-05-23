@@ -62,7 +62,6 @@ impl<T: HasName + HasUuid> Table<T> {
     }
 
     /// Returns true if map has an item corresponding to this uuid, else false.
-    #[allow(dead_code)]
     pub fn contains_uuid(&self, uuid: &Uuid) -> bool {
         self.uuid_map.contains_key(uuid)
     }

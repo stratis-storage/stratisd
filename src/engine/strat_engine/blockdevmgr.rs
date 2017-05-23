@@ -14,8 +14,7 @@ use devicemapper::{Bytes, Device, Sectors, Segment};
 use time::Timespec;
 use uuid::Uuid;
 
-use super::super::super::consts::IEC;
-
+use super::super::consts::IEC;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::PoolUuid;
 

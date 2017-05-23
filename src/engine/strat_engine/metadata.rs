@@ -15,8 +15,7 @@ use devicemapper::consts::SECTOR_SIZE;
 use time::Timespec;
 use uuid::Uuid;
 
-use super::super::super::consts::IEC;
-
+use super::super::consts::IEC;
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 use super::super::types::{DevUuid, PoolUuid};
 
@@ -592,7 +591,7 @@ mod tests {
     use time::{now, Timespec};
     use uuid::Uuid;
 
-    use super::super::super::super::consts::IEC;
+    use super::super::super::consts::IEC;
 
     use super::super::engine::DevOwnership;
     use super::*;

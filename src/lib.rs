@@ -19,7 +19,6 @@ extern crate log;
 #[cfg(test)]
 extern crate quickcheck;
 
-pub mod consts;
 pub mod engine;
 pub mod dbus_api;
 pub mod stratis;

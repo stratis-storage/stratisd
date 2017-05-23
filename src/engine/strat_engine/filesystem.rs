@@ -12,8 +12,7 @@ use devicemapper::Bytes;
 use devicemapper::{ThinDev, ThinStatus};
 use devicemapper::ThinPoolDev;
 
-use super::super::super::consts::IEC;
-
+use super::super::consts::IEC;
 use super::super::engine::{Filesystem, HasName, HasUuid};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{FilesystemUuid, PoolUuid};

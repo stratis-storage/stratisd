@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+pub use self::consts::IEC;
+
 pub use self::engine::Dev;
 pub use self::engine::Engine;
 pub use self::engine::Filesystem;
@@ -26,6 +28,7 @@ mod macros;
 // strat_engine is public so that integration tests can access its internals.
 pub mod strat_engine;
 
+mod consts;
 mod engine;
 mod errors;
 mod sim_engine;

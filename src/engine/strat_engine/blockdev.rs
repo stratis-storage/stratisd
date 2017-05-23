@@ -17,6 +17,7 @@ use super::super::types::{DevUuid, PoolUuid};
 
 use super::metadata::BDA;
 use super::range_alloc::RangeAllocator;
+use super::serde_structs::{BlockDevSave, Isomorphism};
 
 
 #[derive(Debug)]
@@ -95,5 +96,14 @@ impl BlockDev {
          segs.iter()
              .map(|&(start, len)| Segment::new(self.dev, start, len))
              .collect())
+    }
+}
+
+impl Isomorphism<BlockDevSave> for BlockDev {
+    fn to_save(&self) -> EngineResult<BlockDevSave> {
+        Ok(BlockDevSave {
+               devnode: self.devnode.clone(),
+               size: self.size(),
+           })
     }
 }

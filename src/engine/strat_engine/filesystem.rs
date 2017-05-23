@@ -101,13 +101,13 @@ impl Filesystem for StratFilesystem {
 }
 
 impl Isomorphism<FilesystemSave> for StratFilesystem {
-    fn to_save(&self) -> FilesystemSave {
-        FilesystemSave {
-            name: self.name.clone(),
-            uuid: self.fs_id.simple().to_string(),
-            thin_id: self.thin_dev.id(),
-            size: self.thin_dev.size(),
-        }
+    fn to_save(&self) -> EngineResult<FilesystemSave> {
+        Ok(FilesystemSave {
+               name: self.name.clone(),
+               uuid: self.fs_id.simple().to_string(),
+               thin_id: self.thin_dev.id(),
+               size: self.thin_dev.size(),
+           })
     }
 }
 

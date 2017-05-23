@@ -11,7 +11,7 @@ use std::vec::Vec;
 
 use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::DM;
-use devicemapper::{DataBlocks, Sectors};
+use devicemapper::{DataBlocks, Sectors, Segment};
 use devicemapper::LinearDev;
 use devicemapper::{ThinPoolDev, ThinPoolStatus, ThinPoolWorkingStatus};
 use time::now;
@@ -30,7 +30,7 @@ use super::dmdevice::{FlexRole, ThinPoolRole, format_flex_name, format_thinpool_
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::mdv::MetadataVol;
 use super::metadata::MIN_MDA_SECTORS;
-use super::serde_structs::{Isomorphism, PoolSave};
+use super::serde_structs::{FlexDevsSave, Isomorphism, PoolSave, ThinPoolDevSave};
 
 const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 const META_LOWATER: u64 = 512;
@@ -141,7 +141,7 @@ impl StratPool {
     // TODO: Check current time against global last updated, and use
     // alternate time value if earlier, as described in SWDD
     pub fn write_metadata(&mut self) -> EngineResult<()> {
-        let data = try!(serde_json::to_string(&self.to_save()));
+        let data = try!(serde_json::to_string(&try!(self.to_save())));
         self.block_devs
             .save_state(&now().to_timespec(), data.as_bytes())
     }
@@ -309,7 +309,58 @@ impl HasName for StratPool {
 }
 
 impl Isomorphism<PoolSave> for StratPool {
-    fn to_save(&self) -> PoolSave {
-        PoolSave { name: self.name.clone() }
+    fn to_save(&self) -> EngineResult<PoolSave> {
+
+        let mapper = |seg: &Segment| -> EngineResult<(String, Sectors, Sectors)> {
+            let bd = try!(self.block_devs
+                     .get_by_device(seg.device)
+                     .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                                                format!("no block device found for device {:?}",
+                                                        seg.device))));
+            Ok((bd.uuid().simple().to_string(), seg.start, seg.length))
+        };
+
+        let mut meta_dev = vec![];
+        for item in self.mdv.segments().iter().map(&mapper) {
+            match item {
+                Ok(seg) => meta_dev.push(seg),
+                Err(err) => return Err(err),
+            }
+        }
+
+        let mut thin_meta_dev = vec![];
+        for item in self.thin_pool
+                .meta_dev()
+                .segments()
+                .iter()
+                .map(&mapper) {
+            match item {
+                Ok(seg) => thin_meta_dev.push(seg),
+                Err(err) => return Err(err),
+            }
+        }
+
+        let mut thin_data_dev = vec![];
+        for item in self.thin_pool
+                .data_dev()
+                .segments()
+                .iter()
+                .map(&mapper) {
+            match item {
+                Ok(seg) => thin_data_dev.push(seg),
+                Err(err) => return Err(err),
+            }
+        }
+
+        Ok(PoolSave {
+               name: self.name.clone(),
+               block_devs: try!(self.block_devs.to_save()),
+               flex_devs: FlexDevsSave {
+                   meta_dev: meta_dev,
+                   thin_meta_dev: thin_meta_dev,
+                   thin_data_dev: thin_data_dev,
+               },
+               thinpool_dev: ThinPoolDevSave { data_block_size: *self.thin_pool.data_block_size() },
+           })
     }
 }

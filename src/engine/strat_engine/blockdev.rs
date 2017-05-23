@@ -21,7 +21,7 @@ use super::range_alloc::RangeAllocator;
 
 #[derive(Debug)]
 pub struct BlockDev {
-    pub dev: Device,
+    dev: Device,
     pub devnode: PathBuf,
     bda: BDA,
     used: RangeAllocator,
@@ -36,14 +36,10 @@ impl BlockDev {
             used: allocator,
         }
     }
+
     pub fn wipe_metadata(self) -> EngineResult<()> {
         let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
         BDA::wipe(&mut f)
-    }
-
-    /// Get the "x:y" device string for this blockdev
-    pub fn dstr(&self) -> String {
-        self.dev.dstr()
     }
 
     pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
@@ -57,20 +53,14 @@ impl BlockDev {
     }
 
     /// List the available-for-upper-layer-use range in this blockdev.
-    fn avail_range(&self) -> (Sectors, Sectors) {
+    pub fn avail_range(&self) -> Segment {
         let start = self.bda.size();
         let size = self.size();
         // Blockdev size is at least MIN_DEV_SIZE, so this can fail only if
         // size of metadata area exceeds 1 GiB. Initial metadata area size
         // is 4 MiB.
         assert!(start <= size);
-        (start, size - start)
-    }
-
-    /// Return the available range as a segment
-    pub fn avail_range_segment(&self) -> Segment {
-        let (start, length) = self.avail_range();
-        Segment::new(self.dev, start, length)
+        Segment::new(self.dev, start, size - start)
     }
 
     /// The device's UUID.
@@ -99,7 +89,11 @@ impl BlockDev {
 
     // Find some sector ranges that could be allocated. If more
     // sectors are needed than our capacity, return partial results.
-    pub fn request_space(&mut self, size: Sectors) -> (Sectors, Vec<(Sectors, Sectors)>) {
-        self.used.request(size)
+    pub fn request_space(&mut self, size: Sectors) -> (Sectors, Vec<Segment>) {
+        let (size, segs) = self.used.request(size);
+        (size,
+         segs.iter()
+             .map(|&(start, len)| Segment::new(self.dev, start, len))
+             .collect())
     }
 }

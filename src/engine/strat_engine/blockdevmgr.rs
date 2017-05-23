@@ -103,9 +103,7 @@ impl BlockDevMgr {
             }
 
             let (gotten, r_segs) = bd.request_space(needed);
-            segs.extend(r_segs
-                            .iter()
-                            .map(|&(start, len)| Segment::new(bd.dev, start, len)));
+            segs.extend(r_segs);
             needed = needed - gotten;
         }
 

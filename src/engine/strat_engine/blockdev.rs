@@ -37,6 +37,11 @@ impl BlockDev {
         }
     }
 
+    /// Returns the blockdev's Device
+    pub fn device(&self) -> &Device {
+        &self.dev
+    }
+
     pub fn wipe_metadata(self) -> EngineResult<()> {
         let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
         BDA::wipe(&mut f)

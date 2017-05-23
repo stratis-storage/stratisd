@@ -5,7 +5,7 @@
 // Code to handle a collection of block devices.
 
 use std::io;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -38,17 +38,12 @@ pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
 
 #[derive(Debug)]
 pub struct BlockDevMgr {
-    block_devs: HashMap<PathBuf, BlockDev>,
+    block_devs: Vec<BlockDev>,
 }
 
 impl BlockDevMgr {
     pub fn new(block_devs: Vec<BlockDev>) -> BlockDevMgr {
-        BlockDevMgr {
-            block_devs: block_devs
-                .into_iter()
-                .map(|bd| (bd.devnode.clone(), bd))
-                .collect(),
-        }
+        BlockDevMgr { block_devs: block_devs }
     }
 
     /// Initialize a new BlockDevMgr with specified pool and devices.
@@ -70,13 +65,13 @@ impl BlockDevMgr {
         let bds = try!(initialize(pool_uuid, devices, MIN_MDA_SECTORS, force));
         let bdev_paths = bds.iter().map(|p| p.devnode.clone()).collect();
         for bd in bds {
-            self.block_devs.insert(bd.devnode.clone(), bd);
+            self.block_devs.push(bd);
         }
         Ok(bdev_paths)
     }
 
     pub fn destroy_all(mut self) -> EngineResult<()> {
-        for (_, bd) in self.block_devs.drain() {
+        for bd in self.block_devs.drain(..) {
             try!(bd.wipe_metadata());
         }
         Ok(())
@@ -84,7 +79,7 @@ impl BlockDevMgr {
 
     // Unused space left on blockdevs
     pub fn avail_space(&self) -> Sectors {
-        self.block_devs.values().map(|bd| bd.available()).sum()
+        self.block_devs.iter().map(|bd| bd.available()).sum()
     }
 
     /// If available space is less than size, return None, else return
@@ -97,7 +92,7 @@ impl BlockDevMgr {
             return None;
         }
 
-        for mut bd in self.block_devs.values_mut() {
+        for mut bd in self.block_devs.iter_mut() {
             if needed == Sectors(0) {
                 break;
             }
@@ -113,7 +108,10 @@ impl BlockDevMgr {
     }
 
     pub fn devnodes(&self) -> Vec<PathBuf> {
-        self.block_devs.keys().map(|p| p.clone()).collect()
+        self.block_devs
+            .iter()
+            .map(|d| d.devnode.clone())
+            .collect()
     }
 
     /// Write the given data to all blockdevs marking with specified time.
@@ -123,7 +121,7 @@ impl BlockDevMgr {
         // Panic can occur for a the usual IO reasons, but also:
         // 1. If the timestamp is older than a previously written timestamp.
         // 2. If the variable length metadata is too large.
-        for bd in self.block_devs.values_mut() {
+        for mut bd in self.block_devs.iter_mut() {
             bd.save_state(time, metadata).unwrap();
         }
         Ok(())

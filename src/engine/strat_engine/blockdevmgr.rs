@@ -56,6 +56,11 @@ impl BlockDevMgr {
         Ok(BlockDevMgr::new(try!(initialize(pool_uuid, devices, mda_size, force))))
     }
 
+    /// Obtain a BlockDev by its Device.
+    pub fn get_by_device(&self, device: Device) -> Option<&BlockDev> {
+        self.block_devs.iter().find(|d| d.device() == &device)
+    }
+
     pub fn add(&mut self,
                pool_uuid: &PoolUuid,
                paths: &[&Path],

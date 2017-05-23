@@ -28,8 +28,8 @@ use dbus::tree::PropInfo;
 use dbus::tree::Tree;
 use dbus::ConnectionItem;
 
-use super::super::engine::{Engine, Redundancy};
-use super::super::stratis::VERSION;
+use engine::{Engine, Redundancy};
+use stratis::VERSION;
 
 use super::pool::create_dbus_pool;
 use super::types::{DeferredAction, DbusContext, DbusErrorEnum, TData};

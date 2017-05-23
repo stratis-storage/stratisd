@@ -22,7 +22,7 @@ use dbus::tree::PropInfo;
 
 use uuid::Uuid;
 
-use super::super::engine::RenameAction;
+use engine::RenameAction;
 
 use super::filesystem::create_dbus_filesystem;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};

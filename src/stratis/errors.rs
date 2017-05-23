@@ -9,7 +9,7 @@ use std::io;
 use dbus;
 use term;
 
-use super::super::engine::EngineError;
+use engine::EngineError;
 
 pub type StratisResult<T> = Result<T, StratisError>;
 

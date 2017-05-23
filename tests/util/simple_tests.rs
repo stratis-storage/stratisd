@@ -119,7 +119,7 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
             .unwrap();
     let total_blockdev_size = initialized
         .iter()
-        .fold(Sectors(0), |s, i| s + i.avail_range().range().1);
+        .fold(Sectors(0), |s, i| s + i.avail_range().length);
 
     let segments = initialized
         .iter()

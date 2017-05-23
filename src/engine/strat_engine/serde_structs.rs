@@ -14,6 +14,8 @@
 
 use std::marker::Sized;
 
+use devicemapper::Sectors;
+
 /// Implements saving struct data to a serializable form and reconstructing
 /// a struct from that form.
 /// Assuming the context of the existing devices this must be an isomorphism,
@@ -30,4 +32,12 @@ pub trait Isomorphism<T> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PoolSave {
     pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FilesystemSave {
+    pub name: String,
+    pub uuid: String,
+    pub thin_id: u32,
+    pub size: Sectors,
 }

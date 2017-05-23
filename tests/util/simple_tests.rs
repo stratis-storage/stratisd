@@ -192,7 +192,7 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
 /// Test that creating a pool claims all blockdevs and that destroying a pool
 /// releases all blockdevs.
 pub fn test_pool_blockdevs(paths: &[&Path]) -> () {
-    let mut engine = StratEngine::new();
+    let mut engine = StratEngine::initialize().unwrap();
     let (uuid, blockdevs) = engine
         .create_pool("test_pool", paths, None, true)
         .unwrap();
@@ -220,7 +220,7 @@ pub fn test_pool_blockdevs(paths: &[&Path]) -> () {
 
 /// Verify that tearing down an engine doesn't fail if no filesystems on it.
 pub fn test_teardown(paths: &[&Path]) -> () {
-    let mut engine = StratEngine::new();
+    let mut engine = StratEngine::initialize().unwrap();
     engine
         .create_pool("test_pool", paths, None, true)
         .unwrap();
@@ -274,7 +274,7 @@ pub fn test_setup(paths: &[&Path]) -> () {
 /// space required.
 pub fn test_empty_pool(paths: &[&Path]) -> () {
     assert!(paths.len() == 0);
-    let mut engine = StratEngine::new();
+    let mut engine = StratEngine::initialize().unwrap();
     assert!(match engine
                       .create_pool("test_pool", paths, None, true)
                       .unwrap_err() {
@@ -296,7 +296,7 @@ pub fn test_basic_metadata(paths: &[&Path]) {
 
     let (paths1, paths2) = paths.split_at(2);
 
-    let mut engine = StratEngine::new();
+    let mut engine = StratEngine::initialize().unwrap();
 
     let name1 = "name1";
     let (uuid1, _) = engine.create_pool(&name1, paths1, None, false).unwrap();

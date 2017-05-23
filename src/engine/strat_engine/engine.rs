@@ -10,12 +10,11 @@ use std::path::PathBuf;
 use devicemapper::DM;
 use uuid::Uuid;
 
-use super::super::super::engine::{Engine, Pool, Redundancy, RenameAction};
 
-use super::super::engine::{HasName, HasUuid};
+use super::super::engine::{Engine, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
-use super::super::types::PoolUuid;
+use super::super::types::{PoolUuid, Redundancy, RenameAction};
 
 use super::pool::StratPool;
 use super::setup::find_all;

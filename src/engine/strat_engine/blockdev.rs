@@ -6,8 +6,6 @@
 
 use std::fs::OpenOptions;
 use std::path::PathBuf;
-use std::thread;
-use std::time::Duration;
 
 use devicemapper::Device;
 use devicemapper::Segment;
@@ -73,12 +71,6 @@ impl BlockDev {
     pub fn avail_range_segment(&self) -> Segment {
         let (start, length) = self.avail_range();
         Segment::new(self.dev, start, length)
-    }
-
-    /// The /dev/mapper/<name> device is not immediately available for use.
-    /// TODO: Implement wait for event or poll.
-    pub fn wait_for_dm() {
-        thread::sleep(Duration::from_millis(500))
     }
 
     /// The device's UUID.

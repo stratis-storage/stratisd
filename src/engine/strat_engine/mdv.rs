@@ -16,9 +16,10 @@ use devicemapper::{LinearDev, DM};
 use serde_json;
 use nix::unistd::fsync;
 
-use engine::engine::{HasUuid, FilesystemUuid};
-use engine::EngineResult;
-use engine::PoolUuid;
+use super::super::engine::HasUuid;
+use super::super::errors::EngineResult;
+use super::super::types::{FilesystemUuid, PoolUuid};
+
 use super::filesystem::{create_fs, mount_fs, unmount_fs, StratFilesystem};
 use super::serde_structs::{Isomorphism, FilesystemSave};
 
@@ -128,6 +129,7 @@ impl MetadataVol {
         Ok(())
     }
 
+    #[allow(dead_code)]
     /// Get list of filesystems stored on the MDV.
     pub fn filesystems(&self) -> EngineResult<Vec<FilesystemSave>> {
         let mut filesystems = Vec::new();

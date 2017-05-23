@@ -17,7 +17,7 @@ use serde_json::{Value, from_reader};
 
 use self::devicemapper::{Bytes, Sectors};
 
-use libstratis::consts::IEC;
+use libstratis::engine::IEC;
 use libstratis::engine::strat_engine::device::wipe_sectors;
 
 use util::logger::init_logger;

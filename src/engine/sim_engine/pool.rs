@@ -13,18 +13,12 @@ use std::vec::Vec;
 
 use uuid::Uuid;
 
-use engine::EngineError;
-use engine::EngineResult;
-use engine::ErrorEnum;
-use engine::Filesystem;
-use engine::Pool;
-use engine::RenameAction;
-
-use engine::engine::Redundancy;
+use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
+use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::structures::Table;
+use super::super::types::{FilesystemUuid, PoolUuid, RenameAction, Redundancy};
 
 use super::blockdev::SimDev;
-use super::super::engine::{FilesystemUuid, HasName, HasUuid, PoolUuid};
-use super::super::structures::Table;
 use super::filesystem::SimFilesystem;
 use super::randomization::Randomizer;
 

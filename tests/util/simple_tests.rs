@@ -119,11 +119,11 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
             .unwrap();
     let total_blockdev_size = initialized
         .iter()
-        .fold(Sectors(0), |s, i| s + i.avail_range_segment().range().1);
+        .fold(Sectors(0), |s, i| s + i.avail_range().length);
 
     let segments = initialized
         .iter()
-        .map(|block_dev| block_dev.avail_range_segment())
+        .map(|block_dev| block_dev.avail_range())
         .collect::<Vec<Segment>>();
 
     let device_name = "stratis_testing_linear";
@@ -154,11 +154,11 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
     let dm = DM::new().unwrap();
     let metadata_dev = LinearDev::new("stratis_testing_thinpool_metadata",
                                       &dm,
-                                      vec![metadata_blockdev.avail_range_segment()])
+                                      vec![metadata_blockdev.avail_range()])
             .unwrap();
     let data_dev = LinearDev::new("stratis_testing_thinpool_datadev",
                                   &dm,
-                                  vec![data_blockdev.avail_range_segment()])
+                                  vec![data_blockdev.avail_range()])
             .unwrap();
     let thinpool_dev = ThinPoolDev::new("stratis_testing_thinpool",
                                         &dm,

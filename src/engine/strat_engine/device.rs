@@ -13,7 +13,7 @@ use std::path::Path;
 use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::{Bytes, Sectors};
 
-use engine::{EngineResult, EngineError};
+use super::super::errors::{EngineResult, EngineError};
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);
 

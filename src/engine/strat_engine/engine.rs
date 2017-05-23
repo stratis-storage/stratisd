@@ -10,19 +10,14 @@ use std::path::PathBuf;
 use devicemapper::DM;
 use uuid::Uuid;
 
-use engine::Engine;
-use engine::EngineError;
-use engine::EngineResult;
-use engine::ErrorEnum;
-use engine::Pool;
-use engine::Redundancy;
-use engine::RenameAction;
+
+use super::super::engine::{Engine, HasName, HasUuid, Pool};
+use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::structures::Table;
+use super::super::types::{PoolUuid, Redundancy, RenameAction};
 
 use super::pool::StratPool;
 use super::setup::find_all;
-
-use super::super::engine::{HasName, HasUuid, PoolUuid};
-use super::super::structures::Table;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DevOwnership {

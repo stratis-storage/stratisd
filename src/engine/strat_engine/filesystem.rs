@@ -7,17 +7,18 @@ use std::error::Error;
 use std::path::Path;
 use std::process::Command;
 
-use consts::IEC;
-
 use devicemapper::DM;
 use devicemapper::Bytes;
 use devicemapper::{ThinDev, ThinStatus};
 use devicemapper::ThinPoolDev;
 
-use engine::{EngineError, EngineResult, ErrorEnum, Filesystem};
-use super::serde_structs::{Isomorphism, FilesystemSave};
-use super::super::engine::{FilesystemUuid, HasName, HasUuid, PoolUuid};
+use super::super::consts::IEC;
+use super::super::engine::{Filesystem, HasName, HasUuid};
+use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::types::{FilesystemUuid, PoolUuid};
+
 use super::dmdevice::{ThinRole, format_thin_name};
+use super::serde_structs::{Isomorphism, FilesystemSave};
 
 #[derive(Debug)]
 pub struct StratFilesystem {

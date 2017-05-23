@@ -37,9 +37,7 @@ use log::LogLevelFilter;
 use env_logger::LogBuilder;
 use dbus::WatchEvent;
 
-use libstratis::engine::Engine;
-use libstratis::engine::sim_engine::SimEngine;
-use libstratis::engine::strat_engine::StratEngine;
+use libstratis::engine::{Engine, SimEngine, StratEngine};
 use libstratis::stratis::{StratisResult, StratisError, VERSION};
 
 /// Try to write the error from the program to stderr, vehemently.

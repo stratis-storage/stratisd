@@ -9,8 +9,7 @@ use dbus::MessageItem;
 use dbus::arg::{ArgType, Iter, IterAppend};
 use dbus::tree::{MethodErr, MTFn, PropInfo};
 
-use engine;
-use engine::EngineError;
+use engine::{EngineError, ErrorEnum};
 
 use super::types::{DbusErrorEnum, TData};
 
@@ -40,11 +39,11 @@ pub fn engine_to_dbus_err(err: &EngineError) -> (DbusErrorEnum, String) {
     let error = match *err {
         EngineError::Engine(ref e, _) => {
             match *e {
-                engine::ErrorEnum::Error => DbusErrorEnum::ERROR,
-                engine::ErrorEnum::AlreadyExists => DbusErrorEnum::ALREADY_EXISTS,
-                engine::ErrorEnum::Busy => DbusErrorEnum::BUSY,
-                engine::ErrorEnum::Invalid => DbusErrorEnum::ERROR,
-                engine::ErrorEnum::NotFound => DbusErrorEnum::NOTFOUND,
+                ErrorEnum::Error => DbusErrorEnum::ERROR,
+                ErrorEnum::AlreadyExists => DbusErrorEnum::ALREADY_EXISTS,
+                ErrorEnum::Busy => DbusErrorEnum::BUSY,
+                ErrorEnum::Invalid => DbusErrorEnum::ERROR,
+                ErrorEnum::NotFound => DbusErrorEnum::NOTFOUND,
             }
         }
         EngineError::Io(_) => DbusErrorEnum::IO_ERROR,

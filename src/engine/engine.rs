@@ -8,35 +8,7 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 use super::errors::EngineResult;
-
-pub type DevUuid = Uuid;
-pub type FilesystemUuid = Uuid;
-pub type PoolUuid = Uuid;
-
-#[derive(Debug)]
-pub enum RenameAction {
-    Identity,
-    NoSource,
-    Renamed,
-}
-
-/// Redundancy classifications which the engine allows for pools.
-custom_derive! {
-    #[derive(Debug, Eq, PartialEq, EnumDisplay,
-             IterVariants(RedundancyVariants))]
-    #[allow(non_camel_case_types)]
-    /// Redundancy specification for a pool.
-    pub enum Redundancy {
-        NONE,
-    }
-}
-
-/// Get the u16 value of this Redundancy constructor.
-impl From<Redundancy> for u16 {
-    fn from(r: Redundancy) -> u16 {
-        r as u16
-    }
-}
+use super::types::{FilesystemUuid, PoolUuid, RenameAction};
 
 pub trait HasUuid: Debug {
     fn uuid(&self) -> &Uuid;

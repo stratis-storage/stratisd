@@ -14,10 +14,11 @@ use devicemapper::{Bytes, Device, Sectors, Segment};
 use time::Timespec;
 use uuid::Uuid;
 
-use consts::IEC;
-use engine::{EngineError, EngineResult, ErrorEnum, PoolUuid};
-use engine::strat_engine::blockdev::BlockDev;
+use super::super::consts::IEC;
+use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::types::PoolUuid;
 
+use super::blockdev::BlockDev;
 use super::device::blkdev_size;
 use super::engine::DevOwnership;
 use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};
@@ -102,9 +103,7 @@ impl BlockDevMgr {
             }
 
             let (gotten, r_segs) = bd.request_space(needed);
-            segs.extend(r_segs
-                            .iter()
-                            .map(|&(start, len)| Segment::new(bd.dev, start, len)));
+            segs.extend(r_segs);
             needed = needed - gotten;
         }
 

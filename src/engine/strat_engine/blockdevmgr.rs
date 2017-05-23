@@ -38,7 +38,7 @@ pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
 
 #[derive(Debug)]
 pub struct BlockDevMgr {
-    pub block_devs: HashMap<PathBuf, BlockDev>,
+    block_devs: HashMap<PathBuf, BlockDev>,
 }
 
 impl BlockDevMgr {

@@ -11,6 +11,9 @@ pub use self::errors::EngineError;
 pub use self::errors::EngineResult;
 pub use self::errors::ErrorEnum;
 
+pub use self::sim_engine::SimEngine;
+pub use self::strat_engine::StratEngine;
+
 pub use self::types::DevUuid;
 pub use self::types::FilesystemUuid;
 pub use self::types::PoolUuid;
@@ -20,10 +23,11 @@ pub use self::types::RenameAction;
 #[macro_use]
 mod macros;
 
-pub mod sim_engine;
+// strat_engine is public so that integration tests can access its internals.
 pub mod strat_engine;
 
 mod engine;
 mod errors;
+mod sim_engine;
 mod structures;
 mod types;

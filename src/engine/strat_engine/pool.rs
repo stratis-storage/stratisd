@@ -25,13 +25,13 @@ use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{FilesystemUuid, RenameAction, Redundancy};
 
-use super::serde_structs::{Isomorphism, PoolSave};
 use super::blockdevmgr::BlockDevMgr;
 use super::device::wipe_sectors;
 use super::dmdevice::{FlexRole, ThinPoolRole, format_flex_name, format_thinpool_name};
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::mdv::MetadataVol;
 use super::metadata::MIN_MDA_SECTORS;
+use super::serde_structs::{Isomorphism, PoolSave};
 
 const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 const META_LOWATER: u64 = 512;

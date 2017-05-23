@@ -12,7 +12,7 @@ use std::io::prelude::*;
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 
-use devicemapper::{LinearDev, DM};
+use devicemapper::{LinearDev, DM, Segment};
 use serde_json;
 use nix::unistd::fsync;
 
@@ -149,6 +149,11 @@ impl MetadataVol {
         }
 
         Ok(filesystems)
+    }
+
+    /// Return the segments used.
+    pub fn segments(&self) -> &[Segment] {
+        self.dev.segments()
     }
 
     /// Tear down a Metadata Volume.

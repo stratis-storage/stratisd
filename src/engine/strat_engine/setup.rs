@@ -9,16 +9,21 @@ use std::io::ErrorKind;
 use std::fs::{OpenOptions, read_dir};
 use std::os::linux::fs::MetadataExt;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use nix::Errno;
 use nix::sys::stat::{S_IFBLK, S_IFMT};
 use serde_json;
 
+use devicemapper::Device;
+
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 use super::super::types::PoolUuid;
 
-use super::metadata::{BDA, StaticHeader};
+use super::blockdev::BlockDev;
 use super::engine::DevOwnership;
+use super::metadata::{BDA, StaticHeader};
+use super::range_alloc::RangeAllocator;
 use super::serde_structs::PoolSave;
 
 
@@ -181,4 +186,54 @@ pub fn get_pool_metadata(pool_table: &HashMap<PoolUuid, Vec<PathBuf>>)
         }
     }
     Ok(metadata)
+}
+
+/// Instantiate each pool's blockdevs.
+/// Return a map from the pool uuid to the pools blockdevs.
+pub fn get_pool_blockdevs(devnode_table: &HashMap<PoolUuid, Vec<PathBuf>>,
+                          metadata_table: &HashMap<PoolUuid, PoolSave>)
+                          -> EngineResult<HashMap<PoolUuid, Vec<BlockDev>>> {
+    let mut result = HashMap::new();
+    for (pool_uuid, pool_save) in metadata_table {
+        let segments = pool_save
+            .flex_devs
+            .meta_dev
+            .iter()
+            .chain(pool_save.flex_devs.thin_meta_dev.iter())
+            .chain(pool_save.flex_devs.thin_data_dev.iter());
+
+        let mut segment_table = HashMap::new();
+        for seg in segments {
+            segment_table
+                .entry(seg.0.clone())
+                .or_insert(vec![])
+                .push((seg.1, seg.2))
+        }
+
+        let devnodes = devnode_table
+            .get(&pool_uuid)
+            .expect("devnode_table.keys() == metadata_table.keys()");
+
+        // TODO: do a verification of matching size on BlockDevs
+        // It is possible to find the current size of a device by using
+        // blkdev_size() function. It is also possible to get the size
+        // via the BlockDev's BDA.
+        let mut blockdevs = vec![];
+        for dev in devnodes {
+            let bda = try!(BDA::load(&mut try!(OpenOptions::new().read(true).open(dev))));
+            let bda = try!(bda.ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                                                         "no BDA found for Stratis device"
+                                                             .into())));
+            let dev_uuid = bda.dev_uuid().simple().to_string();
+            let limit = bda.dev_size();
+            let allocator = match segment_table.get(&dev_uuid) {
+                Some(segments) => RangeAllocator::new(limit, segments),
+                None => RangeAllocator::new(limit, &vec![]),
+            };
+            let device = try!(Device::from_str(&dev.to_string_lossy()));
+            blockdevs.push(BlockDev::new(device, dev.clone(), bda, allocator));
+        }
+        result.insert(pool_uuid.clone(), blockdevs);
+    }
+    Ok(result)
 }

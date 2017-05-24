@@ -50,6 +50,7 @@ pub struct StratPool {
     pub filesystems: Table<StratFilesystem>,
     redundancy: Redundancy,
     thin_pool: ThinPoolDev,
+    thin_pool_meta_spare: Vec<Segment>,
     mdv: MetadataVol,
 }
 
@@ -87,6 +88,10 @@ impl StratPool {
             .alloc_space(INITIAL_META_SIZE)
             .expect("blockmgr must not fail, already checked for space");
 
+        let meta_spare_regions = block_mgr
+            .alloc_space(INITIAL_META_SIZE)
+            .expect("blockmgr must not fail, already checked for space");
+
         let data_regions = block_mgr
             .alloc_space(INITIAL_DATA_SIZE)
             .expect("blockmgr must not fail, already checked for space");
@@ -107,6 +112,7 @@ impl StratPool {
             filesystems: Table::new(),
             redundancy: redundancy,
             thin_pool: thinpool_dev,
+            thin_pool_meta_spare: meta_spare_regions,
             mdv: mdv,
         };
 
@@ -162,7 +168,8 @@ impl StratPool {
 
     /// Minimum initial size for a pool.
     pub fn min_initial_size() -> Sectors {
-        INITIAL_META_SIZE + INITIAL_DATA_SIZE + INITIAL_MDV_SIZE
+        // One extra meta for spare
+        (INITIAL_META_SIZE * 2u64) + INITIAL_DATA_SIZE + INITIAL_MDV_SIZE
     }
 
     // TODO: Check current time against global last updated, and use

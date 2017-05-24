@@ -17,7 +17,7 @@ use super::super::structures::Table;
 use super::super::types::{PoolUuid, Redundancy, RenameAction};
 
 use super::pool::StratPool;
-use super::setup::find_all;
+use super::setup::{find_all, get_pool_blockdevs, get_pool_dmdevs, get_pool_metadata};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DevOwnership {
@@ -97,10 +97,14 @@ impl Engine for StratEngine {
     // TODO: Fix this method so that it actually sets up the engine.
     fn setup(&mut self) -> EngineResult<()> {
         let pools = try!(find_all());
-        if !pools.is_empty() {
-            let err_msg = "Stratis was already run once, can not yet reconstruct state";
-            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, err_msg.into()));
+        if pools.is_empty() {
+            return Ok(());
         }
-        Ok(())
+
+        let metadata = try!(get_pool_metadata(&pools));
+        let blockdevs = try!(get_pool_blockdevs(&pools, &metadata));
+        let _ = try!(get_pool_dmdevs(&blockdevs, &metadata));
+        let err_msg = "Stratis was already run once, can not yet reconstruct state";
+        Err(EngineError::Engine(ErrorEnum::AlreadyExists, err_msg.into()))
     }
 }

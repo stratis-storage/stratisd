@@ -21,6 +21,7 @@ use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 use super::super::types::PoolUuid;
 
 use super::blockdev::BlockDev;
+use super::blockdevmgr::BlockDevMgr;
 use super::engine::DevOwnership;
 use super::metadata::{BDA, StaticHeader};
 use super::range_alloc::RangeAllocator;
@@ -192,7 +193,7 @@ pub fn get_pool_metadata(pool_table: &HashMap<PoolUuid, Vec<PathBuf>>)
 /// Return a map from the pool uuid to the pools blockdevs.
 pub fn get_pool_blockdevs(devnode_table: &HashMap<PoolUuid, Vec<PathBuf>>,
                           metadata_table: &HashMap<PoolUuid, PoolSave>)
-                          -> EngineResult<HashMap<PoolUuid, Vec<BlockDev>>> {
+                          -> EngineResult<HashMap<PoolUuid, BlockDevMgr>> {
     let mut result = HashMap::new();
     for (pool_uuid, pool_save) in metadata_table {
         let segments = pool_save
@@ -233,7 +234,7 @@ pub fn get_pool_blockdevs(devnode_table: &HashMap<PoolUuid, Vec<PathBuf>>,
             let device = try!(Device::from_str(&dev.to_string_lossy()));
             blockdevs.push(BlockDev::new(device, dev.clone(), bda, allocator));
         }
-        result.insert(pool_uuid.clone(), blockdevs);
+        result.insert(pool_uuid.clone(), BlockDevMgr::new(blockdevs));
     }
     Ok(result)
 }

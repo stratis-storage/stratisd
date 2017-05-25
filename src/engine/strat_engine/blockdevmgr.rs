@@ -249,7 +249,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
                                        &Uuid::new_v4(),
                                        mda_size,
                                        dev_size.sectors()));
-        let allocator = RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())]);
+        let allocator = try!(RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())]));
 
         bds.push(BlockDev::new(dev, devnode, bda, allocator));
     }

@@ -227,8 +227,8 @@ pub fn get_pool_blockdevs(devnode_table: &HashMap<PoolUuid, Vec<PathBuf>>,
             let dev_uuid = bda.dev_uuid().simple().to_string();
             let limit = bda.dev_size();
             let allocator = match segment_table.get(&dev_uuid) {
-                Some(segments) => RangeAllocator::new(limit, segments),
-                None => RangeAllocator::new(limit, &vec![]),
+                Some(segments) => try!(RangeAllocator::new(limit, segments)),
+                None => try!(RangeAllocator::new(limit, &vec![])),
             };
             let device = try!(Device::from_str(&dev.to_string_lossy()));
             blockdevs.push(BlockDev::new(device, dev.clone(), bda, allocator));

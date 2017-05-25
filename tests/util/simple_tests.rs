@@ -32,7 +32,7 @@ use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
                                                  MIN_MDA_SECTORS};
 use libstratis::engine::strat_engine::serde_structs::Recordable;
-use libstratis::engine::strat_engine::setup::{find_all, get_blockdevs, get_metadata};
+use libstratis::engine::strat_engine::setup::{find_all, get_blockdevs, get_dmdevs, get_metadata};
 use libstratis::engine::strat_engine::StratEngine;
 
 /// Dirty sectors where specified, with 1s.
@@ -315,6 +315,7 @@ pub fn test_empty_pool(paths: &[&Path]) -> () {
 /// 3. Use find_all() to get the devices in the pool.
 /// 4. Use get_metadata to find metadata for each pool and verify correctness.
 /// 5. Teardown the engine and repeat.
+/// 6. Create the dm devices belonging to the pool.
 pub fn test_basic_metadata(paths: &[&Path]) {
     assert!(paths.len() > 2);
 
@@ -364,4 +365,10 @@ pub fn test_basic_metadata(paths: &[&Path]) {
     let blockdevs2 = get_blockdevs(&pool_save2, devnodes2).unwrap();
     assert!(blockdevs1.len() == pool_save1.block_devs.len());
     assert!(blockdevs2.len() == pool_save2.block_devs.len());
+
+    // These should work, under the assumption of a clean teardown.
+    let (tp1, _) = get_dmdevs(&uuid1, &blockdevs1, &pool_save1).unwrap();
+    let (tp2, _) = get_dmdevs(&uuid2, &blockdevs2, &pool_save2).unwrap();
+    assert!(tp1.name().contains(&uuid1.simple().to_string()));
+    assert!(tp2.name().contains(&uuid2.simple().to_string()));
 }

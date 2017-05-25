@@ -103,8 +103,9 @@ impl RangeAllocator {
         Ok(())
     }
 
+    #[allow(dead_code)]
     /// Mark ranges previously marked as used as now unused.
-    pub fn remove_ranges(&mut self, to_free: &[(Sectors, Sectors)]) -> () {
+    fn remove_ranges(&mut self, to_free: &[(Sectors, Sectors)]) -> () {
         for &(off, len) in to_free {
             self.check_for_overflow(off, len);
 

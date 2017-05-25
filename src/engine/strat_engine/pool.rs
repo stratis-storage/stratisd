@@ -99,7 +99,7 @@ impl StratPool {
             .expect("blockmgr must not fail, already checked for space");
         let device_name = format_flex_name(&pool_uuid, FlexRole::ThinData);
         let data_dev = try!(LinearDev::new(&device_name, dm, data_regions));
-        let length = try!(data_dev.size()).sectors();
+        let length = try!(data_dev.size());
 
         let device_name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
         // TODO Fix hard coded data blocksize and low water mark.

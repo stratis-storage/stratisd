@@ -140,7 +140,7 @@ impl StratPool {
 
     // TODO: Check current time against global last updated, and use
     // alternate time value if earlier, as described in SWDD
-    pub fn write_metadata(&mut self) -> EngineResult<()> {
+    fn write_metadata(&mut self) -> EngineResult<()> {
         let data = try!(serde_json::to_string(&try!(self.to_save())));
         self.block_devs
             .save_state(&now().to_timespec(), data.as_bytes())

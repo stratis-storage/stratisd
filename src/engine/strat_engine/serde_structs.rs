@@ -13,24 +13,17 @@
 // restoring state from saved metadata.
 
 use std::collections::HashMap;
-use std::marker::Sized;
 use std::path::PathBuf;
 
 use devicemapper::Sectors;
 
 use engine::EngineResult;
 
-/// Implements saving struct data to a serializable form and reconstructing
-/// a struct from that form.
-/// Assuming the context of the existing devices this must be an isomorphism,
-/// i.e., setup(x.to_save()) == x and setup(x).to_save() == x or it's a bug.
-pub trait Isomorphism<T> {
-    fn to_save(&self) -> EngineResult<T>;
-    fn setup(T) -> Self
-        where Self: Sized
-    {
-        unimplemented!()
-    }
+/// Implements saving struct data to a serializable form. The form should be
+/// sufficient, in conjunction with the environment, to reconstruct the
+/// saved struct in all its essentials.
+pub trait Recordable<T> {
+    fn record(&self) -> EngineResult<T>;
 }
 
 #[derive(Debug, Serialize, Deserialize)]

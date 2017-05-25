@@ -23,7 +23,7 @@ use super::device::blkdev_size;
 use super::engine::DevOwnership;
 use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};
 use super::range_alloc::RangeAllocator;
-use super::serde_structs::{BlockDevSave, Isomorphism};
+use super::serde_structs::{BlockDevSave, Recordable};
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
 
@@ -140,14 +140,14 @@ impl BlockDevMgr {
     }
 }
 
-impl Isomorphism<HashMap<String, BlockDevSave>> for BlockDevMgr {
-    fn to_save(&self) -> EngineResult<HashMap<String, BlockDevSave>> {
+impl Recordable<HashMap<String, BlockDevSave>> for BlockDevMgr {
+    fn record(&self) -> EngineResult<HashMap<String, BlockDevSave>> {
 
         // This function exists to assist the type-checker. The type-checker
         // was unable to infer the type of the apparently equivalent anonymous
         // closure in Rust version 1.17.0.
         fn mapper(bd: &BlockDev) -> EngineResult<(String, BlockDevSave)> {
-            Ok((bd.uuid().simple().to_string(), try!(bd.to_save())))
+            Ok((bd.uuid().simple().to_string(), try!(bd.record())))
         }
 
         let mut result: HashMap<String, BlockDevSave> = HashMap::new();

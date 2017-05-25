@@ -44,7 +44,6 @@ pub struct PoolSave {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BlockDevSave {
     pub devnode: PathBuf,
-    pub size: Sectors,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

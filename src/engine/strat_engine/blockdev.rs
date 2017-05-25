@@ -101,9 +101,6 @@ impl BlockDev {
 
 impl Isomorphism<BlockDevSave> for BlockDev {
     fn to_save(&self) -> EngineResult<BlockDevSave> {
-        Ok(BlockDevSave {
-               devnode: self.devnode.clone(),
-               size: self.size(),
-           })
+        Ok(BlockDevSave { devnode: self.devnode.clone() })
     }
 }

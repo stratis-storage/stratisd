@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use super::super::consts::IEC;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::PoolUuid;
+use super::super::types::{DevUuid, PoolUuid};
 
 use super::blockdev::BlockDev;
 use super::device::blkdev_size;
@@ -59,6 +59,11 @@ impl BlockDevMgr {
     /// Obtain a BlockDev by its Device.
     pub fn get_by_device(&self, device: Device) -> Option<&BlockDev> {
         self.block_devs.iter().find(|d| d.device() == &device)
+    }
+
+    // Obtain a BlockDev by its UUID.
+    pub fn get_by_uuid(&self, uuid: &DevUuid) -> Option<&BlockDev> {
+        self.block_devs.iter().find(|d| d.uuid() == uuid)
     }
 
     pub fn add(&mut self,

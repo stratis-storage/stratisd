@@ -30,9 +30,19 @@ impl RangeAllocator {
         Ok(allocator)
     }
 
-    fn check_for_overflow(&self, off: Sectors, len: Sectors) {
-        assert_ne!(off.checked_add(*len), None);
-        assert!(off + len <= self.limit, "off+len greater than range limit");
+    fn check_for_overflow(&self, off: Sectors, len: Sectors) -> EngineResult<()> {
+        if off.checked_add(*len).is_none() {
+            let err_msg = format!("elements in range ({}, {}) inexpressible in u64", off, len);
+            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
+        }
+        if off + len > self.limit {
+            return Err(EngineError::Engine(ErrorEnum::Invalid,
+                                           format!("elements in range ({}, {}) exceed limit {}",
+                                                   off,
+                                                   len,
+                                                   self.limit)));
+        }
+        Ok(())
     }
 
     /// Mark ranges previously marked as unused as now used.
@@ -41,7 +51,7 @@ impl RangeAllocator {
     /// TODO: Make this operation atomic.
     fn insert_ranges(&mut self, ranges: &[(Sectors, Sectors)]) -> EngineResult<()> {
         for &(off, len) in ranges {
-            self.check_for_overflow(off, len);
+            try!(self.check_for_overflow(off, len));
 
             let prev = self.used
                 .range(..off)
@@ -107,7 +117,9 @@ impl RangeAllocator {
     /// Mark ranges previously marked as used as now unused.
     fn remove_ranges(&mut self, to_free: &[(Sectors, Sectors)]) -> () {
         for &(off, len) in to_free {
-            self.check_for_overflow(off, len);
+            // TODO: when this method goes into use, fix it so that it returns
+            // an EngineResult, make this a try!.
+            self.check_for_overflow(off, len).unwrap();
 
             let maybe_prev = self.used
                 .range((Unbounded, Included(off)))
@@ -408,19 +420,19 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    /// Verify that insert_ranges() panics when an element outside the range
+    /// Verify that insert_ranges() errors when an element outside the range
     /// limit is requested.
     fn test_allocator_failures_overflow_limit() {
         let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
 
         // overflow limit range
-        let _ = allocator.insert_ranges(&[(Sectors(1), Sectors(128))]);
+        assert!(allocator
+                    .insert_ranges(&[(Sectors(1), Sectors(128))])
+                    .is_err());
     }
 
     #[test]
-    #[should_panic]
-    /// Verify that insert_ranges() panics when an element in a requested range
+    /// Verify that insert_ranges() errors when an element in a requested range
     /// exceeds u64::MAX.
     fn test_allocator_failures_overflow_max() {
         use std::u64::MAX;
@@ -428,6 +440,8 @@ mod tests {
         let mut allocator = RangeAllocator::new(Sectors(MAX), &[]).unwrap();
 
         // overflow max u64
-        let _ = allocator.insert_ranges(&[(Sectors(MAX), Sectors(1))]);
+        assert!(allocator
+                    .insert_ranges(&[(Sectors(MAX), Sectors(1))])
+                    .is_err());
     }
 }

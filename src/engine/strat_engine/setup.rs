@@ -15,7 +15,7 @@ use nix::Errno;
 use nix::sys::stat::{S_IFBLK, S_IFMT};
 use serde_json;
 
-use devicemapper::Device;
+use devicemapper::{Device, ThinPoolDev};
 
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 use super::super::types::PoolUuid;
@@ -241,6 +241,21 @@ pub fn get_pool_blockdevs(devnode_table: &HashMap<PoolUuid, Vec<PathBuf>>,
             blockdevs.push(BlockDev::new(device, dev.clone(), bda, allocator));
         }
         result.insert(pool_uuid.clone(), BlockDevMgr::new(blockdevs));
+    }
+    Ok(result)
+}
+
+/// Locate each pool's thinpool device.
+/// Return a map from the pool UUID to the pool's thinpool device.
+// TODO: Make this safe in the case where DM devices have not been cleaned up.
+pub fn get_pool_thinpooldevs(blockdev_table: &HashMap<PoolUuid, BlockDevMgr>,
+                             metadata_table: &HashMap<PoolUuid, PoolSave>)
+                             -> EngineResult<HashMap<PoolUuid, ThinPoolDev>> {
+    let result = HashMap::new();
+    for (pool_uuid, _pool_save) in metadata_table {
+        let _ = blockdev_table
+            .get(pool_uuid)
+            .expect("blockdev_table.keys() == metadata_table.keys()");
     }
     Ok(result)
 }

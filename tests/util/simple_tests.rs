@@ -162,7 +162,7 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
             .unwrap();
     let thinpool_dev = ThinPoolDev::new("stratis_testing_thinpool",
                                         &dm,
-                                        data_dev.size().unwrap().sectors(),
+                                        data_dev.size().unwrap(),
                                         Sectors(1024),
                                         DataBlocks(256000),
                                         metadata_dev,

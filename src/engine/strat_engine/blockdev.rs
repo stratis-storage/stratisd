@@ -17,7 +17,7 @@ use super::super::types::{DevUuid, PoolUuid};
 
 use super::metadata::BDA;
 use super::range_alloc::RangeAllocator;
-use super::serde_structs::{BlockDevSave, Isomorphism};
+use super::serde_structs::{BlockDevSave, Recordable};
 
 
 #[derive(Debug)]
@@ -99,8 +99,8 @@ impl BlockDev {
     }
 }
 
-impl Isomorphism<BlockDevSave> for BlockDev {
-    fn to_save(&self) -> EngineResult<BlockDevSave> {
+impl Recordable<BlockDevSave> for BlockDev {
+    fn record(&self) -> EngineResult<BlockDevSave> {
         Ok(BlockDevSave { devnode: self.devnode.clone() })
     }
 }

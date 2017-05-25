@@ -30,7 +30,7 @@ use super::dmdevice::{FlexRole, ThinPoolRole, format_flex_name, format_thinpool_
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::mdv::MetadataVol;
 use super::metadata::MIN_MDA_SECTORS;
-use super::serde_structs::{FlexDevsSave, Isomorphism, PoolSave, ThinPoolDevSave};
+use super::serde_structs::{FlexDevsSave, PoolSave, Recordable, ThinPoolDevSave};
 
 const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 const META_LOWATER: u64 = 512;
@@ -152,7 +152,7 @@ impl StratPool {
     // TODO: Check current time against global last updated, and use
     // alternate time value if earlier, as described in SWDD
     fn write_metadata(&mut self) -> EngineResult<()> {
-        let data = try!(serde_json::to_string(&try!(self.to_save())));
+        let data = try!(serde_json::to_string(&try!(self.record())));
         self.block_devs
             .save_state(&now().to_timespec(), data.as_bytes())
     }
@@ -319,8 +319,8 @@ impl HasName for StratPool {
     }
 }
 
-impl Isomorphism<PoolSave> for StratPool {
-    fn to_save(&self) -> EngineResult<PoolSave> {
+impl Recordable<PoolSave> for StratPool {
+    fn record(&self) -> EngineResult<PoolSave> {
 
         let mapper = |seg: &Segment| -> EngineResult<(String, Sectors, Sectors)> {
             let bd = try!(self.block_devs
@@ -365,7 +365,7 @@ impl Isomorphism<PoolSave> for StratPool {
 
         Ok(PoolSave {
                name: self.name.clone(),
-               block_devs: try!(self.block_devs.to_save()),
+               block_devs: try!(self.block_devs.record()),
                flex_devs: FlexDevsSave {
                    meta_dev: meta_dev,
                    thin_meta_dev: thin_meta_dev,

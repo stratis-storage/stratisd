@@ -21,7 +21,7 @@ use super::super::errors::EngineResult;
 use super::super::types::{FilesystemUuid, PoolUuid};
 
 use super::filesystem::{create_fs, mount_fs, unmount_fs, StratFilesystem};
-use super::serde_structs::{Isomorphism, FilesystemSave};
+use super::serde_structs::{FilesystemSave, Recordable};
 
 // TODO: Monitor fs size and extend linear and fs if needed
 // TODO: Document format of stuff on MDV in SWDD (currently ad-hoc)
@@ -66,7 +66,7 @@ impl MetadataVol {
     // ensure file contents are not truncated if operation is
     // interrupted.
     pub fn save_fs(&self, fs: &StratFilesystem) -> EngineResult<()> {
-        let data = try!(serde_json::to_string(&try!(fs.to_save())));
+        let data = try!(serde_json::to_string(&try!(fs.record())));
         let path = self.mount_pt
             .join("filesystems")
             .join(fs.uuid().simple().to_string())

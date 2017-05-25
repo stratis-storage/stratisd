@@ -111,11 +111,11 @@ impl StratPool {
         Ok(pool)
     }
 
-    fn setup_thinpooldev(dm: &DM,
-                         pool_uuid: &PoolUuid,
-                         meta_segs: Vec<Segment>,
-                         data_segs: Vec<Segment>)
-                         -> EngineResult<ThinPoolDev> {
+    pub fn setup_thinpooldev(dm: &DM,
+                             pool_uuid: &PoolUuid,
+                             meta_segs: Vec<Segment>,
+                             data_segs: Vec<Segment>)
+                             -> EngineResult<ThinPoolDev> {
         let device_name = format_flex_name(pool_uuid, FlexRole::ThinMeta);
         let meta_dev = try!(LinearDev::new(&device_name, dm, meta_segs));
 

@@ -14,17 +14,20 @@ use std::str::FromStr;
 use nix::Errno;
 use nix::sys::stat::{S_IFBLK, S_IFMT};
 use serde_json;
+use uuid::Uuid;
 
-use devicemapper::Device;
+use devicemapper::{DM, Device, Sectors, Segment, ThinPoolDev};
 
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
-use super::super::types::PoolUuid;
+use super::super::types::{DevUuid, PoolUuid};
 
 use super::blockdev::BlockDev;
 use super::blockdevmgr::BlockDevMgr;
 use super::device::blkdev_size;
 use super::engine::DevOwnership;
+use super::mdv::MetadataVol;
 use super::metadata::{BDA, StaticHeader};
+use super::pool::StratPool;
 use super::range_alloc::RangeAllocator;
 use super::serde_structs::PoolSave;
 
@@ -262,6 +265,69 @@ pub fn get_pool_blockdevs(devnode_table: &HashMap<PoolUuid, Vec<PathBuf>>,
         }
 
         result.insert(pool_uuid.clone(), BlockDevMgr::new(blockdevs));
+    }
+    Ok(result)
+}
+
+/// Locate each pool's thinpool device.
+/// Return a map from the pool UUID to the pool's thinpool device.
+// TODO: Make this safe in the case where DM devices have not been cleaned up.
+pub fn get_pool_dmdevs(blockdev_table: &HashMap<PoolUuid, BlockDevMgr>,
+                       metadata_table: &HashMap<PoolUuid, PoolSave>)
+                       -> EngineResult<HashMap<PoolUuid, (ThinPoolDev, MetadataVol)>> {
+    let mut result = HashMap::new();
+    for (pool_uuid, pool_save) in metadata_table {
+        let blockdevs = blockdev_table
+            .get(pool_uuid)
+            .expect("blockdev_table.keys() == metadata_table.keys()");
+
+        let uuid_map: HashMap<DevUuid, Device> = blockdevs
+            .into_iter()
+            .map(|bd| (*bd.uuid(), *bd.device()))
+            .collect();
+
+        let lookup = |triple: &(Uuid, Sectors, Sectors)| -> EngineResult<Segment> {
+            let device = try!(uuid_map
+                                  .get(&triple.0)
+                                  .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                                                             format!("missing device for UUID {:?}",
+                                                                     &triple.0))));
+            Ok(Segment {
+                   device: *device,
+                   start: triple.1,
+                   length: triple.2,
+               })
+        };
+
+        let meta_segments: Vec<Segment> = try!(pool_save
+                                                   .flex_devs
+                                                   .meta_dev
+                                                   .iter()
+                                                   .map(&lookup)
+                                                   .collect());
+
+        let thin_meta_segments: Vec<Segment> = try!(pool_save
+                                                        .flex_devs
+                                                        .thin_meta_dev
+                                                        .iter()
+                                                        .map(&lookup)
+                                                        .collect());
+
+        let thin_data_segments: Vec<Segment> = try!(pool_save
+                                                        .flex_devs
+                                                        .thin_data_dev
+                                                        .iter()
+                                                        .map(&lookup)
+                                                        .collect());
+
+        let dm = try!(DM::new());
+        let thinpool_dev = try!(StratPool::setup_thinpooldev(&dm,
+                                                             pool_uuid,
+                                                             thin_meta_segments,
+                                                             thin_data_segments));
+
+        let mdv = try!(StratPool::setup_mdv(&dm, pool_uuid, meta_segments));
+        result.insert(*pool_uuid, (thinpool_dev, mdv));
     }
     Ok(result)
 }

@@ -49,6 +49,9 @@ impl RangeAllocator {
     /// Return an error if ranges overlap with each other or with previously
     /// inserted ranges.
     /// TODO: Make this operation atomic.
+    /// TODO: Consider using a different algorithmic that first sorts ranges
+    /// and then merges used and ranges by traversing them in parallel, for
+    /// efficiency.
     fn insert_ranges(&mut self, ranges: &[(Sectors, Sectors)]) -> EngineResult<()> {
         for &(off, len) in ranges {
             try!(self.check_for_overflow(off, len));

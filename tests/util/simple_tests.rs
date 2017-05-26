@@ -25,15 +25,14 @@ use self::tempdir::TempDir;
 use self::uuid::Uuid;
 
 use libstratis::engine::{Engine, EngineError, ErrorEnum};
-use libstratis::engine::strat_engine::StratEngine;
 use libstratis::engine::strat_engine::blockdevmgr::{initialize, resolve_devices};
-use libstratis::engine::strat_engine::device::{blkdev_size, write_sectors};
+use libstratis::engine::strat_engine::device::{blkdev_size, wipe_sectors, write_sectors};
 use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_fs};
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
                                                  MIN_MDA_SECTORS};
 use libstratis::engine::strat_engine::setup::{find_all, get_pool_metadata};
-
+use libstratis::engine::strat_engine::StratEngine;
 
 /// Dirty sectors where specified, with 1s.
 fn dirty_sectors(path: &Path, offset: Sectors, length: Sectors) {
@@ -156,6 +155,17 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
                                       &dm,
                                       vec![metadata_blockdev.avail_range()])
             .unwrap();
+
+    // Clear the meta data device.  If the first block is not all zeros - the
+    // stale data will cause the device to appear as an existing meta rather
+    // than a new one.  Clear the entire device to be safe.  Stratis implements
+    // the same approach when constructing a thin pool.
+    wipe_sectors(&metadata_dev.devnode().unwrap(),
+                 Sectors(0),
+                 metadata_dev.size().unwrap())
+            .unwrap();
+
+
     let data_dev = LinearDev::new("stratis_testing_thinpool_datadev",
                                   &dm,
                                   vec![data_blockdev.avail_range()])

@@ -30,6 +30,11 @@ impl RangeAllocator {
         Ok(allocator)
     }
 
+    /// The total number of Sectors in this block device
+    pub fn size(&self) -> Sectors {
+        self.limit
+    }
+
     fn check_for_overflow(&self, off: Sectors, len: Sectors) -> EngineResult<()> {
         if off.checked_add(*len).is_none() {
             let err_msg = format!("elements in range ({}, {}) inexpressible in u64", off, len);

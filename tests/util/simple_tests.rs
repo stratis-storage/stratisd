@@ -9,7 +9,7 @@ extern crate tempdir;
 extern crate time;
 extern crate uuid;
 
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -132,7 +132,11 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
     let mut linear_dev_path = PathBuf::from("/dev/mapper");
     linear_dev_path.push(device_name);
 
-    let lineardev_size = blkdev_size(&File::open(linear_dev_path).unwrap()).unwrap();
+    let lineardev_size = blkdev_size(&OpenOptions::new()
+                                          .read(true)
+                                          .open(linear_dev_path)
+                                          .unwrap())
+            .unwrap();
     assert!(total_blockdev_size.bytes() == lineardev_size);
     lineardev.teardown(&dm).unwrap();
 }
@@ -192,7 +196,13 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
     unmount_fs(tmp_dir.path()).unwrap();
     for i in 0..100 {
         let file_path = tmp_dir.path().join(format!("stratis_test{}.txt", i));
-        writeln!(&File::create(file_path).unwrap(), "data").unwrap();
+        writeln!(&OpenOptions::new()
+                      .create(true)
+                      .write(true)
+                      .open(file_path)
+                      .unwrap(),
+                 "data")
+                .unwrap();
     }
     thin_dev.teardown(&dm).unwrap();
     thinpool_dev.teardown(&dm).unwrap();

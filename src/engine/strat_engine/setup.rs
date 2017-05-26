@@ -22,6 +22,7 @@ use super::super::types::PoolUuid;
 
 use super::blockdev::BlockDev;
 use super::blockdevmgr::BlockDevMgr;
+use super::device::blkdev_size;
 use super::engine::DevOwnership;
 use super::metadata::{BDA, StaticHeader};
 use super::range_alloc::RangeAllocator;
@@ -215,22 +216,27 @@ pub fn get_pool_blockdevs(devnode_table: &HashMap<PoolUuid, Vec<PathBuf>>,
             .get(&pool_uuid)
             .expect("devnode_table.keys() == metadata_table.keys()");
 
-        // TODO: do a verification of matching size on BlockDevs
-        // It is possible to find the current size of a device by using
-        // blkdev_size() function. It is also possible to get the size
-        // via the BlockDev's BDA.
         let mut blockdevs = vec![];
         for dev in devnodes {
             let bda = try!(BDA::load(&mut try!(OpenOptions::new().read(true).open(dev))));
             let bda = try!(bda.ok_or(EngineError::Engine(ErrorEnum::NotFound,
                                                          "no BDA found for Stratis device"
                                                              .into())));
+
             let dev_uuid = bda.dev_uuid().simple().to_string();
-            let limit = bda.dev_size();
+
+            let actual_size = try!(blkdev_size(&try!(OpenOptions::new().read(true).open(dev))))
+                .sectors();
+
+            // If size of device has changed and is less, then it is possible
+            // that the segments previously allocated for this blockdev no
+            // longer exist. If that is the case, RangeAllocator::new() will
+            // return an error.
             let allocator = match segment_table.get(&dev_uuid) {
-                Some(segments) => try!(RangeAllocator::new(limit, segments)),
-                None => try!(RangeAllocator::new(limit, &vec![])),
+                Some(segments) => try!(RangeAllocator::new(actual_size, segments)),
+                None => try!(RangeAllocator::new(actual_size, &vec![])),
             };
+
             let device = try!(Device::from_str(&dev.to_string_lossy()));
             blockdevs.push(BlockDev::new(device, dev.clone(), bda, allocator));
         }

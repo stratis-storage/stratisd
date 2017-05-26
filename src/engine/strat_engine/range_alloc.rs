@@ -26,6 +26,10 @@ impl RangeAllocator {
         allocator
     }
 
+    pub fn size(&self) -> Sectors {
+        self.limit
+    }
+
     fn check_for_overflow(&self, off: Sectors, len: Sectors) {
         assert_ne!(off.checked_add(*len), None);
         assert!(off + len <= self.limit, "off+len greater than range limit");

@@ -210,12 +210,8 @@ pub fn initialize(pool_uuid: &PoolUuid,
     let mut bds = Vec::new();
     for (dev, (devnode, dev_size, mut f)) in add_devs {
 
-        let bda = try!(BDA::initialize(&mut f,
-                                       pool_uuid,
-                                       &Uuid::new_v4(),
-                                       mda_size,
-                                       dev_size.sectors()));
-        let allocator = RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())]);
+        let bda = try!(BDA::initialize(&mut f, pool_uuid, &Uuid::new_v4(), mda_size));
+        let allocator = RangeAllocator::new(dev_size.sectors(), &[(Sectors(0), bda.size())]);
 
         bds.push(BlockDev::new(dev, devnode, bda, allocator));
     }

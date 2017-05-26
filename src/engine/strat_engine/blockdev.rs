@@ -70,7 +70,7 @@ impl BlockDev {
 
     /// The device's size.
     pub fn size(&self) -> Sectors {
-        self.bda.dev_size()
+        self.used.size()
     }
 
     /// Last time metadata was written to this device.

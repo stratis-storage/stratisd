@@ -48,13 +48,12 @@ impl BDA {
     pub fn initialize<F>(mut f: &mut F,
                          pool_uuid: &Uuid,
                          dev_uuid: &Uuid,
-                         mda_size: Sectors,
-                         blkdev_size: Sectors)
+                         mda_size: Sectors)
                          -> EngineResult<BDA>
         where F: Seek + Write
     {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
-        let header = StaticHeader::new(pool_uuid, dev_uuid, mda_size, blkdev_size);
+        let header = StaticHeader::new(pool_uuid, dev_uuid, mda_size);
         let hdr_buf = header.sigblock_to_buf();
 
         // Write 8K header. Static_Header copies go in sectors 1 and 9.
@@ -140,11 +139,6 @@ impl BDA {
         &self.header.pool_uuid
     }
 
-    /// The size of the device.
-    pub fn dev_size(&self) -> Sectors {
-        self.header.blkdev_size
-    }
-
     /// The number of sectors the BDA itself occupies.
     pub fn size(&self) -> Sectors {
         BDA_STATIC_HDR_SECTORS + self.header.mda_size + self.header.reserved_size
@@ -153,7 +147,6 @@ impl BDA {
 
 #[derive(Debug)]
 pub struct StaticHeader {
-    blkdev_size: Sectors,
     pool_uuid: PoolUuid,
     dev_uuid: DevUuid,
     mda_size: Sectors,
@@ -162,13 +155,8 @@ pub struct StaticHeader {
 }
 
 impl StaticHeader {
-    pub fn new(pool_uuid: &PoolUuid,
-               dev_uuid: &DevUuid,
-               mda_size: Sectors,
-               blkdev_size: Sectors)
-               -> StaticHeader {
+    pub fn new(pool_uuid: &PoolUuid, dev_uuid: &DevUuid, mda_size: Sectors) -> StaticHeader {
         StaticHeader {
-            blkdev_size: blkdev_size,
             pool_uuid: pool_uuid.clone(),
             dev_uuid: dev_uuid.clone(),
             mda_size: mda_size,
@@ -244,7 +232,6 @@ impl StaticHeader {
     pub fn sigblock_to_buf(&self) -> [u8; SECTOR_SIZE] {
         let mut buf = [0u8; SECTOR_SIZE];
         buf[4..20].clone_from_slice(STRAT_MAGIC);
-        LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size);
         buf[32..64].clone_from_slice(self.pool_uuid.simple().to_string().as_bytes());
         buf[64..96].clone_from_slice(self.dev_uuid.simple().to_string().as_bytes());
         LittleEndian::write_u64(&mut buf[96..104], *self.mda_size);
@@ -270,7 +257,6 @@ impl StaticHeader {
             return Err(EngineError::Engine(ErrorEnum::Invalid, "header CRC invalid".into()));
         }
 
-        let blkdev_size = Sectors(LittleEndian::read_u64(&buf[20..28]));
 
         let pool_uuid = try!(Uuid::parse_str(try!(from_utf8(&buf[32..64]))));
         let dev_uuid = try!(Uuid::parse_str(try!(from_utf8(&buf[64..96]))));
@@ -282,7 +268,6 @@ impl StaticHeader {
         Ok(Some(StaticHeader {
                     pool_uuid: pool_uuid,
                     dev_uuid: dev_uuid,
-                    blkdev_size: blkdev_size,
                     mda_size: mda_size,
                     reserved_size: Sectors(LittleEndian::read_u64(&buf[104..112])),
                     flags: 0,
@@ -591,19 +576,16 @@ mod tests {
     use time::{now, Timespec};
     use uuid::Uuid;
 
-    use super::super::super::consts::IEC;
-
     use super::super::engine::DevOwnership;
     use super::*;
 
     /// Return a static header with random block device and MDA size.
     /// The block device is less than the minimum, for efficiency in testing.
-    fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
+    fn random_static_header(mda_size_factor: u32) -> StaticHeader {
         let pool_uuid = Uuid::new_v4();
         let dev_uuid = Uuid::new_v4();
         let mda_size = MIN_MDA_SECTORS + Sectors((mda_size_factor * 4) as u64);
-        let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
-        StaticHeader::new(&pool_uuid, &dev_uuid, mda_size, blkdev_size)
+        StaticHeader::new(&pool_uuid, &dev_uuid, mda_size)
     }
 
     #[test]
@@ -644,21 +626,16 @@ mod tests {
     /// Verify that the file is again unowned.
     fn prop_test_ownership() {
         fn test_ownership(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
-            let sh = random_static_header(blkdev_size, mda_size_factor);
+            let sh = random_static_header(mda_size_factor);
             let pool_uuid = sh.pool_uuid;
-            let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+            let mut buf = Cursor::new(vec![0; blkdev_size as usize]);
             let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
             match ownership {
                 DevOwnership::Unowned => {}
                 _ => return TestResult::failed(),
             }
 
-            BDA::initialize(&mut buf,
-                            &sh.pool_uuid,
-                            &sh.dev_uuid,
-                            sh.mda_size,
-                            sh.blkdev_size)
-                    .unwrap();
+            BDA::initialize(&mut buf, &sh.pool_uuid, &sh.dev_uuid, sh.mda_size).unwrap();
             let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
             match ownership {
                 DevOwnership::Ours(uuid) => {
@@ -689,14 +666,9 @@ mod tests {
     /// Verify that the last update time is None.
     fn prop_empty_bda() {
         fn empty_bda(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
-            let sh = random_static_header(blkdev_size, mda_size_factor);
-            let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
-            let bda = BDA::initialize(&mut buf,
-                                      &sh.pool_uuid,
-                                      &sh.dev_uuid,
-                                      sh.mda_size,
-                                      sh.blkdev_size)
-                    .unwrap();
+            let sh = random_static_header(mda_size_factor);
+            let mut buf = Cursor::new(vec![0; blkdev_size as usize]);
+            let bda = BDA::initialize(&mut buf, &sh.pool_uuid, &sh.dev_uuid, sh.mda_size).unwrap();
             TestResult::from_bool(bda.last_update_time().is_none())
         }
 
@@ -712,20 +684,15 @@ mod tests {
         let data = [0u8; 3];
 
         // Construct a BDA.
-        let sh = random_static_header(0, 0);
-        let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
-        let mut bda = BDA::initialize(&mut buf,
-                                      &sh.pool_uuid,
-                                      &sh.dev_uuid,
-                                      sh.mda_size,
-                                      sh.blkdev_size)
-                .unwrap();
+        let sh = random_static_header(0);
+        let mut buf = Cursor::new(vec![0; 0 as usize]);
+        let mut bda = BDA::initialize(&mut buf, &sh.pool_uuid, &sh.dev_uuid, sh.mda_size).unwrap();
 
         let timestamp0 = now().to_timespec();
         let timestamp1 = now().to_timespec();
         assert!(timestamp0 != timestamp1);
 
-        let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+        let mut buf = Cursor::new(vec![0; 0 as usize]);
         bda.save_state(&timestamp1, &data, &mut buf).unwrap();
 
         // Error, because current timestamp is older than written to newer.
@@ -755,14 +722,10 @@ mod tests {
                        state: Vec<u8>,
                        next_state: Vec<u8>)
                        -> TestResult {
-            let sh = random_static_header(blkdev_size, mda_size_factor);
-            let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
-            let mut bda = BDA::initialize(&mut buf,
-                                          &sh.pool_uuid,
-                                          &sh.dev_uuid,
-                                          sh.mda_size,
-                                          sh.blkdev_size)
-                    .unwrap();
+            let sh = random_static_header(mda_size_factor);
+            let mut buf = Cursor::new(vec![0; blkdev_size as usize]);
+            let mut bda = BDA::initialize(&mut buf, &sh.pool_uuid, &sh.dev_uuid, sh.mda_size)
+                .unwrap();
             let current_time = now().to_timespec();
             bda.save_state(&current_time, &state, &mut buf).unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();
@@ -835,12 +798,11 @@ mod tests {
     /// Construct an arbitrary StaticHeader object.
     /// Write it to a buffer, read it out and make sure you get the same thing.
     fn prop_static_header() {
-        fn static_header(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
-            let sh1 = random_static_header(blkdev_size, mda_size_factor);
+        fn static_header(mda_size_factor: u32) -> TestResult {
+            let sh1 = random_static_header(mda_size_factor);
             let buf = sh1.sigblock_to_buf();
             let sh2 = StaticHeader::sigblock_from_buf(&buf).unwrap().unwrap();
             TestResult::from_bool(sh1.pool_uuid == sh2.pool_uuid && sh1.dev_uuid == sh2.dev_uuid &&
-                                  sh1.blkdev_size == sh2.blkdev_size &&
                                   sh1.mda_size == sh2.mda_size &&
                                   sh1.reserved_size == sh2.reserved_size &&
                                   sh1.flags == sh2.flags)
@@ -848,7 +810,7 @@ mod tests {
 
         QuickCheck::new()
             .tests(30)
-            .quickcheck(static_header as fn(u64, u32) -> TestResult);
+            .quickcheck(static_header as fn(u32) -> TestResult);
     }
 
     #[test]

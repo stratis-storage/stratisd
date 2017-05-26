@@ -9,16 +9,23 @@ use std::io::ErrorKind;
 use std::fs::{OpenOptions, read_dir};
 use std::os::linux::fs::MetadataExt;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use nix::Errno;
 use nix::sys::stat::{S_IFBLK, S_IFMT};
 use serde_json;
 
+use devicemapper::{Device, ThinPoolDev};
+
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 use super::super::types::PoolUuid;
 
-use super::metadata::{BDA, StaticHeader};
+use super::blockdev::BlockDev;
+use super::blockdevmgr::BlockDevMgr;
+use super::device::blkdev_size;
 use super::engine::DevOwnership;
+use super::metadata::{BDA, StaticHeader};
+use super::range_alloc::RangeAllocator;
 use super::serde_structs::PoolSave;
 
 
@@ -181,4 +188,74 @@ pub fn get_pool_metadata(pool_table: &HashMap<PoolUuid, Vec<PathBuf>>)
         }
     }
     Ok(metadata)
+}
+
+/// Instantiate each pool's blockdevs.
+/// Return a map from the pool uuid to the pools blockdevs.
+pub fn get_pool_blockdevs(devnode_table: &HashMap<PoolUuid, Vec<PathBuf>>,
+                          metadata_table: &HashMap<PoolUuid, PoolSave>)
+                          -> EngineResult<HashMap<PoolUuid, BlockDevMgr>> {
+    let mut result = HashMap::new();
+    for (pool_uuid, pool_save) in metadata_table {
+        let segments = pool_save
+            .flex_devs
+            .meta_dev
+            .iter()
+            .chain(pool_save.flex_devs.thin_meta_dev.iter())
+            .chain(pool_save.flex_devs.thin_data_dev.iter());
+
+        let mut segment_table = HashMap::new();
+        for seg in segments {
+            segment_table
+                .entry(seg.0.clone())
+                .or_insert(vec![])
+                .push((seg.1, seg.2))
+        }
+
+        let devnodes = devnode_table
+            .get(&pool_uuid)
+            .expect("devnode_table.keys() == metadata_table.keys()");
+
+        let mut blockdevs = vec![];
+        for dev in devnodes {
+            let bda = try!(BDA::load(&mut try!(OpenOptions::new().read(true).open(dev))));
+            let bda = try!(bda.ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                                                         "no BDA found for Stratis device"
+                                                             .into())));
+
+            let dev_uuid = bda.dev_uuid().simple().to_string();
+
+            let actual_size = try!(blkdev_size(&try!(OpenOptions::new().read(true).open(dev))))
+                .sectors();
+
+            // If size of device has changed and is less, then it is possible
+            // that the segments previously allocated for this blockdev no
+            // longer exist. If that is the case, RangeAllocator::new() will
+            // return an error.
+            let allocator = match segment_table.get(&dev_uuid) {
+                Some(segments) => try!(RangeAllocator::new(actual_size, segments)),
+                None => try!(RangeAllocator::new(actual_size, &vec![])),
+            };
+
+            let device = try!(Device::from_str(&dev.to_string_lossy()));
+            blockdevs.push(BlockDev::new(device, dev.clone(), bda, allocator));
+        }
+        result.insert(pool_uuid.clone(), BlockDevMgr::new(blockdevs));
+    }
+    Ok(result)
+}
+
+/// Locate each pool's thinpool device.
+/// Return a map from the pool UUID to the pool's thinpool device.
+// TODO: Make this safe in the case where DM devices have not been cleaned up.
+pub fn get_pool_thinpooldevs(blockdev_table: &HashMap<PoolUuid, BlockDevMgr>,
+                             metadata_table: &HashMap<PoolUuid, PoolSave>)
+                             -> EngineResult<HashMap<PoolUuid, ThinPoolDev>> {
+    let result = HashMap::new();
+    for (pool_uuid, _pool_save) in metadata_table {
+        let _ = blockdev_table
+            .get(pool_uuid)
+            .expect("blockdev_table.keys() == metadata_table.keys()");
+    }
+    Ok(result)
 }

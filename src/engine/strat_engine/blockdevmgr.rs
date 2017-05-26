@@ -5,7 +5,7 @@
 // Code to handle a collection of block devices.
 
 use std::io;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -16,13 +16,14 @@ use uuid::Uuid;
 
 use super::super::consts::IEC;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::PoolUuid;
+use super::super::types::{DevUuid, PoolUuid};
 
 use super::blockdev::BlockDev;
 use super::device::blkdev_size;
 use super::engine::DevOwnership;
 use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};
 use super::range_alloc::RangeAllocator;
+use super::serde_structs::{BlockDevSave, Recordable};
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
 
@@ -35,6 +36,7 @@ pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
     }
     Ok(devices)
 }
+
 
 #[derive(Debug)]
 pub struct BlockDevMgr {
@@ -54,6 +56,16 @@ impl BlockDevMgr {
                       -> EngineResult<BlockDevMgr> {
         let devices = try!(resolve_devices(paths));
         Ok(BlockDevMgr::new(try!(initialize(pool_uuid, devices, mda_size, force))))
+    }
+
+    /// Obtain a BlockDev by its Device.
+    pub fn get_by_device(&self, device: Device) -> Option<&BlockDev> {
+        self.block_devs.iter().find(|d| d.device() == &device)
+    }
+
+    // Obtain a BlockDev by its UUID.
+    pub fn get_by_uuid(&self, uuid: &DevUuid) -> Option<&BlockDev> {
+        self.block_devs.iter().find(|d| d.uuid() == uuid)
     }
 
     pub fn add(&mut self,
@@ -128,6 +140,28 @@ impl BlockDevMgr {
     }
 }
 
+impl Recordable<HashMap<String, BlockDevSave>> for BlockDevMgr {
+    fn record(&self) -> EngineResult<HashMap<String, BlockDevSave>> {
+
+        // This function exists to assist the type-checker. The type-checker
+        // was unable to infer the type of the apparently equivalent anonymous
+        // closure in Rust version 1.17.0.
+        fn mapper(bd: &BlockDev) -> EngineResult<(String, BlockDevSave)> {
+            Ok((bd.uuid().simple().to_string(), try!(bd.record())))
+        }
+
+        let mut result: HashMap<String, BlockDevSave> = HashMap::new();
+        for item in self.block_devs.iter().map(mapper) {
+            match item {
+                Ok((uuid, save)) => {
+                    result.insert(uuid, save);
+                }
+                Err(err) => return Err(err),
+            }
+        }
+        Ok(result)
+    }
+}
 
 /// Initialize multiple blockdevs at once. This allows all of them
 /// to be checked for usability before writing to any of them.
@@ -215,7 +249,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
                                        &Uuid::new_v4(),
                                        mda_size,
                                        dev_size.sectors()));
-        let allocator = RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())]);
+        let allocator = try!(RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())]));
 
         bds.push(BlockDev::new(dev, devnode, bda, allocator));
     }

@@ -11,7 +11,7 @@ use std::vec::Vec;
 
 use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::DM;
-use devicemapper::{DataBlocks, Sectors};
+use devicemapper::{DataBlocks, Sectors, Segment};
 use devicemapper::LinearDev;
 use devicemapper::{ThinPoolDev, ThinPoolStatus, ThinPoolWorkingStatus};
 use time::now;
@@ -22,7 +22,7 @@ use super::super::consts::IEC::Mi;
 use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
-use super::super::types::{FilesystemUuid, RenameAction, Redundancy};
+use super::super::types::{FilesystemUuid, RenameAction, Redundancy, PoolUuid};
 
 use super::blockdevmgr::BlockDevMgr;
 use super::device::wipe_sectors;
@@ -30,7 +30,7 @@ use super::dmdevice::{FlexRole, ThinPoolRole, format_flex_name, format_thinpool_
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::mdv::MetadataVol;
 use super::metadata::MIN_MDA_SECTORS;
-use super::serde_structs::{Isomorphism, PoolSave};
+use super::serde_structs::{FlexDevsSave, PoolSave, Recordable, ThinPoolDevSave};
 
 const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 const META_LOWATER: u64 = 512;
@@ -81,35 +81,13 @@ impl StratPool {
         let meta_regions = block_mgr
             .alloc_space(INITIAL_META_SIZE)
             .expect("blockmgr must not fail, already checked for space");
-        let device_name = format_flex_name(&pool_uuid, FlexRole::ThinMeta);
-        let meta_dev = try!(LinearDev::new(&device_name, dm, meta_regions));
-
-        // When constructing a thin-pool, Stratis reserves the first N
-        // sectors on a block device by creating a linear device with a
-        // starting offset. DM writes the super block in the first block.
-        // DM requires this first block to be zeros when the meta data for
-        // the thin-pool is initially created. If we don't zero the
-        // superblock DM issue error messages because it triggers code paths
-        // that are trying to re-adopt the device with the attributes that
-        // have been passed.
-        try!(wipe_sectors(&try!(meta_dev.devnode()), Sectors(0), INITIAL_META_SIZE));
 
         let data_regions = block_mgr
             .alloc_space(INITIAL_DATA_SIZE)
             .expect("blockmgr must not fail, already checked for space");
-        let device_name = format_flex_name(&pool_uuid, FlexRole::ThinData);
-        let data_dev = try!(LinearDev::new(&device_name, dm, data_regions));
-        let length = try!(data_dev.size());
 
-        let device_name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
-        // TODO Fix hard coded data blocksize and low water mark.
-        let thinpool_dev = try!(ThinPoolDev::new(&device_name,
-                                                 dm,
-                                                 length,
-                                                 DATA_BLOCK_SIZE,
-                                                 DataBlocks(256000),
-                                                 meta_dev,
-                                                 data_dev));
+        let thinpool_dev =
+            try!(StratPool::setup_thinpooldev(dm, &pool_uuid, meta_regions, data_regions));
 
         let mdv_regions = block_mgr
             .alloc_space(INITIAL_MDV_SIZE)
@@ -133,6 +111,39 @@ impl StratPool {
         Ok(pool)
     }
 
+    pub fn setup_thinpooldev(dm: &DM,
+                             pool_uuid: &PoolUuid,
+                             meta_segs: Vec<Segment>,
+                             data_segs: Vec<Segment>)
+                             -> EngineResult<ThinPoolDev> {
+        let device_name = format_flex_name(pool_uuid, FlexRole::ThinMeta);
+        let meta_dev = try!(LinearDev::new(&device_name, dm, meta_segs));
+
+        // When constructing a thin-pool, Stratis reserves the first N
+        // sectors on a block device by creating a linear device with a
+        // starting offset. DM writes the super block in the first block.
+        // DM requires this first block to be zeros when the meta data for
+        // the thin-pool is initially created. If we don't zero the
+        // superblock DM issue error messages because it triggers code paths
+        // that are trying to re-adopt the device with the attributes that
+        // have been passed.
+        try!(wipe_sectors(&try!(meta_dev.devnode()), Sectors(0), INITIAL_META_SIZE));
+
+        let device_name = format_flex_name(pool_uuid, FlexRole::ThinData);
+        let data_dev = try!(LinearDev::new(&device_name, dm, data_segs));
+
+        let device_name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
+        // TODO Fix hard coded data blocksize and low water mark.
+        let thinpool_dev = try!(ThinPoolDev::new(&device_name,
+                                                 dm,
+                                                 try!(data_dev.size()),
+                                                 DATA_BLOCK_SIZE,
+                                                 DataBlocks(256000),
+                                                 meta_dev,
+                                                 data_dev));
+        Ok(thinpool_dev)
+    }
+
     /// Minimum initial size for a pool.
     pub fn min_initial_size() -> Sectors {
         INITIAL_META_SIZE + INITIAL_DATA_SIZE + INITIAL_MDV_SIZE
@@ -140,8 +151,8 @@ impl StratPool {
 
     // TODO: Check current time against global last updated, and use
     // alternate time value if earlier, as described in SWDD
-    pub fn write_metadata(&mut self) -> EngineResult<()> {
-        let data = try!(serde_json::to_string(&self.to_save()));
+    fn write_metadata(&mut self) -> EngineResult<()> {
+        let data = try!(serde_json::to_string(&try!(self.record())));
         self.block_devs
             .save_state(&now().to_timespec(), data.as_bytes())
     }
@@ -308,8 +319,59 @@ impl HasName for StratPool {
     }
 }
 
-impl Isomorphism<PoolSave> for StratPool {
-    fn to_save(&self) -> PoolSave {
-        PoolSave { name: self.name.clone() }
+impl Recordable<PoolSave> for StratPool {
+    fn record(&self) -> EngineResult<PoolSave> {
+
+        let mapper = |seg: &Segment| -> EngineResult<(String, Sectors, Sectors)> {
+            let bd = try!(self.block_devs
+                     .get_by_device(seg.device)
+                     .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                                                format!("no block device found for device {:?}",
+                                                        seg.device))));
+            Ok((bd.uuid().simple().to_string(), seg.start, seg.length))
+        };
+
+        let mut meta_dev = vec![];
+        for item in self.mdv.segments().iter().map(&mapper) {
+            match item {
+                Ok(seg) => meta_dev.push(seg),
+                Err(err) => return Err(err),
+            }
+        }
+
+        let mut thin_meta_dev = vec![];
+        for item in self.thin_pool
+                .meta_dev()
+                .segments()
+                .iter()
+                .map(&mapper) {
+            match item {
+                Ok(seg) => thin_meta_dev.push(seg),
+                Err(err) => return Err(err),
+            }
+        }
+
+        let mut thin_data_dev = vec![];
+        for item in self.thin_pool
+                .data_dev()
+                .segments()
+                .iter()
+                .map(&mapper) {
+            match item {
+                Ok(seg) => thin_data_dev.push(seg),
+                Err(err) => return Err(err),
+            }
+        }
+
+        Ok(PoolSave {
+               name: self.name.clone(),
+               block_devs: try!(self.block_devs.record()),
+               flex_devs: FlexDevsSave {
+                   meta_dev: meta_dev,
+                   thin_meta_dev: thin_meta_dev,
+                   thin_data_dev: thin_data_dev,
+               },
+               thinpool_dev: ThinPoolDevSave { data_block_size: *self.thin_pool.data_block_size() },
+           })
     }
 }

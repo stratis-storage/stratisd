@@ -207,14 +207,35 @@ pub fn initialize(pool_uuid: &PoolUuid,
 
     let add_devs = try!(filter_devs(dev_infos, pool_uuid, force));
 
-    let mut bds = Vec::new();
+    let mut bds: Vec<BlockDev> = Vec::new();
     for (dev, (devnode, dev_size, mut f)) in add_devs {
 
-        let bda = try!(BDA::initialize(&mut f,
-                                       pool_uuid,
-                                       &Uuid::new_v4(),
-                                       mda_size,
-                                       dev_size.sectors()));
+        let bda = BDA::initialize(&mut f,
+                                  pool_uuid,
+                                  &Uuid::new_v4(),
+                                  mda_size,
+                                  dev_size.sectors());
+        if bda.is_err() {
+            let mut unerased_devnodes = Vec::new();
+            BDA::wipe(&mut f).unwrap_or_else(|_| unerased_devnodes.push(devnode.clone()));
+            for bd in bds.drain(..) {
+                let bd_devnode = bd.devnode.clone();
+                bd.wipe_metadata()
+                    .unwrap_or_else(|_| unerased_devnodes.push(bd_devnode));
+            }
+
+            let err_msg = format!("Failed to initialize {:?}", devnode);
+            if unerased_devnodes.is_empty() {
+                return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+            } else {
+                let err_msg = format!("{}, then failed to wipe already initialized devnodes: {:?}",
+                                      err_msg,
+                                      unerased_devnodes);
+                return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+            }
+        }
+
+        let bda = bda.expect("!bda.is_err()");
         let allocator = RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())]);
 
         bds.push(BlockDev::new(dev, devnode, bda, allocator));

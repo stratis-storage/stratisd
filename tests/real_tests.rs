@@ -54,7 +54,7 @@ fn get_devices(count: u8) -> Option<Vec<PathBuf>> {
         .map(|x| PathBuf::from(x.as_str().unwrap()))
         .collect();
 
-    let length = Bytes(IEC::Mi as u64).sectors();
+    let length = Bytes(IEC::Mi).sectors();
     for device in devices.iter() {
         wipe_sectors(device, Sectors(0), length).unwrap();
     }

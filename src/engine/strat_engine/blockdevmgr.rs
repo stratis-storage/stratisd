@@ -25,7 +25,7 @@ use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};
 use super::range_alloc::RangeAllocator;
 use super::serde_structs::{BlockDevSave, Recordable};
 
-const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u64);
+const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 
 /// Resolve a list of Paths of some sort to a set of unique Devices.
 /// Return an IOError if there was a problem resolving any particular device.

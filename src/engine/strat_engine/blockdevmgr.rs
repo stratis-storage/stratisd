@@ -236,7 +236,8 @@ pub fn initialize(pool_uuid: &PoolUuid,
         }
 
         let bda = bda.expect("!bda.is_err()");
-        let allocator = RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())]);
+        let allocator = RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())])
+            .expect("bda.size() < bda.dev_size() and single range");
 
         bds.push(BlockDev::new(dev, devnode, bda, allocator));
     }

@@ -49,6 +49,11 @@ impl StratEngine {
         }
         Ok(())
     }
+
+    /// Get pool as StratPool
+    pub fn get_strat_pool(&self, uuid: &PoolUuid) -> Option<&StratPool> {
+        self.pools.get_by_uuid(uuid)
+    }
 }
 
 impl Engine for StratEngine {

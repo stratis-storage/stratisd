@@ -41,8 +41,8 @@ fn get_devices(count: u8, dir: &TempDir) -> Vec<LoopDevice> {
     let lc = LoopControl::open().unwrap();
     let mut loop_devices = Vec::new();
 
-    let length = Bytes(IEC::Gi as u64);
-    let wipe_length = Bytes(IEC::Mi as u64).sectors();
+    let length = Bytes(IEC::Gi);
+    let wipe_length = Bytes(IEC::Mi).sectors();
     for index in 0..count {
         let subdir = TempDir::new_in(dir, &index.to_string()).unwrap();
         let path = subdir.path().join("store");

@@ -26,7 +26,7 @@ pub trait Recordable<T> {
     fn record(&self) -> EngineResult<T>;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PoolSave {
     pub name: String,
     pub block_devs: HashMap<String, BlockDevSave>,
@@ -34,12 +34,12 @@ pub struct PoolSave {
     pub thinpool_dev: ThinPoolDevSave,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockDevSave {
     pub devnode: PathBuf,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FilesystemSave {
     pub name: String,
     pub uuid: String,
@@ -47,14 +47,14 @@ pub struct FilesystemSave {
     pub size: Sectors,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlexDevsSave {
     pub meta_dev: Vec<(String, Sectors, Sectors)>,
     pub thin_meta_dev: Vec<(String, Sectors, Sectors)>,
     pub thin_data_dev: Vec<(String, Sectors, Sectors)>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ThinPoolDevSave {
     pub data_block_size: u64,
 }

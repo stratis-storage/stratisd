@@ -142,24 +142,13 @@ impl BlockDevMgr {
 
 impl Recordable<HashMap<String, BlockDevSave>> for BlockDevMgr {
     fn record(&self) -> EngineResult<HashMap<String, BlockDevSave>> {
-
-        // This function exists to assist the type-checker. The type-checker
-        // was unable to infer the type of the apparently equivalent anonymous
-        // closure in Rust version 1.17.0.
-        fn mapper(bd: &BlockDev) -> EngineResult<(String, BlockDevSave)> {
-            Ok((bd.uuid().simple().to_string(), try!(bd.record())))
-        }
-
-        let mut result: HashMap<String, BlockDevSave> = HashMap::new();
-        for item in self.block_devs.iter().map(mapper) {
-            match item {
-                Ok((uuid, save)) => {
-                    result.insert(uuid, save);
-                }
-                Err(err) => return Err(err),
-            }
-        }
-        Ok(result)
+        self.block_devs
+            .iter()
+            .map(|bd| {
+                     bd.record()
+                         .and_then(|bdsave| Ok((bd.uuid().simple().to_string(), bdsave)))
+                 })
+            .collect()
     }
 }
 

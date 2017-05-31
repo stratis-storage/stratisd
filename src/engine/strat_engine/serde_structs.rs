@@ -12,26 +12,31 @@
 // can convert to or from them when saving our current state, or
 // restoring state from saved metadata.
 
-use std::marker::Sized;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 use devicemapper::Sectors;
 
-/// Implements saving struct data to a serializable form and reconstructing
-/// a struct from that form.
-/// Assuming the context of the existing devices this must be an isomorphism,
-/// i.e., setup(x.to_save()) == x and setup(x).to_save() == x or it's a bug.
-pub trait Isomorphism<T> {
-    fn to_save(&self) -> T;
-    fn setup(T) -> Self
-        where Self: Sized
-    {
-        unimplemented!()
-    }
+use engine::EngineResult;
+
+/// Implements saving struct data to a serializable form. The form should be
+/// sufficient, in conjunction with the environment, to reconstruct the
+/// saved struct in all its essentials.
+pub trait Recordable<T> {
+    fn record(&self) -> EngineResult<T>;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PoolSave {
     pub name: String,
+    pub block_devs: HashMap<String, BlockDevSave>,
+    pub flex_devs: FlexDevsSave,
+    pub thinpool_dev: ThinPoolDevSave,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BlockDevSave {
+    pub devnode: PathBuf,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -40,4 +45,16 @@ pub struct FilesystemSave {
     pub uuid: String,
     pub thin_id: u32,
     pub size: Sectors,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FlexDevsSave {
+    pub meta_dev: Vec<(String, Sectors, Sectors)>,
+    pub thin_meta_dev: Vec<(String, Sectors, Sectors)>,
+    pub thin_data_dev: Vec<(String, Sectors, Sectors)>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ThinPoolDevSave {
+    pub data_block_size: u64,
 }

@@ -17,6 +17,7 @@ use super::super::types::{DevUuid, PoolUuid};
 
 use super::metadata::BDA;
 use super::range_alloc::RangeAllocator;
+use super::serde_structs::{BlockDevSave, Recordable};
 
 
 #[derive(Debug)]
@@ -35,6 +36,11 @@ impl BlockDev {
             bda: bda,
             used: allocator,
         }
+    }
+
+    /// Returns the blockdev's Device
+    pub fn device(&self) -> &Device {
+        &self.dev
     }
 
     pub fn wipe_metadata(self) -> EngineResult<()> {
@@ -90,5 +96,11 @@ impl BlockDev {
          segs.iter()
              .map(|&(start, len)| Segment::new(self.dev, start, len))
              .collect())
+    }
+}
+
+impl Recordable<BlockDevSave> for BlockDev {
+    fn record(&self) -> EngineResult<BlockDevSave> {
+        Ok(BlockDevSave { devnode: self.devnode.clone() })
     }
 }

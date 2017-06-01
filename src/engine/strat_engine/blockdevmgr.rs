@@ -8,6 +8,7 @@ use std::io;
 use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
+use std::slice::Iter;
 use std::str::FromStr;
 
 use devicemapper::{Bytes, Device, Sectors, Segment};
@@ -137,6 +138,15 @@ impl BlockDevMgr {
             bd.save_state(time, metadata).unwrap();
         }
         Ok(())
+    }
+}
+
+impl<'a> IntoIterator for &'a BlockDevMgr {
+    type Item = &'a BlockDev;
+    type IntoIter = Iter<'a, BlockDev>;
+
+    fn into_iter(self) -> Iter<'a, BlockDev> {
+        self.block_devs.iter()
     }
 }
 

@@ -30,11 +30,10 @@ const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 /// Resolve a list of Paths of some sort to a set of unique Devices.
 /// Return an IOError if there was a problem resolving any particular device.
 pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
-    let mut devices = HashSet::new();
-    for path in paths {
-        devices.insert(try!(Device::from_str(&path.to_string_lossy())));
-    }
-    Ok(devices)
+    paths
+        .iter()
+        .map(|p| Device::from_str(&p.to_string_lossy()))
+        .collect()
 }
 
 

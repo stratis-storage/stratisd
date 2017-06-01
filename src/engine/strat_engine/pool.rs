@@ -22,7 +22,7 @@ use super::super::consts::IEC::Mi;
 use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
-use super::super::types::{FilesystemUuid, RenameAction, Redundancy};
+use super::super::types::{FilesystemUuid, PoolUuid, RenameAction, Redundancy};
 
 use super::blockdevmgr::BlockDevMgr;
 use super::device::wipe_sectors;
@@ -43,7 +43,7 @@ const INITIAL_MDV_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
 #[derive(Debug)]
 pub struct StratPool {
     name: String,
-    pool_uuid: Uuid,
+    pool_uuid: PoolUuid,
     pub block_devs: BlockDevMgr,
     pub filesystems: Table<StratFilesystem>,
     redundancy: Redundancy,
@@ -297,7 +297,7 @@ impl Pool for StratPool {
 }
 
 impl HasUuid for StratPool {
-    fn uuid(&self) -> &FilesystemUuid {
+    fn uuid(&self) -> &PoolUuid {
         &self.pool_uuid
     }
 }

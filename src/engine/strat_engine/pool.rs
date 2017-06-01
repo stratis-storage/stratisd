@@ -320,37 +320,21 @@ impl Recordable<PoolSave> for StratPool {
             Ok((bd.uuid().simple().to_string(), seg.start, seg.length))
         };
 
-        let mut meta_dev = vec![];
-        for item in self.mdv.segments().iter().map(&mapper) {
-            match item {
-                Ok(seg) => meta_dev.push(seg),
-                Err(err) => return Err(err),
-            }
-        }
+        let meta_dev = try!(self.mdv.segments().iter().map(&mapper).collect());
 
-        let mut thin_meta_dev = vec![];
-        for item in self.thin_pool
-                .meta_dev()
-                .segments()
-                .iter()
-                .map(&mapper) {
-            match item {
-                Ok(seg) => thin_meta_dev.push(seg),
-                Err(err) => return Err(err),
-            }
-        }
+        let thin_meta_dev = try!(self.thin_pool
+                                     .meta_dev()
+                                     .segments()
+                                     .iter()
+                                     .map(&mapper)
+                                     .collect());
 
-        let mut thin_data_dev = vec![];
-        for item in self.thin_pool
-                .data_dev()
-                .segments()
-                .iter()
-                .map(&mapper) {
-            match item {
-                Ok(seg) => thin_data_dev.push(seg),
-                Err(err) => return Err(err),
-            }
-        }
+        let thin_data_dev = try!(self.thin_pool
+                                     .data_dev()
+                                     .segments()
+                                     .iter()
+                                     .map(&mapper)
+                                     .collect());
 
         Ok(PoolSave {
                name: self.name.clone(),

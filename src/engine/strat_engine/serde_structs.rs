@@ -17,7 +17,7 @@ use std::path::PathBuf;
 
 use devicemapper::Sectors;
 
-use engine::EngineResult;
+use super::super::errors::EngineResult;
 
 /// Implements saving struct data to a serializable form. The form should be
 /// sufficient, in conjunction with the environment, to reconstruct the

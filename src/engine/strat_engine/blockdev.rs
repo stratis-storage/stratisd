@@ -56,7 +56,7 @@ impl BlockDev {
     /// List the available-for-upper-layer-use range in this blockdev.
     pub fn avail_range(&self) -> Segment {
         let start = self.bda.size();
-        let size = self.size();
+        let size = self.current_capacity();
         // Blockdev size is at least MIN_DEV_SIZE, so this can fail only if
         // size of metadata area exceeds 1 GiB. Initial metadata area size
         // is 4 MiB.
@@ -74,9 +74,14 @@ impl BlockDev {
         self.bda.pool_uuid()
     }
 
-    /// The device's size.
-    pub fn size(&self) -> Sectors {
+    /// The size of the device as recorded in the metadata.
+    pub fn recorded_size(&self) -> Sectors {
         self.bda.dev_size()
+    }
+
+    /// The actual size of the device now.
+    pub fn current_capacity(&self) -> Sectors {
+        self.used.capacity()
     }
 
     /// Last time metadata was written to this device.

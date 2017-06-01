@@ -311,13 +311,13 @@ impl HasName for StratPool {
 impl Recordable<PoolSave> for StratPool {
     fn record(&self) -> EngineResult<PoolSave> {
 
-        let mapper = |seg: &Segment| -> EngineResult<(String, Sectors, Sectors)> {
+        let mapper = |seg: &Segment| -> EngineResult<(Uuid, Sectors, Sectors)> {
             let bd = try!(self.block_devs
                      .get_by_device(seg.device)
                      .ok_or(EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no block device found for device {:?}",
                                                         seg.device))));
-            Ok((bd.uuid().simple().to_string(), seg.start, seg.length))
+            Ok((*bd.uuid(), seg.start, seg.length))
         };
 
         let meta_dev = try!(self.mdv.segments().iter().map(&mapper).collect());

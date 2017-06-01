@@ -139,14 +139,11 @@ impl BlockDevMgr {
     }
 }
 
-impl Recordable<HashMap<String, BlockDevSave>> for BlockDevMgr {
-    fn record(&self) -> EngineResult<HashMap<String, BlockDevSave>> {
+impl Recordable<HashMap<Uuid, BlockDevSave>> for BlockDevMgr {
+    fn record(&self) -> EngineResult<HashMap<Uuid, BlockDevSave>> {
         self.block_devs
             .iter()
-            .map(|bd| {
-                     bd.record()
-                         .and_then(|bdsave| Ok((bd.uuid().simple().to_string(), bdsave)))
-                 })
+            .map(|bd| bd.record().and_then(|bdsave| Ok((*bd.uuid(), bdsave))))
             .collect()
     }
 }

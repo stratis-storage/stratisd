@@ -38,9 +38,8 @@ pub struct RealTestDev {
 impl RealTestDev {
     /// Construct a new test device
     pub fn new(path: &str) -> RealTestDev {
-        let dev_path = PathBuf::from(path);
-        wipe_sectors(dev_path.as_path(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
-        RealTestDev { path: dev_path }
+        wipe_sectors(path, Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
+        RealTestDev { path: PathBuf::from(path) }
     }
 
     fn as_path(&self) -> &Path {
@@ -50,7 +49,7 @@ impl RealTestDev {
 
 impl Drop for RealTestDev {
     fn drop(&mut self) {
-        wipe_sectors(self.as_path(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
+        wipe_sectors(&self.path, Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
     }
 }
 

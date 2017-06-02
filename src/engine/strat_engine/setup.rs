@@ -247,6 +247,21 @@ pub fn get_pool_blockdevs(devnode_table: &HashMap<PoolUuid, Vec<PathBuf>>,
 
             blockdevs.push(BlockDev::new(device, dev.clone(), bda, allocator));
         }
+
+        // Verify that blockdevs found match blockdevs recorded.
+        let current_uuids: HashSet<_> = blockdevs.iter().map(|b| *b.uuid()).collect();
+        let recorded_uuids: HashSet<_> = pool_save.block_devs.keys().map(|u| *u).collect();
+
+        if current_uuids != recorded_uuids {
+            let err_msg = "Recorded block dev UUIDs != discovered blockdev UUIDs";
+            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+        }
+
+        if blockdevs.len() != current_uuids.len() {
+            let err_msg = "Duplicate block devices found in environment";
+            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+        }
+
         result.insert(pool_uuid.clone(), BlockDevMgr::new(blockdevs));
     }
     Ok(result)

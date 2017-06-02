@@ -4,7 +4,7 @@
 
 // Code to handle a single block device.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::ErrorKind;
 use std::fs::{OpenOptions, read_dir};
 use std::os::linux::fs::MetadataExt;
@@ -217,7 +217,17 @@ pub fn get_pool_blockdevs(devnode_table: &HashMap<PoolUuid, Vec<PathBuf>>,
             .expect("devnode_table.keys() == metadata_table.keys()");
 
         let mut blockdevs = vec![];
+        let mut devices = HashSet::new();
         for dev in devnodes {
+            let device = try!(Device::from_str(&dev.to_string_lossy()));
+
+            // If we've seen this device already, skip it.
+            if devices.contains(&device) {
+                continue;
+            } else {
+                devices.insert(device);
+            }
+
             let bda = try!(BDA::load(&mut try!(OpenOptions::new().read(true).open(dev))));
             let bda = try!(bda.ok_or(EngineError::Engine(ErrorEnum::NotFound,
                                                          "no BDA found for Stratis device"
@@ -235,7 +245,6 @@ pub fn get_pool_blockdevs(devnode_table: &HashMap<PoolUuid, Vec<PathBuf>>,
                 None => try!(RangeAllocator::new(actual_size, &vec![])),
             };
 
-            let device = try!(Device::from_str(&dev.to_string_lossy()));
             blockdevs.push(BlockDev::new(device, dev.clone(), bda, allocator));
         }
         result.insert(pool_uuid.clone(), BlockDevMgr::new(blockdevs));

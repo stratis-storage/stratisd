@@ -31,10 +31,33 @@ use util::simple_tests::test_setup;
 use util::simple_tests::test_teardown;
 use util::simple_tests::test_thinpool_device;
 
+pub struct RealTestDev {
+    path: PathBuf,
+}
+
+impl RealTestDev {
+    /// Construct a new test device
+    pub fn new(path: &str) -> RealTestDev {
+        let dev_path = PathBuf::from(path);
+        wipe_sectors(dev_path.as_path(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
+        RealTestDev { path: dev_path }
+    }
+
+    fn as_path(&self) -> &Path {
+        &self.path.as_path()
+    }
+}
+
+impl Drop for RealTestDev {
+    fn drop(&mut self) {
+        wipe_sectors(self.as_path(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
+    }
+}
 
 /// Set up count devices from configuration file.
 /// Wipe first MiB on each device.
-fn get_devices(count: u8) -> Option<Vec<PathBuf>> {
+fn get_devices(count: u8) -> Option<Vec<RealTestDev>> {
+
     let file = OpenOptions::new()
         .read(true)
         .open("tests/test_config.json")
@@ -48,16 +71,11 @@ fn get_devices(count: u8) -> Option<Vec<PathBuf>> {
     if devpaths.len() < count as usize {
         return None;
     }
-    let devices: Vec<PathBuf> = devpaths
+    let devices: Vec<RealTestDev> = devpaths
         .iter()
         .take(count as usize)
-        .map(|x| PathBuf::from(x.as_str().unwrap()))
+        .map(|x| RealTestDev::new(x.as_str().unwrap()))
         .collect();
-
-    let length = Bytes(IEC::Mi).sectors();
-    for device in devices.iter() {
-        wipe_sectors(device, Sectors(0), length).unwrap();
-    }
 
     Some(devices)
 }

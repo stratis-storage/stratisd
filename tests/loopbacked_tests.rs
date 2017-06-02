@@ -12,7 +12,7 @@ extern crate tempdir;
 mod util;
 
 use std::fs::OpenOptions;
-use std::io::{Seek, Write, SeekFrom};
+use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 use devicemapper::{Bytes, Sectors};
@@ -33,19 +33,53 @@ use util::simple_tests::test_setup;
 use util::simple_tests::test_teardown;
 use util::simple_tests::test_thinpool_device;
 
+pub struct LoopTestDev {
+    ld: LoopDevice,
+}
+
+impl LoopTestDev {
+    pub fn new(lc: &LoopControl, path: &Path) -> LoopTestDev {
+        OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(path)
+            .unwrap();
+
+        let ld = lc.next_free().unwrap();
+        ld.attach(path, 0).unwrap();
+        // Wipe 1 MiB at the beginning, as data sits around on the files.
+        wipe_sectors(&ld.get_path().unwrap(),
+                     Sectors(0),
+                     Bytes(IEC::Mi).sectors())
+                .unwrap();
+
+        LoopTestDev { ld: ld }
+    }
+
+    fn get_path(&self) -> PathBuf {
+        self.ld.get_path().unwrap()
+    }
+
+    pub fn detach(&self) {
+        self.ld.detach().unwrap()
+    }
+}
+
+impl Drop for LoopTestDev {
+    fn drop(&mut self) {
+        self.detach()
+    }
+}
 
 /// Setup count loop backed devices in dir.
 /// Make sure each loop device is backed by a 1 GiB file.
 /// Wipe the first 1 MiB of the file.
-fn get_devices(count: u8, dir: &TempDir) -> Vec<LoopDevice> {
+fn get_devices(count: u8, dir: &TempDir) -> Vec<LoopTestDev> {
     let lc = LoopControl::open().unwrap();
     let mut loop_devices = Vec::new();
 
-    let length = Bytes(IEC::Gi);
-    let wipe_length = Bytes(IEC::Mi).sectors();
     for index in 0..count {
-        let subdir = TempDir::new_in(dir, &index.to_string()).unwrap();
-        let path = subdir.path().join("store");
+        let path = dir.path().join(format!("store{}", &index));
         let mut f = OpenOptions::new()
             .read(true)
             .write(true)
@@ -55,23 +89,13 @@ fn get_devices(count: u8, dir: &TempDir) -> Vec<LoopDevice> {
 
         // the proper way to do this is fallocate, but nix doesn't implement yet.
         // TODO: see https://github.com/nix-rust/nix/issues/596
-        f.seek(SeekFrom::Start(*length)).unwrap();
+        f.seek(SeekFrom::Start(IEC::Gi)).unwrap();
         f.write(&[0]).unwrap();
         f.flush().unwrap();
 
-        // Wipe 1 MiB at the beginning, as data sits around on the files.
-        OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(&path)
-            .unwrap();
-        wipe_sectors(&path, Sectors(0), wipe_length).unwrap();
+        let ltd = LoopTestDev::new(&lc, &path);
 
-
-        let ld = lc.next_free().unwrap();
-        ld.attach(path, 0).unwrap();
-        loop_devices.push(ld);
+        loop_devices.push(ltd);
     }
     loop_devices
 }
@@ -85,24 +109,12 @@ fn test_with_spec<F>(count: u8, test: F) -> ()
 {
     init_logger();
     let tmpdir = TempDir::new("stratis").unwrap();
-    let loop_devices: Vec<LoopDevice> = get_devices(count, &tmpdir);
-    let device_paths: Vec<PathBuf> = loop_devices
-        .iter()
-        .map(|x| x.get_path().unwrap())
-        .collect();
+    let loop_devices: Vec<LoopTestDev> = get_devices(count, &tmpdir);
+    let device_paths: Vec<PathBuf> = loop_devices.iter().map(|x| x.get_path()).collect();
     let device_paths: Vec<&Path> = device_paths.iter().map(|x| x.as_path()).collect();
 
     test(&device_paths);
 
-    for dev in loop_devices {
-        dev.detach().unwrap();
-    }
-
-    // Explicitly delete the temporary directory with all its contents.
-    // Allowing it to be deleted on drop will cause any errors to be suppressed.
-    // This may alert us to some problem with the underlying infrastructure
-    // of the tests.
-    tmpdir.close().unwrap();
 }
 
 

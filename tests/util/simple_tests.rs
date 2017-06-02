@@ -193,7 +193,6 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
 
     let tmp_dir = TempDir::new("stratis_testing").unwrap();
     mount_fs(&thin_dev.devnode().unwrap(), tmp_dir.path()).unwrap();
-    unmount_fs(tmp_dir.path()).unwrap();
     for i in 0..100 {
         let file_path = tmp_dir.path().join(format!("stratis_test{}.txt", i));
         writeln!(&OpenOptions::new()
@@ -204,6 +203,9 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
                  "data")
                 .unwrap();
     }
+    // The -d (detach-loop) is passed for both loopback and real devs,
+    // it helps with loopback devs and does no harm for real devs.
+    unmount_fs(tmp_dir.path(), &["-d"]).unwrap();
     thin_dev.teardown(&dm).unwrap();
     thinpool_dev.teardown(&dm).unwrap();
 }

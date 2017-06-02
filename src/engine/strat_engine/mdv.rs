@@ -158,7 +158,8 @@ impl MetadataVol {
 
     /// Tear down a Metadata Volume.
     pub fn teardown(self, dm: &DM) -> EngineResult<()> {
-        try!(unmount_fs(&self.mount_pt));
+        let v: Vec<&str> = Vec::new();
+        try!(unmount_fs(&self.mount_pt, &v));
         try!(self.dev.teardown(dm));
 
         Ok(())

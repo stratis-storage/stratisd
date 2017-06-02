@@ -4,6 +4,7 @@
 extern crate rand;
 
 use std::error::Error;
+use std::ffi::OsStr;
 use std::path::Path;
 use std::process::Command;
 
@@ -147,10 +148,14 @@ pub fn mount_fs(dev_path: &Path, mount_point: &Path) -> EngineResult<()> {
     Ok(())
 }
 
-pub fn unmount_fs(mount_point: &Path) -> EngineResult<()> {
+pub fn unmount_fs<I, S>(mount_point: &Path, flags: I) -> EngineResult<()>
+    where I: IntoIterator<Item = S>,
+          S: AsRef<OsStr>
+{
     debug!("Unmount filesystem {:?}", mount_point);
 
-    let output = try!(Command::new("umount").arg(mount_point).output());
+    let mut command = Command::new("umount");
+    let output = try!(command.arg(mount_point).args(flags).output());
 
     if output.status.success() {
         debug!("Unmounted filesystem {:?}", mount_point)

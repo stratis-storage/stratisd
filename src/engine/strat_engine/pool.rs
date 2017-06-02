@@ -344,7 +344,7 @@ impl Recordable<PoolSave> for StratPool {
                    thin_meta_dev: thin_meta_dev,
                    thin_data_dev: thin_data_dev,
                },
-               thinpool_dev: ThinPoolDevSave { data_block_size: *self.thin_pool.data_block_size() },
+               thinpool_dev: ThinPoolDevSave { data_block_size: self.thin_pool.data_block_size() },
            })
     }
 }

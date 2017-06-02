@@ -59,5 +59,5 @@ pub struct FlexDevsSave {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ThinPoolDevSave {
-    pub data_block_size: u64,
+    pub data_block_size: Sectors,
 }

@@ -25,6 +25,7 @@ use super::blockdev::BlockDev;
 use super::blockdevmgr::BlockDevMgr;
 use super::device::blkdev_size;
 use super::engine::DevOwnership;
+use super::filesystem::StratFilesystem;
 use super::mdv::MetadataVol;
 use super::metadata::{BDA, StaticHeader};
 use super::pool::StratPool;
@@ -329,5 +330,26 @@ pub fn get_pool_dmdevs(blockdev_table: &HashMap<PoolUuid, BlockDevMgr>,
         let mdv = try!(StratPool::setup_mdv(&dm, pool_uuid, meta_segments));
         result.insert(*pool_uuid, (thinpool_dev, mdv));
     }
+    Ok(result)
+}
+
+pub fn get_pool_filesystems(stuff: &HashMap<PoolUuid, (ThinPoolDev, MetadataVol)>)
+                            -> EngineResult<HashMap<PoolUuid, Vec<StratFilesystem>>> {
+    let dm = try!(DM::new());
+    let mut result = HashMap::new();
+    for (pool_uuid, &(ref thinpool, ref mdv)) in stuff {
+        let mut filesystems = Vec::new();
+        for fssave in try!(mdv.filesystems()) {
+            filesystems.push(try!(StratFilesystem::setup(pool_uuid,
+                                                         fssave.thin_id as u16,
+                                                         fssave.uuid,
+                                                         &fssave.name,
+                                                         fssave.size,
+                                                         &dm,
+                                                         thinpool)));
+        }
+        result.insert(*pool_uuid, filesystems);
+    }
+
     Ok(result)
 }

@@ -240,10 +240,9 @@ pub fn get_pool_blockdevs(devnode_table: &HashMap<PoolUuid, Vec<PathBuf>>,
             // that the segments previously allocated for this blockdev no
             // longer exist. If that is the case, RangeAllocator::new() will
             // return an error.
-            let allocator = match segment_table.get(bda.dev_uuid()) {
-                Some(segments) => try!(RangeAllocator::new(actual_size, segments)),
-                None => try!(RangeAllocator::new(actual_size, &vec![])),
-            };
+            let allocator =
+                try!(RangeAllocator::new(actual_size,
+                                         segment_table.get(bda.dev_uuid()).unwrap_or(&vec![])));
 
             blockdevs.push(BlockDev::new(device, dev.clone(), bda, allocator));
         }

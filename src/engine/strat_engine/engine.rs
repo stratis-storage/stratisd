@@ -19,6 +19,8 @@ use super::super::types::{PoolUuid, Redundancy, RenameAction};
 use super::pool::StratPool;
 use super::setup::find_all;
 
+pub const DEV_PATH: &'static str = "/dev/stratis";
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum DevOwnership {
     Ours(Uuid),
@@ -33,7 +35,7 @@ pub struct StratEngine {
 
 impl StratEngine {
     pub fn initialize() -> EngineResult<StratEngine> {
-        if let Err(err) = create_dir("/dev/stratis") {
+        if let Err(err) = create_dir(DEV_PATH) {
             if err.kind() != ErrorKind::AlreadyExists {
                 return Err(From::from(err));
             }

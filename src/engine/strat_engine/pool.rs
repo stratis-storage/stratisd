@@ -92,9 +92,8 @@ impl StratPool {
         let mdv_regions = block_mgr
             .alloc_space(INITIAL_MDV_SIZE)
             .expect("blockmgr must not fail, already checked for space");
-        let device_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
-        let mdv_dev = try!(LinearDev::new(&device_name, dm, mdv_regions));
-        let mdv = try!(MetadataVol::initialize(&pool_uuid, mdv_dev));
+
+        let mdv = try!(StratPool::setup_mdv(dm, &pool_uuid, mdv_regions));
 
         let mut pool = StratPool {
             name: name.to_owned(),
@@ -144,6 +143,17 @@ impl StratPool {
                                  DataBlocks(256000),
                                  meta_dev,
                                  data_dev)))
+    }
+
+
+    pub fn setup_mdv(dm: &DM,
+                     pool_uuid: &PoolUuid,
+                     segs: Vec<Segment>)
+                     -> EngineResult<MetadataVol> {
+        let device_name = format_flex_name(pool_uuid, FlexRole::MetadataVolume);
+        let mdv_dev = try!(LinearDev::new(&device_name, dm, segs));
+        let mdv = try!(MetadataVol::initialize(&pool_uuid, mdv_dev));
+        Ok(mdv)
     }
 
     /// Minimum initial size for a pool.

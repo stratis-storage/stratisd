@@ -119,13 +119,6 @@ impl BlockDevMgr {
         Some(segs)
     }
 
-    pub fn devnodes(&self) -> Vec<PathBuf> {
-        self.block_devs
-            .iter()
-            .map(|d| d.devnode.clone())
-            .collect()
-    }
-
     /// Write the given data to all blockdevs marking with specified time.
     // TODO: Cap # of blockdevs written to, as described in SWDD
     pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {

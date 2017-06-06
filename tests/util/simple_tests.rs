@@ -31,6 +31,7 @@ use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_fs};
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
                                                  MIN_MDA_SECTORS};
+use libstratis::engine::strat_engine::serde_structs::Recordable;
 use libstratis::engine::strat_engine::setup::{find_all, get_pool_metadata};
 use libstratis::engine::strat_engine::StratEngine;
 
@@ -307,11 +308,10 @@ pub fn test_empty_pool(paths: &[&Path]) -> () {
 
 /// Verify that metadata can be read from pools.
 /// 1. Split paths into two separate sets.
-/// 2. Create a pool from the first set.
-/// 3. Use find_all() to get the devices in the pool.
+/// 2. Create two pools from each set.
+/// 3. Use find_all() to get the devices in the pools.
 /// 4. Use get_pool_metadata to find metadata for all pools.
-/// 5. Verify that metadata name is correct.
-/// 6. Create a second pool and repeat.
+/// 5. Verify that metadata is correct.
 /// 7. Teardown the engine and repeat.
 pub fn test_basic_metadata(paths: &[&Path]) {
     assert!(paths.len() > 2);
@@ -322,25 +322,30 @@ pub fn test_basic_metadata(paths: &[&Path]) {
 
     let name1 = "name1";
     let (uuid1, _) = engine.create_pool(&name1, paths1, None, false).unwrap();
-
-    let pools = find_all().unwrap();
-    let metadata = get_pool_metadata(&pools).unwrap();
-    assert!(metadata.len() == 1);
-    assert!(metadata.get(&uuid1).unwrap().name == name1);
+    let metadata1 = engine
+        .get_strat_pool(&uuid1)
+        .unwrap()
+        .record()
+        .unwrap();
 
     let name2 = "name2";
     let (uuid2, _) = engine.create_pool(&name2, paths2, None, false).unwrap();
+    let metadata2 = engine
+        .get_strat_pool(&uuid2)
+        .unwrap()
+        .record()
+        .unwrap();
 
     let pools = find_all().unwrap();
     let metadata = get_pool_metadata(&pools).unwrap();
     assert!(metadata.len() == 2);
-    assert!(metadata.get(&uuid1).unwrap().name == name1);
-    assert!(metadata.get(&uuid2).unwrap().name == name2);
+    assert!(*metadata.get(&uuid1).unwrap() == metadata1);
+    assert!(*metadata.get(&uuid2).unwrap() == metadata2);
 
     engine.teardown().unwrap();
     let pools = find_all().unwrap();
     let metadata = get_pool_metadata(&pools).unwrap();
     assert!(metadata.len() == 2);
-    assert!(metadata.get(&uuid1).unwrap().name == name1);
-    assert!(metadata.get(&uuid2).unwrap().name == name2);
+    assert!(*metadata.get(&uuid1).unwrap() == metadata1);
+    assert!(*metadata.get(&uuid2).unwrap() == metadata2);
 }

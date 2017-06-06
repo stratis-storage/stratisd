@@ -24,6 +24,7 @@ use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{FilesystemUuid, PoolUuid, RenameAction, Redundancy};
 
+use super::blockdev::BlockDev;
 use super::blockdevmgr::BlockDevMgr;
 use super::device::wipe_sectors;
 use super::dmdevice::{FlexRole, ThinPoolRole, format_flex_name, format_thinpool_name};
@@ -44,7 +45,7 @@ const INITIAL_MDV_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
 pub struct StratPool {
     name: String,
     pool_uuid: PoolUuid,
-    pub block_devs: BlockDevMgr,
+    block_devs: BlockDevMgr,
     pub filesystems: Table<StratFilesystem>,
     redundancy: Redundancy,
     thin_pool: ThinPoolDev,
@@ -222,6 +223,11 @@ impl StratPool {
         try!(self.thin_pool.teardown(&dm));
         try!(self.mdv.teardown(&dm));
         Ok(())
+    }
+
+    /// All the block devices belonging to this pool.
+    pub fn blockdevs(&self) -> &[&BlockDev] {
+        &self.block_devs.into_iter().collect::<Vec<&BlockDev>>()
     }
 }
 

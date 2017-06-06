@@ -53,7 +53,7 @@ impl StratFilesystem {
                                              dm,
                                              thin_pool,
                                              thin_id as u32,
-                                             Bytes(IEC::Gi).sectors()));
+                                             Bytes(IEC::Ti).sectors()));
         try!(create_fs(try!(new_thin_dev.devnode()).as_path()));
         Ok(StratFilesystem {
                fs_id: fs_id,

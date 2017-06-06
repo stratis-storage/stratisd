@@ -36,16 +36,19 @@ impl RangeAllocator {
     }
 
     fn check_for_overflow(&self, off: Sectors, len: Sectors) -> EngineResult<()> {
-        if off.checked_add(*len).is_none() {
-            let err_msg = format!("elements in range ({}, {}) inexpressible in u64", off, len);
+        if let Some(sum) = off.checked_add(len) {
+            if sum > self.limit {
+                let err_msg = format!("elements in range ({}, {}) exceed limit {}",
+                                      off,
+                                      len,
+                                      self.limit);
+                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
+            }
+        } else {
+            let err_msg = format!("elements in range ({}, {}) inexpressible in this format",
+                                  off,
+                                  len);
             return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
-        }
-        if off + len > self.limit {
-            return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                           format!("elements in range ({}, {}) exceed limit {}",
-                                                   off,
-                                                   len,
-                                                   self.limit)));
         }
         Ok(())
     }

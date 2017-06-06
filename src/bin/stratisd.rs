@@ -94,8 +94,6 @@ fn run() -> StratisResult<()> {
         }
     };
 
-    try!(engine.borrow_mut().setup());
-
     let (dbus_conn, mut tree, dbus_context) = try!(libstratis::dbus_api::connect(engine.clone()));
 
     // Get a list of fds to poll for

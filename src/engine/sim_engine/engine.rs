@@ -91,12 +91,6 @@ impl Engine for SimEngine {
     fn check(&mut self) -> () {
         check_engine!(self)
     }
-
-    fn setup(&mut self) -> EngineResult<()> {
-        // do nothing, as currently the sim engine does not interact w/ the
-        // environment, other than D-Bus.
-        Ok(())
-    }
 }
 
 #[cfg(test)]

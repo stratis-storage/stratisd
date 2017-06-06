@@ -41,6 +41,21 @@ impl StratEngine {
             }
         }
 
+        let pools = try!(find_all());
+
+        // FIXME: This is quite clearly incomplete pool reconstruction.
+        for (pool_uuid, devices) in pools.iter() {
+            let pool_save = try!(try!(get_metadata(pool_uuid, devices))
+                                     .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                                                                format!("no metadata for pool {}",
+                                                                        pool_uuid))));
+            let _ = get_blockdevmgr(&pool_save, devices);
+        }
+        if !pools.is_empty() {
+            let err_msg = "Stratis was already run once, can not yet reconstruct state";
+            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, err_msg.into()));
+        }
+
         Ok(StratEngine { pools: Table::new() })
     }
 
@@ -94,22 +109,5 @@ impl Engine for StratEngine {
 
     fn check(&mut self) -> () {
         check_engine!(self);
-    }
-
-    // TODO: Fix this method so that it actually sets up the engine.
-    fn setup(&mut self) -> EngineResult<()> {
-        let pools = try!(find_all());
-        for (pool_uuid, devices) in pools.iter() {
-            let pool_save = try!(try!(get_metadata(pool_uuid, devices))
-                                     .ok_or(EngineError::Engine(ErrorEnum::NotFound,
-                                                                format!("no metadata for pool {}",
-                                                                        pool_uuid))));
-            let _ = get_blockdevmgr(&pool_save, devices);
-        }
-        if !pools.is_empty() {
-            let err_msg = "Stratis was already run once, can not yet reconstruct state";
-            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, err_msg.into()));
-        }
-        Ok(())
     }
 }

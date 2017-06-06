@@ -73,10 +73,7 @@ impl Engine for StratEngine {
 
         let dm = try!(DM::new());
         let pool = try!(StratPool::initialize(name, &dm, blockdev_paths, redundancy, force));
-        let bdev_devnodes = pool.block_devs
-            .into_iter()
-            .map(|d| d.devnode.clone())
-            .collect();
+        let bdev_devnodes = pool.blockdevs().map(|d| d.devnode.clone()).collect();
 
         let uuid = pool.uuid().clone();
         self.pools.insert(pool);

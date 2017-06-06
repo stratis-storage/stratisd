@@ -7,6 +7,7 @@ use std::collections::hash_map::RandomState;
 use std::iter::FromIterator;
 use std::path::Path;
 use std::path::PathBuf;
+use std::slice::Iter;
 use std::vec::Vec;
 
 use devicemapper::consts::SECTOR_SIZE;
@@ -226,8 +227,9 @@ impl StratPool {
     }
 
     /// All the block devices belonging to this pool.
-    pub fn blockdevs(&self) -> &[&BlockDev] {
-        &self.block_devs.into_iter().collect::<Vec<&BlockDev>>()
+    pub fn blockdevs<'a>(&self) -> Iter<'a, BlockDev> {
+        let junk: Iter<'a, BlockDev> = self.block_devs.into_iter();
+        junk
     }
 }
 

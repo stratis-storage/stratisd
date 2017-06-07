@@ -19,6 +19,8 @@ use uuid::Uuid;
 
 use engine::RenameAction;
 
+use super::super::engine::Filesystem;
+
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
 use super::util::STRATIS_BASE_PATH;
@@ -132,10 +134,15 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-/// Get the devnode for an object path.
-fn get_filesystem_devnode(i: &mut IterAppend,
-                          p: &PropInfo<MTFn<TData>, TData>)
-                          -> Result<(), MethodErr> {
+/// Get a filesystem property and place it on the D-Bus. The property is
+/// found by means of the getter method which takes a reference to a
+/// Filesystem and obtains the property from the filesystem.
+fn get_filesystem_property<F>(i: &mut IterAppend,
+                              p: &PropInfo<MTFn<TData>, TData>,
+                              getter: F)
+                              -> Result<(), MethodErr>
+    where F: Fn(&Filesystem) -> Result<MessageItem, MethodErr>
+{
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
 
@@ -162,48 +169,30 @@ fn get_filesystem_devnode(i: &mut IterAppend,
     let filesystem = try!(pool.get_filesystem(filesystem_uuid)
         .ok_or(MethodErr::failed(&format!("no name for filesystem with uuid {}",
                                           &filesystem_uuid))));
-    let devnode = try!(filesystem
-        .devnode()
-        .map_err(|_| {
-                     MethodErr::failed(&format!("no devnode for filesystem with uuid {}",
-                                                &filesystem_uuid))
-                 }));
-    i.append(MessageItem::Str(format!("{}", devnode.display())));
+    i.append(try!(getter(filesystem)));
     Ok(())
+}
+
+/// Get the devnode for an object path.
+fn get_filesystem_devnode(i: &mut IterAppend,
+                          p: &PropInfo<MTFn<TData>, TData>)
+                          -> Result<(), MethodErr> {
+
+    fn get_devnode(filesystem: &Filesystem) -> Result<MessageItem, MethodErr> {
+        let devnode = try!(filesystem
+            .devnode()
+            .map_err(|_| {
+                     MethodErr::failed(&format!("no devnode for filesystem with uuid {}",
+                                                filesystem.uuid()))
+            }));
+        Ok(MessageItem::Str(format!("{}", devnode.display())))
+    }
+
+    get_filesystem_property(i, p, get_devnode)
 }
 
 fn get_filesystem_name(i: &mut IterAppend,
                        p: &PropInfo<MTFn<TData>, TData>)
                        -> Result<(), MethodErr> {
-    let dbus_context = p.tree.get_data();
-    let object_path = p.path.get_name();
-
-    let filesystem_path = p.tree
-        .get(&object_path)
-        .expect("tree must contain implicit argument");
-    let filesystem_data = try!(ref_ok_or(filesystem_path.get_data(),
-                                         MethodErr::failed(&format!("no data for object path {}",
-                                                                    &object_path))));
-
-    let pool_path = try!(p.tree
-                             .get(&filesystem_data.parent)
-                             .ok_or(MethodErr::failed(&format!("no path for parent object path {}",
-                                                               &filesystem_data.parent))));
-    let pool_uuid = try!(ref_ok_or(pool_path.get_data(),
-                                   MethodErr::failed(&format!("no data for object path {}",
-                                                              &object_path))))
-            .uuid;
-
-    let mut engine = dbus_context.engine.borrow_mut();
-    let pool = try!(engine
-                        .get_pool(&pool_uuid)
-                        .ok_or(MethodErr::failed(&format!("no pool corresponding to uuid {}",
-                                                          &pool_uuid))));
-
-    let filesystem_uuid = &filesystem_data.uuid;
-    i.append(try!(pool.get_filesystem(filesystem_uuid)
-                      .map(|x| MessageItem::Str(x.name().to_owned()))
-                      .ok_or(MethodErr::failed(&format!("no name for filesystem with uuid {}",
-                                                        &filesystem_uuid)))));
-    Ok(())
+    get_filesystem_property(i, p, |f| Ok(MessageItem::Str(f.name().to_owned())))
 }

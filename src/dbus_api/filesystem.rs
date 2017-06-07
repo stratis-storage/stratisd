@@ -44,6 +44,11 @@ pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext,
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
+    let devnode_property = f.property::<&str, _>("Devnode", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_filesystem_devnode);
+
     let name_property = f.property::<&str, _>("Name", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
@@ -69,6 +74,7 @@ pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext,
         .introspectable()
         .add(f.interface(interface_name, ())
                  .add_m(rename_method)
+                 .add_p(devnode_property)
                  .add_p(name_property)
                  .add_p(pool_property)
                  .add_p(uuid_property));
@@ -126,6 +132,45 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
+/// Get the devnode for an object path.
+fn get_filesystem_devnode(i: &mut IterAppend,
+                          p: &PropInfo<MTFn<TData>, TData>)
+                          -> Result<(), MethodErr> {
+    let dbus_context = p.tree.get_data();
+    let object_path = p.path.get_name();
+
+    let filesystem_path = p.tree
+        .get(&object_path)
+        .expect("tree must contain implicit argument");
+    let filesystem_data = try!(ref_ok_or(filesystem_path.get_data(),
+                                         MethodErr::failed(&format!("no data for object path {}",
+                                                                    &object_path))));
+    let pool_path = try!(p.tree
+                             .get(&filesystem_data.parent)
+                             .ok_or(MethodErr::failed(&format!("no path for parent object path {}",
+                                                               &filesystem_data.parent))));
+    let pool_uuid = try!(ref_ok_or(pool_path.get_data(),
+                                   MethodErr::failed(&format!("no data for object path {}",
+                                                              &object_path))))
+            .uuid;
+    let mut engine = dbus_context.engine.borrow_mut();
+    let pool = try!(engine
+                        .get_pool(&pool_uuid)
+                        .ok_or(MethodErr::failed(&format!("no pool corresponding to uuid {}",
+                                                          &pool_uuid))));
+    let filesystem_uuid = &filesystem_data.uuid;
+    let filesystem = try!(pool.get_filesystem(filesystem_uuid)
+        .ok_or(MethodErr::failed(&format!("no name for filesystem with uuid {}",
+                                          &filesystem_uuid))));
+    let devnode = try!(filesystem
+        .devnode()
+        .map_err(|_| {
+                     MethodErr::failed(&format!("no devnode for filesystem with uuid {}",
+                                                &filesystem_uuid))
+                 }));
+    i.append(MessageItem::Str(format!("{}", devnode.display())));
+    Ok(())
+}
 
 fn get_filesystem_name(i: &mut IterAppend,
                        p: &PropInfo<MTFn<TData>, TData>)

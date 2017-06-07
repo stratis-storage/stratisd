@@ -25,6 +25,8 @@ pub trait Filesystem: HasName + HasUuid {
     fn rename(&mut self, name: &str) -> ();
     /// Destroy this filesystem
     fn destroy(self) -> EngineResult<()>;
+    /// path of the device node
+    fn devnode(&self) -> EngineResult<PathBuf>;
 }
 
 pub trait Pool: HasName + HasUuid {

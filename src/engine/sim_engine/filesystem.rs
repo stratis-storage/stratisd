@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::path::PathBuf;
 
 use super::super::engine::{HasName, HasUuid, Filesystem};
 use super::super::errors::EngineResult;
@@ -29,6 +30,10 @@ impl Filesystem for SimFilesystem {
 
     fn destroy(self) -> EngineResult<()> {
         Ok(())
+    }
+
+    fn devnode(&self) -> EngineResult<PathBuf> {
+        Ok(PathBuf::from(format!("/dev/stratis/{}", self.name)))
     }
 }
 

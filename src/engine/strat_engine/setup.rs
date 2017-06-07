@@ -172,96 +172,66 @@ pub fn get_metadata(pool_uuid: &PoolUuid, devnodes: &[PathBuf]) -> EngineResult<
     Err(EngineError::Engine(ErrorEnum::NotFound, err_str.into()))
 }
 
+/// Get the BlockDevMgr corresponding to this pool.
+pub fn get_blockdevmgr(pool_save: &PoolSave, devnodes: &[PathBuf]) -> EngineResult<BlockDevMgr> {
+    let segments = pool_save
+        .flex_devs
+        .meta_dev
+        .iter()
+        .chain(pool_save.flex_devs.thin_meta_dev.iter())
+        .chain(pool_save.flex_devs.thin_data_dev.iter());
 
-/// Get the most recent metadata for each pool.
-/// Since the metadata is written immediately after a pool is created, it
-/// is considered an error for a pool to be w/out metadata.
-pub fn get_pool_metadata(pool_table: &HashMap<PoolUuid, Vec<PathBuf>>)
-                         -> EngineResult<HashMap<PoolUuid, PoolSave>> {
-    let mut metadata = HashMap::new();
-    for (pool_uuid, devices) in pool_table.iter() {
-        if let Ok(Some(pool)) = get_metadata(pool_uuid, &devices) {
-            metadata.insert(pool_uuid.clone(), pool);
+    let mut segment_table = HashMap::new();
+    for seg in segments {
+        segment_table
+            .entry(seg.0.clone())
+            .or_insert(vec![])
+            .push((seg.1, seg.2))
+    }
+
+    let mut blockdevs = vec![];
+    let mut devices = HashSet::new();
+    for dev in devnodes {
+        let device = try!(Device::from_str(&dev.to_string_lossy()));
+
+        // If we've seen this device already, skip it.
+        if devices.contains(&device) {
+            continue;
         } else {
-            return Err(EngineError::Engine(ErrorEnum::NotFound,
-                                           format!("no metadata for pool {}", pool_uuid)));
+            devices.insert(device);
         }
+
+        let bda = try!(BDA::load(&mut try!(OpenOptions::new().read(true).open(dev))));
+        let bda = try!(bda.ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                                                     "no BDA found for Stratis device".into())));
+
+        let actual_size = try!(blkdev_size(&try!(OpenOptions::new().read(true).open(dev))))
+            .sectors();
+
+        // If size of device has changed and is less, then it is possible
+        // that the segments previously allocated for this blockdev no
+        // longer exist. If that is the case, RangeAllocator::new() will
+        // return an error.
+        let allocator =
+            try!(RangeAllocator::new(actual_size,
+                                     segment_table.get(bda.dev_uuid()).unwrap_or(&vec![])));
+
+        blockdevs.push(BlockDev::new(device, dev.clone(), bda, allocator));
     }
-    Ok(metadata)
-}
 
-/// Instantiate each pool's blockdevs.
-/// Return a map from the pool uuid to the pools blockdevs.
-pub fn get_pool_blockdevs(devnode_table: &HashMap<PoolUuid, Vec<PathBuf>>,
-                          metadata_table: &HashMap<PoolUuid, PoolSave>)
-                          -> EngineResult<HashMap<PoolUuid, BlockDevMgr>> {
-    let mut result = HashMap::new();
-    for (pool_uuid, pool_save) in metadata_table {
-        let segments = pool_save
-            .flex_devs
-            .meta_dev
-            .iter()
-            .chain(pool_save.flex_devs.thin_meta_dev.iter())
-            .chain(pool_save.flex_devs.thin_data_dev.iter());
+    // Verify that blockdevs found match blockdevs recorded.
+    let current_uuids: HashSet<_> = blockdevs.iter().map(|b| *b.uuid()).collect();
+    let recorded_uuids: HashSet<_> = pool_save.block_devs.keys().map(|u| *u).collect();
 
-        let mut segment_table = HashMap::new();
-        for seg in segments {
-            segment_table
-                .entry(seg.0.clone())
-                .or_insert(vec![])
-                .push((seg.1, seg.2))
-        }
-
-        let devnodes = devnode_table
-            .get(&pool_uuid)
-            .expect("devnode_table.keys() == metadata_table.keys()");
-
-        let mut blockdevs = vec![];
-        let mut devices = HashSet::new();
-        for dev in devnodes {
-            let device = try!(Device::from_str(&dev.to_string_lossy()));
-
-            // If we've seen this device already, skip it.
-            if devices.contains(&device) {
-                continue;
-            } else {
-                devices.insert(device);
-            }
-
-            let bda = try!(BDA::load(&mut try!(OpenOptions::new().read(true).open(dev))));
-            let bda = try!(bda.ok_or(EngineError::Engine(ErrorEnum::NotFound,
-                                                         "no BDA found for Stratis device"
-                                                             .into())));
-
-            let actual_size = try!(blkdev_size(&try!(OpenOptions::new().read(true).open(dev))))
-                .sectors();
-
-            // If size of device has changed and is less, then it is possible
-            // that the segments previously allocated for this blockdev no
-            // longer exist. If that is the case, RangeAllocator::new() will
-            // return an error.
-            let allocator =
-                try!(RangeAllocator::new(actual_size,
-                                         segment_table.get(bda.dev_uuid()).unwrap_or(&vec![])));
-
-            blockdevs.push(BlockDev::new(device, dev.clone(), bda, allocator));
-        }
-
-        // Verify that blockdevs found match blockdevs recorded.
-        let current_uuids: HashSet<_> = blockdevs.iter().map(|b| *b.uuid()).collect();
-        let recorded_uuids: HashSet<_> = pool_save.block_devs.keys().map(|u| *u).collect();
-
-        if current_uuids != recorded_uuids {
-            let err_msg = "Recorded block dev UUIDs != discovered blockdev UUIDs";
-            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
-        }
-
-        if blockdevs.len() != current_uuids.len() {
-            let err_msg = "Duplicate block devices found in environment";
-            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
-        }
-
-        result.insert(pool_uuid.clone(), BlockDevMgr::new(blockdevs));
+    if current_uuids != recorded_uuids {
+        let err_msg = "Recorded block dev UUIDs != discovered blockdev UUIDs";
+        return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
     }
-    Ok(result)
+
+    if blockdevs.len() != current_uuids.len() {
+        let err_msg = "Duplicate block devices found in environment";
+        return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+    }
+
+    Ok(BlockDevMgr::new(blockdevs))
 }

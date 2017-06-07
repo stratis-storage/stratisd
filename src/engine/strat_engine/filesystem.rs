@@ -5,7 +5,7 @@ extern crate rand;
 
 use std::error::Error;
 use std::ffi::OsStr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use devicemapper::DM;
@@ -98,6 +98,10 @@ impl Filesystem for StratFilesystem {
             Ok(_) => Ok(()),
             Err(e) => Err(EngineError::Engine(ErrorEnum::Error, e.description().into())),
         }
+    }
+
+    fn devnode(&self) -> EngineResult<PathBuf> {
+        Ok(try!(self.thin_dev.devnode()))
     }
 }
 

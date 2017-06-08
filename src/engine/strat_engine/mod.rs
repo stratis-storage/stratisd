@@ -11,7 +11,7 @@ pub mod metadata;
 mod mdv;
 pub mod filesystem;
 mod pool;
-mod serde_structs;
+pub mod serde_structs;
 pub mod setup;
 mod range_alloc;
 

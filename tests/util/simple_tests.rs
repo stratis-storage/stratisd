@@ -32,7 +32,7 @@ use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
                                                  MIN_MDA_SECTORS};
 use libstratis::engine::strat_engine::serde_structs::Recordable;
-use libstratis::engine::strat_engine::setup::{find_all, get_metadata};
+use libstratis::engine::strat_engine::setup::{find_all, get_blockdevmgr, get_metadata};
 use libstratis::engine::strat_engine::StratEngine;
 
 /// Dirty sectors where specified, with 1s.
@@ -340,20 +340,24 @@ pub fn test_basic_metadata(paths: &[&Path]) {
 
     let pools = find_all().unwrap();
     assert!(pools.len() == 2);
-    assert!(get_metadata(&uuid1, pools.get(&uuid1).unwrap())
-                .unwrap()
-                .unwrap() == metadata1);
-    assert!(get_metadata(&uuid2, pools.get(&uuid2).unwrap())
-                .unwrap()
-                .unwrap() == metadata2);
+    let devnodes1 = pools.get(&uuid1).unwrap();
+    let devnodes2 = pools.get(&uuid2).unwrap();
+    let pool_save1 = get_metadata(&uuid1, devnodes1).unwrap().unwrap();
+    let pool_save2 = get_metadata(&uuid2, devnodes2).unwrap().unwrap();
+    assert!(pool_save1 == metadata1);
+    assert!(pool_save2 == metadata2);
+    assert!(get_blockdevmgr(&pool_save1, devnodes1).is_ok());
+    assert!(get_blockdevmgr(&pool_save2, devnodes2).is_ok());
 
     engine.teardown().unwrap();
     let pools = find_all().unwrap();
     assert!(pools.len() == 2);
-    assert!(get_metadata(&uuid1, pools.get(&uuid1).unwrap())
-                .unwrap()
-                .unwrap() == metadata1);
-    assert!(get_metadata(&uuid2, pools.get(&uuid2).unwrap())
-                .unwrap()
-                .unwrap() == metadata2);
+    let devnodes1 = pools.get(&uuid1).unwrap();
+    let devnodes2 = pools.get(&uuid2).unwrap();
+    let pool_save1 = get_metadata(&uuid1, devnodes1).unwrap().unwrap();
+    let pool_save2 = get_metadata(&uuid2, devnodes2).unwrap().unwrap();
+    assert!(pool_save1 == metadata1);
+    assert!(pool_save2 == metadata2);
+    assert!(get_blockdevmgr(&pool_save1, devnodes1).is_ok());
+    assert!(get_blockdevmgr(&pool_save2, devnodes2).is_ok());
 }

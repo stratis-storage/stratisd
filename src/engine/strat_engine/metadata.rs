@@ -241,7 +241,7 @@ impl StaticHeader {
     }
 
     /// Generate a buf suitable for writing to blockdev
-    pub fn sigblock_to_buf(&self) -> [u8; SECTOR_SIZE] {
+    fn sigblock_to_buf(&self) -> [u8; SECTOR_SIZE] {
         let mut buf = [0u8; SECTOR_SIZE];
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size);

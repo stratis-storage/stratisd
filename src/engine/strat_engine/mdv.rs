@@ -27,6 +27,7 @@ use super::serde_structs::{FilesystemSave, Recordable};
 // TODO: Monitor fs size and extend linear and fs if needed
 // TODO: Document format of stuff on MDV in SWDD (currently ad-hoc)
 
+const FILESYSTEM_DIR: &'static str = "filesystems";
 
 #[derive(Debug)]
 pub struct MetadataVol {
@@ -54,7 +55,7 @@ impl MetadataVol {
 
         try!(mount_fs(&try!(dev.devnode()), &mount_pt));
 
-        if let Err(err) = create_dir(&mount_pt.join("filesystems")) {
+        if let Err(err) = create_dir(&mount_pt.join(FILESYSTEM_DIR)) {
             if err.kind() != ErrorKind::AlreadyExists {
                 return Err(From::from(err));
             }
@@ -71,7 +72,7 @@ impl MetadataVol {
     pub fn save_fs(&self, fs: &StratFilesystem) -> EngineResult<()> {
         let data = try!(serde_json::to_string(&try!(fs.record())));
         let path = self.mount_pt
-            .join("filesystems")
+            .join(FILESYSTEM_DIR)
             .join(fs.uuid().simple().to_string())
             .with_extension("json");
 
@@ -98,7 +99,7 @@ impl MetadataVol {
     /// Remove info on a filesystem from persistent storage.
     pub fn rm_fs(&self, fs_uuid: &FilesystemUuid) -> EngineResult<()> {
         let fs_path = self.mount_pt
-            .join("filesystems")
+            .join(FILESYSTEM_DIR)
             .join(fs_uuid.simple().to_string())
             .with_extension("json");
         if let Err(err) = remove_file(fs_path) {
@@ -112,7 +113,7 @@ impl MetadataVol {
 
     /// Check the current state of the MDV.
     pub fn check(&self) -> EngineResult<()> {
-        for dir_e in try!(read_dir(self.mount_pt.join("filesystems"))) {
+        for dir_e in try!(read_dir(self.mount_pt.join(FILESYSTEM_DIR))) {
             let dir_e = try!(dir_e);
 
             // Clean up any lingering .temp files. These should only
@@ -137,7 +138,7 @@ impl MetadataVol {
     pub fn filesystems(&self) -> EngineResult<Vec<FilesystemSave>> {
         let mut filesystems = Vec::new();
 
-        for dir_e in try!(read_dir(self.mount_pt.join("filesystems"))) {
+        for dir_e in try!(read_dir(self.mount_pt.join(FILESYSTEM_DIR))) {
             let dir_e = try!(dir_e);
 
             if dir_e.path().ends_with(".temp") {

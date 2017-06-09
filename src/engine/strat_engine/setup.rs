@@ -21,7 +21,6 @@ use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 use super::super::types::PoolUuid;
 
 use super::blockdev::BlockDev;
-use super::blockdevmgr::BlockDevMgr;
 use super::device::blkdev_size;
 use super::engine::DevOwnership;
 use super::metadata::{BDA, StaticHeader};
@@ -172,8 +171,8 @@ pub fn get_metadata(pool_uuid: &PoolUuid, devnodes: &[PathBuf]) -> EngineResult<
     Err(EngineError::Engine(ErrorEnum::NotFound, err_str.into()))
 }
 
-/// Get the BlockDevMgr corresponding to this pool.
-pub fn get_blockdevmgr(pool_save: &PoolSave, devnodes: &[PathBuf]) -> EngineResult<BlockDevMgr> {
+/// Get the blockdevs corresponding to this pool.
+pub fn get_blockdevs(pool_save: &PoolSave, devnodes: &[PathBuf]) -> EngineResult<Vec<BlockDev>> {
     let segments = pool_save
         .flex_devs
         .meta_dev
@@ -233,5 +232,5 @@ pub fn get_blockdevmgr(pool_save: &PoolSave, devnodes: &[PathBuf]) -> EngineResu
         return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
     }
 
-    Ok(BlockDevMgr::new(blockdevs))
+    Ok(blockdevs)
 }

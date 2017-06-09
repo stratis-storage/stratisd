@@ -32,7 +32,7 @@ use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
                                                  MIN_MDA_SECTORS};
 use libstratis::engine::strat_engine::serde_structs::Recordable;
-use libstratis::engine::strat_engine::setup::{find_all, get_blockdevmgr, get_metadata};
+use libstratis::engine::strat_engine::setup::{find_all, get_blockdevs, get_metadata};
 use libstratis::engine::strat_engine::StratEngine;
 
 /// Dirty sectors where specified, with 1s.
@@ -346,8 +346,10 @@ pub fn test_basic_metadata(paths: &[&Path]) {
     let pool_save2 = get_metadata(&uuid2, devnodes2).unwrap().unwrap();
     assert!(pool_save1 == metadata1);
     assert!(pool_save2 == metadata2);
-    assert!(get_blockdevmgr(&pool_save1, devnodes1).is_ok());
-    assert!(get_blockdevmgr(&pool_save2, devnodes2).is_ok());
+    let blockdevs1 = get_blockdevs(&pool_save1, devnodes1).unwrap();
+    let blockdevs2 = get_blockdevs(&pool_save2, devnodes2).unwrap();
+    assert!(blockdevs1.len() == pool_save1.block_devs.len());
+    assert!(blockdevs2.len() == pool_save2.block_devs.len());
 
     engine.teardown().unwrap();
     let pools = find_all().unwrap();
@@ -358,6 +360,8 @@ pub fn test_basic_metadata(paths: &[&Path]) {
     let pool_save2 = get_metadata(&uuid2, devnodes2).unwrap().unwrap();
     assert!(pool_save1 == metadata1);
     assert!(pool_save2 == metadata2);
-    assert!(get_blockdevmgr(&pool_save1, devnodes1).is_ok());
-    assert!(get_blockdevmgr(&pool_save2, devnodes2).is_ok());
+    let blockdevs1 = get_blockdevs(&pool_save1, devnodes1).unwrap();
+    let blockdevs2 = get_blockdevs(&pool_save2, devnodes2).unwrap();
+    assert!(blockdevs1.len() == pool_save1.block_devs.len());
+    assert!(blockdevs2.len() == pool_save2.block_devs.len());
 }

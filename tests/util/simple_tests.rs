@@ -27,6 +27,7 @@ use self::uuid::Uuid;
 use libstratis::engine::{Engine, EngineError, ErrorEnum};
 use libstratis::engine::strat_engine::blockdevmgr::{initialize, resolve_devices};
 use libstratis::engine::strat_engine::device::{blkdev_size, wipe_sectors, write_sectors};
+use libstratis::engine::strat_engine::dmdevice::SThinDevId;
 use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_fs};
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
@@ -186,7 +187,7 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
     let thin_dev = ThinDev::new("stratis_testing_thindev",
                                 &dm,
                                 &thinpool_dev,
-                                7,
+                                SThinDevId::new_random(),
                                 Sectors(300000))
             .unwrap();
 

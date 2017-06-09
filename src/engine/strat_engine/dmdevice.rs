@@ -7,6 +7,11 @@
 use std::fmt;
 use std::fmt::Display;
 
+use rand;
+use serde;
+
+use devicemapper::ThinDevId;
+
 use super::super::super::engine::{FilesystemUuid, PoolUuid};
 
 const FORMAT_VERSION: u16 = 1;
@@ -73,4 +78,40 @@ pub fn format_thinpool_name(pool_uuid: &PoolUuid, role: ThinPoolRole) -> String 
                    FORMAT_VERSION,
                    pool_uuid.simple().to_string(),
                    role);
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct SThinDevId {
+    value: u32,
+}
+
+impl fmt::Display for SThinDevId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&self.value, f)
+    }
+}
+
+impl ThinDevId for SThinDevId {}
+
+impl SThinDevId {
+    /// Instantiate a new, random, thindev id.
+    pub fn new_random() -> SThinDevId {
+        SThinDevId { value: rand::random::<u32>() >> 8 }
+    }
+}
+
+impl serde::Serialize for SThinDevId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: serde::Serializer
+    {
+        serializer.serialize_u32(self.value)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SThinDevId {
+    fn deserialize<D>(deserializer: D) -> Result<SThinDevId, D::Error>
+        where D: serde::de::Deserializer<'de>
+    {
+        Ok(SThinDevId { value: try!(serde::Deserialize::deserialize(deserializer)) })
+    }
 }

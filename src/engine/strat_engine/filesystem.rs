@@ -1,12 +1,13 @@
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
-extern crate rand;
 
 use std::error::Error;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use rand;
 
 use devicemapper::DM;
 use devicemapper::Bytes;

@@ -17,7 +17,7 @@ use super::super::structures::Table;
 use super::super::types::{PoolUuid, Redundancy, RenameAction};
 
 use super::pool::StratPool;
-use super::setup::{find_all, get_blockdevs, get_dmdevs, get_metadata};
+use super::setup::{find_all, get_blockdevs, get_dmdevs, get_filesystems, get_metadata};
 
 pub const DEV_PATH: &'static str = "/dev/stratis";
 
@@ -50,7 +50,8 @@ impl StratEngine {
                                                                 format!("no metadata for pool {}",
                                                                         pool_uuid))));
             let blockdevs = try!(get_blockdevs(&pool_save, devices));
-            let (_, _) = try!(get_dmdevs(pool_uuid, &blockdevs, &pool_save));
+            let (thinpool, mdv) = try!(get_dmdevs(pool_uuid, &blockdevs, &pool_save));
+            let _ = try!(get_filesystems(pool_uuid, &thinpool, &mdv));
         }
         if !pools.is_empty() {
             let err_msg = "Stratis was already run once, can not yet reconstruct state";

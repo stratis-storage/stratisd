@@ -22,6 +22,8 @@ use devicemapper::Sectors;
 use super::super::errors::EngineResult;
 use super::super::types::{DevUuid, FilesystemUuid};
 
+use super::dmdevice::SThinDevId;
+
 /// Implements saving struct data to a serializable form. The form should be
 /// sufficient, in conjunction with the environment, to reconstruct the
 /// saved struct in all its essentials.
@@ -46,7 +48,7 @@ pub struct BlockDevSave {
 pub struct FilesystemSave {
     pub name: String,
     pub uuid: FilesystemUuid,
-    pub thin_id: u32,
+    pub thin_id: SThinDevId,
     pub size: Sectors,
 }
 

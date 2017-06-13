@@ -16,8 +16,8 @@ use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{PoolUuid, Redundancy, RenameAction};
 
-use super::pool::StratPool;
-use super::setup::{find_all, get_blockdevs, get_dmdevs, get_filesystems, get_metadata};
+use super::pool::{StratPool, get_dmdevs, get_filesystems};
+use super::setup::{find_all, get_blockdevs, get_metadata};
 
 pub const DEV_PATH: &'static str = "/dev/stratis";
 

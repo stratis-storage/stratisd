@@ -31,9 +31,9 @@ use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_fs};
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
                                                  MIN_MDA_SECTORS};
+use libstratis::engine::strat_engine::pool::{get_dmdevs, get_filesystems};
 use libstratis::engine::strat_engine::serde_structs::Recordable;
-use libstratis::engine::strat_engine::setup::{find_all, get_blockdevs, get_dmdevs,
-                                              get_filesystems, get_metadata};
+use libstratis::engine::strat_engine::setup::{find_all, get_blockdevs, get_metadata};
 use libstratis::engine::strat_engine::StratEngine;
 
 /// Dirty sectors where specified, with 1s.

@@ -9,14 +9,16 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::vec::Vec;
 
+use rand::random;
+use serde_json;
+use time::now;
+use uuid::Uuid;
+
 use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::DM;
 use devicemapper::{DataBlocks, Sectors, Segment};
 use devicemapper::LinearDev;
-use devicemapper::{ThinPoolDev, ThinPoolStatus, ThinPoolWorkingStatus};
-use time::now;
-use uuid::Uuid;
-use serde_json;
+use devicemapper::{ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolWorkingStatus};
 
 use super::super::consts::IEC::Mi;
 use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
@@ -264,8 +266,13 @@ impl Pool for StratPool {
         let mut result = Vec::new();
         for name in names.iter() {
             let uuid = Uuid::new_v4();
+            // FIXME: Start managing thin ids in pool.
+            let thin_id =
+                ThinDevId::new_u64((random::<u32>() >> 8) as u64)
+                    .expect("must require only 24 bits");
             let new_filesystem = try!(StratFilesystem::initialize(&self.pool_uuid,
                                                                   uuid,
+                                                                  thin_id,
                                                                   name,
                                                                   &dm,
                                                                   &mut self.thin_pool));

@@ -7,11 +7,9 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use rand;
-
 use devicemapper::DM;
-use devicemapper::Bytes;
-use devicemapper::{ThinDev, ThinStatus};
+use devicemapper::{Bytes, Sectors};
+use devicemapper::{ThinDev, ThinDevId, ThinStatus};
 use devicemapper::ThinPoolDev;
 
 use super::super::consts::IEC;
@@ -37,29 +35,39 @@ pub enum FilesystemStatus {
 impl StratFilesystem {
     pub fn initialize(pool_id: &PoolUuid,
                       fs_id: FilesystemUuid,
+                      thin_id: ThinDevId,
                       name: &str,
                       dm: &DM,
                       thin_pool: &ThinPoolDev)
                       -> EngineResult<StratFilesystem> {
-        // TODO should replace with proper id generation. DM takes a 24 bit
-        // number for the thin_id.  Generate a u16 to avoid the possibility of
-        // "too big". Should this be moved into the DM binding (or lower)?
-        // How can a client be expected to avoid collisions?
-        let thin_id = rand::random::<u16>();
-        let device_name = format_thin_name(pool_id, ThinRole::Filesystem(fs_id));
-        // TODO We don't require a size to be provided for create_filesystems -
-        // but devicemapper requires an initial size for a thin provisioned
-        // device - currently hard coded to 1GB.
-        let new_thin_dev = try!(ThinDev::new(&device_name,
+        let fs = try!(StratFilesystem::setup(pool_id,
+                                             fs_id,
+                                             thin_id,
+                                             name,
+                                             Bytes(IEC::Ti).sectors(),
                                              dm,
-                                             thin_pool,
-                                             thin_id as u32,
-                                             Bytes(IEC::Ti).sectors()));
-        try!(create_fs(try!(new_thin_dev.devnode()).as_path()));
+                                             thin_pool));
+        try!(create_fs(try!(fs.devnode()).as_path()));
+        Ok(fs)
+    }
+
+    /// Setup a filesystem, setting up the thin device as necessary.
+    // FIXME: Check for still existing device mapper devices.
+    pub fn setup(pool_uuid: &PoolUuid,
+                 fs_id: FilesystemUuid,
+                 thindev_id: ThinDevId,
+                 name: &str,
+                 size: Sectors,
+                 dm: &DM,
+                 thin_pool: &ThinPoolDev)
+                 -> EngineResult<StratFilesystem> {
+        let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fs_id));
+        let thin_dev = try!(ThinDev::setup(&device_name, dm, thin_pool, thindev_id, size));
+
         Ok(StratFilesystem {
                fs_id: fs_id,
                name: name.to_owned(),
-               thin_dev: new_thin_dev,
+               thin_dev: thin_dev,
            })
     }
 

@@ -24,11 +24,12 @@ use super::super::types::{DevUuid, PoolUuid};
 use super::blockdev::BlockDev;
 use super::device::blkdev_size;
 use super::engine::DevOwnership;
+use super::filesystem::StratFilesystem;
 use super::mdv::MetadataVol;
 use super::metadata::{BDA, StaticHeader};
 use super::pool::StratPool;
 use super::range_alloc::RangeAllocator;
-use super::serde_structs::PoolSave;
+use super::serde_structs::{FilesystemSave, PoolSave};
 
 
 /// Find all Stratis devices.
@@ -290,4 +291,26 @@ pub fn get_dmdevs(pool_uuid: &PoolUuid,
 
     let mdv = try!(StratPool::setup_mdv(&dm, pool_uuid, meta_segments));
     Ok((thinpool_dev, mdv))
+}
+
+/// Get the filesystems belonging to the pool.
+pub fn get_filesystems(pool_uuid: &PoolUuid,
+                       thinpool: &ThinPoolDev,
+                       mdv: &MetadataVol)
+                       -> EngineResult<Vec<StratFilesystem>> {
+    let dm = try!(DM::new());
+    let get_filesystem = |fssave: &FilesystemSave| -> EngineResult<StratFilesystem> {
+        Ok(try!(StratFilesystem::setup(pool_uuid,
+                                       fssave.uuid,
+                                       fssave.thin_id,
+                                       &fssave.name,
+                                       fssave.size,
+                                       &dm,
+                                       thinpool)))
+    };
+
+    try!(mdv.filesystems())
+        .iter()
+        .map(get_filesystem)
+        .collect()
 }

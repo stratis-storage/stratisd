@@ -2,7 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// Code to handle a single block device.
+// Code to handle initial setup steps for a pool.
+// Initial setup steps are steps that do not alter the environment.
 
 use std::collections::{HashMap, HashSet};
 use std::io::ErrorKind;
@@ -14,23 +15,18 @@ use std::str::FromStr;
 use nix::Errno;
 use nix::sys::stat::{S_IFBLK, S_IFMT};
 use serde_json;
-use uuid::Uuid;
 
-use devicemapper::{DM, Device, Sectors, Segment, ThinPoolDev, LinearDev};
+use devicemapper::Device;
 
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
-use super::super::types::{DevUuid, PoolUuid};
+use super::super::types::PoolUuid;
 
 use super::blockdev::BlockDev;
-use super::dmdevice::{FlexRole, ThinPoolRole, format_flex_name, format_thinpool_name};
 use super::device::blkdev_size;
 use super::engine::DevOwnership;
-use super::filesystem::StratFilesystem;
-use super::mdv::MetadataVol;
 use super::metadata::{BDA, StaticHeader};
-use super::pool::{StratPool, DATA_LOWATER};
 use super::range_alloc::RangeAllocator;
-use super::serde_structs::{FilesystemSave, PoolSave};
+use super::serde_structs::PoolSave;
 
 
 /// Find all Stratis devices.
@@ -238,95 +234,4 @@ pub fn get_blockdevs(pool_save: &PoolSave, devnodes: &[PathBuf]) -> EngineResult
     }
 
     Ok(blockdevs)
-}
-
-/// Locate each pool's thinpool device.
-/// Return a map from the pool UUID to the pool's thinpool device.
-// TODO: Make this safe in the case where DM devices have not been cleaned up.
-pub fn get_dmdevs(pool_uuid: &PoolUuid,
-                  blockdevs: &[BlockDev],
-                  pool_save: &PoolSave)
-                  -> EngineResult<(ThinPoolDev, MetadataVol)> {
-    let uuid_map: HashMap<DevUuid, Device> = blockdevs
-        .iter()
-        .map(|bd| (*bd.uuid(), *bd.device()))
-        .collect();
-
-    let lookup = |triple: &(Uuid, Sectors, Sectors)| -> EngineResult<Segment> {
-        let device = try!(uuid_map
-                              .get(&triple.0)
-                              .ok_or(EngineError::Engine(ErrorEnum::NotFound,
-                                                         format!("missing device for UUID {:?}",
-                                                                 &triple.0))));
-        Ok(Segment {
-               device: *device,
-               start: triple.1,
-               length: triple.2,
-           })
-    };
-
-    let meta_segments: Vec<Segment> = try!(pool_save
-                                               .flex_devs
-                                               .meta_dev
-                                               .iter()
-                                               .map(&lookup)
-                                               .collect());
-
-    let thin_meta_segments: Vec<Segment> = try!(pool_save
-                                                    .flex_devs
-                                                    .thin_meta_dev
-                                                    .iter()
-                                                    .map(&lookup)
-                                                    .collect());
-
-    let thin_data_segments: Vec<Segment> = try!(pool_save
-                                                    .flex_devs
-                                                    .thin_data_dev
-                                                    .iter()
-                                                    .map(&lookup)
-                                                    .collect());
-
-    let dm = try!(DM::new());
-
-    let meta_dev = try!(LinearDev::new(&format_flex_name(pool_uuid, FlexRole::ThinMeta),
-                                       &dm,
-                                       thin_meta_segments));
-
-    let data_dev = try!(LinearDev::new(&format_flex_name(pool_uuid, FlexRole::ThinData),
-                                       &dm,
-                                       thin_data_segments));
-
-    let thinpool_dev = try!(ThinPoolDev::setup(&format_thinpool_name(&pool_uuid,
-                                                                     ThinPoolRole::Pool),
-                                               &dm,
-                                               try!(data_dev.size()),
-                                               pool_save.thinpool_dev.data_block_size,
-                                               DATA_LOWATER,
-                                               meta_dev,
-                                               data_dev));
-
-    let mdv = try!(StratPool::setup_mdv(&dm, pool_uuid, meta_segments));
-    Ok((thinpool_dev, mdv))
-}
-
-/// Get the filesystems belonging to the pool.
-pub fn get_filesystems(pool_uuid: &PoolUuid,
-                       thinpool: &ThinPoolDev,
-                       mdv: &MetadataVol)
-                       -> EngineResult<Vec<StratFilesystem>> {
-    let dm = try!(DM::new());
-    let get_filesystem = |fssave: &FilesystemSave| -> EngineResult<StratFilesystem> {
-        Ok(try!(StratFilesystem::setup(pool_uuid,
-                                       fssave.uuid,
-                                       fssave.thin_id,
-                                       &fssave.name,
-                                       fssave.size,
-                                       &dm,
-                                       thinpool)))
-    };
-
-    try!(mdv.filesystems())
-        .iter()
-        .map(get_filesystem)
-        .collect()
 }

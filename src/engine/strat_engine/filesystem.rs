@@ -82,6 +82,11 @@ impl StratFilesystem {
         }
         Ok(FilesystemStatus::Good)
     }
+
+    /// The thin id for the thin device that backs this filesystem.
+    pub fn thin_id(&self) -> ThinDevId {
+        self.thin_dev.id()
+    }
 }
 
 impl HasName for StratFilesystem {

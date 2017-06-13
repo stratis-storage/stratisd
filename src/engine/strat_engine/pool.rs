@@ -9,7 +9,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::vec::Vec;
 
-use rand::random;
 use serde_json;
 use time::now;
 use uuid::Uuid;
@@ -18,7 +17,7 @@ use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::DM;
 use devicemapper::{DataBlocks, Sectors, Segment};
 use devicemapper::LinearDev;
-use devicemapper::{ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolWorkingStatus};
+use devicemapper::{ThinPoolDev, ThinPoolStatus, ThinPoolWorkingStatus};
 
 use super::super::consts::IEC::Mi;
 use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
@@ -28,7 +27,8 @@ use super::super::types::{FilesystemUuid, PoolUuid, RenameAction, Redundancy};
 
 use super::blockdevmgr::BlockDevMgr;
 use super::device::wipe_sectors;
-use super::dmdevice::{FlexRole, ThinPoolRole, format_flex_name, format_thinpool_name};
+use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, format_flex_name,
+                      format_thinpool_name};
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::mdv::MetadataVol;
 use super::metadata::MIN_MDA_SECTORS;
@@ -52,6 +52,7 @@ pub struct StratPool {
     thin_pool: ThinPoolDev,
     thin_pool_meta_spare: Vec<Segment>,
     mdv: MetadataVol,
+    thindev_ids: ThinDevIdPool,
 }
 
 impl StratPool {
@@ -137,6 +138,7 @@ impl StratPool {
             thin_pool: thinpool_dev,
             thin_pool_meta_spare: meta_spare_regions,
             mdv: mdv,
+            thindev_ids: ThinDevIdPool::new_from_ids(vec![]),
         };
 
         try!(pool.write_metadata());
@@ -263,10 +265,7 @@ impl Pool for StratPool {
         let mut result = Vec::new();
         for name in names.iter() {
             let uuid = Uuid::new_v4();
-            // FIXME: Start managing thin ids in pool.
-            let thin_id =
-                ThinDevId::new_u64((random::<u32>() >> 8) as u64)
-                    .expect("must require only 24 bits");
+            let thin_id = try!(self.thindev_ids.new_id());
             let new_filesystem = try!(StratFilesystem::initialize(&self.pool_uuid,
                                                                   uuid,
                                                                   thin_id,

@@ -154,15 +154,42 @@ impl StratPool {
     }
 
     /// Setup a StratPool using its UUID and the list of devnodes it has.
+    // TODO: Clean up after errors that occur after some action has been
+    // taken on the environment.
     pub fn setup(uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<StratPool> {
         let metadata = try!(try!(get_metadata(uuid, devnodes))
                                 .ok_or(EngineError::Engine(ErrorEnum::NotFound,
                                                            format!("no metadata for pool {}",
                                                                    uuid))));
         let blockdevs = try!(get_blockdevs(&metadata, devnodes));
-        let (thinpool, mdv, _spare_meta_segs) = try!(get_dmdevs(uuid, &blockdevs, &metadata));
-        let _ = try!(get_filesystems(uuid, &thinpool, &mdv));
-        unimplemented!()
+
+        // This is the cleanup zone.
+        let (thinpool, mdv, spare_meta_segs) = try!(get_dmdevs(uuid, &blockdevs, &metadata));
+        let filesystems = try!(get_filesystems(uuid, &thinpool, &mdv));
+        let thindev_ids = ThinDevIdPool::new_from_ids(&filesystems
+                                                           .iter()
+                                                           .map(|x| x.thin_id())
+                                                           .collect::<Vec<ThinDevId>>());
+
+        let mut table = Table::new();
+        for fs in filesystems {
+            let evicted = table.insert(fs);
+            if !evicted.is_empty() {
+                let err_msg = "filesystems with duplicate UUID or name specified in metadata";
+                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+            }
+        }
+        Ok(StratPool {
+               name: metadata.name,
+               pool_uuid: uuid,
+               block_devs: BlockDevMgr::new(blockdevs),
+               filesystems: table,
+               redundancy: Redundancy::NONE,
+               thin_pool: thinpool,
+               thin_pool_meta_spare: spare_meta_segs,
+               mdv: mdv,
+               thindev_ids: thindev_ids,
+           })
     }
 
     fn setup_mdv(dm: &DM, pool_uuid: PoolUuid, segs: Vec<Segment>) -> EngineResult<MetadataVol> {

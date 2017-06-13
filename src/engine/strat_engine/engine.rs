@@ -34,6 +34,12 @@ pub struct StratEngine {
 }
 
 impl StratEngine {
+    /// Setup a StratEngine.
+    /// 1. Verify the existance of Stratis /dev directory.
+    /// 2. Setup all the pools belonging to the engine.
+    ///
+    /// Returns an error if there was an error reading device nodes.
+    /// Returns an error if there was an error setting up any of the pools.
     pub fn initialize() -> EngineResult<StratEngine> {
         if let Err(err) = create_dir(DEV_PATH) {
             if err.kind() != ErrorKind::AlreadyExists {
@@ -45,13 +51,11 @@ impl StratEngine {
 
         let mut table = Table::new();
         for (pool_uuid, devices) in pools.iter() {
-            table.insert(try!(StratPool::setup(*pool_uuid, devices)));
-        }
-
-        // FIXME: Get rid of this when StratPool::setup() works.
-        if !pools.is_empty() {
-            let err_msg = "Stratis was already run once, can not yet reconstruct state";
-            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, err_msg.into()));
+            let evicted = table.insert(try!(StratPool::setup(*pool_uuid, devices)));
+            if !evicted.is_empty() {
+                let err_msg = "found two pools with the same id or name";
+                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+            }
         }
 
         Ok(StratEngine { pools: table })

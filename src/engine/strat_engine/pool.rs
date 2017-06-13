@@ -36,6 +36,7 @@ use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::mdv::MetadataVol;
 use super::metadata::MIN_MDA_SECTORS;
 use super::serde_structs::{FilesystemSave, FlexDevsSave, PoolSave, Recordable, ThinPoolDevSave};
+use super::setup::{get_blockdevs, get_metadata};
 
 const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 const META_LOWATER: u64 = 512;
@@ -130,7 +131,7 @@ impl StratPool {
             .alloc_space(INITIAL_MDV_SIZE)
             .expect("blockmgr must not fail, already checked for space");
 
-        let mdv = try!(StratPool::setup_mdv(dm, &pool_uuid, mdv_regions));
+        let mdv = try!(StratPool::setup_mdv(dm, pool_uuid, mdv_regions));
 
         let mut pool = StratPool {
             name: name.to_owned(),
@@ -149,8 +150,20 @@ impl StratPool {
         Ok(pool)
     }
 
-    fn setup_mdv(dm: &DM, pool_uuid: &PoolUuid, segs: Vec<Segment>) -> EngineResult<MetadataVol> {
-        let device_name = format_flex_name(pool_uuid, FlexRole::MetadataVolume);
+    /// Setup a StratPool using its UUID and the list of devnodes it has.
+    pub fn setup(uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<StratPool> {
+        let metadata = try!(try!(get_metadata(uuid, devnodes))
+                                .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                                                           format!("no metadata for pool {}",
+                                                                   uuid))));
+        let blockdevs = try!(get_blockdevs(&metadata, devnodes));
+        let (thinpool, mdv) = try!(get_dmdevs(uuid, &blockdevs, &metadata));
+        let _ = try!(get_filesystems(uuid, &thinpool, &mdv));
+        unimplemented!()
+    }
+
+    fn setup_mdv(dm: &DM, pool_uuid: PoolUuid, segs: Vec<Segment>) -> EngineResult<MetadataVol> {
+        let device_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
         let mdv_dev = try!(LinearDev::new(&device_name, dm, segs));
         let mdv = try!(MetadataVol::initialize(&pool_uuid, mdv_dev));
         Ok(mdv)
@@ -381,7 +394,7 @@ impl Recordable<PoolSave> for StratPool {
 /// Locate each pool's thinpool device.
 /// Return a map from the pool UUID to the pool's thinpool device.
 // TODO: Make this safe in the case where DM devices have not been cleaned up.
-pub fn get_dmdevs(pool_uuid: &PoolUuid,
+pub fn get_dmdevs(pool_uuid: PoolUuid,
                   blockdevs: &[BlockDev],
                   pool_save: &PoolSave)
                   -> EngineResult<(ThinPoolDev, MetadataVol)> {
@@ -426,11 +439,11 @@ pub fn get_dmdevs(pool_uuid: &PoolUuid,
 
     let dm = try!(DM::new());
 
-    let meta_dev = try!(LinearDev::new(&format_flex_name(pool_uuid, FlexRole::ThinMeta),
+    let meta_dev = try!(LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
                                        &dm,
                                        thin_meta_segments));
 
-    let data_dev = try!(LinearDev::new(&format_flex_name(pool_uuid, FlexRole::ThinData),
+    let data_dev = try!(LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinData),
                                        &dm,
                                        thin_data_segments));
 
@@ -448,7 +461,7 @@ pub fn get_dmdevs(pool_uuid: &PoolUuid,
 }
 
 /// Get the filesystems belonging to the pool.
-pub fn get_filesystems(pool_uuid: &PoolUuid,
+pub fn get_filesystems(pool_uuid: PoolUuid,
                        thinpool: &ThinPoolDev,
                        mdv: &MetadataVol)
                        -> EngineResult<Vec<StratFilesystem>> {

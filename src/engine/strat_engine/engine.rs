@@ -16,8 +16,8 @@ use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{PoolUuid, Redundancy, RenameAction};
 
-use super::pool::{StratPool, get_dmdevs, get_filesystems};
-use super::setup::{find_all, get_blockdevs, get_metadata};
+use super::pool::StratPool;
+use super::setup::find_all;
 
 pub const DEV_PATH: &'static str = "/dev/stratis";
 
@@ -43,22 +43,18 @@ impl StratEngine {
 
         let pools = try!(find_all());
 
-        // FIXME: This is quite clearly incomplete pool reconstruction.
+        let mut table = Table::new();
         for (pool_uuid, devices) in pools.iter() {
-            let pool_save = try!(try!(get_metadata(pool_uuid, devices))
-                                     .ok_or(EngineError::Engine(ErrorEnum::NotFound,
-                                                                format!("no metadata for pool {}",
-                                                                        pool_uuid))));
-            let blockdevs = try!(get_blockdevs(&pool_save, devices));
-            let (thinpool, mdv) = try!(get_dmdevs(pool_uuid, &blockdevs, &pool_save));
-            let _ = try!(get_filesystems(pool_uuid, &thinpool, &mdv));
+            table.insert(try!(StratPool::setup(*pool_uuid, devices)));
         }
+
+        // FIXME: Get rid of this when StratPool::setup() works.
         if !pools.is_empty() {
             let err_msg = "Stratis was already run once, can not yet reconstruct state";
             return Err(EngineError::Engine(ErrorEnum::AlreadyExists, err_msg.into()));
         }
 
-        Ok(StratEngine { pools: Table::new() })
+        Ok(StratEngine { pools: table })
     }
 
     /// Teardown Stratis, preparatory to a shutdown.

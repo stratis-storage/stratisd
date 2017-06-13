@@ -261,7 +261,7 @@ pub fn test_teardown(paths: &[&Path]) -> () {
 /// 5. Run find_all() again and verify that both sets of devices are found.
 /// 6. Verify that get_metadata() return an error. initialize() only
 /// initializes block devices, it does not write metadata.
-pub fn test_setup(paths: &[&Path]) -> () {
+pub fn test_initialize(paths: &[&Path]) -> () {
     assert!(paths.len() > 2);
 
     let (paths1, paths2) = paths.split_at(2);
@@ -384,4 +384,35 @@ pub fn test_basic_metadata(paths: &[&Path]) {
     tp2.teardown(&dm).unwrap();
     mdv1.teardown(&dm).unwrap();
     mdv2.teardown(&dm).unwrap();
+}
+
+/// Test engine setup.
+/// 1. Create two pools.
+/// 2. Verify that both exist.
+/// 3. Teardown the engine.
+/// 4. Verify that pools are gone.
+/// 5. Initialize the engine.
+/// 6. Verify that pools can be found again.
+pub fn test_setup(paths: &[&Path]) {
+    assert!(paths.len() > 2);
+
+    let (paths1, paths2) = paths.split_at(2);
+
+    let mut engine = StratEngine::initialize().unwrap();
+
+    let name1 = "name1";
+    let (uuid1, _) = engine.create_pool(&name1, paths1, None, false).unwrap();
+
+    let name2 = "name2";
+    let (uuid2, _) = engine.create_pool(&name2, paths2, None, false).unwrap();
+
+    assert!(engine.get_pool(&uuid1).is_some());
+    assert!(engine.get_pool(&uuid2).is_some());
+
+    engine.teardown().unwrap();
+
+    let mut engine = StratEngine::initialize().unwrap();
+
+    assert!(engine.get_pool(&uuid1).is_some());
+    assert!(engine.get_pool(&uuid2).is_some());
 }

@@ -96,7 +96,7 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<PathBuf>>> {
 
 /// Get the most recent metadata from a set of Devices for a given pool UUID.
 /// Returns None if no metadata found for this pool.
-pub fn get_metadata(pool_uuid: &PoolUuid, devnodes: &[PathBuf]) -> EngineResult<Option<PoolSave>> {
+pub fn get_metadata(pool_uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<Option<PoolSave>> {
 
     // No device nodes means no metadata
     if devnodes.is_empty() {
@@ -116,7 +116,7 @@ pub fn get_metadata(pool_uuid: &PoolUuid, devnodes: &[PathBuf]) -> EngineResult<
         }
         let bda = bda.expect("unreachable if bda is None");
 
-        if bda.pool_uuid() != pool_uuid {
+        if *bda.pool_uuid() != pool_uuid {
             continue;
         }
         bdas.push((devnode, bda));

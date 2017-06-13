@@ -18,7 +18,7 @@ use self::devicemapper::consts::SECTOR_SIZE;
 use self::devicemapper::LinearDev;
 use self::devicemapper::Segment;
 use self::devicemapper::{DataBlocks, Sectors};
-use self::devicemapper::ThinDev;
+use self::devicemapper::{ThinDev, ThinDevId};
 use self::devicemapper::ThinPoolDev;
 
 use self::tempdir::TempDir;
@@ -186,7 +186,7 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
     let thin_dev = ThinDev::new("stratis_testing_thindev",
                                 &dm,
                                 &thinpool_dev,
-                                7,
+                                ThinDevId::new_u64(7).expect("7 is small enough"),
                                 Sectors(300000))
             .unwrap();
 

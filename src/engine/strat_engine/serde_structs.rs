@@ -17,7 +17,7 @@ use std::path::PathBuf;
 
 use uuid::Uuid;
 
-use devicemapper::Sectors;
+use devicemapper::{Sectors, ThinDevId};
 
 use super::super::errors::EngineResult;
 use super::super::types::{DevUuid, FilesystemUuid};
@@ -46,7 +46,7 @@ pub struct BlockDevSave {
 pub struct FilesystemSave {
     pub name: String,
     pub uuid: FilesystemUuid,
-    pub thin_id: u32,
+    pub thin_id: ThinDevId,
     pub size: Sectors,
 }
 

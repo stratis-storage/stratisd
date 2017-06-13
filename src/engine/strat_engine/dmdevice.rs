@@ -7,6 +7,10 @@
 use std::fmt;
 use std::fmt::Display;
 
+use devicemapper::ThinDevId;
+
+use super::super::errors::EngineResult;
+
 use super::super::super::engine::{FilesystemUuid, PoolUuid};
 
 const FORMAT_VERSION: u16 = 1;
@@ -75,4 +79,30 @@ pub fn format_thinpool_name(pool_uuid: &PoolUuid, role: ThinPoolRole) -> String 
                    FORMAT_VERSION,
                    pool_uuid.simple().to_string(),
                    role);
+}
+
+
+#[derive(Debug)]
+/// A pool of thindev ids, all unique.
+pub struct ThinDevIdPool {
+    next_id: u32,
+}
+
+impl ThinDevIdPool {
+    /// Make a new pool from a possibly empty Vec of ids.
+    /// Does not verify the absence of duplicate ids.
+    pub fn new_from_ids(ids: &[ThinDevId]) -> ThinDevIdPool {
+        let max_id: Option<u32> = ids.into_iter().map(|x| (*x).into()).max();
+        ThinDevIdPool { next_id: max_id.map(|x| x + 1).unwrap_or(0) }
+    }
+
+    /// Get a new id for a thindev.
+    /// Returns an error if no thindev id can be constructed.
+    // TODO: Improve this so that it is guaranteed only to fail if every 24 bit
+    // number has been used.
+    pub fn new_id(&mut self) -> EngineResult<ThinDevId> {
+        let next_id = try!(ThinDevId::new_u64((self.next_id) as u64));
+        self.next_id = self.next_id + 1;
+        Ok(next_id)
+    }
 }

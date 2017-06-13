@@ -37,7 +37,7 @@ const META_LOWATER: u64 = 512;
 const DATA_LOWATER: DataBlocks = DataBlocks(512);
 
 const INITIAL_META_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
-const INITIAL_DATA_SIZE: Sectors = Sectors(512 * Mi / SECTOR_SIZE as u64);
+const INITIAL_DATA_SIZE: Sectors = Sectors(768 * Mi / SECTOR_SIZE as u64);
 const INITIAL_MDV_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
 
 #[derive(Debug)]

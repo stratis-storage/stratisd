@@ -9,6 +9,7 @@ use std::io::ErrorKind;
 use std::fs::{OpenOptions, read_dir};
 use std::os::linux::fs::MetadataExt;
 use std::path::PathBuf;
+use std::process::Command;
 use std::str::FromStr;
 
 use nix::Errno;
@@ -16,7 +17,8 @@ use nix::sys::stat::{S_IFBLK, S_IFMT};
 use serde_json;
 use uuid::Uuid;
 
-use devicemapper::{DM, Device, Sectors, Segment, ThinPoolDev, LinearDev};
+use devicemapper as dm;
+use devicemapper::{DM, Device, Sectors, Segment, ThinPoolDev, LinearDev, DmError};
 
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 use super::super::types::{DevUuid, PoolUuid};
@@ -246,7 +248,7 @@ pub fn get_blockdevs(pool_save: &PoolSave, devnodes: &[PathBuf]) -> EngineResult
 pub fn get_dmdevs(pool_uuid: &PoolUuid,
                   blockdevs: &[BlockDev],
                   pool_save: &PoolSave)
-                  -> EngineResult<(ThinPoolDev, MetadataVol)> {
+                  -> EngineResult<(ThinPoolDev, MetadataVol, Vec<Segment>)> {
     let uuid_map: HashMap<DevUuid, Device> = blockdevs
         .iter()
         .map(|bd| (*bd.uuid(), *bd.device()))
@@ -286,6 +288,13 @@ pub fn get_dmdevs(pool_uuid: &PoolUuid,
                                                     .map(&lookup)
                                                     .collect());
 
+    let mut thin_meta_spare_segments: Vec<Segment> = try!(pool_save
+                                                              .flex_devs
+                                                              .thin_meta_dev_spare
+                                                              .iter()
+                                                              .map(&lookup)
+                                                              .collect());
+
     let dm = try!(DM::new());
 
     let meta_dev = try!(LinearDev::new(&format_flex_name(pool_uuid, FlexRole::ThinMeta),
@@ -296,17 +305,58 @@ pub fn get_dmdevs(pool_uuid: &PoolUuid,
                                        &dm,
                                        thin_data_segments));
 
-    let thinpool_dev = try!(ThinPoolDev::setup(&format_thinpool_name(&pool_uuid,
-                                                                     ThinPoolRole::Pool),
-                                               &dm,
-                                               try!(data_dev.size()),
-                                               pool_save.thinpool_dev.data_block_size,
-                                               DATA_LOWATER,
-                                               meta_dev,
-                                               data_dev));
+    let thinpool_dev = match ThinPoolDev::setup(&format_thinpool_name(&pool_uuid,
+                                                                      ThinPoolRole::Pool),
+                                                &dm,
+                                                try!(data_dev.size()),
+                                                pool_save.thinpool_dev.data_block_size,
+                                                DATA_LOWATER,
+                                                meta_dev,
+                                                data_dev) {
+        Ok(dev) => dev,
+        Err(DmError::Dm(dm::ErrorEnum::CheckFailed(meta_dev, data_dev), _)) => {
+
+            let mut spare_dev = try!(LinearDev::new(&format_flex_name(pool_uuid,
+                                                                      FlexRole::ThinMetaSpare),
+                                                    &dm,
+                                                    thin_meta_spare_segments.drain(..).collect()));
+
+            if try!(Command::new("thin_repair")
+                        .arg("-i")
+                        .arg(&try!(meta_dev.devnode()))
+                        .arg("-o")
+                        .arg(&try!(spare_dev.devnode()))
+                        .status())
+                       .success() == false {
+                return Err(DmError::Dm(dm::ErrorEnum::Error,
+                                       "thin_repair failed, pool unusable".into())
+                                   .into());
+            }
+
+            debug!("thin repair successful, using corrected thin meta");
+            // Repair worked! Swap meta and meta_spare
+            try!(meta_dev.teardown(&dm));
+            try!(spare_dev.set_name(&dm, &format_flex_name(pool_uuid, FlexRole::ThinMeta)));
+
+            thin_meta_spare_segments = try!(pool_save
+                                                .flex_devs
+                                                .thin_meta_dev
+                                                .iter()
+                                                .map(&lookup)
+                                                .collect());
+            try!(ThinPoolDev::setup(&format_thinpool_name(&pool_uuid, ThinPoolRole::Pool),
+                                    &dm,
+                                    try!(data_dev.size()),
+                                    pool_save.thinpool_dev.data_block_size,
+                                    DATA_LOWATER,
+                                    spare_dev,
+                                    data_dev))
+        }
+        Err(err) => return Err(err.into()),
+    };
 
     let mdv = try!(StratPool::setup_mdv(&dm, pool_uuid, meta_segments));
-    Ok((thinpool_dev, mdv))
+    Ok((thinpool_dev, mdv, thin_meta_spare_segments))
 }
 
 /// Get the filesystems belonging to the pool.

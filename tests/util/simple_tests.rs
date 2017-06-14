@@ -378,4 +378,10 @@ pub fn test_basic_metadata(paths: &[&Path]) {
 
     let filesystems2 = get_filesystems(&uuid2, &tp2, &mdv2).unwrap();
     assert!(filesystems2.is_empty());
+
+    let dm = DM::new().unwrap();
+    tp1.teardown(&dm).unwrap();
+    tp2.teardown(&dm).unwrap();
+    mdv1.teardown(&dm).unwrap();
+    mdv2.teardown(&dm).unwrap();
 }

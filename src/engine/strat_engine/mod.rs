@@ -4,6 +4,7 @@
 
 mod blockdev;
 pub mod blockdevmgr;
+mod cleanup;
 pub mod device;
 pub mod dmdevice;
 pub mod engine;

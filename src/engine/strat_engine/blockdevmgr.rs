@@ -18,6 +18,7 @@ use super::super::consts::IEC;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{DevUuid, PoolUuid};
 
+use super::cleanup::wipe_blockdevs;
 use super::blockdev::BlockDev;
 use super::device::blkdev_size;
 use super::engine::DevOwnership;
@@ -81,11 +82,8 @@ impl BlockDevMgr {
         Ok(bdev_paths)
     }
 
-    pub fn destroy_all(mut self) -> EngineResult<()> {
-        for bd in self.block_devs.drain(..) {
-            try!(bd.wipe_metadata());
-        }
-        Ok(())
+    pub fn destroy_all(self) -> EngineResult<()> {
+        Ok(try!(wipe_blockdevs(self.block_devs)))
     }
 
     // Unused space left on blockdevs
@@ -234,31 +232,18 @@ pub fn initialize(pool_uuid: &PoolUuid,
                                   &Uuid::new_v4(),
                                   mda_size,
                                   dev_size.sectors());
-        if bda.is_err() {
-            let mut unerased_devnodes = Vec::new();
-            BDA::wipe(&mut f).unwrap_or_else(|_| unerased_devnodes.push(devnode.clone()));
-            for bd in bds.drain(..) {
-                let bd_devnode = bd.devnode.clone();
-                bd.wipe_metadata()
-                    .unwrap_or_else(|_| unerased_devnodes.push(bd_devnode));
-            }
+        if let Ok(bda) = bda {
+            let allocator = RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())])
+                .expect("bda.size() < bda.dev_size() and single range");
 
-            let err_msg = format!("Failed to initialize {:?}", devnode);
-            if unerased_devnodes.is_empty() {
-                return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
-            } else {
-                let err_msg = format!("{}, then failed to wipe already initialized devnodes: {:?}",
-                                      err_msg,
-                                      unerased_devnodes);
-                return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
-            }
+            bds.push(BlockDev::new(dev, devnode, bda, allocator));
+        } else {
+            // TODO: check the return values and update state machine on failure
+            let _ = BDA::wipe(&mut f);
+            let _ = wipe_blockdevs(bds);
+
+            return Err(bda.unwrap_err());
         }
-
-        let bda = bda.expect("!bda.is_err()");
-        let allocator = RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())])
-            .expect("bda.size() < bda.dev_size() and single range");
-
-        bds.push(BlockDev::new(dev, devnode, bda, allocator));
     }
     Ok(bds)
 }

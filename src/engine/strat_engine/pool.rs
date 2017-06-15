@@ -2,41 +2,44 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::RandomState;
 use std::iter::FromIterator;
 use std::path::Path;
 use std::path::PathBuf;
 use std::vec::Vec;
 
-use rand::random;
 use serde_json;
 use time::now;
 use uuid::Uuid;
 
 use devicemapper::consts::SECTOR_SIZE;
+use devicemapper::Device;
 use devicemapper::DM;
 use devicemapper::{DataBlocks, Sectors, Segment};
 use devicemapper::LinearDev;
-use devicemapper::{ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolWorkingStatus};
+use devicemapper::{ThinPoolDev, ThinPoolStatus, ThinPoolWorkingStatus};
 
 use super::super::consts::IEC::Mi;
 use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
-use super::super::types::{FilesystemUuid, PoolUuid, RenameAction, Redundancy};
+use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, RenameAction, Redundancy};
 
+use super::blockdev::BlockDev;
 use super::blockdevmgr::BlockDevMgr;
 use super::device::wipe_sectors;
-use super::dmdevice::{FlexRole, ThinPoolRole, format_flex_name, format_thinpool_name};
+use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, format_flex_name,
+                      format_thinpool_name};
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::mdv::MetadataVol;
 use super::metadata::MIN_MDA_SECTORS;
-use super::serde_structs::{FlexDevsSave, PoolSave, Recordable, ThinPoolDevSave};
+use super::serde_structs::{FilesystemSave, FlexDevsSave, PoolSave, Recordable, ThinPoolDevSave};
+use super::setup::{get_blockdevs, get_metadata};
 
 const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 const META_LOWATER: u64 = 512;
-pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
+const DATA_LOWATER: DataBlocks = DataBlocks(512);
 
 const INITIAL_META_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
 const INITIAL_DATA_SIZE: Sectors = Sectors(768 * Mi / SECTOR_SIZE as u64);
@@ -52,6 +55,7 @@ pub struct StratPool {
     thin_pool: ThinPoolDev,
     thin_pool_meta_spare: Vec<Segment>,
     mdv: MetadataVol,
+    thindev_ids: ThinDevIdPool,
 }
 
 impl StratPool {
@@ -126,7 +130,7 @@ impl StratPool {
             .alloc_space(INITIAL_MDV_SIZE)
             .expect("blockmgr must not fail, already checked for space");
 
-        let mdv = try!(StratPool::setup_mdv(dm, &pool_uuid, mdv_regions));
+        let mdv = try!(StratPool::setup_mdv(dm, pool_uuid, mdv_regions));
 
         let mut pool = StratPool {
             name: name.to_owned(),
@@ -137,6 +141,7 @@ impl StratPool {
             thin_pool: thinpool_dev,
             thin_pool_meta_spare: meta_spare_regions,
             mdv: mdv,
+            thindev_ids: ThinDevIdPool::new_from_ids(vec![]),
         };
 
         try!(pool.write_metadata());
@@ -144,11 +149,45 @@ impl StratPool {
         Ok(pool)
     }
 
-    pub fn setup_mdv(dm: &DM,
-                     pool_uuid: &PoolUuid,
-                     segs: Vec<Segment>)
-                     -> EngineResult<MetadataVol> {
-        let device_name = format_flex_name(pool_uuid, FlexRole::MetadataVolume);
+    /// Setup a StratPool using its UUID and the list of devnodes it has.
+    // TODO: Clean up after errors that occur after some action has been
+    // taken on the environment.
+    pub fn setup(uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<StratPool> {
+        let metadata = try!(try!(get_metadata(uuid, devnodes))
+                                .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                                                           format!("no metadata for pool {}",
+                                                                   uuid))));
+        let blockdevs = try!(get_blockdevs(&metadata, devnodes));
+
+        // This is the cleanup zone.
+        let (thinpool, mdv) = try!(get_dmdevs(uuid, &blockdevs, &metadata));
+        let filesystems = try!(get_filesystems(uuid, &thinpool, &mdv));
+        let thindev_ids =
+            ThinDevIdPool::new_from_ids(filesystems.iter().map(|x| x.thin_id()).collect());
+
+        let mut table = Table::new();
+        for fs in filesystems {
+            let evicted = table.insert(fs);
+            if !evicted.is_empty() {
+                let err_msg = "filesystems with duplicate UUID or name specified in metadata";
+                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+            }
+        }
+        Ok(StratPool {
+               name: metadata.name,
+               pool_uuid: uuid,
+               block_devs: BlockDevMgr::new(blockdevs),
+               filesystems: table,
+               redundancy: Redundancy::NONE,
+               thin_pool: thinpool,
+               thin_pool_meta_spare: vec![],
+               mdv: mdv,
+               thindev_ids: thindev_ids,
+           })
+    }
+
+    fn setup_mdv(dm: &DM, pool_uuid: PoolUuid, segs: Vec<Segment>) -> EngineResult<MetadataVol> {
+        let device_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
         let mdv_dev = try!(LinearDev::new(&device_name, dm, segs));
         let mdv = try!(MetadataVol::initialize(&pool_uuid, mdv_dev));
         Ok(mdv)
@@ -263,10 +302,7 @@ impl Pool for StratPool {
         let mut result = Vec::new();
         for name in names.iter() {
             let uuid = Uuid::new_v4();
-            // FIXME: Start managing thin ids in pool.
-            let thin_id =
-                ThinDevId::new_u64((random::<u32>() >> 8) as u64)
-                    .expect("must require only 24 bits");
+            let thin_id = try!(self.thindev_ids.new_id());
             let new_filesystem = try!(StratFilesystem::initialize(&self.pool_uuid,
                                                                   uuid,
                                                                   thin_id,
@@ -374,4 +410,95 @@ impl Recordable<PoolSave> for StratPool {
                thinpool_dev: ThinPoolDevSave { data_block_size: self.thin_pool.data_block_size() },
            })
     }
+}
+
+/// Locate each pool's thinpool device.
+/// Return a map from the pool UUID to the pool's thinpool device.
+// TODO: Make this safe in the case where DM devices have not been cleaned up.
+pub fn get_dmdevs(pool_uuid: PoolUuid,
+                  blockdevs: &[BlockDev],
+                  pool_save: &PoolSave)
+                  -> EngineResult<(ThinPoolDev, MetadataVol)> {
+    let uuid_map: HashMap<DevUuid, Device> = blockdevs
+        .iter()
+        .map(|bd| (*bd.uuid(), *bd.device()))
+        .collect();
+
+    let lookup = |triple: &(Uuid, Sectors, Sectors)| -> EngineResult<Segment> {
+        let device = try!(uuid_map
+                              .get(&triple.0)
+                              .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                                                         format!("missing device for UUID {:?}",
+                                                                 &triple.0))));
+        Ok(Segment {
+               device: *device,
+               start: triple.1,
+               length: triple.2,
+           })
+    };
+
+    let meta_segments: Vec<Segment> = try!(pool_save
+                                               .flex_devs
+                                               .meta_dev
+                                               .iter()
+                                               .map(&lookup)
+                                               .collect());
+
+    let thin_meta_segments: Vec<Segment> = try!(pool_save
+                                                    .flex_devs
+                                                    .thin_meta_dev
+                                                    .iter()
+                                                    .map(&lookup)
+                                                    .collect());
+
+    let thin_data_segments: Vec<Segment> = try!(pool_save
+                                                    .flex_devs
+                                                    .thin_data_dev
+                                                    .iter()
+                                                    .map(&lookup)
+                                                    .collect());
+
+    let dm = try!(DM::new());
+
+    let meta_dev = try!(LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
+                                       &dm,
+                                       thin_meta_segments));
+
+    let data_dev = try!(LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinData),
+                                       &dm,
+                                       thin_data_segments));
+
+    let thinpool_dev = try!(ThinPoolDev::setup(&format_thinpool_name(&pool_uuid,
+                                                                     ThinPoolRole::Pool),
+                                               &dm,
+                                               try!(data_dev.size()),
+                                               pool_save.thinpool_dev.data_block_size,
+                                               DATA_LOWATER,
+                                               meta_dev,
+                                               data_dev));
+
+    let mdv = try!(StratPool::setup_mdv(&dm, pool_uuid, meta_segments));
+    Ok((thinpool_dev, mdv))
+}
+
+/// Get the filesystems belonging to the pool.
+pub fn get_filesystems(pool_uuid: PoolUuid,
+                       thinpool: &ThinPoolDev,
+                       mdv: &MetadataVol)
+                       -> EngineResult<Vec<StratFilesystem>> {
+    let dm = try!(DM::new());
+    let get_filesystem = |fssave: &FilesystemSave| -> EngineResult<StratFilesystem> {
+        Ok(try!(StratFilesystem::setup(pool_uuid,
+                                       fssave.uuid,
+                                       fssave.thin_id,
+                                       &fssave.name,
+                                       fssave.size,
+                                       &dm,
+                                       thinpool)))
+    };
+
+    try!(mdv.filesystems())
+        .iter()
+        .map(get_filesystem)
+        .collect()
 }

@@ -16,18 +16,19 @@ use nix::sys::stat::{S_IFBLK, S_IFMT};
 use serde_json;
 use uuid::Uuid;
 
-use devicemapper::{DM, Device, Sectors, Segment, ThinPoolDev};
+use devicemapper::{DM, Device, Sectors, Segment, ThinPoolDev, LinearDev};
 
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 use super::super::types::{DevUuid, PoolUuid};
 
 use super::blockdev::BlockDev;
+use super::dmdevice::{FlexRole, ThinPoolRole, format_flex_name, format_thinpool_name};
 use super::device::blkdev_size;
 use super::engine::DevOwnership;
 use super::filesystem::StratFilesystem;
 use super::mdv::MetadataVol;
 use super::metadata::{BDA, StaticHeader};
-use super::pool::StratPool;
+use super::pool::{StratPool, DATA_LOWATER};
 use super::range_alloc::RangeAllocator;
 use super::serde_structs::{FilesystemSave, PoolSave};
 
@@ -286,8 +287,23 @@ pub fn get_dmdevs(pool_uuid: &PoolUuid,
                                                     .collect());
 
     let dm = try!(DM::new());
-    let thinpool_dev =
-        try!(StratPool::setup_thinpooldev(&dm, pool_uuid, thin_meta_segments, thin_data_segments));
+
+    let meta_dev = try!(LinearDev::new(&format_flex_name(pool_uuid, FlexRole::ThinMeta),
+                                       &dm,
+                                       thin_meta_segments));
+
+    let data_dev = try!(LinearDev::new(&format_flex_name(pool_uuid, FlexRole::ThinData),
+                                       &dm,
+                                       thin_data_segments));
+
+    let thinpool_dev = try!(ThinPoolDev::setup(&format_thinpool_name(&pool_uuid,
+                                                                     ThinPoolRole::Pool),
+                                               &dm,
+                                               try!(data_dev.size()),
+                                               pool_save.thinpool_dev.data_block_size,
+                                               DATA_LOWATER,
+                                               meta_dev,
+                                               data_dev));
 
     let mdv = try!(StratPool::setup_mdv(&dm, pool_uuid, meta_segments));
     Ok((thinpool_dev, mdv))

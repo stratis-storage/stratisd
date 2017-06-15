@@ -137,7 +137,6 @@ impl StratPool {
         let data_dev = try!(LinearDev::new(&device_name, dm, data_segs));
 
         let device_name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
-        // TODO Fix hard coded data blocksize and low water mark.
         Ok(try!(ThinPoolDev::new(&device_name,
                                  dm,
                                  try!(data_dev.size()),

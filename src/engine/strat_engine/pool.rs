@@ -70,7 +70,10 @@ impl StratPool {
 
         if block_mgr.avail_space() < StratPool::min_initial_size() {
             let avail_size = block_mgr.avail_space().bytes();
-            try!(block_mgr.destroy_all());
+
+            // TODO: check the return value and update state machine on failure
+            let _ = block_mgr.destroy_all();
+
             return Err(EngineError::Engine(ErrorEnum::Invalid,
                                            format!("Space on pool must be at least {} bytes, \
                                                    available space is only {} bytes",

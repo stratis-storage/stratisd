@@ -16,6 +16,7 @@ use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{PoolUuid, Redundancy, RenameAction};
 
+use super::cleanup::teardown_pools;
 use super::pool::StratPool;
 use super::setup::find_all;
 
@@ -53,6 +54,10 @@ impl StratEngine {
         for (pool_uuid, devices) in pools.iter() {
             let evicted = table.insert(try!(StratPool::setup(*pool_uuid, devices)));
             if !evicted.is_empty() {
+
+                // TODO: update state machine on failure.
+                let _ = teardown_pools(table.empty());
+
                 let err_msg = "found two pools with the same id or name";
                 return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
             }
@@ -63,10 +68,7 @@ impl StratEngine {
 
     /// Teardown Stratis, preparatory to a shutdown.
     pub fn teardown(self) -> EngineResult<()> {
-        for pool in self.pools.empty() {
-            try!(pool.teardown());
-        }
-        Ok(())
+        Ok(try!(teardown_pools(self.pools.empty())))
     }
 
     /// Get pool as StratPool

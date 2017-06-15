@@ -33,20 +33,24 @@ pub enum FilesystemStatus {
 }
 
 impl StratFilesystem {
-    pub fn initialize(pool_id: &PoolUuid,
+    pub fn initialize(pool_uuid: &PoolUuid,
                       fs_id: FilesystemUuid,
-                      thin_id: ThinDevId,
+                      thindev_id: ThinDevId,
                       name: &str,
                       dm: &DM,
                       thin_pool: &ThinPoolDev)
                       -> EngineResult<StratFilesystem> {
-        let fs = try!(StratFilesystem::setup(pool_id,
-                                             fs_id,
-                                             thin_id,
-                                             name,
-                                             Bytes(IEC::Ti).sectors(),
-                                             dm,
-                                             thin_pool));
+        let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fs_id));
+        let thin_dev = try!(ThinDev::new(&device_name,
+                                         dm,
+                                         thin_pool,
+                                         thindev_id,
+                                         Bytes(IEC::Ti).sectors()));
+        let fs = StratFilesystem {
+            fs_id: fs_id,
+            name: name.to_owned(),
+            thin_dev: thin_dev,
+        };
         try!(create_fs(try!(fs.devnode()).as_path()));
         Ok(fs)
     }

@@ -5,9 +5,11 @@
 // Code to handle cleanup after a failed operation.
 
 
+use super::super::engine::HasUuid;
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 
 use super::blockdev::BlockDev;
+use super::pool::StratPool;
 
 /// Wipe a Vec of blockdevs of their identifying headers.
 /// Return an error if any of the blockdevs could not be wiped.
@@ -26,6 +28,23 @@ pub fn wipe_blockdevs(mut blockdevs: Vec<BlockDev>) -> EngineResult<()> {
     } else {
         let err_msg = format!("Failed to wipe already initialized devnodes: {:?}",
                               unerased_devnodes);
+        Err(EngineError::Engine(ErrorEnum::Error, err_msg))
+    }
+}
+
+/// Teardown pools.
+pub fn teardown_pools(mut pools: Vec<StratPool>) -> EngineResult<()> {
+    let mut untorndown_pools = Vec::new();
+    for pool in pools.drain(..) {
+        let pool_uuid = *pool.uuid();
+        pool.teardown()
+            .unwrap_or_else(|_| untorndown_pools.push(pool_uuid));
+    }
+    if untorndown_pools.is_empty() {
+        Ok(())
+    } else {
+        let err_msg = format!("Failed to teardown already set up pools: {:?}",
+                              untorndown_pools);
         Err(EngineError::Engine(ErrorEnum::Error, err_msg))
     }
 }

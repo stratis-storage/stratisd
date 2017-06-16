@@ -16,8 +16,9 @@ use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{PoolUuid, Redundancy, RenameAction};
 
+use super::cleanup::teardown_pools;
 use super::pool::StratPool;
-use super::setup::{find_all, get_blockdevs, get_dmdevs, get_filesystems, get_metadata};
+use super::setup::find_all;
 
 pub const DEV_PATH: &'static str = "/dev/stratis";
 
@@ -34,6 +35,12 @@ pub struct StratEngine {
 }
 
 impl StratEngine {
+    /// Setup a StratEngine.
+    /// 1. Verify the existance of Stratis /dev directory.
+    /// 2. Setup all the pools belonging to the engine.
+    ///
+    /// Returns an error if there was an error reading device nodes.
+    /// Returns an error if there was an error setting up any of the pools.
     pub fn initialize() -> EngineResult<StratEngine> {
         if let Err(err) = create_dir(DEV_PATH) {
             if err.kind() != ErrorKind::AlreadyExists {
@@ -43,30 +50,25 @@ impl StratEngine {
 
         let pools = try!(find_all());
 
-        // FIXME: This is quite clearly incomplete pool reconstruction.
+        let mut table = Table::new();
         for (pool_uuid, devices) in pools.iter() {
-            let pool_save = try!(try!(get_metadata(pool_uuid, devices))
-                                     .ok_or(EngineError::Engine(ErrorEnum::NotFound,
-                                                                format!("no metadata for pool {}",
-                                                                        pool_uuid))));
-            let blockdevs = try!(get_blockdevs(&pool_save, devices));
-            let (thinpool, mdv) = try!(get_dmdevs(pool_uuid, &blockdevs, &pool_save));
-            let _ = try!(get_filesystems(pool_uuid, &thinpool, &mdv));
-        }
-        if !pools.is_empty() {
-            let err_msg = "Stratis was already run once, can not yet reconstruct state";
-            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, err_msg.into()));
+            let evicted = table.insert(try!(StratPool::setup(*pool_uuid, devices)));
+            if !evicted.is_empty() {
+
+                // TODO: update state machine on failure.
+                let _ = teardown_pools(table.empty());
+
+                let err_msg = "found two pools with the same id or name";
+                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+            }
         }
 
-        Ok(StratEngine { pools: Table::new() })
+        Ok(StratEngine { pools: table })
     }
 
     /// Teardown Stratis, preparatory to a shutdown.
     pub fn teardown(self) -> EngineResult<()> {
-        for pool in self.pools.empty() {
-            try!(pool.teardown());
-        }
-        Ok(())
+        Ok(try!(teardown_pools(self.pools.empty())))
     }
 
     /// Get pool as StratPool

@@ -51,13 +51,14 @@ impl StratFilesystem {
             name: name.to_owned(),
             thin_dev: thin_dev,
         };
+
         try!(create_fs(try!(fs.devnode()).as_path()));
         Ok(fs)
     }
 
     /// Setup a filesystem, setting up the thin device as necessary.
     // FIXME: Check for still existing device mapper devices.
-    pub fn setup(pool_uuid: &PoolUuid,
+    pub fn setup(pool_uuid: PoolUuid,
                  fs_id: FilesystemUuid,
                  thindev_id: ThinDevId,
                  name: &str,
@@ -65,7 +66,7 @@ impl StratFilesystem {
                  dm: &DM,
                  thin_pool: &ThinPoolDev)
                  -> EngineResult<StratFilesystem> {
-        let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fs_id));
+        let device_name = format_thin_name(&pool_uuid, ThinRole::Filesystem(fs_id));
         let thin_dev = try!(ThinDev::setup(&device_name, dm, thin_pool, thindev_id, size));
 
         Ok(StratFilesystem {
@@ -85,6 +86,11 @@ impl StratFilesystem {
             ThinStatus::Fail => return Ok(FilesystemStatus::Failed),
         }
         Ok(FilesystemStatus::Good)
+    }
+
+    /// The thin id for the thin device that backs this filesystem.
+    pub fn thin_id(&self) -> ThinDevId {
+        self.thin_dev.id()
     }
 }
 

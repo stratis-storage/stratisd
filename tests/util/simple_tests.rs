@@ -368,8 +368,8 @@ pub fn test_basic_metadata(paths: &[&Path]) {
     assert!(blockdevs2.len() == pool_save2.block_devs.len());
 
     // These should work, under the assumption of a clean teardown.
-    let (tp1, mdv1) = get_dmdevs(uuid1, &blockdevs1, &pool_save1).unwrap();
-    let (tp2, mdv2) = get_dmdevs(uuid2, &blockdevs2, &pool_save2).unwrap();
+    let (tp1, mdv1, _) = get_dmdevs(uuid1, &blockdevs1, &pool_save1).unwrap();
+    let (tp2, mdv2, _) = get_dmdevs(uuid2, &blockdevs2, &pool_save2).unwrap();
     assert!(tp1.name().contains(&uuid1.simple().to_string()));
     assert!(tp2.name().contains(&uuid2.simple().to_string()));
 

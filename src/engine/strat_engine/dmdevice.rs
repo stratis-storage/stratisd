@@ -15,6 +15,7 @@ pub enum FlexRole {
     MetadataVolume,
     ThinData,
     ThinMeta,
+    ThinMetaSpare,
 }
 
 impl Display for FlexRole {
@@ -23,6 +24,7 @@ impl Display for FlexRole {
             FlexRole::MetadataVolume => write!(f, "mdv"),
             FlexRole::ThinData => write!(f, "thindata"),
             FlexRole::ThinMeta => write!(f, "thinmeta"),
+            FlexRole::ThinMetaSpare => write!(f, "thinmetaspare"),
         }
     }
 }

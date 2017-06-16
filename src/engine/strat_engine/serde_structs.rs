@@ -55,6 +55,7 @@ pub struct FlexDevsSave {
     pub meta_dev: Vec<(Uuid, Sectors, Sectors)>,
     pub thin_meta_dev: Vec<(Uuid, Sectors, Sectors)>,
     pub thin_data_dev: Vec<(Uuid, Sectors, Sectors)>,
+    pub thin_meta_dev_spare: Vec<(Uuid, Sectors, Sectors)>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

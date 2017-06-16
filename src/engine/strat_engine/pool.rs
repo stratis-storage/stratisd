@@ -363,6 +363,8 @@ impl Recordable<PoolSave> for StratPool {
                                      .map(&mapper)
                                      .collect());
 
+        let thin_meta_dev_spare = try!(self.thin_pool_meta_spare.iter().map(&mapper).collect());
+
         Ok(PoolSave {
                name: self.name.clone(),
                block_devs: try!(self.block_devs.record()),
@@ -370,6 +372,7 @@ impl Recordable<PoolSave> for StratPool {
                    meta_dev: meta_dev,
                    thin_meta_dev: thin_meta_dev,
                    thin_data_dev: thin_data_dev,
+                   thin_meta_dev_spare: thin_meta_dev_spare,
                },
                thinpool_dev: ThinPoolDevSave { data_block_size: self.thin_pool.data_block_size() },
            })

@@ -7,10 +7,9 @@
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 
-use devicemapper::Device;
-use devicemapper::Segment;
-use devicemapper::Sectors;
 use time::Timespec;
+
+use devicemapper::{Device, Sectors, Segment};
 
 use super::super::errors::EngineResult;
 use super::super::types::{DevUuid, PoolUuid};

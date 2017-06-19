@@ -7,10 +7,11 @@ use std::fmt;
 use std::error;
 use std::str;
 
-use devicemapper;
 use nix;
 use uuid;
 use serde_json;
+
+use devicemapper;
 
 #[derive(Debug, Clone)]
 pub enum ErrorEnum {

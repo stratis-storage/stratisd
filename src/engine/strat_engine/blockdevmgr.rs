@@ -10,9 +10,10 @@ use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use devicemapper::{Bytes, Device, Sectors, Segment};
 use time::Timespec;
 use uuid::Uuid;
+
+use devicemapper::{Bytes, Device, Sectors, Segment};
 
 use super::super::consts::IEC;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};

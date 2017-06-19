@@ -12,9 +12,10 @@ use std::io::prelude::*;
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 
-use devicemapper::{LinearDev, DM, Segment};
-use serde_json;
 use nix::unistd::fsync;
+use serde_json;
+
+use devicemapper::{DM, LinearDev, Segment};
 
 use super::super::engine::HasUuid;
 use super::super::errors::EngineResult;

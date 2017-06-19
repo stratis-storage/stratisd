@@ -15,9 +15,10 @@ use std::fs::OpenOptions;
 use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-use devicemapper::{Bytes, Sectors};
 use loopdev::{LoopControl, LoopDevice};
 use tempdir::TempDir;
+
+use devicemapper::{Bytes, Sectors};
 
 use libstratis::engine::IEC;
 use libstratis::engine::strat_engine::device::wipe_sectors;

@@ -43,16 +43,14 @@ impl SimPool {
         let device_pairs = devices
             .iter()
             .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
-        let new_pool = SimPool {
+        SimPool {
             name: name.to_owned(),
             pool_uuid: Uuid::new_v4(),
             block_devs: HashMap::from_iter(device_pairs),
             filesystems: Table::default(),
             redundancy: redundancy,
             rdm: rdm.clone(),
-        };
-
-        new_pool
+        }
     }
 
     pub fn check(&mut self) -> () {}
@@ -84,14 +82,14 @@ impl Pool for SimPool {
                                   specs: &[&'b str])
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
         let names: HashSet<_, RandomState> = HashSet::from_iter(specs);
-        for name in names.iter() {
+        for name in &names {
             if self.filesystems.contains_name(name) {
                 return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
             }
         }
 
         let mut result = Vec::new();
-        for name in names.iter() {
+        for name in &names {
             let uuid = Uuid::new_v4();
             let new_filesystem = SimFilesystem::new(uuid, name);
             self.filesystems.insert(new_filesystem);

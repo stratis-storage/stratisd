@@ -39,18 +39,17 @@ pub fn engine_to_dbus_err(err: &EngineError) -> (DbusErrorEnum, String) {
     let error = match *err {
         EngineError::Engine(ref e, _) => {
             match *e {
-                ErrorEnum::Error => DbusErrorEnum::ERROR,
+                ErrorEnum::Error | ErrorEnum::Invalid => DbusErrorEnum::ERROR,
                 ErrorEnum::AlreadyExists => DbusErrorEnum::ALREADY_EXISTS,
                 ErrorEnum::Busy => DbusErrorEnum::BUSY,
-                ErrorEnum::Invalid => DbusErrorEnum::ERROR,
                 ErrorEnum::NotFound => DbusErrorEnum::NOTFOUND,
             }
         }
         EngineError::Io(_) => DbusErrorEnum::IO_ERROR,
         EngineError::Nix(_) => DbusErrorEnum::NIX_ERROR,
-        EngineError::Uuid(_) => DbusErrorEnum::INTERNAL_ERROR,
-        EngineError::Utf8(_) => DbusErrorEnum::INTERNAL_ERROR,
-        EngineError::Serde(_) => DbusErrorEnum::INTERNAL_ERROR,
+        EngineError::Uuid(_) |
+        EngineError::Utf8(_) |
+        EngineError::Serde(_) |
         EngineError::DM(_) => DbusErrorEnum::INTERNAL_ERROR,
     };
     (error, err.description().to_owned())
@@ -73,10 +72,10 @@ pub fn default_object_path<'a>() -> dbus::Path<'a> {
 }
 
 /// Similar to Option::ok_or, but unpacks a reference to a reference.
-pub fn ref_ok_or<'a, E, T>(opt: &'a Option<T>, err: E) -> Result<&'a T, E> {
-    match opt {
-        &Some(ref t) => Ok(t),
-        &None => Err(err),
+pub fn ref_ok_or<E, T>(opt: &Option<T>, err: E) -> Result<&T, E> {
+    match *opt {
+        Some(ref t) => Ok(t),
+        None => Err(err),
     }
 }
 
@@ -84,7 +83,7 @@ pub fn ref_ok_or<'a, E, T>(opt: &'a Option<T>, err: E) -> Result<&'a T, E> {
 pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
     let object_path = p.path.get_name();
     let path = p.tree
-        .get(&object_path)
+        .get(object_path)
         .expect("implicit argument must be in tree");
     let data = try!(ref_ok_or(path.get_data(),
                               MethodErr::failed(&format!("no data for object path {}",
@@ -98,7 +97,7 @@ pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<
 pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
     let object_path = p.path.get_name();
     let path = p.tree
-        .get(&object_path)
+        .get(object_path)
         .expect("implicit argument must be in tree");
     let data = try!(ref_ok_or(path.get_data(),
                               MethodErr::failed(&format!("no data for object path {}",

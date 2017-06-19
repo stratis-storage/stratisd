@@ -73,7 +73,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                              .expect("'d' originated in the 'devs' D-Bus argument.")
                              .into()
                      });
-            let paths = paths.map(|x| MessageItem::Str(x)).collect();
+            let paths = paths.map(MessageItem::Str).collect();
             let return_path = MessageItem::ObjectPath(pool_object_path);
             let return_list = MessageItem::Array(paths, "s".into());
             let return_value = MessageItem::Struct(vec![return_path, return_list]);
@@ -192,7 +192,7 @@ fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
+fn get_base_tree(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
 
     let f = Factory::new_fn();
 
@@ -271,7 +271,7 @@ pub fn handle(c: &Connection,
               dbus_context: &DbusContext)
               -> Result<(), dbus::Error> {
     if let ConnectionItem::MethodCall(ref msg) = item {
-        if let Some(v) = tree.handle(&msg) {
+        if let Some(v) = tree.handle(msg) {
             // Probably the wisest is to ignore any send errors here -
             // maybe the remote has disconnected during our processing.
             for m in v {

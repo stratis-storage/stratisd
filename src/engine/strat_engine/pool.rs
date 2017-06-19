@@ -113,17 +113,17 @@ impl StratPool {
         // that are trying to re-adopt the device with the attributes that
         // have been passed.
         let meta_dev = try!(LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
-                                           &dm,
+                                           dm,
                                            meta_regions));
         try!(wipe_sectors(&try!(meta_dev.devnode()), Sectors(0), INITIAL_META_SIZE));
 
         let data_dev = try!(LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinData),
-                                           &dm,
+                                           dm,
                                            data_regions));
 
         let thinpool_dev = try!(ThinPoolDev::new(&format_thinpool_name(&pool_uuid,
                                                                        ThinPoolRole::Pool),
-                                                 &dm,
+                                                 dm,
                                                  try!(data_dev.size()),
                                                  DATA_BLOCK_SIZE,
                                                  DATA_LOWATER,
@@ -145,7 +145,7 @@ impl StratPool {
             thin_pool: thinpool_dev,
             thin_pool_meta_spare: meta_spare_regions,
             mdv: mdv,
-            thindev_ids: ThinDevIdPool::new_from_ids(&vec![]),
+            thindev_ids: ThinDevIdPool::new_from_ids(&[]),
         };
 
         try!(pool.write_metadata());
@@ -158,7 +158,7 @@ impl StratPool {
     // taken on the environment.
     pub fn setup(uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<StratPool> {
         let metadata = try!(try!(get_metadata(uuid, devnodes))
-                                .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                                .ok_or_else(|| EngineError::Engine(ErrorEnum::NotFound,
                                                            format!("no metadata for pool {}",
                                                                    uuid))));
         let blockdevs = try!(get_blockdevs(&metadata, devnodes));
@@ -283,7 +283,7 @@ impl StratPool {
         // TODO: any necessary clean up of filesystems
         if !self.filesystems.is_empty() {
             return Err(EngineError::Engine(ErrorEnum::Busy,
-                                           format!("May be unsynced files on device.")));
+                                           "May be unsynced files on device".into()));
         }
         let dm = try!(DM::new());
         try!(self.thin_pool.teardown(&dm));
@@ -297,7 +297,7 @@ impl Pool for StratPool {
                                   specs: &[&'b str])
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
         let names: HashSet<_, RandomState> = HashSet::from_iter(specs);
-        for name in names.iter() {
+        for name in &names {
             if self.filesystems.contains_name(name) {
                 return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
             }
@@ -306,7 +306,7 @@ impl Pool for StratPool {
         // TODO: Roll back on filesystem initialization failure.
         let dm = try!(DM::new());
         let mut result = Vec::new();
-        for name in names.iter() {
+        for name in &names {
             let uuid = Uuid::new_v4();
             let thin_id = try!(self.thindev_ids.new_id());
             let new_filesystem = try!(StratFilesystem::initialize(&self.pool_uuid,
@@ -314,7 +314,7 @@ impl Pool for StratPool {
                                                                   thin_id,
                                                                   name,
                                                                   &dm,
-                                                                  &mut self.thin_pool));
+                                                                  &self.thin_pool));
             try!(self.mdv.save_fs(&new_filesystem));
             self.filesystems.insert(new_filesystem);
             result.push((**name, uuid));
@@ -383,7 +383,7 @@ impl Recordable<PoolSave> for StratPool {
         let mapper = |seg: &Segment| -> EngineResult<(Uuid, Sectors, Sectors)> {
             let bd = try!(self.block_devs
                      .get_by_device(seg.device)
-                     .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                     .ok_or_else(|| EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no block device found for device {:?}",
                                                         seg.device))));
             Ok((*bd.uuid(), seg.start, seg.length))
@@ -436,7 +436,7 @@ fn setup_thinpooldev(pool_uuid: PoolUuid,
     let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
     let size = try!(data_dev.size());
     match ThinPoolDev::setup(&name,
-                             &dm,
+                             dm,
                              size,
                              data_block_size,
                              low_water_mark,
@@ -445,9 +445,9 @@ fn setup_thinpooldev(pool_uuid: PoolUuid,
         Ok(dev) => Ok((dev, spare_segments)),
         Err(DmError::Dm(devicemapper::ErrorEnum::CheckFailed(meta_dev, data_dev), _)) => {
             let (new_meta_dev, new_spare_segments) =
-                try!(attempt_thin_repair(pool_uuid, &dm, meta_dev, spare_segments));
+                try!(attempt_thin_repair(pool_uuid, dm, meta_dev, spare_segments));
             Ok((try!(ThinPoolDev::setup(&name,
-                                        &dm,
+                                        dm,
                                         size,
                                         data_block_size,
                                         low_water_mark,
@@ -474,13 +474,13 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
                                                spare_segments.drain(..).collect()));
 
 
-    if try!(Command::new("thin_repair")
-                .arg("-i")
-                .arg(&try!(meta_dev.devnode()))
-                .arg("-o")
-                .arg(&try!(new_meta_dev.devnode()))
-                .status())
-               .success() == false {
+    if !(try!(Command::new("thin_repair")
+                  .arg("-i")
+                  .arg(&try!(meta_dev.devnode()))
+                  .arg("-o")
+                  .arg(&try!(new_meta_dev.devnode()))
+                  .status())
+                 .success()) {
         return Err(EngineError::Engine(ErrorEnum::Error,
                                        "thin_repair failed, pool unusable".into()));
     }
@@ -520,7 +520,7 @@ pub fn get_dmdevs(pool_uuid: PoolUuid,
     let lookup = |triple: &(Uuid, Sectors, Sectors)| -> EngineResult<Segment> {
         let device = try!(uuid_map
                               .get(&triple.0)
-                              .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                              .ok_or_else(|| EngineError::Engine(ErrorEnum::NotFound,
                                                          format!("missing device for UUID {:?}",
                                                                  &triple.0))));
         Ok(Segment {

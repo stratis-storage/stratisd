@@ -12,7 +12,7 @@ extern crate uuid;
 
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use self::tempdir::TempDir;
 use self::uuid::Uuid;
@@ -47,16 +47,11 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
         .map(|block_dev| block_dev.avail_range())
         .collect::<Vec<Segment>>();
 
-    let device_name = "stratis_testing_linear";
     let dm = DM::new().unwrap();
-    let lineardev = LinearDev::new(&device_name, &dm, segments).unwrap();
-
-    let mut linear_dev_path = PathBuf::from("/dev/mapper");
-    linear_dev_path.push(device_name);
-
+    let lineardev = LinearDev::new("stratis_testing_linear", &dm, segments).unwrap();
     let lineardev_size = blkdev_size(&OpenOptions::new()
                                           .read(true)
-                                          .open(linear_dev_path)
+                                          .open(lineardev.devnode().unwrap())
                                           .unwrap())
             .unwrap();
     assert!(total_blockdev_size.bytes() == lineardev_size);

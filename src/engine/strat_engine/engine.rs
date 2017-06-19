@@ -7,9 +7,9 @@ use std::io::ErrorKind;
 use std::path::Path;
 use std::path::PathBuf;
 
-use devicemapper::DM;
 use uuid::Uuid;
 
+use devicemapper::DM;
 
 use super::super::engine::{Engine, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};

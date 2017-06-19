@@ -13,16 +13,15 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use self::tempdir::TempDir;
+use self::uuid::Uuid;
+
 use self::devicemapper::DM;
-use self::devicemapper::consts::SECTOR_SIZE;
 use self::devicemapper::LinearDev;
 use self::devicemapper::Segment;
 use self::devicemapper::{DataBlocks, Sectors};
-use self::devicemapper::{ThinDev, ThinDevId};
-use self::devicemapper::ThinPoolDev;
-
-use self::tempdir::TempDir;
-use self::uuid::Uuid;
+use self::devicemapper::{ThinDev, ThinDevId, ThinPoolDev};
+use self::devicemapper::consts::SECTOR_SIZE;
 
 use libstratis::engine::{Engine, EngineError, ErrorEnum};
 use libstratis::engine::strat_engine::blockdevmgr::{initialize, resolve_devices};

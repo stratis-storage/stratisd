@@ -10,10 +10,11 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
 use crc::crc32;
-use devicemapper::{Bytes, Sectors};
-use devicemapper::consts::SECTOR_SIZE;
 use time::Timespec;
 use uuid::Uuid;
+
+use devicemapper::{Bytes, Sectors};
+use devicemapper::consts::SECTOR_SIZE;
 
 use super::super::consts::IEC;
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};

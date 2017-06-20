@@ -10,6 +10,8 @@ before_install:
 language: rust
 
 matrix:
+    allow_failures:
+        - env: TASK=clippy
     include:
         - rust: stable
           env: TASK=fmt

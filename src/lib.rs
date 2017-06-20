@@ -2,6 +2,8 @@
 #![cfg_attr(feature = "clippy", plugin(clippy))]
 #![cfg_attr(not(feature = "clippy"), allow(unknown_lints))]
 
+#![allow(doc_markdown)]
+
 extern crate devicemapper;
 extern crate clap;
 #[macro_use]

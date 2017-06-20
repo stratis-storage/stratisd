@@ -51,3 +51,5 @@ docs:
 	build
 	test
 	docs
+	test-real
+	test-loop

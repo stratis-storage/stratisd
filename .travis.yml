@@ -8,9 +8,23 @@ before_install:
     - sudo apt-get install -y libdbus-1-dev
 
 language: rust
-rust: stable
+
+matrix:
+    include:
+        - rust: stable
+          env: TASK=fmt
+        - rust: stable
+          env: TASK=build
+        - rust: stable
+          env: TASK=docs
+        - rust: stable
+          env: TASK=test
+        - rust: stable
+          env: TASK=test-loop
+        - rust: nightly
+          env: TASK=clippy
 
 branches:
     only: master
 
-script: make check
+script: make -f Makefile $TASK

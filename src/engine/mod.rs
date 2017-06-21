@@ -29,6 +29,7 @@ mod macros;
 pub mod strat_engine;
 
 mod consts;
+#[allow(module_inception)]
 mod engine;
 mod errors;
 mod sim_engine;

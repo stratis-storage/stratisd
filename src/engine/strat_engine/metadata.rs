@@ -186,7 +186,7 @@ impl StaticHeader {
     {
         try!(f.seek(SeekFrom::Start(0)));
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
-        try!(f.read(&mut buf));
+        try!(f.read_exact(&mut buf));
 
         // TODO: repair static header if one incorrect?
         // Note: this would require some adjustment or some revision to

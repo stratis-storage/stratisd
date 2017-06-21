@@ -364,12 +364,20 @@ impl MDARegions {
     pub fn save_state<F>(&mut self, time: &Timespec, data: &[u8], f: &mut F) -> EngineResult<()>
         where F: Seek + Write
     {
-        let used = data.len();
-        let data_crc = crc32::checksum_ieee(data);
-        let hdr_buf = MDAHeader::to_buf(used, data_crc, time);
+        if self.last_update_time() >= Some(time) {
+            return Err(EngineError::Engine(ErrorEnum::Invalid, "Overwriting newer data".into()));
+        }
 
         let region_size = self.region_size.bytes();
-        try!(check_mda_region_size(Bytes(used as u64), region_size));
+        let used = Bytes(data.len() as u64);
+        try!(check_mda_region_size(used, region_size));
+
+        let header = MDAHeader {
+            last_updated: *time,
+            used: used,
+            data_crc: crc32::checksum_ieee(data),
+        };
+        let hdr_buf = header.to_buf();
 
         let mut save_region = |region: usize| -> EngineResult<()> {
             try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(region, region_size))));
@@ -380,10 +388,6 @@ impl MDARegions {
             Ok(())
         };
 
-        if self.last_update_time() >= Some(time) {
-            return Err(EngineError::Engine(ErrorEnum::Invalid, "Overwriting newer data".into()));
-        }
-
         let older_region = self.older();
 
         // Save to primary and backup regions
@@ -391,11 +395,7 @@ impl MDARegions {
         try!(save_region(older_region));
         try!(save_region(older_region + 2));
 
-        self.mdas[older_region] = Some(MDAHeader {
-                                           last_updated: *time,
-                                           used: Bytes(used as u64),
-                                           data_crc: data_crc,
-                                       });
+        self.mdas[older_region] = Some(header);
 
         Ok(())
     }
@@ -493,19 +493,16 @@ impl MDAHeader {
         }
     }
 
-    pub fn to_buf(data_len: usize,
-                  data_crc: u32,
-                  timestamp: &Timespec)
-                  -> [u8; _MDA_REGION_HDR_SIZE] {
+    pub fn to_buf(&self) -> [u8; _MDA_REGION_HDR_SIZE] {
         // Unsigned casts are always safe, as sec and nsec values are never negative
-        assert!(timestamp.sec >= 0 && timestamp.nsec >= 0);
+        assert!(self.last_updated.sec >= 0 && self.last_updated.nsec >= 0);
 
         let mut buf = [0u8; _MDA_REGION_HDR_SIZE];
 
-        LittleEndian::write_u32(&mut buf[4..8], data_crc);
-        LittleEndian::write_u64(&mut buf[8..16], data_len as u64);
-        LittleEndian::write_u64(&mut buf[16..24], timestamp.sec as u64);
-        LittleEndian::write_u32(&mut buf[24..28], timestamp.nsec as u32);
+        LittleEndian::write_u32(&mut buf[4..8], self.data_crc);
+        LittleEndian::write_u64(&mut buf[8..16], *self.used as u64);
+        LittleEndian::write_u64(&mut buf[16..24], self.last_updated.sec as u64);
+        LittleEndian::write_u32(&mut buf[24..28], self.last_updated.nsec as u32);
 
         let buf_crc = crc32::checksum_ieee(&buf[4.._MDA_REGION_HDR_SIZE]);
         LittleEndian::write_u32(&mut buf[..4], buf_crc);
@@ -855,17 +852,20 @@ mod tests {
 
             // 4 is NUM_MDA_REGIONS which is not imported from super.
             let region_size = (MIN_MDA_SECTORS / 4usize).bytes() + Bytes(region_size_ext as u64);
-            let timestamp = Timespec::new(sec, nsec);
-            let data_crc = crc32::checksum_ieee(&data);
-            let buf = MDAHeader::to_buf(data.len(), data_crc, &timestamp);
+            let header = MDAHeader {
+                last_updated: Timespec::new(sec, nsec),
+                used: Bytes(data.len() as u64),
+                data_crc: crc32::checksum_ieee(&data),
+            };
+            let buf = header.to_buf();
             let mda1 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
             let mda2 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
 
             TestResult::from_bool(mda1.last_updated == mda2.last_updated &&
                                   mda1.used == mda2.used &&
                                   mda1.data_crc == mda2.data_crc &&
-                                  timestamp == mda1.last_updated &&
-                                  data_crc == mda1.data_crc)
+                                  header.last_updated == mda1.last_updated &&
+                                  header.data_crc == mda1.data_crc)
         }
 
         QuickCheck::new()
@@ -877,9 +877,12 @@ mod tests {
     #[test]
     fn test_from_buf_crc_error() {
         let data = [0u8; 3];
-        let timestamp = now().to_timespec();
-        let data_crc = crc32::checksum_ieee(&data);
-        let mut buf = MDAHeader::to_buf(data.len(), data_crc, &timestamp);
+        let header = MDAHeader {
+            last_updated: now().to_timespec(),
+            used: Bytes(data.len() as u64),
+            data_crc: crc32::checksum_ieee(&data),
+        };
+        let mut buf = header.to_buf();
         LittleEndian::write_u32(&mut buf[..4], 0u32);
         assert!(MDAHeader::from_buf(&buf, Bytes(data.len() as u64) + MDA_REGION_HDR_SIZE).is_err());
     }
@@ -888,9 +891,12 @@ mod tests {
     #[test]
     fn test_from_buf_size_error() {
         let data = [0u8; 3];
-        let timestamp = now().to_timespec();
-        let data_crc = crc32::checksum_ieee(&data);
-        let buf = MDAHeader::to_buf(data.len(), data_crc, &timestamp);
+        let header = MDAHeader {
+            last_updated: now().to_timespec(),
+            used: Bytes(data.len() as u64),
+            data_crc: crc32::checksum_ieee(&data),
+        };
+        let buf = header.to_buf();
         assert!(MDAHeader::from_buf(&buf, MDA_REGION_HDR_SIZE).is_err());
     }
 }

@@ -222,7 +222,13 @@ impl StaticHeader {
 
         try!(f.seek(SeekFrom::Start(0)));
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
-        try!(f.read(&mut buf));
+        if try!(f.read(&mut buf)) < _BDA_STATIC_HDR_SIZE {
+            if buf.iter().any(|x| *x != 0) {
+                return Ok(DevOwnership::Theirs);
+            } else {
+                return Ok(DevOwnership::Unowned);
+            }
+        }
 
         // Using setup() as a test of ownership sets a high bar. It is
         // not sufficient to have STRAT_MAGIC to be considered "Ours",

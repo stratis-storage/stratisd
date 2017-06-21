@@ -251,6 +251,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
     base_tree.add(obj_path)
 }
 
+#[allow(type_complexity)]
 pub fn connect(engine: Rc<RefCell<Engine>>)
                -> Result<(Connection, Tree<MTFn<TData>, TData>, DbusContext), dbus::Error> {
     let c = try!(Connection::get_private(BusType::System));

@@ -295,7 +295,7 @@ impl StaticHeader {
 pub struct MDARegions {
     // Spec defines 4 regions, but regions 2 & 3 are duplicates of 0 and 1 respectively
     region_size: Sectors,
-    mdas: [MDAHeader; NUM_PRIMARY_MDA_REGIONS],
+    mdas: [Option<MDAHeader>; NUM_PRIMARY_MDA_REGIONS],
 }
 
 impl MDARegions {
@@ -320,7 +320,7 @@ impl MDARegions {
 
         Ok(MDARegions {
                region_size: region_size,
-               mdas: [MDAHeader::new(), MDAHeader::new()],
+               mdas: [None, None],
            })
     }
 
@@ -331,28 +331,28 @@ impl MDARegions {
         let region_size = header.mda_size / NUM_MDA_REGIONS;
         let per_region_size = region_size.bytes();
 
-        let mut load_a_region = |region: usize| -> EngineResult<MDAHeader> {
+        let mut load_a_region = |region: usize| -> EngineResult<Option<MDAHeader>> {
             let mut hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
             try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(region, per_region_size))));
             try!(f.read_exact(&mut hdr_buf));
             let mda = try!(MDAHeader::from_buf(&hdr_buf, per_region_size));
 
             // Loading checks CRC
-            try!(mda.load_region(f));
+            if mda.is_some() {
+                try!(mda.as_ref().expect("is_some()").load_region(f));
+            }
 
             Ok(mda)
         };
 
-        let mda0 = load_a_region(0).unwrap_or_else(|_| {
-                                                       load_a_region(2).unwrap_or_else(|_| {
-                                                                                    MDAHeader::new()
-                                                                                })
-                                                   });
-        let mda1 = load_a_region(1).unwrap_or_else(|_| {
-                                                       load_a_region(3).unwrap_or_else(|_| {
-                                                                                    MDAHeader::new()
-                                                                                })
-                                                   });
+        let mda0 = load_a_region(0)
+            .or_else(|_| load_a_region(2))
+            .ok()
+            .unwrap_or(None);
+        let mda1 = load_a_region(1)
+            .or_else(|_| load_a_region(3))
+            .ok()
+            .unwrap_or(None);
 
         Ok(MDARegions {
                region_size: region_size,
@@ -391,9 +391,11 @@ impl MDARegions {
         try!(save_region(older_region));
         try!(save_region(older_region + 2));
 
-        self.mdas[older_region].last_updated = Some(*time);
-        self.mdas[older_region].used = Some(Bytes(used as u64));
-        self.mdas[older_region].data_crc = Some(data_crc);
+        self.mdas[older_region] = Some(MDAHeader {
+                                           last_updated: *time,
+                                           used: Bytes(used as u64),
+                                           data_crc: data_crc,
+                                       });
 
         Ok(())
     }
@@ -402,7 +404,10 @@ impl MDARegions {
         where F: Read + Seek
     {
         let newer_region = self.newer();
-        let mda = &self.mdas[newer_region];
+        let mda = match self.mdas[newer_region] {
+            None => return Ok(None),
+            Some(ref mda) => mda,
+        };
 
         let mut load_region = |region: usize| {
             let offset = MDARegions::mda_offset(region, self.region_size.bytes()) +
@@ -413,15 +418,20 @@ impl MDARegions {
 
         Ok(load_region(newer_region).unwrap_or_else(|_| {
                                                         load_region(newer_region + 2)
-                                                            .unwrap_or_else(|_| None)
+                                                            .unwrap_or(None)
                                                     }))
     }
 
     pub fn older(&self) -> usize {
-        match self.mdas[0].last_updated.cmp(&self.mdas[1].last_updated) {
-            Ordering::Less => 0,
-            Ordering::Greater => 1,
-            Ordering::Equal => 1,
+        match (&self.mdas[0], &self.mdas[1]) {
+            (&None, _) => 0,
+            (_, &None) => 1,
+            (&Some(ref mda0), &Some(ref mda1)) => {
+                match mda0.last_updated.cmp(&mda1.last_updated) {
+                    Ordering::Less => 0,
+                    Ordering::Equal | Ordering::Greater => 1,
+                }
+            }
         }
     }
 
@@ -435,47 +445,35 @@ impl MDARegions {
 
     /// The last update time for these MDA regions
     pub fn last_update_time(&self) -> Option<&Timespec> {
-        self.mdas[self.newer()].last_updated.as_ref()
+        self.mdas[self.newer()].as_ref().map(|h| &h.last_updated)
     }
 }
 
 #[derive(Debug)]
 pub struct MDAHeader {
-    last_updated: Option<Timespec>,
+    last_updated: Timespec,
 
     /// Size of region used for pool metadata.
-    used: Option<Bytes>,
+    used: Bytes,
 
-    data_crc: Option<u32>,
+    data_crc: u32,
 }
 
 impl MDAHeader {
-    pub fn new() -> MDAHeader {
-        MDAHeader {
-            last_updated: None,
-            used: None,
-            data_crc: None,
-        }
-    }
-
     /// Get an MDAHeader from the buffer.
     /// Return an error for a bad checksum.
     /// Return an error if the size of the region used is too large for the given region_size.
+    /// Return None if there is no MDAHeader to be read. This is detected if the
+    /// timestamp region in the buffer is 0.
     pub fn from_buf(buf: &[u8; _MDA_REGION_HDR_SIZE],
                     region_size: Bytes)
-                    -> EngineResult<MDAHeader> {
+                    -> EngineResult<Option<MDAHeader>> {
         if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_ieee(&buf[4..]) {
             return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region header CRC".into()));
         }
 
         match LittleEndian::read_u64(&buf[16..24]) {
-            0 => {
-                Ok(MDAHeader {
-                       used: None,
-                       last_updated: None,
-                       data_crc: None,
-                   })
-            }
+            0 => Ok(None),
             secs => {
                 let used = Bytes(LittleEndian::read_u64(&buf[8..16]));
                 try!(check_mda_region_size(used, region_size));
@@ -486,11 +484,11 @@ impl MDAHeader {
                 assert!(nsecs <= std::i32::MAX as u32);
                 assert!(secs <= std::i64::MAX as u64);
 
-                Ok(MDAHeader {
-                       used: Some(used),
-                       last_updated: Some(Timespec::new(secs as i64, nsecs as i32)),
-                       data_crc: Some(LittleEndian::read_u32(&buf[4..8])),
-                   })
+                Ok(Some(MDAHeader {
+                            used: used,
+                            last_updated: Timespec::new(secs as i64, nsecs as i32),
+                            data_crc: LittleEndian::read_u32(&buf[4..8]),
+                        }))
             }
         }
     }
@@ -520,23 +518,17 @@ impl MDAHeader {
     pub fn load_region<F>(&self, f: &mut F) -> EngineResult<Option<Vec<u8>>>
         where F: Read
     {
-        if let Some(used) = self.used {
-            // This cast could fail if running on a 32-bit machine and
-            // size of metadata is greater than 2^32 - 1 bytes, which is
-            // unlikely.
-            assert!(*used <= std::usize::MAX as u64);
-            let mut data_buf = vec![0u8; *used as usize];
-            try!(f.read_exact(&mut data_buf));
+        // This cast could fail if running on a 32-bit machine and
+        // size of metadata is greater than 2^32 - 1 bytes, which is
+        // unlikely.
+        assert!(*self.used <= std::usize::MAX as u64);
+        let mut data_buf = vec![0u8; *self.used as usize];
+        try!(f.read_exact(&mut data_buf));
 
-            if self.data_crc
-                   .expect("Option constructors of 'data_crc' and 'used' are always the same.") !=
-               crc32::checksum_ieee(&data_buf) {
-                return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region data CRC".into()));
-            }
-            Ok(Some(data_buf))
-        } else {
-            Ok(None)
+        if self.data_crc != crc32::checksum_ieee(&data_buf) {
+            return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region data CRC".into()));
         }
+        Ok(Some(data_buf))
     }
 }
 
@@ -866,14 +858,14 @@ mod tests {
             let timestamp = Timespec::new(sec, nsec);
             let data_crc = crc32::checksum_ieee(&data);
             let buf = MDAHeader::to_buf(data.len(), data_crc, &timestamp);
-            let mda1 = MDAHeader::from_buf(&buf, region_size).unwrap();
-            let mda2 = MDAHeader::from_buf(&buf, region_size).unwrap();
+            let mda1 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
+            let mda2 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
 
             TestResult::from_bool(mda1.last_updated == mda2.last_updated &&
                                   mda1.used == mda2.used &&
                                   mda1.data_crc == mda2.data_crc &&
-                                  timestamp == mda1.last_updated.unwrap() &&
-                                  data_crc == mda1.data_crc.unwrap())
+                                  timestamp == mda1.last_updated &&
+                                  data_crc == mda1.data_crc)
         }
 
         QuickCheck::new()

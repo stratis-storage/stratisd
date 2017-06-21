@@ -465,9 +465,9 @@ impl MDAHeader {
     /// Get an MDAHeader from the buffer.
     /// Return an error for a bad checksum.
     /// Return an error if the size of the region used is too large for the given region_size.
-    pub fn from_buf(buf: &[u8; _MDA_REGION_HDR_SIZE],
-                    region_size: Bytes)
-                    -> EngineResult<MDAHeader> {
+    fn from_buf(buf: &[u8; _MDA_REGION_HDR_SIZE],
+                region_size: Bytes)
+                -> EngineResult<MDAHeader> {
         if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_ieee(&buf[4..]) {
             return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region header CRC".into()));
         }
@@ -501,10 +501,7 @@ impl MDAHeader {
         }
     }
 
-    pub fn to_buf(data_len: usize,
-                  data_crc: u32,
-                  timestamp: &Timespec)
-                  -> [u8; _MDA_REGION_HDR_SIZE] {
+    fn to_buf(data_len: usize, data_crc: u32, timestamp: &Timespec) -> [u8; _MDA_REGION_HDR_SIZE] {
         // Unsigned casts are always safe, as sec and nsec values are never negative
         assert!(timestamp.sec >= 0 && timestamp.nsec >= 0);
 
@@ -523,7 +520,7 @@ impl MDAHeader {
 
     /// Given a pre-seek()ed File, load the MDA region and return the contents
     // MDAHeader cannot seek because it doesn't know which region it's in
-    pub fn load_region<F>(&self, f: &mut F) -> EngineResult<Option<Vec<u8>>>
+    fn load_region<F>(&self, f: &mut F) -> EngineResult<Option<Vec<u8>>>
         where F: Read
     {
         if let Some(used) = self.used {

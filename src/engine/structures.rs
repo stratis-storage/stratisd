@@ -13,6 +13,7 @@ use super::engine::{HasName, HasUuid};
 
 /// Map UUID and name to T items.
 #[derive(Debug)]
+#[allow(new_without_default_derive)]
 pub struct Table<T: HasName + HasUuid> {
     items: Vec<T>,
     name_map: HashMap<String, usize>,

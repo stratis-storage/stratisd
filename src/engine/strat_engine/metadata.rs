@@ -320,8 +320,7 @@ impl MDARegions {
 
         Ok(MDARegions {
                region_size: region_size,
-               mdas: [MDAHeader::new(per_region_size),
-                      MDAHeader::new(per_region_size)],
+               mdas: [MDAHeader::new(), MDAHeader::new()],
            })
     }
 
@@ -346,12 +345,16 @@ impl MDARegions {
 
         let mda0 =
             load_a_region(0).unwrap_or_else(|_| {
-                load_a_region(2).unwrap_or_else(|_| MDAHeader::new(per_region_size))
-            });
+                                                load_a_region(2).unwrap_or_else(|_| {
+                                                                                    MDAHeader::new()
+                                                                                })
+                                            });
         let mda1 =
             load_a_region(1).unwrap_or_else(|_| {
-                load_a_region(3).unwrap_or_else(|_| MDAHeader::new(per_region_size))
-            });
+                                                load_a_region(3).unwrap_or_else(|_| {
+                                                                                    MDAHeader::new()
+                                                                                })
+                                            });
 
         Ok(MDARegions {
                region_size: region_size,
@@ -445,19 +448,14 @@ pub struct MDAHeader {
     /// Size of region used for pool metadata.
     used: Option<Bytes>,
 
-    /// Total size of region, including both the header and space used for
-    /// pool metadata.
-    region_size: Bytes,
-
     data_crc: Option<u32>,
 }
 
 impl MDAHeader {
-    pub fn new(region_size: Bytes) -> MDAHeader {
+    pub fn new() -> MDAHeader {
         MDAHeader {
             last_updated: None,
             used: None,
-            region_size: region_size,
             data_crc: None,
         }
     }
@@ -478,7 +476,6 @@ impl MDAHeader {
                        used: None,
                        last_updated: None,
                        data_crc: None,
-                       region_size: region_size,
                    })
             }
             secs => {
@@ -495,7 +492,6 @@ impl MDAHeader {
                        used: Some(used),
                        last_updated: Some(Timespec::new(secs as i64, nsecs as i32)),
                        data_crc: Some(LittleEndian::read_u32(&buf[4..8])),
-                       region_size: region_size,
                    })
             }
         }
@@ -524,8 +520,6 @@ impl MDAHeader {
         where F: Read
     {
         if let Some(used) = self.used {
-            // This should never fail, since the property is checked when the MDAHeader is loaded
-            assert!(MDA_REGION_HDR_SIZE + used <= self.region_size);
             // This cast could fail if running on a 32-bit machine and
             // size of metadata is greater than 2^32 - 1 bytes, which is
             // unlikely.

@@ -119,6 +119,7 @@ impl DataType for TData {
 /// Add and remove actions are pushed onto the queue.
 /// The queue can also be drained.
 #[derive(Debug)]
+#[allow(new_without_default_derive)]
 pub struct ActionQueue {
     queue: VecDeque<DeferredAction>,
 }

@@ -20,6 +20,7 @@ use super::randomization::Randomizer;
 
 
 #[derive(Debug)]
+#[allow(new_without_default_derive)]
 pub struct SimEngine {
     pools: Table<SimPool>,
     rdm: Rc<RefCell<Randomizer>>,

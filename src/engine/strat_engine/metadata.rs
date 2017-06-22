@@ -304,7 +304,7 @@ impl MDARegions {
         *(BDA_STATIC_HDR_SIZE + per_region_size * index)
     }
 
-    pub fn initialize<F>(header: &StaticHeader, f: &mut F) -> EngineResult<MDARegions>
+    fn initialize<F>(header: &StaticHeader, f: &mut F) -> EngineResult<MDARegions>
         where F: Seek + Write
     {
         let hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
@@ -325,7 +325,7 @@ impl MDARegions {
     }
 
     // Construct MDARegions based on on-disk info
-    pub fn load<F>(header: &StaticHeader, f: &mut F) -> EngineResult<MDARegions>
+    fn load<F>(header: &StaticHeader, f: &mut F) -> EngineResult<MDARegions>
         where F: Read + Seek
     {
         let region_size = header.mda_size / NUM_MDA_REGIONS;
@@ -361,7 +361,7 @@ impl MDARegions {
     }
 
     // Write data to the older region
-    pub fn save_state<F>(&mut self, time: &Timespec, data: &[u8], f: &mut F) -> EngineResult<()>
+    fn save_state<F>(&mut self, time: &Timespec, data: &[u8], f: &mut F) -> EngineResult<()>
         where F: Seek + Write
     {
         if self.last_update_time() >= Some(time) {
@@ -400,7 +400,7 @@ impl MDARegions {
         Ok(())
     }
 
-    pub fn load_state<F>(&self, f: &mut F) -> EngineResult<Option<Vec<u8>>>
+    fn load_state<F>(&self, f: &mut F) -> EngineResult<Option<Vec<u8>>>
         where F: Read + Seek
     {
         let newer_region = self.newer();
@@ -422,7 +422,7 @@ impl MDARegions {
                                                     }))
     }
 
-    pub fn older(&self) -> usize {
+    fn older(&self) -> usize {
         match (&self.mdas[0], &self.mdas[1]) {
             (&None, _) => 0,
             (_, &None) => 1,
@@ -435,7 +435,7 @@ impl MDARegions {
         }
     }
 
-    pub fn newer(&self) -> usize {
+    fn newer(&self) -> usize {
         match self.older() {
             0 => 1,
             1 => 0,
@@ -444,7 +444,7 @@ impl MDARegions {
     }
 
     /// The last update time for these MDA regions
-    pub fn last_update_time(&self) -> Option<&Timespec> {
+    fn last_update_time(&self) -> Option<&Timespec> {
         self.mdas[self.newer()].as_ref().map(|h| &h.last_updated)
     }
 }

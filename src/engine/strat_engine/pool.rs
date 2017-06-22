@@ -140,7 +140,7 @@ impl StratPool {
             name: name.to_owned(),
             pool_uuid: pool_uuid,
             block_devs: block_mgr,
-            filesystems: Table::new(),
+            filesystems: Table::default(),
             redundancy: redundancy,
             thin_pool: thinpool_dev,
             thin_pool_meta_spare: meta_spare_regions,
@@ -171,7 +171,7 @@ impl StratPool {
                                                            .map(|x| x.thin_id())
                                                            .collect::<Vec<ThinDevId>>());
 
-        let mut table = Table::new();
+        let mut table = Table::default();
         for fs in filesystems {
             let evicted = table.insert(fs);
             if !evicted.is_empty() {

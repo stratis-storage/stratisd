@@ -13,11 +13,20 @@ use super::engine::{HasName, HasUuid};
 
 /// Map UUID and name to T items.
 #[derive(Debug)]
-#[allow(new_without_default_derive)]
 pub struct Table<T: HasName + HasUuid> {
     items: Vec<T>,
     name_map: HashMap<String, usize>,
     uuid_map: HashMap<Uuid, usize>,
+}
+
+impl<T: HasName + HasUuid> Default for Table<T> {
+    fn default() -> Table<T> {
+        Table {
+            items: Vec::default(),
+            name_map: HashMap::default(),
+            uuid_map: HashMap::default(),
+        }
+    }
 }
 
 impl<'a, T: HasName + HasUuid> IntoIterator for &'a mut Table<T> {
@@ -35,15 +44,6 @@ impl<'a, T: HasName + HasUuid> IntoIterator for &'a mut Table<T> {
 /// inserted. In order to rename a T item, it must be removed, renamed, and
 /// reinserted under the new name.
 impl<T: HasName + HasUuid> Table<T> {
-    pub fn new() -> Self {
-        Table {
-            items: Vec::new(),
-            name_map: HashMap::new(),
-            uuid_map: HashMap::new(),
-        }
-
-    }
-
     /// Empty this table of all its items, returning them in a vector.
     pub fn empty(self) -> Vec<T> {
         self.items
@@ -243,7 +243,7 @@ mod tests {
     /// Verify that the table is now empty and that removing by name yields
     /// no result.
     fn remove_existing_item() {
-        let mut t: Table<TestThing> = Table::new();
+        let mut t: Table<TestThing> = Table::default();
         table_invariant(&t);
 
         let uuid = Uuid::new_v4();
@@ -273,7 +273,7 @@ mod tests {
     /// This is good, because then you can't have a thing that is both in
     /// the table and not in the table.
     fn insert_same_keys() {
-        let mut t: Table<TestThing> = Table::new();
+        let mut t: Table<TestThing> = Table::default();
         table_invariant(&t);
 
         let uuid = Uuid::new_v4();
@@ -314,7 +314,7 @@ mod tests {
     /// Insert a thing and then insert another thing with the same name.
     /// The previously inserted thing should be returned.
     fn insert_same_name() {
-        let mut t: Table<TestThing> = Table::new();
+        let mut t: Table<TestThing> = Table::default();
         table_invariant(&t);
 
         let uuid = Uuid::new_v4();

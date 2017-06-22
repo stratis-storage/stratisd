@@ -87,7 +87,7 @@ fn run() -> StratisResult<()> {
     let engine: Rc<RefCell<Engine>> = {
         if matches.is_present("sim") {
             info!("Using SimEngine");
-            Rc::new(RefCell::new(SimEngine::new()))
+            Rc::new(RefCell::new(SimEngine::default()))
         } else {
             info!("Using StratEngine");
             Rc::new(RefCell::new(try!(StratEngine::initialize())))

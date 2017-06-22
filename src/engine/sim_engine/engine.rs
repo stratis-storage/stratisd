@@ -19,21 +19,13 @@ use super::pool::SimPool;
 use super::randomization::Randomizer;
 
 
-#[derive(Debug)]
-#[allow(new_without_default_derive)]
+#[derive(Debug, Default)]
 pub struct SimEngine {
     pools: Table<SimPool>,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
-impl SimEngine {
-    pub fn new() -> SimEngine {
-        SimEngine {
-            pools: Table::new(),
-            rdm: Rc::new(RefCell::new(Randomizer::new())),
-        }
-    }
-}
+impl SimEngine {}
 
 impl Engine for SimEngine {
     fn create_pool(&mut self,
@@ -116,7 +108,9 @@ mod tests {
 
         /// Configure simulator should always return Ok.
         fn configure_simulator_runs(denominator: u32) -> bool {
-            SimEngine::new().configure_simulator(denominator).is_ok()
+            SimEngine::default()
+                .configure_simulator(denominator)
+                .is_ok()
         }
 
         QuickCheck::new()
@@ -127,19 +121,21 @@ mod tests {
     #[test]
     /// When an engine has no pools, any name lookup should fail
     fn get_pool_err() {
-        assert!(SimEngine::new().get_pool(&Uuid::new_v4()).is_none());
+        assert!(SimEngine::default().get_pool(&Uuid::new_v4()).is_none());
     }
 
     #[test]
     /// When an engine has no pools, destroying any pool must succeed
     fn destroy_pool_empty() {
-        assert!(SimEngine::new().destroy_pool(&Uuid::new_v4()).is_ok());
+        assert!(SimEngine::default()
+                    .destroy_pool(&Uuid::new_v4())
+                    .is_ok());
     }
 
     #[test]
     /// Destroying an empty pool should succeed.
     fn destroy_empty_pool() {
-        let mut engine = SimEngine::new();
+        let mut engine = SimEngine::default();
         let (uuid, _) = engine.create_pool("name", &[], None, false).unwrap();
         assert!(engine.destroy_pool(&uuid).is_ok());
     }
@@ -147,7 +143,7 @@ mod tests {
     #[test]
     /// Destroying a pool with devices should succeed
     fn destroy_pool_w_devices() {
-        let mut engine = SimEngine::new();
+        let mut engine = SimEngine::default();
         let (uuid, _) = engine
             .create_pool("name", &[Path::new("/s/d")], None, false)
             .unwrap();
@@ -157,7 +153,7 @@ mod tests {
     #[test]
     /// Destroying a pool with filesystems should fail
     fn destroy_pool_w_filesystem() {
-        let mut engine = SimEngine::new();
+        let mut engine = SimEngine::default();
         let (uuid, _) = engine
             .create_pool("name", &[Path::new("/s/d")], None, false)
             .unwrap();
@@ -173,7 +169,7 @@ mod tests {
     /// Creating a new pool identical to the previous should succeed
     fn create_new_pool_twice() {
         let name = "name";
-        let mut engine = SimEngine::new();
+        let mut engine = SimEngine::default();
         engine.create_pool(name, &[], None, false).unwrap();
         assert!(match engine.create_pool(name, &[], None, false) {
                     Ok((_, devs)) => devs.is_empty(),
@@ -185,7 +181,7 @@ mod tests {
     /// Creating a new pool with the same name should fail
     fn create_pool_name_collision() {
         let name = "name";
-        let mut engine = SimEngine::new();
+        let mut engine = SimEngine::default();
         engine
             .create_pool(name, &[Path::new("/s/d")], None, false)
             .unwrap();
@@ -199,7 +195,7 @@ mod tests {
     /// Creating a pool with duplicate devices should succeed
     fn create_pool_duplicate_devices() {
         let path = "/s/d";
-        let mut engine = SimEngine::new();
+        let mut engine = SimEngine::default();
         let devices = vec![Path::new(path), Path::new(path)];
         assert!(match engine.create_pool("name", &devices, None, false) {
                     Ok((_, devs)) => devs.len() == 1,
@@ -210,7 +206,7 @@ mod tests {
     #[test]
     /// Creating a pool with an impossible raid level should fail
     fn create_pool_max_u16_raid() {
-        let mut engine = SimEngine::new();
+        let mut engine = SimEngine::default();
         assert!(engine
                     .create_pool("name", &[], Some(std::u16::MAX), false)
                     .is_err());
@@ -219,7 +215,7 @@ mod tests {
     #[test]
     /// Renaming a pool on an empty engine always works
     fn rename_empty() {
-        let mut engine = SimEngine::new();
+        let mut engine = SimEngine::default();
         assert!(match engine.rename_pool(&Uuid::new_v4(), "new_name") {
                     Ok(RenameAction::NoSource) => true,
                     _ => false,
@@ -230,7 +226,7 @@ mod tests {
     /// Renaming a pool to itself always works
     fn rename_identity() {
         let name = "name";
-        let mut engine = SimEngine::new();
+        let mut engine = SimEngine::default();
         let (uuid, _) = engine.create_pool(name, &[], None, false).unwrap();
         assert!(match engine.rename_pool(&uuid, name) {
                     Ok(RenameAction::Identity) => true,
@@ -241,7 +237,7 @@ mod tests {
     #[test]
     /// Renaming a pool to another pool should work if new name not taken
     fn rename_happens() {
-        let mut engine = SimEngine::new();
+        let mut engine = SimEngine::default();
         let (uuid, _) = engine.create_pool("old_name", &[], None, false).unwrap();
         assert!(match engine.rename_pool(&uuid, "new_name") {
                     Ok(RenameAction::Renamed) => true,
@@ -253,7 +249,7 @@ mod tests {
     /// Renaming a pool to another pool should fail if new name taken
     fn rename_fails() {
         let new_name = "new_name";
-        let mut engine = SimEngine::new();
+        let mut engine = SimEngine::default();
         let (uuid, _) = engine.create_pool("old_name", &[], None, false).unwrap();
         engine.create_pool(new_name, &[], None, false).unwrap();
         assert!(match engine.rename_pool(&uuid, new_name) {
@@ -266,7 +262,7 @@ mod tests {
     /// Renaming should succeed if old_name absent, new present
     fn rename_no_op() {
         let new_name = "new_name";
-        let mut engine = SimEngine::new();
+        let mut engine = SimEngine::default();
         engine.create_pool(new_name, &[], None, false).unwrap();
         assert!(match engine.rename_pool(&Uuid::new_v4(), new_name) {
                     Ok(RenameAction::NoSource) => true,

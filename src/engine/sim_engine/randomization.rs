@@ -13,6 +13,15 @@ pub struct Randomizer {
     denominator: u32,
 }
 
+impl Default for Randomizer {
+    fn default() -> Randomizer {
+        Randomizer {
+            rng: thread_rng(),
+            denominator: 0u32,
+        }
+    }
+}
+
 
 /// Implement Debug explicitly as ThreadRng does not derive it.
 /// See: https://github.com/rust-lang-nursery/rand/issues/118
@@ -23,13 +32,6 @@ impl fmt::Debug for Randomizer {
 }
 
 impl Randomizer {
-    pub fn new() -> Randomizer {
-        Randomizer {
-            rng: thread_rng(),
-            denominator: 0u32,
-        }
-    }
-
     /// Throw a denominator sided die, returning true if 1 comes up
     /// If denominator is 0, return false
     pub fn throw_die(&mut self) -> bool {
@@ -59,7 +61,7 @@ mod tests {
         /// Verify that if the denominator is 0 the result is always false,
         /// if 1, always true.
         fn denominator_result(denominator: u32) -> bool {
-            let result = Randomizer::new()
+            let result = Randomizer::default()
                 .set_probability(denominator)
                 .throw_die();
             if denominator > 1 {

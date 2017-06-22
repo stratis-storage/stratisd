@@ -88,7 +88,7 @@ pub struct DbusContext {
 impl DbusContext {
     pub fn new(engine: Rc<RefCell<Engine>>) -> DbusContext {
         DbusContext {
-            actions: Rc::new(RefCell::new(ActionQueue::new())),
+            actions: Rc::new(RefCell::new(ActionQueue::default())),
             engine: engine,
             next_index: Rc::new(Cell::new(0)),
         }
@@ -118,18 +118,12 @@ impl DataType for TData {
 /// An action queue.
 /// Add and remove actions are pushed onto the queue.
 /// The queue can also be drained.
-#[derive(Debug)]
-#[allow(new_without_default_derive)]
+#[derive(Debug, Default)]
 pub struct ActionQueue {
     queue: VecDeque<DeferredAction>,
 }
 
 impl ActionQueue {
-    /// Initialize an empty action queue.
-    pub fn new() -> ActionQueue {
-        ActionQueue { queue: VecDeque::new() }
-    }
-
     /// Push an Add action onto the back of the queue.
     pub fn push_add(&mut self, object_path: ObjectPath<MTFn<TData>, TData>) {
         self.queue.push_back(DeferredAction::Add(object_path))

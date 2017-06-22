@@ -76,6 +76,8 @@ impl BDA {
            })
     }
 
+    /// Load a BDA on initial setup of a device.
+    /// Returns None if no BDA appears to exist.
     pub fn load<F>(f: &mut F) -> EngineResult<Option<BDA>>
         where F: Read + Seek
     {
@@ -304,6 +306,8 @@ impl MDARegions {
         *(BDA_STATIC_HDR_SIZE + per_region_size * index)
     }
 
+    /// Initialize the space allotted to the MDA regions to 0.
+    /// Return an MDARegions object with uninitialized MDAHeader objects.
     pub fn initialize<F>(header: &StaticHeader, f: &mut F) -> EngineResult<MDARegions>
         where F: Seek + Write
     {
@@ -324,16 +328,20 @@ impl MDARegions {
            })
     }
 
-    // Construct MDARegions based on on-disk info
+    /// Construct MDARegions from data on the disk.
     pub fn load<F>(header: &StaticHeader, f: &mut F) -> EngineResult<MDARegions>
         where F: Read + Seek
     {
         let region_size = header.mda_size / NUM_MDA_REGIONS;
         let per_region_size = region_size.bytes();
 
-        let mut load_a_region = |region: usize| -> EngineResult<Option<MDAHeader>> {
+        /// Load a single region at the location specified by index.
+        /// If it appears that no metadata has been written at the location
+        /// return None. If it appears that there is metadata, but it has
+        /// been corrrupted, return an error.
+        let mut load_a_region = |index: usize| -> EngineResult<Option<MDAHeader>> {
             let mut hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
-            try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(region, per_region_size))));
+            try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(index, per_region_size))));
             try!(f.read_exact(&mut hdr_buf));
             let mda = try!(MDAHeader::from_buf(&hdr_buf, per_region_size));
 
@@ -360,7 +368,13 @@ impl MDARegions {
            })
     }
 
-    // Write data to the older region
+    /// Write metadata to the older of the metadata regions.
+    /// If operation is completed, update the value of the
+    /// older MDAHeader with the new values.
+    /// If time specified is earlier than the last update time, return an
+    /// error. If the size of the data is greater than the available space,
+    /// return an error. If there is an error when writing the data, return
+    /// an error.
     pub fn save_state<F>(&mut self, time: &Timespec, data: &[u8], f: &mut F) -> EngineResult<()>
         where F: Seek + Write
     {
@@ -379,8 +393,9 @@ impl MDARegions {
         };
         let hdr_buf = header.to_buf();
 
-        let mut save_region = |region: usize| -> EngineResult<()> {
-            try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(region, region_size))));
+        /// Write data to a region specified by index.
+        let mut save_region = |index: usize| -> EngineResult<()> {
+            try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(index, region_size))));
             try!(f.write_all(&hdr_buf));
             try!(f.write_all(data));
             try!(f.flush());
@@ -388,10 +403,9 @@ impl MDARegions {
             Ok(())
         };
 
+        // TODO: Consider if there is an action that should be taken if
+        // saving to one or the other region fails.
         let older_region = self.older();
-
-        // Save to primary and backup regions
-        // TODO: Should we ignore errors?
         try!(save_region(older_region));
         try!(save_region(older_region + 2));
 
@@ -400,6 +414,10 @@ impl MDARegions {
         Ok(())
     }
 
+    /// Load metadata from the newer MDA region.
+    /// In case there is no record of metadata in regions, return None.
+    /// If there is a record of metadata, and there is a failure to read
+    /// the metadata, return an error.
     pub fn load_state<F>(&self, f: &mut F) -> EngineResult<Option<Vec<u8>>>
         where F: Read + Seek
     {
@@ -409,19 +427,23 @@ impl MDARegions {
             Some(ref mda) => mda,
         };
 
-        let mut load_region = |region: usize| {
-            let offset = MDARegions::mda_offset(region, self.region_size.bytes()) +
+        /// Load the metadata region specified by index.
+        /// It is an error if the metadata can not be found.
+        let mut load_region = |index: usize| -> EngineResult<Vec<u8>> {
+            let offset = MDARegions::mda_offset(index, self.region_size.bytes()) +
                          _MDA_REGION_HDR_SIZE as u64;
             try!(f.seek(SeekFrom::Start(offset)));
             mda.load_region(f)
         };
 
-        Ok(load_region(newer_region).unwrap_or_else(|_| {
-                                                        load_region(newer_region + 2)
-                                                            .unwrap_or(None)
-                                                    }))
+        // TODO: Figure out if there is an action to take if the
+        // first read returns an error.
+        load_region(newer_region)
+            .or_else(|_| load_region(newer_region + 2))
+            .map(Some)
     }
 
+    /// The index of the older region, or 0 if there is a tie.
     pub fn older(&self) -> usize {
         match (&self.mdas[0], &self.mdas[1]) {
             (&None, _) => 0,
@@ -435,6 +457,7 @@ impl MDARegions {
         }
     }
 
+    /// The index of the newer region, or 1 if there is a tie.
     pub fn newer(&self) -> usize {
         match self.older() {
             0 => 1,
@@ -510,9 +533,11 @@ impl MDAHeader {
         buf
     }
 
-    /// Given a pre-seek()ed File, load the MDA region and return the contents
+    /// Given a pre-seek()ed File, load the MDA region and return the contents.
+    /// Return an error if the data can not be read, since the existance
+    /// of the MDAHeader implies that the data must be available.
     // MDAHeader cannot seek because it doesn't know which region it's in
-    pub fn load_region<F>(&self, f: &mut F) -> EngineResult<Option<Vec<u8>>>
+    pub fn load_region<F>(&self, f: &mut F) -> EngineResult<Vec<u8>>
         where F: Read
     {
         // This cast could fail if running on a 32-bit machine and
@@ -525,7 +550,7 @@ impl MDAHeader {
         if self.data_crc != crc32::checksum_ieee(&data_buf) {
             return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region data CRC".into()));
         }
-        Ok(Some(data_buf))
+        Ok(data_buf)
     }
 }
 

@@ -426,12 +426,12 @@ impl MDARegions {
             None => return Ok(None),
             Some(ref mda) => mda,
         };
+        let region_size = self.region_size.bytes();
 
         /// Load the metadata region specified by index.
         /// It is an error if the metadata can not be found.
         let mut load_region = |index: usize| -> EngineResult<Vec<u8>> {
-            let offset = MDARegions::mda_offset(index, self.region_size.bytes()) +
-                         _MDA_REGION_HDR_SIZE as u64;
+            let offset = MDARegions::mda_offset(index, region_size) + _MDA_REGION_HDR_SIZE as u64;
             try!(f.seek(SeekFrom::Start(offset)));
             mda.load_region(f)
         };

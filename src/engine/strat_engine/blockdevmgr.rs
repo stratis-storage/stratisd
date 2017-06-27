@@ -125,16 +125,19 @@ impl BlockDevMgr {
     }
 
     /// Write the given data to all blockdevs marking with specified time.
+    /// Return an error if data was not written to any blockdev.
     // TODO: Cap # of blockdevs written to, as described in SWDD
     pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
-        // TODO: Do something better than panic when saving to blockdev fails.
-        // Panic can occur for a the usual IO reasons, but also:
-        // 1. If the timestamp is older than a previously written timestamp.
-        // 2. If the variable length metadata is too large.
-        for mut bd in self.block_devs.iter_mut() {
-            bd.save_state(time, metadata).unwrap();
+        let mut saved = false;
+        for mut bd in &mut self.block_devs {
+            saved |= bd.save_state(time, metadata).is_ok();
         }
-        Ok(())
+        if saved {
+            Ok(())
+        } else {
+            let err_msg = "Failed to save metadata to even one device in pool";
+            Err(EngineError::Engine(ErrorEnum::Error, err_msg.into()))
+        }
     }
 }
 

@@ -2,13 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std;
-use std::cmp::Ordering;
 use std::str::from_utf8;
 use std::io::{Read, Seek, SeekFrom, Write};
 
-use byteorder::ByteOrder;
-use byteorder::LittleEndian;
+use byteorder::{ByteOrder, LittleEndian};
 use crc::crc32;
 use time::Timespec;
 use uuid::Uuid;
@@ -22,26 +19,21 @@ use super::super::types::{DevUuid, PoolUuid};
 
 use super::engine::DevOwnership;
 
+pub use self::mda::{MIN_MDA_SECTORS, validate_mda_size};
+
 const _BDA_STATIC_HDR_SECTORS: usize = 16;
 pub const BDA_STATIC_HDR_SECTORS: Sectors = Sectors(_BDA_STATIC_HDR_SECTORS as u64);
 const _BDA_STATIC_HDR_SIZE: usize = _BDA_STATIC_HDR_SECTORS * SECTOR_SIZE;
 const BDA_STATIC_HDR_SIZE: Bytes = Bytes(_BDA_STATIC_HDR_SIZE as u64);
 
 const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
-const NUM_MDA_REGIONS: usize = 4;
-const PER_MDA_REGION_COPIES: usize = 2;
-const NUM_PRIMARY_MDA_REGIONS: usize = NUM_MDA_REGIONS / PER_MDA_REGION_COPIES;
-
-const _MDA_REGION_HDR_SIZE: usize = 32;
-const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
-pub const MIN_MDA_SECTORS: Sectors = Sectors(2032);
 
 const STRAT_MAGIC: &'static [u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
 #[derive(Debug)]
 pub struct BDA {
     header: StaticHeader,
-    regions: MDARegions,
+    regions: mda::MDARegions,
 }
 
 impl BDA {
@@ -68,7 +60,8 @@ impl BDA {
         try!(f.write_all(&zeroed[SECTOR_SIZE * 6..]));
         try!(f.flush());
 
-        let regions = try!(MDARegions::initialize(&header, &mut f));
+        let regions =
+            try!(mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, &mut f));
 
         Ok(BDA {
                header: header,
@@ -87,7 +80,7 @@ impl BDA {
         }
         let header = header.expect("must have exited if None");
 
-        let regions = try!(MDARegions::load(&header, f));
+        let regions = try!(mda::MDARegions::load(BDA_STATIC_HDR_SIZE, header.mda_size, f));
 
         Ok(Some(BDA {
                     header: header,
@@ -117,14 +110,15 @@ impl BDA {
                          -> EngineResult<()>
         where F: Seek + Write
     {
-        self.regions.save_state(time, metadata, &mut f)
+        self.regions
+            .save_state(BDA_STATIC_HDR_SIZE, time, metadata, &mut f)
     }
 
     /// Read latest metadata from the disk
     pub fn load_state<F>(&self, mut f: &mut F) -> EngineResult<Option<Vec<u8>>>
         where F: Read + Seek
     {
-        self.regions.load_state(&mut f)
+        self.regions.load_state(BDA_STATIC_HDR_SIZE, &mut f)
     }
 
     /// The time when the most recent metadata was written to the BDA,
@@ -280,7 +274,7 @@ impl StaticHeader {
 
         let mda_size = Sectors(LittleEndian::read_u64(&buf[96..104]));
 
-        try!(validate_mda_size(mda_size));
+        try!(mda::validate_mda_size(mda_size));
 
         Ok(Some(StaticHeader {
                     pool_uuid: pool_uuid,
@@ -293,309 +287,423 @@ impl StaticHeader {
     }
 }
 
-#[derive(Debug)]
-pub struct MDARegions {
-    // Spec defines 4 regions, but regions 2 & 3 are duplicates of 0 and 1 respectively
-    region_size: Sectors,
-    mdas: [Option<MDAHeader>; NUM_PRIMARY_MDA_REGIONS],
-}
+mod mda {
+    use std;
+    use std::cmp::Ordering;
+    use std::io::{Read, Seek, SeekFrom, Write};
 
-impl MDARegions {
-    /// Calculate the offset from start of device for an MDARegion.
-    fn mda_offset(index: usize, per_region_size: Bytes) -> u64 {
-        *(BDA_STATIC_HDR_SIZE + per_region_size * index)
+    use byteorder::{ByteOrder, LittleEndian};
+    use crc::crc32;
+    use time::Timespec;
+
+    use devicemapper::{Bytes, Sectors};
+
+    use super::super::super::errors::{EngineResult, EngineError, ErrorEnum};
+
+    const _MDA_REGION_HDR_SIZE: usize = 32;
+    const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
+
+    const NUM_MDA_REGIONS: usize = 4;
+    const PER_MDA_REGION_COPIES: usize = 2;
+    const NUM_PRIMARY_MDA_REGIONS: usize = NUM_MDA_REGIONS / PER_MDA_REGION_COPIES;
+    pub const MIN_MDA_SECTORS: Sectors = Sectors(2032);
+
+
+    #[derive(Debug)]
+    pub struct MDARegions {
+        // Spec defines 4 regions, but regions 2 & 3 are duplicates of 0 and 1 respectively
+        region_size: Sectors,
+        mdas: [Option<MDAHeader>; NUM_PRIMARY_MDA_REGIONS],
     }
 
-    /// Initialize the space allotted to the MDA regions to 0.
-    /// Return an MDARegions object with uninitialized MDAHeader objects.
-    pub fn initialize<F>(header: &StaticHeader, f: &mut F) -> EngineResult<MDARegions>
-        where F: Seek + Write
-    {
-        let hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
-
-        let region_size = header.mda_size / NUM_MDA_REGIONS;
-        let per_region_size = region_size.bytes();
-        for region in 0..NUM_MDA_REGIONS {
-            try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(region, per_region_size))));
-            try!(f.write_all(&hdr_buf));
+    impl MDARegions {
+        /// Calculate the offset from start of device for an MDARegion.
+        fn mda_offset(header_size: Bytes, index: usize, per_region_size: Bytes) -> u64 {
+            *(header_size + per_region_size * index)
         }
 
-        try!(f.flush());
+        /// Initialize the space allotted to the MDA regions to 0.
+        /// Return an MDARegions object with uninitialized MDAHeader objects.
+        pub fn initialize<F>(header_size: Bytes,
+                             size: Sectors,
+                             f: &mut F)
+                             -> EngineResult<MDARegions>
+            where F: Seek + Write
+        {
+            let hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
 
-        Ok(MDARegions {
-               region_size: region_size,
-               mdas: [None, None],
-           })
-    }
-
-    /// Construct MDARegions from data on the disk.
-    pub fn load<F>(header: &StaticHeader, f: &mut F) -> EngineResult<MDARegions>
-        where F: Read + Seek
-    {
-        let region_size = header.mda_size / NUM_MDA_REGIONS;
-        let per_region_size = region_size.bytes();
-
-        /// Load a single region at the location specified by index.
-        /// If it appears that no metadata has been written at the location
-        /// return None. If it appears that there is metadata, but it has
-        /// been corrrupted, return an error.
-        let mut load_a_region = |index: usize| -> EngineResult<Option<MDAHeader>> {
-            let mut hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
-            try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(index, per_region_size))));
-            try!(f.read_exact(&mut hdr_buf));
-            let mda = try!(MDAHeader::from_buf(&hdr_buf, per_region_size));
-
-            // Loading checks CRC
-            if mda.is_some() {
-                try!(mda.as_ref().expect("is_some()").load_region(f));
+            let region_size = size / NUM_MDA_REGIONS;
+            let per_region_size = region_size.bytes();
+            for region in 0..NUM_MDA_REGIONS {
+                try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(header_size,
+                                                                   region,
+                                                                   per_region_size))));
+                try!(f.write_all(&hdr_buf));
             }
 
-            Ok(mda)
-        };
-
-        let mda0 = load_a_region(0)
-            .or_else(|_| load_a_region(2))
-            .ok()
-            .unwrap_or(None);
-        let mda1 = load_a_region(1)
-            .or_else(|_| load_a_region(3))
-            .ok()
-            .unwrap_or(None);
-
-        Ok(MDARegions {
-               region_size: region_size,
-               mdas: [mda0, mda1],
-           })
-    }
-
-    /// Write metadata to the older of the metadata regions.
-    /// If operation is completed, update the value of the
-    /// older MDAHeader with the new values.
-    /// If time specified is earlier than the last update time, return an
-    /// error. If the size of the data is greater than the available space,
-    /// return an error. If there is an error when writing the data, return
-    /// an error.
-    pub fn save_state<F>(&mut self, time: &Timespec, data: &[u8], f: &mut F) -> EngineResult<()>
-        where F: Seek + Write
-    {
-        if self.last_update_time() >= Some(time) {
-            return Err(EngineError::Engine(ErrorEnum::Invalid, "Overwriting newer data".into()));
-        }
-
-        let region_size = self.region_size.bytes();
-        let used = Bytes(data.len() as u64);
-        try!(check_mda_region_size(used, region_size));
-
-        let header = MDAHeader {
-            last_updated: *time,
-            used: used,
-            data_crc: crc32::checksum_ieee(data),
-        };
-        let hdr_buf = header.to_buf();
-
-        /// Write data to a region specified by index.
-        let mut save_region = |index: usize| -> EngineResult<()> {
-            try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(index, region_size))));
-            try!(f.write_all(&hdr_buf));
-            try!(f.write_all(data));
             try!(f.flush());
 
+            Ok(MDARegions {
+                   region_size: region_size,
+                   mdas: [None, None],
+               })
+        }
+
+        /// Construct MDARegions from data on the disk.
+        pub fn load<F>(header_size: Bytes, size: Sectors, f: &mut F) -> EngineResult<MDARegions>
+            where F: Read + Seek
+        {
+            let region_size = size / NUM_MDA_REGIONS;
+            let per_region_size = region_size.bytes();
+
+            /// Load a single region at the location specified by index.
+            /// If it appears that no metadata has been written at the location
+            /// return None. If it appears that there is metadata, but it has
+            /// been corrrupted, return an error.
+            let mut load_a_region = |index: usize| -> EngineResult<Option<MDAHeader>> {
+                let mut hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
+                try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(header_size,
+                                                                   index,
+                                                                   per_region_size))));
+                try!(f.read_exact(&mut hdr_buf));
+                let mda = try!(MDAHeader::from_buf(&hdr_buf, per_region_size));
+
+                // Loading checks CRC
+                if mda.is_some() {
+                    try!(mda.as_ref().expect("is_some()").load_region(f));
+                }
+
+                Ok(mda)
+            };
+
+            let mda0 = load_a_region(0)
+                .or_else(|_| load_a_region(2))
+                .ok()
+                .unwrap_or(None);
+            let mda1 = load_a_region(1)
+                .or_else(|_| load_a_region(3))
+                .ok()
+                .unwrap_or(None);
+
+            Ok(MDARegions {
+                   region_size: region_size,
+                   mdas: [mda0, mda1],
+               })
+        }
+
+        /// Write metadata to the older of the metadata regions.
+        /// If operation is completed, update the value of the
+        /// older MDAHeader with the new values.
+        /// If time specified is earlier than the last update time, return an
+        /// error. If the size of the data is greater than the available space,
+        /// return an error. If there is an error when writing the data, return
+        /// an error.
+        pub fn save_state<F>(&mut self,
+                             header_size: Bytes,
+                             time: &Timespec,
+                             data: &[u8],
+                             f: &mut F)
+                             -> EngineResult<()>
+            where F: Seek + Write
+        {
+            if self.last_update_time() >= Some(time) {
+                return Err(EngineError::Engine(ErrorEnum::Invalid,
+                                               "Overwriting newer data".into()));
+            }
+
+            let region_size = self.region_size.bytes();
+            let used = Bytes(data.len() as u64);
+            try!(check_mda_region_size(used, region_size));
+
+            let header = MDAHeader {
+                last_updated: *time,
+                used: used,
+                data_crc: crc32::checksum_ieee(data),
+            };
+            let hdr_buf = header.to_buf();
+
+            /// Write data to a region specified by index.
+            let mut save_region = |index: usize| -> EngineResult<()> {
+                try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(header_size,
+                                                                   index,
+                                                                   region_size))));
+                try!(f.write_all(&hdr_buf));
+                try!(f.write_all(data));
+                try!(f.flush());
+
+                Ok(())
+            };
+
+            // TODO: Consider if there is an action that should be taken if
+            // saving to one or the other region fails.
+            let older_region = self.older();
+            try!(save_region(older_region));
+            try!(save_region(older_region + 2));
+
+            self.mdas[older_region] = Some(header);
+
             Ok(())
-        };
+        }
 
-        // TODO: Consider if there is an action that should be taken if
-        // saving to one or the other region fails.
-        let older_region = self.older();
-        try!(save_region(older_region));
-        try!(save_region(older_region + 2));
+        /// Load metadata from the newer MDA region.
+        /// In case there is no record of metadata in regions, return None.
+        /// If there is a record of metadata, and there is a failure to read
+        /// the metadata, return an error.
+        pub fn load_state<F>(&self, header_size: Bytes, f: &mut F) -> EngineResult<Option<Vec<u8>>>
+            where F: Read + Seek
+        {
+            let newer_region = self.newer();
+            let mda = match self.mdas[newer_region] {
+                None => return Ok(None),
+                Some(ref mda) => mda,
+            };
+            let region_size = self.region_size.bytes();
 
-        self.mdas[older_region] = Some(header);
+            /// Load the metadata region specified by index.
+            /// It is an error if the metadata can not be found.
+            let mut load_region = |index: usize| -> EngineResult<Vec<u8>> {
+                let offset = MDARegions::mda_offset(header_size, index, region_size) +
+                             _MDA_REGION_HDR_SIZE as u64;
+                try!(f.seek(SeekFrom::Start(offset)));
+                mda.load_region(f)
+            };
 
-        Ok(())
-    }
+            // TODO: Figure out if there is an action to take if the
+            // first read returns an error.
+            load_region(newer_region)
+                .or_else(|_| load_region(newer_region + 2))
+                .map(Some)
+        }
 
-    /// Load metadata from the newer MDA region.
-    /// In case there is no record of metadata in regions, return None.
-    /// If there is a record of metadata, and there is a failure to read
-    /// the metadata, return an error.
-    pub fn load_state<F>(&self, f: &mut F) -> EngineResult<Option<Vec<u8>>>
-        where F: Read + Seek
-    {
-        let newer_region = self.newer();
-        let mda = match self.mdas[newer_region] {
-            None => return Ok(None),
-            Some(ref mda) => mda,
-        };
-        let region_size = self.region_size.bytes();
-
-        /// Load the metadata region specified by index.
-        /// It is an error if the metadata can not be found.
-        let mut load_region = |index: usize| -> EngineResult<Vec<u8>> {
-            let offset = MDARegions::mda_offset(index, region_size) + _MDA_REGION_HDR_SIZE as u64;
-            try!(f.seek(SeekFrom::Start(offset)));
-            mda.load_region(f)
-        };
-
-        // TODO: Figure out if there is an action to take if the
-        // first read returns an error.
-        load_region(newer_region)
-            .or_else(|_| load_region(newer_region + 2))
-            .map(Some)
-    }
-
-    /// The index of the older region, or 0 if there is a tie.
-    pub fn older(&self) -> usize {
-        match (&self.mdas[0], &self.mdas[1]) {
-            (&None, _) => 0,
-            (_, &None) => 1,
-            (&Some(ref mda0), &Some(ref mda1)) => {
-                match mda0.last_updated.cmp(&mda1.last_updated) {
-                    Ordering::Less => 0,
-                    Ordering::Equal | Ordering::Greater => 1,
+        /// The index of the older region, or 0 if there is a tie.
+        fn older(&self) -> usize {
+            match (&self.mdas[0], &self.mdas[1]) {
+                (&None, _) => 0,
+                (_, &None) => 1,
+                (&Some(ref mda0), &Some(ref mda1)) => {
+                    match mda0.last_updated.cmp(&mda1.last_updated) {
+                        Ordering::Less => 0,
+                        Ordering::Equal | Ordering::Greater => 1,
+                    }
                 }
             }
         }
-    }
 
-    /// The index of the newer region, or 1 if there is a tie.
-    pub fn newer(&self) -> usize {
-        match self.older() {
-            0 => 1,
-            1 => 0,
-            _ => panic!("invalid val from older()"),
-        }
-    }
-
-    /// The last update time for these MDA regions
-    pub fn last_update_time(&self) -> Option<&Timespec> {
-        self.mdas[self.newer()].as_ref().map(|h| &h.last_updated)
-    }
-}
-
-#[derive(Debug)]
-pub struct MDAHeader {
-    last_updated: Timespec,
-
-    /// Size of region used for pool metadata.
-    used: Bytes,
-
-    data_crc: u32,
-}
-
-impl MDAHeader {
-    /// Get an MDAHeader from the buffer.
-    /// Return an error for a bad checksum.
-    /// Return an error if the size of the region used is too large for the given region_size.
-    /// Return None if there is no MDAHeader to be read. This is detected if the
-    /// timestamp region in the buffer is 0.
-    pub fn from_buf(buf: &[u8; _MDA_REGION_HDR_SIZE],
-                    region_size: Bytes)
-                    -> EngineResult<Option<MDAHeader>> {
-        if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_ieee(&buf[4..]) {
-            return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region header CRC".into()));
-        }
-
-        match LittleEndian::read_u64(&buf[16..24]) {
-            0 => Ok(None),
-            secs => {
-                let used = Bytes(LittleEndian::read_u64(&buf[8..16]));
-                try!(check_mda_region_size(used, region_size));
-
-                let nsecs = LittleEndian::read_u32(&buf[24..28]);
-                // Signed cast is safe, highest order bit of each value
-                // read is guaranteed to be 0.
-                assert!(nsecs <= std::i32::MAX as u32);
-                assert!(secs <= std::i64::MAX as u64);
-
-                Ok(Some(MDAHeader {
-                            used: used,
-                            last_updated: Timespec::new(secs as i64, nsecs as i32),
-                            data_crc: LittleEndian::read_u32(&buf[4..8]),
-                        }))
+        /// The index of the newer region, or 1 if there is a tie.
+        fn newer(&self) -> usize {
+            match self.older() {
+                0 => 1,
+                1 => 0,
+                _ => panic!("invalid val from older()"),
             }
         }
-    }
 
-    pub fn to_buf(&self) -> [u8; _MDA_REGION_HDR_SIZE] {
-        // Unsigned casts are always safe, as sec and nsec values are never negative
-        assert!(self.last_updated.sec >= 0 && self.last_updated.nsec >= 0);
-
-        let mut buf = [0u8; _MDA_REGION_HDR_SIZE];
-
-        LittleEndian::write_u32(&mut buf[4..8], self.data_crc);
-        LittleEndian::write_u64(&mut buf[8..16], *self.used as u64);
-        LittleEndian::write_u64(&mut buf[16..24], self.last_updated.sec as u64);
-        LittleEndian::write_u32(&mut buf[24..28], self.last_updated.nsec as u32);
-
-        let buf_crc = crc32::checksum_ieee(&buf[4.._MDA_REGION_HDR_SIZE]);
-        LittleEndian::write_u32(&mut buf[..4], buf_crc);
-
-        buf
-    }
-
-    /// Given a pre-seek()ed File, load the MDA region and return the contents.
-    /// Return an error if the data can not be read, since the existance
-    /// of the MDAHeader implies that the data must be available.
-    // MDAHeader cannot seek because it doesn't know which region it's in
-    pub fn load_region<F>(&self, f: &mut F) -> EngineResult<Vec<u8>>
-        where F: Read
-    {
-        // This cast could fail if running on a 32-bit machine and
-        // size of metadata is greater than 2^32 - 1 bytes, which is
-        // unlikely.
-        assert!(*self.used <= std::usize::MAX as u64);
-        let mut data_buf = vec![0u8; *self.used as usize];
-        try!(f.read_exact(&mut data_buf));
-
-        if self.data_crc != crc32::checksum_ieee(&data_buf) {
-            return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region data CRC".into()));
+        /// The last update time for these MDA regions
+        pub fn last_update_time(&self) -> Option<&Timespec> {
+            self.mdas[self.newer()].as_ref().map(|h| &h.last_updated)
         }
-        Ok(data_buf)
     }
-}
 
+    #[derive(Debug)]
+    pub struct MDAHeader {
+        last_updated: Timespec,
 
-/// Check that data size does not exceed region available.
-/// Note that used is the amount used for metadata only.
-fn check_mda_region_size(used: Bytes, available: Bytes) -> EngineResult<()> {
-    if MDA_REGION_HDR_SIZE + used > available {
-        return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                       format!("metadata length {} exceeds region available {}",
-                                               used,
-                                               // available region > header size
-                                               available - MDA_REGION_HDR_SIZE)
-                                               .into()));
-    };
-    Ok(())
-}
+        /// Size of region used for pool metadata.
+        used: Bytes,
 
-/// Validate MDA size
-pub fn validate_mda_size(size: Sectors) -> EngineResult<()> {
-    if size % NUM_MDA_REGIONS != Sectors(0) {
-        return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                       format!("MDA size {} is not divisible by number of \
-                                                copies required {}",
-                                               size,
-                                               NUM_MDA_REGIONS)));
-    };
+        data_crc: u32,
+    }
 
-    if size < MIN_MDA_SECTORS {
-        return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                       format!("MDA size {} is less than minimum ({})",
-                                               size,
-                                               MIN_MDA_SECTORS)));
-    };
-    Ok(())
+    impl MDAHeader {
+        /// Get an MDAHeader from the buffer.
+        /// Return an error for a bad checksum.
+        /// Return an error if the size of the region used is too large for the given region_size.
+        /// Return None if there is no MDAHeader to be read. This is detected if the
+        /// timestamp region in the buffer is 0.
+        fn from_buf(buf: &[u8; _MDA_REGION_HDR_SIZE],
+                    region_size: Bytes)
+                    -> EngineResult<Option<MDAHeader>> {
+            if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_ieee(&buf[4..]) {
+                return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region header CRC".into()));
+            }
+
+            match LittleEndian::read_u64(&buf[16..24]) {
+                0 => Ok(None),
+                secs => {
+                    let used = Bytes(LittleEndian::read_u64(&buf[8..16]));
+                    try!(check_mda_region_size(used, region_size));
+
+                    let nsecs = LittleEndian::read_u32(&buf[24..28]);
+                    // Signed cast is safe, highest order bit of each value
+                    // read is guaranteed to be 0.
+                    assert!(nsecs <= std::i32::MAX as u32);
+                    assert!(secs <= std::i64::MAX as u64);
+
+                    Ok(Some(MDAHeader {
+                                used: used,
+                                last_updated: Timespec::new(secs as i64, nsecs as i32),
+                                data_crc: LittleEndian::read_u32(&buf[4..8]),
+                            }))
+                }
+            }
+        }
+
+        fn to_buf(&self) -> [u8; _MDA_REGION_HDR_SIZE] {
+            // Unsigned casts are always safe, as sec and nsec values are never negative
+            assert!(self.last_updated.sec >= 0 && self.last_updated.nsec >= 0);
+
+            let mut buf = [0u8; _MDA_REGION_HDR_SIZE];
+
+            LittleEndian::write_u32(&mut buf[4..8], self.data_crc);
+            LittleEndian::write_u64(&mut buf[8..16], *self.used as u64);
+            LittleEndian::write_u64(&mut buf[16..24], self.last_updated.sec as u64);
+            LittleEndian::write_u32(&mut buf[24..28], self.last_updated.nsec as u32);
+
+            let buf_crc = crc32::checksum_ieee(&buf[4.._MDA_REGION_HDR_SIZE]);
+            LittleEndian::write_u32(&mut buf[..4], buf_crc);
+
+            buf
+        }
+
+        /// Given a pre-seek()ed File, load the MDA region and return the contents.
+        /// Return an error if the data can not be read, since the existance
+        /// of the MDAHeader implies that the data must be available.
+        // MDAHeader cannot seek because it doesn't know which region it's in
+        fn load_region<F>(&self, f: &mut F) -> EngineResult<Vec<u8>>
+            where F: Read
+        {
+            // This cast could fail if running on a 32-bit machine and
+            // size of metadata is greater than 2^32 - 1 bytes, which is
+            // unlikely.
+            assert!(*self.used <= std::usize::MAX as u64);
+            let mut data_buf = vec![0u8; *self.used as usize];
+            try!(f.read_exact(&mut data_buf));
+
+            if self.data_crc != crc32::checksum_ieee(&data_buf) {
+                return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region data CRC".into()));
+            }
+            Ok(data_buf)
+        }
+    }
+
+    /// Check that data size does not exceed region available.
+    /// Note that used is the amount used for metadata only.
+    fn check_mda_region_size(used: Bytes, available: Bytes) -> EngineResult<()> {
+        if MDA_REGION_HDR_SIZE + used > available {
+            return Err(EngineError::Engine(ErrorEnum::Invalid,
+                                           format!("metadata length {} exceeds region available {}",
+                                                   used,
+                                                   // available region > header size
+                                                   available - MDA_REGION_HDR_SIZE)
+                                                   .into()));
+        };
+        Ok(())
+    }
+
+    /// Validate MDA size
+    pub fn validate_mda_size(size: Sectors) -> EngineResult<()> {
+        if size % NUM_MDA_REGIONS != Sectors(0) {
+            return Err(EngineError::Engine(ErrorEnum::Invalid,
+                                           format!("MDA size {} is not divisible by number of \
+                                                    copies required {}",
+                                                   size,
+                                                   NUM_MDA_REGIONS)));
+        };
+
+        if size < MIN_MDA_SECTORS {
+            return Err(EngineError::Engine(ErrorEnum::Invalid,
+                                           format!("MDA size {} is less than minimum ({})",
+                                                   size,
+                                                   MIN_MDA_SECTORS)));
+        };
+        Ok(())
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use quickcheck::{QuickCheck, TestResult};
+        use time::{now, Timespec};
+
+        use super::*;
+
+        #[test]
+        /// Using an arbitrary data buffer, construct an mda header buffer
+        /// Read the mda header buffer twice.
+        /// Verify that the resulting MDAHeaders have all equal components.
+        /// Verify timestamp and data CRC against original values.
+        fn prop_mda_header() {
+            fn mda_header(data: Vec<u8>, sec: i64, nsec: i32, region_size_ext: u32) -> TestResult {
+                // unwritable timestamp
+                if sec < 0 || nsec < 0 {
+                    return TestResult::discard();
+                }
+
+                // sec value of 0 is interpreted as no timestamp when read
+                if sec == 0 {
+                    return TestResult::discard();
+                }
+
+                // 4 is NUM_MDA_REGIONS which is not imported from super.
+                let region_size = (MIN_MDA_SECTORS / 4usize).bytes() +
+                                  Bytes(region_size_ext as u64);
+                let header = MDAHeader {
+                    last_updated: Timespec::new(sec, nsec),
+                    used: Bytes(data.len() as u64),
+                    data_crc: crc32::checksum_ieee(&data),
+                };
+                let buf = header.to_buf();
+                let mda1 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
+                let mda2 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
+
+                TestResult::from_bool(mda1.last_updated == mda2.last_updated &&
+                                      mda1.used == mda2.used &&
+                                      mda1.data_crc == mda2.data_crc &&
+                                      header.last_updated == mda1.last_updated &&
+                                      header.data_crc == mda1.data_crc)
+            }
+
+            QuickCheck::new()
+                .tests(50)
+                .quickcheck(mda_header as fn(Vec<u8>, i64, i32, u32) -> TestResult);
+        }
+
+        /// Verify that bad crc causes an error.
+        #[test]
+        fn test_from_buf_crc_error() {
+            let data = [0u8; 3];
+            let header = MDAHeader {
+                last_updated: now().to_timespec(),
+                used: Bytes(data.len() as u64),
+                data_crc: crc32::checksum_ieee(&data),
+            };
+            let mut buf = header.to_buf();
+            LittleEndian::write_u32(&mut buf[..4], 0u32);
+            assert!(MDAHeader::from_buf(&buf, Bytes(data.len() as u64) + MDA_REGION_HDR_SIZE)
+                        .is_err());
+        }
+
+        /// Verify that too small region_size causes an error.
+        #[test]
+        fn test_from_buf_size_error() {
+            let data = [0u8; 3];
+            let header = MDAHeader {
+                last_updated: now().to_timespec(),
+                used: Bytes(data.len() as u64),
+                data_crc: crc32::checksum_ieee(&data),
+            };
+            let buf = header.to_buf();
+            assert!(MDAHeader::from_buf(&buf, MDA_REGION_HDR_SIZE).is_err());
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
 
-    use crc::crc32;
     use devicemapper::{Bytes, Sectors};
     use quickcheck::{QuickCheck, TestResult};
-    use time::{now, Timespec};
+    use time::now;
     use uuid::Uuid;
 
     use super::super::super::consts::IEC;
@@ -856,72 +964,5 @@ mod tests {
         QuickCheck::new()
             .tests(30)
             .quickcheck(static_header as fn(u64, u32) -> TestResult);
-    }
-
-    #[test]
-    /// Using an arbitrary data buffer, construct an mda header buffer
-    /// Read the mda header buffer twice.
-    /// Verify that the resulting MDAHeaders have all equal components.
-    /// Verify timestamp and data CRC against original values.
-    fn prop_mda_header() {
-        fn mda_header(data: Vec<u8>, sec: i64, nsec: i32, region_size_ext: u32) -> TestResult {
-            // unwritable timestamp
-            if sec < 0 || nsec < 0 {
-                return TestResult::discard();
-            }
-
-            // sec value of 0 is interpreted as no timestamp when read
-            if sec == 0 {
-                return TestResult::discard();
-            }
-
-            // 4 is NUM_MDA_REGIONS which is not imported from super.
-            let region_size = (MIN_MDA_SECTORS / 4usize).bytes() + Bytes(region_size_ext as u64);
-            let header = MDAHeader {
-                last_updated: Timespec::new(sec, nsec),
-                used: Bytes(data.len() as u64),
-                data_crc: crc32::checksum_ieee(&data),
-            };
-            let buf = header.to_buf();
-            let mda1 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
-            let mda2 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
-
-            TestResult::from_bool(mda1.last_updated == mda2.last_updated &&
-                                  mda1.used == mda2.used &&
-                                  mda1.data_crc == mda2.data_crc &&
-                                  header.last_updated == mda1.last_updated &&
-                                  header.data_crc == mda1.data_crc)
-        }
-
-        QuickCheck::new()
-            .tests(50)
-            .quickcheck(mda_header as fn(Vec<u8>, i64, i32, u32) -> TestResult);
-    }
-
-    /// Verify that bad crc causes an error.
-    #[test]
-    fn test_from_buf_crc_error() {
-        let data = [0u8; 3];
-        let header = MDAHeader {
-            last_updated: now().to_timespec(),
-            used: Bytes(data.len() as u64),
-            data_crc: crc32::checksum_ieee(&data),
-        };
-        let mut buf = header.to_buf();
-        LittleEndian::write_u32(&mut buf[..4], 0u32);
-        assert!(MDAHeader::from_buf(&buf, Bytes(data.len() as u64) + MDA_REGION_HDR_SIZE).is_err());
-    }
-
-    /// Verify that too small region_size causes an error.
-    #[test]
-    fn test_from_buf_size_error() {
-        let data = [0u8; 3];
-        let header = MDAHeader {
-            last_updated: now().to_timespec(),
-            used: Bytes(data.len() as u64),
-            data_crc: crc32::checksum_ieee(&data),
-        };
-        let buf = header.to_buf();
-        assert!(MDAHeader::from_buf(&buf, MDA_REGION_HDR_SIZE).is_err());
     }
 }

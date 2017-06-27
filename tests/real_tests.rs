@@ -21,16 +21,16 @@ use libstratis::engine::IEC;
 use libstratis::engine::strat_engine::device::wipe_sectors;
 
 use util::logger::init_logger;
-use util::simple_tests::test_basic_metadata;
+use util::blockdev_tests::test_force_flag_dirty;
+use util::blockdev_tests::test_force_flag_stratis;
+use util::blockdev_tests::test_pool_blockdevs;
+use util::dm_tests::test_thinpool_device;
+use util::dm_tests::test_linear_device;
+use util::setup_tests::test_basic_metadata;
+use util::setup_tests::test_initialize;
+use util::setup_tests::test_setup;
 use util::simple_tests::test_empty_pool;
-use util::simple_tests::test_force_flag_dirty;
-use util::simple_tests::test_force_flag_stratis;
-use util::simple_tests::test_initialize;
-use util::simple_tests::test_linear_device;
-use util::simple_tests::test_pool_blockdevs;
-use util::simple_tests::test_setup;
 use util::simple_tests::test_teardown;
-use util::simple_tests::test_thinpool_device;
 
 pub struct RealTestDev {
     path: PathBuf,

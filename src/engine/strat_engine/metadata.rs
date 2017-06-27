@@ -366,14 +366,7 @@ mod mda {
                                                                    index,
                                                                    per_region_size))));
                 try!(f.read_exact(&mut hdr_buf));
-                let mda = try!(MDAHeader::from_buf(&hdr_buf, per_region_size));
-
-                // Loading checks CRC
-                if mda.is_some() {
-                    try!(mda.as_ref().expect("is_some()").load_region(f));
-                }
-
-                Ok(mda)
+                Ok(try!(MDAHeader::from_buf(&hdr_buf, per_region_size)))
             };
 
             let mda0 = load_a_region(0)

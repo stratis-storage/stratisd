@@ -414,4 +414,6 @@ pub fn test_setup(paths: &[&Path]) {
 
     assert!(engine.get_pool(&uuid1).is_some());
     assert!(engine.get_pool(&uuid2).is_some());
+
+    engine.teardown().unwrap();
 }

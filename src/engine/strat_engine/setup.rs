@@ -197,9 +197,8 @@ pub fn get_blockdevs(pool_save: &PoolSave, devnodes: &[PathBuf]) -> EngineResult
         // If we've seen this device already, skip it.
         if devices.contains(&device) {
             continue;
-        } else {
-            devices.insert(device);
         }
+        devices.insert(device);
 
         let bda = try!(BDA::load(&mut try!(OpenOptions::new().read(true).open(dev))));
         let bda = try!(bda.ok_or(EngineError::Engine(ErrorEnum::NotFound,

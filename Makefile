@@ -44,7 +44,7 @@ docs:
 	cargo doc --no-deps
 
 clippy:
-	RUSTFLAGS='-D warnings' cargo build --features "clippy"
+	RUSTFLAGS='-D warnings' cargo build --features "clippy" --verbose
 
 .PHONY:
 	fmt

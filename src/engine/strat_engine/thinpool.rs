@@ -7,12 +7,14 @@
 use std::process::Command;
 
 use devicemapper;
-use devicemapper::{DM, DataBlocks, DmError, DmResult, LinearDev, Sectors, Segment, ThinPoolDev};
+use devicemapper::{DM, DataBlocks, DmError, DmResult, LinearDev, Sectors, Segment, ThinDevId,
+                   ThinPoolDev};
 
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::PoolUuid;
 
-use super::dmdevice::{FlexRole, ThinPoolRole, format_flex_name, format_thinpool_name};
+use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, format_flex_name,
+                      format_thinpool_name};
 use super::serde_structs::{Recordable, ThinPoolDevSave};
 
 /// A ThinPool struct contains the thinpool itself, but also the spare
@@ -21,6 +23,7 @@ use super::serde_structs::{Recordable, ThinPoolDevSave};
 pub struct ThinPool {
     thin_pool: ThinPoolDev,
     meta_spare: Vec<Segment>,
+    id_gen: ThinDevIdPool,
 }
 
 impl ThinPool {
@@ -44,6 +47,7 @@ impl ThinPool {
         Ok(ThinPool {
                thin_pool: thinpool_dev,
                meta_spare: spare_segments,
+               id_gen: ThinDevIdPool::new_from_ids(&[]),
            })
     }
 
@@ -58,6 +62,7 @@ impl ThinPool {
                  dm: &DM,
                  data_block_size: Sectors,
                  low_water_mark: DataBlocks,
+                 thin_ids: &[ThinDevId],
                  spare_segments: Vec<Segment>,
                  meta_dev: LinearDev,
                  data_dev: LinearDev)
@@ -75,6 +80,7 @@ impl ThinPool {
                 Ok(ThinPool {
                        thin_pool: dev,
                        meta_spare: spare_segments,
+                       id_gen: ThinDevIdPool::new_from_ids(&thin_ids),
                    })
             }
             Err(DmError::Dm(devicemapper::ErrorEnum::CheckFailed(meta_dev, data_dev), _)) => {
@@ -89,10 +95,16 @@ impl ThinPool {
                                                           new_meta_dev,
                                                           data_dev)),
                        meta_spare: new_spare_segments,
+                       id_gen: ThinDevIdPool::new_from_ids(&thin_ids),
                    })
             }
             Err(err) => Err(err.into()),
         }
+    }
+
+    /// Get a new id.
+    pub fn new_id(&mut self) -> EngineResult<ThinDevId> {
+        self.id_gen.new_id()
     }
 
     /// Tear down the thin pool.

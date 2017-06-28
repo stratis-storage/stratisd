@@ -43,16 +43,14 @@ impl SimPool {
         let device_pairs = devices
             .iter()
             .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
-        let new_pool = SimPool {
+        SimPool {
             name: name.to_owned(),
             pool_uuid: Uuid::new_v4(),
             block_devs: HashMap::from_iter(device_pairs),
             filesystems: Table::default(),
             redundancy: redundancy,
             rdm: rdm.clone(),
-        };
-
-        new_pool
+        }
     }
 
     pub fn check(&mut self) -> () {}

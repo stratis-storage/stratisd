@@ -29,6 +29,7 @@ use util::blockdev_tests::test_force_flag_stratis;
 use util::blockdev_tests::test_pool_blockdevs;
 use util::dm_tests::test_thinpool_device;
 use util::dm_tests::test_linear_device;
+use util::pool_tests::test_thinpool_expand;
 use util::setup_tests::test_basic_metadata;
 use util::setup_tests::test_initialize;
 use util::setup_tests::test_setup;
@@ -140,6 +141,10 @@ pub fn loop_test_thinpool_device() {
     test_with_spec(3, test_thinpool_device);
 }
 
+#[test]
+pub fn loop_test_thinpool_expand() {
+    test_with_spec(3, test_thinpool_expand);
+}
 
 #[test]
 pub fn loop_test_pool_blockdevs() {

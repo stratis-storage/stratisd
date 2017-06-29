@@ -102,7 +102,7 @@ impl ThinDevIdPool {
     // number has been used.
     pub fn new_id(&mut self) -> EngineResult<ThinDevId> {
         let next_id = try!(ThinDevId::new_u64((self.next_id) as u64));
-        self.next_id = self.next_id + 1;
+        self.next_id += 1;
         Ok(next_id)
     }
 }

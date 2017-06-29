@@ -7,9 +7,10 @@
 use std::process::Command;
 
 use devicemapper;
-use devicemapper::{DM, DataBlocks, DmError, DmResult, LinearDev, Sectors, Segment, ThinDevId,
-                   ThinPoolDev};
+use devicemapper::{Bytes, DM, DataBlocks, DmError, DmResult, LinearDev, Sectors, Segment, ThinDev,
+                   ThinDevId, ThinPoolDev};
 
+use super::super::consts::IEC;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::PoolUuid;
 
@@ -102,9 +103,13 @@ impl ThinPool {
         }
     }
 
-    /// Get a new id.
-    pub fn new_id(&mut self) -> EngineResult<ThinDevId> {
-        self.id_gen.new_id()
+    /// Make a new thin device.
+    pub fn make_thin_device(&mut self, dm: &DM, name: &str) -> EngineResult<ThinDev> {
+        Ok(try!(ThinDev::new(name,
+                             dm,
+                             &self.thin_pool,
+                             try!(self.id_gen.new_id()),
+                             Bytes(IEC::Ti).sectors())))
     }
 
     /// Tear down the thin pool.

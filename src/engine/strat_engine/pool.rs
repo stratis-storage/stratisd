@@ -407,13 +407,11 @@ impl Pool for StratPool {
         let mut result = Vec::new();
         for name in names.iter() {
             let uuid = Uuid::new_v4();
-            let thin_id = try!(self.thin_pool.new_id());
             let new_filesystem = try!(StratFilesystem::initialize(&self.pool_uuid,
                                                                   uuid,
-                                                                  thin_id,
                                                                   name,
                                                                   &dm,
-                                                                  &self.thin_pool.thin_pool()));
+                                                                  &mut self.thin_pool));
             try!(self.mdv.save_fs(&new_filesystem));
             self.filesystems.insert(new_filesystem);
             result.push((**name, uuid));

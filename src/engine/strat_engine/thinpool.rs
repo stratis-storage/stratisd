@@ -112,6 +112,16 @@ impl ThinPool {
                              Bytes(IEC::Ti).sectors())))
     }
 
+    /// Setup a previously constructed thin device.
+    pub fn setup_thin_device(&self,
+                             dm: &DM,
+                             name: &str,
+                             id: ThinDevId,
+                             size: Sectors)
+                             -> EngineResult<ThinDev> {
+        Ok(try!(ThinDev::setup(name, dm, &self.thin_pool, id, size)))
+    }
+
     /// Tear down the thin pool.
     pub fn teardown(self, dm: &DM) -> DmResult<()> {
         self.thin_pool.teardown(dm)

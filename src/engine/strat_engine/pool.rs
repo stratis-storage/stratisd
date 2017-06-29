@@ -238,7 +238,7 @@ impl StratPool {
                                                &fssave.name,
                                                fssave.size,
                                                &dm,
-                                               thinpool.thin_pool())))
+                                               &thinpool)))
             };
 
             try!(filesystem_metadatas

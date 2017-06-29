@@ -10,7 +10,6 @@ use std::process::Command;
 use devicemapper::DM;
 use devicemapper::Sectors;
 use devicemapper::{ThinDev, ThinDevId, ThinStatus};
-use devicemapper::ThinPoolDev;
 
 use super::super::engine::{Filesystem, HasName, HasUuid};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -59,10 +58,10 @@ impl StratFilesystem {
                  name: &str,
                  size: Sectors,
                  dm: &DM,
-                 thin_pool: &ThinPoolDev)
+                 thin_pool: &ThinPool)
                  -> EngineResult<StratFilesystem> {
         let device_name = format_thin_name(&pool_uuid, ThinRole::Filesystem(fs_id));
-        let thin_dev = try!(ThinDev::setup(&device_name, dm, thin_pool, thindev_id, size));
+        let thin_dev = try!(thin_pool.setup_thin_device(dm, &device_name, thindev_id, size));
 
         Ok(StratFilesystem {
                fs_id: fs_id,

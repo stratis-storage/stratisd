@@ -10,7 +10,6 @@ fmt: ${HOME}/.cargo/bin/cargo-fmt
 build:
 	RUSTFLAGS='-D warnings' cargo build
 
-# Tests are in order of complexity, from least to greatest.
 test-loop:
 	sudo env "PATH=${PATH}" RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 cargo test -- --test loop_test_empty_pool
 	sudo env "PATH=${PATH}" RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 cargo test -- --test loop_test_force_flag_dirty
@@ -24,7 +23,6 @@ test-loop:
 	sudo env "PATH=${PATH}" RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 cargo test -- --test loop_test_setup
 	sudo env "PATH=${PATH}" RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 cargo test -- --test loop_test_thinpool_expand
 
-# Tests are in order of complexity, from least to greatest.
 test-real:
 	sudo env "PATH=${PATH}" RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 cargo test -- --test real_test_empty_pool
 	sudo env "PATH=${PATH}" RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 cargo test -- --test real_test_force_flag_dirty

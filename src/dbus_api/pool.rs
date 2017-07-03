@@ -50,7 +50,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_path = m.tree
-        .get(&object_path)
+        .get(object_path)
         .expect("implicit argument must be in tree");
     let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
@@ -102,7 +102,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_path = m.tree
-        .get(&object_path)
+        .get(object_path)
         .expect("implicit argument must be in tree");
     let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
@@ -113,7 +113,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     for op in filesystems {
         if let Some(filesystem_path) = m.tree.get(&op) {
             let filesystem_uuid = get_data!(filesystem_path; default_return; return_message).uuid;
-            filesystem_map.insert(filesystem_uuid.clone(), op);
+            filesystem_map.insert(filesystem_uuid, op);
         }
     }
 
@@ -158,7 +158,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_path = m.tree
-        .get(&object_path)
+        .get(object_path)
         .expect("implicit argument must be in tree");
     let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
@@ -176,7 +176,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                              .expect("'d' originated in the 'devs' D-Bus argument.")
                              .into()
                      });
-            let paths = paths.map(|x| MessageItem::Str(x)).collect();
+            let paths = paths.map(MessageItem::Str).collect();
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::Array(paths, return_sig.into()), rc, rs)
         }
@@ -201,14 +201,14 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Bool(false);
 
     let pool_path = m.tree
-        .get(&object_path)
+        .get(object_path)
         .expect("implicit argument must be in tree");
     let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
     let msg = match dbus_context
               .engine
               .borrow_mut()
-              .rename_pool(&pool_uuid, new_name) {
+              .rename_pool(pool_uuid, new_name) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", pool_uuid);
             let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, error_message);
@@ -235,7 +235,7 @@ fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
     let pool_path = p.tree
-        .get(&object_path)
+        .get(object_path)
         .expect("implicit argument must be in tree");
     let data = try!(ref_ok_or(pool_path.get_data(),
                               MethodErr::failed(&format!("no data for object path {}",
@@ -245,8 +245,10 @@ fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
                       .borrow_mut()
                       .get_pool(&data.uuid)
                       .map(|x| MessageItem::Str(x.name().to_owned()))
-                      .ok_or(MethodErr::failed(&format!("no name for pool with uuid {}",
-                                                        &data.uuid)))));
+                      .ok_or_else(|| {
+                                      MethodErr::failed(&format!("no name for pool with uuid {}",
+                                                                 &data.uuid))
+                                  })));
     Ok(())
 }
 

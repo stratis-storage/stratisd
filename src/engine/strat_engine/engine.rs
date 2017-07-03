@@ -51,7 +51,7 @@ impl StratEngine {
         let pools = try!(find_all());
 
         let mut table = Table::default();
-        for (pool_uuid, devices) in pools.iter() {
+        for (pool_uuid, devices) in &pools {
             let evicted = table.insert(try!(StratPool::setup(*pool_uuid, devices)));
             if !evicted.is_empty() {
 
@@ -99,7 +99,7 @@ impl Engine for StratEngine {
         let pool = try!(StratPool::initialize(name, &dm, blockdev_paths, redundancy, force));
         let bdev_devnodes = pool.block_devs.devnodes();
 
-        let uuid = pool.uuid().clone();
+        let uuid = *pool.uuid();
         self.pools.insert(pool);
         Ok((uuid, bdev_devnodes))
     }

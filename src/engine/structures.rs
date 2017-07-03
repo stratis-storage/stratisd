@@ -104,7 +104,7 @@ impl<T: HasName + HasUuid> Table<T> {
                                      .last()
                                      .expect("name_map is non-empty <-> items is non-empty");
                 self.name_map.insert(last_item.name().into(), index);
-                self.uuid_map.insert(last_item.uuid().clone(), index);
+                self.uuid_map.insert(*last_item.uuid(), index);
             }
 
             // Remove the item we want to remove and also the uuid mapping
@@ -129,7 +129,7 @@ impl<T: HasName + HasUuid> Table<T> {
                                      .last()
                                      .expect("uuid_map is non-empty <-> items is non-empty");
                 self.name_map.insert(last_item.name().into(), index);
-                self.uuid_map.insert(last_item.uuid().clone(), index);
+                self.uuid_map.insert(*last_item.uuid(), index);
             }
 
             // Remove the item we want to remove and also the uuid mapping
@@ -157,14 +157,13 @@ impl<T: HasName + HasUuid> Table<T> {
         let future_last_index = self.items.len();
         self.name_map
             .insert(item.name().into(), future_last_index);
-        self.uuid_map
-            .insert(item.uuid().clone(), future_last_index);
+        self.uuid_map.insert(*item.uuid(), future_last_index);
 
         self.items.push(item);
 
         match (name_item, uuid_item) {
             (None, None) => vec![],
-            (None, Some(item)) => vec![item],
+            (None, Some(item)) |
             (Some(item), None) => vec![item],
             (Some(p1), Some(p2)) => vec![p1, p2],
         }

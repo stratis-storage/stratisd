@@ -102,7 +102,7 @@ impl BlockDevMgr {
             return None;
         }
 
-        for mut bd in self.block_devs.iter_mut() {
+        for mut bd in &mut self.block_devs {
             if needed == Sectors(0) {
                 break;
             }
@@ -131,7 +131,7 @@ impl BlockDevMgr {
         // Panic can occur for a the usual IO reasons, but also:
         // 1. If the timestamp is older than a previously written timestamp.
         // 2. If the variable length metadata is too large.
-        for mut bd in self.block_devs.iter_mut() {
+        for mut bd in &mut self.block_devs {
             bd.save_state(time, metadata).unwrap();
         }
         Ok(())

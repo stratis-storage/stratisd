@@ -184,8 +184,8 @@ pub fn get_blockdevs(pool_save: &PoolSave, devnodes: &[PathBuf]) -> EngineResult
     let mut segment_table = HashMap::new();
     for seg in segments {
         segment_table
-            .entry(seg.0.clone())
-            .or_insert(vec![])
+            .entry(seg.0)
+            .or_insert_with(Vec::new)
             .push((seg.1, seg.2))
     }
 
@@ -201,8 +201,11 @@ pub fn get_blockdevs(pool_save: &PoolSave, devnodes: &[PathBuf]) -> EngineResult
         devices.insert(device);
 
         let bda = try!(BDA::load(&mut try!(OpenOptions::new().read(true).open(dev))));
-        let bda = try!(bda.ok_or(EngineError::Engine(ErrorEnum::NotFound,
-                                                     "no BDA found for Stratis device".into())));
+        let bda = try!(bda.ok_or_else(|| {
+                                          EngineError::Engine(ErrorEnum::NotFound,
+                                                              "no BDA found for Stratis device"
+                                                                  .into())
+                                      }));
 
         let actual_size = try!(blkdev_size(&try!(OpenOptions::new().read(true).open(dev))))
             .sectors();
@@ -220,7 +223,7 @@ pub fn get_blockdevs(pool_save: &PoolSave, devnodes: &[PathBuf]) -> EngineResult
 
     // Verify that blockdevs found match blockdevs recorded.
     let current_uuids: HashSet<_> = blockdevs.iter().map(|b| *b.uuid()).collect();
-    let recorded_uuids: HashSet<_> = pool_save.block_devs.keys().map(|u| *u).collect();
+    let recorded_uuids: HashSet<_> = pool_save.block_devs.keys().cloned().collect();
 
     if current_uuids != recorded_uuids {
         let err_msg = "Recorded block dev UUIDs != discovered blockdev UUIDs";

@@ -7,7 +7,7 @@
 /// associated with object path.
 macro_rules! get_data {
     ( $path:ident; $default:expr; $message:expr ) => {
-        if let &Some(ref data) = $path.get_data() {
+        if let Some(ref data) = *$path.get_data() {
             data
         } else {
             let message = format!("no data for object path {}", $path.get_name());

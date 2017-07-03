@@ -170,8 +170,8 @@ impl StaticHeader {
                -> StaticHeader {
         StaticHeader {
             blkdev_size: blkdev_size,
-            pool_uuid: pool_uuid.clone(),
-            dev_uuid: dev_uuid.clone(),
+            pool_uuid: *pool_uuid,
+            dev_uuid: *dev_uuid,
             mda_size: mda_size,
             reserved_size: MDA_RESERVED_SECTORS,
             flags: 0,
@@ -186,7 +186,7 @@ impl StaticHeader {
     {
         try!(f.seek(SeekFrom::Start(0)));
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
-        try!(f.read(&mut buf));
+        try!(f.read_exact(&mut buf));
 
         // TODO: repair static header if one incorrect?
         // Note: this would require some adjustment or some revision to
@@ -222,7 +222,13 @@ impl StaticHeader {
 
         try!(f.seek(SeekFrom::Start(0)));
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
-        try!(f.read(&mut buf));
+        if try!(f.read(&mut buf)) < _BDA_STATIC_HDR_SIZE {
+            if buf.iter().any(|x| *x != 0) {
+                return Ok(DevOwnership::Theirs);
+            } else {
+                return Ok(DevOwnership::Unowned);
+            }
+        }
 
         // Using setup() as a test of ownership sets a high bar. It is
         // not sufficient to have STRAT_MAGIC to be considered "Ours",
@@ -419,8 +425,7 @@ impl MDARegions {
     pub fn older(&self) -> usize {
         match self.mdas[0].last_updated.cmp(&self.mdas[1].last_updated) {
             Ordering::Less => 0,
-            Ordering::Greater => 1,
-            Ordering::Equal => 1,
+            Ordering::Greater | Ordering::Equal => 1,
         }
     }
 
@@ -526,13 +531,15 @@ impl MDAHeader {
     pub fn load_region<F>(&self, f: &mut F) -> EngineResult<Option<Vec<u8>>>
         where F: Read
     {
+        #![allow(absurd_extreme_comparisons)]
         if let Some(used) = self.used {
             // This should never fail, since the property is checked when the MDAHeader is loaded
             assert!(MDA_REGION_HDR_SIZE + used <= self.region_size);
             // This cast could fail if running on a 32-bit machine and
             // size of metadata is greater than 2^32 - 1 bytes, which is
-            // unlikely.
+            // unlikely. The comparison _is_ absurd on a 64-bit machine.
             assert!(*used <= std::usize::MAX as u64);
+
             let mut data_buf = vec![0u8; *used as usize];
             try!(f.read_exact(&mut data_buf));
 

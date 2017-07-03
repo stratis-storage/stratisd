@@ -34,4 +34,4 @@ mod engine;
 mod errors;
 mod sim_engine;
 mod structures;
-mod types;
+pub mod types;

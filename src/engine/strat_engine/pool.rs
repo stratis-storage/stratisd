@@ -41,12 +41,11 @@ use super::metadata::MIN_MDA_SECTORS;
 use super::serde_structs::{FilesystemSave, FlexDevsSave, PoolSave, Recordable, ThinPoolDevSave};
 use super::setup::{get_blockdevs, get_metadata};
 
-const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
+pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 const META_LOWATER: u64 = 512;
-const DATA_LOWATER: DataBlocks = DataBlocks(512);
-
+pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
 const INITIAL_META_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
-const INITIAL_DATA_SIZE: Sectors = Sectors(768 * Mi / SECTOR_SIZE as u64);
+pub const INITIAL_DATA_SIZE: Sectors = Sectors(768 * Mi / SECTOR_SIZE as u64);
 const INITIAL_MDV_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
 
 #[derive(Debug)]
@@ -212,6 +211,25 @@ impl StratPool {
         self.block_devs
             .save_state(&now().to_timespec(), data.as_bytes())
     }
+    /// Return an extend size for the physical space backing a pool
+    /// TODO: returning the current size will double the space provisoned to
+    /// back the pool.  We should determine if this is a reasonable value.
+    fn extend_size(&self, current_size: Sectors) -> Sectors {
+        current_size
+    }
+
+    /// Expand the physical space allocated to a pool by the value from extend_size()
+    /// Return tne number of Sectors added
+    fn extend_data(&mut self, dm: &DM, current_size: Sectors) -> EngineResult<Sectors> {
+        let extend_size = self.extend_size(current_size);
+        if let Some(new_data_regions) = self.block_devs.alloc_space(extend_size) {
+            try!(self.thin_pool.extend_data(dm, new_data_regions));
+        } else {
+            return Err(EngineError::Engine(ErrorEnum::Error,
+                                           format!("No free data regions for pool expansion")));
+        }
+        Ok(extend_size)
+    }
 
     pub fn check(&mut self) -> () {
         #![allow(match_same_arms)]
@@ -255,7 +273,11 @@ impl StratPool {
                 }
 
                 if usage.used_data > usage.total_data - DATA_LOWATER {
-                    // TODO: Extend data device
+                    // Request expansion of physical space allocated to the pool
+                    match self.extend_data(&dm, usage.total_data.0 * DATA_BLOCK_SIZE) {
+                        Ok(_) => {}
+                        Err(_) => {} // TODO: Take pool offline?
+                    }
                 }
             }
             ThinPoolStatus::Fail => {

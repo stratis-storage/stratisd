@@ -369,18 +369,20 @@ mod mda {
                 Ok(try!(MDAHeader::from_buf(&hdr_buf, per_region_size)))
             };
 
-            let mda0 = load_a_region(0)
-                .or_else(|_| load_a_region(2))
-                .ok()
-                .unwrap_or(None);
-            let mda1 = load_a_region(1)
-                .or_else(|_| load_a_region(3))
-                .ok()
-                .unwrap_or(None);
+            /// Get an MDAHeader for the given index.
+            /// If there is a failure reading the first, fall back on the
+            /// second. If there is a failure reading both, return None.
+            /// TODO: Consider whether this is the correct behavior.
+            let mut get_mda = |index: usize| -> Option<MDAHeader> {
+                load_a_region(index)
+                    .or_else(|_| load_a_region(index + 2))
+                    .ok()
+                    .unwrap_or(None)
+            };
 
             Ok(MDARegions {
                    region_size: region_size,
-                   mdas: [mda0, mda1],
+                   mdas: [get_mda(0), get_mda(1)],
                })
         }
 

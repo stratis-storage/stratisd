@@ -91,17 +91,20 @@ impl StratPool {
 
         }
 
-        let meta_regions = block_mgr
-            .alloc_space(INITIAL_META_SIZE)
-            .expect("blockmgr must not fail, already checked for space");
+        let (amount, meta_regions) = block_mgr.alloc_space(INITIAL_META_SIZE);
+        assert_eq!(amount,
+                   INITIAL_META_SIZE,
+                   "blockmgr must not fail, already checked for space");
 
-        let meta_spare_regions = block_mgr
-            .alloc_space(INITIAL_META_SIZE)
-            .expect("blockmgr must not fail, already checked for space");
+        let (amount, meta_spare_regions) = block_mgr.alloc_space(INITIAL_META_SIZE);
+        assert_eq!(amount,
+                   INITIAL_META_SIZE,
+                   "blockmgr must not fail, already checked for space");
 
-        let data_regions = block_mgr
-            .alloc_space(INITIAL_DATA_SIZE)
-            .expect("blockmgr must not fail, already checked for space");
+        let (amount, data_regions) = block_mgr.alloc_space(INITIAL_DATA_SIZE);
+        assert_eq!(amount,
+                   INITIAL_DATA_SIZE,
+                   "blockmgr must not fail, already checked for space");
 
         // When constructing a thin-pool, Stratis reserves the first N
         // sectors on a block device by creating a linear device with a
@@ -129,9 +132,10 @@ impl StratPool {
                                                  meta_dev,
                                                  data_dev));
 
-        let mdv_regions = block_mgr
-            .alloc_space(INITIAL_MDV_SIZE)
-            .expect("blockmgr must not fail, already checked for space");
+        let (amount, mdv_regions) = block_mgr.alloc_space(INITIAL_MDV_SIZE);
+        assert_eq!(amount,
+                   INITIAL_MDV_SIZE,
+                   "blockmgr must not fail, already checked for space");
 
         let mdv = try!(StratPool::setup_mdv(dm, pool_uuid, mdv_regions));
 
@@ -211,24 +215,25 @@ impl StratPool {
         self.block_devs
             .save_state(&now().to_timespec(), data.as_bytes())
     }
-    /// Return an extend size for the physical space backing a pool
-    /// TODO: returning the current size will double the space provisoned to
-    /// back the pool.  We should determine if this is a reasonable value.
-    fn extend_size(&self, current_size: Sectors) -> Sectors {
-        current_size
-    }
 
-    /// Expand the physical space allocated to a pool by the value from extend_size()
-    /// Return tne number of Sectors added
+    /// Expand the physical space allocated to a pool.
+    /// Return the number of Sectors added.
+    // TODO: Improve this function:
+    // * If there is enough space available the size of the new region is
+    // double the size of the old. This is most likely too greedy, we need a
+    // more sophisticated policy.
+    // * This method succeeds if the pool can be extended at all. This is
+    // most likely too generous a policy, as a very small extension may be
+    // no help at all.
     fn extend_data(&mut self, dm: &DM, current_size: Sectors) -> EngineResult<Sectors> {
-        let extend_size = self.extend_size(current_size);
-        if let Some(new_data_regions) = self.block_devs.alloc_space(extend_size) {
-            try!(self.thin_pool.extend_data(dm, new_data_regions));
+        let (amount, regions) = self.block_devs.alloc_space(current_size);
+        if amount > Sectors(0) {
+            try!(self.thin_pool.extend_data(dm, regions));
         } else {
             return Err(EngineError::Engine(ErrorEnum::Error,
                                            format!("No free data regions for pool expansion")));
         }
-        Ok(extend_size)
+        Ok(amount)
     }
 
     pub fn check(&mut self) -> () {

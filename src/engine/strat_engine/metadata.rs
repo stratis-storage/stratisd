@@ -146,6 +146,11 @@ impl BDA {
     pub fn size(&self) -> Sectors {
         BDA_STATIC_HDR_SECTORS + self.header.mda_size + self.header.reserved_size
     }
+
+    /// The maximum size of variable length metadata that can be accommodated.
+    pub fn max_data_size(&self) -> Sectors {
+        self.regions.max_data_size()
+    }
 }
 
 #[derive(Debug)]
@@ -320,6 +325,12 @@ mod mda {
         /// Calculate the offset from start of device for an MDARegion.
         fn mda_offset(header_size: Bytes, index: usize, per_region_size: Bytes) -> u64 {
             *(header_size + per_region_size * index)
+        }
+
+        /// The maximum size of variable length metadata that this region
+        /// can accommodate.
+        pub fn max_data_size(&self) -> Sectors {
+            self.region_size
         }
 
         /// Initialize the space allotted to the MDA regions to 0.

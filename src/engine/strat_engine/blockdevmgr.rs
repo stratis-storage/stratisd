@@ -126,12 +126,18 @@ impl BlockDevMgr {
 
     /// Write the given data to all blockdevs marking with specified time.
     /// Return an error if data was not written to any blockdev.
+    /// Omit blockdevs which do not have sufficient space in BDA to accommodate
+    /// metadata.
     // TODO: Cap # of blockdevs written to, as described in SWDD
     pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
-        let mut saved = false;
-        for mut bd in &mut self.block_devs {
-            saved |= bd.save_state(time, metadata).is_ok();
-        }
+        let data_size = Bytes(metadata.len() as u64).sectors();
+
+        let saved = self.block_devs
+            .iter_mut()
+            .filter(|b| b.max_metadata_size() >= data_size)
+            .fold(false,
+                  |acc, mut b| acc | b.save_state(time, metadata).is_ok());
+
         if saved {
             Ok(())
         } else {

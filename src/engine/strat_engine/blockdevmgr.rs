@@ -10,6 +10,7 @@ use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use rand::{thread_rng, sample};
 use time::{Duration, Timespec};
 use uuid::Uuid;
 
@@ -28,6 +29,7 @@ use super::range_alloc::RangeAllocator;
 use super::serde_structs::{BlockDevSave, Recordable};
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
+const MAX_NUM_TO_WRITE: usize = 10;
 
 /// Resolve a list of Paths of some sort to a set of unique Devices.
 /// Return an IOError if there was a problem resolving any particular device.
@@ -133,8 +135,8 @@ impl BlockDevMgr {
     /// Omit blockdevs which do not have sufficient space in BDA to accommodate
     /// metadata. If specified time is not more recent than previously written
     /// time, use a time that is one nanosecond greater than that previously
-    /// written.
-    // TODO: Cap # of blockdevs written to, as described in SWDD
+    /// written. Randomly select no more than MAX_NUM_TO_WRITE blockdevs to
+    /// write to.
     pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
         let stamp_time = if Some(*time) <= self.last_update_time {
             self.last_update_time.expect("> Some(time)") + Duration::nanoseconds(1)
@@ -143,9 +145,14 @@ impl BlockDevMgr {
         };
 
         let data_size = Bytes(metadata.len() as u64).sectors();
-        let saved = self.block_devs
+        let candidates = self.block_devs
             .iter_mut()
-            .filter(|b| b.max_metadata_size() >= data_size)
+            .filter(|b| b.max_metadata_size() >= data_size);
+
+        // TODO: consider making selection not entirely random, i.e, ensuring
+        // distribution of metadata over different paths.
+        let saved = sample(&mut thread_rng(), candidates, MAX_NUM_TO_WRITE)
+            .iter_mut()
             .fold(false,
                   |acc, mut b| acc | b.save_state(&stamp_time, metadata).is_ok());
 

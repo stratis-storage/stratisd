@@ -73,7 +73,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                              .expect("'d' originated in the 'devs' D-Bus argument.")
                              .into()
                      });
-            let paths = paths.map(|x| MessageItem::Str(x)).collect();
+            let paths = paths.map(MessageItem::Str).collect();
             let return_path = MessageItem::ObjectPath(pool_object_path);
             let return_list = MessageItem::Array(paths, "s".into());
             let return_value = MessageItem::Struct(vec![return_path, return_list]);

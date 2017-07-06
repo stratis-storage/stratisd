@@ -10,7 +10,7 @@ use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use time::Timespec;
+use time::{Duration, Timespec};
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Device, Sectors, Segment};
@@ -42,11 +42,15 @@ pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
 #[derive(Debug)]
 pub struct BlockDevMgr {
     block_devs: Vec<BlockDev>,
+    last_update_time: Option<Timespec>,
 }
 
 impl BlockDevMgr {
     pub fn new(block_devs: Vec<BlockDev>) -> BlockDevMgr {
-        BlockDevMgr { block_devs: block_devs }
+        BlockDevMgr {
+            block_devs: block_devs,
+            last_update_time: None,
+        }
     }
 
     /// Initialize a new BlockDevMgr with specified pool and devices.
@@ -127,18 +131,26 @@ impl BlockDevMgr {
     /// Write the given data to all blockdevs marking with specified time.
     /// Return an error if data was not written to any blockdev.
     /// Omit blockdevs which do not have sufficient space in BDA to accommodate
-    /// metadata.
+    /// metadata. If specified time is not more recent than previously written
+    /// time, use a time that is one nanosecond greater than that previously
+    /// written.
     // TODO: Cap # of blockdevs written to, as described in SWDD
     pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
-        let data_size = Bytes(metadata.len() as u64).sectors();
+        let stamp_time = if Some(*time) <= self.last_update_time {
+            self.last_update_time.expect("> Some(time)") + Duration::nanoseconds(1)
+        } else {
+            *time
+        };
 
+        let data_size = Bytes(metadata.len() as u64).sectors();
         let saved = self.block_devs
             .iter_mut()
             .filter(|b| b.max_metadata_size() >= data_size)
             .fold(false,
-                  |acc, mut b| acc | b.save_state(time, metadata).is_ok());
+                  |acc, mut b| acc | b.save_state(&stamp_time, metadata).is_ok());
 
         if saved {
+            self.last_update_time = Some(stamp_time);
             Ok(())
         } else {
             let err_msg = "Failed to save metadata to even one device in pool";

@@ -92,6 +92,11 @@ impl BlockDev {
         self.used.available()
     }
 
+    /// The maximum size of variable length metadata that can be accommodated.
+    pub fn max_metadata_size(&self) -> Sectors {
+        self.bda.max_data_size()
+    }
+
     // Find some sector ranges that could be allocated. If more
     // sectors are needed than our capacity, return partial results.
     pub fn request_space(&mut self, size: Sectors) -> (Sectors, Vec<Segment>) {

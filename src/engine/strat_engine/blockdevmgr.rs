@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use rand::{thread_rng, sample};
-use time::{Duration, Timespec};
+use time::{Duration, Timespec, now};
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Device, Sectors, Segment};
@@ -130,18 +130,19 @@ impl BlockDevMgr {
             .collect()
     }
 
-    /// Write the given data to all blockdevs marking with specified time.
+    /// Write the given data to all blockdevs marking with current time.
     /// Return an error if data was not written to any blockdev.
     /// Omit blockdevs which do not have sufficient space in BDA to accommodate
-    /// metadata. If specified time is not more recent than previously written
+    /// metadata. If current time is not more recent than previously written
     /// time, use a time that is one nanosecond greater than that previously
     /// written. Randomly select no more than MAX_NUM_TO_WRITE blockdevs to
     /// write to.
-    pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
-        let stamp_time = if Some(*time) <= self.last_update_time {
+    pub fn save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {
+        let current_time = now().to_timespec();
+        let stamp_time = if Some(current_time) <= self.last_update_time {
             self.last_update_time.expect("> Some(time)") + Duration::nanoseconds(1)
         } else {
-            *time
+            current_time
         };
 
         let data_size = Bytes(metadata.len() as u64).sectors();

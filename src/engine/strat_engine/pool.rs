@@ -11,7 +11,6 @@ use std::process::Command;
 use std::vec::Vec;
 
 use serde_json;
-use time::now;
 use uuid::Uuid;
 
 use devicemapper;
@@ -204,12 +203,10 @@ impl StratPool {
         (INITIAL_META_SIZE * 2u64) + INITIAL_DATA_SIZE + INITIAL_MDV_SIZE
     }
 
-    // TODO: Check current time against global last updated, and use
-    // alternate time value if earlier, as described in SWDD
+    /// Write current metadata to pool members.
     fn write_metadata(&mut self) -> EngineResult<()> {
         let data = try!(serde_json::to_string(&try!(self.record())));
-        self.block_devs
-            .save_state(&now().to_timespec(), data.as_bytes())
+        self.block_devs.save_state(data.as_bytes())
     }
     /// Return an extend size for the physical space backing a pool
     /// TODO: returning the current size will double the space provisoned to

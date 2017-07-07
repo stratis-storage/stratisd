@@ -145,23 +145,18 @@ pub fn get_metadata(pool_uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<O
     // exhausted.
     for &(devnode, ref bda) in
         bdas.iter()
-            .filter(|p| p.1.last_update_time() == most_recent_time) {
+            .filter(|&&(_, ref bda)| bda.last_update_time() == most_recent_time) {
 
-        let f = OpenOptions::new().read(true).open(devnode);
-        if f.is_err() {
-            continue;
-        }
-        let mut f = f.expect("f is not err");
+        let poolsave = OpenOptions::new()
+            .read(true)
+            .open(devnode)
+            .ok()
+            .and_then(|mut f| bda.load_state(&mut f).ok())
+            .and_then(|opt| opt)
+            .and_then(|data| serde_json::from_slice(&data).ok());
 
-        if let Ok(Some(data)) = bda.load_state(&mut f) {
-            let json: serde_json::Result<PoolSave> = serde_json::from_slice(&data);
-            if let Ok(pool) = json {
-                return Ok(Some(pool));
-            } else {
-                continue;
-            }
-        } else {
-            continue;
+        if poolsave.is_some() {
+            return Ok(poolsave);
         }
     }
 

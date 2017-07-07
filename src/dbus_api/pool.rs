@@ -50,7 +50,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_path = m.tree
-        .get(&object_path)
+        .get(object_path)
         .expect("implicit argument must be in tree");
     let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
@@ -102,7 +102,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_path = m.tree
-        .get(&object_path)
+        .get(object_path)
         .expect("implicit argument must be in tree");
     let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
@@ -158,7 +158,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_path = m.tree
-        .get(&object_path)
+        .get(object_path)
         .expect("implicit argument must be in tree");
     let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
@@ -201,7 +201,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Bool(false);
 
     let pool_path = m.tree
-        .get(&object_path)
+        .get(object_path)
         .expect("implicit argument must be in tree");
     let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
@@ -235,7 +235,7 @@ fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
     let pool_path = p.tree
-        .get(&object_path)
+        .get(object_path)
         .expect("implicit argument must be in tree");
     let data = try!(ref_ok_or(pool_path.get_data(),
                               MethodErr::failed(&format!("no data for object path {}",

@@ -192,7 +192,7 @@ fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn get_base_tree<'a>(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
+fn get_base_tree(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
 
     let f = Factory::new_fn();
 

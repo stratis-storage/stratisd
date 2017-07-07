@@ -8,17 +8,16 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use devicemapper::DM;
-use devicemapper::{Bytes, Sectors};
+use devicemapper::Sectors;
 use devicemapper::{ThinDev, ThinDevId, ThinStatus};
-use devicemapper::ThinPoolDev;
 
-use super::super::consts::IEC;
 use super::super::engine::{Filesystem, HasName, HasUuid};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{FilesystemUuid, PoolUuid};
 
 use super::dmdevice::{ThinRole, format_thin_name};
 use super::serde_structs::{FilesystemSave, Recordable};
+use super::thinpool::ThinPool;
 
 #[derive(Debug)]
 pub struct StratFilesystem {
@@ -35,17 +34,12 @@ pub enum FilesystemStatus {
 impl StratFilesystem {
     pub fn initialize(pool_uuid: &PoolUuid,
                       fs_id: FilesystemUuid,
-                      thindev_id: ThinDevId,
                       name: &str,
                       dm: &DM,
-                      thin_pool: &ThinPoolDev)
+                      thin_pool: &mut ThinPool)
                       -> EngineResult<StratFilesystem> {
         let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fs_id));
-        let thin_dev = try!(ThinDev::new(&device_name,
-                                         dm,
-                                         thin_pool,
-                                         thindev_id,
-                                         Bytes(IEC::Ti).sectors()));
+        let thin_dev = try!(thin_pool.make_thin_device(dm, &device_name));
         let fs = StratFilesystem {
             fs_id: fs_id,
             name: name.to_owned(),
@@ -64,10 +58,10 @@ impl StratFilesystem {
                  name: &str,
                  size: Sectors,
                  dm: &DM,
-                 thin_pool: &ThinPoolDev)
+                 thin_pool: &ThinPool)
                  -> EngineResult<StratFilesystem> {
         let device_name = format_thin_name(&pool_uuid, ThinRole::Filesystem(fs_id));
-        let thin_dev = try!(ThinDev::setup(&device_name, dm, thin_pool, thindev_id, size));
+        let thin_dev = try!(thin_pool.setup_thin_device(dm, &device_name, thindev_id, size));
 
         Ok(StratFilesystem {
                fs_id: fs_id,

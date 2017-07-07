@@ -98,29 +98,23 @@ impl BlockDevMgr {
         self.block_devs.iter().map(|bd| bd.available()).sum()
     }
 
-    /// If available space is less than size, return None, else return
-    /// the segments allocated.
-    pub fn alloc_space(&mut self, size: Sectors) -> Option<Vec<Segment>> {
-        let mut needed: Sectors = size;
+    /// Return the number of sectors allocated and the allocated segments.
+    pub fn alloc_space(&mut self, size: Sectors) -> (Sectors, Vec<Segment>) {
+        let mut needed = size;
         let mut segs = Vec::new();
 
-        if self.avail_space() < size {
-            return None;
-        }
-
-        for mut bd in self.block_devs.iter_mut() {
+        for mut bd in &mut self.block_devs {
             if needed == Sectors(0) {
                 break;
             }
 
             let (gotten, r_segs) = bd.request_space(needed);
             segs.extend(r_segs);
+            assert!(gotten <= needed);
             needed = needed - gotten;
         }
 
-        assert_eq!(needed, Sectors(0));
-
-        Some(segs)
+        (size - needed, segs)
     }
 
     pub fn devnodes(&self) -> Vec<PathBuf> {

@@ -38,9 +38,7 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
                                  MIN_MDA_SECTORS,
                                  false)
             .unwrap();
-    let total_blockdev_size = initialized
-        .iter()
-        .fold(Sectors(0), |s, i| s + i.avail_range().length);
+    let total_blockdev_size: Sectors = initialized.iter().map(|i| i.avail_range().length).sum();
 
     let segments = initialized
         .iter()

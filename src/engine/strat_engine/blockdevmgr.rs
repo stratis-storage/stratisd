@@ -115,7 +115,7 @@ impl BlockDevMgr {
 
             let (gotten, r_segs) = bd.request_space(needed);
             segs.extend(r_segs);
-            needed = needed - gotten;
+            needed -= gotten;
         }
 
         assert_eq!(needed, Sectors(0));

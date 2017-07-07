@@ -228,7 +228,7 @@ impl RangeAllocator {
             self.insert_ranges(&[used_range])
                 .expect("available ranges must be insertable");
 
-            needed = needed - to_use;
+            needed -= to_use;
         }
 
         (amount - needed, segs)

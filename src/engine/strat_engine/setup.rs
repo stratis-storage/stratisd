@@ -98,11 +98,6 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<PathBuf>>> {
 /// Returns None if no metadata found for this pool.
 pub fn get_metadata(pool_uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<Option<PoolSave>> {
 
-    // No device nodes means no metadata
-    if devnodes.is_empty() {
-        return Ok(None);
-    }
-
     // Get pairs of device nodes and matching BDAs
     // If no BDA, or BDA UUID does not match pool UUID, skip.
     // If there is an error reading the BDA, error. There could have been

@@ -12,23 +12,28 @@ use std::io::prelude::*;
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 
+use nix::sys::statvfs::vfs::Statvfs;
 use nix::unistd::fsync;
 use serde_json;
 
 use devicemapper::{DM, LinearDev, Segment};
 
+use super::super::consts::IEC::Mi;
 use super::super::engine::HasUuid;
 use super::super::errors::EngineResult;
 use super::super::types::{FilesystemUuid, PoolUuid};
 
+use super::blockdevmgr::BlockDevMgr;
 use super::engine::DEV_PATH;
-use super::filesystem::{create_fs, mount_fs, unmount_fs, StratFilesystem};
+use super::filesystem::{create_fs, grow_fs, mount_fs, unmount_fs, StratFilesystem};
 use super::serde_structs::{FilesystemSave, Recordable};
 
 // TODO: Monitor fs size and extend linear and fs if needed
 // TODO: Document format of stuff on MDV in SWDD (currently ad-hoc)
 
 const FILESYSTEM_DIR: &'static str = "filesystems";
+
+const MIN_MDV_AVAIL_BYTES: u64 = 4 * Mi;
 
 #[derive(Debug)]
 pub struct MetadataVol {
@@ -113,7 +118,7 @@ impl MetadataVol {
     }
 
     /// Check the current state of the MDV.
-    pub fn check(&self) -> EngineResult<()> {
+    pub fn check(&mut self, block_devs: &mut BlockDevMgr) -> EngineResult<()> {
         for dir_e in try!(read_dir(self.mount_pt.join(FILESYSTEM_DIR))) {
             let dir_e = try!(dir_e);
 
@@ -127,6 +132,21 @@ impl MetadataVol {
                                err.description())
                     }
                     Ok(_) => debug!("Cleaning up temp file {:?}", dir_e.path()),
+                }
+            }
+        }
+
+        let fsinfo = try!(Statvfs::for_path(&self.mount_pt));
+        let avail_bytes = fsinfo.f_bsize * fsinfo.f_bavail;
+        if avail_bytes < MIN_MDV_AVAIL_BYTES {
+            // Double the size
+            let added_space = try!(self.dev.size());
+            let new_space = block_devs.alloc_space(added_space);
+            match new_space {
+                None => debug!("Could not alloc {} sectors to extend MDV!", added_space),
+                Some(space) => {
+                    try!(self.dev.extend(space));
+                    try!(grow_fs(&self.mount_pt));
                 }
             }
         }

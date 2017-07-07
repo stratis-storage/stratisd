@@ -153,6 +153,21 @@ pub fn create_fs(dev_path: &Path) -> EngineResult<()> {
     Ok(())
 }
 
+pub fn grow_fs(dev_path: &Path) -> EngineResult<()> {
+
+    debug!("Grow filesystem for : {:?}", dev_path);
+    let output = try!(Command::new("xfs_growfs").arg(&dev_path).output());
+
+    if output.status.success() {
+        debug!("Grew xfs filesystem on {:?}", dev_path)
+    } else {
+        let message = String::from_utf8_lossy(&output.stderr);
+        debug!("stderr: {}", message);
+        return Err(EngineError::Engine(ErrorEnum::Error, message.into()));
+    }
+    Ok(())
+}
+
 pub fn mount_fs(dev_path: &Path, mount_point: &Path) -> EngineResult<()> {
 
     debug!("Mount filesystem {:?} on : {:?}", dev_path, mount_point);

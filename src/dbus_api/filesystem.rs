@@ -98,7 +98,7 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Bool(false);
 
     let filesystem_path = m.tree
-        .get(&object_path)
+        .get(object_path)
         .expect("implicit argument must be in tree");
     let filesystem_data = get_data!(filesystem_path; default_return; return_message);
 
@@ -147,7 +147,7 @@ fn get_filesystem_property<F>(i: &mut IterAppend,
     let object_path = p.path.get_name();
 
     let filesystem_path = p.tree
-        .get(&object_path)
+        .get(object_path)
         .expect("tree must contain implicit argument");
     let filesystem_data = try!(ref_ok_or(filesystem_path.get_data(),
                                          MethodErr::failed(&format!("no data for object path {}",

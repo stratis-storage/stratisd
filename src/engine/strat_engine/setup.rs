@@ -111,15 +111,11 @@ pub fn get_metadata(pool_uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<O
     let mut bdas = Vec::new();
     for devnode in devnodes {
         let bda = try!(BDA::load(&mut try!(OpenOptions::new().read(true).open(devnode))));
-        if bda.is_none() {
-            continue;
+        if let Some(bda) = bda {
+            if *bda.pool_uuid() == pool_uuid {
+                bdas.push((devnode, bda));
+            }
         }
-        let bda = bda.expect("unreachable if bda is None");
-
-        if *bda.pool_uuid() != pool_uuid {
-            continue;
-        }
-        bdas.push((devnode, bda));
     }
 
     // We may have had no devices with BDAs for this pool, so return if no BDAs.

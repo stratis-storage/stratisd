@@ -12,6 +12,7 @@ use std::io::prelude::*;
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 
+use nix::mount::{MsFlags, mount, umount};
 use nix::unistd::fsync;
 use serde_json;
 
@@ -22,7 +23,7 @@ use super::super::errors::EngineResult;
 use super::super::types::{FilesystemUuid, PoolUuid};
 
 use super::engine::DEV_PATH;
-use super::filesystem::{create_fs, mount_fs, unmount_fs, StratFilesystem};
+use super::filesystem::{create_fs, StratFilesystem};
 use super::serde_structs::{FilesystemSave, Recordable};
 
 // TODO: Monitor fs size and extend linear and fs if needed
@@ -54,7 +55,11 @@ impl MetadataVol {
             }
         }
 
-        try!(mount_fs(&try!(dev.devnode()), &mount_pt));
+        try!(mount(Some(&try!(dev.devnode())),
+                   &mount_pt,
+                   Some("xfs"),
+                   MsFlags::empty(),
+                   None as Option<&str>));
 
         if let Err(err) = create_dir(&mount_pt.join(FILESYSTEM_DIR)) {
             if err.kind() != ErrorKind::AlreadyExists {
@@ -162,7 +167,7 @@ impl MetadataVol {
 
     /// Tear down a Metadata Volume.
     pub fn teardown(self, dm: &DM) -> EngineResult<()> {
-        try!(unmount_fs(&self.mount_pt, &[] as &[&str]));
+        try!(umount(&self.mount_pt));
         try!(self.dev.teardown(dm));
 
         Ok(())

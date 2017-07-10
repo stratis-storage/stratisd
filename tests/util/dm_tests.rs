@@ -7,6 +7,7 @@
 
 extern crate devicemapper;
 extern crate libstratis;
+extern crate nix;
 extern crate tempdir;
 extern crate uuid;
 
@@ -14,6 +15,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
 
+use self::nix::mount::{MsFlags, MNT_DETACH, mount, umount2};
 use self::tempdir::TempDir;
 use self::uuid::Uuid;
 
@@ -25,7 +27,7 @@ use self::devicemapper::{ThinDev, ThinDevId, ThinPoolDev};
 
 use libstratis::engine::strat_engine::blockdevmgr::{initialize, resolve_devices};
 use libstratis::engine::strat_engine::device::{blkdev_size, wipe_sectors};
-use libstratis::engine::strat_engine::filesystem::{create_fs, mount_fs, unmount_fs};
+use libstratis::engine::strat_engine::filesystem::create_fs;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 
 
@@ -107,7 +109,12 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
     create_fs(&thin_dev.devnode().unwrap()).unwrap();
 
     let tmp_dir = TempDir::new("stratis_testing").unwrap();
-    mount_fs(&thin_dev.devnode().unwrap(), tmp_dir.path()).unwrap();
+    mount(Some(&thin_dev.devnode().unwrap()),
+          tmp_dir.path(),
+          Some("xfs"),
+          MsFlags::empty(),
+          None as Option<&str>)
+            .unwrap();
     for i in 0..100 {
         let file_path = tmp_dir.path().join(format!("stratis_test{}.txt", i));
         writeln!(&OpenOptions::new()
@@ -118,9 +125,9 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
                  "data")
                 .unwrap();
     }
-    // The -d (detach-loop) is passed for both loopback and real devs,
+    // The MNT_DETACH flags is passed for both loopback and real devs,
     // it helps with loopback devs and does no harm for real devs.
-    unmount_fs(tmp_dir.path(), &["-d"]).unwrap();
+    umount2(tmp_dir.path(), MNT_DETACH).unwrap();
     thin_dev.teardown(&dm).unwrap();
     thinpool_dev.teardown(&dm).unwrap();
 }

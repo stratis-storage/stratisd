@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::error::Error;
-use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -139,43 +138,6 @@ pub fn create_fs(dev_path: &Path) -> EngineResult<()> {
 
     if output.status.success() {
         debug!("Created xfs filesystem on {:?}", dev_path)
-    } else {
-        let message = String::from_utf8_lossy(&output.stderr);
-        debug!("stderr: {}", message);
-        return Err(EngineError::Engine(ErrorEnum::Error, message.into()));
-    }
-    Ok(())
-}
-
-pub fn mount_fs(dev_path: &Path, mount_point: &Path) -> EngineResult<()> {
-
-    debug!("Mount filesystem {:?} on : {:?}", dev_path, mount_point);
-    let output = try!(Command::new("mount")
-                          .arg(&dev_path)
-                          .arg(mount_point)
-                          .output());
-
-    if output.status.success() {
-        debug!("Mounted filesystem on {:?}", mount_point)
-    } else {
-        let message = String::from_utf8_lossy(&output.stderr);
-        debug!("stderr: {}", message);
-        return Err(EngineError::Engine(ErrorEnum::Error, message.into()));
-    }
-    Ok(())
-}
-
-pub fn unmount_fs<I, S>(mount_point: &Path, flags: I) -> EngineResult<()>
-    where I: IntoIterator<Item = S>,
-          S: AsRef<OsStr>
-{
-    debug!("Unmount filesystem {:?}", mount_point);
-
-    let mut command = Command::new("umount");
-    let output = try!(command.arg(mount_point).args(flags).output());
-
-    if output.status.success() {
-        debug!("Unmounted filesystem {:?}", mount_point)
     } else {
         let message = String::from_utf8_lossy(&output.stderr);
         debug!("stderr: {}", message);

@@ -305,7 +305,7 @@ impl StratPool {
         #![allow(match_same_arms)]
         let dm = DM::new().expect("Could not get DM handle");
 
-        if let Err(e) = self.mdv.check() {
+        if let Err(e) = self.mdv.check(&mut self.block_devs) {
             error!("MDV error: {}", e);
             return;
         }

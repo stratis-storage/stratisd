@@ -113,30 +113,24 @@ pub fn get_metadata(pool_uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<O
         }
     }
 
-    // We may have had no devices with BDAs for this pool, so return if no BDAs.
-    if bdas.is_empty() {
-        return Ok(None);
-    }
-
-    // Get a most recent BDA
-    let &(_, ref most_recent_bda) = bdas.iter()
-        .max_by_key(|p| p.1.last_update_time())
-        .expect("bdas is not empty, must have a max");
-
     // Most recent time should never be None if this was a properly
     // created pool; this allows for the method to be called in other
     // circumstances.
-    let most_recent_time = most_recent_bda.last_update_time();
-    if most_recent_time.is_none() {
-        return Ok(None);
-    }
+    let most_recent_time = {
+        match bdas.iter()
+                  .filter_map(|&(_, ref bda)| bda.last_update_time())
+                  .max() {
+            Some(time) => time,
+            None => return Ok(None),
+        }
+    };
 
     // Try to read from all available devnodes that could contain most
     // recent metadata. In the event of errors, continue to try until all are
     // exhausted.
     for &(devnode, ref bda) in
         bdas.iter()
-            .filter(|&&(_, ref bda)| bda.last_update_time() == most_recent_time) {
+            .filter(|&&(_, ref bda)| bda.last_update_time() == Some(most_recent_time)) {
 
         let poolsave = OpenOptions::new()
             .read(true)

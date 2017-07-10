@@ -98,11 +98,6 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<PathBuf>>> {
 /// Returns None if no metadata found for this pool.
 pub fn get_metadata(pool_uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<Option<PoolSave>> {
 
-    // No device nodes means no metadata
-    if devnodes.is_empty() {
-        return Ok(None);
-    }
-
     // Get pairs of device nodes and matching BDAs
     // If no BDA, or BDA UUID does not match pool UUID, skip.
     // If there is an error reading the BDA, error. There could have been
@@ -111,57 +106,42 @@ pub fn get_metadata(pool_uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<O
     let mut bdas = Vec::new();
     for devnode in devnodes {
         let bda = try!(BDA::load(&mut try!(OpenOptions::new().read(true).open(devnode))));
-        if bda.is_none() {
-            continue;
+        if let Some(bda) = bda {
+            if *bda.pool_uuid() == pool_uuid {
+                bdas.push((devnode, bda));
+            }
         }
-        let bda = bda.expect("unreachable if bda is None");
-
-        if *bda.pool_uuid() != pool_uuid {
-            continue;
-        }
-        bdas.push((devnode, bda));
     }
-
-    // We may have had no devices with BDAs for this pool, so return if no BDAs.
-    if bdas.is_empty() {
-        return Ok(None);
-    }
-
-    // Get a most recent BDA
-    let &(_, ref most_recent_bda) = bdas.iter()
-        .max_by_key(|p| p.1.last_update_time())
-        .expect("bdas is not empty, must have a max");
 
     // Most recent time should never be None if this was a properly
     // created pool; this allows for the method to be called in other
     // circumstances.
-    let most_recent_time = most_recent_bda.last_update_time();
-    if most_recent_time.is_none() {
-        return Ok(None);
-    }
+    let most_recent_time = {
+        match bdas.iter()
+                  .filter_map(|&(_, ref bda)| bda.last_update_time())
+                  .max() {
+            Some(time) => time,
+            None => return Ok(None),
+        }
+    };
 
     // Try to read from all available devnodes that could contain most
     // recent metadata. In the event of errors, continue to try until all are
     // exhausted.
     for &(devnode, ref bda) in
         bdas.iter()
-            .filter(|p| p.1.last_update_time() == most_recent_time) {
+            .filter(|&&(_, ref bda)| bda.last_update_time() == Some(most_recent_time)) {
 
-        let f = OpenOptions::new().read(true).open(devnode);
-        if f.is_err() {
-            continue;
-        }
-        let mut f = f.expect("f is not err");
+        let poolsave = OpenOptions::new()
+            .read(true)
+            .open(devnode)
+            .ok()
+            .and_then(|mut f| bda.load_state(&mut f).ok())
+            .and_then(|opt| opt)
+            .and_then(|data| serde_json::from_slice(&data).ok());
 
-        if let Ok(Some(data)) = bda.load_state(&mut f) {
-            let json: serde_json::Result<PoolSave> = serde_json::from_slice(&data);
-            if let Ok(pool) = json {
-                return Ok(Some(pool));
-            } else {
-                continue;
-            }
-        } else {
-            continue;
+        if poolsave.is_some() {
+            return Ok(poolsave);
         }
     }
 
@@ -195,10 +175,9 @@ pub fn get_blockdevs(pool_save: &PoolSave, devnodes: &[PathBuf]) -> EngineResult
         let device = try!(Device::from_str(&dev.to_string_lossy()));
 
         // If we've seen this device already, skip it.
-        if devices.contains(&device) {
+        if !devices.insert(device) {
             continue;
         }
-        devices.insert(device);
 
         let bda = try!(BDA::load(&mut try!(OpenOptions::new().read(true).open(dev))));
         let bda = try!(bda.ok_or(EngineError::Engine(ErrorEnum::NotFound,

@@ -128,20 +128,16 @@ impl Recordable<FilesystemSave> for StratFilesystem {
     }
 }
 
-pub fn create_fs(dev_path: &Path) -> EngineResult<()> {
-
-    debug!("Create filesystem for : {:?}", dev_path);
-    let output = try!(Command::new("mkfs.xfs")
-                          .arg("-f")
-                          .arg(&dev_path)
-                          .output());
-
-    if output.status.success() {
-        debug!("Created xfs filesystem on {:?}", dev_path)
+/// Create a filesystem on devnode.
+pub fn create_fs(devnode: &Path) -> EngineResult<()> {
+    if try!(Command::new("mkfs.xfs")
+                .arg("-f")
+                .arg(&devnode)
+                .status())
+               .success() {
+        Ok(())
     } else {
-        let message = String::from_utf8_lossy(&output.stderr);
-        debug!("stderr: {}", message);
-        return Err(EngineError::Engine(ErrorEnum::Error, message.into()));
+        let err_msg = format!("Failed to create new filesystem at {:?}", devnode);
+        Err(EngineError::Engine(ErrorEnum::Error, err_msg))
     }
-    Ok(())
 }

@@ -26,11 +26,11 @@ use libstratis::engine::types::Redundancy;
 /// than are initially allocated to the pool, the pool must have been expanded.
 pub fn test_thinpool_expand(paths: &[&Path]) -> () {
     StratEngine::initialize().unwrap();
-    let mut pool = StratPool::initialize("stratis_test_pool",
-                                         &DM::new().unwrap(),
-                                         paths,
-                                         Redundancy::NONE,
-                                         true)
+    let (mut pool, _) = StratPool::initialize("stratis_test_pool",
+                                              &DM::new().unwrap(),
+                                              paths,
+                                              Redundancy::NONE,
+                                              true)
             .unwrap();
     let &(_, fs_uuid) = pool.create_filesystems(&vec!["stratis_test_filesystem"])
         .unwrap()

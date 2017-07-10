@@ -47,7 +47,7 @@ const INITIAL_MDV_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
 pub struct StratPool {
     name: String,
     pool_uuid: PoolUuid,
-    pub block_devs: BlockDevMgr,
+    block_devs: BlockDevMgr,
     pub filesystems: Table<StratFilesystem>,
     redundancy: Redundancy,
     thin_pool: ThinPool,
@@ -63,7 +63,7 @@ impl StratPool {
                       paths: &[&Path],
                       redundancy: Redundancy,
                       force: bool)
-                      -> EngineResult<StratPool> {
+                      -> EngineResult<(StratPool, Vec<PathBuf>)> {
         let pool_uuid = Uuid::new_v4();
 
         let mut block_mgr =
@@ -129,6 +129,8 @@ impl StratPool {
         let mdv_dev = try!(LinearDev::new(&mdv_name, dm, mdv_regions));
         let mdv = try!(MetadataVol::initialize(&pool_uuid, mdv_dev));
 
+        let devnodes = block_mgr.devnodes();
+
         let mut pool = StratPool {
             name: name.to_owned(),
             pool_uuid: pool_uuid,
@@ -141,7 +143,7 @@ impl StratPool {
 
         try!(pool.write_metadata());
 
-        Ok(pool)
+        Ok((pool, devnodes))
     }
 
     /// Setup a StratPool using its UUID and the list of devnodes it has.

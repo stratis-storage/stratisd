@@ -74,11 +74,10 @@ impl BDA {
     pub fn load<F>(f: &mut F) -> EngineResult<Option<BDA>>
         where F: Read + Seek
     {
-        let header = try!(StaticHeader::setup(f));
-        if header.is_none() {
-            return Ok(None);
-        }
-        let header = header.expect("must have exited if None");
+        let header = match try!(StaticHeader::setup(f)) {
+            Some(header) => header,
+            None => return Ok(None),
+        };
 
         let regions = try!(mda::MDARegions::load(BDA_STATIC_HDR_SIZE, header.mda_size, f));
 

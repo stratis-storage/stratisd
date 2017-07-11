@@ -98,20 +98,25 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<PathBuf>>> {
 /// Returns None if no metadata found for this pool.
 pub fn get_metadata(pool_uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<Option<PoolSave>> {
 
-    // Get pairs of device nodes and matching BDAs
-    // If no BDA, or BDA UUID does not match pool UUID, skip.
-    // If there is an error reading the BDA, error. There could have been
-    // vital information on that BDA, for example, it may have contained
-    // the newest metadata.
-    let mut bdas = Vec::new();
-    for devnode in devnodes {
-        let bda = try!(BDA::load(&mut try!(OpenOptions::new().read(true).open(devnode))));
-        if let Some(bda) = bda {
-            if *bda.pool_uuid() == pool_uuid {
-                bdas.push((devnode, bda));
-            }
-        }
-    }
+    // Get pairs of device nodes and matching BDAs from readable and
+    // valid devices. Skip if no BDA, or BDA UUID does not match pool
+    // UUID.
+    let bdas = devnodes
+        .iter()
+        .filter_map(|devnode| {
+            OpenOptions::new()
+                .read(true)
+                .open(devnode)
+                .ok()
+                .and_then(|mut f| BDA::load(&mut f).ok())
+                .and_then(|opt| opt)
+                .and_then(|bda| if *bda.pool_uuid() == pool_uuid {
+                              Some((devnode, bda))
+                          } else {
+                              None
+                          })
+        })
+        .collect::<Vec<_>>();
 
     // Most recent time should never be None if this was a properly
     // created pool; this allows for the method to be called in other

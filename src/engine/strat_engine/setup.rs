@@ -152,8 +152,13 @@ pub fn get_metadata(pool_uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<O
     Err(EngineError::Engine(ErrorEnum::NotFound, err_str.into()))
 }
 
-/// Get the blockdevs corresponding to this pool.
-pub fn get_blockdevs(pool_save: &PoolSave, devnodes: &[PathBuf]) -> EngineResult<Vec<BlockDev>> {
+/// Get all the blockdevs corresponding to this pool that can be obtained from
+/// this list of devnodes.
+/// Returns an error if the blockdevs obtained do not match the metadata.
+pub fn get_blockdevs(pool_uuid: PoolUuid,
+                     pool_save: &PoolSave,
+                     devnodes: &[PathBuf])
+                     -> EngineResult<Vec<BlockDev>> {
     let segments = pool_save
         .flex_devs
         .meta_dev
@@ -180,21 +185,22 @@ pub fn get_blockdevs(pool_save: &PoolSave, devnodes: &[PathBuf]) -> EngineResult
         }
 
         let bda = try!(BDA::load(&mut try!(OpenOptions::new().read(true).open(dev))));
-        let bda = try!(bda.ok_or(EngineError::Engine(ErrorEnum::NotFound,
-                                                     "no BDA found for Stratis device".into())));
+        if let Some(bda) = bda {
+            if *bda.pool_uuid() == pool_uuid {
+                let actual_size = try!(blkdev_size(&try!(OpenOptions::new().read(true).open(dev))))
+                    .sectors();
 
-        let actual_size = try!(blkdev_size(&try!(OpenOptions::new().read(true).open(dev))))
-            .sectors();
+                // If size of device has changed and is less, then it is
+                // possible that the segments previously allocated for this
+                // blockdev no longer exist. If that is the case,
+                // RangeAllocator::new() will return an error.
+                let allocator =
+                    try!(RangeAllocator::new(actual_size,
+                                             segment_table.get(bda.dev_uuid()).unwrap_or(&vec![])));
 
-        // If size of device has changed and is less, then it is possible
-        // that the segments previously allocated for this blockdev no
-        // longer exist. If that is the case, RangeAllocator::new() will
-        // return an error.
-        let allocator =
-            try!(RangeAllocator::new(actual_size,
-                                     segment_table.get(bda.dev_uuid()).unwrap_or(&vec![])));
-
-        blockdevs.push(BlockDev::new(device, dev.clone(), bda, allocator));
+                blockdevs.push(BlockDev::new(device, dev.clone(), bda, allocator));
+            }
+        }
     }
 
     // Verify that blockdevs found match blockdevs recorded.

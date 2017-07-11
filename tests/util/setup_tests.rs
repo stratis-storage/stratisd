@@ -104,8 +104,8 @@ pub fn test_basic_metadata(paths: &[&Path]) {
     let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
     assert!(pool_save1 == metadata1);
     assert!(pool_save2 == metadata2);
-    let blockdevs1 = get_blockdevs(&pool_save1, devnodes1).unwrap();
-    let blockdevs2 = get_blockdevs(&pool_save2, devnodes2).unwrap();
+    let blockdevs1 = get_blockdevs(uuid1, &pool_save1, devnodes1).unwrap();
+    let blockdevs2 = get_blockdevs(uuid2, &pool_save2, devnodes2).unwrap();
     assert!(blockdevs1.len() == pool_save1.block_devs.len());
     assert!(blockdevs2.len() == pool_save2.block_devs.len());
 
@@ -118,8 +118,8 @@ pub fn test_basic_metadata(paths: &[&Path]) {
     let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
     assert!(pool_save1 == metadata1);
     assert!(pool_save2 == metadata2);
-    let blockdevs1 = get_blockdevs(&pool_save1, devnodes1).unwrap();
-    let blockdevs2 = get_blockdevs(&pool_save2, devnodes2).unwrap();
+    let blockdevs1 = get_blockdevs(uuid1, &pool_save1, devnodes1).unwrap();
+    let blockdevs2 = get_blockdevs(uuid2, &pool_save2, devnodes2).unwrap();
     assert!(blockdevs1.len() == pool_save1.block_devs.len());
     assert!(blockdevs2.len() == pool_save2.block_devs.len());
 }

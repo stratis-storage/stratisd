@@ -153,7 +153,7 @@ impl StratPool {
                                 .ok_or(EngineError::Engine(ErrorEnum::NotFound,
                                                            format!("no metadata for pool {}",
                                                                    uuid))));
-        let blockdevs = try!(get_blockdevs(&metadata, devnodes));
+        let blockdevs = try!(get_blockdevs(uuid, &metadata, devnodes));
 
         let uuid_map: HashMap<DevUuid, Device> = blockdevs
             .iter()

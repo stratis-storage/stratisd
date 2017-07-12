@@ -82,7 +82,7 @@ fn run() -> StratisResult<()> {
 
     builder
         .init()
-        .expect("This is the first and only initialization of the logger; it must succeed.");
+        .expect("This is the first and only initialization of the logger; it must succeed");
 
     let engine: Rc<RefCell<Engine>> = {
         if matches.is_present("sim") {

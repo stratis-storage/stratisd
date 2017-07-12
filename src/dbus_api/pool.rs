@@ -176,7 +176,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                              .expect("'d' originated in the 'devs' D-Bus argument.")
                              .into()
                      });
-            let paths = paths.map(|x| MessageItem::Str(x)).collect();
+            let paths = paths.map(MessageItem::Str).collect();
             let (rc, rs) = ok_message_items();
             return_message.append3(MessageItem::Array(paths, return_sig.into()), rc, rs)
         }

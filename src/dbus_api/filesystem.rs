@@ -31,7 +31,6 @@ use super::util::get_next_arg;
 use super::util::get_parent;
 use super::util::get_uuid;
 use super::util::ok_message_items;
-use super::util::ref_ok_or;
 
 
 pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext,
@@ -149,17 +148,29 @@ fn get_filesystem_property<F>(i: &mut IterAppend,
     let filesystem_path = p.tree
         .get(object_path)
         .expect("tree must contain implicit argument");
-    let filesystem_data = try!(ref_ok_or(filesystem_path.get_data(),
-                                         MethodErr::failed(&format!("no data for object path {}",
-                                                                    &object_path))));
+
+    let filesystem_data = try!(filesystem_path
+                        .get_data()
+                        .as_ref()
+                        .ok_or_else(|| {
+                                        MethodErr::failed(&format!("no data for object path {}",
+                                                                   object_path))
+                                    }));
+
     let pool_path = try!(p.tree
                              .get(&filesystem_data.parent)
                              .ok_or(MethodErr::failed(&format!("no path for parent object path {}",
                                                                &filesystem_data.parent))));
-    let pool_uuid = try!(ref_ok_or(pool_path.get_data(),
-                                   MethodErr::failed(&format!("no data for object path {}",
-                                                              &object_path))))
+
+    let pool_uuid = try!(pool_path
+                        .get_data()
+                        .as_ref()
+                        .ok_or_else(|| {
+                                        MethodErr::failed(&format!("no data for object path {}",
+                                                                   object_path))
+                                    }))
             .uuid;
+
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = try!(engine
                         .get_pool(&pool_uuid)

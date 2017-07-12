@@ -72,23 +72,20 @@ pub fn default_object_path<'a>() -> dbus::Path<'a> {
     dbus::Path::new("/").expect("'/' is guaranteed to be a valid Path.")
 }
 
-/// Similar to Option::ok_or, but unpacks a reference to a reference.
-pub fn ref_ok_or<'a, E, T>(opt: &'a Option<T>, err: E) -> Result<&'a T, E> {
-    match opt {
-        &Some(ref t) => Ok(t),
-        &None => Err(err),
-    }
-}
-
 /// Get the UUID for an object path.
 pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
     let object_path = p.path.get_name();
     let path = p.tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let data = try!(ref_ok_or(path.get_data(),
-                              MethodErr::failed(&format!("no data for object path {}",
-                                                         &object_path))));
+
+    let data = try!(path.get_data()
+                        .as_ref()
+                        .ok_or_else(|| {
+                                        MethodErr::failed(&format!("no data for object path {}",
+                                                                   object_path))
+                                    }));
+
     i.append(MessageItem::Str(format!("{}", data.uuid.simple())));
     Ok(())
 }
@@ -100,9 +97,14 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Resul
     let path = p.tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let data = try!(ref_ok_or(path.get_data(),
-                              MethodErr::failed(&format!("no data for object path {}",
-                                                         &object_path))));
+
+    let data = try!(path.get_data()
+                        .as_ref()
+                        .ok_or_else(|| {
+                                        MethodErr::failed(&format!("no data for object path {}",
+                                                                   object_path))
+                                    }));
+
     i.append(MessageItem::ObjectPath(data.parent.clone()));
     Ok(())
 }

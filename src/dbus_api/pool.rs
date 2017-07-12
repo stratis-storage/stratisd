@@ -34,7 +34,6 @@ use super::util::engine_to_dbus_err;
 use super::util::get_next_arg;
 use super::util::get_uuid;
 use super::util::ok_message_items;
-use super::util::ref_ok_or;
 
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -237,9 +236,15 @@ fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
     let pool_path = p.tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let data = try!(ref_ok_or(pool_path.get_data(),
-                              MethodErr::failed(&format!("no data for object path {}",
-                                                         &object_path))));
+
+    let data = try!(pool_path
+                        .get_data()
+                        .as_ref()
+                        .ok_or_else(|| {
+                                        MethodErr::failed(&format!("no data for object path {}",
+                                                                   object_path))
+                                    }));
+
     i.append(try!(dbus_context
                       .engine
                       .borrow_mut()

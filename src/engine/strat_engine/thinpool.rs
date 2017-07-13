@@ -145,6 +145,11 @@ impl ThinPool {
     pub fn extend_data(&mut self, dm: &DM, segs: Vec<Segment>) -> EngineResult<()> {
         Ok(try!(self.thin_pool.extend_data(dm, segs)))
     }
+
+    /// Extend the thinpool meta data device with new data regions.
+    pub fn extend_meta(&mut self, dm: &DM, segs: Vec<Segment>) -> EngineResult<()> {
+        Ok(try!(self.thin_pool.extend_meta(dm, segs)))
+    }
 }
 
 impl Recordable<ThinPoolDevSave> for ThinPool {

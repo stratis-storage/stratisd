@@ -301,6 +301,21 @@ impl StratPool {
         Ok(extend_size)
     }
 
+    /// Expand the physical space allocated to the pool meta data
+    /// Return the number of Sectors added
+    fn extend_meta(&mut self, dm: &DM, current_size: MetaBlocks) -> EngineResult<Sectors> {
+        // The meta data space should be extended by a multiple of the
+        // META_BLOCK_SIZE, doubling will ensure a proper extend_size.
+        let extend_size = self.extend_size(current_size.sectors());
+        if let Some(new_data_regions) = self.block_devs.alloc_space(extend_size) {
+            try!(self.thin_pool.extend_meta(dm, new_data_regions));
+        } else {
+            return Err(EngineError::Engine(ErrorEnum::Error,
+                                           format!("No free data regions for meta expansion")));
+        }
+        Ok(extend_size)
+    }
+
     pub fn check(&mut self) -> () {
         #![allow(match_same_arms)]
         let dm = DM::new().expect("Could not get DM handle");
@@ -339,7 +354,11 @@ impl StratPool {
                 }
 
                 if usage.used_meta > usage.total_meta - META_LOWATER {
-                    // TODO: Extend meta device
+                    // Request expansion of the space allocated to the meta device
+                    match self.extend_meta(&dm, usage.total_meta) {
+                        Ok(_) => {}
+                        Err(_) => {} // TODO: Take pool offline?
+                    }
                 }
 
                 if usage.used_data > usage.total_data - DATA_LOWATER {

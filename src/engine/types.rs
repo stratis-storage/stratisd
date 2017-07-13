@@ -8,7 +8,7 @@ pub type DevUuid = Uuid;
 pub type FilesystemUuid = Uuid;
 pub type PoolUuid = Uuid;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum RenameAction {
     Identity,
     NoSource,

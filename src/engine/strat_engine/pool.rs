@@ -15,7 +15,7 @@ use uuid::Uuid;
 use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::Device;
 use devicemapper::DM;
-use devicemapper::{DataBlocks, Sectors, Segment};
+use devicemapper::{DataBlocks, MetaBlocks, Sectors, Segment};
 use devicemapper::LinearDev;
 use devicemapper::{ThinDevId, ThinPoolStatus, ThinPoolWorkingStatus};
 
@@ -36,7 +36,7 @@ use super::setup::{get_blockdevs, get_metadata};
 use super::thinpool::ThinPool;
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
-const META_LOWATER: u64 = 512;
+const META_LOWATER: MetaBlocks = MetaBlocks(512);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
 const INITIAL_META_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
 pub const INITIAL_DATA_SIZE: Sectors = Sectors(768 * Mi / SECTOR_SIZE as u64);

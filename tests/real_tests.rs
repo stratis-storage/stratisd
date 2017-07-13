@@ -29,6 +29,7 @@ use util::dm_tests::test_linear_device;
 use util::pool_tests::test_thinpool_expand;
 use util::setup_tests::test_basic_metadata;
 use util::setup_tests::test_initialize;
+use util::setup_tests::test_pool_rename;
 use util::setup_tests::test_setup;
 use util::simple_tests::test_empty_pool;
 use util::simple_tests::test_teardown;
@@ -150,4 +151,9 @@ pub fn real_test_basic_metadata() {
 #[test]
 pub fn real_test_setup() {
     test_with_spec(4, test_setup);
+}
+
+#[test]
+pub fn real_test_pool_rename() {
+    test_with_spec(2, test_pool_rename);
 }

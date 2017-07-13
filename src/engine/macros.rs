@@ -55,31 +55,6 @@ macro_rules! get_pool {
     }
 }
 
-macro_rules! rename_pool {
-    ( $s:ident; $uuid:ident; $new_name:ident ) => {
-        let old_name;
-        if let Some(pool) = $s.pools.get_by_uuid($uuid) {
-            old_name = pool.name().to_owned();
-        } else {
-            return Ok(RenameAction::NoSource);
-        };
-
-        if old_name == $new_name {
-            return Ok(RenameAction::Identity);
-        }
-
-        if $s.pools.contains_name($new_name) {
-            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
-        }
-
-        let mut pool = $s.pools.remove_by_uuid($uuid)
-            .expect("Must succeed since $s.pools.get_by_uuid() returned a value.");
-        pool.rename($new_name);
-        $s.pools.insert(pool);
-        return Ok(RenameAction::Renamed);
-    }
-}
-
 macro_rules! get_filesystem {
     ( $s:ident; $uuid:ident ) => {
         $s.filesystems.get_mut_by_uuid($uuid).map(|p| p as &mut Filesystem)

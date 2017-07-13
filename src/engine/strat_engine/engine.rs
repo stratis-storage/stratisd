@@ -109,7 +109,32 @@ impl Engine for StratEngine {
     }
 
     fn rename_pool(&mut self, uuid: &PoolUuid, new_name: &str) -> EngineResult<RenameAction> {
-        rename_pool!{self; uuid; new_name}
+        let old_name = match self.pools.get_by_uuid(uuid) {
+            Some(pool) => pool.name().to_owned(),
+            None => return Ok(RenameAction::NoSource),
+        };
+
+        if old_name == new_name {
+            return Ok(RenameAction::Identity);
+        }
+
+        if self.pools.contains_name(new_name) {
+            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, new_name.into()));
+        }
+
+        let mut pool = self.pools
+            .remove_by_uuid(uuid)
+            .expect("Must succeed since self.pools.get_by_uuid() returned a value.");
+        pool.rename(new_name);
+
+        if let Err(err) = pool.write_metadata() {
+            pool.rename(&old_name);
+            self.pools.insert(pool);
+            Err(err)
+        } else {
+            self.pools.insert(pool);
+            Ok(RenameAction::Renamed)
+        }
     }
 
     fn get_pool(&mut self, uuid: &PoolUuid) -> Option<&mut Pool> {

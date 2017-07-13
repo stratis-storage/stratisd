@@ -104,12 +104,16 @@ impl ThinPool {
     }
 
     /// Make a new thin device.
-    pub fn make_thin_device(&mut self, dm: &DM, name: &str) -> EngineResult<ThinDev> {
+    pub fn make_thin_device(&mut self,
+                            dm: &DM,
+                            name: &str,
+                            size: Option<Sectors>)
+                            -> EngineResult<ThinDev> {
         Ok(try!(ThinDev::new(name,
                              dm,
                              &self.thin_pool,
                              try!(self.id_gen.new_id()),
-                             Bytes(IEC::Ti).sectors())))
+                             size.unwrap_or(Bytes(IEC::Ti).sectors()))))
     }
 
     /// Setup a previously constructed thin device.

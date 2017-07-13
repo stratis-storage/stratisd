@@ -277,7 +277,7 @@ impl StratPool {
     }
 
     /// Write current metadata to pool members.
-    fn write_metadata(&mut self) -> EngineResult<()> {
+    pub fn write_metadata(&mut self) -> EngineResult<()> {
         let data = try!(serde_json::to_string(&try!(self.record())));
         self.block_devs.save_state(data.as_bytes())
     }

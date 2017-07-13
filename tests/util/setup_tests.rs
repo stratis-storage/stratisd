@@ -14,6 +14,7 @@ use std::path::Path;
 use self::uuid::Uuid;
 
 use libstratis::engine::Engine;
+use libstratis::engine::types::RenameAction;
 use libstratis::engine::strat_engine::blockdevmgr::{initialize, resolve_devices};
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 use libstratis::engine::strat_engine::serde_structs::Recordable;
@@ -154,5 +155,24 @@ pub fn test_setup(paths: &[&Path]) {
     assert!(engine.get_pool(&uuid1).is_some());
     assert!(engine.get_pool(&uuid2).is_some());
 
+    engine.teardown().unwrap();
+}
+
+/// Verify that a pool rename causes the pool metadata to get the new name.
+pub fn test_pool_rename(paths: &[&Path]) {
+    let mut engine = StratEngine::initialize().unwrap();
+
+    let name1 = "name1";
+    let (uuid1, _) = engine.create_pool(&name1, paths, None, false).unwrap();
+
+    let name2 = "name2";
+    let action = engine.rename_pool(&uuid1, name2).unwrap();
+
+    assert_eq!(action, RenameAction::Renamed);
+    engine.teardown().unwrap();
+
+    let mut engine = StratEngine::initialize().unwrap();
+    let pool_name: String = engine.get_pool(&uuid1).unwrap().name().into();
+    assert_eq!(pool_name, name2);
     engine.teardown().unwrap();
 }

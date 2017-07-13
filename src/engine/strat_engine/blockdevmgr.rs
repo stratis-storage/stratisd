@@ -93,11 +93,6 @@ impl BlockDevMgr {
         Ok(try!(wipe_blockdevs(self.block_devs)))
     }
 
-    // Unused space left on blockdevs
-    pub fn avail_space(&self) -> Sectors {
-        self.block_devs.iter().map(|bd| bd.available()).sum()
-    }
-
     /// If available space is less than size, return None, else return
     /// the segments allocated.
     pub fn alloc_space(&mut self, size: Sectors) -> Option<Vec<Segment>> {
@@ -164,6 +159,32 @@ impl BlockDevMgr {
             let err_msg = "Failed to save metadata to even one device in pool";
             Err(EngineError::Engine(ErrorEnum::Error, err_msg.into()))
         }
+    }
+
+    // SIZE methods
+
+    /// The number of sectors not allocated for any purpose.
+    pub fn avail_space(&self) -> Sectors {
+        self.block_devs.iter().map(|bd| bd.available()).sum()
+    }
+
+    /// The current capacity of all the blockdevs.
+    /// self.current_capacity() > self.avail_space() because some sectors
+    /// are certainly allocated for Stratis metadata
+    pub fn current_capacity(&self) -> Sectors {
+        self.block_devs
+            .iter()
+            .map(|b| b.current_capacity())
+            .sum()
+    }
+
+    /// The number of sectors given over to Stratis metadata
+    /// self.current_capacity() - self.metadata_size() >= self.avail_space()
+    pub fn metadata_size(&self) -> Sectors {
+        self.block_devs
+            .iter()
+            .map(|bd| bd.metadata_size())
+            .sum()
     }
 }
 

@@ -456,6 +456,19 @@ impl Pool for StratPool {
     fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
         get_filesystem!(self; uuid)
     }
+
+    fn total_physical_size(&self) -> Sectors {
+        self.block_devs.current_capacity()
+    }
+
+    fn total_physical_used(&self) -> EngineResult<Sectors> {
+        self.thin_pool
+            .total_physical_used()
+            .and_then(|v| {
+                          Ok(v + self.block_devs.metadata_size() +
+                             self.mdv.segments().iter().map(|s| s.length).sum())
+                      })
+    }
 }
 
 impl HasUuid for StratPool {

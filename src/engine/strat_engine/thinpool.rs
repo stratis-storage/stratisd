@@ -8,7 +8,7 @@ use std::process::Command;
 
 use devicemapper;
 use devicemapper::{Bytes, DM, DataBlocks, DmError, DmResult, LinearDev, Sectors, Segment, ThinDev,
-                   ThinDevId, ThinPoolDev};
+                   ThinDevId, ThinPoolDev, ThinPoolStatus};
 
 use super::super::consts::IEC;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -146,6 +146,31 @@ impl ThinPool {
     /// Extend the thinpool with new data regions.
     pub fn extend_data(&mut self, dm: &DM, segs: Vec<Segment>) -> EngineResult<()> {
         Ok(try!(self.thin_pool.extend_data(dm, segs)))
+    }
+
+    /// The number of physical sectors in use, that is, unavailable for storage
+    /// of additional user data, by this pool.
+    // This includes all the sectors being held as spares for the meta device,
+    // all the sectors allocated to the meta data device, and all the sectors
+    // in use on the data device.
+    pub fn total_physical_used(&self) -> EngineResult<Sectors> {
+        let data_dev_used = match try!(self.thin_pool.status(&try!(DM::new()))) {
+            ThinPoolStatus::Good(_, usage) => *usage.used_data * DATA_BLOCK_SIZE,
+            _ => {
+                let err_msg = "thin pool failed, could not obtain usage";
+                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+            }
+        };
+
+        let spare_total = self.spare_segments().iter().map(|s| s.length).sum();
+        let meta_dev_total = self.thin_pool
+            .meta_dev()
+            .segments()
+            .iter()
+            .map(|s| s.length)
+            .sum();
+
+        Ok(data_dev_used + spare_total + meta_dev_total)
     }
 }
 

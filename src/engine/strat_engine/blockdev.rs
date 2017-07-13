@@ -54,7 +54,7 @@ impl BlockDev {
 
     /// List the available-for-upper-layer-use range in this blockdev.
     pub fn avail_range(&self) -> Segment {
-        let start = self.bda.size();
+        let start = self.metadata_size();
         let size = self.current_capacity();
         // Blockdev size is at least MIN_DEV_SIZE, so this can fail only if
         // size of metadata area exceeds 1 GiB. Initial metadata area size
@@ -73,28 +73,9 @@ impl BlockDev {
         self.bda.pool_uuid()
     }
 
-    /// The size of the device as recorded in the metadata.
-    pub fn recorded_size(&self) -> Sectors {
-        self.bda.dev_size()
-    }
-
-    /// The actual size of the device now.
-    pub fn current_capacity(&self) -> Sectors {
-        self.used.capacity()
-    }
-
     /// Last time metadata was written to this device.
     pub fn last_update_time(&self) -> Option<&Timespec> {
         self.bda.last_update_time()
-    }
-
-    pub fn available(&self) -> Sectors {
-        self.used.available()
-    }
-
-    /// The maximum size of variable length metadata that can be accommodated.
-    pub fn max_metadata_size(&self) -> Sectors {
-        self.bda.max_data_size()
     }
 
     // Find some sector ranges that could be allocated. If more
@@ -105,6 +86,35 @@ impl BlockDev {
          segs.iter()
              .map(|&(start, len)| Segment::new(self.dev, start, len))
              .collect())
+    }
+
+    // ALL SIZE METHODS
+
+    /// The size of the device as recorded in the metadata.
+    pub fn recorded_size(&self) -> Sectors {
+        self.bda.dev_size()
+    }
+
+    /// The actual size of the device now.
+    pub fn current_capacity(&self) -> Sectors {
+        self.used.capacity()
+    }
+
+    /// The number of Sectors on this device used by Stratis for metadata
+    pub fn metadata_size(&self) -> Sectors {
+        self.bda.size()
+    }
+
+    /// The number of Sectors on this device not allocated for any purpose.
+    /// self.current_capacity() - self.metadata_size() >= self.available()
+    pub fn available(&self) -> Sectors {
+        self.used.available()
+    }
+
+    /// The maximum size of variable length metadata that can be accommodated.
+    /// self.max_metadata_size() < self.metadata_size()
+    pub fn max_metadata_size(&self) -> Sectors {
+        self.bda.max_data_size()
     }
 }
 

@@ -405,7 +405,8 @@ impl Pool for StratPool {
                                                                   uuid,
                                                                   name,
                                                                   &dm,
-                                                                  &mut self.thin_pool));
+                                                                  &mut self.thin_pool,
+                                                                  None));
             try!(self.mdv.save_fs(&new_filesystem));
             self.filesystems.insert(new_filesystem);
             result.push((**name, uuid));

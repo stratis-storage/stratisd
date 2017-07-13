@@ -35,10 +35,11 @@ impl StratFilesystem {
                       fs_id: FilesystemUuid,
                       name: &str,
                       dm: &DM,
-                      thin_pool: &mut ThinPool)
+                      thin_pool: &mut ThinPool,
+                      size: Option<Sectors>)
                       -> EngineResult<StratFilesystem> {
         let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fs_id));
-        let thin_dev = try!(thin_pool.make_thin_device(dm, &device_name));
+        let thin_dev = try!(thin_pool.make_thin_device(dm, &device_name, size));
         let fs = StratFilesystem {
             fs_id: fs_id,
             name: name.to_owned(),

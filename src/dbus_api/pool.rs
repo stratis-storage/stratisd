@@ -22,7 +22,7 @@ use dbus::tree::PropInfo;
 
 use uuid::Uuid;
 
-use engine::RenameAction;
+use engine::{Pool, RenameAction};
 
 use super::filesystem::create_dbus_filesystem;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
@@ -230,29 +230,42 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+/// Get a pool property and place it on the D-Bus. The property is
+/// found by means of the getter method which takes a reference to a
+/// Pool and obtains the property from the pool.
+fn get_pool_property<F>(i: &mut IterAppend,
+                        p: &PropInfo<MTFn<TData>, TData>,
+                        getter: F)
+                        -> Result<(), MethodErr>
+    where F: Fn(&Pool) -> Result<MessageItem, MethodErr>
+{
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
     let pool_path = p.tree
         .get(object_path)
         .expect("implicit argument must be in tree");
 
-    let data = try!(pool_path
+    let pool_uuid = try!(pool_path
                         .get_data()
                         .as_ref()
                         .ok_or_else(|| {
                                         MethodErr::failed(&format!("no data for object path {}",
                                                                    object_path))
-                                    }));
+                                    }))
+            .uuid;
 
-    i.append(try!(dbus_context
-                      .engine
-                      .borrow_mut()
-                      .get_pool(&data.uuid)
-                      .map(|x| MessageItem::Str(x.name().to_owned()))
-                      .ok_or(MethodErr::failed(&format!("no name for pool with uuid {}",
-                                                        &data.uuid)))));
+    let mut engine = dbus_context.engine.borrow_mut();
+    let pool = try!(engine
+                        .get_pool(&pool_uuid)
+                        .ok_or(MethodErr::failed(&format!("no pool corresponding to uuid {}",
+                                                          &pool_uuid))));
+
+    i.append(try!(getter(pool)));
     Ok(())
+}
+
+fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+    get_pool_property(i, p, |p| Ok(MessageItem::Str(p.name().to_owned())))
 }
 
 pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,

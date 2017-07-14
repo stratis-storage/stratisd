@@ -35,7 +35,8 @@ use super::serde_structs::{FilesystemSave, FlexDevsSave, PoolSave, Recordable};
 use super::setup::{get_blockdevs, get_metadata};
 use super::thinpool::ThinPool;
 
-pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
+pub use super::thinpool::DATA_BLOCK_SIZE;
+
 const META_LOWATER: MetaBlocks = MetaBlocks(512);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
 const INITIAL_META_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);

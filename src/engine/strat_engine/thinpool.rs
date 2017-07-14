@@ -18,6 +18,8 @@ use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, format_flex_name,
                       format_thinpool_name};
 use super::serde_structs::{Recordable, ThinPoolDevSave};
 
+pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
+
 /// A ThinPool struct contains the thinpool itself, but also the spare
 /// segments for its metadata device.
 #[derive(Debug)]

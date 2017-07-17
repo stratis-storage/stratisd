@@ -147,6 +147,7 @@ class FilesystemSpec(InterfaceSpec):
         """
         Names of the properties of the Filesystem interface.
         """
+        Devnode = "Devnode"
         Name = "Name"
         Pool = "Pool"
         Uuid = "Uuid"
@@ -162,6 +163,7 @@ class FilesystemSpec(InterfaceSpec):
     XFORMERS = _xformers(INPUT_SIGS)
 
     PROPERTY_SIGS = {
+       PropertyNames.Devnode: "s",
        PropertyNames.Name: "s",
        PropertyNames.Pool: "o",
        PropertyNames.Uuid: "s",

@@ -239,6 +239,8 @@ class PoolSpec(InterfaceSpec):
         Names of the properties of the manager interface.
         """
         Name = "Name"
+        TotalPhysicalSize = "TotalPhysicalSize"
+        TotalPhysicalUsed = "TotalPhysicalUsed"
         Uuid = "Uuid"
 
     INTERFACE_NAME = 'org.storage.stratis1.pool'
@@ -260,6 +262,8 @@ class PoolSpec(InterfaceSpec):
 
     PROPERTY_SIGS = {
        PropertyNames.Name: "s",
+       PropertyNames.TotalPhysicalSize: "s",
+       PropertyNames.TotalPhysicalUsed: "s",
        PropertyNames.Uuid: "s",
     }
 

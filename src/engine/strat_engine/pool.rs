@@ -15,7 +15,7 @@ use uuid::Uuid;
 use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::Device;
 use devicemapper::DM;
-use devicemapper::{DataBlocks, MetaBlocks, Sectors, Segment};
+use devicemapper::{Sectors, Segment};
 use devicemapper::LinearDev;
 use devicemapper::{ThinDevId, ThinPoolStatus, ThinPoolWorkingStatus};
 
@@ -33,12 +33,10 @@ use super::mdv::MetadataVol;
 use super::metadata::MIN_MDA_SECTORS;
 use super::serde_structs::{FilesystemSave, FlexDevsSave, PoolSave, Recordable};
 use super::setup::{get_blockdevs, get_metadata};
-use super::thinpool::ThinPool;
+use super::thinpool::{META_LOWATER, ThinPool};
 
-pub use super::thinpool::DATA_BLOCK_SIZE;
+pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER};
 
-const META_LOWATER: MetaBlocks = MetaBlocks(512);
-pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
 const INITIAL_META_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
 pub const INITIAL_DATA_SIZE: Sectors = Sectors(768 * Mi / SECTOR_SIZE as u64);
 const INITIAL_MDV_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);

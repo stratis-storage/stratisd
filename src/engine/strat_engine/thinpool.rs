@@ -7,8 +7,8 @@
 use std::process::Command;
 
 use devicemapper;
-use devicemapper::{Bytes, DM, DataBlocks, DmError, DmResult, LinearDev, Sectors, Segment, ThinDev,
-                   ThinDevId, ThinPoolDev, ThinPoolStatus};
+use devicemapper::{Bytes, DM, DataBlocks, DmError, DmResult, LinearDev, MetaBlocks, Sectors,
+                   Segment, ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatus};
 
 use super::super::consts::IEC;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -19,6 +19,8 @@ use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, format_flex_name,
 use super::serde_structs::{Recordable, ThinPoolDevSave};
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
+pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
+pub const META_LOWATER: MetaBlocks = MetaBlocks(512);
 
 /// A ThinPool struct contains the thinpool itself, but also the spare
 /// segments for its metadata device.

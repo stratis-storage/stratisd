@@ -19,6 +19,7 @@ Test 'CreatePool'.
 import time
 import unittest
 
+from stratisd_client_dbus import GMOPool
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import StratisdErrorsGen
 from stratisd_client_dbus import get_managed_objects
@@ -84,10 +85,16 @@ class Create2TestCase(unittest.TestCase):
 
         if rc == self._errors.OK:
             self.assertIsNotNone(result)
-            (pool, _) = result
+            (pool, table) = result
             self.assertEqual(pool, poolpath)
             self.assertEqual(len(pools), 1)
             self.assertLessEqual(len(devnodes), len(devs))
+
+            pool_info = GMOPool(table)
+            self.assertLessEqual(
+                int(pool_info.TotalPhysicalUsed()),
+                int(pool_info.TotalPhysicalSize())
+            )
         else:
             self.assertIsNone(result)
             self.assertEqual(len(pools), 0)

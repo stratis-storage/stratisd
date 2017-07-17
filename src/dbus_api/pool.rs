@@ -268,6 +268,31 @@ fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
     get_pool_property(i, p, |p| Ok(MessageItem::Str(p.name().to_owned())))
 }
 
+fn get_pool_total_physical_used(i: &mut IterAppend,
+                                p: &PropInfo<MTFn<TData>, TData>)
+                                -> Result<(), MethodErr> {
+    fn get_used(pool: &Pool) -> Result<MessageItem, MethodErr> {
+        let err_func = |_| {
+            MethodErr::failed(&format!("no total physical size computed for pool with uuid {}",
+                                       pool.uuid()))
+        };
+
+        try!(pool.total_physical_used()
+                 .map(|u| Ok(MessageItem::Str(format!("{}", *u))))
+                 .map_err(err_func))
+    }
+
+    get_pool_property(i, p, get_used)
+}
+
+fn get_pool_total_physical_size(i: &mut IterAppend,
+                                p: &PropInfo<MTFn<TData>, TData>)
+                                -> Result<(), MethodErr> {
+    get_pool_property(i,
+                      p,
+                      |p| Ok(MessageItem::Str(format!("{}", *p.total_physical_size()))))
+}
+
 pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,
                             parent: dbus::Path<'static>,
                             uuid: Uuid)
@@ -305,6 +330,16 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_pool_name);
 
+    let total_physical_size_property = f.property::<&str, _>("TotalPhysicalSize", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::False)
+        .on_get(get_pool_total_physical_size);
+
+    let total_physical_used_property = f.property::<&str, _>("TotalPhysicalUsed", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::False)
+        .on_get(get_pool_total_physical_used);
+
     let uuid_property = f.property::<&str, _>("Uuid", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
@@ -324,6 +359,8 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,
                  .add_m(add_devs_method)
                  .add_m(rename_method)
                  .add_p(name_property)
+                 .add_p(total_physical_size_property)
+                 .add_p(total_physical_used_property)
                  .add_p(uuid_property));
 
     let path = object_path.get_name().to_owned();

@@ -19,7 +19,7 @@ use self::devicemapper::Sectors;
 use self::devicemapper::consts::SECTOR_SIZE;
 
 use libstratis::engine::Engine;
-use libstratis::engine::strat_engine::blockdevmgr::{initialize, resolve_devices};
+use libstratis::engine::strat_engine::blockdevmgr::{BlockDevMgr, initialize, resolve_devices};
 use libstratis::engine::strat_engine::device::write_sectors;
 use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
@@ -126,4 +126,19 @@ pub fn test_pool_blockdevs(paths: &[&Path]) -> () {
                                                                     .unwrap())
                                  .unwrap() == DevOwnership::Unowned
                      }));
+}
+
+/// Verify that initially, current_capacity() - metadata_size() = avail_space()
+/// After 2 Sectors have been allocated, that amount must also be included in
+/// balance.
+pub fn test_blockdevmgr_used(paths: &[&Path]) -> () {
+    let uuid = Uuid::new_v4();
+    let mut mgr = BlockDevMgr::initialize(&uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+    assert_eq!(mgr.avail_space() + mgr.metadata_size(),
+               mgr.current_capacity());
+
+    let allocated = Sectors(2);
+    mgr.alloc_space(allocated).unwrap();
+    assert_eq!(mgr.avail_space() + allocated + mgr.metadata_size(),
+               mgr.current_capacity());
 }

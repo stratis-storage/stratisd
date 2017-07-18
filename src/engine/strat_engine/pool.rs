@@ -312,7 +312,7 @@ impl StratPool {
             return;
         }
 
-        let result = match self.thin_pool.thin_pool().status(&dm) {
+        let result = match self.thin_pool.thin_pool_status(&dm) {
             Ok(r) => r,
             Err(_) => {
                 error!("Could not get thinpool status");
@@ -499,17 +499,13 @@ impl Recordable<PoolSave> for StratPool {
         let meta_dev = try!(self.mdv.segments().iter().map(&mapper).collect());
 
         let thin_meta_dev = try!(self.thin_pool
-                                     .thin_pool()
-                                     .meta_dev()
-                                     .segments()
+                                     .thin_pool_meta_segments()
                                      .iter()
                                      .map(&mapper)
                                      .collect());
 
         let thin_data_dev = try!(self.thin_pool
-                                     .thin_pool()
-                                     .data_dev()
-                                     .segments()
+                                     .thin_pool_data_segments()
                                      .iter()
                                      .map(&mapper)
                                      .collect());

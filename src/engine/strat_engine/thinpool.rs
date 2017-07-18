@@ -107,6 +107,11 @@ impl ThinPool {
         }
     }
 
+    /// The status of the thin pool as calculated by DM.
+    pub fn thin_pool_status(&self, dm: &DM) -> EngineResult<ThinPoolStatus> {
+        Ok(try!(self.thin_pool.status(dm)))
+    }
+
     /// Make a new thin device.
     pub fn make_thin_device(&mut self,
                             dm: &DM,
@@ -135,14 +140,19 @@ impl ThinPool {
         self.thin_pool.teardown(dm)
     }
 
-    /// Get an immutable reference to the thin pool component of the ThinPool.
-    pub fn thin_pool(&self) -> &ThinPoolDev {
-        &self.thin_pool
-    }
-
     /// Get an immutable reference to the sparse segments of the ThinPool.
     pub fn spare_segments(&self) -> &[Segment] {
         &self.meta_spare
+    }
+
+    /// The segments belonging to the thin pool meta device.
+    pub fn thin_pool_meta_segments(&self) -> &[Segment] {
+        self.thin_pool.meta_dev().segments()
+    }
+
+    /// The segments belonging to the thin pool data device.
+    pub fn thin_pool_data_segments(&self) -> &[Segment] {
+        self.thin_pool.data_dev().segments()
     }
 
     /// Extend the thinpool with new data regions.

@@ -15,7 +15,7 @@ use uuid::Uuid;
 use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::Device;
 use devicemapper::DM;
-use devicemapper::{Sectors, Segment};
+use devicemapper::{DataBlocks, MetaBlocks, Sectors, Segment};
 use devicemapper::LinearDev;
 use devicemapper::{ThinDevId, ThinPoolStatus, ThinPoolWorkingStatus};
 
@@ -37,8 +37,8 @@ use super::thinpool::{META_LOWATER, ThinPool};
 
 pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER};
 
-const INITIAL_META_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
-pub const INITIAL_DATA_SIZE: Sectors = Sectors(768 * Mi / SECTOR_SIZE as u64);
+const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4096);
+pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
 const INITIAL_MDV_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
 
 #[derive(Debug)]
@@ -83,15 +83,15 @@ impl StratPool {
         }
 
         let meta_regions = block_mgr
-            .alloc_space(INITIAL_META_SIZE)
+            .alloc_space(INITIAL_META_SIZE.sectors())
             .expect("blockmgr must not fail, already checked for space");
 
         let meta_spare_regions = block_mgr
-            .alloc_space(INITIAL_META_SIZE)
+            .alloc_space(INITIAL_META_SIZE.sectors())
             .expect("blockmgr must not fail, already checked for space");
 
         let data_regions = block_mgr
-            .alloc_space(INITIAL_DATA_SIZE)
+            .alloc_space(*INITIAL_DATA_SIZE * DATA_BLOCK_SIZE)
             .expect("blockmgr must not fail, already checked for space");
 
         // When constructing a thin-pool, Stratis reserves the first N
@@ -105,7 +105,9 @@ impl StratPool {
         let meta_dev = try!(LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
                                            dm,
                                            meta_regions));
-        try!(wipe_sectors(&try!(meta_dev.devnode()), Sectors(0), INITIAL_META_SIZE));
+        try!(wipe_sectors(&try!(meta_dev.devnode()),
+                          Sectors(0),
+                          INITIAL_META_SIZE.sectors()));
 
         let data_dev = try!(LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinData),
                                            dm,
@@ -272,7 +274,8 @@ impl StratPool {
     /// Minimum initial size for a pool.
     pub fn min_initial_size() -> Sectors {
         // One extra meta for spare
-        (INITIAL_META_SIZE * 2u64) + INITIAL_DATA_SIZE + INITIAL_MDV_SIZE
+        (INITIAL_META_SIZE.sectors() * 2u64) + *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE +
+        INITIAL_MDV_SIZE
     }
 
     /// Write current metadata to pool members.

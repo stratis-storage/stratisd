@@ -45,7 +45,7 @@ pub fn test_thinpool_expand(paths: &[&Path]) -> () {
     {
         let mut f = OpenOptions::new().write(true).open(devnode).unwrap();
         // Write 1 more sector than is initially allocated to a pool
-        let write_size = INITIAL_DATA_SIZE + Sectors(1);
+        let write_size = *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE + Sectors(1);
         let buf = &[1u8; SECTOR_SIZE];
         for i in 0..*write_size {
             f.write_all(buf).unwrap();
@@ -53,7 +53,7 @@ pub fn test_thinpool_expand(paths: &[&Path]) -> () {
             // the amount of free space in pool has decreased to the DATA_LOWATER value.
             // TODO: Actually handle DM events and possibly call extend() directly,
             // depending on the specificity of the events.
-            if i == *(INITIAL_DATA_SIZE - Sectors(*DATA_LOWATER * *DATA_BLOCK_SIZE)) {
+            if i == *(*(INITIAL_DATA_SIZE - DATA_LOWATER) * DATA_BLOCK_SIZE) {
                 pool.check();
             }
         }

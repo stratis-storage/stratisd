@@ -104,12 +104,12 @@ impl StratPool {
         // that are trying to re-adopt the device with the attributes that
         // have been passed.
         let meta_dev = try!(LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
-                                           &dm,
+                                           dm,
                                            meta_regions));
         try!(wipe_sectors(&try!(meta_dev.devnode()), Sectors(0), INITIAL_META_SIZE));
 
         let data_dev = try!(LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinData),
-                                           &dm,
+                                           dm,
                                            data_regions));
 
         let thinpool = try!(ThinPool::new(pool_uuid,

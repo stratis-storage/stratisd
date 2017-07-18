@@ -81,7 +81,7 @@ impl ThinPool {
                 Ok(ThinPool {
                        thin_pool: dev,
                        meta_spare: spare_segments,
-                       id_gen: ThinDevIdPool::new_from_ids(&thin_ids),
+                       id_gen: ThinDevIdPool::new_from_ids(thin_ids),
                    })
             }
             Err(DmError::Dm(devicemapper::ErrorEnum::CheckFailed(meta_dev, data_dev), _)) => {
@@ -96,7 +96,7 @@ impl ThinPool {
                                                           new_meta_dev,
                                                           data_dev)),
                        meta_spare: new_spare_segments,
-                       id_gen: ThinDevIdPool::new_from_ids(&thin_ids),
+                       id_gen: ThinDevIdPool::new_from_ids(thin_ids),
                    })
             }
             Err(err) => Err(err.into()),

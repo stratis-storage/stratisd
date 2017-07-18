@@ -4,6 +4,7 @@
 
 /// Code to handle management of a pool's thinpool device.
 
+use std::borrow::BorrowMut;
 use std::process::Command;
 
 use uuid::Uuid;
@@ -164,11 +165,12 @@ impl ThinPool {
     }
 
     /// The status of the thin pool as calculated by DM.
-    pub fn check(&self, dm: &DM) -> EngineResult<ThinPoolStatus> {
+    pub fn check(&mut self, dm: &DM) -> EngineResult<ThinPoolStatus> {
         let thinpool = try!(self.thin_pool.status(dm));
         try!(self.mdv.check());
 
         let filesystems: Vec<_> = try!(self.filesystems
+                                           .borrow_mut()
                                            .into_iter()
                                            .map(|fs| fs.check(dm))
                                            .collect());

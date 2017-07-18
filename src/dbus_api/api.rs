@@ -271,7 +271,7 @@ pub fn handle(c: &Connection,
               dbus_context: &DbusContext)
               -> Result<(), dbus::Error> {
     if let ConnectionItem::MethodCall(ref msg) = item {
-        if let Some(v) = tree.handle(&msg) {
+        if let Some(v) = tree.handle(msg) {
             // Probably the wisest is to ignore any send errors here -
             // maybe the remote has disconnected during our processing.
             for m in v {

@@ -7,8 +7,8 @@
 use std::process::Command;
 
 use devicemapper;
-use devicemapper::{Bytes, DM, DataBlocks, DmError, DmResult, LinearDev, Sectors, Segment, ThinDev,
-                   ThinDevId, ThinPoolDev, ThinPoolStatus};
+use devicemapper::{Bytes, DM, DataBlocks, DmError, DmResult, LinearDev, MetaBlocks, Sectors,
+                   Segment, ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatus};
 
 use super::super::consts::IEC;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -19,6 +19,8 @@ use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, format_flex_name,
 use super::serde_structs::{Recordable, ThinPoolDevSave};
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
+pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
+pub const META_LOWATER: MetaBlocks = MetaBlocks(512);
 
 /// A ThinPool struct contains the thinpool itself, but also the spare
 /// segments for its metadata device.
@@ -105,6 +107,11 @@ impl ThinPool {
         }
     }
 
+    /// The status of the thin pool as calculated by DM.
+    pub fn thin_pool_status(&self, dm: &DM) -> EngineResult<ThinPoolStatus> {
+        Ok(try!(self.thin_pool.status(dm)))
+    }
+
     /// Make a new thin device.
     pub fn make_thin_device(&mut self,
                             dm: &DM,
@@ -133,14 +140,19 @@ impl ThinPool {
         self.thin_pool.teardown(dm)
     }
 
-    /// Get an immutable reference to the thin pool component of the ThinPool.
-    pub fn thin_pool(&self) -> &ThinPoolDev {
-        &self.thin_pool
-    }
-
     /// Get an immutable reference to the sparse segments of the ThinPool.
     pub fn spare_segments(&self) -> &[Segment] {
         &self.meta_spare
+    }
+
+    /// The segments belonging to the thin pool meta device.
+    pub fn thin_pool_meta_segments(&self) -> &[Segment] {
+        self.thin_pool.meta_dev().segments()
+    }
+
+    /// The segments belonging to the thin pool data device.
+    pub fn thin_pool_data_segments(&self) -> &[Segment] {
+        self.thin_pool.data_dev().segments()
     }
 
     /// Extend the thinpool with new data regions.

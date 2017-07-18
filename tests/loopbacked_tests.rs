@@ -24,6 +24,7 @@ use libstratis::engine::IEC;
 use libstratis::engine::strat_engine::device::wipe_sectors;
 
 use util::logger::init_logger;
+use util::blockdev_tests::test_blockdevmgr_used;
 use util::blockdev_tests::test_force_flag_dirty;
 use util::blockdev_tests::test_force_flag_stratis;
 use util::blockdev_tests::test_pool_blockdevs;
@@ -185,4 +186,9 @@ pub fn loop_test_setup() {
 #[test]
 pub fn loop_test_pool_rename() {
     test_with_spec(2, test_pool_rename);
+}
+
+#[test]
+pub fn loop_test_blockdevmgr_used() {
+    test_with_spec(2, test_blockdevmgr_used);
 }

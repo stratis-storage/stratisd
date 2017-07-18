@@ -35,7 +35,8 @@ use super::serde_structs::{FilesystemSave, FlexDevsSave, PoolSave, Recordable};
 use super::setup::{get_blockdevs, get_metadata};
 use super::thinpool::ThinPool;
 
-pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
+pub use super::thinpool::DATA_BLOCK_SIZE;
+
 const META_LOWATER: MetaBlocks = MetaBlocks(512);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
 const INITIAL_META_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
@@ -454,6 +455,19 @@ impl Pool for StratPool {
 
     fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
         get_filesystem!(self; uuid)
+    }
+
+    fn total_physical_size(&self) -> Sectors {
+        self.block_devs.current_capacity()
+    }
+
+    fn total_physical_used(&self) -> EngineResult<Sectors> {
+        self.thin_pool
+            .total_physical_used()
+            .and_then(|v| {
+                          Ok(v + self.block_devs.metadata_size() +
+                             self.mdv.segments().iter().map(|s| s.length).sum())
+                      })
     }
 }
 

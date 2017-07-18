@@ -13,6 +13,9 @@ use std::vec::Vec;
 
 use uuid::Uuid;
 
+use devicemapper::Sectors;
+
+use super::super::consts::IEC;
 use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
@@ -112,6 +115,16 @@ impl Pool for SimPool {
 
     fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
         get_filesystem!(self; uuid)
+    }
+
+    fn total_physical_size(&self) -> Sectors {
+        // We choose to make our pools very big, and we can change that
+        // if it is inconvenient.
+        Sectors(IEC::Ei)
+    }
+
+    fn total_physical_used(&self) -> EngineResult<Sectors> {
+        Ok(Sectors(0))
     }
 }
 

@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 
 use uuid::Uuid;
 
+use devicemapper::Sectors;
+
 use super::errors::EngineResult;
 use super::types::{FilesystemUuid, PoolUuid, RenameAction};
 
@@ -71,6 +73,19 @@ pub trait Pool: HasName + HasUuid {
 
     /// Get the filesystem in this pool with this UUID.
     fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem>;
+
+    /// The total number of Sectors belonging to this pool.
+    /// There are no exclusions, so this number includes overhead sectors
+    /// of all sorts, sectors allocated for every sort of metadata by
+    /// Stratis or devicemapper and therefore not available to the user for
+    /// storing their data. There is no larger physical size number that can be
+    /// associated with a pool.
+    fn total_physical_size(&self) -> Sectors;
+
+    /// The number of Sectors in this pool that are currently in use by the
+    /// pool for some purpose, be it to store metadata, to store user data,
+    /// or to reserve for some other purpose.
+    fn total_physical_used(&self) -> EngineResult<Sectors>;
 }
 
 pub trait Engine: Debug {

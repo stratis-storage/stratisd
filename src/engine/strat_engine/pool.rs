@@ -286,15 +286,17 @@ impl StratPool {
     /// Return an extend size for the physical space backing a pool
     /// TODO: returning the current size will double the space provisoned to
     /// back the pool.  We should determine if this is a reasonable value.
-    fn extend_size(&self, current_size: Sectors) -> Sectors {
+    fn extend_size(&self, current_size: DataBlocks) -> DataBlocks {
         current_size
     }
 
     /// Expand the physical space allocated to a pool by the value from extend_size()
-    /// Return tne number of Sectors added
-    fn extend_data(&mut self, dm: &DM, current_size: Sectors) -> EngineResult<Sectors> {
+    /// Return the number of DataBlocks added
+    fn extend_data(&mut self, dm: &DM, current_size: DataBlocks) -> EngineResult<DataBlocks> {
         let extend_size = self.extend_size(current_size);
-        if let Some(new_data_regions) = self.block_devs.alloc_space(extend_size) {
+        if let Some(new_data_regions) =
+            self.block_devs
+                .alloc_space(*extend_size * DATA_BLOCK_SIZE) {
             try!(self.thin_pool.extend_data(dm, new_data_regions));
         } else {
             return Err(EngineError::Engine(ErrorEnum::Error,
@@ -346,7 +348,7 @@ impl StratPool {
 
                 if usage.used_data > usage.total_data - DATA_LOWATER {
                     // Request expansion of physical space allocated to the pool
-                    match self.extend_data(&dm, usage.total_data.0 * DATA_BLOCK_SIZE) {
+                    match self.extend_data(&dm, usage.total_data) {
                         Ok(_) => {}
                         Err(_) => {} // TODO: Take pool offline?
                     }

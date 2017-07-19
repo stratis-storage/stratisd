@@ -164,9 +164,9 @@ impl<T: HasName + HasUuid> Table<T> {
 
         match (name_item, uuid_item) {
             (None, None) => vec![],
-            (None, Some(item)) => vec![item],
-            (Some(item), None) => vec![item],
-            (Some(p1), Some(p2)) => vec![p1, p2],
+            (None, Some(uuid_item)) => vec![uuid_item],
+            (Some(name_item), None) => vec![name_item],
+            (Some(name_item), Some(uuid_item)) => vec![name_item, uuid_item],
         }
     }
 }

@@ -266,11 +266,11 @@ pub fn connect(engine: Rc<RefCell<Engine>>)
 }
 
 pub fn handle(c: &Connection,
-              item: ConnectionItem,
+              item: &ConnectionItem,
               tree: &mut Tree<MTFn<TData>, TData>,
               dbus_context: &DbusContext)
               -> Result<(), dbus::Error> {
-    if let ConnectionItem::MethodCall(ref msg) = item {
+    if let ConnectionItem::MethodCall(ref msg) = *item {
         if let Some(v) = tree.handle(msg) {
             // Probably the wisest is to ignore any send errors here -
             // maybe the remote has disconnected during our processing.

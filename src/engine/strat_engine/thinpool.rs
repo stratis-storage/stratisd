@@ -63,6 +63,7 @@ impl ThinPool {
     /// If initial setup fails due to a thin_check failure, attempt to fix
     /// the problem by running thin_repair. If failure recurs, return an
     /// error.
+    #[allow(too_many_arguments)]
     pub fn setup(pool_uuid: PoolUuid,
                  dm: &DM,
                  data_block_size: Sectors,

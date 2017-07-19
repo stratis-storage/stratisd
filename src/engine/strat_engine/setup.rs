@@ -169,7 +169,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
     let mut segment_table = HashMap::new();
     for seg in segments {
         segment_table
-            .entry(seg.0.clone())
+            .entry(seg.0)
             .or_insert(vec![])
             .push((seg.1, seg.2))
     }

@@ -158,9 +158,11 @@ fn get_filesystem_property<F>(i: &mut IterAppend,
                                     }));
 
     let pool_path = try!(p.tree
-                             .get(&filesystem_data.parent)
-                             .ok_or(MethodErr::failed(&format!("no path for parent object path {}",
-                                                               &filesystem_data.parent))));
+                 .get(&filesystem_data.parent)
+                 .ok_or_else(|| {
+                                 MethodErr::failed(&format!("no path for parent object path {}",
+                                                            &filesystem_data.parent))
+                             }));
 
     let pool_uuid = try!(pool_path
                         .get_data()
@@ -173,12 +175,14 @@ fn get_filesystem_property<F>(i: &mut IterAppend,
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = try!(engine
-                        .get_pool(&pool_uuid)
-                        .ok_or(MethodErr::failed(&format!("no pool corresponding to uuid {}",
-                                                          &pool_uuid))));
+                 .get_pool(&pool_uuid)
+                 .ok_or_else(|| {
+                                 MethodErr::failed(&format!("no pool corresponding to uuid {}",
+                                                            &pool_uuid))
+                             }));
     let filesystem_uuid = &filesystem_data.uuid;
     let filesystem = try!(pool.get_filesystem(filesystem_uuid)
-        .ok_or(MethodErr::failed(&format!("no name for filesystem with uuid {}",
+        .ok_or_else(|| MethodErr::failed(&format!("no name for filesystem with uuid {}",
                                           &filesystem_uuid))));
     i.append(try!(getter(filesystem)));
     Ok(())

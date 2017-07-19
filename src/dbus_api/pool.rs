@@ -112,7 +112,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     for op in filesystems {
         if let Some(filesystem_path) = m.tree.get(&op) {
             let filesystem_uuid = get_data!(filesystem_path; default_return; return_message).uuid;
-            filesystem_map.insert(filesystem_uuid.clone(), op);
+            filesystem_map.insert(filesystem_uuid, op);
         }
     }
 
@@ -256,9 +256,11 @@ fn get_pool_property<F>(i: &mut IterAppend,
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = try!(engine
-                        .get_pool(&pool_uuid)
-                        .ok_or(MethodErr::failed(&format!("no pool corresponding to uuid {}",
-                                                          &pool_uuid))));
+                 .get_pool(&pool_uuid)
+                 .ok_or_else(|| {
+                                 MethodErr::failed(&format!("no pool corresponding to uuid {}",
+                                                            &pool_uuid))
+                             }));
 
     i.append(try!(getter(pool)));
     Ok(())

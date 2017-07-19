@@ -151,7 +151,7 @@ impl StratPool {
     // taken on the environment.
     pub fn setup(uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<StratPool> {
         let metadata = try!(try!(get_metadata(uuid, devnodes))
-                                .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                                .ok_or_else(|| EngineError::Engine(ErrorEnum::NotFound,
                                                            format!("no metadata for pool {}",
                                                                    uuid))));
         let blockdevs = try!(get_blockdevs(uuid, &metadata, devnodes));
@@ -167,7 +167,7 @@ impl StratPool {
         let lookup = |triple: &(Uuid, Sectors, Sectors)| -> EngineResult<Segment> {
             let device = try!(uuid_map
                                   .get(&triple.0)
-                                  .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                                  .ok_or_else(|| EngineError::Engine(ErrorEnum::NotFound,
                                                              format!("missing device for UUID {:?}",
                                                                      &triple.0))));
             Ok(Segment {
@@ -394,7 +394,7 @@ impl Pool for StratPool {
                                   specs: &[&'b str])
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
         let names: HashSet<_, RandomState> = HashSet::from_iter(specs);
-        for name in names.iter() {
+        for name in &names {
             if self.filesystems.contains_name(name) {
                 return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
             }
@@ -403,7 +403,7 @@ impl Pool for StratPool {
         // TODO: Roll back on filesystem initialization failure.
         let dm = try!(DM::new());
         let mut result = Vec::new();
-        for name in names.iter() {
+        for name in &names {
             let uuid = Uuid::new_v4();
             let new_filesystem = try!(StratFilesystem::initialize(&self.pool_uuid,
                                                                   uuid,
@@ -492,7 +492,7 @@ impl Recordable<PoolSave> for StratPool {
         let mapper = |seg: &Segment| -> EngineResult<(Uuid, Sectors, Sectors)> {
             let bd = try!(self.block_devs
                      .get_by_device(seg.device)
-                     .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                     .ok_or_else(|| EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no block device found for device {:?}",
                                                         seg.device))));
             Ok((*bd.uuid(), seg.start, seg.length))

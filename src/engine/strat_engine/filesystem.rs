@@ -86,6 +86,11 @@ impl StratFilesystem {
     pub fn thin_id(&self) -> ThinDevId {
         self.thin_dev.id()
     }
+
+    /// Tear down the filesystem.
+    pub fn teardown(self, dm: &DM) -> EngineResult<()> {
+        Ok(try!(self.thin_dev.teardown(dm)))
+    }
 }
 
 impl HasName for StratFilesystem {

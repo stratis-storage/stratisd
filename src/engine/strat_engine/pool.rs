@@ -299,8 +299,9 @@ impl StratPool {
                 .alloc_space(*extend_size * DATA_BLOCK_SIZE) {
             try!(self.thin_pool.extend_data(dm, new_data_regions));
         } else {
-            return Err(EngineError::Engine(ErrorEnum::Error,
-                                           format!("No free data regions for pool expansion")));
+            let err_msg = format!("Insufficient space to accomodate request for {} data blocks",
+                                  *extend_size);
+            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
         }
         Ok(extend_size)
     }

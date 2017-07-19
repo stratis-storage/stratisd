@@ -350,6 +350,7 @@ impl StratPool {
                 if usage.used_data > usage.total_data - DATA_LOWATER {
                     // Request expansion of physical space allocated to the pool
                     match self.extend_data(&dm, usage.total_data) {
+                        #![allow(single_match)]
                         Ok(_) => {}
                         Err(_) => {} // TODO: Take pool offline?
                     }

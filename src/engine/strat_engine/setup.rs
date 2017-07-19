@@ -170,7 +170,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
     for seg in segments {
         segment_table
             .entry(seg.0)
-            .or_insert(vec![])
+            .or_insert_with(Vec::default)
             .push((seg.1, seg.2))
     }
 

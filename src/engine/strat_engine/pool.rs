@@ -151,7 +151,7 @@ impl StratPool {
     // taken on the environment.
     pub fn setup(uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<StratPool> {
         let metadata = try!(try!(get_metadata(uuid, devnodes))
-                                .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                                .ok_or_else(|| EngineError::Engine(ErrorEnum::NotFound,
                                                            format!("no metadata for pool {}",
                                                                    uuid))));
         let blockdevs = try!(get_blockdevs(uuid, &metadata, devnodes));
@@ -167,7 +167,7 @@ impl StratPool {
         let lookup = |triple: &(Uuid, Sectors, Sectors)| -> EngineResult<Segment> {
             let device = try!(uuid_map
                                   .get(&triple.0)
-                                  .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                                  .ok_or_else(|| EngineError::Engine(ErrorEnum::NotFound,
                                                              format!("missing device for UUID {:?}",
                                                                      &triple.0))));
             Ok(Segment {
@@ -492,7 +492,7 @@ impl Recordable<PoolSave> for StratPool {
         let mapper = |seg: &Segment| -> EngineResult<(Uuid, Sectors, Sectors)> {
             let bd = try!(self.block_devs
                      .get_by_device(seg.device)
-                     .ok_or(EngineError::Engine(ErrorEnum::NotFound,
+                     .ok_or_else(|| EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no block device found for device {:?}",
                                                         seg.device))));
             Ok((*bd.uuid(), seg.start, seg.length))

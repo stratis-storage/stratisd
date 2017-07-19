@@ -256,9 +256,11 @@ fn get_pool_property<F>(i: &mut IterAppend,
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = try!(engine
-                        .get_pool(&pool_uuid)
-                        .ok_or(MethodErr::failed(&format!("no pool corresponding to uuid {}",
-                                                          &pool_uuid))));
+                 .get_pool(&pool_uuid)
+                 .ok_or_else(|| {
+                                 MethodErr::failed(&format!("no pool corresponding to uuid {}",
+                                                            &pool_uuid))
+                             }));
 
     i.append(try!(getter(pool)));
     Ok(())

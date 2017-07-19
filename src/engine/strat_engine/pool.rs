@@ -394,7 +394,7 @@ impl Pool for StratPool {
                                   specs: &[&'b str])
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
         let names: HashSet<_, RandomState> = HashSet::from_iter(specs);
-        for name in names.iter() {
+        for name in &names {
             if self.filesystems.contains_name(name) {
                 return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
             }
@@ -403,7 +403,7 @@ impl Pool for StratPool {
         // TODO: Roll back on filesystem initialization failure.
         let dm = try!(DM::new());
         let mut result = Vec::new();
-        for name in names.iter() {
+        for name in &names {
             let uuid = Uuid::new_v4();
             let new_filesystem = try!(StratFilesystem::initialize(&self.pool_uuid,
                                                                   uuid,

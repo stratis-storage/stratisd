@@ -103,7 +103,7 @@ impl BlockDevMgr {
             return None;
         }
 
-        for mut bd in self.block_devs.iter_mut() {
+        for mut bd in &mut self.block_devs {
             if needed == Sectors(0) {
                 break;
             }

@@ -112,7 +112,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     for op in filesystems {
         if let Some(filesystem_path) = m.tree.get(&op) {
             let filesystem_uuid = get_data!(filesystem_path; default_return; return_message).uuid;
-            filesystem_map.insert(filesystem_uuid.clone(), op);
+            filesystem_map.insert(filesystem_uuid, op);
         }
     }
 

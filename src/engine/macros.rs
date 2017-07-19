@@ -81,6 +81,26 @@ macro_rules! rename_filesystem_pre {
     }
 }
 
+macro_rules! rename_pool_pre {
+    ( $s:ident; $uuid:ident; $new_name:ident ) => {
+        {
+            let old_name = match $s.pools.get_by_uuid($uuid) {
+                Some(pool) => pool.name().to_owned(),
+                None => return Ok(RenameAction::NoSource),
+            };
+
+            if old_name == $new_name {
+                return Ok(RenameAction::Identity);
+            }
+
+            if $s.pools.contains_name($new_name) {
+                return Err(EngineError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
+            }
+            old_name
+        }
+    }
+}
+
 macro_rules! check_engine {
     ( $s:ident ) => {
         for pool in &mut $s.pools {

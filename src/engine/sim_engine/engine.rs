@@ -68,18 +68,7 @@ impl Engine for SimEngine {
     }
 
     fn rename_pool(&mut self, uuid: &PoolUuid, new_name: &str) -> EngineResult<RenameAction> {
-        let old_name = match self.pools.get_by_uuid(uuid) {
-            Some(pool) => pool.name().to_owned(),
-            None => return Ok(RenameAction::NoSource),
-        };
-
-        if old_name == new_name {
-            return Ok(RenameAction::Identity);
-        }
-
-        if self.pools.contains_name(new_name) {
-            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, new_name.into()));
-        }
+        rename_pool_pre!(self; uuid; new_name);
 
         let mut pool = self.pools
             .remove_by_uuid(uuid)

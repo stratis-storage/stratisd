@@ -61,28 +61,23 @@ macro_rules! get_filesystem {
     }
 }
 
-macro_rules! rename_filesystem {
+macro_rules! rename_filesystem_pre {
     ( $s:ident; $uuid:ident; $new_name:ident ) => {
-        let old_name;
-        if let Some(fs) = $s.filesystems.get_by_uuid($uuid) {
-            old_name = fs.name().to_owned();
-        } else {
-            return Ok(RenameAction::NoSource);
-        };
+        {
+            let old_name = match $s.filesystems.get_by_uuid($uuid) {
+                Some(filesystem) => filesystem.name().to_owned(),
+                None => return Ok(RenameAction::NoSource),
+            };
 
-        if old_name == $new_name {
-            return Ok(RenameAction::Identity);
+            if old_name == $new_name {
+                return Ok(RenameAction::Identity);
+            }
+
+            if $s.filesystems.contains_name($new_name) {
+                return Err(EngineError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
+            }
+            old_name
         }
-
-        if $s.filesystems.contains_name($new_name) {
-            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
-        }
-
-        let mut filesystem = $s.filesystems.remove_by_uuid($uuid)
-            .expect("Must succeed since $s.filesystems.get_by_uuid() returned a value.");
-        filesystem.rename($new_name);
-        $s.filesystems.insert(filesystem);
-        return Ok(RenameAction::Renamed);
     }
 }
 

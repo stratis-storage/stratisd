@@ -206,13 +206,13 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
                                                spare_segments.drain(..).collect()));
 
 
-    if try!(Command::new("thin_repair")
-                .arg("-i")
-                .arg(&try!(meta_dev.devnode()))
-                .arg("-o")
-                .arg(&try!(new_meta_dev.devnode()))
-                .status())
-               .success() == false {
+    if !try!(Command::new("thin_repair")
+                 .arg("-i")
+                 .arg(&try!(meta_dev.devnode()))
+                 .arg("-o")
+                 .arg(&try!(new_meta_dev.devnode()))
+                 .status())
+                .success() {
         return Err(EngineError::Engine(ErrorEnum::Error,
                                        "thin_repair failed, pool unusable".into()));
     }

@@ -1,6 +1,5 @@
 sudo: required
 os: linux
-dist: trusty
 group: edge
 
 before_install:

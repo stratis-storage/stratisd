@@ -30,6 +30,10 @@ const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)
 
 const STRAT_MAGIC: &'static [u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
+const SIGBLOCK_REGION_ONE: (usize, usize) = (SECTOR_SIZE, 2 * SECTOR_SIZE);
+const SIGBLOCK_REGION_TWO: (usize, usize) = (9 * SECTOR_SIZE, 10 * SECTOR_SIZE);
+
+
 #[derive(Debug)]
 pub struct BDA {
     header: StaticHeader,
@@ -203,8 +207,8 @@ impl StaticHeader {
     /// verify that it matches the next.
     /// Return None if the static header's magic number is wrong.
     fn setup_from_buf(buf: &[u8; _BDA_STATIC_HDR_SIZE]) -> EngineResult<Option<StaticHeader>> {
-        let sigblock_spots = [&buf[SECTOR_SIZE..2 * SECTOR_SIZE],
-                              &buf[9 * SECTOR_SIZE..10 * SECTOR_SIZE]];
+        let sigblock_spots = [&buf[SIGBLOCK_REGION_ONE.0..SIGBLOCK_REGION_ONE.1],
+                              &buf[SIGBLOCK_REGION_TWO.0..SIGBLOCK_REGION_TWO.1]];
 
         // TODO: repair static header if one incorrect?
         for buf in &sigblock_spots {

@@ -858,6 +858,38 @@ mod tests {
     }
 
     #[test]
+    /// Construct a BDA input stream of all 0s of size _BDA_STATIC_HDR_SIZE.
+    /// Verify that loading the StaticHeader and loading the BDA yield None.
+    fn all_zero_bda() {
+        let mut buf = Cursor::new(vec![0u8; _BDA_STATIC_HDR_SIZE]);
+        assert!(StaticHeader::setup(&mut buf).unwrap().is_none());
+        assert!(BDA::load(&mut buf).unwrap().is_none());
+    }
+
+    #[test]
+    /// Make a buffer that is too short to have a StaticHeader on it.
+    /// Verify that loading the Static Header and loading the BDA yield None.
+    fn very_short_bda() {
+        let mut buf = Cursor::new(vec![0u8; SECTOR_SIZE]);
+        assert!(StaticHeader::setup(&mut buf).unwrap().is_none());
+        assert!(BDA::load(&mut buf).unwrap().is_none());
+    }
+
+    #[test]
+    /// Make a buffer just large enough to contain a single static header.
+    /// Verify that the StaticHeader is read and that there is a failure reading
+    /// the BDA.
+    fn just_one_static_header() {
+        let mut vec = vec![0u8; 2 * SECTOR_SIZE];
+        vec[SECTOR_SIZE..2 * SECTOR_SIZE].clone_from_slice(&random_static_header(0, 0)
+                                                                .sigblock_to_buf());
+        let mut buf = Cursor::new(vec);
+        assert!(StaticHeader::setup(&mut buf).unwrap().is_some());
+
+        assert!(BDA::load(&mut buf).is_err());
+    }
+
+    #[test]
     /// Construct an arbitrary StaticHeader object.
     /// Initialize a BDA.
     /// Verify that the last update time is None.

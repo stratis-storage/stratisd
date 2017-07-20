@@ -187,9 +187,6 @@ impl StaticHeader {
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
         f.read(&mut buf)?;
 
-        // TODO: repair static header if one incorrect?
-        // Note: this would require some adjustment or some revision to
-        // setup_from_buf().
         StaticHeader::setup_from_buf(&buf)
     }
 
@@ -202,6 +199,7 @@ impl StaticHeader {
         let sigblock_spots = [&buf[SECTOR_SIZE..2 * SECTOR_SIZE],
                               &buf[9 * SECTOR_SIZE..10 * SECTOR_SIZE]];
 
+        // TODO: repair static header if one incorrect?
         for buf in &sigblock_spots {
             match StaticHeader::sigblock_from_buf(buf) {
                 Ok(val) => return Ok(val),

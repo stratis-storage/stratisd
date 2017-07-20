@@ -27,6 +27,7 @@ use util::blockdev_tests::test_force_flag_stratis;
 use util::blockdev_tests::test_pool_blockdevs;
 use util::dm_tests::test_thinpool_device;
 use util::dm_tests::test_linear_device;
+use util::pool_tests::test_filesystem_rename;
 use util::pool_tests::test_thinpool_expand;
 use util::setup_tests::test_basic_metadata;
 use util::setup_tests::test_initialize;
@@ -162,4 +163,9 @@ pub fn real_test_pool_rename() {
 #[test]
 pub fn real_test_blockdevmgr_used() {
     test_with_spec(2, test_blockdevmgr_used);
+}
+
+#[test]
+pub fn real_test_filesystem_rename() {
+    test_with_spec(2, test_filesystem_rename);
 }

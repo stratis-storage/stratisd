@@ -14,18 +14,17 @@ use self::devicemapper::DM;
 use self::devicemapper::Sectors;
 use self::devicemapper::consts::SECTOR_SIZE;
 
-use libstratis::engine::Pool;
+use libstratis::engine::{Engine, Pool};
+use libstratis::engine::strat_engine::StratEngine;
 use libstratis::engine::strat_engine::pool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE,
                                              StratPool};
-use libstratis::engine::strat_engine::StratEngine;
-use libstratis::engine::types::Redundancy;
+use libstratis::engine::types::{Redundancy, RenameAction};
 
 /// Verify that a the physical space allocated to a pool is expanded when
 /// the nuber of sectors written to a thin-dev in the pool exceeds the
 /// INITIAL_DATA_SIZE.  If we are able to write more sectors to the filesystem
 /// than are initially allocated to the pool, the pool must have been expanded.
 pub fn test_thinpool_expand(paths: &[&Path]) -> () {
-    StratEngine::initialize().unwrap();
     let (mut pool, _) = StratPool::initialize("stratis_test_pool",
                                               &DM::new().unwrap(),
                                               paths,
@@ -60,4 +59,41 @@ pub fn test_thinpool_expand(paths: &[&Path]) -> () {
     }
     pool.destroy_filesystems(&[&fs_uuid]).unwrap();
     pool.teardown().unwrap();
+}
+
+
+/// Verify that a filesystem rename causes the filesystem metadata to be
+/// updated.
+pub fn test_filesystem_rename(paths: &[&Path]) {
+    let mut engine = StratEngine::initialize().unwrap();
+
+    let name1 = "name1";
+    let name2 = "name2";
+    let (uuid1, _) = engine.create_pool(&name1, paths, None, false).unwrap();
+    let fs_uuid = {
+        let mut pool = engine.get_pool(&uuid1).unwrap();
+        let &(fs_name, fs_uuid) = pool.create_filesystems(&[name1])
+            .unwrap()
+            .first()
+            .unwrap();
+
+        assert_eq!(name1, fs_name);
+
+        let action = pool.rename_filesystem(&fs_uuid, name2).unwrap();
+        assert_eq!(action, RenameAction::Renamed);
+        fs_uuid
+    };
+    engine.teardown().unwrap();
+
+    let mut engine = StratEngine::initialize().unwrap();
+    let filesystem_name: String = engine
+        .get_pool(&uuid1)
+        .unwrap()
+        .get_filesystem(&fs_uuid)
+        .unwrap()
+        .name()
+        .into();
+    assert_eq!(filesystem_name, name2);
+
+    engine.teardown().unwrap();
 }

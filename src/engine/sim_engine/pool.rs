@@ -106,7 +106,16 @@ impl Pool for SimPool {
                          uuid: &FilesystemUuid,
                          new_name: &str)
                          -> EngineResult<RenameAction> {
-        rename_filesystem!{self; uuid; new_name}
+        rename_filesystem_pre!(self; uuid; new_name);
+
+        let mut filesystem =
+            self.filesystems
+                .remove_by_uuid(uuid)
+                .expect("Must succeed since self.filesystems.get_by_uuid() returned a value");
+
+        filesystem.rename(new_name);
+        self.filesystems.insert(filesystem);
+        Ok(RenameAction::Renamed)
     }
 
     fn rename(&mut self, name: &str) {

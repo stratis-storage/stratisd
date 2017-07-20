@@ -376,19 +376,10 @@ impl StratPool {
 
     /// Teardown a pool.
     /// Take down the device mapper devices belonging to the pool.
-    /// This method and destroy() must keep their DM teardown operations
-    /// in sync.
     /// Precondition: All filesystems belonging to this pool must be
     /// unmounted.
     pub fn teardown(self) -> EngineResult<()> {
-        let dm = try!(DM::new());
-
-        for fs in self.filesystems.empty() {
-            try!(fs.teardown(&dm));
-        }
-
-        try!(self.thin_pool.teardown(&dm));
-        try!(self.mdv.teardown(&dm));
+        teardown_pool!(self);
         Ok(())
     }
 }
@@ -429,21 +420,11 @@ impl Pool for StratPool {
         Ok(bdev_paths)
     }
 
-    /// This method and teardown() must keep their DM teardown operations
-    /// in sync.
     /// Precondition: All filesystems belonging to this pool must be
     /// unmounted.
     fn destroy(self) -> EngineResult<()> {
-        let dm = try!(DM::new());
-
-        for fs in self.filesystems.empty() {
-            try!(fs.teardown(&dm));
-        }
-
-        try!(self.thin_pool.teardown(&dm));
-        try!(self.mdv.teardown(&dm));
+        teardown_pool!(self);
         try!(self.block_devs.destroy_all());
-
         Ok(())
     }
 
@@ -460,7 +441,22 @@ impl Pool for StratPool {
                          uuid: &FilesystemUuid,
                          new_name: &str)
                          -> EngineResult<RenameAction> {
-        rename_filesystem!{self; uuid; new_name}
+        let old_name = rename_filesystem_pre!(self; uuid; new_name);
+
+        let mut filesystem =
+            self.filesystems
+                .remove_by_uuid(uuid)
+                .expect("Must succeed since self.filesystems.get_by_uuid() returned a value");
+
+        filesystem.rename(new_name);
+        if let Err(err) = self.mdv.save_fs(&filesystem) {
+            filesystem.rename(&old_name);
+            self.filesystems.insert(filesystem);
+            Err(err)
+        } else {
+            self.filesystems.insert(filesystem);
+            Ok(RenameAction::Renamed)
+        }
     }
 
     fn rename(&mut self, name: &str) {

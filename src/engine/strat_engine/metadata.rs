@@ -580,8 +580,14 @@ mod mda {
             // This cast could fail if running on a 32-bit machine and
             // size of metadata is greater than 2^32 - 1 bytes, which is
             // unlikely.
+            //
+            // This comparison seems absurd when compiled in an environment
+            // where usize is u64, which is usual. It is not absurd when
+            // compiled in an environment where usize is u32.
+            #![allow(absurd_extreme_comparisons)]
             assert!(*self.used <= std::usize::MAX as u64);
             let mut data_buf = vec![0u8; *self.used as usize];
+
             try!(f.read_exact(&mut data_buf));
 
             if self.data_crc != crc32::checksum_ieee(&data_buf) {

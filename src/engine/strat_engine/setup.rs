@@ -170,7 +170,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
     for seg in segments {
         segment_table
             .entry(seg.0)
-            .or_insert(vec![])
+            .or_insert_with(Vec::default)
             .push((seg.1, seg.2))
     }
 
@@ -205,7 +205,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
 
     // Verify that blockdevs found match blockdevs recorded.
     let current_uuids: HashSet<_> = blockdevs.iter().map(|b| *b.uuid()).collect();
-    let recorded_uuids: HashSet<_> = pool_save.block_devs.keys().map(|u| *u).collect();
+    let recorded_uuids: HashSet<_> = pool_save.block_devs.keys().cloned().collect();
 
     if current_uuids != recorded_uuids {
         let err_msg = "Recorded block dev UUIDs != discovered blockdev UUIDs";

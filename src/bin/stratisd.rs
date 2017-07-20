@@ -112,7 +112,7 @@ fn run() -> StratisResult<()> {
         for pfd in fds.iter().filter(|pfd| pfd.revents != 0) {
             for item in dbus_conn.watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents)) {
                 if let Err(r) = libstratis::dbus_api::handle(&dbus_conn,
-                                                             item,
+                                                             &item,
                                                              &mut tree,
                                                              &dbus_context) {
                     write_or_panic(From::from(r));

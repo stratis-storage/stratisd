@@ -7,8 +7,8 @@
 use std::process::Command;
 
 use devicemapper;
-use devicemapper::{Bytes, DM, DataBlocks, DmError, DmResult, LinearDev, MetaBlocks, Sectors,
-                   Segment, ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatus};
+use devicemapper::{DM, DataBlocks, DmError, DmResult, LinearDev, MetaBlocks, Sectors, Segment,
+                   ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatus};
 
 use super::super::consts::IEC;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -21,6 +21,8 @@ use super::serde_structs::{Recordable, ThinPoolDevSave};
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
 pub const META_LOWATER: MetaBlocks = MetaBlocks(512);
+
+const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
 /// A ThinPool struct contains the thinpool itself, but also the spare
 /// segments for its metadata device.
@@ -63,6 +65,7 @@ impl ThinPool {
     /// If initial setup fails due to a thin_check failure, attempt to fix
     /// the problem by running thin_repair. If failure recurs, return an
     /// error.
+    #[allow(too_many_arguments)]
     pub fn setup(pool_uuid: PoolUuid,
                  dm: &DM,
                  data_block_size: Sectors,
@@ -122,7 +125,7 @@ impl ThinPool {
                              dm,
                              &self.thin_pool,
                              try!(self.id_gen.new_id()),
-                             size.unwrap_or(Bytes(IEC::Ti).sectors()))))
+                             size.unwrap_or(DEFAULT_THIN_DEV_SIZE))))
     }
 
     /// Setup a previously constructed thin device.
@@ -206,13 +209,13 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
                                                spare_segments.drain(..).collect()));
 
 
-    if try!(Command::new("thin_repair")
-                .arg("-i")
-                .arg(&try!(meta_dev.devnode()))
-                .arg("-o")
-                .arg(&try!(new_meta_dev.devnode()))
-                .status())
-               .success() == false {
+    if !try!(Command::new("thin_repair")
+                 .arg("-i")
+                 .arg(&try!(meta_dev.devnode()))
+                 .arg("-o")
+                 .arg(&try!(new_meta_dev.devnode()))
+                 .status())
+                .success() {
         return Err(EngineError::Engine(ErrorEnum::Error,
                                        "thin_repair failed, pool unusable".into()));
     }

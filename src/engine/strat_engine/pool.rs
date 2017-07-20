@@ -299,8 +299,9 @@ impl StratPool {
                 .alloc_space(*extend_size * DATA_BLOCK_SIZE) {
             try!(self.thin_pool.extend_data(dm, new_data_regions));
         } else {
-            return Err(EngineError::Engine(ErrorEnum::Error,
-                                           format!("No free data regions for pool expansion")));
+            let err_msg = format!("Insufficient space to accomodate request for {} data blocks",
+                                  *extend_size);
+            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
         }
         Ok(extend_size)
     }
@@ -349,6 +350,7 @@ impl StratPool {
                 if usage.used_data > usage.total_data - DATA_LOWATER {
                     // Request expansion of physical space allocated to the pool
                     match self.extend_data(&dm, usage.total_data) {
+                        #![allow(single_match)]
                         Ok(_) => {}
                         Err(_) => {} // TODO: Take pool offline?
                     }

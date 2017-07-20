@@ -183,13 +183,14 @@ impl StaticHeader {
 
 
     /// Read data from f into buffer of length _BDA_STATIC_HDR_SIZE.
-    fn read_into_buf<F>(f: &mut F) -> EngineResult<[u8; _BDA_STATIC_HDR_SIZE]>
+    /// Return a newly constructed buffer and the number of bytes read.
+    fn read_into_buf<F>(f: &mut F) -> EngineResult<([u8; _BDA_STATIC_HDR_SIZE], usize)>
         where F: Read + Seek
     {
         f.seek(SeekFrom::Start(0))?;
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
-        f.read(&mut buf)?;
-        Ok(buf)
+        let bytes = f.read(&mut buf)?;
+        Ok((buf, bytes))
     }
 
     /// Try to find a valid StaticHeader on a device.
@@ -198,23 +199,24 @@ impl StaticHeader {
     fn setup<F>(f: &mut F) -> EngineResult<Option<StaticHeader>>
         where F: Read + Seek
     {
-        StaticHeader::setup_from_buf(&StaticHeader::read_into_buf(f)?)
+        let (buf, bytes) = StaticHeader::read_into_buf(f)?;
+        StaticHeader::setup_from_buf(&buf, bytes)
     }
 
     /// Try to find a valid StaticHeader in a buffer.
     /// If there is an error in reading the first, try the next. If there is
     /// no error in reading the first, assume it is correct, i.e., do not
     /// verify that it matches the next.
-    /// Return None if the static header's magic number is wrong.
-    fn setup_from_buf(buf: &[u8; _BDA_STATIC_HDR_SIZE]) -> EngineResult<Option<StaticHeader>> {
-        let sigblock_spots = [&buf[SIGBLOCK_REGION_ONE.0..SIGBLOCK_REGION_ONE.1],
-                              &buf[SIGBLOCK_REGION_TWO.0..SIGBLOCK_REGION_TWO.1]];
-
+    /// Return None if the static header's magic number is wrong or if there
+    /// is insufficient data in the buffer to read the magic number.
+    fn setup_from_buf(buf: &[u8; _BDA_STATIC_HDR_SIZE],
+                      bytes: usize)
+                      -> EngineResult<Option<StaticHeader>> {
         // TODO: repair static header if one incorrect?
-        for buf in &sigblock_spots {
-            match StaticHeader::sigblock_from_buf(buf) {
-                Ok(val) => return Ok(val),
-                _ => continue,
+        for &(start, end) in &[SIGBLOCK_REGION_ONE, SIGBLOCK_REGION_TWO] {
+            let region_length = if bytes < start { 0 } else { bytes - start };
+            if let Ok(val) = StaticHeader::sigblock_from_buf(&buf[start..end], region_length) {
+                return Ok(val);
             }
         }
 
@@ -226,13 +228,13 @@ impl StaticHeader {
     pub fn determine_ownership<F>(f: &mut F) -> EngineResult<DevOwnership>
         where F: Read + Seek
     {
-        let buf = StaticHeader::read_into_buf(f)?;
+        let (buf, bytes) = StaticHeader::read_into_buf(f)?;
 
         // Using setup() as a test of ownership sets a high bar. It is
         // not sufficient to have STRAT_MAGIC to be considered "Ours",
         // it must also have correct CRC, no weird stuff in fields,
         // etc!
-        match StaticHeader::setup_from_buf(&buf) {
+        match StaticHeader::setup_from_buf(&buf, bytes) {
             Ok(Some(sh)) => Ok(DevOwnership::Ours(sh.pool_uuid)),
             Ok(None) => {
                 if buf.iter().any(|x| *x != 0) {
@@ -262,12 +264,25 @@ impl StaticHeader {
 
     /// Build a StaticHeader from a SECTOR_SIZE buf that was read from
     /// a blockdev.
-    fn sigblock_from_buf(buf: &[u8]) -> EngineResult<Option<StaticHeader>> {
-
+    /// Returns None if Stratis magic number not found. This may occur because
+    /// the number of bytes read is not enough to contain the magic number.
+    /// Returns an error if the buf does not contain SECTOR_SIZE bytes of data
+    /// but the Stratis magic number was read.
+    fn sigblock_from_buf(buf: &[u8], bytes: usize) -> EngineResult<Option<StaticHeader>> {
         assert_eq!(buf.len(), SECTOR_SIZE);
 
-        if &buf[4..20] != STRAT_MAGIC {
+        if bytes < 20 || &buf[4..20] != STRAT_MAGIC {
             return Ok(None);
+        }
+
+        // If a partial Stratis header, return immediately with the real
+        // problem instead of with distracting information about non-matching
+        // crc.
+        if bytes < SECTOR_SIZE {
+            let err_msg = format!("Only {} bytes in buffer, static header requires {}",
+                                  bytes,
+                                  SECTOR_SIZE);
+            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
         }
 
         let crc = crc32::checksum_ieee(&buf[4..SECTOR_SIZE]);
@@ -997,7 +1012,9 @@ mod tests {
         fn static_header(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
             let sh1 = random_static_header(blkdev_size, mda_size_factor);
             let buf = sh1.sigblock_to_buf();
-            let sh2 = StaticHeader::sigblock_from_buf(&buf).unwrap().unwrap();
+            let sh2 = StaticHeader::sigblock_from_buf(&buf, buf.len())
+                .unwrap()
+                .unwrap();
             TestResult::from_bool(sh1.pool_uuid == sh2.pool_uuid && sh1.dev_uuid == sh2.dev_uuid &&
                                   sh1.blkdev_size == sh2.blkdev_size &&
                                   sh1.mda_size == sh2.mda_size &&

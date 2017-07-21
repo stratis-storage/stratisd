@@ -56,7 +56,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_pool!(engine; pool_uuid; default_return; return_message);
 
-    let result = pool.create_filesystems(&filesystems.collect::<Vec<&str>>());
+    let result = pool.create_filesystems(&filesystems.collect::<Vec<&str>>(), None);
 
     let msg = match result {
         Ok(ref infos) => {

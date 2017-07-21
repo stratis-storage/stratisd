@@ -386,7 +386,8 @@ impl StratPool {
 
 impl Pool for StratPool {
     fn create_filesystems<'a, 'b>(&'a mut self,
-                                  specs: &[&'b str])
+                                  specs: &[&'b str],
+                                  size: Option<Sectors>)
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
         let names: HashSet<_, RandomState> = HashSet::from_iter(specs);
         for name in &names {
@@ -405,7 +406,7 @@ impl Pool for StratPool {
                                                                   name,
                                                                   &dm,
                                                                   &mut self.thin_pool,
-                                                                  None));
+                                                                  size));
             try!(self.mdv.save_fs(&new_filesystem));
             self.filesystems.insert(new_filesystem);
             result.push((**name, uuid));

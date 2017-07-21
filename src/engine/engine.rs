@@ -37,7 +37,8 @@ pub trait Pool: HasName + HasUuid {
     /// Returns an error if any of the specified names are already in use
     /// for filesystems in this pool.
     fn create_filesystems<'a, 'b>(&'a mut self,
-                                  specs: &[&'b str])
+                                  specs: &[&'b str],
+                                  size: Option<Sectors>)
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>>;
 
     /// Adds blockdevs specified by paths to pool.

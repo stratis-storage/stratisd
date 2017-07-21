@@ -519,6 +519,20 @@ mod mda {
         data_crc: u32,
     }
 
+    // Implementing Default explicitly because Timespec does not implement
+    // Default. The time crate has been superceded by the chrono crate, and
+    // is in maintenance mode, so there is little point in submitting a PR
+    // to change Timespec's behavior.
+    impl Default for MDAHeader {
+        fn default() -> MDAHeader {
+            MDAHeader {
+                last_updated: Timespec::new(0, 0),
+                used: Bytes(0),
+                data_crc: 0,
+            }
+        }
+    }
+
     impl MDAHeader {
         /// Get an MDAHeader from the buffer.
         /// Return an error for a bad checksum.
@@ -636,6 +650,14 @@ mod mda {
         use time::{now, Timespec};
 
         use super::*;
+
+        #[test]
+        /// Verify that default MDAHeader is all 0s except for CRC.
+        fn test_default_mda_header() {
+            assert!(MDAHeader::default().to_buf()[4..]
+                        .iter()
+                        .all(|x| *x == 0u8));
+        }
 
         #[test]
         /// Using an arbitrary data buffer, construct an mda header buffer

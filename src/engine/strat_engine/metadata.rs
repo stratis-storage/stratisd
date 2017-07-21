@@ -340,7 +340,7 @@ mod mda {
                              -> EngineResult<MDARegions>
             where F: Seek + Write
         {
-            let hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
+            let hdr_buf = MDAHeader::default().to_buf();
 
             let region_size = size / NUM_MDA_REGIONS;
             let per_region_size = region_size.bytes();

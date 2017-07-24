@@ -2,8 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::fs::create_dir;
-use std::io::ErrorKind;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -19,8 +17,6 @@ use super::super::types::{PoolUuid, Redundancy, RenameAction};
 use super::cleanup::teardown_pools;
 use super::pool::StratPool;
 use super::setup::find_all;
-
-pub const DEV_PATH: &'static str = "/dev/stratis";
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DevOwnership {
@@ -42,12 +38,6 @@ impl StratEngine {
     /// Returns an error if there was an error reading device nodes.
     /// Returns an error if there was an error setting up any of the pools.
     pub fn initialize() -> EngineResult<StratEngine> {
-        if let Err(err) = create_dir(DEV_PATH) {
-            if err.kind() != ErrorKind::AlreadyExists {
-                return Err(From::from(err));
-            }
-        }
-
         let pools = try!(find_all());
 
         let mut table = Table::default();

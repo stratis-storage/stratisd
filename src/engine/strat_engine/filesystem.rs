@@ -7,16 +7,13 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use devicemapper::DM;
-use devicemapper::Sectors;
 use devicemapper::{ThinDev, ThinDevId, ThinStatus};
 
 use super::super::engine::{Filesystem, HasName, HasUuid};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::{FilesystemUuid, PoolUuid};
+use super::super::types::FilesystemUuid;
 
-use super::dmdevice::{ThinRole, format_thin_name};
 use super::serde_structs::{FilesystemSave, Recordable};
-use super::thinpool::ThinPool;
 
 #[derive(Debug)]
 pub struct StratFilesystem {
@@ -31,15 +28,11 @@ pub enum FilesystemStatus {
 }
 
 impl StratFilesystem {
-    pub fn initialize(pool_uuid: &PoolUuid,
-                      fs_id: FilesystemUuid,
+    pub fn initialize(fs_id: FilesystemUuid,
                       name: &str,
-                      dm: &DM,
-                      thin_pool: &mut ThinPool,
-                      size: Option<Sectors>)
+                      thin_dev: ThinDev)
                       -> EngineResult<StratFilesystem> {
-        let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fs_id));
-        let thin_dev = try!(thin_pool.make_thin_device(dm, &device_name, size));
+
         let fs = StratFilesystem {
             fs_id: fs_id,
             name: name.to_owned(),
@@ -52,16 +45,10 @@ impl StratFilesystem {
 
     /// Setup a filesystem, setting up the thin device as necessary.
     // FIXME: Check for still existing device mapper devices.
-    pub fn setup(pool_uuid: PoolUuid,
-                 fs_id: FilesystemUuid,
-                 thindev_id: ThinDevId,
+    pub fn setup(fs_id: FilesystemUuid,
                  name: &str,
-                 size: Sectors,
-                 dm: &DM,
-                 thin_pool: &ThinPool)
+                 thin_dev: ThinDev)
                  -> EngineResult<StratFilesystem> {
-        let device_name = format_thin_name(&pool_uuid, ThinRole::Filesystem(fs_id));
-        let thin_dev = try!(thin_pool.setup_thin_device(dm, &device_name, thindev_id, size));
 
         Ok(StratFilesystem {
                fs_id: fs_id,

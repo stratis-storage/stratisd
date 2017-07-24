@@ -27,7 +27,7 @@ use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, RenameAction, Redun
 
 use super::blockdevmgr::BlockDevMgr;
 use super::device::wipe_sectors;
-use super::dmdevice::{FlexRole, format_flex_name};
+use super::dmdevice::{FlexRole, format_flex_name, format_thin_name, ThinRole};
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::mdv::MetadataVol;
 use super::metadata::MIN_MDA_SECTORS;
@@ -236,13 +236,11 @@ impl StratPool {
         let filesystems: Vec<StratFilesystem> = {
             /// Set up a filesystem from its metadata.
             let get_filesystem = |fssave: &FilesystemSave| -> EngineResult<StratFilesystem> {
-                Ok(try!(StratFilesystem::setup(uuid,
-                                               fssave.uuid,
-                                               fssave.thin_id,
-                                               &fssave.name,
-                                               fssave.size,
-                                               &dm,
-                                               &thinpool)))
+                let thin_dev = try!(thinpool.setup_thin_device(&dm,
+                                    &format_thin_name(&uuid, ThinRole::Filesystem(fssave.uuid)),
+                                    fssave.thin_id,
+                                    fssave.size));
+                Ok(try!(StratFilesystem::setup(fssave.uuid, &fssave.name, thin_dev)))
             };
 
             try!(filesystem_metadatas
@@ -400,12 +398,12 @@ impl Pool for StratPool {
         let mut result = Vec::new();
         for name in &names {
             let uuid = Uuid::new_v4();
-            let new_filesystem = try!(StratFilesystem::initialize(&self.pool_uuid,
-                                                                  uuid,
-                                                                  name,
-                                                                  &dm,
-                                                                  &mut self.thin_pool,
-                                                                  None));
+            let thin_dev = try!(self.thin_pool
+                         .make_thin_device(&dm,
+                                           &format_thin_name(&self.pool_uuid,
+                                                             ThinRole::Filesystem(uuid)),
+                                           None));
+            let new_filesystem = try!(StratFilesystem::initialize(uuid, name, thin_dev));
             try!(self.mdv.save_fs(&new_filesystem));
             self.filesystems.insert(new_filesystem);
             result.push((**name, uuid));

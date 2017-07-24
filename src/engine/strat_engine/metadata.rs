@@ -360,6 +360,10 @@ mod mda {
         }
 
         /// Construct MDARegions from data on the disk.
+        /// Note that this method is always called in a context where a
+        /// StaticHeader has already been read. Therefore, it
+        /// constitutes an error if it is not possible to discover two
+        /// well-formed MDAHeaders for this device.
         pub fn load<F>(header_size: Bytes, size: Sectors, f: &mut F) -> EngineResult<MDARegions>
             where F: Read + Seek
         {
@@ -381,18 +385,14 @@ mod mda {
 
             /// Get an MDAHeader for the given index.
             /// If there is a failure reading the first, fall back on the
-            /// second. If there is a failure reading both, return None.
-            /// TODO: Consider whether this is the correct behavior.
-            let mut get_mda = |index: usize| -> Option<MDAHeader> {
-                load_a_region(index)
-                    .or_else(|_| load_a_region(index + 2))
-                    .ok()
-                    .unwrap_or(None)
+            /// second. If there is a failure reading both, return an error.
+            let mut get_mda = |index: usize| -> EngineResult<Option<MDAHeader>> {
+                load_a_region(index).or_else(|_| load_a_region(index + 2))
             };
 
             Ok(MDARegions {
                    region_size: region_size,
-                   mdas: [get_mda(0), get_mda(1)],
+                   mdas: [try!(get_mda(0)), try!(get_mda(1))],
                })
         }
 

@@ -16,6 +16,7 @@ use self::devicemapper::consts::SECTOR_SIZE;
 use self::devicemapper::ThinDev;
 
 use libstratis::engine::{Engine, Pool};
+use libstratis::engine::engine::HasUuid;
 use libstratis::engine::strat_engine::StratEngine;
 use libstratis::engine::strat_engine::pool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE,
                                              StratPool};
@@ -118,6 +119,8 @@ pub fn test_thinpool_thindev_destroy(paths: &[&Path]) -> () {
 
     pool.destroy_filesystems(&[&fs_uuid]).unwrap();
 
+    let pool_uuid = *pool.uuid();
+
     // Try to setup a thindev that has been destroyed
     let dm = DM::new().unwrap();
     let thindev = ThinDev::setup("stratis_test_thin_dev",
@@ -126,5 +129,16 @@ pub fn test_thinpool_thindev_destroy(paths: &[&Path]) -> () {
                                  fs_id,
                                  Sectors(128u64));
     assert!(thindev.is_err());
+    pool.teardown().unwrap();
+
+    // Check that destroyed fs is not present in MDV. If the record
+    // had been left on the MDV that didn't match a thin_id in the
+    // thinpool, ::setup() will fail.
+    let paths2: Vec<_> = paths.into_iter().map(|x| x.to_path_buf()).collect();
+    let mut pool = StratPool::setup(pool_uuid, &paths2).unwrap();
+
+    // This also should never happen, given the previous two parts of
+    // this test.
+    assert!(pool.get_filesystem(&fs_uuid).is_none());
     pool.teardown().unwrap();
 }

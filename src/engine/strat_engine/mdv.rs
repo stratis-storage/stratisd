@@ -22,12 +22,13 @@ use super::super::engine::HasUuid;
 use super::super::errors::EngineResult;
 use super::super::types::{FilesystemUuid, PoolUuid};
 
-use super::engine::DEV_PATH;
 use super::filesystem::{create_fs, StratFilesystem};
 use super::serde_structs::{FilesystemSave, Recordable};
 
 // TODO: Monitor fs size and extend linear and fs if needed
 // TODO: Document format of stuff on MDV in SWDD (currently ad-hoc)
+
+const DEV_PATH: &'static str = "/dev/stratis";
 
 const FILESYSTEM_DIR: &'static str = "filesystems";
 
@@ -46,6 +47,12 @@ impl MetadataVol {
 
     /// Set up an existing Metadata Volume.
     pub fn setup(pool_uuid: &PoolUuid, dev: LinearDev) -> EngineResult<MetadataVol> {
+        if let Err(err) = create_dir(DEV_PATH) {
+            if err.kind() != ErrorKind::AlreadyExists {
+                return Err(From::from(err));
+            }
+        }
+
         let filename = format!(".mdv-{}", pool_uuid.simple());
         let mount_pt: PathBuf = vec![DEV_PATH, &filename].iter().collect();
 

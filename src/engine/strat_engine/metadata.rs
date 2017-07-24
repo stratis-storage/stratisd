@@ -646,9 +646,12 @@ mod mda {
 
     #[cfg(test)]
     mod tests {
+        use std::io::Cursor;
+
         use quickcheck::{QuickCheck, TestResult};
         use time::{now, Timespec};
 
+        use super::super::*;
         use super::*;
 
         #[test]
@@ -657,6 +660,20 @@ mod mda {
             assert!(MDAHeader::default().to_buf()[4..]
                         .iter()
                         .all(|x| *x == 0u8));
+        }
+
+        #[test]
+        /// Verify that loading the MDARegions fails if the regions are all 0s.
+        /// Verify that loading MDARegions succeeds if the regions are properly
+        /// initialized.
+        fn test_reading_mda_regions() {
+            let buf_length = *(BDA_STATIC_HDR_SIZE + 4usize * MIN_MDA_SECTORS.bytes()) as usize;
+            let mut buf = Cursor::new(vec![0; buf_length]);
+            assert!(MDARegions::load(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf).is_err());
+
+            MDARegions::initialize(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf).unwrap();
+            let regions = MDARegions::load(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf).unwrap();
+            assert!(regions.last_update_time().is_none());
         }
 
         #[test]

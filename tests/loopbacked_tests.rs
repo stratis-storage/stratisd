@@ -32,6 +32,7 @@ use util::dm_tests::test_thinpool_device;
 use util::dm_tests::test_linear_device;
 use util::pool_tests::test_filesystem_rename;
 use util::pool_tests::test_thinpool_expand;
+use util::pool_tests::test_thinpool_thindev_destroy;
 use util::setup_tests::test_basic_metadata;
 use util::setup_tests::test_initialize;
 use util::setup_tests::test_pool_rename;
@@ -147,6 +148,11 @@ pub fn loop_test_thinpool_device() {
 #[test]
 pub fn loop_test_thinpool_expand() {
     test_with_spec(3, test_thinpool_expand);
+}
+
+#[test]
+pub fn loop_test_thinpool_thindev_destroy() {
+    test_with_spec(3, test_thinpool_thindev_destroy);
 }
 
 #[test]

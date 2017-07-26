@@ -23,8 +23,6 @@ pub trait HasName: Debug {
 pub trait Dev: Debug {}
 
 pub trait Filesystem: HasName + HasUuid {
-    /// Destroy this filesystem
-    fn destroy(self) -> EngineResult<()>;
     /// path of the device node
     fn devnode(&self) -> EngineResult<PathBuf>;
 }
@@ -45,13 +43,14 @@ pub trait Pool: HasName + HasUuid {
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
 
     /// Destroy the pool.
-    /// Will fail if filesystems allocated from the pool are in use,
-    /// or even exist.
+    /// Precondition: All filesystems belonging to this pool must be
+    /// unmounted.
     fn destroy(self) -> EngineResult<()>;
 
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
     /// This list will be a subset of the uuids passed in fs_uuids.
+    /// Precondition: All filesystems given must be unmounted.
     fn destroy_filesystems<'a, 'b>(&'a mut self,
                                    fs_uuids: &[&'b FilesystemUuid])
                                    -> EngineResult<Vec<&'b FilesystemUuid>>;

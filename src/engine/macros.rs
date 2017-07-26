@@ -19,23 +19,10 @@ macro_rules! calculate_redundancy {
     }
 }
 
-macro_rules! destroy_filesystems {
-    ( $s:ident; $fs:expr ) => {
-        let mut removed = Vec::new();
-        for uuid in $fs.iter().map(|x| *x) {
-            if let Some(fs) = $s.filesystems.remove_by_uuid(&uuid) {
-                try!(fs.destroy());
-                removed.push(uuid);
-            }
-        }
-        Ok(removed)
-    }
-}
-
 macro_rules! destroy_pool {
     ( $s:ident; $uuid: ident) => {
         if let Some(ref pool) = $s.pools.get_by_uuid($uuid) {
-            if !pool.filesystems.is_empty() {
+            if pool.has_filesystems() {
                 return Err(EngineError::Engine(
                     ErrorEnum::Busy, "filesystems remaining on pool".into()));
             };
@@ -52,12 +39,6 @@ macro_rules! destroy_pool {
 macro_rules! get_pool {
     ( $s:ident; $uuid:ident ) => {
         $s.pools.get_mut_by_uuid($uuid).map(|p| p as &mut Pool)
-    }
-}
-
-macro_rules! get_filesystem {
-    ( $s:ident; $uuid:ident ) => {
-        $s.filesystems.get_mut_by_uuid($uuid).map(|p| p as &mut Filesystem)
     }
 }
 

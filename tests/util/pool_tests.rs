@@ -13,8 +13,10 @@ use std::path::Path;
 use self::devicemapper::DM;
 use self::devicemapper::Sectors;
 use self::devicemapper::consts::SECTOR_SIZE;
+use self::devicemapper::ThinDev;
 
 use libstratis::engine::{Engine, Pool};
+use libstratis::engine::engine::HasUuid;
 use libstratis::engine::strat_engine::StratEngine;
 use libstratis::engine::strat_engine::pool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE,
                                              StratPool};
@@ -96,4 +98,47 @@ pub fn test_filesystem_rename(paths: &[&Path]) {
     assert_eq!(filesystem_name, name2);
 
     engine.teardown().unwrap();
+}
+
+/// Verify that destroy_filesystems actually deallocates the space
+/// from the thinpool, by attempting to reinstantiate it using the
+/// same thin id and verifying that it fails.
+pub fn test_thinpool_thindev_destroy(paths: &[&Path]) -> () {
+    let (mut pool, _) = StratPool::initialize("stratis_test_pool",
+                                              &DM::new().unwrap(),
+                                              paths,
+                                              Redundancy::NONE,
+                                              true)
+            .unwrap();
+    let &(_, fs_uuid) = pool.create_filesystems(&["stratis_test_filesystem"])
+        .unwrap()
+        .first()
+        .unwrap();
+
+    let fs_id = pool.get_strat_filesystem(&fs_uuid).unwrap().thin_id();
+
+    pool.destroy_filesystems(&[&fs_uuid]).unwrap();
+
+    let pool_uuid = *pool.uuid();
+
+    // Try to setup a thindev that has been destroyed
+    let dm = DM::new().unwrap();
+    let thindev = ThinDev::setup("stratis_test_thin_dev",
+                                 &dm,
+                                 pool.thinpooldev(),
+                                 fs_id,
+                                 Sectors(128u64));
+    assert!(thindev.is_err());
+    pool.teardown().unwrap();
+
+    // Check that destroyed fs is not present in MDV. If the record
+    // had been left on the MDV that didn't match a thin_id in the
+    // thinpool, ::setup() will fail.
+    let paths2: Vec<_> = paths.into_iter().map(|x| x.to_path_buf()).collect();
+    let mut pool = StratPool::setup(pool_uuid, &paths2).unwrap();
+
+    // This also should never happen, given the previous two parts of
+    // this test.
+    assert!(pool.get_filesystem(&fs_uuid).is_none());
+    pool.teardown().unwrap();
 }

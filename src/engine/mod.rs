@@ -30,7 +30,7 @@ pub mod strat_engine;
 
 mod consts;
 #[allow(module_inception)]
-mod engine;
+pub mod engine;
 mod errors;
 mod sim_engine;
 mod structures;

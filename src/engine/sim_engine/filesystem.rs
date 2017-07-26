@@ -29,10 +29,6 @@ impl SimFilesystem {
 }
 
 impl Filesystem for SimFilesystem {
-    fn destroy(self) -> EngineResult<()> {
-        Ok(())
-    }
-
     fn devnode(&self) -> EngineResult<PathBuf> {
         Ok(PathBuf::from(format!("/dev/stratis/{}", self.name)))
     }

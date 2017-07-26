@@ -21,13 +21,14 @@ impl SimFilesystem {
             name: name.to_owned(),
         }
     }
+
+    /// Set the name of this filesystem to name.
+    pub fn rename(&mut self, name: &str) {
+        self.name = name.to_owned();
+    }
 }
 
 impl Filesystem for SimFilesystem {
-    fn rename(&mut self, name: &str) {
-        self.name = name.to_owned();
-    }
-
     fn destroy(self) -> EngineResult<()> {
         Ok(())
     }

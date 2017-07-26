@@ -91,6 +91,11 @@ impl StratFilesystem {
     pub fn teardown(self, dm: &DM) -> EngineResult<()> {
         Ok(try!(self.thin_dev.teardown(dm)))
     }
+
+    /// Set the name of this filesystem to name.
+    pub fn rename(&mut self, name: &str) {
+        self.name = name.to_owned();
+    }
 }
 
 impl HasName for StratFilesystem {
@@ -106,10 +111,6 @@ impl HasUuid for StratFilesystem {
 }
 
 impl Filesystem for StratFilesystem {
-    fn rename(&mut self, name: &str) {
-        self.name = name.to_owned();
-    }
-
     fn destroy(self) -> EngineResult<()> {
         let dm = try!(DM::new());
         match self.thin_dev.teardown(&dm) {

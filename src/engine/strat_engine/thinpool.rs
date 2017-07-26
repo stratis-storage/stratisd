@@ -271,11 +271,11 @@ impl ThinPool {
     /// already be in use.
     pub fn create_filesystem(&mut self,
                              pool_uuid: &Uuid,
-                             fs_uuid: FilesystemUuid,
                              name: &str,
                              dm: &DM,
                              size: Option<Sectors>)
-                             -> EngineResult<()> {
+                             -> EngineResult<FilesystemUuid> {
+        let fs_uuid = Uuid::new_v4();
         let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fs_uuid));
         let thin_dev = try!(ThinDev::new(&device_name,
                                          dm,
@@ -287,7 +287,7 @@ impl ThinPool {
         try!(self.mdv.save_fs(&new_filesystem));
         self.filesystems.insert(new_filesystem);
 
-        Ok(())
+        Ok(fs_uuid)
     }
 
     /// Destroy a filesystem within the thin pool.

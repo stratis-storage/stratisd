@@ -375,9 +375,8 @@ impl Pool for StratPool {
         let dm = try!(DM::new());
         let mut result = Vec::new();
         for name in &names {
-            let fs_uuid = Uuid::new_v4();
-            try!(self.thin_pool
-                     .create_filesystem(&self.pool_uuid, fs_uuid, name, &dm, None));
+            let fs_uuid = try!(self.thin_pool
+                                   .create_filesystem(&self.pool_uuid, name, &dm, None));
             result.push((**name, fs_uuid));
         }
 

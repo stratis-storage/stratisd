@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 use std::iter::IntoIterator;
-use std::slice::IterMut;
+use std::slice::{Iter, IterMut};
 
 use uuid::Uuid;
 
@@ -35,6 +35,15 @@ impl<'a, T: HasName + HasUuid> IntoIterator for &'a mut Table<T> {
 
     fn into_iter(mut self) -> IterMut<'a, T> {
         self.items.iter_mut()
+    }
+}
+
+impl<'a, T: HasName + HasUuid> IntoIterator for &'a Table<T> {
+    type Item = &'a T;
+    type IntoIter = Iter<'a, T>;
+
+    fn into_iter(self) -> Iter<'a, T> {
+        self.items.iter()
     }
 }
 

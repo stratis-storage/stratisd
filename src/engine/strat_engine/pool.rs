@@ -12,17 +12,17 @@ use std::vec::Vec;
 use serde_json;
 use uuid::Uuid;
 
+use devicemapper as dm;
 use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::Device;
 use devicemapper::DM;
 use devicemapper::{DataBlocks, MetaBlocks, Sectors, Segment};
 use devicemapper::LinearDev;
-use devicemapper::{ThinDevId, ThinPoolStatus, ThinPoolWorkingStatus};
+use devicemapper::{ThinDevId, ThinPoolWorkingStatus, ThinPoolDev};
 
 use super::super::consts::IEC::Mi;
 use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::structures::Table;
 use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, RenameAction, Redundancy};
 
 use super::blockdevmgr::BlockDevMgr;
@@ -31,7 +31,7 @@ use super::dmdevice::{FlexRole, format_flex_name};
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::mdv::MetadataVol;
 use super::metadata::MIN_MDA_SECTORS;
-use super::serde_structs::{FilesystemSave, FlexDevsSave, PoolSave, Recordable};
+use super::serde_structs::{FlexDevsSave, PoolSave, Recordable};
 use super::setup::{get_blockdevs, get_metadata};
 use super::thinpool::{META_LOWATER, ThinPool};
 
@@ -46,10 +46,8 @@ pub struct StratPool {
     name: String,
     pool_uuid: PoolUuid,
     block_devs: BlockDevMgr,
-    pub filesystems: Table<StratFilesystem>,
     redundancy: Redundancy,
     thin_pool: ThinPool,
-    mdv: MetadataVol,
 }
 
 impl StratPool {
@@ -113,14 +111,6 @@ impl StratPool {
                                            dm,
                                            data_regions));
 
-        let thinpool = try!(ThinPool::new(pool_uuid,
-                                          dm,
-                                          DATA_BLOCK_SIZE,
-                                          DATA_LOWATER,
-                                          meta_spare_regions,
-                                          meta_dev,
-                                          data_dev));
-
         let mdv_regions = block_mgr
             .alloc_space(INITIAL_MDV_SIZE)
             .expect("blockmgr must not fail, already checked for space");
@@ -129,16 +119,23 @@ impl StratPool {
         let mdv_dev = try!(LinearDev::new(&mdv_name, dm, mdv_regions));
         let mdv = try!(MetadataVol::initialize(&pool_uuid, mdv_dev));
 
+        let thinpool = try!(ThinPool::new(pool_uuid,
+                                          dm,
+                                          DATA_BLOCK_SIZE,
+                                          DATA_LOWATER,
+                                          meta_spare_regions,
+                                          meta_dev,
+                                          data_dev,
+                                          mdv));
+
         let devnodes = block_mgr.devnodes();
 
         let mut pool = StratPool {
             name: name.to_owned(),
             pool_uuid: pool_uuid,
             block_devs: block_mgr,
-            filesystems: Table::default(),
             redundancy: redundancy,
             thin_pool: thinpool,
-            mdv: mdv,
         };
 
         try!(pool.write_metadata());
@@ -230,44 +227,16 @@ impl StratPool {
                                             &thin_ids,
                                             thin_meta_spare_segments,
                                             meta_dev,
-                                            data_dev));
-
-
-        let filesystems: Vec<StratFilesystem> = {
-            /// Set up a filesystem from its metadata.
-            let get_filesystem = |fssave: &FilesystemSave| -> EngineResult<StratFilesystem> {
-                Ok(try!(StratFilesystem::setup(uuid,
-                                               fssave.uuid,
-                                               fssave.thin_id,
-                                               &fssave.name,
-                                               fssave.size,
-                                               &dm,
-                                               &thinpool)))
-            };
-
-            try!(filesystem_metadatas
-                     .iter()
-                     .map(get_filesystem)
-                     .collect())
-        };
-
-        let mut table = Table::default();
-        for fs in filesystems {
-            let evicted = table.insert(fs);
-            if !evicted.is_empty() {
-                let err_msg = "filesystems with duplicate UUID or name specified in metadata";
-                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
-            }
-        }
+                                            data_dev,
+                                            mdv,
+                                            filesystem_metadatas));
 
         Ok(StratPool {
                name: metadata.name,
                pool_uuid: uuid,
                block_devs: BlockDevMgr::new(blockdevs),
-               filesystems: table,
                redundancy: Redundancy::NONE,
                thin_pool: thinpool,
-               mdv: mdv,
            })
     }
 
@@ -310,12 +279,7 @@ impl StratPool {
         #![allow(match_same_arms)]
         let dm = DM::new().expect("Could not get DM handle");
 
-        if let Err(e) = self.mdv.check() {
-            error!("MDV error: {}", e);
-            return;
-        }
-
-        let result = match self.thin_pool.thin_pool_status(&dm) {
+        let result = match self.thin_pool.check(&dm) {
             Ok(r) => r,
             Err(_) => {
                 error!("Could not get thinpool status");
@@ -324,8 +288,8 @@ impl StratPool {
             }
         };
 
-        match result {
-            ThinPoolStatus::Good(wstatus, usage) => {
+        match result.thinpool {
+            dm::ThinPoolStatus::Good(wstatus, usage) => {
                 match wstatus {
                     ThinPoolWorkingStatus::Good => {}
                     ThinPoolWorkingStatus::ReadOnly => {
@@ -356,31 +320,41 @@ impl StratPool {
                     }
                 }
             }
-            ThinPoolStatus::Fail => {
+            dm::ThinPoolStatus::Fail => {
                 // TODO: Take pool offline?
                 // TODO: Run thin_check
             }
-        }
+        };
 
-        for fs in &mut self.filesystems {
-            match fs.check(&dm) {
-                Ok(f_status) => {
-                    if let FilesystemStatus::Failed = f_status {
-                        // TODO: recover fs? (how?)
-                    }
-                }
-                Err(_e) => error!("fs.check() failed"),
+        for fs_status in result.filesystems {
+            if let FilesystemStatus::Failed = fs_status {
+                // TODO: filesystem failed, how to recover?
             }
         }
     }
 
     /// Teardown a pool.
     /// Take down the device mapper devices belonging to the pool.
-    /// Precondition: All filesystems belonging to this pool must be
-    /// unmounted.
     pub fn teardown(self) -> EngineResult<()> {
-        teardown_pool!(self);
+        let dm = try!(DM::new());
+
+        try!(self.thin_pool.teardown(&dm));
+
         Ok(())
+    }
+
+    /// Look up a filesystem in the pool.
+    pub fn get_strat_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut StratFilesystem> {
+        self.thin_pool.get_mut_filesystem_by_uuid(uuid)
+    }
+
+    /// Get the devicemapper::ThinPoolDev for this pool. Used for testing.
+    pub fn thinpooldev(&self) -> &ThinPoolDev {
+        self.thin_pool.thinpooldev()
+    }
+
+    pub fn has_filesystems(&self) -> bool {
+        self.thin_pool.has_filesystems()
     }
 }
 
@@ -390,7 +364,9 @@ impl Pool for StratPool {
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
         let names: HashSet<_, RandomState> = HashSet::from_iter(specs);
         for name in &names {
-            if self.filesystems.contains_name(name) {
+            if self.thin_pool
+                   .get_mut_filesystem_by_name(name)
+                   .is_some() {
                 return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
             }
         }
@@ -399,16 +375,10 @@ impl Pool for StratPool {
         let dm = try!(DM::new());
         let mut result = Vec::new();
         for name in &names {
-            let uuid = Uuid::new_v4();
-            let new_filesystem = try!(StratFilesystem::initialize(&self.pool_uuid,
-                                                                  uuid,
-                                                                  name,
-                                                                  &dm,
-                                                                  &mut self.thin_pool,
-                                                                  None));
-            try!(self.mdv.save_fs(&new_filesystem));
-            self.filesystems.insert(new_filesystem);
-            result.push((**name, uuid));
+            let fs_uuid = Uuid::new_v4();
+            try!(self.thin_pool
+                     .create_filesystem(&self.pool_uuid, fs_uuid, name, &dm, None));
+            result.push((**name, fs_uuid));
         }
 
         Ok(result)
@@ -420,10 +390,11 @@ impl Pool for StratPool {
         Ok(bdev_paths)
     }
 
-    /// Precondition: All filesystems belonging to this pool must be
-    /// unmounted.
     fn destroy(self) -> EngineResult<()> {
-        teardown_pool!(self);
+        let dm = try!(DM::new());
+
+        try!(self.thin_pool.teardown(&dm));
+
         try!(self.block_devs.destroy_all());
         Ok(())
     }
@@ -431,32 +402,22 @@ impl Pool for StratPool {
     fn destroy_filesystems<'a, 'b>(&'a mut self,
                                    fs_uuids: &[&'b FilesystemUuid])
                                    -> EngineResult<Vec<&'b FilesystemUuid>> {
-        for fsid in fs_uuids {
-            try!(self.mdv.rm_fs(fsid));
+        let dm = try!(DM::new());
+
+        let mut removed = Vec::new();
+        for uuid in fs_uuids {
+            try!(self.thin_pool.destroy_filesystem(&dm, uuid));
+            removed.push(*uuid);
         }
-        destroy_filesystems!{self; fs_uuids}
+
+        Ok(removed)
     }
 
     fn rename_filesystem(&mut self,
                          uuid: &FilesystemUuid,
                          new_name: &str)
                          -> EngineResult<RenameAction> {
-        let old_name = rename_filesystem_pre!(self; uuid; new_name);
-
-        let mut filesystem =
-            self.filesystems
-                .remove_by_uuid(uuid)
-                .expect("Must succeed since self.filesystems.get_by_uuid() returned a value");
-
-        filesystem.rename(new_name);
-        if let Err(err) = self.mdv.save_fs(&filesystem) {
-            filesystem.rename(&old_name);
-            self.filesystems.insert(filesystem);
-            Err(err)
-        } else {
-            self.filesystems.insert(filesystem);
-            Ok(RenameAction::Renamed)
-        }
+        self.thin_pool.rename_filesystem(uuid, new_name)
     }
 
     fn rename(&mut self, name: &str) {
@@ -464,7 +425,8 @@ impl Pool for StratPool {
     }
 
     fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
-        get_filesystem!(self; uuid)
+        self.get_strat_filesystem(uuid)
+            .map(|fs| fs as &mut Filesystem)
     }
 
     fn total_physical_size(&self) -> Sectors {
@@ -474,10 +436,7 @@ impl Pool for StratPool {
     fn total_physical_used(&self) -> EngineResult<Sectors> {
         self.thin_pool
             .total_physical_used()
-            .and_then(|v| {
-                          Ok(v + self.block_devs.metadata_size() +
-                             self.mdv.segments().iter().map(|s| s.length).sum())
-                      })
+            .and_then(|v| Ok(v + self.block_devs.metadata_size()))
     }
 }
 
@@ -505,7 +464,11 @@ impl Recordable<PoolSave> for StratPool {
             Ok((*bd.uuid(), seg.start, seg.length))
         };
 
-        let meta_dev = try!(self.mdv.segments().iter().map(&mapper).collect());
+        let meta_dev = try!(self.thin_pool
+                                .thin_pool_mdv_segments()
+                                .iter()
+                                .map(&mapper)
+                                .collect());
 
         let thin_meta_dev = try!(self.thin_pool
                                      .thin_pool_meta_segments()

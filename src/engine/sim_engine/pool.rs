@@ -57,6 +57,10 @@ impl SimPool {
     }
 
     pub fn check(&mut self) -> () {}
+
+    pub fn has_filesystems(&self) -> bool {
+        !self.filesystems.is_empty()
+    }
 }
 
 impl Pool for SimPool {
@@ -73,7 +77,13 @@ impl Pool for SimPool {
     fn destroy_filesystems<'a, 'b>(&'a mut self,
                                    fs_uuids: &[&'b FilesystemUuid])
                                    -> EngineResult<Vec<&'b FilesystemUuid>> {
-        destroy_filesystems!{self; fs_uuids}
+        let mut removed = Vec::new();
+        for uuid in fs_uuids {
+            if self.filesystems.remove_by_uuid(uuid).is_some() {
+                removed.push(*uuid);
+            }
+        }
+        Ok(removed)
     }
 
     fn destroy(self) -> EngineResult<()> {

@@ -1,6 +1,3 @@
-# Do test-loop last, since the tests for that target require sudo.
-# Using sudo changes permissions on various directories. It is less trouble
-# not to have to fix up permissions after every sudo'd test.
 ${HOME}/.cargo/bin/cargo-fmt:
 	cargo install rustfmt --vers 0.8.3
 

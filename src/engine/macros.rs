@@ -42,12 +42,6 @@ macro_rules! get_pool {
     }
 }
 
-macro_rules! get_filesystem {
-    ( $s:ident; $uuid:ident ) => {
-        $s.filesystems.get_mut_by_uuid($uuid).map(|p| p as &mut Filesystem)
-    }
-}
-
 macro_rules! rename_filesystem_pre {
     ( $s:ident; $uuid:ident; $new_name:ident ) => {
         {

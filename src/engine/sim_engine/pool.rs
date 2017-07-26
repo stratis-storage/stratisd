@@ -133,7 +133,9 @@ impl Pool for SimPool {
     }
 
     fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
-        get_filesystem!(self; uuid)
+        self.filesystems
+            .get_mut_by_uuid(uuid)
+            .map(|p| p as &mut Filesystem)
     }
 
     fn total_physical_size(&self) -> Sectors {

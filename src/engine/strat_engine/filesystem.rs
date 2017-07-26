@@ -5,8 +5,9 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use devicemapper::DM;
-use devicemapper::{ThinDev, ThinDevId, ThinStatus, ThinPoolDev};
+use devicemapper::{Bytes, DM, DataBlocks, Sectors, ThinDev, ThinDevId, ThinStatus, ThinPoolDev};
+
+use nix::sys::statvfs::*;
 
 use super::super::engine::{Filesystem, HasName, HasUuid};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -62,6 +63,25 @@ impl StratFilesystem {
     /// The thin id for the thin device that backs this filesystem.
     pub fn thin_id(&self) -> ThinDevId {
         self.thin_dev.id()
+    }
+
+    /// Get the mount_point for this filesystem
+    /// TODO Replace this code with something less brittle
+    pub fn get_mount_point(&self) -> EngineResult<PathBuf> {
+        let output = try!(Command::new("df")
+                              .arg("--output=target")
+                              .arg(&try!(self.devnode()))
+                              .output());
+        if output.status.success() {
+            let output_str = String::from_utf8_lossy(&output.stdout);
+            match output_str.lines().last() {
+                Some(mount_point) => return Ok(PathBuf::from(mount_point)),
+                _ => {}
+            }
+        }
+        let err_msg = format!("Failed to get fielsystem mountpoint at {:?}",
+                              self.devnode());
+        Err(EngineError::Engine(ErrorEnum::Error, err_msg))
     }
 
     /// Tear down the filesystem.

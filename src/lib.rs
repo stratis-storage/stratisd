@@ -8,6 +8,7 @@ extern crate devicemapper;
 extern crate clap;
 #[macro_use]
 extern crate nix;
+extern crate mnt;
 extern crate crc;
 extern crate byteorder;
 extern crate uuid;

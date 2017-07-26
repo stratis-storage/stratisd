@@ -6,6 +6,8 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use mnt::get_mount;
+
 use devicemapper::DM;
 use devicemapper::Sectors;
 use devicemapper::{ThinDev, ThinDevId, ThinStatus};
@@ -85,6 +87,22 @@ impl StratFilesystem {
     /// The thin id for the thin device that backs this filesystem.
     pub fn thin_id(&self) -> ThinDevId {
         self.thin_dev.id()
+    }
+
+    /// Get the mount_point for this filesystem
+    pub fn get_mount_point(&self) -> EngineResult<PathBuf> {
+        match get_mount(&try!(self.devnode())) {
+            Ok(list) => {
+                match list {
+                    Some(mount) => Ok(mount.file),
+                    None => {
+                        Err(EngineError::Engine(ErrorEnum::Error,
+                                                "No mount point for filesystem".into()))
+                    }
+                }
+            }
+            Err(e) => Err(EngineError::Engine(ErrorEnum::Error, e.description().into())),
+        }
     }
 
     /// Tear down the filesystem.

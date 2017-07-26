@@ -33,7 +33,7 @@ pub fn test_thinpool_expand(paths: &[&Path]) -> () {
                                               Redundancy::NONE,
                                               true)
             .unwrap();
-    let &(_, fs_uuid) = pool.create_filesystems(&vec!["stratis_test_filesystem"])
+    let &(_, fs_uuid) = pool.create_filesystems(&vec![("stratis_test_filesystem", None)])
         .unwrap()
         .first()
         .unwrap();
@@ -74,7 +74,7 @@ pub fn test_filesystem_rename(paths: &[&Path]) {
     let (uuid1, _) = engine.create_pool(&name1, paths, None, false).unwrap();
     let fs_uuid = {
         let mut pool = engine.get_pool(&uuid1).unwrap();
-        let &(fs_name, fs_uuid) = pool.create_filesystems(&[name1])
+        let &(fs_name, fs_uuid) = pool.create_filesystems(&[(name1, None)])
             .unwrap()
             .first()
             .unwrap();
@@ -110,7 +110,7 @@ pub fn test_thinpool_thindev_destroy(paths: &[&Path]) -> () {
                                               Redundancy::NONE,
                                               true)
             .unwrap();
-    let &(_, fs_uuid) = pool.create_filesystems(&["stratis_test_filesystem"])
+    let &(_, fs_uuid) = pool.create_filesystems(&[("stratis_test_filesystem", None)])
         .unwrap()
         .first()
         .unwrap();

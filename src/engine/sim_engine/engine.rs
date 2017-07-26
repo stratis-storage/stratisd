@@ -167,7 +167,7 @@ mod tests {
             .unwrap();
         {
             let pool = engine.get_pool(&uuid).unwrap();
-            pool.create_filesystems(&["test"]).unwrap();
+            pool.create_filesystems(&[("test", None)]).unwrap();
         }
         assert!(engine.destroy_pool(&uuid).is_err());
     }

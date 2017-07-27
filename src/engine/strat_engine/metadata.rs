@@ -340,7 +340,7 @@ mod mda {
                              -> EngineResult<MDARegions>
             where F: Seek + Write
         {
-            let hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
+            let hdr_buf = MDAHeader::default().to_buf();
 
             let region_size = size / NUM_MDA_REGIONS;
             let per_region_size = region_size.bytes();
@@ -360,6 +360,10 @@ mod mda {
         }
 
         /// Construct MDARegions from data on the disk.
+        /// Note that this method is always called in a context where a
+        /// StaticHeader has already been read. Therefore, it
+        /// constitutes an error if it is not possible to discover two
+        /// well-formed MDAHeaders for this device.
         pub fn load<F>(header_size: Bytes, size: Sectors, f: &mut F) -> EngineResult<MDARegions>
             where F: Read + Seek
         {
@@ -381,18 +385,14 @@ mod mda {
 
             /// Get an MDAHeader for the given index.
             /// If there is a failure reading the first, fall back on the
-            /// second. If there is a failure reading both, return None.
-            /// TODO: Consider whether this is the correct behavior.
-            let mut get_mda = |index: usize| -> Option<MDAHeader> {
-                load_a_region(index)
-                    .or_else(|_| load_a_region(index + 2))
-                    .ok()
-                    .unwrap_or(None)
+            /// second. If there is a failure reading both, return an error.
+            let mut get_mda = |index: usize| -> EngineResult<Option<MDAHeader>> {
+                load_a_region(index).or_else(|_| load_a_region(index + 2))
             };
 
             Ok(MDARegions {
                    region_size: region_size,
-                   mdas: [get_mda(0), get_mda(1)],
+                   mdas: [try!(get_mda(0)), try!(get_mda(1))],
                })
         }
 
@@ -519,6 +519,20 @@ mod mda {
         data_crc: u32,
     }
 
+    // Implementing Default explicitly because Timespec does not implement
+    // Default. The time crate has been superceded by the chrono crate, and
+    // is in maintenance mode, so there is little point in submitting a PR
+    // to change Timespec's behavior.
+    impl Default for MDAHeader {
+        fn default() -> MDAHeader {
+            MDAHeader {
+                last_updated: Timespec::new(0, 0),
+                used: Bytes(0),
+                data_crc: 0,
+            }
+        }
+    }
+
     impl MDAHeader {
         /// Get an MDAHeader from the buffer.
         /// Return an error for a bad checksum.
@@ -632,10 +646,35 @@ mod mda {
 
     #[cfg(test)]
     mod tests {
+        use std::io::Cursor;
+
         use quickcheck::{QuickCheck, TestResult};
         use time::{now, Timespec};
 
+        use super::super::*;
         use super::*;
+
+        #[test]
+        /// Verify that default MDAHeader is all 0s except for CRC.
+        fn test_default_mda_header() {
+            assert!(MDAHeader::default().to_buf()[4..]
+                        .iter()
+                        .all(|x| *x == 0u8));
+        }
+
+        #[test]
+        /// Verify that loading the MDARegions fails if the regions are all 0s.
+        /// Verify that loading MDARegions succeeds if the regions are properly
+        /// initialized.
+        fn test_reading_mda_regions() {
+            let buf_length = *(BDA_STATIC_HDR_SIZE + 4usize * MIN_MDA_SECTORS.bytes()) as usize;
+            let mut buf = Cursor::new(vec![0; buf_length]);
+            assert!(MDARegions::load(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf).is_err());
+
+            MDARegions::initialize(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf).unwrap();
+            let regions = MDARegions::load(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf).unwrap();
+            assert!(regions.last_update_time().is_none());
+        }
 
         #[test]
         /// Using an arbitrary data buffer, construct an mda header buffer

@@ -7,16 +7,26 @@
 
 extern crate devicemapper;
 extern crate libstratis;
+extern crate nix;
+extern crate tempdir;
 extern crate uuid;
 
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::Path;
 
+use self::nix::mount::{MsFlags, MNT_DETACH, mount, umount2};
+use self::tempdir::TempDir;
 use self::uuid::Uuid;
 
-use libstratis::engine::Engine;
-use libstratis::engine::types::RenameAction;
+use self::devicemapper::DM;
+
+use libstratis::engine::{Engine, Pool};
+use libstratis::engine::engine::HasUuid;
+use libstratis::engine::types::{Redundancy, RenameAction};
 use libstratis::engine::strat_engine::blockdevmgr::{initialize, resolve_devices};
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
+use libstratis::engine::strat_engine::pool::StratPool;
 use libstratis::engine::strat_engine::serde_structs::Recordable;
 use libstratis::engine::strat_engine::setup::{find_all, get_blockdevs, get_metadata};
 use libstratis::engine::strat_engine::StratEngine;
@@ -175,4 +185,46 @@ pub fn test_pool_rename(paths: &[&Path]) {
     let pool_name: String = engine.get_pool(&uuid1).unwrap().name().into();
     assert_eq!(pool_name, name2);
     engine.teardown().unwrap();
+}
+
+/// Verify that setting up a pool when the pool has not been previously torn
+/// down does not fail. Clutter the original pool with a filesystem with some
+/// data on it.
+pub fn test_pool_setup(paths: &[&Path]) {
+    let dm = DM::new().unwrap();
+
+    let (mut pool, _) = StratPool::initialize("name", &dm, paths, Redundancy::NONE, false).unwrap();
+
+    let (_, fs_uuid) = pool.create_filesystems(&["fsname"]).unwrap()[0];
+
+    let tmp_dir = TempDir::new("stratis_testing").unwrap();
+    let new_file = tmp_dir.path().join("stratis_test.txt");
+    {
+        let fs = pool.get_filesystem(&fs_uuid).unwrap();
+        mount(Some(&fs.devnode().unwrap()),
+              tmp_dir.path(),
+              Some("xfs"),
+              MsFlags::empty(),
+              None as Option<&str>)
+                .unwrap();
+        writeln!(&OpenOptions::new()
+                      .create(true)
+                      .write(true)
+                      .open(new_file)
+                      .unwrap(),
+                 "data")
+                .unwrap();
+    }
+
+    let mut new_pool = StratPool::setup(*pool.uuid(),
+                                        &paths
+                                             .into_iter()
+                                             .map(|x| x.to_path_buf())
+                                             .collect::<Vec<_>>())
+            .unwrap();
+
+    assert!(new_pool.get_filesystem(&fs_uuid).is_some());
+
+    umount2(tmp_dir.path(), MNT_DETACH).unwrap();
+    pool.teardown().unwrap();
 }

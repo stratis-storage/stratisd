@@ -30,6 +30,7 @@ use util::blockdev_tests::test_force_flag_stratis;
 use util::blockdev_tests::test_pool_blockdevs;
 use util::dm_tests::test_thinpool_device;
 use util::dm_tests::test_linear_device;
+use util::filesystem_tests::test_xfs_expand;
 use util::pool_tests::test_filesystem_rename;
 use util::pool_tests::test_thinpool_expand;
 use util::pool_tests::test_thinpool_thindev_destroy;
@@ -209,4 +210,9 @@ pub fn loop_test_filesystem_rename() {
 #[test]
 pub fn loop_test_pool_setup() {
     test_with_spec(2, test_pool_setup);
+}
+
+#[test]
+pub fn loop_test_xfs_expand() {
+    test_with_spec(3, test_xfs_expand);
 }

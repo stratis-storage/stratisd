@@ -22,8 +22,8 @@ use libstratis::engine::strat_engine::pool::{DATA_BLOCK_SIZE, DATA_LOWATER, INIT
                                              StratPool};
 use libstratis::engine::types::{Redundancy, RenameAction};
 
-/// Verify that a the physical space allocated to a pool is expanded when
-/// the nuber of sectors written to a thin-dev in the pool exceeds the
+/// Verify that the physical space allocated to a pool is expanded when
+/// the number of sectors written to a thin-dev in the pool exceeds the
 /// INITIAL_DATA_SIZE.  If we are able to write more sectors to the filesystem
 /// than are initially allocated to the pool, the pool must have been expanded.
 pub fn test_thinpool_expand(paths: &[&Path]) -> () {

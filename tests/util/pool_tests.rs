@@ -33,7 +33,8 @@ pub fn test_thinpool_expand(paths: &[&Path]) -> () {
                                               Redundancy::NONE,
                                               true)
             .unwrap();
-    let &(_, fs_uuid) = pool.create_filesystems(&vec![("stratis_test_filesystem", None)])
+
+    let &(_, fs_uuid) = pool.create_filesystems(&[("stratis_test_filesystem", None)])
         .unwrap()
         .first()
         .unwrap();

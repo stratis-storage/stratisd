@@ -88,7 +88,6 @@ impl ThinPool {
     /// If initial setup fails due to a thin_check failure, attempt to fix
     /// the problem by running thin_repair. If failure recurs, return an
     /// error.
-    // FIXME: Check for still existing device mapper devices.
     #[allow(too_many_arguments)]
     pub fn setup(pool_uuid: PoolUuid,
                  dm: &DM,

@@ -132,7 +132,7 @@ impl ThinPool {
 
         // TODO: not fail completely if one filesystem setup fails?
         let filesystems: Vec<StratFilesystem> = {
-            /// Set up a filesystem from its metadata.
+            // Set up a filesystem from its metadata.
             let get_filesystem = |fssave: &FilesystemSave| -> EngineResult<StratFilesystem> {
                 let device_name = format_thin_name(&pool_uuid, ThinRole::Filesystem(fssave.uuid));
                 let thin_dev = try!(ThinDev::setup(&device_name,

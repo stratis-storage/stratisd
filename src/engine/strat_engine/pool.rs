@@ -158,9 +158,9 @@ impl StratPool {
             .map(|bd| (*bd.uuid(), *bd.device()))
             .collect();
 
-        /// Obtain a Segment from a Uuid, Sectors, Sectors triple.
-        /// This can fail if there is no entry for the UUID in the map
-        /// from UUIDs to device numbers.
+        // Obtain a Segment from a Uuid, Sectors, Sectors triple.
+        // This can fail if there is no entry for the UUID in the map
+        // from UUIDs to device numbers.
         let lookup = |triple: &(Uuid, Sectors, Sectors)| -> EngineResult<Segment> {
             let device = try!(uuid_map
                                   .get(&triple.0)

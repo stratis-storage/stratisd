@@ -370,10 +370,10 @@ mod mda {
             let region_size = size / NUM_MDA_REGIONS;
             let per_region_size = region_size.bytes();
 
-            /// Load a single region at the location specified by index.
-            /// If it appears that no metadata has been written at the location
-            /// return None. If it appears that there is metadata, but it has
-            /// been corrrupted, return an error.
+            // Load a single region at the location specified by index.
+            // If it appears that no metadata has been written at the location
+            // return None. If it appears that there is metadata, but it has
+            // been corrrupted, return an error.
             let mut load_a_region = |index: usize| -> EngineResult<Option<MDAHeader>> {
                 let mut hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
                 try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(header_size,
@@ -383,9 +383,9 @@ mod mda {
                 Ok(try!(MDAHeader::from_buf(&hdr_buf, per_region_size)))
             };
 
-            /// Get an MDAHeader for the given index.
-            /// If there is a failure reading the first, fall back on the
-            /// second. If there is a failure reading both, return an error.
+            // Get an MDAHeader for the given index.
+            // If there is a failure reading the first, fall back on the
+            // second. If there is a failure reading both, return an error.
             let mut get_mda = |index: usize| -> EngineResult<Option<MDAHeader>> {
                 load_a_region(index).or_else(|_| load_a_region(index + 2))
             };
@@ -427,7 +427,7 @@ mod mda {
             };
             let hdr_buf = header.to_buf();
 
-            /// Write data to a region specified by index.
+            // Write data to a region specified by index.
             let mut save_region = |index: usize| -> EngineResult<()> {
                 try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(header_size,
                                                                    index,
@@ -464,8 +464,8 @@ mod mda {
             };
             let region_size = self.region_size.bytes();
 
-            /// Load the metadata region specified by index.
-            /// It is an error if the metadata can not be found.
+            // Load the metadata region specified by index.
+            // It is an error if the metadata can not be found.
             let mut load_region = |index: usize| -> EngineResult<Vec<u8>> {
                 let offset = MDARegions::mda_offset(header_size, index, region_size) +
                              _MDA_REGION_HDR_SIZE as u64;

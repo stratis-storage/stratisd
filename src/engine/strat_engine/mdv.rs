@@ -12,6 +12,7 @@ use std::io::prelude::*;
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 
+use nix;
 use nix::mount::{MsFlags, mount, umount};
 use nix::unistd::fsync;
 use serde_json;
@@ -62,11 +63,19 @@ impl MetadataVol {
             }
         }
 
-        try!(mount(Some(&try!(dev.devnode())),
-                   &mount_pt,
-                   Some("xfs"),
-                   MsFlags::empty(),
-                   None as Option<&str>));
+        if let Err(err) = mount(Some(&try!(dev.devnode())),
+                                &mount_pt,
+                                Some("xfs"),
+                                MsFlags::empty(),
+                                None as Option<&str>) {
+            match err {
+                nix::Error::Sys(nix::Errno::EBUSY) => {
+                    // EBUSY is the error returned in this context when the
+                    // device is already mounted at the specified mountpoint.
+                }
+                _ => return Err(From::from(err)),
+            }
+        }
 
         if let Err(err) = create_dir(&mount_pt.join(FILESYSTEM_DIR)) {
             if err.kind() != ErrorKind::AlreadyExists {

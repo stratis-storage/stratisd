@@ -36,6 +36,7 @@ use util::pool_tests::test_thinpool_thindev_destroy;
 use util::setup_tests::test_basic_metadata;
 use util::setup_tests::test_initialize;
 use util::setup_tests::test_pool_rename;
+use util::setup_tests::test_pool_setup;
 use util::setup_tests::test_setup;
 use util::simple_tests::test_empty_pool;
 use util::simple_tests::test_teardown;
@@ -203,4 +204,9 @@ pub fn loop_test_blockdevmgr_used() {
 #[test]
 pub fn loop_test_filesystem_rename() {
     test_with_spec(2, test_filesystem_rename);
+}
+
+#[test]
+pub fn loop_test_pool_setup() {
+    test_with_spec(2, test_pool_setup);
 }

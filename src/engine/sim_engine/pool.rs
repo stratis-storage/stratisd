@@ -147,6 +147,13 @@ impl Pool for SimPool {
     fn total_physical_used(&self) -> EngineResult<Sectors> {
         Ok(Sectors(0))
     }
+
+    fn filesystems(&self) -> Vec<&Filesystem> {
+        self.filesystems
+            .into_iter()
+            .map(|x| x as &Filesystem)
+            .collect()
+    }
 }
 
 impl HasUuid for SimPool {

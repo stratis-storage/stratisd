@@ -123,4 +123,8 @@ impl Engine for StratEngine {
     fn check(&mut self) -> () {
         check_engine!(self);
     }
+
+    fn pools(&self) -> Vec<&Pool> {
+        self.pools.into_iter().map(|x| x as &Pool).collect()
+    }
 }

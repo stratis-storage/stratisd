@@ -15,7 +15,7 @@ use devicemapper::{DM, DataBlocks, DmError, LinearDev, MetaBlocks, Sectors, Segm
 use devicemapper::ErrorEnum::CheckFailed;
 
 use super::super::consts::IEC;
-use super::super::engine::HasName;
+use super::super::engine::{Filesystem, HasName};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{PoolUuid, FilesystemUuid, RenameAction};
@@ -266,6 +266,13 @@ impl ThinPool {
 
     pub fn has_filesystems(&self) -> bool {
         !self.filesystems.is_empty()
+    }
+
+    pub fn filesystems(&self) -> Vec<&Filesystem> {
+        self.filesystems
+            .into_iter()
+            .map(|x| x as &Filesystem)
+            .collect()
     }
 
     /// Create a filesystem within the thin pool. Given name must not

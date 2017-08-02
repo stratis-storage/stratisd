@@ -84,6 +84,9 @@ pub trait Pool: HasName + HasUuid {
     /// pool for some purpose, be it to store metadata, to store user data,
     /// or to reserve for some other purpose.
     fn total_physical_used(&self) -> EngineResult<Sectors>;
+
+    /// Get all the filesystems belonging to this pool.
+    fn filesystems(&self) -> Vec<&Filesystem>;
 }
 
 pub trait Engine: Debug {
@@ -119,4 +122,7 @@ pub trait Engine: Debug {
 
     /// Check pools' current state and take appropriate actions
     fn check(&mut self) -> ();
+
+    /// Get all pools belonging to this engine.
+    fn pools(&self) -> Vec<&Pool>;
 }

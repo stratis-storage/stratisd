@@ -436,6 +436,10 @@ impl Pool for StratPool {
             .total_physical_used()
             .and_then(|v| Ok(v + self.block_devs.metadata_size()))
     }
+
+    fn filesystems(&self) -> Vec<&Filesystem> {
+        self.thin_pool.filesystems()
+    }
 }
 
 impl HasUuid for StratPool {

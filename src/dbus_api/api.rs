@@ -192,7 +192,7 @@ fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn get_base_tree(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
+fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, dbus::Path<'a>) {
 
     let f = Factory::new_fn();
 
@@ -248,7 +248,8 @@ fn get_base_tree(dbus_context: DbusContext) -> Tree<MTFn<TData>, TData> {
                  .add_p(redundancy_values_property)
                  .add_p(version_property));
 
-    base_tree.add(obj_path)
+    let path = obj_path.get_name().to_owned();
+    (base_tree.add(obj_path), path)
 }
 
 #[allow(type_complexity)]
@@ -256,7 +257,7 @@ pub fn connect(engine: Rc<RefCell<Engine>>)
                -> Result<(Connection, Tree<MTFn<TData>, TData>, DbusContext), dbus::Error> {
     let c = try!(Connection::get_private(BusType::System));
 
-    let tree = get_base_tree(DbusContext::new(engine));
+    let (tree, _) = get_base_tree(DbusContext::new(engine));
     let dbus_context = tree.get_data().clone();
     try!(tree.set_registered(&c, true));
 

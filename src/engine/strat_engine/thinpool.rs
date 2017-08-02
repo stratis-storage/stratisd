@@ -15,7 +15,7 @@ use devicemapper::{DM, DataBlocks, DmError, LinearDev, MetaBlocks, Sectors, Segm
 use devicemapper::ErrorEnum::CheckFailed;
 
 use super::super::consts::IEC;
-use super::super::engine::HasName;
+use super::super::engine::{Filesystem, HasName};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{PoolUuid, FilesystemUuid, RenameAction};
@@ -254,10 +254,19 @@ impl ThinPool {
         Ok(data_dev_used + spare_total + meta_dev_total + mdv_total)
     }
 
+    pub fn get_filesystem_by_uuid(&self, uuid: &FilesystemUuid) -> Option<&StratFilesystem> {
+        self.filesystems.get_by_uuid(uuid)
+    }
+
     pub fn get_mut_filesystem_by_uuid(&mut self,
                                       uuid: &FilesystemUuid)
                                       -> Option<&mut StratFilesystem> {
         self.filesystems.get_mut_by_uuid(uuid)
+    }
+
+    #[allow(dead_code)]
+    pub fn get_filesystem_by_name(&self, name: &str) -> Option<&StratFilesystem> {
+        self.filesystems.get_by_name(name)
     }
 
     pub fn get_mut_filesystem_by_name(&mut self, name: &str) -> Option<&mut StratFilesystem> {
@@ -266,6 +275,13 @@ impl ThinPool {
 
     pub fn has_filesystems(&self) -> bool {
         !self.filesystems.is_empty()
+    }
+
+    pub fn filesystems(&self) -> Vec<&Filesystem> {
+        self.filesystems
+            .into_iter()
+            .map(|x| x as &Filesystem)
+            .collect()
     }
 
     /// Create a filesystem within the thin pool. Given name must not

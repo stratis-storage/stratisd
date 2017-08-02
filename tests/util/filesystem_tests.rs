@@ -46,7 +46,7 @@ pub fn test_xfs_expand(paths: &[&Path]) -> () {
         .unwrap();
     // Braces to ensure f is closed before destroy and the borrow of pool is complete
     {
-        let filesystem = pool.get_strat_filesystem(&fs_uuid).unwrap();
+        let filesystem = pool.get_mut_strat_filesystem(&fs_uuid).unwrap();
         let devnode = filesystem.devnode().unwrap();
         // Write 2 MiB of data. The filesystem's free space is now 1 MiB below
         // FILESYSTEM_LOWATER.

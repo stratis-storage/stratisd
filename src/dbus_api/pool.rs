@@ -56,7 +56,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let pool = get_pool!(engine; pool_uuid; default_return; return_message);
+    let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let result =
         pool.create_filesystems(&filesystems
@@ -111,7 +111,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let pool = get_pool!(engine; pool_uuid; default_return; return_message);
+    let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let mut filesystem_map: HashMap<Uuid, dbus::Path<'static>> = HashMap::new();
     for op in filesystems {
@@ -167,7 +167,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let pool = get_pool!(engine; pool_uuid; default_return; return_message);
+    let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
@@ -259,7 +259,7 @@ fn get_pool_property<F>(i: &mut IterAppend,
                                     }))
             .uuid;
 
-    let mut engine = dbus_context.engine.borrow_mut();
+    let engine = dbus_context.engine.borrow();
     let pool = try!(engine
                  .get_pool(&pool_uuid)
                  .ok_or_else(|| {

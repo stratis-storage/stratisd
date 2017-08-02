@@ -343,7 +343,9 @@ impl StratPool {
     }
 
     /// Look up a filesystem in the pool.
-    pub fn get_strat_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut StratFilesystem> {
+    pub fn get_mut_strat_filesystem(&mut self,
+                                    uuid: &FilesystemUuid)
+                                    -> Option<&mut StratFilesystem> {
         self.thin_pool.get_mut_filesystem_by_uuid(uuid)
     }
 
@@ -422,8 +424,15 @@ impl Pool for StratPool {
         self.name = name.to_owned();
     }
 
-    fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
-        self.get_strat_filesystem(uuid)
+    fn get_filesystem(&self, uuid: &FilesystemUuid) -> Option<&Filesystem> {
+        self.thin_pool
+            .get_filesystem_by_uuid(uuid)
+            .map(|fs| fs as &Filesystem)
+    }
+
+    fn get_mut_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
+        self.thin_pool
+            .get_mut_filesystem_by_uuid(uuid)
             .map(|fs| fs as &mut Filesystem)
     }
 
@@ -435,6 +444,10 @@ impl Pool for StratPool {
         self.thin_pool
             .total_physical_used()
             .and_then(|v| Ok(v + self.block_devs.metadata_size()))
+    }
+
+    fn filesystems(&self) -> Vec<&Filesystem> {
+        self.thin_pool.filesystems()
     }
 }
 

@@ -116,11 +116,19 @@ impl Engine for StratEngine {
         }
     }
 
-    fn get_pool(&mut self, uuid: &PoolUuid) -> Option<&mut Pool> {
+    fn get_pool(&self, uuid: &PoolUuid) -> Option<&Pool> {
         get_pool!(self; uuid)
+    }
+
+    fn get_mut_pool(&mut self, uuid: &PoolUuid) -> Option<&mut Pool> {
+        get_mut_pool!(self; uuid)
     }
 
     fn check(&mut self) -> () {
         check_engine!(self);
+    }
+
+    fn pools(&self) -> Vec<&Pool> {
+        self.pools.into_iter().map(|x| x as &Pool).collect()
     }
 }

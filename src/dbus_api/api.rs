@@ -31,6 +31,7 @@ use dbus::ConnectionItem;
 use engine::{Engine, Redundancy};
 use stratis::VERSION;
 
+use super::filesystem::create_dbus_filesystem;
 use super::pool::create_dbus_pool;
 use super::types::{DeferredAction, DbusContext, DbusErrorEnum, TData};
 use super::util::STRATIS_BASE_PATH;
@@ -257,8 +258,20 @@ pub fn connect(engine: Rc<RefCell<Engine>>)
                -> Result<(Connection, Tree<MTFn<TData>, TData>, DbusContext), dbus::Error> {
     let c = try!(Connection::get_private(BusType::System));
 
-    let (tree, _) = get_base_tree(DbusContext::new(engine));
+    let local_engine = Rc::clone(&engine);
+
+    let (tree, object_path) = get_base_tree(DbusContext::new(engine));
     let dbus_context = tree.get_data().clone();
+
+    // This should never panic as create_dbus_pool() and
+    // create_dbus_filesystem() do not borrow the engine.
+    for pool in local_engine.borrow().pools() {
+        let pool_path = create_dbus_pool(&dbus_context, object_path.clone(), *pool.uuid());
+        for fs_uuid in pool.filesystems().iter().map(|f| *f.uuid()) {
+            create_dbus_filesystem(&dbus_context, pool_path.clone(), fs_uuid);
+        }
+    }
+
     try!(tree.set_registered(&c, true));
 
     try!(c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32));

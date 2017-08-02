@@ -343,7 +343,7 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
                                                spare_segments.drain(..).collect()));
 
 
-    if !try!(Command::new("thin_repair")
+    if !try!(Command::new("asdhasdthin_repairXX")
                  .arg("-i")
                  .arg(&try!(meta_dev.devnode()))
                  .arg("-o")

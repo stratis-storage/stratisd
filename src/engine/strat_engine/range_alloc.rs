@@ -108,16 +108,22 @@ impl RangeAllocator {
                 (None, Some((next_off, next_len))) => {
                     // Contig with next, make new entry
                     self.used.insert(off, len + next_len);
-                    self.used.remove(&next_off).expect("must exist");
+                    self.used
+                        .remove(&next_off)
+                        .expect("matched Some((next_off, ...");
                 }
                 (Some((prev_off, prev_len)), None) => {
                     // Contig with prev, just extend prev
-                    *self.used.get_mut(&prev_off).expect("must exist") = prev_len + len;
+                    *self.used
+                         .get_mut(&prev_off)
+                         .expect("matched Some((prev_off, ...") = prev_len + len;
                 }
                 (Some((prev_off, prev_len)), Some((next_off, next_len))) => {
                     // Contig with both, remove next and extend prev
                     self.used.remove(&next_off);
-                    *self.used.get_mut(&prev_off).expect("must exist") = prev_len + len + next_len;
+                    *self.used
+                         .get_mut(&prev_off)
+                         .expect("matched Some((prev_off, ...") = prev_len + len + next_len;
                 }
             }
         }

@@ -22,8 +22,8 @@ use libstratis::engine::strat_engine::pool::{DATA_BLOCK_SIZE, DATA_LOWATER, INIT
                                              StratPool};
 use libstratis::engine::types::{Redundancy, RenameAction};
 
-/// Verify that a the physical space allocated to a pool is expanded when
-/// the nuber of sectors written to a thin-dev in the pool exceeds the
+/// Verify that the physical space allocated to a pool is expanded when
+/// the number of sectors written to a thin-dev in the pool exceeds the
 /// INITIAL_DATA_SIZE.  If we are able to write more sectors to the filesystem
 /// than are initially allocated to the pool, the pool must have been expanded.
 pub fn test_thinpool_expand(paths: &[&Path]) -> () {
@@ -33,7 +33,8 @@ pub fn test_thinpool_expand(paths: &[&Path]) -> () {
                                               Redundancy::NONE,
                                               true)
             .unwrap();
-    let &(_, fs_uuid) = pool.create_filesystems(&vec!["stratis_test_filesystem"])
+
+    let &(_, fs_uuid) = pool.create_filesystems(&[("stratis_test_filesystem", None)])
         .unwrap()
         .first()
         .unwrap();
@@ -74,7 +75,7 @@ pub fn test_filesystem_rename(paths: &[&Path]) {
     let (uuid1, _) = engine.create_pool(&name1, paths, None, false).unwrap();
     let fs_uuid = {
         let mut pool = engine.get_pool(&uuid1).unwrap();
-        let &(fs_name, fs_uuid) = pool.create_filesystems(&[name1])
+        let &(fs_name, fs_uuid) = pool.create_filesystems(&[(name1, None)])
             .unwrap()
             .first()
             .unwrap();
@@ -110,7 +111,7 @@ pub fn test_thinpool_thindev_destroy(paths: &[&Path]) -> () {
                                               Redundancy::NONE,
                                               true)
             .unwrap();
-    let &(_, fs_uuid) = pool.create_filesystems(&["stratis_test_filesystem"])
+    let &(_, fs_uuid) = pool.create_filesystems(&[("stratis_test_filesystem", None)])
         .unwrap()
         .first()
         .unwrap();

@@ -195,7 +195,7 @@ pub fn test_pool_setup(paths: &[&Path]) {
 
     let (mut pool, _) = StratPool::initialize("name", &dm, paths, Redundancy::NONE, false).unwrap();
 
-    let (_, fs_uuid) = pool.create_filesystems(&["fsname"]).unwrap()[0];
+    let (_, fs_uuid) = pool.create_filesystems(&[("fsname", None)]).unwrap()[0];
 
     let tmp_dir = TempDir::new("stratis_testing").unwrap();
     let new_file = tmp_dir.path().join("stratis_test.txt");

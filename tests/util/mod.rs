@@ -5,6 +5,7 @@
 
 pub mod blockdev_tests;
 pub mod dm_tests;
+pub mod filesystem_tests;
 pub mod pool_tests;
 pub mod setup_tests;
 pub mod simple_tests;

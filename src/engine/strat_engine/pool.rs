@@ -2,8 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::{HashMap, HashSet};
-use std::collections::hash_map::RandomState;
+use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::path::Path;
 use std::path::PathBuf;
@@ -360,12 +359,12 @@ impl StratPool {
 
 impl Pool for StratPool {
     fn create_filesystems<'a, 'b>(&'a mut self,
-                                  specs: &[&'b str])
+                                  specs: &[(&'b str, Option<Sectors>)])
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
-        let names: HashSet<_, RandomState> = HashSet::from_iter(specs);
-        for name in &names {
+        let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
+        for name in names.keys() {
             if self.thin_pool
-                   .get_mut_filesystem_by_name(name)
+                   .get_mut_filesystem_by_name(*name)
                    .is_some() {
                 return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
             }
@@ -374,10 +373,10 @@ impl Pool for StratPool {
         // TODO: Roll back on filesystem initialization failure.
         let dm = try!(DM::new());
         let mut result = Vec::new();
-        for name in &names {
+        for (name, size) in names {
             let fs_uuid = try!(self.thin_pool
-                                   .create_filesystem(&self.pool_uuid, name, &dm, None));
-            result.push((**name, fs_uuid));
+                                   .create_filesystem(&self.pool_uuid, name, &dm, size));
+            result.push((name, fs_uuid));
         }
 
         Ok(result)

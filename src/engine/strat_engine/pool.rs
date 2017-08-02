@@ -277,7 +277,7 @@ impl StratPool {
 
     pub fn check(&mut self) -> () {
         #![allow(match_same_arms)]
-        let dm = DM::new().expect("Could not get DM handle");
+        let dm = DM::new().unwrap();
 
         let result = match self.thin_pool.check(&dm) {
             Ok(r) => r,

@@ -160,7 +160,7 @@ pub fn test_setup(paths: &[&Path]) {
 
     engine.teardown().unwrap();
 
-    let mut engine = StratEngine::initialize().unwrap();
+    let engine = StratEngine::initialize().unwrap();
 
     assert!(engine.get_pool(&uuid1).is_some());
     assert!(engine.get_pool(&uuid2).is_some());
@@ -181,7 +181,7 @@ pub fn test_pool_rename(paths: &[&Path]) {
     assert_eq!(action, RenameAction::Renamed);
     engine.teardown().unwrap();
 
-    let mut engine = StratEngine::initialize().unwrap();
+    let engine = StratEngine::initialize().unwrap();
     let pool_name: String = engine.get_pool(&uuid1).unwrap().name().into();
     assert_eq!(pool_name, name2);
     engine.teardown().unwrap();
@@ -216,11 +216,11 @@ pub fn test_pool_setup(paths: &[&Path]) {
                 .unwrap();
     }
 
-    let mut new_pool = StratPool::setup(*pool.uuid(),
-                                        &paths
-                                             .into_iter()
-                                             .map(|x| x.to_path_buf())
-                                             .collect::<Vec<_>>())
+    let new_pool = StratPool::setup(*pool.uuid(),
+                                    &paths
+                                         .into_iter()
+                                         .map(|x| x.to_path_buf())
+                                         .collect::<Vec<_>>())
             .unwrap();
 
     assert!(new_pool.get_filesystem(&fs_uuid).is_some());

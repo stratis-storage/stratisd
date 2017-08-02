@@ -105,7 +105,7 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let pool = get_pool!(engine; pool_uuid; default_return; return_message);
+    let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let msg = match pool.rename_filesystem(&filesystem_data.uuid, new_name) {
         Ok(RenameAction::NoSource) => {
@@ -173,7 +173,7 @@ fn get_filesystem_property<F>(i: &mut IterAppend,
                                     }))
             .uuid;
 
-    let mut engine = dbus_context.engine.borrow_mut();
+    let engine = dbus_context.engine.borrow();
     let pool = try!(engine
                  .get_pool(&pool_uuid)
                  .ok_or_else(|| {

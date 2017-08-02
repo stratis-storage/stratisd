@@ -70,7 +70,10 @@ pub trait Pool: HasName + HasUuid {
     fn rename(&mut self, name: &str) -> ();
 
     /// Get the filesystem in this pool with this UUID.
-    fn get_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem>;
+    fn get_filesystem(&self, uuid: &FilesystemUuid) -> Option<&Filesystem>;
+
+    /// Get the mutable filesystem in this pool with this UUID.
+    fn get_mut_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem>;
 
     /// The total number of Sectors belonging to this pool.
     /// There are no exclusions, so this number includes overhead sectors
@@ -114,7 +117,10 @@ pub trait Engine: Debug {
     fn rename_pool(&mut self, uuid: &PoolUuid, new_name: &str) -> EngineResult<RenameAction>;
 
     /// Find the pool designated by uuid.
-    fn get_pool(&mut self, uuid: &PoolUuid) -> Option<&mut Pool>;
+    fn get_pool(&self, uuid: &PoolUuid) -> Option<&Pool>;
+
+    /// Get a mutable referent to the pool designated by uuid.
+    fn get_mut_pool(&mut self, uuid: &PoolUuid) -> Option<&mut Pool>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.

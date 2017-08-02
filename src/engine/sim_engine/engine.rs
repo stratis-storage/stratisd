@@ -79,8 +79,12 @@ impl Engine for SimEngine {
         Ok(RenameAction::Renamed)
     }
 
-    fn get_pool(&mut self, uuid: &PoolUuid) -> Option<&mut Pool> {
+    fn get_pool(&self, uuid: &PoolUuid) -> Option<&Pool> {
         get_pool!(self; uuid)
+    }
+
+    fn get_mut_pool(&mut self, uuid: &PoolUuid) -> Option<&mut Pool> {
+        get_mut_pool!(self; uuid)
     }
 
     /// Set properties of the simulator
@@ -170,7 +174,7 @@ mod tests {
             .create_pool("name", &[Path::new("/s/d")], None, false)
             .unwrap();
         {
-            let pool = engine.get_pool(&uuid).unwrap();
+            let pool = engine.get_mut_pool(&uuid).unwrap();
             pool.create_filesystems(&[("test", None)]).unwrap();
         }
         assert!(engine.destroy_pool(&uuid).is_err());

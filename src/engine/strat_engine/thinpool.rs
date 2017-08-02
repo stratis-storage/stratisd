@@ -254,10 +254,19 @@ impl ThinPool {
         Ok(data_dev_used + spare_total + meta_dev_total + mdv_total)
     }
 
+    pub fn get_filesystem_by_uuid(&self, uuid: &FilesystemUuid) -> Option<&StratFilesystem> {
+        self.filesystems.get_by_uuid(uuid)
+    }
+
     pub fn get_mut_filesystem_by_uuid(&mut self,
                                       uuid: &FilesystemUuid)
                                       -> Option<&mut StratFilesystem> {
         self.filesystems.get_mut_by_uuid(uuid)
+    }
+
+    #[allow(dead_code)]
+    pub fn get_filesystem_by_name(&self, name: &str) -> Option<&StratFilesystem> {
+        self.filesystems.get_by_name(name)
     }
 
     pub fn get_mut_filesystem_by_name(&mut self, name: &str) -> Option<&mut StratFilesystem> {

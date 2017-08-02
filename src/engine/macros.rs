@@ -38,6 +38,12 @@ macro_rules! destroy_pool {
 
 macro_rules! get_pool {
     ( $s:ident; $uuid:ident ) => {
+        $s.pools.get_by_uuid($uuid).map(|p| p as &Pool)
+    }
+}
+
+macro_rules! get_mut_pool {
+    ( $s:ident; $uuid:ident ) => {
         $s.pools.get_mut_by_uuid($uuid).map(|p| p as &mut Pool)
     }
 }

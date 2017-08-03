@@ -71,7 +71,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 .iter()
                 .map(|d| {
                          d.to_str()
-                             .expect("'d' originated in the 'devs' D-Bus argument.")
+                             .expect("'d' originated in the 'devs' D-Bus argument")
                              .into()
                      });
             let paths = paths.map(MessageItem::Str).collect();

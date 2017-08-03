@@ -66,10 +66,10 @@ impl StratFilesystem {
                 let free_bytes = fs_total_bytes - fs_total_used_bytes;
                 if free_bytes.sectors() < FILESYSTEM_LOWATER {
                     let extend_size = self.extend_size(self.thin_dev.size());
-                    if let Err(_) = self.thin_dev.extend(dm, extend_size) {
+                    if self.thin_dev.extend(dm, extend_size).is_err() {
                         return Ok(FilesystemStatus::ThinDevExtendFailed);
                     }
-                    if let Err(_) = xfs_growfs(&mount_point) {
+                    if xfs_growfs(&mount_point).is_err() {
                         return Ok(FilesystemStatus::XfsGrowFailed);
                     }
                 }

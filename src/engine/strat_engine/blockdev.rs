@@ -43,12 +43,12 @@ impl BlockDev {
     }
 
     pub fn wipe_metadata(self) -> EngineResult<()> {
-        let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
+        let mut f = OpenOptions::new().write(true).open(&self.devnode)?;
         BDA::wipe(&mut f)
     }
 
     pub fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> EngineResult<()> {
-        let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
+        let mut f = OpenOptions::new().write(true).open(&self.devnode)?;
         self.bda.save_state(time, metadata, &mut f)
     }
 

@@ -43,7 +43,7 @@ impl StratFilesystem {
                       -> EngineResult<StratFilesystem> {
         let fs = StratFilesystem::setup(fs_id, name, thin_dev);
 
-        try!(create_fs(try!(fs.devnode()).as_path()));
+        create_fs(fs.devnode()?.as_path())?;
         Ok(fs)
     }
 
@@ -59,10 +59,10 @@ impl StratFilesystem {
     /// check if filesystem is getting full and needs to be extended
     /// TODO: deal with the thindev in a Fail state.
     pub fn check(&mut self, dm: &DM) -> EngineResult<FilesystemStatus> {
-        match try!(self.thin_dev.status(dm)) {
+        match self.thin_dev.status(dm)? {
             ThinStatus::Good(_) => {
-                let mount_point = try!(self.get_mount_point());
-                let (fs_total_bytes, fs_total_used_bytes) = try!(fs_usage(&mount_point));
+                let mount_point = self.get_mount_point()?;
+                let (fs_total_bytes, fs_total_used_bytes) = fs_usage(&mount_point)?;
                 let free_bytes = fs_total_bytes - fs_total_used_bytes;
                 if free_bytes.sectors() < FILESYSTEM_LOWATER {
                     let extend_size = self.extend_size(self.thin_dev.size());
@@ -95,10 +95,10 @@ impl StratFilesystem {
     /// Get the mount_point for this filesystem
     /// TODO Replace this code with something less brittle
     pub fn get_mount_point(&self) -> EngineResult<PathBuf> {
-        let output = try!(Command::new("df")
-                              .arg("--output=target")
-                              .arg(&try!(self.devnode()))
-                              .output());
+        let output = Command::new("df")
+            .arg("--output=target")
+            .arg(&self.devnode()?)
+            .output()?;
         if output.status.success() {
             let output_str = String::from_utf8_lossy(&output.stdout);
             if let Some(mount_point) = output_str.lines().last() {
@@ -112,7 +112,7 @@ impl StratFilesystem {
 
     /// Tear down the filesystem.
     pub fn teardown(self, dm: &DM) -> EngineResult<()> {
-        Ok(try!(self.thin_dev.teardown(dm)))
+        Ok(self.thin_dev.teardown(dm)?)
     }
 
     /// Set the name of this filesystem to name.
@@ -122,7 +122,7 @@ impl StratFilesystem {
 
     /// Destroy the filesystem.
     pub fn destroy(self, dm: &DM, thin_pool: &ThinPoolDev) -> EngineResult<()> {
-        Ok(try!(self.thin_dev.destroy(dm, thin_pool)))
+        Ok(self.thin_dev.destroy(dm, thin_pool)?)
     }
 }
 
@@ -140,7 +140,7 @@ impl HasUuid for StratFilesystem {
 
 impl Filesystem for StratFilesystem {
     fn devnode(&self) -> EngineResult<PathBuf> {
-        Ok(try!(self.thin_dev.devnode()))
+        Ok(self.thin_dev.devnode()?)
     }
 }
 
@@ -158,18 +158,18 @@ impl Recordable<FilesystemSave> for StratFilesystem {
 /// Return total bytes allocated to the filesystem, total bytes used by data/metadata
 pub fn fs_usage(mount_point: &Path) -> EngineResult<(Bytes, Bytes)> {
     let mut stat = Statvfs::default();
-    try!(statvfs(mount_point, &mut stat));
+    statvfs(mount_point, &mut stat)?;
     Ok((Bytes(stat.f_bsize * stat.f_blocks), Bytes(stat.f_bsize * (stat.f_blocks - stat.f_bfree))))
 }
 
 /// Use the xfs_growfs command to expand a filesystem mounted at the given
 /// mount point.
 pub fn xfs_growfs(mount_point: &Path) -> EngineResult<()> {
-    if try!(Command::new("xfs_growfs")
-                .arg(mount_point)
-                .arg("-d")
-                .status())
-               .success() {
+    if Command::new("xfs_growfs")
+           .arg(mount_point)
+           .arg("-d")
+           .status()?
+           .success() {
         Ok(())
     } else {
         let err_msg = format!("Failed to expand filesystem {:?}", mount_point);
@@ -179,11 +179,11 @@ pub fn xfs_growfs(mount_point: &Path) -> EngineResult<()> {
 
 /// Create a filesystem on devnode.
 pub fn create_fs(devnode: &Path) -> EngineResult<()> {
-    if try!(Command::new("mkfs.xfs")
-                .arg("-f")
-                .arg(&devnode)
-                .status())
-               .success() {
+    if Command::new("mkfs.xfs")
+           .arg("-f")
+           .arg(&devnode)
+           .status()?
+           .success() {
         Ok(())
     } else {
         let err_msg = format!("Failed to create new filesystem at {:?}", devnode);

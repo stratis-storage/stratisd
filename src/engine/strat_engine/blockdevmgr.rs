@@ -61,8 +61,8 @@ impl BlockDevMgr {
                       mda_size: Sectors,
                       force: bool)
                       -> EngineResult<BlockDevMgr> {
-        let devices = try!(resolve_devices(paths));
-        Ok(BlockDevMgr::new(try!(initialize(pool_uuid, devices, mda_size, force))))
+        let devices = resolve_devices(paths)?;
+        Ok(BlockDevMgr::new(initialize(pool_uuid, devices, mda_size, force)?))
     }
 
     /// Obtain a BlockDev by its Device.
@@ -80,8 +80,8 @@ impl BlockDevMgr {
                paths: &[&Path],
                force: bool)
                -> EngineResult<Vec<PathBuf>> {
-        let devices = try!(resolve_devices(paths));
-        let bds = try!(initialize(pool_uuid, devices, MIN_MDA_SECTORS, force));
+        let devices = resolve_devices(paths)?;
+        let bds = initialize(pool_uuid, devices, MIN_MDA_SECTORS, force)?;
         let bdev_paths = bds.iter().map(|p| p.devnode.clone()).collect();
         for bd in bds {
             self.block_devs.push(bd);
@@ -90,7 +90,7 @@ impl BlockDevMgr {
     }
 
     pub fn destroy_all(self) -> EngineResult<()> {
-        Ok(try!(wipe_blockdevs(self.block_devs)))
+        Ok(wipe_blockdevs(self.block_devs)?)
     }
 
     /// If available space is less than size, return None, else return
@@ -214,15 +214,19 @@ pub fn initialize(pool_uuid: &PoolUuid,
     /// its ownership as determined by calling determine_ownership(),
     /// and an open File handle, all of which are needed later.
     pub fn dev_info(dev: &Device) -> EngineResult<(PathBuf, Bytes, DevOwnership, File)> {
-        let devnode = try!(dev.devnode().ok_or_else(|| {
-            EngineError::Engine(ErrorEnum::NotFound,
-                format!("could not get device node from dev {}", dev.dstr()),
-            )
-        }));
+        let devnode = dev.devnode()
+            .ok_or_else(|| {
+                            EngineError::Engine(ErrorEnum::NotFound,
+                                                format!("could not get device node from dev {}",
+                                                        dev.dstr()))
+                        })?;
 
-        let mut f = try!(OpenOptions::new().read(true).write(true).open(&devnode));
-        let dev_size = try!(blkdev_size(&f));
-        let ownership = try!(StaticHeader::determine_ownership(&mut f));
+        let mut f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&devnode)?;
+        let dev_size = blkdev_size(&f)?;
+        let ownership = StaticHeader::determine_ownership(&mut f)?;
 
         Ok((devnode, dev_size, ownership, f))
     }
@@ -239,7 +243,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
     {
         let mut add_devs = Vec::new();
         for (dev, dev_result) in dev_infos {
-            let (devnode, dev_size, ownership, f) = try!(dev_result);
+            let (devnode, dev_size, ownership, f) = dev_result?;
             if dev_size < MIN_DEV_SIZE {
                 let error_message = format!("{} too small, minimum {} bytes",
                                             devnode.display(),
@@ -274,11 +278,11 @@ pub fn initialize(pool_uuid: &PoolUuid,
         Ok(add_devs)
     }
 
-    try!(validate_mda_size(mda_size));
+    validate_mda_size(mda_size)?;
 
     let dev_infos = devices.into_iter().map(|d: Device| (d, dev_info(&d)));
 
-    let add_devs = try!(filter_devs(dev_infos, pool_uuid, force));
+    let add_devs = filter_devs(dev_infos, pool_uuid, force)?;
 
     let mut bds: Vec<BlockDev> = Vec::new();
     for (dev, (devnode, dev_size, mut f)) in add_devs {

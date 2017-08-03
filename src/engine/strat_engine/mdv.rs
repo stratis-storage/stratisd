@@ -42,7 +42,7 @@ pub struct MetadataVol {
 impl MetadataVol {
     /// Initialize a new Metadata Volume.
     pub fn initialize(pool_uuid: &PoolUuid, dev: LinearDev) -> EngineResult<MetadataVol> {
-        try!(create_fs(try!(dev.devnode()).as_path()));
+        create_fs(dev.devnode()?.as_path())?;
         MetadataVol::setup(pool_uuid, dev)
     }
 
@@ -63,7 +63,7 @@ impl MetadataVol {
             }
         }
 
-        if let Err(err) = mount(Some(&try!(dev.devnode())),
+        if let Err(err) = mount(Some(&dev.devnode()?),
                                 &mount_pt,
                                 Some("xfs"),
                                 MsFlags::empty(),
@@ -92,7 +92,7 @@ impl MetadataVol {
     // ensure file contents are not truncated if operation is
     // interrupted.
     pub fn save_fs(&self, fs: &StratFilesystem) -> EngineResult<()> {
-        let data = try!(serde_json::to_string(&try!(fs.record())));
+        let data = serde_json::to_string(&fs.record()?)?;
         let path = self.mount_pt
             .join(FILESYSTEM_DIR)
             .join(fs.uuid().simple().to_string())
@@ -102,18 +102,18 @@ impl MetadataVol {
 
         // Braces to ensure f is closed before renaming
         {
-            let mut f = try!(OpenOptions::new()
-                                 .write(true)
-                                 .create(true)
-                                 .open(&temp_path));
-            try!(f.write_all(data.as_bytes()));
+            let mut f = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(&temp_path)?;
+            f.write_all(data.as_bytes())?;
 
             // Try really hard to make sure it goes to disk
-            try!(f.flush());
-            try!(fsync(f.as_raw_fd()));
+            f.flush()?;
+            fsync(f.as_raw_fd())?;
         }
 
-        try!(rename(temp_path, path));
+        rename(temp_path, path)?;
 
         Ok(())
     }
@@ -135,8 +135,8 @@ impl MetadataVol {
 
     /// Check the current state of the MDV.
     pub fn check(&self) -> EngineResult<()> {
-        for dir_e in try!(read_dir(self.mount_pt.join(FILESYSTEM_DIR))) {
-            let dir_e = try!(dir_e);
+        for dir_e in read_dir(self.mount_pt.join(FILESYSTEM_DIR))? {
+            let dir_e = dir_e?;
 
             // Clean up any lingering .temp files. These should only
             // exist if there was a crash during save_fs().
@@ -159,18 +159,18 @@ impl MetadataVol {
     pub fn filesystems(&self) -> EngineResult<Vec<FilesystemSave>> {
         let mut filesystems = Vec::new();
 
-        for dir_e in try!(read_dir(self.mount_pt.join(FILESYSTEM_DIR))) {
-            let dir_e = try!(dir_e);
+        for dir_e in read_dir(self.mount_pt.join(FILESYSTEM_DIR))? {
+            let dir_e = dir_e?;
 
             if dir_e.path().ends_with(".temp") {
                 continue;
             }
 
-            let mut f = try!(OpenOptions::new().read(true).open(&dir_e.path()));
+            let mut f = OpenOptions::new().read(true).open(&dir_e.path())?;
             let mut data = Vec::new();
-            try!(f.read_to_end(&mut data));
+            f.read_to_end(&mut data)?;
 
-            filesystems.push(try!(serde_json::from_slice(&data)));
+            filesystems.push(serde_json::from_slice(&data)?);
         }
 
         Ok(filesystems)
@@ -183,8 +183,8 @@ impl MetadataVol {
 
     /// Tear down a Metadata Volume.
     pub fn teardown(self, dm: &DM) -> EngineResult<()> {
-        try!(umount(&self.mount_pt));
-        try!(self.dev.teardown(dm));
+        umount(&self.mount_pt)?;
+        self.dev.teardown(dm)?;
 
         Ok(())
     }

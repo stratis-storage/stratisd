@@ -28,8 +28,8 @@ pub fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr
     if iter.arg_type() == ArgType::Invalid {
         return Err(MethodErr::no_arg());
     };
-    let value: T = try!(iter.read::<T>()
-                            .map_err(|_| MethodErr::invalid_arg(&loc)));
+    let value: T = iter.read::<T>()
+        .map_err(|_| MethodErr::invalid_arg(&loc))?;
     Ok(value)
 }
 
@@ -79,12 +79,10 @@ pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<
         .get(object_path)
         .expect("implicit argument must be in tree");
 
-    let data = try!(path.get_data()
-                        .as_ref()
-                        .ok_or_else(|| {
-                                        MethodErr::failed(&format!("no data for object path {}",
-                                                                   object_path))
-                                    }));
+    let data =
+        path.get_data()
+            .as_ref()
+            .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
     i.append(MessageItem::Str(format!("{}", data.uuid.simple())));
     Ok(())
@@ -98,12 +96,10 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Resul
         .get(object_path)
         .expect("implicit argument must be in tree");
 
-    let data = try!(path.get_data()
-                        .as_ref()
-                        .ok_or_else(|| {
-                                        MethodErr::failed(&format!("no data for object path {}",
-                                                                   object_path))
-                                    }));
+    let data =
+        path.get_data()
+            .as_ref()
+            .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
     i.append(MessageItem::ObjectPath(data.parent.clone()));
     Ok(())

@@ -38,11 +38,11 @@ impl StratEngine {
     /// Returns an error if there was an error reading device nodes.
     /// Returns an error if there was an error setting up any of the pools.
     pub fn initialize() -> EngineResult<StratEngine> {
-        let pools = try!(find_all());
+        let pools = find_all()?;
 
         let mut table = Table::default();
         for (pool_uuid, devices) in &pools {
-            let evicted = table.insert(try!(StratPool::setup(*pool_uuid, devices)));
+            let evicted = table.insert(StratPool::setup(*pool_uuid, devices)?);
             if !evicted.is_empty() {
 
                 // TODO: update state machine on failure.
@@ -58,7 +58,7 @@ impl StratEngine {
 
     /// Teardown Stratis, preparatory to a shutdown.
     pub fn teardown(self) -> EngineResult<()> {
-        Ok(try!(teardown_pools(self.pools.empty())))
+        teardown_pools(self.pools.empty())
     }
 
     /// Get pool as StratPool
@@ -85,9 +85,8 @@ impl Engine for StratEngine {
             return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
-        let dm = try!(DM::new());
-        let (pool, devnodes) =
-            try!(StratPool::initialize(name, &dm, blockdev_paths, redundancy, force));
+        let dm = DM::new()?;
+        let (pool, devnodes) = StratPool::initialize(name, &dm, blockdev_paths, redundancy, force)?;
 
         let uuid = pool.uuid().clone();
         self.pools.insert(pool);

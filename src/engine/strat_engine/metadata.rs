@@ -6,8 +6,8 @@ use std::str::from_utf8;
 use std::io::{Read, Seek, SeekFrom, Write};
 
 use byteorder::{ByteOrder, LittleEndian};
+use chrono::{DateTime, Utc};
 use crc::crc32;
-use time::Timespec;
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors};
@@ -103,7 +103,7 @@ impl BDA {
 
     /// Save metadata to the disk
     pub fn save_state<F>(&mut self,
-                         time: &Timespec,
+                         time: &DateTime<Utc>,
                          metadata: &[u8],
                          mut f: &mut F)
                          -> EngineResult<()>
@@ -122,7 +122,7 @@ impl BDA {
 
     /// The time when the most recent metadata was written to the BDA,
     /// if any.
-    pub fn last_update_time(&self) -> Option<&Timespec> {
+    pub fn last_update_time(&self) -> Option<&DateTime<Utc>> {
         self.regions.last_update_time()
     }
 
@@ -297,8 +297,8 @@ mod mda {
     use std::io::{Read, Seek, SeekFrom, Write};
 
     use byteorder::{ByteOrder, LittleEndian};
+    use chrono::{DateTime, TimeZone, Utc};
     use crc::crc32;
-    use time::Timespec;
 
     use devicemapper::{Bytes, Sectors};
 
@@ -405,7 +405,7 @@ mod mda {
         /// an error.
         pub fn save_state<F>(&mut self,
                              header_size: Bytes,
-                             time: &Timespec,
+                             time: &DateTime<Utc>,
                              data: &[u8],
                              f: &mut F)
                              -> EngineResult<()>
@@ -504,14 +504,14 @@ mod mda {
         }
 
         /// The last update time for these MDA regions
-        pub fn last_update_time(&self) -> Option<&Timespec> {
+        pub fn last_update_time(&self) -> Option<&DateTime<Utc>> {
             self.mdas[self.newer()].as_ref().map(|h| &h.last_updated)
         }
     }
 
     #[derive(Debug)]
     pub struct MDAHeader {
-        last_updated: Timespec,
+        last_updated: DateTime<Utc>,
 
         /// Size of region used for pool metadata.
         used: Bytes,
@@ -519,14 +519,12 @@ mod mda {
         data_crc: u32,
     }
 
-    // Implementing Default explicitly because Timespec does not implement
-    // Default. The time crate has been superceded by the chrono crate, and
-    // is in maintenance mode, so there is little point in submitting a PR
-    // to change Timespec's behavior.
+    // Implementing Default explicitly because DateTime<Utc> does not implement
+    // Default.
     impl Default for MDAHeader {
         fn default() -> MDAHeader {
             MDAHeader {
-                last_updated: Timespec::new(0, 0),
+                last_updated: Utc.timestamp(0, 0),
                 used: Bytes(0),
                 data_crc: 0,
             }
@@ -552,15 +550,14 @@ mod mda {
                     let used = Bytes(LittleEndian::read_u64(&buf[8..16]));
                     try!(check_mda_region_size(used, region_size));
 
-                    let nsecs = LittleEndian::read_u32(&buf[24..28]);
                     // Signed cast is safe, highest order bit of each value
                     // read is guaranteed to be 0.
-                    assert!(nsecs <= std::i32::MAX as u32);
                     assert!(secs <= std::i64::MAX as u64);
 
+                    let nsecs = LittleEndian::read_u32(&buf[24..28]);
                     Ok(Some(MDAHeader {
                                 used: used,
-                                last_updated: Timespec::new(secs as i64, nsecs as i32),
+                                last_updated: Utc.timestamp(secs as i64, nsecs),
                                 data_crc: LittleEndian::read_u32(&buf[4..8]),
                             }))
                 }
@@ -569,14 +566,14 @@ mod mda {
 
         fn to_buf(&self) -> [u8; _MDA_REGION_HDR_SIZE] {
             // Unsigned casts are always safe, as sec and nsec values are never negative
-            assert!(self.last_updated.sec >= 0 && self.last_updated.nsec >= 0);
+            assert!(self.last_updated.timestamp() >= 0);
 
             let mut buf = [0u8; _MDA_REGION_HDR_SIZE];
 
             LittleEndian::write_u32(&mut buf[4..8], self.data_crc);
             LittleEndian::write_u64(&mut buf[8..16], *self.used as u64);
-            LittleEndian::write_u64(&mut buf[16..24], self.last_updated.sec as u64);
-            LittleEndian::write_u32(&mut buf[24..28], self.last_updated.nsec as u32);
+            LittleEndian::write_u64(&mut buf[16..24], self.last_updated.timestamp() as u64);
+            LittleEndian::write_u32(&mut buf[24..28], self.last_updated.timestamp_subsec_nanos());
 
             let buf_crc = crc32::checksum_ieee(&buf[4.._MDA_REGION_HDR_SIZE]);
             LittleEndian::write_u32(&mut buf[..4], buf_crc);
@@ -649,7 +646,7 @@ mod mda {
         use std::io::Cursor;
 
         use quickcheck::{QuickCheck, TestResult};
-        use time::{now, Timespec};
+        use chrono::Utc;
 
         use super::super::*;
         use super::*;
@@ -682,14 +679,10 @@ mod mda {
         /// Verify that the resulting MDAHeaders have all equal components.
         /// Verify timestamp and data CRC against original values.
         fn prop_mda_header() {
-            fn mda_header(data: Vec<u8>, sec: i64, nsec: i32, region_size_ext: u32) -> TestResult {
-                // unwritable timestamp
-                if sec < 0 || nsec < 0 {
-                    return TestResult::discard();
-                }
-
-                // sec value of 0 is interpreted as no timestamp when read
-                if sec == 0 {
+            fn mda_header(data: Vec<u8>, sec: i64, nsec: u32, region_size_ext: u32) -> TestResult {
+                // sec < 0: unwritable timestamp
+                // sec == 0: value of 0 is interpreted as no timestamp when read
+                if sec <= 0 {
                     return TestResult::discard();
                 }
 
@@ -697,7 +690,7 @@ mod mda {
                 let region_size = (MIN_MDA_SECTORS / 4usize).bytes() +
                                   Bytes(region_size_ext as u64);
                 let header = MDAHeader {
-                    last_updated: Timespec::new(sec, nsec),
+                    last_updated: Utc.timestamp(sec, nsec),
                     used: Bytes(data.len() as u64),
                     data_crc: crc32::checksum_ieee(&data),
                 };
@@ -714,7 +707,7 @@ mod mda {
 
             QuickCheck::new()
                 .tests(50)
-                .quickcheck(mda_header as fn(Vec<u8>, i64, i32, u32) -> TestResult);
+                .quickcheck(mda_header as fn(Vec<u8>, i64, u32, u32) -> TestResult);
         }
 
         /// Verify that bad crc causes an error.
@@ -722,7 +715,7 @@ mod mda {
         fn test_from_buf_crc_error() {
             let data = [0u8; 3];
             let header = MDAHeader {
-                last_updated: now().to_timespec(),
+                last_updated: Utc::now(),
                 used: Bytes(data.len() as u64),
                 data_crc: crc32::checksum_ieee(&data),
             };
@@ -737,7 +730,7 @@ mod mda {
         fn test_from_buf_size_error() {
             let data = [0u8; 3];
             let header = MDAHeader {
-                last_updated: now().to_timespec(),
+                last_updated: Utc::now(),
                 used: Bytes(data.len() as u64),
                 data_crc: crc32::checksum_ieee(&data),
             };
@@ -753,7 +746,6 @@ mod tests {
 
     use devicemapper::{Bytes, Sectors};
     use quickcheck::{QuickCheck, TestResult};
-    use time::now;
     use uuid::Uuid;
 
     use super::super::super::consts::IEC;
@@ -886,8 +878,8 @@ mod tests {
                                       sh.blkdev_size)
                 .unwrap();
 
-        let timestamp0 = now().to_timespec();
-        let timestamp1 = now().to_timespec();
+        let timestamp0 = Utc::now();
+        let timestamp1 = Utc::now();
         assert!(timestamp0 != timestamp1);
 
         let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
@@ -896,8 +888,8 @@ mod tests {
         // Error, because current timestamp is older than written to newer.
         assert!(bda.save_state(&timestamp0, &data, &mut buf).is_err());
 
-        let timestamp2 = now().to_timespec();
-        let timestamp3 = now().to_timespec();
+        let timestamp2 = Utc::now();
+        let timestamp3 = Utc::now();
         assert!(timestamp2 != timestamp3);
 
         bda.save_state(&timestamp3, &data, &mut buf).unwrap();
@@ -928,7 +920,7 @@ mod tests {
                                           sh.mda_size,
                                           sh.blkdev_size)
                     .unwrap();
-            let current_time = now().to_timespec();
+            let current_time = Utc::now();
             bda.save_state(&current_time, &state, &mut buf).unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();
 
@@ -967,7 +959,7 @@ mod tests {
                 return TestResult::failed();
             }
 
-            let current_time = now().to_timespec();
+            let current_time = Utc::now();
             bda.save_state(&current_time, &next_state, &mut buf)
                 .unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();

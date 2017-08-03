@@ -103,7 +103,7 @@ impl Engine for StratEngine {
 
         let mut pool = self.pools
             .remove_by_uuid(uuid)
-            .expect("Must succeed since self.pools.get_by_uuid() returned a value.");
+            .expect("Must succeed since self.pools.get_by_uuid() returned a value");
         pool.rename(new_name);
 
         if let Err(err) = pool.write_metadata() {

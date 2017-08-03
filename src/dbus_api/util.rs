@@ -69,7 +69,7 @@ pub fn ok_message_items() -> (MessageItem, MessageItem) {
 }
 
 pub fn default_object_path<'a>() -> dbus::Path<'a> {
-    dbus::Path::new("/").expect("'/' is guaranteed to be a valid Path.")
+    dbus::Path::new("/").expect("'/' is guaranteed to be a valid Path")
 }
 
 /// Get the UUID for an object path.

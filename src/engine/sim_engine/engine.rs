@@ -72,7 +72,7 @@ impl Engine for SimEngine {
 
         let mut pool = self.pools
             .remove_by_uuid(uuid)
-            .expect("Must succeed since self.pools.get_by_uuid() returned a value.");
+            .expect("Must succeed since self.pools.get_by_uuid() returned a value");
         pool.rename(new_name);
 
         self.pools.insert(pool);

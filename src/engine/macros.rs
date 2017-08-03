@@ -30,7 +30,7 @@ macro_rules! destroy_pool {
             return Ok(false);
         }
         try!($s.pools.remove_by_uuid($uuid)
-             .expect("Must succeed since $s.pool.get_by_uuid() returned a value.")
+             .expect("Must succeed since $s.pool.get_by_uuid() returned a value")
              .destroy());
         Ok(true)
     }

@@ -151,12 +151,12 @@ impl StratPool {
                                                            format!("no metadata for pool {}",
                                                                    uuid))));
         let blockdevs = try!(get_blockdevs(uuid, &metadata, devnodes));
-
+        debug!("blockdevs = {:?} ", blockdevs);
         let uuid_map: HashMap<DevUuid, Device> = blockdevs
             .iter()
             .map(|bd| (*bd.uuid(), *bd.device()))
             .collect();
-
+        debug!("uuid_map = {:?} ", uuid_map);
         // Obtain a Segment from a Uuid, Sectors, Sectors triple.
         // This can fail if there is no entry for the UUID in the map
         // from UUIDs to device numbers.
@@ -166,12 +166,14 @@ impl StratPool {
                                   .ok_or_else(|| EngineError::Engine(ErrorEnum::NotFound,
                                                              format!("missing device for UUID {:?}",
                                                                      &triple.0))));
+            debug!("device = {:?}", device);
             Ok(Segment {
                    device: *device,
                    start: triple.1,
                    length: triple.2,
                })
         };
+
 
         let meta_segments: Vec<Segment> = try!(metadata
                                                    .flex_devs

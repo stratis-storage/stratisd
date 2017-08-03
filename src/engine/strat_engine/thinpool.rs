@@ -103,7 +103,7 @@ impl ThinPool {
                  -> EngineResult<ThinPool> {
         let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
         let size = try!(data_dev.size());
-
+        debug!("ThinPoolDev::setup {:?}", name);
         let res = match ThinPoolDev::setup(&name,
                                            dm,
                                            size,
@@ -111,8 +111,13 @@ impl ThinPool {
                                            low_water_mark,
                                            meta_dev,
                                            data_dev) {
-            Ok(dev) => Ok((dev, spare_segments)),
+
+            Ok(dev) => {
+                debug!("ThinPoolDev::Ok {:?}", dev);
+                Ok((dev, spare_segments))
+            }
             Err(DmError::Dm(CheckFailed(meta_dev, data_dev), _)) => {
+                debug!("ThinPoolDev::Err {:?}", pool_uuid);
                 attempt_thin_repair(pool_uuid, dm, meta_dev, spare_segments)
                     .and_then(|(new_meta_dev, new_spare_segments)| {
                         ThinPoolDev::setup(&name,

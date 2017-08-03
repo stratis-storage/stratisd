@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 use std::iter::IntoIterator;
 use std::slice::{Iter, IterMut};
+use std::vec::IntoIter;
 
 use uuid::Uuid;
 
@@ -33,7 +34,7 @@ impl<'a, T: HasName + HasUuid> IntoIterator for &'a mut Table<T> {
     type Item = &'a mut T;
     type IntoIter = IterMut<'a, T>;
 
-    fn into_iter(mut self) -> IterMut<'a, T> {
+    fn into_iter(mut self) -> Self::IntoIter {
         self.items.iter_mut()
     }
 }
@@ -42,8 +43,17 @@ impl<'a, T: HasName + HasUuid> IntoIterator for &'a Table<T> {
     type Item = &'a T;
     type IntoIter = Iter<'a, T>;
 
-    fn into_iter(self) -> Iter<'a, T> {
+    fn into_iter(self) -> Self::IntoIter {
         self.items.iter()
+    }
+}
+
+impl<T: HasName + HasUuid> IntoIterator for Table<T> {
+    type Item = T;
+    type IntoIter = IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
     }
 }
 
@@ -177,6 +187,14 @@ impl<T: HasName + HasUuid> Table<T> {
             (Some(name_item), None) => vec![name_item],
             (Some(name_item), Some(uuid_item)) => vec![name_item, uuid_item],
         }
+    }
+
+    pub fn iter(&self) -> Iter<T> {
+        self.items.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> IterMut<T> {
+        self.items.iter_mut()
     }
 }
 

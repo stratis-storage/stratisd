@@ -129,6 +129,6 @@ impl Engine for StratEngine {
     }
 
     fn pools(&self) -> Vec<&Pool> {
-        self.pools.into_iter().map(|x| x as &Pool).collect()
+        self.pools.iter().map(|x| x as &Pool).collect()
     }
 }

@@ -164,10 +164,8 @@ impl<T: HasName + HasUuid> Table<T> {
         let uuid_item = self.remove_by_uuid(item.uuid());
 
         let future_last_index = self.items.len();
-        self.name_map
-            .insert(item.name().into(), future_last_index);
-        self.uuid_map
-            .insert(item.uuid().clone(), future_last_index);
+        self.name_map.insert(item.name().into(), future_last_index);
+        self.uuid_map.insert(item.uuid().clone(), future_last_index);
 
         self.items.push(item);
 

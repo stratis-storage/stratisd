@@ -159,7 +159,7 @@ fn get_filesystem_property<F>(i: &mut IterAppend,
         .get(&filesystem_data.parent)
         .ok_or_else(|| {
                         MethodErr::failed(&format!("no path for parent object path {}",
-                                                   &filesystem_data.parent))
+                                                  &filesystem_data.parent))
                     })?;
 
     let pool_uuid = pool_path
@@ -174,13 +174,13 @@ fn get_filesystem_property<F>(i: &mut IterAppend,
             .get_pool(&pool_uuid)
             .ok_or_else(|| {
                             MethodErr::failed(&format!("no pool corresponding to uuid {}",
-                                                       &pool_uuid))
+                                                      &pool_uuid))
                         })?;
     let filesystem_uuid = &filesystem_data.uuid;
     let filesystem = pool.get_filesystem(filesystem_uuid)
         .ok_or_else(|| {
                         MethodErr::failed(&format!("no name for filesystem with uuid {}",
-                                                   &filesystem_uuid))
+                                                  &filesystem_uuid))
                     })?;
     i.append(getter(filesystem)?);
     Ok(())
@@ -196,7 +196,7 @@ fn get_filesystem_devnode(i: &mut IterAppend,
             .devnode()
             .map_err(|_| {
                          MethodErr::failed(&format!("no devnode for filesystem with uuid {}",
-                                                    filesystem.uuid()))
+                                                   filesystem.uuid()))
                      })?;
         Ok(MessageItem::Str(format!("{}", devnode.display())))
     }

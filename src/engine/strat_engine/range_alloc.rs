@@ -64,11 +64,7 @@ impl RangeAllocator {
         for &(off, len) in ranges {
             self.check_for_overflow(off, len)?;
 
-            let prev = self.used
-                .range(..off)
-                .rev()
-                .next()
-                .map(|(k, v)| (*k, *v));
+            let prev = self.used.range(..off).rev().next().map(|(k, v)| (*k, *v));
 
             let mut contig_prev = None;
             if let Some((prev_off, prev_len)) = prev {

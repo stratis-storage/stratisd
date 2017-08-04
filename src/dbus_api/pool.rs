@@ -262,7 +262,7 @@ fn get_pool_property<F>(i: &mut IterAppend,
             .get_pool(&pool_uuid)
             .ok_or_else(|| {
                             MethodErr::failed(&format!("no pool corresponding to uuid {}",
-                                                       &pool_uuid))
+                                                      &pool_uuid))
                         })?;
 
     i.append(getter(pool)?);
@@ -279,7 +279,7 @@ fn get_pool_total_physical_used(i: &mut IterAppend,
     fn get_used(pool: &Pool) -> Result<MessageItem, MethodErr> {
         let err_func = |_| {
             MethodErr::failed(&format!("no total physical size computed for pool with uuid {}",
-                                       pool.uuid()))
+                                      pool.uuid()))
         };
 
         pool.total_physical_used()

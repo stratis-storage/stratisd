@@ -93,19 +93,11 @@ pub fn test_basic_metadata(paths: &[&Path]) {
 
     let name1 = "name1";
     let (uuid1, _) = engine.create_pool(&name1, paths1, None, false).unwrap();
-    let metadata1 = engine
-        .get_strat_pool(&uuid1)
-        .unwrap()
-        .record()
-        .unwrap();
+    let metadata1 = engine.get_strat_pool(&uuid1).unwrap().record().unwrap();
 
     let name2 = "name2";
     let (uuid2, _) = engine.create_pool(&name2, paths2, None, false).unwrap();
-    let metadata2 = engine
-        .get_strat_pool(&uuid2)
-        .unwrap()
-        .record()
-        .unwrap();
+    let metadata2 = engine.get_strat_pool(&uuid2).unwrap().record().unwrap();
 
     let pools = find_all().unwrap();
     assert!(pools.len() == 2);

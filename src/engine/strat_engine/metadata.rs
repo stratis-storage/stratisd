@@ -654,9 +654,7 @@ mod mda {
         #[test]
         /// Verify that default MDAHeader is all 0s except for CRC.
         fn test_default_mda_header() {
-            assert!(MDAHeader::default().to_buf()[4..]
-                        .iter()
-                        .all(|x| *x == 0u8));
+            assert!(MDAHeader::default().to_buf()[4..].iter().all(|x| *x == 0u8));
         }
 
         #[test]

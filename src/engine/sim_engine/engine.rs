@@ -42,10 +42,7 @@ impl Engine for SimEngine {
         }
 
         let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
-        let devices = device_set
-            .into_iter()
-            .map(|x| *x)
-            .collect::<Vec<&Path>>();
+        let devices = device_set.into_iter().map(|x| *x).collect::<Vec<&Path>>();
 
         let pool = SimPool::new(self.rdm.clone(), name, &devices, redundancy);
 
@@ -143,9 +140,7 @@ mod tests {
     #[test]
     /// When an engine has no pools, destroying any pool must succeed
     fn destroy_pool_empty() {
-        assert!(SimEngine::default()
-                    .destroy_pool(&Uuid::new_v4())
-                    .is_ok());
+        assert!(SimEngine::default().destroy_pool(&Uuid::new_v4()).is_ok());
     }
 
     #[test]

@@ -84,10 +84,7 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<PathBuf>>> {
 
         let mut f = f.expect("unreachable if f is err");
         if let DevOwnership::Ours(uuid) = StaticHeader::determine_ownership(&mut f)? {
-            pool_map
-                .entry(uuid)
-                .or_insert_with(Vec::new)
-                .push(devnode)
+            pool_map.entry(uuid).or_insert_with(Vec::new).push(devnode)
         };
     }
 

@@ -104,9 +104,7 @@ pub fn test_force_flag_stratis(paths: &[&Path]) -> () {
 /// releases all blockdevs.
 pub fn test_pool_blockdevs(paths: &[&Path]) -> () {
     let mut engine = StratEngine::initialize().unwrap();
-    let (uuid, blockdevs) = engine
-        .create_pool("test_pool", paths, None, true)
-        .unwrap();
+    let (uuid, blockdevs) = engine.create_pool("test_pool", paths, None, true).unwrap();
     assert!(blockdevs
                 .iter()
                 .all(|path| {

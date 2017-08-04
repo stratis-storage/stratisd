@@ -263,8 +263,7 @@ impl StratPool {
     fn extend_data(&mut self, dm: &DM, current_size: DataBlocks) -> EngineResult<DataBlocks> {
         let extend_size = self.extend_size(current_size);
         if let Some(new_data_regions) =
-            self.block_devs
-                .alloc_space(*extend_size * DATA_BLOCK_SIZE) {
+            self.block_devs.alloc_space(*extend_size * DATA_BLOCK_SIZE) {
             self.thin_pool.extend_data(dm, new_data_regions)?;
         } else {
             let err_msg = format!("Insufficient space to accomodate request for {} data blocks",
@@ -365,9 +364,7 @@ impl Pool for StratPool {
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
         let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
         for name in names.keys() {
-            if self.thin_pool
-                   .get_mut_filesystem_by_name(*name)
-                   .is_some() {
+            if self.thin_pool.get_mut_filesystem_by_name(*name).is_some() {
                 return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
             }
         }
@@ -510,9 +507,7 @@ impl Recordable<PoolSave> for StratPool {
                    thin_data_dev: thin_data_dev,
                    thin_meta_dev_spare: thin_meta_dev_spare,
                },
-               thinpool_dev: self.thin_pool
-                   .record()
-                   .expect("this function never fails"),
+               thinpool_dev: self.thin_pool.record().expect("this function never fails"),
            })
     }
 }

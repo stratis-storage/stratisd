@@ -15,9 +15,7 @@ use libstratis::engine::strat_engine::StratEngine;
 /// Verify that tearing down an engine doesn't fail if no filesystems on it.
 pub fn test_teardown(paths: &[&Path]) -> () {
     let mut engine = StratEngine::initialize().unwrap();
-    engine
-        .create_pool("test_pool", paths, None, true)
-        .unwrap();
+    engine.create_pool("test_pool", paths, None, true).unwrap();
     assert!(engine.teardown().is_ok())
 }
 

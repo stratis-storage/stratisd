@@ -119,10 +119,7 @@ impl BlockDevMgr {
     }
 
     pub fn devnodes(&self) -> Vec<PathBuf> {
-        self.block_devs
-            .iter()
-            .map(|d| d.devnode.clone())
-            .collect()
+        self.block_devs.iter().map(|d| d.devnode.clone()).collect()
     }
 
     /// Write the given data to all blockdevs marking with current time.
@@ -172,19 +169,13 @@ impl BlockDevMgr {
     /// self.current_capacity() > self.avail_space() because some sectors
     /// are certainly allocated for Stratis metadata
     pub fn current_capacity(&self) -> Sectors {
-        self.block_devs
-            .iter()
-            .map(|b| b.current_capacity())
-            .sum()
+        self.block_devs.iter().map(|b| b.current_capacity()).sum()
     }
 
     /// The number of sectors given over to Stratis metadata
     /// self.current_capacity() - self.metadata_size() >= self.avail_space()
     pub fn metadata_size(&self) -> Sectors {
-        self.block_devs
-            .iter()
-            .map(|bd| bd.metadata_size())
-            .sum()
+        self.block_devs.iter().map(|bd| bd.metadata_size()).sum()
     }
 }
 
@@ -218,10 +209,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
                                                         dev.dstr()))
                         })?;
 
-        let mut f = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(&devnode)?;
+        let mut f = OpenOptions::new().read(true).write(true).open(&devnode)?;
         let dev_size = blkdev_size(&f)?;
         let ownership = StaticHeader::determine_ownership(&mut f)?;
 

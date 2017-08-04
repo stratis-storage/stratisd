@@ -133,9 +133,7 @@ impl Pool for SimPool {
     }
 
     fn get_filesystem(&self, uuid: &FilesystemUuid) -> Option<&Filesystem> {
-        self.filesystems
-            .get_by_uuid(uuid)
-            .map(|p| p as &Filesystem)
+        self.filesystems.get_by_uuid(uuid).map(|p| p as &Filesystem)
     }
 
     fn get_mut_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
@@ -283,9 +281,7 @@ mod tests {
     /// Creating an empty list of filesystems should succeed, always
     fn create_fs_none() {
         let mut engine = SimEngine::default();
-        let (uuid, _) = engine
-            .create_pool("pool_name", &[], None, false)
-            .unwrap();
+        let (uuid, _) = engine.create_pool("pool_name", &[], None, false).unwrap();
         let pool = engine.get_mut_pool(&uuid).unwrap();
         assert!(match pool.create_filesystems(&[]) {
                     Ok(names) => names.is_empty(),
@@ -297,9 +293,7 @@ mod tests {
     /// Creating a non-empty list of filesystems always succeeds.
     fn create_fs_some() {
         let mut engine = SimEngine::default();
-        let (uuid, _) = engine
-            .create_pool("pool_name", &[], None, false)
-            .unwrap();
+        let (uuid, _) = engine.create_pool("pool_name", &[], None, false).unwrap();
         let pool = engine.get_mut_pool(&uuid).unwrap();
         assert!(match pool.create_filesystems(&[("name", None)]) {
                     Ok(names) => (names.len() == 1) & (names[0].0 == "name"),
@@ -312,9 +306,7 @@ mod tests {
     fn create_fs_conflict() {
         let fs_name = "fs_name";
         let mut engine = SimEngine::default();
-        let (uuid, _) = engine
-            .create_pool("pool_name", &[], None, false)
-            .unwrap();
+        let (uuid, _) = engine.create_pool("pool_name", &[], None, false).unwrap();
         let pool = engine.get_mut_pool(&uuid).unwrap();
         pool.create_filesystems(&[(fs_name, None)]).unwrap();
         assert!(match pool.create_filesystems(&[(fs_name, None)]) {
@@ -328,9 +320,7 @@ mod tests {
     fn create_fs_dups() {
         let fs_name = "fs_name";
         let mut engine = SimEngine::default();
-        let (uuid, _) = engine
-            .create_pool("pool_name", &[], None, false)
-            .unwrap();
+        let (uuid, _) = engine.create_pool("pool_name", &[], None, false).unwrap();
         let pool = engine.get_mut_pool(&uuid).unwrap();
         assert!(match pool.create_filesystems(&[(fs_name, None), (fs_name, None)]) {
                     Ok(names) => (names.len() == 1) & (names[0].0 == fs_name),
@@ -342,9 +332,7 @@ mod tests {
     /// Adding a list of devices to an empty pool should yield list.
     fn add_device_empty() {
         let mut engine = SimEngine::default();
-        let (uuid, _) = engine
-            .create_pool("pool_name", &[], None, false)
-            .unwrap();
+        let (uuid, _) = engine.create_pool("pool_name", &[], None, false).unwrap();
         let pool = engine.get_mut_pool(&uuid).unwrap();
         let devices = [Path::new("/s/a"), Path::new("/s/b")];
         assert!(match pool.add_blockdevs(&devices, false) {

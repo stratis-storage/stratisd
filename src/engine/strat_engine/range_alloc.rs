@@ -26,7 +26,7 @@ impl RangeAllocator {
             limit: limit,
             used: BTreeMap::new(),
         };
-        try!(allocator.insert_ranges(initial_used));
+        allocator.insert_ranges(initial_used)?;
         Ok(allocator)
     }
 
@@ -62,13 +62,9 @@ impl RangeAllocator {
     /// efficiency.
     fn insert_ranges(&mut self, ranges: &[(Sectors, Sectors)]) -> EngineResult<()> {
         for &(off, len) in ranges {
-            try!(self.check_for_overflow(off, len));
+            self.check_for_overflow(off, len)?;
 
-            let prev = self.used
-                .range(..off)
-                .rev()
-                .next()
-                .map(|(k, v)| (*k, *v));
+            let prev = self.used.range(..off).rev().next().map(|(k, v)| (*k, *v));
 
             let mut contig_prev = None;
             if let Some((prev_off, prev_len)) = prev {

@@ -66,13 +66,13 @@ impl ThinPool {
                mdv: MetadataVol)
                -> EngineResult<ThinPool> {
         let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
-        let thinpool_dev = try!(ThinPoolDev::new(&name,
-                                                 dm,
-                                                 try!(data_dev.size()),
-                                                 data_block_size,
-                                                 low_water_mark,
-                                                 meta_dev,
-                                                 data_dev));
+        let thinpool_dev = ThinPoolDev::new(&name,
+                                            dm,
+                                            data_dev.size()?,
+                                            data_block_size,
+                                            low_water_mark,
+                                            meta_dev,
+                                            data_dev)?;
         Ok(ThinPool {
                thin_pool: thinpool_dev,
                meta_spare: spare_segments,
@@ -102,7 +102,7 @@ impl ThinPool {
                  fs_save: Vec<FilesystemSave>)
                  -> EngineResult<ThinPool> {
         let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
-        let size = try!(data_dev.size());
+        let size = data_dev.size()?;
 
         let res = match ThinPoolDev::setup(&name,
                                            dm,
@@ -128,22 +128,22 @@ impl ThinPool {
             }
             Err(e) => Err(e.into()),
         };
-        let (thinpool_dev, spare_segments) = try!(res);
+        let (thinpool_dev, spare_segments) = res?;
 
         // TODO: not fail completely if one filesystem setup fails?
-        let filesystems: Vec<StratFilesystem> = {
+        let filesystems = {
             // Set up a filesystem from its metadata.
             let get_filesystem = |fssave: &FilesystemSave| -> EngineResult<StratFilesystem> {
                 let device_name = format_thin_name(&pool_uuid, ThinRole::Filesystem(fssave.uuid));
-                let thin_dev = try!(ThinDev::setup(&device_name,
-                                                   dm,
-                                                   &thinpool_dev,
-                                                   fssave.thin_id,
-                                                   fssave.size));
+                let thin_dev =
+                    ThinDev::setup(&device_name, dm, &thinpool_dev, fssave.thin_id, fssave.size)?;
                 Ok(StratFilesystem::setup(fssave.uuid, &fssave.name, thin_dev))
             };
 
-            try!(fs_save.iter().map(get_filesystem).collect())
+            fs_save
+                .iter()
+                .map(get_filesystem)
+                .collect::<EngineResult<Vec<_>>>()?
         };
 
         let mut fs_table = Table::default();
@@ -166,14 +166,14 @@ impl ThinPool {
 
     /// The status of the thin pool as calculated by DM.
     pub fn check(&mut self, dm: &DM) -> EngineResult<ThinPoolStatus> {
-        let thinpool = try!(self.thin_pool.status(dm));
-        try!(self.mdv.check());
+        let thinpool = self.thin_pool.status(dm)?;
+        self.mdv.check()?;
 
-        let filesystems: Vec<_> = try!(self.filesystems
-                                           .borrow_mut()
-                                           .into_iter()
-                                           .map(|fs| fs.check(dm))
-                                           .collect());
+        let filesystems = self.filesystems
+            .borrow_mut()
+            .into_iter()
+            .map(|fs| fs.check(dm))
+            .collect::<EngineResult<Vec<_>>>()?;
 
         Ok(ThinPoolStatus {
                thinpool,
@@ -187,12 +187,12 @@ impl ThinPool {
         // Must succeed in tearing down all filesystems before the
         // thinpool..
         for fs in self.filesystems.empty() {
-            try!(fs.teardown(dm));
+            fs.teardown(dm)?;
         }
-        try!(self.thin_pool.teardown(dm));
+        self.thin_pool.teardown(dm)?;
 
         // ..but MDV has no DM dependencies with the above
-        try!(self.mdv.teardown(dm));
+        self.mdv.teardown(dm)?;
 
         Ok(())
     }
@@ -224,7 +224,7 @@ impl ThinPool {
 
     /// Extend the thinpool with new data regions.
     pub fn extend_data(&mut self, dm: &DM, segs: Vec<Segment>) -> EngineResult<()> {
-        Ok(try!(self.thin_pool.extend_data(dm, segs)))
+        Ok(self.thin_pool.extend_data(dm, segs)?)
     }
 
     /// The number of physical sectors in use, that is, unavailable for storage
@@ -233,7 +233,7 @@ impl ThinPool {
     // all the sectors allocated to the meta data device, and all the sectors
     // in use on the data device.
     pub fn total_physical_used(&self) -> EngineResult<Sectors> {
-        let data_dev_used = match try!(self.thin_pool.status(&try!(DM::new()))) {
+        let data_dev_used = match self.thin_pool.status(&DM::new()?)? {
             dm::ThinPoolStatus::Good(_, usage) => *usage.used_data * DATA_BLOCK_SIZE,
             _ => {
                 let err_msg = "thin pool failed, could not obtain usage";
@@ -294,14 +294,14 @@ impl ThinPool {
                              -> EngineResult<FilesystemUuid> {
         let fs_uuid = Uuid::new_v4();
         let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fs_uuid));
-        let thin_dev = try!(ThinDev::new(&device_name,
-                                         dm,
-                                         &self.thin_pool,
-                                         try!(self.id_gen.new_id()),
-                                         size.unwrap_or(DEFAULT_THIN_DEV_SIZE)));
+        let thin_dev = ThinDev::new(&device_name,
+                                    dm,
+                                    &self.thin_pool,
+                                    self.id_gen.new_id()?,
+                                    size.unwrap_or(DEFAULT_THIN_DEV_SIZE))?;
 
-        let new_filesystem = try!(StratFilesystem::initialize(fs_uuid, name, thin_dev));
-        try!(self.mdv.save_fs(&new_filesystem));
+        let new_filesystem = StratFilesystem::initialize(fs_uuid, name, thin_dev)?;
+        self.mdv.save_fs(&new_filesystem)?;
         self.filesystems.insert(new_filesystem);
 
         Ok(fs_uuid)
@@ -310,8 +310,8 @@ impl ThinPool {
     /// Destroy a filesystem within the thin pool.
     pub fn destroy_filesystem(&mut self, dm: &DM, uuid: &FilesystemUuid) -> EngineResult<()> {
         if let Some(fs) = self.filesystems.remove_by_uuid(uuid) {
-            try!(fs.destroy(dm, &self.thin_pool));
-            try!(self.mdv.rm_fs(uuid));
+            fs.destroy(dm, &self.thin_pool)?;
+            self.mdv.rm_fs(uuid)?;
         }
         Ok(())
     }
@@ -355,19 +355,18 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
                        meta_dev: LinearDev,
                        mut spare_segments: Vec<Segment>)
                        -> EngineResult<(LinearDev, Vec<Segment>)> {
-    let mut new_meta_dev = try!(LinearDev::new(&format_flex_name(&pool_uuid,
-                                                                 FlexRole::ThinMetaSpare),
-                                               dm,
-                                               spare_segments.drain(..).collect()));
+    let mut new_meta_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinMetaSpare),
+                                          dm,
+                                          spare_segments.drain(..).collect())?;
 
 
-    if !try!(Command::new("thin_repair")
-                 .arg("-i")
-                 .arg(&try!(meta_dev.devnode()))
-                 .arg("-o")
-                 .arg(&try!(new_meta_dev.devnode()))
-                 .status())
-                .success() {
+    if !Command::new("thin_repair")
+            .arg("-i")
+            .arg(&meta_dev.devnode()?)
+            .arg("-o")
+            .arg(&new_meta_dev.devnode()?)
+            .status()?
+            .success() {
         return Err(EngineError::Engine(ErrorEnum::Error,
                                        "thin_repair failed, pool unusable".into()));
     }
@@ -384,8 +383,8 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
                  }
              })
         .collect();
-    try!(meta_dev.teardown(dm));
-    try!(new_meta_dev.set_name(dm, &name));
+    meta_dev.teardown(dm)?;
+    new_meta_dev.set_name(dm, &name)?;
 
     Ok((new_meta_dev, new_spare_segments))
 }

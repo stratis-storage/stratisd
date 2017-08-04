@@ -89,7 +89,7 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let new_name: &str = try!(get_next_arg(&mut iter, 0));
+    let new_name: &str = get_next_arg(&mut iter, 0)?;
 
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
@@ -149,42 +149,40 @@ fn get_filesystem_property<F>(i: &mut IterAppend,
         .get(object_path)
         .expect("tree must contain implicit argument");
 
-    let filesystem_data = try!(filesystem_path
-                        .get_data()
-                        .as_ref()
-                        .ok_or_else(|| {
-                                        MethodErr::failed(&format!("no data for object path {}",
-                                                                   object_path))
-                                    }));
+    let filesystem_data =
+        filesystem_path
+            .get_data()
+            .as_ref()
+            .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
-    let pool_path = try!(p.tree
-                 .get(&filesystem_data.parent)
-                 .ok_or_else(|| {
-                                 MethodErr::failed(&format!("no path for parent object path {}",
-                                                            &filesystem_data.parent))
-                             }));
+    let pool_path = p.tree
+        .get(&filesystem_data.parent)
+        .ok_or_else(|| {
+                        MethodErr::failed(&format!("no path for parent object path {}",
+                                                  &filesystem_data.parent))
+                    })?;
 
-    let pool_uuid = try!(pool_path
-                        .get_data()
-                        .as_ref()
-                        .ok_or_else(|| {
-                                        MethodErr::failed(&format!("no data for object path {}",
-                                                                   object_path))
-                                    }))
-            .uuid;
+    let pool_uuid = pool_path
+        .get_data()
+        .as_ref()
+        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?
+        .uuid;
 
     let engine = dbus_context.engine.borrow();
-    let pool = try!(engine
-                 .get_pool(&pool_uuid)
-                 .ok_or_else(|| {
-                                 MethodErr::failed(&format!("no pool corresponding to uuid {}",
-                                                            &pool_uuid))
-                             }));
+    let pool =
+        engine
+            .get_pool(&pool_uuid)
+            .ok_or_else(|| {
+                            MethodErr::failed(&format!("no pool corresponding to uuid {}",
+                                                      &pool_uuid))
+                        })?;
     let filesystem_uuid = &filesystem_data.uuid;
-    let filesystem = try!(pool.get_filesystem(filesystem_uuid)
-        .ok_or_else(|| MethodErr::failed(&format!("no name for filesystem with uuid {}",
-                                          &filesystem_uuid))));
-    i.append(try!(getter(filesystem)));
+    let filesystem = pool.get_filesystem(filesystem_uuid)
+        .ok_or_else(|| {
+                        MethodErr::failed(&format!("no name for filesystem with uuid {}",
+                                                  &filesystem_uuid))
+                    })?;
+    i.append(getter(filesystem)?);
     Ok(())
 }
 
@@ -194,12 +192,12 @@ fn get_filesystem_devnode(i: &mut IterAppend,
                           -> Result<(), MethodErr> {
 
     fn get_devnode(filesystem: &Filesystem) -> Result<MessageItem, MethodErr> {
-        let devnode = try!(filesystem
+        let devnode = filesystem
             .devnode()
             .map_err(|_| {
-                     MethodErr::failed(&format!("no devnode for filesystem with uuid {}",
-                                                filesystem.uuid()))
-            }));
+                         MethodErr::failed(&format!("no devnode for filesystem with uuid {}",
+                                                   filesystem.uuid()))
+                     })?;
         Ok(MessageItem::Str(format!("{}", devnode.display())))
     }
 

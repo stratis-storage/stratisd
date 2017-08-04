@@ -42,7 +42,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let filesystems: Array<&str, _> = try!(get_next_arg(&mut iter, 0));
+    let filesystems: Array<&str, _> = get_next_arg(&mut iter, 0)?;
     let dbus_context = m.tree.get_data();
 
     let object_path = m.path.get_name();
@@ -97,7 +97,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let filesystems: Array<dbus::Path<'static>, _> = try!(get_next_arg(&mut iter, 0));
+    let filesystems: Array<dbus::Path<'static>, _> = get_next_arg(&mut iter, 0)?;
 
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
@@ -152,8 +152,8 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let force: bool = try!(get_next_arg(&mut iter, 0));
-    let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 1));
+    let force: bool = get_next_arg(&mut iter, 0)?;
+    let devs: Array<&str, _> = get_next_arg(&mut iter, 1)?;
 
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
@@ -197,7 +197,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let new_name: &str = try!(get_next_arg(&mut iter, 0));
+    let new_name: &str = get_next_arg(&mut iter, 0)?;
 
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
@@ -250,24 +250,22 @@ fn get_pool_property<F>(i: &mut IterAppend,
         .get(object_path)
         .expect("implicit argument must be in tree");
 
-    let pool_uuid = try!(pool_path
-                        .get_data()
-                        .as_ref()
-                        .ok_or_else(|| {
-                                        MethodErr::failed(&format!("no data for object path {}",
-                                                                   object_path))
-                                    }))
-            .uuid;
+    let pool_uuid = pool_path
+        .get_data()
+        .as_ref()
+        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?
+        .uuid;
 
     let engine = dbus_context.engine.borrow();
-    let pool = try!(engine
-                 .get_pool(&pool_uuid)
-                 .ok_or_else(|| {
-                                 MethodErr::failed(&format!("no pool corresponding to uuid {}",
-                                                            &pool_uuid))
-                             }));
+    let pool =
+        engine
+            .get_pool(&pool_uuid)
+            .ok_or_else(|| {
+                            MethodErr::failed(&format!("no pool corresponding to uuid {}",
+                                                      &pool_uuid))
+                        })?;
 
-    i.append(try!(getter(pool)));
+    i.append(getter(pool)?);
     Ok(())
 }
 
@@ -281,12 +279,12 @@ fn get_pool_total_physical_used(i: &mut IterAppend,
     fn get_used(pool: &Pool) -> Result<MessageItem, MethodErr> {
         let err_func = |_| {
             MethodErr::failed(&format!("no total physical size computed for pool with uuid {}",
-                                       pool.uuid()))
+                                      pool.uuid()))
         };
 
-        try!(pool.total_physical_used()
-                 .map(|u| Ok(MessageItem::Str(format!("{}", *u))))
-                 .map_err(err_func))
+        pool.total_physical_used()
+            .map(|u| Ok(MessageItem::Str(format!("{}", *u))))
+            .map_err(err_func)?
     }
 
     get_pool_property(i, p, get_used)

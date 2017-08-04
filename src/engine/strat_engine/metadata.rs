@@ -51,17 +51,16 @@ impl BDA {
         let hdr_buf = header.sigblock_to_buf();
 
         // Write 8K header. Static_Header copies go in sectors 1 and 9.
-        try!(f.seek(SeekFrom::Start(0)));
-        try!(f.write_all(&zeroed[..SECTOR_SIZE]));
-        try!(f.write_all(&hdr_buf));
-        try!(f.write_all(&zeroed[SECTOR_SIZE * 7..]));
-        try!(f.flush());
-        try!(f.write_all(&hdr_buf));
-        try!(f.write_all(&zeroed[SECTOR_SIZE * 6..]));
-        try!(f.flush());
+        f.seek(SeekFrom::Start(0))?;
+        f.write_all(&zeroed[..SECTOR_SIZE])?;
+        f.write_all(&hdr_buf)?;
+        f.write_all(&zeroed[SECTOR_SIZE * 7..])?;
+        f.flush()?;
+        f.write_all(&hdr_buf)?;
+        f.write_all(&zeroed[SECTOR_SIZE * 6..])?;
+        f.flush()?;
 
-        let regions =
-            try!(mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, &mut f));
+        let regions = mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, &mut f)?;
 
         Ok(BDA {
                header: header,
@@ -74,12 +73,12 @@ impl BDA {
     pub fn load<F>(f: &mut F) -> EngineResult<Option<BDA>>
         where F: Read + Seek
     {
-        let header = match try!(StaticHeader::setup(f)) {
+        let header = match StaticHeader::setup(f)? {
             Some(header) => header,
             None => return Ok(None),
         };
 
-        let regions = try!(mda::MDARegions::load(BDA_STATIC_HDR_SIZE, header.mda_size, f));
+        let regions = mda::MDARegions::load(BDA_STATIC_HDR_SIZE, header.mda_size, f)?;
 
         Ok(Some(BDA {
                     header: header,
@@ -95,9 +94,9 @@ impl BDA {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
 
         // Wiping Static Header should do it
-        try!(f.seek(SeekFrom::Start(0)));
-        try!(f.write_all(&zeroed));
-        try!(f.flush());
+        f.seek(SeekFrom::Start(0))?;
+        f.write_all(&zeroed)?;
+        f.flush()?;
         Ok(())
     }
 
@@ -184,9 +183,9 @@ impl StaticHeader {
     fn setup<F>(f: &mut F) -> EngineResult<Option<StaticHeader>>
         where F: Read + Seek
     {
-        try!(f.seek(SeekFrom::Start(0)));
+        f.seek(SeekFrom::Start(0))?;
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
-        try!(f.read(&mut buf));
+        f.read(&mut buf)?;
 
         // TODO: repair static header if one incorrect?
         // Note: this would require some adjustment or some revision to
@@ -220,9 +219,9 @@ impl StaticHeader {
     {
 
 
-        try!(f.seek(SeekFrom::Start(0)));
+        f.seek(SeekFrom::Start(0))?;
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
-        try!(f.read(&mut buf));
+        f.read(&mut buf)?;
 
         // Using setup() as a test of ownership sets a high bar. It is
         // not sufficient to have STRAT_MAGIC to be considered "Ours",
@@ -273,12 +272,12 @@ impl StaticHeader {
 
         let blkdev_size = Sectors(LittleEndian::read_u64(&buf[20..28]));
 
-        let pool_uuid = try!(Uuid::parse_str(try!(from_utf8(&buf[32..64]))));
-        let dev_uuid = try!(Uuid::parse_str(try!(from_utf8(&buf[64..96]))));
+        let pool_uuid = Uuid::parse_str(from_utf8(&buf[32..64])?)?;
+        let dev_uuid = Uuid::parse_str(from_utf8(&buf[64..96])?)?;
 
         let mda_size = Sectors(LittleEndian::read_u64(&buf[96..104]));
 
-        try!(mda::validate_mda_size(mda_size));
+        mda::validate_mda_size(mda_size)?;
 
         Ok(Some(StaticHeader {
                     pool_uuid: pool_uuid,
@@ -345,13 +344,13 @@ mod mda {
             let region_size = size / NUM_MDA_REGIONS;
             let per_region_size = region_size.bytes();
             for region in 0..NUM_MDA_REGIONS {
-                try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(header_size,
-                                                                   region,
-                                                                   per_region_size))));
-                try!(f.write_all(&hdr_buf));
+                f.seek(SeekFrom::Start(MDARegions::mda_offset(header_size,
+                                                                 region,
+                                                                 per_region_size)))?;
+                f.write_all(&hdr_buf)?;
             }
 
-            try!(f.flush());
+            f.flush()?;
 
             Ok(MDARegions {
                    region_size: region_size,
@@ -376,11 +375,11 @@ mod mda {
             // been corrrupted, return an error.
             let mut load_a_region = |index: usize| -> EngineResult<Option<MDAHeader>> {
                 let mut hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
-                try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(header_size,
-                                                                   index,
-                                                                   per_region_size))));
-                try!(f.read_exact(&mut hdr_buf));
-                Ok(try!(MDAHeader::from_buf(&hdr_buf, per_region_size)))
+                f.seek(SeekFrom::Start(MDARegions::mda_offset(header_size,
+                                                                 index,
+                                                                 per_region_size)))?;
+                f.read_exact(&mut hdr_buf)?;
+                Ok(MDAHeader::from_buf(&hdr_buf, per_region_size)?)
             };
 
             // Get an MDAHeader for the given index.
@@ -392,7 +391,7 @@ mod mda {
 
             Ok(MDARegions {
                    region_size: region_size,
-                   mdas: [try!(get_mda(0)), try!(get_mda(1))],
+                   mdas: [get_mda(0)?, get_mda(1)?],
                })
         }
 
@@ -418,7 +417,7 @@ mod mda {
 
             let region_size = self.region_size.bytes();
             let used = Bytes(data.len() as u64);
-            try!(check_mda_region_size(used, region_size));
+            check_mda_region_size(used, region_size)?;
 
             let header = MDAHeader {
                 last_updated: *time,
@@ -429,12 +428,10 @@ mod mda {
 
             // Write data to a region specified by index.
             let mut save_region = |index: usize| -> EngineResult<()> {
-                try!(f.seek(SeekFrom::Start(MDARegions::mda_offset(header_size,
-                                                                   index,
-                                                                   region_size))));
-                try!(f.write_all(&hdr_buf));
-                try!(f.write_all(data));
-                try!(f.flush());
+                f.seek(SeekFrom::Start(MDARegions::mda_offset(header_size, index, region_size)))?;
+                f.write_all(&hdr_buf)?;
+                f.write_all(data)?;
+                f.flush()?;
 
                 Ok(())
             };
@@ -442,8 +439,8 @@ mod mda {
             // TODO: Consider if there is an action that should be taken if
             // saving to one or the other region fails.
             let older_region = self.older();
-            try!(save_region(older_region));
-            try!(save_region(older_region + 2));
+            save_region(older_region)?;
+            save_region(older_region + 2)?;
 
             self.mdas[older_region] = Some(header);
 
@@ -469,7 +466,7 @@ mod mda {
             let mut load_region = |index: usize| -> EngineResult<Vec<u8>> {
                 let offset = MDARegions::mda_offset(header_size, index, region_size) +
                              _MDA_REGION_HDR_SIZE as u64;
-                try!(f.seek(SeekFrom::Start(offset)));
+                f.seek(SeekFrom::Start(offset))?;
                 mda.load_region(f)
             };
 
@@ -550,7 +547,7 @@ mod mda {
                 0 => Ok(None),
                 secs => {
                     let used = Bytes(LittleEndian::read_u64(&buf[8..16]));
-                    try!(check_mda_region_size(used, region_size));
+                    check_mda_region_size(used, region_size)?;
 
                     let nsecs = LittleEndian::read_u32(&buf[24..28]);
                     // Signed cast is safe, highest order bit of each value
@@ -602,7 +599,7 @@ mod mda {
             assert!(*self.used <= std::usize::MAX as u64);
             let mut data_buf = vec![0u8; *self.used as usize];
 
-            try!(f.read_exact(&mut data_buf));
+            f.read_exact(&mut data_buf)?;
 
             if self.data_crc != crc32::checksum_ieee(&data_buf) {
                 return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region data CRC".into()));
@@ -657,9 +654,7 @@ mod mda {
         #[test]
         /// Verify that default MDAHeader is all 0s except for CRC.
         fn test_default_mda_header() {
-            assert!(MDAHeader::default().to_buf()[4..]
-                        .iter()
-                        .all(|x| *x == 0u8));
+            assert!(MDAHeader::default().to_buf()[4..].iter().all(|x| *x == 0u8));
         }
 
         #[test]

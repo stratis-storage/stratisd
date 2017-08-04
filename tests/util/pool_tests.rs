@@ -39,10 +39,7 @@ pub fn test_thinpool_expand(paths: &[&Path]) -> () {
         .first()
         .unwrap();
 
-    let devnode = pool.get_filesystem(&fs_uuid)
-        .unwrap()
-        .devnode()
-        .unwrap();
+    let devnode = pool.get_filesystem(&fs_uuid).unwrap().devnode().unwrap();
     // Braces to ensure f is closed before destroy
     {
         let mut f = OpenOptions::new().write(true).open(devnode).unwrap();
@@ -116,9 +113,7 @@ pub fn test_thinpool_thindev_destroy(paths: &[&Path]) -> () {
         .first()
         .unwrap();
 
-    let fs_id = pool.get_mut_strat_filesystem(&fs_uuid)
-        .unwrap()
-        .thin_id();
+    let fs_id = pool.get_mut_strat_filesystem(&fs_uuid).unwrap().thin_id();
 
     pool.destroy_filesystems(&[&fs_uuid]).unwrap();
 

@@ -7,7 +7,7 @@ authors = ["Andy Grover <agrover@redhat.com>", "Mulhern <amulhern@redhat.com>", 
 dbus = "0.5.2"
 clap = "1"
 nix = "0"
-devicemapper = "0.6"
+devicemapper = { git = "git://github.com/trgill/devicemapper-rs.git",  branch = "testing_thinpool"}
 crc = "1"
 byteorder = "0.3.13"
 chrono = "0.4"

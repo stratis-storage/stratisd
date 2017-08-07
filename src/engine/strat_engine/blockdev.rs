@@ -7,7 +7,7 @@
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 
-use time::Timespec;
+use chrono::{DateTime, Utc};
 
 use devicemapper::{Device, Sectors, Segment};
 
@@ -47,7 +47,7 @@ impl BlockDev {
         BDA::wipe(&mut f)
     }
 
-    pub fn save_state(&mut self, time: &Timespec, metadata: &[u8]) -> EngineResult<()> {
+    pub fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> EngineResult<()> {
         let mut f = try!(OpenOptions::new().write(true).open(&self.devnode));
         self.bda.save_state(time, metadata, &mut f)
     }
@@ -74,7 +74,7 @@ impl BlockDev {
     }
 
     /// Last time metadata was written to this device.
-    pub fn last_update_time(&self) -> Option<&Timespec> {
+    pub fn last_update_time(&self) -> Option<&DateTime<Utc>> {
         self.bda.last_update_time()
     }
 

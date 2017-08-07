@@ -11,7 +11,7 @@ extern crate nix;
 extern crate crc;
 extern crate byteorder;
 extern crate uuid;
-extern crate time;
+extern crate chrono;
 extern crate dbus;
 extern crate term;
 extern crate rand;

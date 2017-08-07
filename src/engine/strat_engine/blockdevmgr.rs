@@ -10,8 +10,8 @@ use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use chrono::{DateTime, Duration, Utc};
 use rand::{thread_rng, sample};
-use time::{Duration, Timespec, now};
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Device, Sectors, Segment};
@@ -44,7 +44,7 @@ pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
 #[derive(Debug)]
 pub struct BlockDevMgr {
     block_devs: Vec<BlockDev>,
-    last_update_time: Option<Timespec>,
+    last_update_time: Option<DateTime<Utc>>,
 }
 
 impl BlockDevMgr {
@@ -133,9 +133,12 @@ impl BlockDevMgr {
     /// written. Randomly select no more than MAX_NUM_TO_WRITE blockdevs to
     /// write to.
     pub fn save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {
-        let current_time = now().to_timespec();
+        let current_time = Utc::now();
         let stamp_time = if Some(current_time) <= self.last_update_time {
-            self.last_update_time.expect("> Some(time)") + Duration::nanoseconds(1)
+            self.last_update_time
+                .expect("self.last_update_time >= Some(current_time")
+                .checked_add_signed(Duration::nanoseconds(1))
+                .expect("self.last_update_time << maximum representable DateTime")
         } else {
             current_time
         };
@@ -213,7 +216,8 @@ pub fn initialize(pool_uuid: &PoolUuid,
     pub fn dev_info(dev: &Device) -> EngineResult<(PathBuf, Bytes, DevOwnership, File)> {
         let devnode = try!(dev.devnode().ok_or_else(|| {
             EngineError::Engine(ErrorEnum::NotFound,
-                                format!("could not get device node from dev {}", dev.dstr()))
+                format!("could not get device node from dev {}", dev.dstr()),
+            )
         }));
 
         let mut f = try!(OpenOptions::new().read(true).write(true).open(&devnode));

@@ -62,9 +62,20 @@ Stratisd requires Rust 1.17+ and Cargo to build. These may be available via
 your distribution's package manager. If not, [Rustup](https://www.rustup.rs/)
 is available to install and update the Rust toolchain.
 
+Stratisd makes use of `rustfmt` to enforce consistent formatting in Rust files.
+PRs must pass the `rustfmt` task in the CI in order to be merged.
+The `rustfmt` task currently requires the specific `rustfmt` version 0.8.3.
+Installation of this specific version can be achieved via:
+
+```
+cargo install --vers 0.8.3 rustfmt
+```
+
 Once toolchain is in place, run `cargo build` to build, and then run the
 `stratisd` executable in `./target/debug/` as root. Pass the `--help` option
 for more information on additional developer options.
+
+To reformat all files to ensure proper formatting, run `cargo fmt`.
 
 ### Testing
 Stratisd incorporates two testing modalities: unit tests, which are defined

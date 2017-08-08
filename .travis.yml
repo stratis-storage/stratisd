@@ -1,12 +1,14 @@
-sudo: required
 os: linux
 group: edge
 
-before_install:
-    - sudo apt-get -qq update
-    - sudo apt-get install -y libdbus-1-dev
+addons:
+    apt:
+        packages:
+            libdbus-1-dev
 
 language: rust
+
+cache: cargo
 
 matrix:
     allow_failures:
@@ -21,6 +23,7 @@ matrix:
         - rust: stable
           env: TASK=test
         - rust: stable
+          sudo: required
           env: TASK=test-loop
         - rust: nightly
           env: TASK=clippy

@@ -33,8 +33,9 @@ pub const META_LOWATER: MetaBlocks = MetaBlocks(512);
 
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
-/// A ThinPool struct contains the thinpool itself, but also the spare
-/// segments for its metadata device.
+/// A ThinPool struct contains the thinpool itself, the spare
+/// segments for its metadata device, and the filesystems and filesystem
+/// metadata associated with it.
 #[derive(Debug)]
 pub struct ThinPool {
     thin_pool: ThinPoolDev,

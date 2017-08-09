@@ -90,7 +90,7 @@ impl BlockDevMgr {
     }
 
     pub fn destroy_all(self) -> EngineResult<()> {
-        Ok(wipe_blockdevs(self.block_devs)?)
+        wipe_blockdevs(self.block_devs)
     }
 
     /// If available space is less than size, return None, else return

@@ -24,7 +24,7 @@ use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, ThinRole, format_fl
                       format_thinpool_name, format_thin_name};
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::mdv::MetadataVol;
-use super::serde_structs::{FilesystemSave, Recordable, ThinPoolDevSave};
+use super::serde_structs::{FilesystemSave, FlexDevsSave, Recordable, ThinPoolDevSave};
 
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
@@ -196,24 +196,35 @@ impl ThinPool {
         Ok(())
     }
 
-    /// Get an immutable reference to the sparse segments of the ThinPool.
-    pub fn spare_segments(&self) -> &[Segment] {
-        &self.meta_spare
-    }
-
-    /// The segments belonging to the thin pool meta device.
-    pub fn thin_pool_meta_segments(&self) -> &[Segment] {
-        self.thin_pool.meta_dev().segments()
-    }
-
-    /// The segments belonging to the thin pool data device.
-    pub fn thin_pool_data_segments(&self) -> &[Segment] {
-        self.thin_pool.data_dev().segments()
-    }
-
-    /// The segments belonging to the MDV.
-    pub fn thin_pool_mdv_segments(&self) -> &[Segment] {
-        self.mdv.segments()
+    /// Return the FlexDevsSave data structure for variable length metadata.
+    /// May return an error if mapper can not locate the UUID corresponding
+    /// to a device node.
+    pub fn flexdevssave<F>(&self, mapper: F) -> EngineResult<FlexDevsSave>
+        where F: Fn(&Segment) -> EngineResult<(Uuid, Sectors, Sectors)>
+    {
+        Ok(FlexDevsSave {
+               meta_dev: self.mdv
+                   .segments()
+                   .iter()
+                   .map(&mapper)
+                   .collect::<EngineResult<Vec<_>>>()?,
+               thin_meta_dev: self.thin_pool
+                   .meta_dev()
+                   .segments()
+                   .iter()
+                   .map(&mapper)
+                   .collect::<EngineResult<Vec<_>>>()?,
+               thin_data_dev: self.thin_pool
+                   .data_dev()
+                   .segments()
+                   .iter()
+                   .map(&mapper)
+                   .collect::<EngineResult<Vec<_>>>()?,
+               thin_meta_dev_spare: self.meta_spare
+                   .iter()
+                   .map(&mapper)
+                   .collect::<EngineResult<Vec<_>>>()?,
+           })
     }
 
     /// Get the devicemapper::ThinPoolDev for this pool. Used for testing.
@@ -240,7 +251,7 @@ impl ThinPool {
             }
         };
 
-        let spare_total = self.spare_segments().iter().map(|s| s.length).sum();
+        let spare_total = self.meta_spare.iter().map(|s| s.length).sum();
         let meta_dev_total = self.thin_pool
             .meta_dev()
             .segments()

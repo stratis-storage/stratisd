@@ -30,7 +30,7 @@ use super::dmdevice::{FlexRole, format_flex_name};
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::mdv::MetadataVol;
 use super::metadata::MIN_MDA_SECTORS;
-use super::serde_structs::{FlexDevsSave, PoolSave, Recordable};
+use super::serde_structs::{PoolSave, Recordable};
 use super::setup::{get_blockdevs, get_metadata};
 use super::thinpool::{META_LOWATER, ThinPool};
 
@@ -470,39 +470,11 @@ impl Recordable<PoolSave> for StratPool {
             Ok((*bd.uuid(), seg.start, seg.length))
         };
 
-        let meta_dev = self.thin_pool
-            .thin_pool_mdv_segments()
-            .iter()
-            .map(&mapper)
-            .collect::<EngineResult<Vec<_>>>()?;
-
-        let thin_meta_dev = self.thin_pool
-            .thin_pool_meta_segments()
-            .iter()
-            .map(&mapper)
-            .collect::<EngineResult<Vec<_>>>()?;
-
-        let thin_data_dev = self.thin_pool
-            .thin_pool_data_segments()
-            .iter()
-            .map(&mapper)
-            .collect::<EngineResult<Vec<_>>>()?;
-
-        let thin_meta_dev_spare = self.thin_pool
-            .spare_segments()
-            .iter()
-            .map(&mapper)
-            .collect::<EngineResult<Vec<_>>>()?;
 
         Ok(PoolSave {
                name: self.name.clone(),
                block_devs: self.block_devs.record()?,
-               flex_devs: FlexDevsSave {
-                   meta_dev: meta_dev,
-                   thin_meta_dev: thin_meta_dev,
-                   thin_data_dev: thin_data_dev,
-                   thin_meta_dev_spare: thin_meta_dev_spare,
-               },
+               flex_devs: self.thin_pool.flexdevssave(&mapper)?,
                thinpool_dev: self.thin_pool
                    .record()
                    .expect("this function never fails"),

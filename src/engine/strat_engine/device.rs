@@ -32,14 +32,14 @@ pub fn write_sectors<P: AsRef<Path>>(path: P,
                                      length: Sectors,
                                      buf: &[u8; SECTOR_SIZE])
                                      -> EngineResult<()> {
-    let mut f = try!(OpenOptions::new().write(true).open(path));
+    let mut f = OpenOptions::new().write(true).open(path)?;
 
-    try!(f.seek(SeekFrom::Start(*offset)));
+    f.seek(SeekFrom::Start(*offset))?;
     for _ in 0..*length {
-        try!(f.write_all(buf));
+        f.write_all(buf)?;
     }
 
-    try!(f.flush());
+    f.flush()?;
     Ok(())
 }
 

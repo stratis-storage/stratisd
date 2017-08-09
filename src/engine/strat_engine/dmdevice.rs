@@ -101,7 +101,7 @@ impl ThinDevIdPool {
     // TODO: Improve this so that it is guaranteed only to fail if every 24 bit
     // number has been used.
     pub fn new_id(&mut self) -> EngineResult<ThinDevId> {
-        let next_id = try!(ThinDevId::new_u64((self.next_id) as u64));
+        let next_id = ThinDevId::new_u64((self.next_id) as u64)?;
         self.next_id += 1;
         Ok(next_id)
     }

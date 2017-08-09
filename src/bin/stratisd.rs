@@ -42,10 +42,10 @@ use libstratis::stratis::{StratisResult, StratisError, VERSION};
 /// Try to write the error from the program to stderr, vehemently.
 /// Return an error if stderr unavailable or writing was a failure.
 fn write_err(err: StratisError) -> StratisResult<()> {
-    let mut out = try!(term::stderr().ok_or(StratisError::StderrNotFound));
-    try!(out.fg(term::color::RED));
-    try!(writeln!(out, "{}", err.description()));
-    try!(out.reset());
+    let mut out = term::stderr().ok_or(StratisError::StderrNotFound)?;
+    out.fg(term::color::RED)?;
+    writeln!(out, "{}", err.description())?;
+    out.reset()?;
     Ok(())
 }
 
@@ -89,12 +89,11 @@ fn run() -> StratisResult<()> {
             Rc::new(RefCell::new(SimEngine::default()))
         } else {
             info!("Using StratEngine");
-            Rc::new(RefCell::new(try!(StratEngine::initialize())))
+            Rc::new(RefCell::new(StratEngine::initialize()?))
         }
     };
 
-    let (dbus_conn, mut tree, dbus_context) =
-        try!(libstratis::dbus_api::connect(Rc::clone(&engine)));
+    let (dbus_conn, mut tree, dbus_context) = libstratis::dbus_api::connect(Rc::clone(&engine))?;
 
     // Get a list of fds to poll for
     let mut fds: Vec<_> = dbus_conn

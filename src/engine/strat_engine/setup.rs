@@ -35,9 +35,9 @@ use super::serde_structs::PoolSave;
 pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<PathBuf>>> {
 
     let mut pool_map = HashMap::new();
-    for dir_e in try!(read_dir("/dev")) {
-        let dir_e = try!(dir_e);
-        let mode = try!(dir_e.metadata()).st_mode();
+    for dir_e in read_dir("/dev")? {
+        let dir_e = dir_e?;
+        let mode = dir_e.metadata()?.st_mode();
 
         // Device node can't belong to Stratis if it is not a block device
         if mode & S_IFMT.bits() != S_IFBLK.bits() {
@@ -83,7 +83,7 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<PathBuf>>> {
         }
 
         let mut f = f.expect("unreachable if f is err");
-        if let DevOwnership::Ours(uuid) = try!(StaticHeader::determine_ownership(&mut f)) {
+        if let DevOwnership::Ours(uuid) = StaticHeader::determine_ownership(&mut f)? {
             pool_map
                 .entry(uuid)
                 .or_insert_with(Vec::new)
@@ -105,7 +105,7 @@ pub fn get_metadata(pool_uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<O
     // the newest metadata.
     let mut bdas = Vec::new();
     for devnode in devnodes {
-        let bda = try!(BDA::load(&mut try!(OpenOptions::new().read(true).open(devnode))));
+        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
         if let Some(bda) = bda {
             if *bda.pool_uuid() == pool_uuid {
                 bdas.push((devnode, bda));
@@ -177,17 +177,17 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
     let mut blockdevs = vec![];
     let mut devices = HashSet::new();
     for dev in devnodes {
-        let device = try!(Device::from_str(&dev.to_string_lossy()));
+        let device = Device::from_str(&dev.to_string_lossy())?;
 
         // If we've seen this device already, skip it.
         if !devices.insert(device) {
             continue;
         }
 
-        let bda = try!(BDA::load(&mut try!(OpenOptions::new().read(true).open(dev))));
+        let bda = BDA::load(&mut OpenOptions::new().read(true).open(dev)?)?;
         if let Some(bda) = bda {
             if *bda.pool_uuid() == pool_uuid {
-                let actual_size = try!(blkdev_size(&try!(OpenOptions::new().read(true).open(dev))))
+                let actual_size = blkdev_size(&OpenOptions::new().read(true).open(dev)?)?
                     .sectors();
 
                 // If size of device has changed and is less, then it is
@@ -195,8 +195,8 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                 // blockdev no longer exist. If that is the case,
                 // RangeAllocator::new() will return an error.
                 let allocator =
-                    try!(RangeAllocator::new(actual_size,
-                                             segment_table.get(bda.dev_uuid()).unwrap_or(&vec![])));
+                    RangeAllocator::new(actual_size,
+                                        segment_table.get(bda.dev_uuid()).unwrap_or(&vec![]))?;
 
                 blockdevs.push(BlockDev::new(device, dev.clone(), bda, allocator));
             }

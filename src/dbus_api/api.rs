@@ -47,10 +47,10 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let name: &str = try!(get_next_arg(&mut iter, 0));
-    let redundancy: (bool, u16) = try!(get_next_arg(&mut iter, 1));
-    let force: bool = try!(get_next_arg(&mut iter, 2));
-    let devs: Array<&str, _> = try!(get_next_arg(&mut iter, 3));
+    let name: &str = get_next_arg(&mut iter, 0)?;
+    let redundancy: (bool, u16) = get_next_arg(&mut iter, 1)?;
+    let force: bool = get_next_arg(&mut iter, 2)?;
+    let devs: Array<&str, _> = get_next_arg(&mut iter, 3)?;
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
@@ -98,7 +98,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let object_path: dbus::Path<'static> = try!(get_next_arg(&mut iter, 0));
+    let object_path: dbus::Path<'static> = get_next_arg(&mut iter, 0)?;
 
     let dbus_context = m.tree.get_data();
 
@@ -169,7 +169,7 @@ fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message = m.msg;
     let mut iter = message.iter_init();
 
-    let denominator: u32 = try!(get_next_arg(&mut iter, 0));
+    let denominator: u32 = get_next_arg(&mut iter, 0)?;
 
     let dbus_context = m.tree.get_data();
     let result = dbus_context
@@ -256,7 +256,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
 #[allow(type_complexity)]
 pub fn connect(engine: Rc<RefCell<Engine>>)
                -> Result<(Connection, Tree<MTFn<TData>, TData>, DbusContext), dbus::Error> {
-    let c = try!(Connection::get_private(BusType::System));
+    let c = Connection::get_private(BusType::System)?;
 
     let local_engine = Rc::clone(&engine);
 
@@ -272,9 +272,9 @@ pub fn connect(engine: Rc<RefCell<Engine>>)
         }
     }
 
-    try!(tree.set_registered(&c, true));
+    tree.set_registered(&c, true)?;
 
-    try!(c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32));
+    c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32)?;
 
     Ok((c, tree, dbus_context))
 }
@@ -297,7 +297,7 @@ pub fn handle(c: &Connection,
         for action in b_actions.drain() {
             match action {
                 DeferredAction::Add(path) => {
-                    try!(c.register_object_path(path.get_name()));
+                    c.register_object_path(path.get_name())?;
                     tree.insert(path);
                 }
                 DeferredAction::Remove(path) => {

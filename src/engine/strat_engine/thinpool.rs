@@ -63,14 +63,22 @@ pub struct ThinPoolStatus {
 
 impl ThinPool {
     /// Make a new thin pool.
-    /// Precondition: block_mgr can allocate the space required.
     pub fn new(pool_uuid: PoolUuid,
                dm: &DM,
                data_block_size: Sectors,
                low_water_mark: DataBlocks,
                block_mgr: &mut BlockDevMgr)
                -> EngineResult<ThinPool> {
-        assert!(block_mgr.avail_space() >= ThinPool::initial_size());
+        if block_mgr.avail_space() < ThinPool::initial_size() {
+            let avail_size = block_mgr.avail_space().bytes();
+            return Err(EngineError::Engine(ErrorEnum::Invalid,
+                                           format!("Space on pool must be at least {} bytes, \
+                                                   available space is only {} bytes",
+                                                   ThinPool::initial_size().bytes(),
+                                                   avail_size)));
+
+
+        }
 
         let meta_segments = block_mgr
             .alloc_space(ThinPool::initial_metadata_size())
@@ -249,7 +257,7 @@ impl ThinPool {
 
 
     /// Initial size for a pool.
-    pub fn initial_size() -> Sectors {
+    fn initial_size() -> Sectors {
         // One extra meta for spare
         ThinPool::initial_metadata_size() * 2u64 + ThinPool::initial_data_size() +
         ThinPool::initial_mdv_size()

@@ -12,15 +12,11 @@ use serde_json;
 use uuid::Uuid;
 
 use devicemapper as dm;
-use devicemapper::consts::SECTOR_SIZE;
-use devicemapper::DmDevice;
-use devicemapper::Device;
-use devicemapper::DM;
-use devicemapper::{DataBlocks, MetaBlocks, Sectors, Segment};
+use devicemapper::{Device, DmDevice, DM};
+use devicemapper::{DataBlocks, Sectors, Segment};
 use devicemapper::LinearDev;
 use devicemapper::{ThinDevId, ThinPoolWorkingStatus, ThinPoolDev};
 
-use super::super::consts::IEC::Mi;
 use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, RenameAction, Redundancy};
@@ -33,13 +29,9 @@ use super::mdv::MetadataVol;
 use super::metadata::MIN_MDA_SECTORS;
 use super::serde_structs::{PoolSave, Recordable};
 use super::setup::{get_blockdevs, get_metadata};
-use super::thinpool::{META_LOWATER, ThinPool};
+use super::thinpool::{INITIAL_MDV_SIZE, INITIAL_META_SIZE, META_LOWATER, ThinPool};
 
-pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER};
-
-const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4096);
-pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
-const INITIAL_MDV_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
+pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
 
 #[derive(Debug)]
 pub struct StratPool {
@@ -64,7 +56,7 @@ impl StratPool {
 
         let mut block_mgr = BlockDevMgr::initialize(&pool_uuid, paths, MIN_MDA_SECTORS, force)?;
 
-        if block_mgr.avail_space() < StratPool::min_initial_size() {
+        if block_mgr.avail_space() < ThinPool::initial_size() {
             let avail_size = block_mgr.avail_space().bytes();
 
             // TODO: check the return value and update state machine on failure
@@ -73,7 +65,7 @@ impl StratPool {
             return Err(EngineError::Engine(ErrorEnum::Invalid,
                                            format!("Space on pool must be at least {} bytes, \
                                                    available space is only {} bytes",
-                                                   StratPool::min_initial_size().bytes(),
+                                                   ThinPool::initial_size().bytes(),
                                                    avail_size)));
 
 
@@ -236,13 +228,6 @@ impl StratPool {
                redundancy: Redundancy::NONE,
                thin_pool: thinpool,
            })
-    }
-
-    /// Minimum initial size for a pool.
-    pub fn min_initial_size() -> Sectors {
-        // One extra meta for spare
-        (INITIAL_META_SIZE.sectors() * 2u64) + *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE +
-        INITIAL_MDV_SIZE
     }
 
     /// Write current metadata to pool members.

@@ -13,6 +13,7 @@ use devicemapper as dm;
 use devicemapper::{DM, DmDevice, DataBlocks, DmError, LinearDev, MetaBlocks, Sectors, Segment,
                    ThinDev, ThinDevId, ThinPoolDev};
 use devicemapper::ErrorEnum::CheckFailed;
+use devicemapper::consts::SECTOR_SIZE;
 
 use super::super::consts::IEC;
 use super::super::engine::{Filesystem, HasName};
@@ -32,6 +33,11 @@ pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
 pub const META_LOWATER: MetaBlocks = MetaBlocks(512);
 
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
+
+pub const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4096);
+pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
+pub const INITIAL_MDV_SIZE: Sectors = Sectors(16 * IEC::Mi / SECTOR_SIZE as u64);
+
 
 /// A ThinPool struct contains the thinpool itself, the spare
 /// segments for its metadata device, and the filesystems and filesystem
@@ -163,6 +169,15 @@ impl ThinPool {
                mdv: mdv,
            })
     }
+
+
+    /// Initial size for a pool.
+    pub fn initial_size() -> Sectors {
+        // One extra meta for spare
+        (INITIAL_META_SIZE.sectors() * 2u64) + *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE +
+        INITIAL_MDV_SIZE
+    }
+
 
     /// The status of the thin pool as calculated by DM.
     pub fn check(&mut self, dm: &DM) -> EngineResult<ThinPoolStatus> {

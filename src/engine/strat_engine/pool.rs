@@ -15,22 +15,18 @@ use devicemapper as dm;
 use devicemapper::Device;
 use devicemapper::DM;
 use devicemapper::{DataBlocks, Sectors, Segment};
-use devicemapper::LinearDev;
-use devicemapper::{ThinDevId, ThinPoolWorkingStatus, ThinPoolDev};
+use devicemapper::{ThinPoolWorkingStatus, ThinPoolDev};
 
 use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, RenameAction, Redundancy};
 
 use super::blockdevmgr::BlockDevMgr;
-use super::device::wipe_sectors;
-use super::dmdevice::{FlexRole, format_flex_name};
 use super::filesystem::{StratFilesystem, FilesystemStatus};
-use super::mdv::MetadataVol;
 use super::metadata::MIN_MDA_SECTORS;
 use super::serde_structs::{PoolSave, Recordable};
 use super::setup::{get_blockdevs, get_metadata};
-use super::thinpool::{INITIAL_MDV_SIZE, INITIAL_META_SIZE, META_LOWATER, ThinPool};
+use super::thinpool::{META_LOWATER, ThinPool};
 
 pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
 
@@ -73,52 +69,29 @@ impl StratPool {
         }
 
         let meta_regions = block_mgr
-            .alloc_space(INITIAL_META_SIZE.sectors())
+            .alloc_space(ThinPool::initial_metadata_size())
             .expect("blockmgr must not fail, already checked for space");
 
         let meta_spare_regions = block_mgr
-            .alloc_space(INITIAL_META_SIZE.sectors())
+            .alloc_space(ThinPool::initial_metadata_size())
             .expect("blockmgr must not fail, already checked for space");
 
         let data_regions = block_mgr
-            .alloc_space(*INITIAL_DATA_SIZE * DATA_BLOCK_SIZE)
+            .alloc_space(ThinPool::initial_data_size())
             .expect("blockmgr must not fail, already checked for space");
-
-        // When constructing a thin-pool, Stratis reserves the first N
-        // sectors on a block device by creating a linear device with a
-        // starting offset. DM writes the super block in the first block.
-        // DM requires this first block to be zeros when the meta data for
-        // the thin-pool is initially created. If we don't zero the
-        // superblock DM issue error messages because it triggers code paths
-        // that are trying to re-adopt the device with the attributes that
-        // have been passed.
-        let meta_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
-                                      dm,
-                                      meta_regions)?;
-        wipe_sectors(&meta_dev.devnode()?,
-                     Sectors(0),
-                     INITIAL_META_SIZE.sectors())?;
-
-        let data_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinData),
-                                      dm,
-                                      data_regions)?;
 
         let mdv_regions = block_mgr
-            .alloc_space(INITIAL_MDV_SIZE)
+            .alloc_space(ThinPool::initial_mdv_size())
             .expect("blockmgr must not fail, already checked for space");
-
-        let mdv_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
-        let mdv_dev = LinearDev::new(&mdv_name, dm, mdv_regions)?;
-        let mdv = MetadataVol::initialize(&pool_uuid, mdv_dev)?;
 
         let thinpool = ThinPool::new(pool_uuid,
                                      dm,
                                      DATA_BLOCK_SIZE,
                                      DATA_LOWATER,
                                      meta_spare_regions,
-                                     meta_dev,
-                                     data_dev,
-                                     mdv)?;
+                                     meta_regions,
+                                     data_regions,
+                                     mdv_regions)?;
 
         let devnodes = block_mgr.devnodes();
 
@@ -136,8 +109,6 @@ impl StratPool {
     }
 
     /// Setup a StratPool using its UUID and the list of devnodes it has.
-    // TODO: Clean up after errors that occur after some action has been
-    // taken on the environment.
     pub fn setup(uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<StratPool> {
         let metadata = get_metadata(uuid, devnodes)?
             .ok_or_else(|| {
@@ -197,32 +168,14 @@ impl StratPool {
 
         let dm = DM::new()?;
 
-        // This is the cleanup zone.
-        let meta_dev = LinearDev::new(&format_flex_name(&uuid, FlexRole::ThinMeta),
-                                      &dm,
-                                      thin_meta_segments)?;
-
-        let data_dev = LinearDev::new(&format_flex_name(&uuid, FlexRole::ThinData),
-                                      &dm,
-                                      thin_data_segments)?;
-
-        let mdv_dev = LinearDev::new(&format_flex_name(&uuid, FlexRole::MetadataVolume),
-                                     &dm,
-                                     meta_segments)?;
-        let mdv = MetadataVol::setup(&uuid, mdv_dev)?;
-        let filesystem_metadatas = mdv.filesystems()?;
-        let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
-
         let thinpool = ThinPool::setup(uuid,
                                        &dm,
                                        metadata.thinpool_dev.data_block_size,
                                        DATA_LOWATER,
-                                       &thin_ids,
                                        thin_meta_spare_segments,
-                                       meta_dev,
-                                       data_dev,
-                                       mdv,
-                                       filesystem_metadatas)?;
+                                       thin_meta_segments,
+                                       thin_data_segments,
+                                       meta_segments)?;
 
         Ok(StratPool {
                name: metadata.name,

@@ -20,6 +20,7 @@ use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{PoolUuid, FilesystemUuid, RenameAction};
 
+use super::blockdevmgr::BlockDevMgr;
 use super::device::wipe_sectors;
 use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, ThinRole, format_flex_name,
                       format_thinpool_name, format_thin_name};
@@ -62,16 +63,31 @@ pub struct ThinPoolStatus {
 
 impl ThinPool {
     /// Make a new thin pool.
-    #[allow(too_many_arguments)]
+    /// Precondition: block_mgr can allocate the space required.
     pub fn new(pool_uuid: PoolUuid,
                dm: &DM,
                data_block_size: Sectors,
                low_water_mark: DataBlocks,
-               spare_segments: Vec<Segment>,
-               meta_segments: Vec<Segment>,
-               data_segments: Vec<Segment>,
-               mdv_segments: Vec<Segment>)
+               block_mgr: &mut BlockDevMgr)
                -> EngineResult<ThinPool> {
+        assert!(block_mgr.avail_space() >= ThinPool::initial_size());
+
+        let meta_segments = block_mgr
+            .alloc_space(ThinPool::initial_metadata_size())
+            .expect("blockmgr must not fail, already checked for space");
+
+        let spare_segments = block_mgr
+            .alloc_space(ThinPool::initial_metadata_size())
+            .expect("blockmgr must not fail, already checked for space");
+
+        let data_segments = block_mgr
+            .alloc_space(ThinPool::initial_data_size())
+            .expect("blockmgr must not fail, already checked for space");
+
+        let mdv_segments = block_mgr
+            .alloc_space(ThinPool::initial_mdv_size())
+            .expect("blockmgr must not fail, already checked for space");
+
         // When constructing a thin-pool, Stratis reserves the first N
         // sectors on a block device by creating a linear device with a
         // starting offset. DM writes the super block in the first block.
@@ -85,7 +101,7 @@ impl ThinPool {
                                       meta_segments)?;
         wipe_sectors(&meta_dev.devnode()?,
                      Sectors(0),
-                     INITIAL_META_SIZE.sectors())?;
+                     ThinPool::initial_metadata_size())?;
 
         let data_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinData),
                                       dm,
@@ -216,17 +232,17 @@ impl ThinPool {
     }
 
     /// Initial size for a pool's meta data device.
-    pub fn initial_metadata_size() -> Sectors {
+    fn initial_metadata_size() -> Sectors {
         INITIAL_META_SIZE.sectors()
     }
 
     /// Initial size for a pool's data device.
-    pub fn initial_data_size() -> Sectors {
+    fn initial_data_size() -> Sectors {
         *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE
     }
 
     /// Initial size for a pool's filesystem metadata volume.
-    pub fn initial_mdv_size() -> Sectors {
+    fn initial_mdv_size() -> Sectors {
         INITIAL_MDV_SIZE
     }
 

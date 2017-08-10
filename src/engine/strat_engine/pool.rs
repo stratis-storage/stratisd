@@ -68,30 +68,7 @@ impl StratPool {
 
         }
 
-        let meta_regions = block_mgr
-            .alloc_space(ThinPool::initial_metadata_size())
-            .expect("blockmgr must not fail, already checked for space");
-
-        let meta_spare_regions = block_mgr
-            .alloc_space(ThinPool::initial_metadata_size())
-            .expect("blockmgr must not fail, already checked for space");
-
-        let data_regions = block_mgr
-            .alloc_space(ThinPool::initial_data_size())
-            .expect("blockmgr must not fail, already checked for space");
-
-        let mdv_regions = block_mgr
-            .alloc_space(ThinPool::initial_mdv_size())
-            .expect("blockmgr must not fail, already checked for space");
-
-        let thinpool = ThinPool::new(pool_uuid,
-                                     dm,
-                                     DATA_BLOCK_SIZE,
-                                     DATA_LOWATER,
-                                     meta_spare_regions,
-                                     meta_regions,
-                                     data_regions,
-                                     mdv_regions)?;
+        let thinpool = ThinPool::new(pool_uuid, dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut block_mgr)?;
 
         let devnodes = block_mgr.devnodes();
 

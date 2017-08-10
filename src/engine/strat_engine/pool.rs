@@ -117,42 +117,12 @@ impl StratPool {
                })
         };
 
-        let flex_devs = &metadata.flex_devs;
-
-        let meta_segments = flex_devs
-            .meta_dev
-            .iter()
-            .map(&lookup)
-            .collect::<EngineResult<Vec<_>>>()?;
-
-        let thin_meta_segments = flex_devs
-            .thin_meta_dev
-            .iter()
-            .map(&lookup)
-            .collect::<EngineResult<Vec<_>>>()?;
-
-        let thin_data_segments = flex_devs
-            .thin_data_dev
-            .iter()
-            .map(&lookup)
-            .collect::<EngineResult<Vec<_>>>()?;
-
-        let thin_meta_spare_segments = flex_devs
-            .thin_meta_dev_spare
-            .iter()
-            .map(&lookup)
-            .collect::<EngineResult<Vec<_>>>()?;
-
-        let dm = DM::new()?;
-
         let thinpool = ThinPool::setup(uuid,
-                                       &dm,
+                                       &DM::new()?,
                                        metadata.thinpool_dev.data_block_size,
                                        DATA_LOWATER,
-                                       thin_meta_spare_segments,
-                                       thin_meta_segments,
-                                       thin_data_segments,
-                                       meta_segments)?;
+                                       &metadata.flex_devs,
+                                       lookup)?;
 
         Ok(StratPool {
                name: metadata.name,

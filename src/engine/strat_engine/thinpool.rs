@@ -135,16 +135,39 @@ impl ThinPool {
     /// If initial setup fails due to a thin_check failure, attempt to fix
     /// the problem by running thin_repair. If failure recurs, return an
     /// error.
-    #[allow(too_many_arguments)]
-    pub fn setup(pool_uuid: PoolUuid,
-                 dm: &DM,
-                 data_block_size: Sectors,
-                 low_water_mark: DataBlocks,
-                 spare_segments: Vec<Segment>,
-                 meta_segments: Vec<Segment>,
-                 data_segments: Vec<Segment>,
-                 mdv_segments: Vec<Segment>)
-                 -> EngineResult<ThinPool> {
+    pub fn setup<F>(pool_uuid: PoolUuid,
+                    dm: &DM,
+                    data_block_size: Sectors,
+                    low_water_mark: DataBlocks,
+                    flex_devs: &FlexDevsSave,
+                    mapper: F)
+                    -> EngineResult<ThinPool>
+        where F: Fn(&(Uuid, Sectors, Sectors)) -> EngineResult<Segment>
+    {
+        let mdv_segments = flex_devs
+            .meta_dev
+            .iter()
+            .map(&mapper)
+            .collect::<EngineResult<Vec<_>>>()?;
+
+        let meta_segments = flex_devs
+            .thin_meta_dev
+            .iter()
+            .map(&mapper)
+            .collect::<EngineResult<Vec<_>>>()?;
+
+        let data_segments = flex_devs
+            .thin_data_dev
+            .iter()
+            .map(&mapper)
+            .collect::<EngineResult<Vec<_>>>()?;
+
+        let spare_segments = flex_devs
+            .thin_meta_dev_spare
+            .iter()
+            .map(&mapper)
+            .collect::<EngineResult<Vec<_>>>()?;
+
         let meta_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
                                       dm,
                                       meta_segments)?;

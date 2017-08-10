@@ -13,7 +13,6 @@ use devicemapper as dm;
 use devicemapper::{DM, DataBlocks, DmError, LinearDev, MetaBlocks, Sectors, Segment, ThinDev,
                    ThinDevId, ThinPoolDev};
 use devicemapper::ErrorEnum::CheckFailed;
-use devicemapper::consts::SECTOR_SIZE;
 
 use super::super::consts::IEC;
 use super::super::engine::{Filesystem, HasName};
@@ -21,6 +20,7 @@ use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{PoolUuid, FilesystemUuid, RenameAction};
 
+use super::device::wipe_sectors;
 use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, ThinRole, format_flex_name,
                       format_thinpool_name, format_thin_name};
 use super::filesystem::{StratFilesystem, FilesystemStatus};
@@ -34,9 +34,9 @@ pub const META_LOWATER: MetaBlocks = MetaBlocks(512);
 
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
-pub const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4096);
+const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4096);
 pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
-pub const INITIAL_MDV_SIZE: Sectors = Sectors(16 * IEC::Mi / SECTOR_SIZE as u64);
+const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 
 
 /// A ThinPool struct contains the thinpool itself, the spare
@@ -68,10 +68,33 @@ impl ThinPool {
                data_block_size: Sectors,
                low_water_mark: DataBlocks,
                spare_segments: Vec<Segment>,
-               meta_dev: LinearDev,
-               data_dev: LinearDev,
-               mdv: MetadataVol)
+               meta_segments: Vec<Segment>,
+               data_segments: Vec<Segment>,
+               mdv_segments: Vec<Segment>)
                -> EngineResult<ThinPool> {
+        // When constructing a thin-pool, Stratis reserves the first N
+        // sectors on a block device by creating a linear device with a
+        // starting offset. DM writes the super block in the first block.
+        // DM requires this first block to be zeros when the meta data for
+        // the thin-pool is initially created. If we don't zero the
+        // superblock DM issue error messages because it triggers code paths
+        // that are trying to re-adopt the device with the attributes that
+        // have been passed.
+        let meta_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
+                                      dm,
+                                      meta_segments)?;
+        wipe_sectors(&meta_dev.devnode()?,
+                     Sectors(0),
+                     INITIAL_META_SIZE.sectors())?;
+
+        let data_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinData),
+                                      dm,
+                                      data_segments)?;
+
+        let mdv_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
+        let mdv_dev = LinearDev::new(&mdv_name, dm, mdv_segments)?;
+        let mdv = MetadataVol::initialize(&pool_uuid, mdv_dev)?;
+
         let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
         let thinpool_dev = ThinPoolDev::new(name.as_ref(),
                                             dm,
@@ -100,13 +123,20 @@ impl ThinPool {
                  dm: &DM,
                  data_block_size: Sectors,
                  low_water_mark: DataBlocks,
-                 thin_ids: &[ThinDevId],
                  spare_segments: Vec<Segment>,
-                 meta_dev: LinearDev,
-                 data_dev: LinearDev,
-                 mdv: MetadataVol,
-                 fs_save: Vec<FilesystemSave>)
+                 meta_segments: Vec<Segment>,
+                 data_segments: Vec<Segment>,
+                 mdv_segments: Vec<Segment>)
                  -> EngineResult<ThinPool> {
+        let meta_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
+                                      dm,
+                                      meta_segments)?;
+
+        let data_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinData),
+                                      dm,
+                                      data_segments)?;
+
+
         let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
 
         let res = match ThinPoolDev::setup(name.as_ref(),
@@ -133,6 +163,12 @@ impl ThinPool {
         };
         let (thinpool_dev, spare_segments) = res?;
 
+        let mdv_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::MetadataVolume),
+                                     dm,
+                                     mdv_segments)?;
+        let mdv = MetadataVol::setup(&pool_uuid, mdv_dev)?;
+        let filesystem_metadatas = mdv.filesystems()?;
+
         // TODO: not fail completely if one filesystem setup fails?
         let filesystems = {
             // Set up a filesystem from its metadata.
@@ -146,7 +182,7 @@ impl ThinPool {
                 Ok(StratFilesystem::setup(fssave.uuid, &fssave.name, thin_dev))
             };
 
-            fs_save
+            filesystem_metadatas
                 .iter()
                 .map(get_filesystem)
                 .collect::<EngineResult<Vec<_>>>()?
@@ -161,10 +197,11 @@ impl ThinPool {
             }
         }
 
+        let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
         Ok(ThinPool {
                thin_pool: thinpool_dev,
                meta_spare: spare_segments,
-               id_gen: ThinDevIdPool::new_from_ids(thin_ids),
+               id_gen: ThinDevIdPool::new_from_ids(&thin_ids),
                filesystems: fs_table,
                mdv: mdv,
            })
@@ -174,10 +211,24 @@ impl ThinPool {
     /// Initial size for a pool.
     pub fn initial_size() -> Sectors {
         // One extra meta for spare
-        (INITIAL_META_SIZE.sectors() * 2u64) + *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE +
-        INITIAL_MDV_SIZE
+        ThinPool::initial_metadata_size() * 2u64 + ThinPool::initial_data_size() +
+        ThinPool::initial_mdv_size()
     }
 
+    /// Initial size for a pool's meta data device.
+    pub fn initial_metadata_size() -> Sectors {
+        INITIAL_META_SIZE.sectors()
+    }
+
+    /// Initial size for a pool's data device.
+    pub fn initial_data_size() -> Sectors {
+        *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE
+    }
+
+    /// Initial size for a pool's filesystem metadata volume.
+    pub fn initial_mdv_size() -> Sectors {
+        INITIAL_MDV_SIZE
+    }
 
     /// The status of the thin pool as calculated by DM.
     pub fn check(&mut self, dm: &DM) -> EngineResult<ThinPoolStatus> {

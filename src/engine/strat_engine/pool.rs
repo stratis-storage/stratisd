@@ -52,22 +52,14 @@ impl StratPool {
 
         let mut block_mgr = BlockDevMgr::initialize(&pool_uuid, paths, MIN_MDA_SECTORS, force)?;
 
-        if block_mgr.avail_space() < ThinPool::initial_size() {
-            let avail_size = block_mgr.avail_space().bytes();
-
-            // TODO: check the return value and update state machine on failure
-            let _ = block_mgr.destroy_all();
-
-            return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                           format!("Space on pool must be at least {} bytes, \
-                                                   available space is only {} bytes",
-                                                   ThinPool::initial_size().bytes(),
-                                                   avail_size)));
-
-
-        }
-
-        let thinpool = ThinPool::new(pool_uuid, dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut block_mgr)?;
+        let thinpool = ThinPool::new(pool_uuid, dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut block_mgr);
+        let thinpool = match thinpool {
+            Ok(thinpool) => thinpool,
+            Err(err) => {
+                let _ = block_mgr.destroy_all();
+                return Err(err);
+            }
+        };
 
         let devnodes = block_mgr.devnodes();
 

@@ -33,7 +33,7 @@ impl<'a, T: HasName + HasUuid> IntoIterator for &'a mut Table<T> {
     type Item = &'a mut T;
     type IntoIter = IterMut<'a, T>;
 
-    fn into_iter(mut self) -> IterMut<'a, T> {
+    fn into_iter(self) -> IterMut<'a, T> {
         self.items.iter_mut()
     }
 }

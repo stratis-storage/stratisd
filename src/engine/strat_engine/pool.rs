@@ -251,6 +251,7 @@ impl StratPool {
         let data = serde_json::to_string(&self.record()?)?;
         self.block_devs.save_state(data.as_bytes())
     }
+
     /// Return an extend size for the physical space backing a pool
     /// TODO: returning the current size will double the space provisoned to
     /// back the pool.  We should determine if this is a reasonable value.
@@ -333,13 +334,8 @@ impl StratPool {
     }
 
     /// Teardown a pool.
-    /// Take down the device mapper devices belonging to the pool.
     pub fn teardown(self) -> EngineResult<()> {
-        let dm = DM::new()?;
-
-        self.thin_pool.teardown(&dm)?;
-
-        Ok(())
+        self.thin_pool.teardown(&DM::new()?)
     }
 
     /// Look up a filesystem in the pool.
@@ -391,10 +387,7 @@ impl Pool for StratPool {
     }
 
     fn destroy(self) -> EngineResult<()> {
-        let dm = DM::new()?;
-
-        self.thin_pool.teardown(&dm)?;
-
+        self.thin_pool.teardown(&DM::new()?)?;
         self.block_devs.destroy_all()?;
         Ok(())
     }

@@ -103,7 +103,7 @@ impl BlockDevMgr {
             return None;
         }
 
-        for mut bd in &mut self.block_devs {
+        for bd in &mut self.block_devs {
             if needed == Sectors(0) {
                 break;
             }
@@ -153,7 +153,7 @@ impl BlockDevMgr {
         let saved = sample(&mut thread_rng(), candidates, MAX_NUM_TO_WRITE)
             .iter_mut()
             .fold(false,
-                  |acc, mut b| acc | b.save_state(&stamp_time, metadata).is_ok());
+                  |acc, b| acc | b.save_state(&stamp_time, metadata).is_ok());
 
         if saved {
             self.last_update_time = Some(stamp_time);

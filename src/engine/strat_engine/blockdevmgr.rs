@@ -56,6 +56,14 @@ impl BlkDevSegment {
     }
 }
 
+impl Recordable<Vec<(Uuid, Sectors, Sectors)>> for Vec<BlkDevSegment> {
+    fn record(&self) -> Vec<(Uuid, Sectors, Sectors)> {
+        self.iter()
+            .map(|bseg| (bseg.uuid, bseg.segment.start, bseg.segment.length))
+            .collect::<Vec<_>>()
+    }
+}
+
 /// Build a Vec<Segment> from BlkDevSegments. This is useful for calls
 /// to the devicemapper library.
 pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<Segment> {
@@ -215,13 +223,10 @@ impl BlockDevMgr {
 }
 
 impl Recordable<HashMap<DevUuid, BlockDevSave>> for BlockDevMgr {
-    fn record(&self) -> EngineResult<HashMap<Uuid, BlockDevSave>> {
+    fn record(&self) -> HashMap<Uuid, BlockDevSave> {
         self.block_devs
             .iter()
-            .map(|bd| {
-                     let uuid = *bd.uuid();
-                     bd.record().and_then(|bdsave| Ok((uuid, bdsave)))
-                 })
+            .map(|bd| (*bd.uuid(), bd.record()))
             .collect()
     }
 }

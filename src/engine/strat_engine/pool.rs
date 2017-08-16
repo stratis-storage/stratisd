@@ -102,7 +102,7 @@ impl StratPool {
 
     /// Write current metadata to pool members.
     pub fn write_metadata(&mut self) -> EngineResult<()> {
-        let data = serde_json::to_string(&self.record()?)?;
+        let data = serde_json::to_string(&self.record())?;
         self.block_devs.save_state(data.as_bytes())
     }
 
@@ -311,14 +311,12 @@ impl HasName for StratPool {
 }
 
 impl Recordable<PoolSave> for StratPool {
-    fn record(&self) -> EngineResult<PoolSave> {
-        Ok(PoolSave {
-               name: self.name.clone(),
-               block_devs: self.block_devs.record()?,
-               flex_devs: self.thin_pool.flexdevssave()?,
-               thinpool_dev: self.thin_pool
-                   .record()
-                   .expect("this function never fails"),
-           })
+    fn record(&self) -> PoolSave {
+        PoolSave {
+            name: self.name.clone(),
+            block_devs: self.block_devs.record(),
+            flex_devs: self.thin_pool.record(),
+            thinpool_dev: self.thin_pool.record(),
+        }
     }
 }

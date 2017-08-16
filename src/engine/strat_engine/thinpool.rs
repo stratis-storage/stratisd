@@ -329,30 +329,6 @@ impl ThinPool {
         Ok(())
     }
 
-    /// Return the FlexDevsSave data structure for variable length metadata.
-    /// May return an error if mapper can not locate the UUID corresponding
-    /// to a device node.
-    pub fn flexdevssave(&self) -> EngineResult<FlexDevsSave> {
-        Ok(FlexDevsSave {
-               meta_dev: self.mdv_segments
-                   .iter()
-                   .map(|bseg| (bseg.uuid, bseg.segment.start, bseg.segment.length))
-                   .collect::<Vec<_>>(),
-               thin_meta_dev: self.meta_segments
-                   .iter()
-                   .map(|bseg| (bseg.uuid, bseg.segment.start, bseg.segment.length))
-                   .collect::<Vec<_>>(),
-               thin_data_dev: self.data_segments
-                   .iter()
-                   .map(|bseg| (bseg.uuid, bseg.segment.start, bseg.segment.length))
-                   .collect::<Vec<_>>(),
-               thin_meta_dev_spare: self.meta_spare_segments
-                   .iter()
-                   .map(|bseg| (bseg.uuid, bseg.segment.start, bseg.segment.length))
-                   .collect::<Vec<_>>(),
-           })
-    }
-
     /// Get the devicemapper::ThinPoolDev for this pool. Used for testing.
     pub fn thinpooldev(&self) -> &ThinPoolDev {
         &self.thin_pool
@@ -509,9 +485,20 @@ impl ThinPool {
     }
 }
 
+impl Recordable<FlexDevsSave> for ThinPool {
+    fn record(&self) -> FlexDevsSave {
+        FlexDevsSave {
+            meta_dev: self.mdv_segments.record(),
+            thin_meta_dev: self.meta_segments.record(),
+            thin_data_dev: self.data_segments.record(),
+            thin_meta_dev_spare: self.meta_spare_segments.record(),
+        }
+    }
+}
+
 impl Recordable<ThinPoolDevSave> for ThinPool {
-    fn record(&self) -> EngineResult<ThinPoolDevSave> {
-        Ok(ThinPoolDevSave { data_block_size: self.thin_pool.data_block_size() })
+    fn record(&self) -> ThinPoolDevSave {
+        ThinPoolDevSave { data_block_size: self.thin_pool.data_block_size() }
     }
 }
 

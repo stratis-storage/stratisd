@@ -16,17 +16,17 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use uuid::Uuid;
+use serde::Serialize;
 
 use devicemapper::{Sectors, ThinDevId};
 
-use super::super::errors::EngineResult;
 use super::super::types::{DevUuid, FilesystemUuid};
 
 /// Implements saving struct data to a serializable form. The form should be
 /// sufficient, in conjunction with the environment, to reconstruct the
 /// saved struct in all its essentials.
-pub trait Recordable<T> {
-    fn record(&self) -> EngineResult<T>;
+pub trait Recordable<T: Serialize> {
+    fn record(&self) -> T;
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

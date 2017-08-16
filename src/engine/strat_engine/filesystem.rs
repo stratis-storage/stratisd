@@ -145,13 +145,13 @@ impl Filesystem for StratFilesystem {
 }
 
 impl Recordable<FilesystemSave> for StratFilesystem {
-    fn record(&self) -> EngineResult<FilesystemSave> {
-        Ok(FilesystemSave {
-               name: self.name.clone(),
-               uuid: self.fs_id,
-               thin_id: self.thin_dev.id(),
-               size: self.thin_dev.size(),
-           })
+    fn record(&self) -> FilesystemSave {
+        FilesystemSave {
+            name: self.name.clone(),
+            uuid: self.fs_id,
+            thin_id: self.thin_dev.id(),
+            size: self.thin_dev.size(),
+        }
     }
 }
 

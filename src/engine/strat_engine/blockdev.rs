@@ -115,7 +115,7 @@ impl BlockDev {
 }
 
 impl Recordable<BlockDevSave> for BlockDev {
-    fn record(&self) -> EngineResult<BlockDevSave> {
-        Ok(BlockDevSave { devnode: self.devnode.clone() })
+    fn record(&self) -> BlockDevSave {
+        BlockDevSave { devnode: self.devnode.clone() }
     }
 }

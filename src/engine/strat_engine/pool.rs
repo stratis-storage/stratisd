@@ -94,7 +94,7 @@ impl StratPool {
         // Obtain a Segment from a Uuid, Sectors, Sectors triple.
         // This can fail if there is no entry for the UUID in the map
         // from UUIDs to device numbers.
-        let lookup = |triple: &(Uuid, Sectors, Sectors)| -> EngineResult<Segment> {
+        let lookup = |triple: &(DevUuid, Sectors, Sectors)| -> EngineResult<Segment> {
             let device = uuid_map
                 .get(&triple.0)
                 .ok_or_else(|| {
@@ -338,7 +338,7 @@ impl HasName for StratPool {
 impl Recordable<PoolSave> for StratPool {
     fn record(&self) -> EngineResult<PoolSave> {
 
-        let mapper = |seg: &Segment| -> EngineResult<(Uuid, Sectors, Sectors)> {
+        let mapper = |seg: &Segment| -> EngineResult<(DevUuid, Sectors, Sectors)> {
             let bd = self.block_devs
                 .get_by_device(seg.device)
                 .ok_or_else(|| {

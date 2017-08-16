@@ -18,7 +18,7 @@ use super::super::consts::IEC;
 use super::super::engine::{Filesystem, HasName};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
-use super::super::types::{PoolUuid, FilesystemUuid, RenameAction};
+use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, RenameAction};
 
 use super::blockdevmgr::BlockDevMgr;
 use super::device::wipe_sectors;
@@ -150,7 +150,7 @@ impl ThinPool {
                     flex_devs: &FlexDevsSave,
                     mapper: F)
                     -> EngineResult<ThinPool>
-        where F: Fn(&(Uuid, Sectors, Sectors)) -> EngineResult<Segment>
+        where F: Fn(&(DevUuid, Sectors, Sectors)) -> EngineResult<Segment>
     {
         let mdv_segments = flex_devs
             .meta_dev
@@ -315,7 +315,7 @@ impl ThinPool {
     /// May return an error if mapper can not locate the UUID corresponding
     /// to a device node.
     pub fn flexdevssave<F>(&self, mapper: F) -> EngineResult<FlexDevsSave>
-        where F: Fn(&Segment) -> EngineResult<(Uuid, Sectors, Sectors)>
+        where F: Fn(&Segment) -> EngineResult<(DevUuid, Sectors, Sectors)>
     {
         Ok(FlexDevsSave {
                meta_dev: self.mdv

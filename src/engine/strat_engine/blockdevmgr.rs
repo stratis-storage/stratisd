@@ -65,14 +65,9 @@ impl BlockDevMgr {
         Ok(BlockDevMgr::new(initialize(pool_uuid, devices, mda_size, force)?))
     }
 
-    /// Obtain a BlockDev by its Device.
-    pub fn get_by_device(&self, device: Device) -> Option<&BlockDev> {
-        self.block_devs.iter().find(|d| d.device() == &device)
-    }
-
-    // Obtain a BlockDev by its UUID.
-    pub fn get_by_uuid(&self, uuid: &DevUuid) -> Option<&BlockDev> {
-        self.block_devs.iter().find(|d| d.uuid() == uuid)
+    /// Get a function that maps blockdev device numbers to their UUIDs
+    pub fn device_number_to_uuid(&self) -> Box<Fn(&Device) -> Option<DevUuid>> {
+        device_number_to_uuid(&self.block_devs)
     }
 
     pub fn add(&mut self,
@@ -306,4 +301,28 @@ pub fn initialize(pool_uuid: &PoolUuid,
         }
     }
     Ok(bds)
+}
+
+/// Get a function which maps from a device UUID to a device number.
+/// blockdevs contains a list of blockdevs which contain both their Stratis
+/// UUID and their current device.
+pub fn uuid_to_device_number(blockdevs: &[BlockDev]) -> Box<Fn(&DevUuid) -> Option<Device>> {
+    let uuid_map: HashMap<DevUuid, Device> = blockdevs
+        .iter()
+        .map(|bd| (*bd.uuid(), *bd.device()))
+        .collect();
+
+    Box::new(move |uuid: &DevUuid| -> Option<Device> { uuid_map.get(uuid).cloned() })
+}
+
+/// Get a function which maps from a device number to a device UUID.
+/// blockdevs contains a list of blockdevs which contain both their Stratis
+/// UUID and their current device.
+fn device_number_to_uuid(blockdevs: &[BlockDev]) -> Box<Fn(&Device) -> Option<DevUuid>> {
+    let uuid_map: HashMap<Device, DevUuid> = blockdevs
+        .iter()
+        .map(|bd| (*bd.device(), *bd.uuid()))
+        .collect();
+
+    Box::new(move |device: &Device| -> Option<DevUuid> { uuid_map.get(device).cloned() })
 }

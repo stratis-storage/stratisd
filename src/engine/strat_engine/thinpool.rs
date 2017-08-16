@@ -10,8 +10,8 @@ use std::process::Command;
 use uuid::Uuid;
 
 use devicemapper as dm;
-use devicemapper::{DM, DataBlocks, DmError, LinearDev, MetaBlocks, Sectors, Segment, ThinDev,
-                   ThinDevId, ThinPoolDev};
+use devicemapper::{DM, DataBlocks, Device, DmError, LinearDev, MetaBlocks, Sectors, Segment,
+                   ThinDev, ThinDevId, ThinPoolDev};
 use devicemapper::ErrorEnum::CheckFailed;
 
 use super::super::consts::IEC;
@@ -143,15 +143,28 @@ impl ThinPool {
     /// If initial setup fails due to a thin_check failure, attempt to fix
     /// the problem by running thin_repair. If failure recurs, return an
     /// error.
-    pub fn setup<F>(pool_uuid: PoolUuid,
-                    dm: &DM,
-                    data_block_size: Sectors,
-                    low_water_mark: DataBlocks,
-                    flex_devs: &FlexDevsSave,
-                    mapper: F)
-                    -> EngineResult<ThinPool>
-        where F: Fn(&(DevUuid, Sectors, Sectors)) -> EngineResult<Segment>
-    {
+    pub fn setup(pool_uuid: PoolUuid,
+                 dm: &DM,
+                 data_block_size: Sectors,
+                 low_water_mark: DataBlocks,
+                 flex_devs: &FlexDevsSave,
+                 lookup: Box<Fn(&DevUuid) -> Option<Device>>)
+                 -> EngineResult<ThinPool> {
+
+        let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> EngineResult<Segment> {
+            let device = lookup(&triple.0)
+                .ok_or_else(|| {
+                                EngineError::Engine(ErrorEnum::NotFound,
+                                                    format!("missing device for UUID {:?}",
+                                                            &triple.0))
+                            })?;
+            Ok(Segment {
+                   device: device,
+                   start: triple.1,
+                   length: triple.2,
+               })
+        };
+
         let mdv_segments = flex_devs
             .meta_dev
             .iter()
@@ -314,9 +327,19 @@ impl ThinPool {
     /// Return the FlexDevsSave data structure for variable length metadata.
     /// May return an error if mapper can not locate the UUID corresponding
     /// to a device node.
-    pub fn flexdevssave<F>(&self, mapper: F) -> EngineResult<FlexDevsSave>
-        where F: Fn(&Segment) -> EngineResult<(DevUuid, Sectors, Sectors)>
-    {
+    pub fn flexdevssave(&self,
+                        lookup: Box<Fn(&Device) -> Option<DevUuid>>)
+                        -> EngineResult<FlexDevsSave> {
+        let mapper = |seg: &Segment| -> EngineResult<(DevUuid, Sectors, Sectors)> {
+            let uuid = lookup(&seg.device)
+                .ok_or_else(|| {
+                                EngineError::Engine(ErrorEnum::NotFound,
+                                                    format!("no block device found for device {:?}",
+                                                            seg.device))
+                            })?;
+            Ok((uuid, seg.start, seg.length))
+        };
+
         Ok(FlexDevsSave {
                meta_dev: self.mdv
                    .segments()

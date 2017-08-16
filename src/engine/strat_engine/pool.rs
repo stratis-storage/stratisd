@@ -13,12 +13,12 @@ use uuid::Uuid;
 
 use devicemapper as dm;
 use devicemapper::{Device, DM};
-use devicemapper::{DataBlocks, Sectors, Segment};
+use devicemapper::{DataBlocks, Sectors};
 use devicemapper::{ThinPoolWorkingStatus, ThinPoolDev};
 
 use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, RenameAction, Redundancy};
+use super::super::types::{FilesystemUuid, PoolUuid, RenameAction, Redundancy};
 
 use super::blockdevmgr::BlockDevMgr;
 use super::filesystem::{StratFilesystem, FilesystemStatus};
@@ -83,42 +83,18 @@ impl StratPool {
                             EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no metadata for pool {}", uuid))
                         })?;
-        let blockdevs = get_blockdevs(uuid, &metadata, devnodes)?;
-
-        let uuid_map: HashMap<DevUuid, Device> = blockdevs
-            .iter()
-            .map(|bd| (*bd.uuid(), *bd.device()))
-            .collect();
-
-        // Obtain a Segment from a Uuid, Sectors, Sectors triple.
-        // This can fail if there is no entry for the UUID in the map
-        // from UUIDs to device numbers.
-        let lookup = |triple: &(Uuid, Sectors, Sectors)| -> EngineResult<Segment> {
-            let device = uuid_map
-                .get(&triple.0)
-                .ok_or_else(|| {
-                                EngineError::Engine(ErrorEnum::NotFound,
-                                                    format!("missing device for UUID {:?}",
-                                                            &triple.0))
-                            })?;
-            Ok(Segment {
-                   device: *device,
-                   start: triple.1,
-                   length: triple.2,
-               })
-        };
-
+        let bd_mgr = BlockDevMgr::new(get_blockdevs(uuid, &metadata, devnodes)?);
         let thinpool = ThinPool::setup(uuid,
                                        &DM::new()?,
                                        metadata.thinpool_dev.data_block_size,
                                        DATA_LOWATER,
                                        &metadata.flex_devs,
-                                       lookup)?;
+                                       &bd_mgr)?;
 
         Ok(StratPool {
                name: metadata.name,
                pool_uuid: uuid,
-               block_devs: BlockDevMgr::new(blockdevs),
+               block_devs: bd_mgr,
                redundancy: Redundancy::NONE,
                thin_pool: thinpool,
            })
@@ -336,23 +312,10 @@ impl HasName for StratPool {
 
 impl Recordable<PoolSave> for StratPool {
     fn record(&self) -> EngineResult<PoolSave> {
-
-        let mapper = |seg: &Segment| -> EngineResult<(Uuid, Sectors, Sectors)> {
-            let bd = self.block_devs
-                .get_by_device(seg.device)
-                .ok_or_else(|| {
-                                EngineError::Engine(ErrorEnum::NotFound,
-                                                    format!("no block device found for device {:?}",
-                                                            seg.device))
-                            })?;
-            Ok((*bd.uuid(), seg.start, seg.length))
-        };
-
-
         Ok(PoolSave {
                name: self.name.clone(),
                block_devs: self.block_devs.record()?,
-               flex_devs: self.thin_pool.flexdevssave(&mapper)?,
+               flex_devs: self.thin_pool.flexdevssave()?,
                thinpool_dev: self.thin_pool
                    .record()
                    .expect("this function never fails"),

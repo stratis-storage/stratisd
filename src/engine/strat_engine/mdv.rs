@@ -17,7 +17,7 @@ use nix::mount::{MsFlags, mount, umount};
 use nix::unistd::fsync;
 use serde_json;
 
-use devicemapper::{DM, LinearDev, Segment};
+use devicemapper::{DM, LinearDev};
 
 use super::super::engine::HasUuid;
 use super::super::errors::EngineResult;
@@ -174,11 +174,6 @@ impl MetadataVol {
         }
 
         Ok(filesystems)
-    }
-
-    /// Return the segments used.
-    pub fn segments(&self) -> &[Segment] {
-        self.dev.segments()
     }
 
     /// Tear down a Metadata Volume.

@@ -4,21 +4,20 @@
 
 // Code to handle cleanup after a failed operation.
 
-
 use super::super::engine::HasUuid;
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 
 use super::blockdev::BlockDev;
 use super::pool::StratPool;
 
-/// Wipe a Vec of blockdevs of their identifying headers.
+/// Wipe some blockdevs of their identifying headers.
 /// Return an error if any of the blockdevs could not be wiped.
 /// If an error occurs while wiping a blockdev, attempt to wipe all remaining.
-pub fn wipe_blockdevs(blockdevs: Vec<BlockDev>) -> EngineResult<()> {
+pub fn wipe_blockdevs(blockdevs: &[BlockDev]) -> EngineResult<()> {
     let mut unerased_devnodes = Vec::new();
 
     for bd in blockdevs {
-        let bd_devnode = bd.devnode.clone();
+        let bd_devnode = bd.devnode.to_owned();
         bd.wipe_metadata()
             .unwrap_or_else(|_| unerased_devnodes.push(bd_devnode));
     }

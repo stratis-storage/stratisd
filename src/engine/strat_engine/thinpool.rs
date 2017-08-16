@@ -115,10 +115,6 @@ impl ThinPool {
                                       dm,
                                       data_segments)?;
 
-        let mdv_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
-        let mdv_dev = LinearDev::new(&mdv_name, dm, mdv_segments)?;
-        let mdv = MetadataVol::initialize(&pool_uuid, mdv_dev)?;
-
         let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
         let thinpool_dev = ThinPoolDev::new(&name,
                                             dm,
@@ -127,6 +123,11 @@ impl ThinPool {
                                             low_water_mark,
                                             meta_dev,
                                             data_dev)?;
+
+        let mdv_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
+        let mdv_dev = LinearDev::new(&mdv_name, dm, mdv_segments)?;
+        let mdv = MetadataVol::initialize(&pool_uuid, mdv_dev)?;
+
         Ok(ThinPool {
                thin_pool: thinpool_dev,
                meta_spare: spare_segments,

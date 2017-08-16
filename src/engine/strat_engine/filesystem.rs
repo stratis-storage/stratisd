@@ -61,18 +61,20 @@ impl StratFilesystem {
     pub fn check(&mut self, dm: &DM) -> EngineResult<FilesystemStatus> {
         match self.thin_dev.status(dm)? {
             ThinStatus::Good(_) => {
-                let mount_point = self.get_mount_point()?;
-                let (fs_total_bytes, fs_total_used_bytes) = fs_usage(&mount_point)?;
-                let free_bytes = fs_total_bytes - fs_total_used_bytes;
-                if free_bytes.sectors() < FILESYSTEM_LOWATER {
-                    let extend_size = self.extend_size(self.thin_dev.size());
-                    if self.thin_dev.extend(dm, extend_size).is_err() {
-                        return Ok(FilesystemStatus::ThinDevExtendFailed);
-                    }
-                    if xfs_growfs(&mount_point).is_err() {
-                        return Ok(FilesystemStatus::XfsGrowFailed);
+                if let Some(mount_point) = self.get_mount_point()? {
+                    let (fs_total_bytes, fs_total_used_bytes) = fs_usage(&mount_point)?;
+                    let free_bytes = fs_total_bytes - fs_total_used_bytes;
+                    if free_bytes.sectors() < FILESYSTEM_LOWATER {
+                        let extend_size = self.extend_size(self.thin_dev.size());
+                        if self.thin_dev.extend(dm, extend_size).is_err() {
+                            return Ok(FilesystemStatus::ThinDevExtendFailed);
+                        }
+                        if xfs_growfs(&mount_point).is_err() {
+                            return Ok(FilesystemStatus::XfsGrowFailed);
+                        }
                     }
                 }
+                // TODO: do anything when filesystem is not mounted?
                 // TODO: periodically kick off fstrim?
             }
             ThinStatus::Fail => return Ok(FilesystemStatus::Failed),
@@ -94,20 +96,18 @@ impl StratFilesystem {
 
     /// Get the mount_point for this filesystem
     /// TODO Replace this code with something less brittle
-    pub fn get_mount_point(&self) -> EngineResult<PathBuf> {
+    pub fn get_mount_point(&self) -> EngineResult<Option<PathBuf>> {
         let output = Command::new("df")
             .arg("--output=target")
             .arg(&self.devnode())
             .output()?;
         if output.status.success() {
             let output_str = String::from_utf8_lossy(&output.stdout);
-            if let Some(mount_point) = output_str.lines().last() {
-                return Ok(PathBuf::from(mount_point));
-            }
+            return Ok(output_str.lines().last().map(PathBuf::from));
         }
-        let err_msg = format!("Failed to get filesystem mountpoint at {:?}",
-                              self.devnode());
-        Err(EngineError::Engine(ErrorEnum::Error, err_msg))
+        Err(EngineError::Engine(ErrorEnum::Error,
+                                format!("Failed to get filesystem mountpoint for {:?}",
+                                        self.devnode())))
     }
 
     /// Tear down the filesystem.

@@ -14,10 +14,10 @@ use super::pool::StratPool;
 /// Wipe a Vec of blockdevs of their identifying headers.
 /// Return an error if any of the blockdevs could not be wiped.
 /// If an error occurs while wiping a blockdev, attempt to wipe all remaining.
-pub fn wipe_blockdevs(mut blockdevs: Vec<BlockDev>) -> EngineResult<()> {
+pub fn wipe_blockdevs(blockdevs: Vec<BlockDev>) -> EngineResult<()> {
     let mut unerased_devnodes = Vec::new();
 
-    for bd in blockdevs.drain(..) {
+    for bd in blockdevs {
         let bd_devnode = bd.devnode.clone();
         bd.wipe_metadata()
             .unwrap_or_else(|_| unerased_devnodes.push(bd_devnode));
@@ -33,9 +33,9 @@ pub fn wipe_blockdevs(mut blockdevs: Vec<BlockDev>) -> EngineResult<()> {
 }
 
 /// Teardown pools.
-pub fn teardown_pools(mut pools: Vec<StratPool>) -> EngineResult<()> {
+pub fn teardown_pools(pools: Vec<StratPool>) -> EngineResult<()> {
     let mut untorndown_pools = Vec::new();
-    for pool in pools.drain(..) {
+    for pool in pools {
         let pool_uuid = *pool.uuid();
         pool.teardown()
             .unwrap_or_else(|_| untorndown_pools.push(pool_uuid));

@@ -7,8 +7,11 @@
 use std::fs::File;
 use std::io::{Seek, Write, SeekFrom};
 use std::fs::OpenOptions;
+use std::os::linux::fs::MetadataExt;
 use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
+
+use nix::sys::stat::{S_IFBLK, S_IFMT};
 
 use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::{Bytes, Sectors};
@@ -46,4 +49,20 @@ pub fn write_sectors<P: AsRef<Path>>(path: P,
 /// Zero sectors at the given offset for length sectors.
 pub fn wipe_sectors<P: AsRef<Path>>(path: P, offset: Sectors, length: Sectors) -> EngineResult<()> {
     write_sectors(path, offset, length, &[0u8; SECTOR_SIZE])
+}
+
+/// Get a device number from a device node.
+/// Return None if the device is not a block device; devicemapper is not
+/// interested in other sorts of devices.
+pub fn devnode_to_devno(path: &Path) -> EngineResult<Option<u64>> {
+    match path.metadata() {
+        Ok(metadata) => {
+            Ok(if metadata.st_mode() & S_IFMT.bits() == S_IFBLK.bits() {
+                   Some(metadata.st_rdev())
+               } else {
+                   None
+               })
+        }
+        Err(err) => Err(err)?,
+    }
 }

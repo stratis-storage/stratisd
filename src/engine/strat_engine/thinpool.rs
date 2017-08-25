@@ -10,8 +10,8 @@ use std::process::Command;
 use uuid::Uuid;
 
 use devicemapper as dm;
-use devicemapper::{DM, DataBlocks, DmError, LinearDev, MetaBlocks, Sectors, Segment, ThinDev,
-                   ThinDevId, ThinPoolDev};
+use devicemapper::{DM, DmDevice, DataBlocks, DmError, LinearDev, MetaBlocks, Sectors, Segment,
+                   ThinDev, ThinDevId, ThinPoolDev};
 use devicemapper::ErrorEnum::CheckFailed;
 
 use super::super::consts::IEC;
@@ -362,9 +362,9 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
 
     if !Command::new("thin_repair")
             .arg("-i")
-            .arg(&meta_dev.devnode()?)
+            .arg(&meta_dev.devnode())
             .arg("-o")
-            .arg(&new_meta_dev.devnode()?)
+            .arg(&new_meta_dev.devnode())
             .status()?
             .success() {
         return Err(EngineError::Engine(ErrorEnum::Error,

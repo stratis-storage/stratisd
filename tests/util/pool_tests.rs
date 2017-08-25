@@ -39,10 +39,7 @@ pub fn test_thinpool_expand(paths: &[&Path]) -> () {
         .first()
         .unwrap();
 
-    let devnode = pool.get_filesystem(&fs_uuid)
-        .unwrap()
-        .devnode()
-        .unwrap();
+    let devnode = pool.get_filesystem(&fs_uuid).unwrap().devnode();
     // Braces to ensure f is closed before destroy
     {
         let mut f = OpenOptions::new().write(true).open(devnode).unwrap();

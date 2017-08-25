@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 use devicemapper as dm;
 use devicemapper::consts::SECTOR_SIZE;
+use devicemapper::DmDevice;
 use devicemapper::Device;
 use devicemapper::DM;
 use devicemapper::{DataBlocks, MetaBlocks, Sectors, Segment};
@@ -101,9 +102,7 @@ impl StratPool {
         let meta_dev = LinearDev::new(format_flex_name(&pool_uuid, FlexRole::ThinMeta).as_ref(),
                                       dm,
                                       meta_regions)?;
-        wipe_sectors(&meta_dev.devnode()?,
-                     Sectors(0),
-                     INITIAL_META_SIZE.sectors())?;
+        wipe_sectors(&meta_dev.devnode(), Sectors(0), INITIAL_META_SIZE.sectors())?;
 
         let data_dev = LinearDev::new(format_flex_name(&pool_uuid, FlexRole::ThinData).as_ref(),
                                       dm,

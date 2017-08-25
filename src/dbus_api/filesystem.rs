@@ -192,13 +192,7 @@ fn get_filesystem_devnode(i: &mut IterAppend,
                           -> Result<(), MethodErr> {
 
     fn get_devnode(filesystem: &Filesystem) -> Result<MessageItem, MethodErr> {
-        let devnode = filesystem
-            .devnode()
-            .map_err(|_| {
-                         MethodErr::failed(&format!("no devnode for filesystem with uuid {}",
-                                                    filesystem.uuid()))
-                     })?;
-        Ok(MessageItem::Str(format!("{}", devnode.display())))
+        Ok(MessageItem::Str(format!("{}", filesystem.devnode().display())))
     }
 
     get_filesystem_property(i, p, get_devnode)

@@ -8,12 +8,9 @@
 use std::collections::{HashMap, HashSet};
 use std::io::ErrorKind;
 use std::fs::{OpenOptions, read_dir};
-use std::os::linux::fs::MetadataExt;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use nix::Errno;
-use nix::sys::stat::{S_IFBLK, S_IFMT};
 use serde_json;
 
 use devicemapper::Device;
@@ -22,7 +19,7 @@ use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 use super::super::types::PoolUuid;
 
 use super::blockdev::BlockDev;
-use super::device::blkdev_size;
+use super::device::{blkdev_size, devnode_to_devno};
 use super::engine::DevOwnership;
 use super::metadata::{BDA, StaticHeader};
 use super::range_alloc::RangeAllocator;
@@ -37,14 +34,11 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<PathBuf>>> {
     let mut pool_map = HashMap::new();
     for dir_e in read_dir("/dev")? {
         let dir_e = dir_e?;
-        let mode = dir_e.metadata()?.st_mode();
+        let devnode = dir_e.path();
 
-        // Device node can't belong to Stratis if it is not a block device
-        if mode & S_IFMT.bits() != S_IFBLK.bits() {
+        if devnode_to_devno(&devnode)?.is_none() {
             continue;
         }
-
-        let devnode = dir_e.path();
 
         let f = OpenOptions::new().read(true).open(&devnode);
 
@@ -177,7 +171,11 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
     let mut blockdevs = vec![];
     let mut devices = HashSet::new();
     for dev in devnodes {
-        let device = Device::from_str(&dev.to_string_lossy())?;
+        let devno = devnode_to_devno(&dev)?;
+        if devno.is_none() {
+            continue;
+        }
+        let device = Device::from(devno.expect("!devno.is_none()"));
 
         // If we've seen this device already, skip it.
         if !devices.insert(device) {

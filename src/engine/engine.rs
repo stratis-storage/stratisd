@@ -24,7 +24,7 @@ pub trait Dev: Debug {}
 
 pub trait Filesystem: HasName + HasUuid {
     /// path of the device node
-    fn devnode(&self) -> EngineResult<PathBuf>;
+    fn devnode(&self) -> PathBuf;
 }
 
 pub trait Pool: HasName + HasUuid {

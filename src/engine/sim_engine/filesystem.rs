@@ -5,7 +5,6 @@
 use std::path::PathBuf;
 
 use super::super::engine::{HasName, HasUuid, Filesystem};
-use super::super::errors::EngineResult;
 use super::super::types::FilesystemUuid;
 
 #[derive(Debug)]
@@ -29,8 +28,8 @@ impl SimFilesystem {
 }
 
 impl Filesystem for SimFilesystem {
-    fn devnode(&self) -> EngineResult<PathBuf> {
-        Ok(PathBuf::from(format!("/dev/stratis/{}", self.name)))
+    fn devnode(&self) -> PathBuf {
+        ["/dev/stratis", &self.name].into_iter().collect()
     }
 }
 

@@ -201,7 +201,7 @@ pub fn test_pool_setup(paths: &[&Path]) {
     let new_file = tmp_dir.path().join("stratis_test.txt");
     {
         let fs = pool.get_filesystem(&fs_uuid).unwrap();
-        mount(Some(&fs.devnode().unwrap()),
+        mount(Some(&fs.devnode()),
               tmp_dir.path(),
               Some("xfs"),
               MsFlags::empty(),

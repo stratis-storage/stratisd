@@ -19,7 +19,7 @@ use self::nix::mount::{MsFlags, MNT_DETACH, mount, umount2};
 use self::tempdir::TempDir;
 use self::uuid::Uuid;
 
-use self::devicemapper::DM;
+use self::devicemapper::{DmName, DM};
 use self::devicemapper::LinearDev;
 use self::devicemapper::Segment;
 use self::devicemapper::{DataBlocks, Sectors};
@@ -48,7 +48,10 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
         .collect::<Vec<Segment>>();
 
     let dm = DM::new().unwrap();
-    let lineardev = LinearDev::new("stratis_testing_linear", &dm, segments).unwrap();
+    let lineardev = LinearDev::new(DmName::new("stratis_testing_linear").expect("valid format"),
+                                   &dm,
+                                   segments)
+            .unwrap();
     let lineardev_size = blkdev_size(&OpenOptions::new()
                                           .read(true)
                                           .open(lineardev.devnode().unwrap())
@@ -72,10 +75,11 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
                                               initialized.last().unwrap());
 
     let dm = DM::new().unwrap();
-    let metadata_dev = LinearDev::new("stratis_testing_thinpool_metadata",
-                                      &dm,
-                                      vec![metadata_blockdev.avail_range()])
-            .unwrap();
+    let metadata_dev =
+        LinearDev::new(DmName::new("stratis_testing_thinpool_metadata").expect("valid format"),
+                       &dm,
+                       vec![metadata_blockdev.avail_range()])
+                .unwrap();
 
     // Clear the meta data device.  If the first block is not all zeros - the
     // stale data will cause the device to appear as an existing meta rather
@@ -87,19 +91,20 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
             .unwrap();
 
 
-    let data_dev = LinearDev::new("stratis_testing_thinpool_datadev",
-                                  &dm,
-                                  vec![data_blockdev.avail_range()])
-            .unwrap();
-    let thinpool_dev = ThinPoolDev::new("stratis_testing_thinpool",
-                                        &dm,
-                                        data_dev.size().unwrap(),
-                                        Sectors(1024),
-                                        DataBlocks(256000),
-                                        metadata_dev,
-                                        data_dev)
-            .unwrap();
-    let thin_dev = ThinDev::new("stratis_testing_thindev",
+    let data_dev =
+        LinearDev::new(DmName::new("stratis_testing_thinpool_datadev").expect("valid format"),
+                       &dm,
+                       vec![data_blockdev.avail_range()])
+                .unwrap();
+    let thinpool_dev =
+        ThinPoolDev::new(DmName::new("stratis_testing_thinpool").expect("valid format"),
+                         &dm,
+                         Sectors(1024),
+                         DataBlocks(256000),
+                         metadata_dev,
+                         data_dev)
+                .unwrap();
+    let thin_dev = ThinDev::new(DmName::new("stratis_testing_thindev").expect("valid format"),
                                 &dm,
                                 &thinpool_dev,
                                 ThinDevId::new_u64(7).expect("7 is small enough"),

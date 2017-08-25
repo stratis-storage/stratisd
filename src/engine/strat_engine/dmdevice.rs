@@ -7,7 +7,7 @@
 use std::fmt;
 use std::fmt::Display;
 
-use devicemapper::ThinDevId;
+use devicemapper::{DmNameBuf, ThinDevId};
 
 use super::super::errors::EngineResult;
 
@@ -58,27 +58,34 @@ impl Display for ThinPoolRole {
 }
 
 /// Format a name for the flex layer.
-pub fn format_flex_name(pool_uuid: &PoolUuid, role: FlexRole) -> String {
-    return format!("stratis-{}-{}-flex-{}",
-                   FORMAT_VERSION,
-                   pool_uuid.simple().to_string(),
-                   role);
+/// Prerequisite: len(format!("{}", FORMAT_VERSION)) < 72
+pub fn format_flex_name(pool_uuid: &PoolUuid, role: FlexRole) -> DmNameBuf {
+    DmNameBuf::new(format!("stratis-{}-{}-flex-{}",
+                           FORMAT_VERSION,
+                           pool_uuid.simple().to_string(),
+                           role))
+            .expect("FORMAT_VERSION display length < 72")
+
 }
 
 /// Format a name for the thin layer.
-pub fn format_thin_name(pool_uuid: &PoolUuid, role: ThinRole) -> String {
-    return format!("stratis-{}-{}-thin-{}",
-                   FORMAT_VERSION,
-                   pool_uuid.simple().to_string(),
-                   role);
+/// Prerequisite: len(format!("{}", FORMAT_VERSION)) < 50
+pub fn format_thin_name(pool_uuid: &PoolUuid, role: ThinRole) -> DmNameBuf {
+    DmNameBuf::new(format!("stratis-{}-{}-thin-{}",
+                           FORMAT_VERSION,
+                           pool_uuid.simple().to_string(),
+                           role))
+            .expect("FORMAT_VERSION display length < 50")
 }
 
 /// Format a name for the thin pool layer.
-pub fn format_thinpool_name(pool_uuid: &PoolUuid, role: ThinPoolRole) -> String {
-    return format!("stratis-{}-{}-thinpool-{}",
-                   FORMAT_VERSION,
-                   pool_uuid.simple().to_string(),
-                   role);
+/// Prerequisite: len(format!("{}", FORMAT_VERSION)) < 81
+pub fn format_thinpool_name(pool_uuid: &PoolUuid, role: ThinPoolRole) -> DmNameBuf {
+    DmNameBuf::new(format!("stratis-{}-{}-thinpool-{}",
+                           FORMAT_VERSION,
+                           pool_uuid.simple().to_string(),
+                           role))
+            .expect("FORMAT_VERSION display_length < 81")
 }
 
 

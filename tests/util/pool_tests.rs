@@ -10,7 +10,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
 
-use self::devicemapper::DM;
+use self::devicemapper::{DmName, DM};
 use self::devicemapper::Sectors;
 use self::devicemapper::consts::SECTOR_SIZE;
 use self::devicemapper::ThinDev;
@@ -126,7 +126,7 @@ pub fn test_thinpool_thindev_destroy(paths: &[&Path]) -> () {
 
     // Try to setup a thindev that has been destroyed
     let dm = DM::new().unwrap();
-    let thindev = ThinDev::setup("stratis_test_thin_dev",
+    let thindev = ThinDev::setup(DmName::new("stratis_test_thin_dev").expect("valid format"),
                                  &dm,
                                  pool.thinpooldev(),
                                  fs_id,

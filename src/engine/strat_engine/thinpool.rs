@@ -66,9 +66,8 @@ impl ThinPool {
                mdv: MetadataVol)
                -> EngineResult<ThinPool> {
         let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
-        let thinpool_dev = ThinPoolDev::new(&name,
+        let thinpool_dev = ThinPoolDev::new(name.as_ref(),
                                             dm,
-                                            data_dev.size()?,
                                             data_block_size,
                                             low_water_mark,
                                             meta_dev,
@@ -102,11 +101,9 @@ impl ThinPool {
                  fs_save: Vec<FilesystemSave>)
                  -> EngineResult<ThinPool> {
         let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
-        let size = data_dev.size()?;
 
-        let res = match ThinPoolDev::setup(&name,
+        let res = match ThinPoolDev::setup(name.as_ref(),
                                            dm,
-                                           size,
                                            data_block_size,
                                            low_water_mark,
                                            meta_dev,
@@ -115,9 +112,8 @@ impl ThinPool {
             Err(DmError::Dm(CheckFailed(meta_dev, data_dev), _)) => {
                 attempt_thin_repair(pool_uuid, dm, meta_dev, spare_segments)
                     .and_then(|(new_meta_dev, new_spare_segments)| {
-                        ThinPoolDev::setup(&name,
+                        ThinPoolDev::setup(name.as_ref(),
                                            dm,
-                                           size,
                                            data_block_size,
                                            low_water_mark,
                                            new_meta_dev,
@@ -135,8 +131,11 @@ impl ThinPool {
             // Set up a filesystem from its metadata.
             let get_filesystem = |fssave: &FilesystemSave| -> EngineResult<StratFilesystem> {
                 let device_name = format_thin_name(&pool_uuid, ThinRole::Filesystem(fssave.uuid));
-                let thin_dev =
-                    ThinDev::setup(&device_name, dm, &thinpool_dev, fssave.thin_id, fssave.size)?;
+                let thin_dev = ThinDev::setup(device_name.as_ref(),
+                                              dm,
+                                              &thinpool_dev,
+                                              fssave.thin_id,
+                                              fssave.size)?;
                 Ok(StratFilesystem::setup(fssave.uuid, &fssave.name, thin_dev))
             };
 
@@ -294,7 +293,7 @@ impl ThinPool {
                              -> EngineResult<FilesystemUuid> {
         let fs_uuid = Uuid::new_v4();
         let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fs_uuid));
-        let thin_dev = ThinDev::new(&device_name,
+        let thin_dev = ThinDev::new(device_name.as_ref(),
                                     dm,
                                     &self.thin_pool,
                                     self.id_gen.new_id()?,
@@ -355,7 +354,8 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
                        meta_dev: LinearDev,
                        mut spare_segments: Vec<Segment>)
                        -> EngineResult<(LinearDev, Vec<Segment>)> {
-    let mut new_meta_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinMetaSpare),
+    let mut new_meta_dev = LinearDev::new(format_flex_name(&pool_uuid, FlexRole::ThinMetaSpare)
+                                              .as_ref(),
                                           dm,
                                           spare_segments.drain(..).collect())?;
 
@@ -384,7 +384,7 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
              })
         .collect();
     meta_dev.teardown(dm)?;
-    new_meta_dev.set_name(dm, &name)?;
+    new_meta_dev.set_name(dm, name.as_ref())?;
 
     Ok((new_meta_dev, new_spare_segments))
 }

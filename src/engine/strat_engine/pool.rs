@@ -98,14 +98,14 @@ impl StratPool {
         // superblock DM issue error messages because it triggers code paths
         // that are trying to re-adopt the device with the attributes that
         // have been passed.
-        let meta_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
+        let meta_dev = LinearDev::new(format_flex_name(&pool_uuid, FlexRole::ThinMeta).as_ref(),
                                       dm,
                                       meta_regions)?;
         wipe_sectors(&meta_dev.devnode()?,
                      Sectors(0),
                      INITIAL_META_SIZE.sectors())?;
 
-        let data_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinData),
+        let data_dev = LinearDev::new(format_flex_name(&pool_uuid, FlexRole::ThinData).as_ref(),
                                       dm,
                                       data_regions)?;
 
@@ -114,7 +114,7 @@ impl StratPool {
             .expect("blockmgr must not fail, already checked for space");
 
         let mdv_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
-        let mdv_dev = LinearDev::new(&mdv_name, dm, mdv_regions)?;
+        let mdv_dev = LinearDev::new(mdv_name.as_ref(), dm, mdv_regions)?;
         let mdv = MetadataVol::initialize(&pool_uuid, mdv_dev)?;
 
         let thinpool = ThinPool::new(pool_uuid,
@@ -204,15 +204,15 @@ impl StratPool {
         let dm = DM::new()?;
 
         // This is the cleanup zone.
-        let meta_dev = LinearDev::new(&format_flex_name(&uuid, FlexRole::ThinMeta),
+        let meta_dev = LinearDev::new(format_flex_name(&uuid, FlexRole::ThinMeta).as_ref(),
                                       &dm,
                                       thin_meta_segments)?;
 
-        let data_dev = LinearDev::new(&format_flex_name(&uuid, FlexRole::ThinData),
+        let data_dev = LinearDev::new(format_flex_name(&uuid, FlexRole::ThinData).as_ref(),
                                       &dm,
                                       thin_data_segments)?;
 
-        let mdv_dev = LinearDev::new(&format_flex_name(&uuid, FlexRole::MetadataVolume),
+        let mdv_dev = LinearDev::new(format_flex_name(&uuid, FlexRole::MetadataVolume).as_ref(),
                                      &dm,
                                      meta_segments)?;
         let mdv = MetadataVol::setup(&uuid, mdv_dev)?;

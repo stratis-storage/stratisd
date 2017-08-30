@@ -12,33 +12,22 @@ use serde_json;
 use uuid::Uuid;
 
 use devicemapper as dm;
-use devicemapper::consts::SECTOR_SIZE;
-use devicemapper::Device;
 use devicemapper::DM;
-use devicemapper::{DataBlocks, MetaBlocks, Sectors, Segment};
-use devicemapper::LinearDev;
-use devicemapper::{ThinDevId, ThinPoolWorkingStatus, ThinPoolDev};
+use devicemapper::{DataBlocks, Sectors};
+use devicemapper::{ThinPoolWorkingStatus, ThinPoolDev};
 
-use super::super::consts::IEC::Mi;
 use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, RenameAction, Redundancy};
+use super::super::types::{FilesystemUuid, PoolUuid, RenameAction, Redundancy};
 
 use super::blockdevmgr::BlockDevMgr;
-use super::device::wipe_sectors;
-use super::dmdevice::{FlexRole, format_flex_name};
 use super::filesystem::{StratFilesystem, FilesystemStatus};
-use super::mdv::MetadataVol;
 use super::metadata::MIN_MDA_SECTORS;
-use super::serde_structs::{FlexDevsSave, PoolSave, Recordable};
+use super::serde_structs::{PoolSave, Recordable};
 use super::setup::{get_blockdevs, get_metadata};
 use super::thinpool::{META_LOWATER, ThinPool};
 
-pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER};
-
-const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4096);
-pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
-const INITIAL_MDV_SIZE: Sectors = Sectors(16 * Mi / SECTOR_SIZE as u64);
+pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
 
 #[derive(Debug)]
 pub struct StratPool {
@@ -63,68 +52,14 @@ impl StratPool {
 
         let mut block_mgr = BlockDevMgr::initialize(&pool_uuid, paths, MIN_MDA_SECTORS, force)?;
 
-        if block_mgr.avail_space() < StratPool::min_initial_size() {
-            let avail_size = block_mgr.avail_space().bytes();
-
-            // TODO: check the return value and update state machine on failure
-            let _ = block_mgr.destroy_all();
-
-            return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                           format!("Space on pool must be at least {} bytes, \
-                                                   available space is only {} bytes",
-                                                   StratPool::min_initial_size().bytes(),
-                                                   avail_size)));
-
-
-        }
-
-        let meta_regions = block_mgr
-            .alloc_space(INITIAL_META_SIZE.sectors())
-            .expect("blockmgr must not fail, already checked for space");
-
-        let meta_spare_regions = block_mgr
-            .alloc_space(INITIAL_META_SIZE.sectors())
-            .expect("blockmgr must not fail, already checked for space");
-
-        let data_regions = block_mgr
-            .alloc_space(*INITIAL_DATA_SIZE * DATA_BLOCK_SIZE)
-            .expect("blockmgr must not fail, already checked for space");
-
-        // When constructing a thin-pool, Stratis reserves the first N
-        // sectors on a block device by creating a linear device with a
-        // starting offset. DM writes the super block in the first block.
-        // DM requires this first block to be zeros when the meta data for
-        // the thin-pool is initially created. If we don't zero the
-        // superblock DM issue error messages because it triggers code paths
-        // that are trying to re-adopt the device with the attributes that
-        // have been passed.
-        let meta_dev = LinearDev::new(format_flex_name(&pool_uuid, FlexRole::ThinMeta).as_ref(),
-                                      dm,
-                                      meta_regions)?;
-        wipe_sectors(&meta_dev.devnode()?,
-                     Sectors(0),
-                     INITIAL_META_SIZE.sectors())?;
-
-        let data_dev = LinearDev::new(format_flex_name(&pool_uuid, FlexRole::ThinData).as_ref(),
-                                      dm,
-                                      data_regions)?;
-
-        let mdv_regions = block_mgr
-            .alloc_space(INITIAL_MDV_SIZE)
-            .expect("blockmgr must not fail, already checked for space");
-
-        let mdv_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
-        let mdv_dev = LinearDev::new(mdv_name.as_ref(), dm, mdv_regions)?;
-        let mdv = MetadataVol::initialize(&pool_uuid, mdv_dev)?;
-
-        let thinpool = ThinPool::new(pool_uuid,
-                                     dm,
-                                     DATA_BLOCK_SIZE,
-                                     DATA_LOWATER,
-                                     meta_spare_regions,
-                                     meta_dev,
-                                     data_dev,
-                                     mdv)?;
+        let thinpool = ThinPool::new(pool_uuid, dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut block_mgr);
+        let thinpool = match thinpool {
+            Ok(thinpool) => thinpool,
+            Err(err) => {
+                let _ = block_mgr.destroy_all();
+                return Err(err);
+            }
+        };
 
         let devnodes = block_mgr.devnodes();
 
@@ -142,113 +77,32 @@ impl StratPool {
     }
 
     /// Setup a StratPool using its UUID and the list of devnodes it has.
-    // TODO: Clean up after errors that occur after some action has been
-    // taken on the environment.
     pub fn setup(uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<StratPool> {
         let metadata = get_metadata(uuid, devnodes)?
             .ok_or_else(|| {
                             EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no metadata for pool {}", uuid))
                         })?;
-        let blockdevs = get_blockdevs(uuid, &metadata, devnodes)?;
-
-        let uuid_map: HashMap<DevUuid, Device> = blockdevs
-            .iter()
-            .map(|bd| (*bd.uuid(), *bd.device()))
-            .collect();
-
-        // Obtain a Segment from a Uuid, Sectors, Sectors triple.
-        // This can fail if there is no entry for the UUID in the map
-        // from UUIDs to device numbers.
-        let lookup = |triple: &(Uuid, Sectors, Sectors)| -> EngineResult<Segment> {
-            let device = uuid_map
-                .get(&triple.0)
-                .ok_or_else(|| {
-                                EngineError::Engine(ErrorEnum::NotFound,
-                                                    format!("missing device for UUID {:?}",
-                                                            &triple.0))
-                            })?;
-            Ok(Segment {
-                   device: *device,
-                   start: triple.1,
-                   length: triple.2,
-               })
-        };
-
-        let flex_devs = &metadata.flex_devs;
-
-        let meta_segments = flex_devs
-            .meta_dev
-            .iter()
-            .map(&lookup)
-            .collect::<EngineResult<Vec<_>>>()?;
-
-        let thin_meta_segments = flex_devs
-            .thin_meta_dev
-            .iter()
-            .map(&lookup)
-            .collect::<EngineResult<Vec<_>>>()?;
-
-        let thin_data_segments = flex_devs
-            .thin_data_dev
-            .iter()
-            .map(&lookup)
-            .collect::<EngineResult<Vec<_>>>()?;
-
-        let thin_meta_spare_segments = flex_devs
-            .thin_meta_dev_spare
-            .iter()
-            .map(&lookup)
-            .collect::<EngineResult<Vec<_>>>()?;
-
-        let dm = DM::new()?;
-
-        // This is the cleanup zone.
-        let meta_dev = LinearDev::new(format_flex_name(&uuid, FlexRole::ThinMeta).as_ref(),
-                                      &dm,
-                                      thin_meta_segments)?;
-
-        let data_dev = LinearDev::new(format_flex_name(&uuid, FlexRole::ThinData).as_ref(),
-                                      &dm,
-                                      thin_data_segments)?;
-
-        let mdv_dev = LinearDev::new(format_flex_name(&uuid, FlexRole::MetadataVolume).as_ref(),
-                                     &dm,
-                                     meta_segments)?;
-        let mdv = MetadataVol::setup(&uuid, mdv_dev)?;
-        let filesystem_metadatas = mdv.filesystems()?;
-        let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
-
+        let bd_mgr = BlockDevMgr::new(get_blockdevs(uuid, &metadata, devnodes)?);
         let thinpool = ThinPool::setup(uuid,
-                                       &dm,
+                                       &DM::new()?,
                                        metadata.thinpool_dev.data_block_size,
                                        DATA_LOWATER,
-                                       &thin_ids,
-                                       thin_meta_spare_segments,
-                                       meta_dev,
-                                       data_dev,
-                                       mdv,
-                                       filesystem_metadatas)?;
+                                       &metadata.flex_devs,
+                                       &bd_mgr)?;
 
         Ok(StratPool {
                name: metadata.name,
                pool_uuid: uuid,
-               block_devs: BlockDevMgr::new(blockdevs),
+               block_devs: bd_mgr,
                redundancy: Redundancy::NONE,
                thin_pool: thinpool,
            })
     }
 
-    /// Minimum initial size for a pool.
-    pub fn min_initial_size() -> Sectors {
-        // One extra meta for spare
-        (INITIAL_META_SIZE.sectors() * 2u64) + *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE +
-        INITIAL_MDV_SIZE
-    }
-
     /// Write current metadata to pool members.
     pub fn write_metadata(&mut self) -> EngineResult<()> {
-        let data = serde_json::to_string(&self.record()?)?;
+        let data = serde_json::to_string(&self.record())?;
         self.block_devs.save_state(data.as_bytes())
     }
 
@@ -457,55 +311,12 @@ impl HasName for StratPool {
 }
 
 impl Recordable<PoolSave> for StratPool {
-    fn record(&self) -> EngineResult<PoolSave> {
-
-        let mapper = |seg: &Segment| -> EngineResult<(Uuid, Sectors, Sectors)> {
-            let bd = self.block_devs
-                .get_by_device(seg.device)
-                .ok_or_else(|| {
-                                EngineError::Engine(ErrorEnum::NotFound,
-                                                    format!("no block device found for device {:?}",
-                                                            seg.device))
-                            })?;
-            Ok((*bd.uuid(), seg.start, seg.length))
-        };
-
-        let meta_dev = self.thin_pool
-            .thin_pool_mdv_segments()
-            .iter()
-            .map(&mapper)
-            .collect::<EngineResult<Vec<_>>>()?;
-
-        let thin_meta_dev = self.thin_pool
-            .thin_pool_meta_segments()
-            .iter()
-            .map(&mapper)
-            .collect::<EngineResult<Vec<_>>>()?;
-
-        let thin_data_dev = self.thin_pool
-            .thin_pool_data_segments()
-            .iter()
-            .map(&mapper)
-            .collect::<EngineResult<Vec<_>>>()?;
-
-        let thin_meta_dev_spare = self.thin_pool
-            .spare_segments()
-            .iter()
-            .map(&mapper)
-            .collect::<EngineResult<Vec<_>>>()?;
-
-        Ok(PoolSave {
-               name: self.name.clone(),
-               block_devs: self.block_devs.record()?,
-               flex_devs: FlexDevsSave {
-                   meta_dev: meta_dev,
-                   thin_meta_dev: thin_meta_dev,
-                   thin_data_dev: thin_data_dev,
-                   thin_meta_dev_spare: thin_meta_dev_spare,
-               },
-               thinpool_dev: self.thin_pool
-                   .record()
-                   .expect("this function never fails"),
-           })
+    fn record(&self) -> PoolSave {
+        PoolSave {
+            name: self.name.clone(),
+            block_devs: self.block_devs.record(),
+            flex_devs: self.thin_pool.record(),
+            thinpool_dev: self.thin_pool.record(),
+        }
     }
 }

@@ -40,12 +40,15 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
                                  MIN_MDA_SECTORS,
                                  false)
             .unwrap();
-    let total_blockdev_size: Sectors = initialized.iter().map(|i| i.avail_range().length).sum();
+    let total_blockdev_size: Sectors = initialized.iter().map(|i| i.avail_range().1).sum();
 
     let segments = initialized
         .iter()
-        .map(|block_dev| block_dev.avail_range())
-        .collect::<Vec<Segment>>();
+        .map(|block_dev| {
+                 let (start, length) = block_dev.avail_range();
+                 Segment::new(*block_dev.device(), start, length)
+             })
+        .collect::<Vec<_>>();
 
     let dm = DM::new().unwrap();
     let lineardev = LinearDev::new(DmName::new("stratis_testing_linear").expect("valid format"),
@@ -75,10 +78,13 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
                                               initialized.last().unwrap());
 
     let dm = DM::new().unwrap();
+
+    let (meta_start, meta_length) = metadata_blockdev.avail_range();
+    let meta_segment = Segment::new(*metadata_blockdev.device(), meta_start, meta_length);
     let metadata_dev =
         LinearDev::new(DmName::new("stratis_testing_thinpool_metadata").expect("valid format"),
                        &dm,
-                       vec![metadata_blockdev.avail_range()])
+                       vec![meta_segment])
                 .unwrap();
 
     // Clear the meta data device.  If the first block is not all zeros - the
@@ -90,11 +96,12 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
                  metadata_dev.size().unwrap())
             .unwrap();
 
-
+    let (data_start, data_length) = data_blockdev.avail_range();
+    let data_segment = Segment::new(*data_blockdev.device(), data_start, data_length);
     let data_dev =
         LinearDev::new(DmName::new("stratis_testing_thinpool_datadev").expect("valid format"),
                        &dm,
-                       vec![data_blockdev.avail_range()])
+                       vec![data_segment])
                 .unwrap();
     let thinpool_dev =
         ThinPoolDev::new(DmName::new("stratis_testing_thinpool").expect("valid format"),

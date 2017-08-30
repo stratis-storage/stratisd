@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 
-use devicemapper::{Device, Sectors, Segment};
+use devicemapper::{Device, Sectors};
 
 use super::super::errors::EngineResult;
 use super::super::types::{DevUuid, PoolUuid};
@@ -42,7 +42,7 @@ impl BlockDev {
         &self.dev
     }
 
-    pub fn wipe_metadata(self) -> EngineResult<()> {
+    pub fn wipe_metadata(&self) -> EngineResult<()> {
         let mut f = OpenOptions::new().write(true).open(&self.devnode)?;
         BDA::wipe(&mut f)
     }
@@ -53,14 +53,14 @@ impl BlockDev {
     }
 
     /// List the available-for-upper-layer-use range in this blockdev.
-    pub fn avail_range(&self) -> Segment {
+    pub fn avail_range(&self) -> (Sectors, Sectors) {
         let start = self.metadata_size();
         let size = self.current_capacity();
         // Blockdev size is at least MIN_DEV_SIZE, so this can fail only if
         // size of metadata area exceeds 1 GiB. Initial metadata area size
         // is 4 MiB.
         assert!(start <= size);
-        Segment::new(self.dev, start, size - start)
+        (start, size - start)
     }
 
     /// The device's UUID.
@@ -80,12 +80,8 @@ impl BlockDev {
 
     // Find some sector ranges that could be allocated. If more
     // sectors are needed than our capacity, return partial results.
-    pub fn request_space(&mut self, size: Sectors) -> (Sectors, Vec<Segment>) {
-        let (size, segs) = self.used.request(size);
-        (size,
-         segs.iter()
-             .map(|&(start, len)| Segment::new(self.dev, start, len))
-             .collect())
+    pub fn request_space(&mut self, size: Sectors) -> (Sectors, Vec<(Sectors, Sectors)>) {
+        self.used.request(size)
     }
 
     // ALL SIZE METHODS
@@ -119,7 +115,7 @@ impl BlockDev {
 }
 
 impl Recordable<BlockDevSave> for BlockDev {
-    fn record(&self) -> EngineResult<BlockDevSave> {
-        Ok(BlockDevSave { devnode: self.devnode.clone() })
+    fn record(&self) -> BlockDevSave {
+        BlockDevSave { devnode: self.devnode.clone() }
     }
 }

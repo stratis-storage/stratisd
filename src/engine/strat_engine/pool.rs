@@ -143,7 +143,7 @@ impl StratPool {
     /// Setup a StratPool using its UUID and the list of devnodes it has.
     // TODO: Clean up after errors that occur after some action has been
     // taken on the environment.
-    pub fn setup(uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<StratPool> {
+    pub fn setup(uuid: PoolUuid, devnodes: &HashMap<Device, PathBuf>) -> EngineResult<StratPool> {
         let metadata = get_metadata(uuid, devnodes)?
             .ok_or_else(|| {
                             EngineError::Engine(ErrorEnum::NotFound,

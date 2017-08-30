@@ -11,20 +11,22 @@ extern crate nix;
 extern crate tempdir;
 extern crate uuid;
 
+use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use self::nix::mount::{MsFlags, MNT_DETACH, mount, umount2};
 use self::tempdir::TempDir;
 use self::uuid::Uuid;
 
-use self::devicemapper::DM;
+use self::devicemapper::{Device, DM};
 
 use libstratis::engine::{Engine, Pool};
 use libstratis::engine::engine::HasUuid;
 use libstratis::engine::types::{Redundancy, RenameAction};
-use libstratis::engine::strat_engine::blockdevmgr::{initialize, resolve_devices};
+use libstratis::engine::strat_engine::blockdevmgr::initialize;
+use libstratis::engine::strat_engine::device::resolve_devices;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 use libstratis::engine::strat_engine::pool::StratPool;
 use libstratis::engine::strat_engine::serde_structs::Recordable;
@@ -216,12 +218,12 @@ pub fn test_pool_setup(paths: &[&Path]) {
                 .unwrap();
     }
 
-    let new_pool = StratPool::setup(*pool.uuid(),
-                                    &paths
-                                         .into_iter()
-                                         .map(|x| x.to_path_buf())
-                                         .collect::<Vec<_>>())
-            .unwrap();
+    let paths2: HashMap<Device, PathBuf> = resolve_devices(paths)
+        .unwrap()
+        .into_iter()
+        .map(|(d, p)| (d, p.to_owned()))
+        .collect();
+    let new_pool = StratPool::setup(*pool.uuid(), &paths2).unwrap();
 
     assert!(new_pool.get_filesystem(&fs_uuid).is_some());
 

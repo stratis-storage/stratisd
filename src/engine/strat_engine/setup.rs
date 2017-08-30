@@ -28,17 +28,26 @@ use super::serde_structs::PoolSave;
 
 /// Find all Stratis devices.
 ///
-/// Returns a map of pool uuids to a vector of devices for each pool.
-pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<PathBuf>>> {
+/// Returns a map of pool uuids to a map of devices to devnodes for each pool.
+pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
 
     let mut pool_map = HashMap::new();
+    let mut devno_set = HashSet::new();
     for dir_e in read_dir("/dev")? {
         let dir_e = dir_e?;
         let devnode = dir_e.path();
 
-        if devnode_to_devno(&devnode)?.is_none() {
-            continue;
-        }
+        let devno = match devnode_to_devno(&devnode)? {
+            None => continue,
+            Some(devno) => {
+                // If this device has already been processed, continue.
+                if devno_set.insert(devno) {
+                    devno
+                } else {
+                    continue;
+                }
+            }
+        };
 
         let f = OpenOptions::new().read(true).open(&devnode);
 
@@ -78,10 +87,13 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<PathBuf>>> {
 
         let mut f = f.expect("unreachable if f is err");
         if let DevOwnership::Ours(uuid) = StaticHeader::determine_ownership(&mut f)? {
-            pool_map
+            // No value should ever be ejected, because duplicate device nodes
+            // are filtered out above. Therefore, the return value of insert()
+            // might as well be ignored.
+            let _ = pool_map
                 .entry(uuid)
-                .or_insert_with(Vec::new)
-                .push(devnode)
+                .or_insert_with(HashMap::new)
+                .insert(Device::from(devno), devnode);
         };
     }
 
@@ -90,7 +102,9 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, Vec<PathBuf>>> {
 
 /// Get the most recent metadata from a set of Devices for a given pool UUID.
 /// Returns None if no metadata found for this pool.
-pub fn get_metadata(pool_uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<Option<PoolSave>> {
+pub fn get_metadata(pool_uuid: PoolUuid,
+                    devnodes: &HashMap<Device, PathBuf>)
+                    -> EngineResult<Option<PoolSave>> {
 
     // Get pairs of device nodes and matching BDAs
     // If no BDA, or BDA UUID does not match pool UUID, skip.
@@ -98,7 +112,7 @@ pub fn get_metadata(pool_uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<O
     // vital information on that BDA, for example, it may have contained
     // the newest metadata.
     let mut bdas = Vec::new();
-    for devnode in devnodes {
+    for devnode in devnodes.values() {
         let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
         if let Some(bda) = bda {
             if *bda.pool_uuid() == pool_uuid {
@@ -147,11 +161,11 @@ pub fn get_metadata(pool_uuid: PoolUuid, devnodes: &[PathBuf]) -> EngineResult<O
 }
 
 /// Get all the blockdevs corresponding to this pool that can be obtained from
-/// this list of devnodes.
+/// the given devices.
 /// Returns an error if the blockdevs obtained do not match the metadata.
 pub fn get_blockdevs(pool_uuid: PoolUuid,
                      pool_save: &PoolSave,
-                     devnodes: &[PathBuf])
+                     devnodes: &HashMap<Device, PathBuf>)
                      -> EngineResult<Vec<BlockDev>> {
     let segments = pool_save
         .flex_devs
@@ -169,23 +183,11 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
     }
 
     let mut blockdevs = vec![];
-    let mut devices = HashSet::new();
-    for dev in devnodes {
-        let devno = devnode_to_devno(&dev)?;
-        if devno.is_none() {
-            continue;
-        }
-        let device = Device::from(devno.expect("!devno.is_none()"));
-
-        // If we've seen this device already, skip it.
-        if !devices.insert(device) {
-            continue;
-        }
-
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(dev)?)?;
+    for (device, devnode) in devnodes {
+        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
         if let Some(bda) = bda {
             if *bda.pool_uuid() == pool_uuid {
-                let actual_size = blkdev_size(&OpenOptions::new().read(true).open(dev)?)?
+                let actual_size = blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?
                     .sectors();
 
                 // If size of device has changed and is less, then it is
@@ -196,7 +198,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                     RangeAllocator::new(actual_size,
                                         segment_table.get(bda.dev_uuid()).unwrap_or(&vec![]))?;
 
-                blockdevs.push(BlockDev::new(device, dev.clone(), bda, allocator));
+                blockdevs.push(BlockDev::new(*device, devnode.to_owned(), bda, allocator));
             }
         }
     }

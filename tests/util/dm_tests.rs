@@ -25,8 +25,8 @@ use self::devicemapper::Segment;
 use self::devicemapper::{DataBlocks, Sectors};
 use self::devicemapper::{DmDevice, ThinDev, ThinDevId, ThinPoolDev};
 
-use libstratis::engine::strat_engine::blockdevmgr::{initialize, resolve_devices};
-use libstratis::engine::strat_engine::device::{blkdev_size, wipe_sectors};
+use libstratis::engine::strat_engine::blockdevmgr::initialize;
+use libstratis::engine::strat_engine::device::{blkdev_size, resolve_devices, wipe_sectors};
 use libstratis::engine::strat_engine::filesystem::create_fs;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 

@@ -20,7 +20,7 @@ use super::super::types::{DevUuid, PoolUuid};
 
 use super::cleanup::wipe_blockdevs;
 use super::blockdev::BlockDev;
-use super::device::{blkdev_size, devnode_to_devno};
+use super::device::{blkdev_size, resolve_devices};
 use super::engine::DevOwnership;
 use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};
 use super::range_alloc::RangeAllocator;
@@ -28,26 +28,6 @@ use super::serde_structs::{BlockDevSave, Recordable};
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 const MAX_NUM_TO_WRITE: usize = 10;
-
-/// Resolve a list of Paths of some sort to a set of unique Devices.
-/// Return an IOError if there was a problem resolving any particular device.
-/// The set of devices maps each device to one of the paths passed.
-pub fn resolve_devices<'a>(paths: &'a [&Path]) -> EngineResult<HashMap<Device, &'a Path>> {
-    let mut pairs = Vec::new();
-    for path in paths {
-        match devnode_to_devno(path) {
-            Ok(Some(devno)) => pairs.push((path, devno)),
-            Ok(None) => {}
-            Err(err) => return Err(err),
-        }
-    }
-
-    Ok(pairs
-           .into_iter()
-           .map(|(p, n)| (Device::from(n), *p))
-           .collect())
-}
-
 
 #[derive(Debug)]
 pub struct BlockDevMgr {

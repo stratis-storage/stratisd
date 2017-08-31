@@ -341,8 +341,11 @@ impl ThinPool {
         // Last existing and first new may be contiguous. Coalesce into
         // a single BlkDevSegment if so.
         let coalesced_new_first = {
-            match (self.data_segments.last_mut(), new_segs.first()) {
-                (Some(old_last), Some(new_first)) => {
+            match new_segs.first() {
+                Some(new_first) => {
+                    let old_last = self.data_segments
+                        .last_mut()
+                        .expect("thin pool must always have some data segments");
                     if old_last.uuid == new_first.uuid &&
                        (old_last.segment.start + old_last.segment.length ==
                         new_first.segment.start) {
@@ -352,7 +355,7 @@ impl ThinPool {
                         false
                     }
                 }
-                _ => false,
+                None => false,
             }
         };
 

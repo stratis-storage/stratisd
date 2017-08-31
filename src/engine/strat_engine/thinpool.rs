@@ -64,14 +64,10 @@ impl ThinPool {
                block_mgr: &mut BlockDevMgr)
                -> EngineResult<ThinPool> {
         if block_mgr.avail_space() < ThinPool::initial_size() {
-            let avail_size = block_mgr.avail_space().bytes();
-            return Err(EngineError::Engine(ErrorEnum::Invalid,
-                                           format!("Space on pool must be at least {} bytes, \
-                                                   available space is only {} bytes",
-                                                   ThinPool::initial_size().bytes(),
-                                                   avail_size)));
-
-
+            let err_msg = format!("Space on pool must be at least {}, available space is only {}",
+                                  ThinPool::initial_size().bytes(),
+                                  block_mgr.avail_space().bytes());
+            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
         }
 
         let meta_segments = block_mgr

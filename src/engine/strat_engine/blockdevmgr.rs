@@ -87,9 +87,14 @@ impl BlockDevMgr {
         Ok(BlockDevMgr::new(initialize(pool_uuid, devices, mda_size, force)?))
     }
 
-    // Obtain a BlockDev by its UUID.
-    pub fn get_by_uuid(&self, uuid: &DevUuid) -> Option<&BlockDev> {
-        self.block_devs.iter().find(|d| d.uuid() == uuid)
+    /// Get a function that maps UUIDs to Devices.
+    pub fn uuid_to_devno(&self) -> Box<Fn(&DevUuid) -> Option<Device>> {
+        let uuid_map: HashMap<DevUuid, Device> = self.block_devs
+            .iter()
+            .map(|bd| (*bd.uuid(), *bd.device()))
+            .collect();
+
+        Box::new(move |uuid: &DevUuid| -> Option<Device> { uuid_map.get(uuid).cloned() })
     }
 
     pub fn add(&mut self,

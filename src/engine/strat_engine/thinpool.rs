@@ -146,16 +146,15 @@ impl ThinPool {
                  flex_devs: &FlexDevsSave,
                  bd_mgr: &BlockDevMgr)
                  -> EngineResult<ThinPool> {
-
+        let uuid_to_devno = bd_mgr.uuid_to_devno();
         let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> EngineResult<BlkDevSegment> {
-            let bd = bd_mgr
-                .get_by_uuid(&triple.0)
+            let device = uuid_to_devno(&triple.0)
                 .ok_or_else(|| {
                                 EngineError::Engine(ErrorEnum::NotFound,
                                                     format!("missing device for UUID {:?}",
                                                             &triple.0))
                             })?;
-            Ok(BlkDevSegment::new(triple.0, Segment::new(*bd.device(), triple.1, triple.2)))
+            Ok(BlkDevSegment::new(triple.0, Segment::new(device, triple.1, triple.2)))
         };
 
         let mdv_segments = flex_devs

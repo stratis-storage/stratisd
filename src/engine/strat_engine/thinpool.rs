@@ -10,8 +10,8 @@ use std::process::Command;
 use uuid::Uuid;
 
 use devicemapper as dm;
-use devicemapper::{DM, DmDevice, DataBlocks, DmError, LinearDev, MetaBlocks, Sectors, Segment,
-                   ThinDev, ThinDevId, ThinPoolDev};
+use devicemapper::{DM, DataBlocks, DmDevice, DmError, LinearDev, MetaBlocks, Sectors, Segment,
+                   ThinDev, ThinDevId, ThinPoolDev, ThinPoolWorkingStatus};
 use devicemapper::ErrorEnum::CheckFailed;
 
 use super::super::consts::IEC;
@@ -31,7 +31,7 @@ use super::serde_structs::{FilesystemSave, FlexDevsSave, Recordable, ThinPoolDev
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
-pub const META_LOWATER: MetaBlocks = MetaBlocks(512);
+const META_LOWATER: MetaBlocks = MetaBlocks(512);
 
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
@@ -53,15 +53,6 @@ pub struct ThinPool {
     id_gen: ThinDevIdPool,
     filesystems: Table<StratFilesystem>,
     mdv: MetadataVol,
-}
-
-/// A struct returning the status of the distinct parts of the
-/// thinpool.
-pub struct ThinPoolStatus {
-    /// The status of the thinpool itself.
-    pub thinpool: dm::ThinPoolStatus,
-    /// The status of the filesystems within the thinpool.
-    pub filesystems: Vec<FilesystemStatus>,
 }
 
 impl ThinPool {
@@ -296,9 +287,47 @@ impl ThinPool {
         INITIAL_MDV_SIZE
     }
 
-    /// The status of the thin pool as calculated by DM.
-    pub fn check(&mut self, dm: &DM) -> EngineResult<ThinPoolStatus> {
-        let thinpool = self.thin_pool.status(dm)?;
+    /// Run status checks and take actions on the thinpool and its components.
+    pub fn check(&mut self, dm: &DM, bd_mgr: &mut BlockDevMgr) -> EngineResult<()> {
+        #![allow(match_same_arms)]
+        let thinpool: dm::ThinPoolStatus = self.thin_pool.status(dm)?;
+        match thinpool {
+            dm::ThinPoolStatus::Good(wstatus, usage) => {
+                match wstatus {
+                    ThinPoolWorkingStatus::Good => {}
+                    ThinPoolWorkingStatus::ReadOnly => {
+                        // TODO: why is pool r/o and how do we get it
+                        // rw again?
+                    }
+                    ThinPoolWorkingStatus::OutOfSpace => {
+                        // TODO: Add more space if possible, or
+                        // prevent further usage
+                        // Should never happen -- we should be extending first!
+                    }
+                    ThinPoolWorkingStatus::NeedsCheck => {
+                        // TODO: Take pool offline?
+                        // TODO: run thin_check
+                    }
+                }
+
+                if usage.used_meta > usage.total_meta - META_LOWATER {
+                    // TODO: Extend meta device
+                }
+
+                if usage.used_data > usage.total_data - DATA_LOWATER {
+                    // Request expansion of physical space allocated to the pool
+                    match self.extend_thinpool(dm, usage.total_data, bd_mgr) {
+                        #![allow(single_match)]
+                        Ok(_) => {}
+                        Err(_) => {} // TODO: Take pool offline?
+                    }
+                }
+            }
+            dm::ThinPoolStatus::Fail => {
+                // TODO: Take pool offline?
+                // TODO: Run thin_check
+            }
+        };
         self.mdv.check()?;
 
         let filesystems = self.filesystems
@@ -307,10 +336,12 @@ impl ThinPool {
             .map(|fs| fs.check(dm))
             .collect::<EngineResult<Vec<_>>>()?;
 
-        Ok(ThinPoolStatus {
-               thinpool,
-               filesystems,
-           })
+        for fs_status in filesystems {
+            if let FilesystemStatus::Failed = fs_status {
+                // TODO: filesystem failed, how to recover?
+            }
+        }
+        Ok(())
     }
 
     /// Tear down the components managed here: filesystems, the MDV,
@@ -334,8 +365,31 @@ impl ThinPool {
         &self.thin_pool
     }
 
+    /// Expand the physical space allocated to a pool.
+    /// The physical space is always doubled, and the method fails if the
+    /// requested amount of space is not available.
+    /// Return the number of DataBlocks added.
+    // TODO: Refine this method. Doubling the size may not always be correct,
+    // and a hard fail if the requested size is not available may not be
+    // correct either.
+    fn extend_thinpool(&mut self,
+                       dm: &DM,
+                       current_size: DataBlocks,
+                       bd_mgr: &mut BlockDevMgr)
+                       -> EngineResult<DataBlocks> {
+        let extend_size = current_size;
+        if let Some(new_data_regions) = bd_mgr.alloc_space(*extend_size * DATA_BLOCK_SIZE) {
+            self.extend_data(dm, new_data_regions)?;
+        } else {
+            let err_msg = format!("Insufficient space to accomodate request for {} data blocks",
+                                  *extend_size);
+            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+        }
+        Ok(extend_size)
+    }
+
     /// Extend the thinpool with new data regions.
-    pub fn extend_data(&mut self, dm: &DM, new_segs: Vec<BlkDevSegment>) -> EngineResult<()> {
+    fn extend_data(&mut self, dm: &DM, new_segs: Vec<BlkDevSegment>) -> EngineResult<()> {
         self.thin_pool.extend_data(dm, map_to_dm(&new_segs))?;
 
         // Last existing and first new may be contiguous. Coalesce into

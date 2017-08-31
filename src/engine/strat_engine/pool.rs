@@ -11,21 +11,18 @@ use std::vec::Vec;
 use serde_json;
 use uuid::Uuid;
 
-use devicemapper as dm;
-use devicemapper::{Device, DM};
-use devicemapper::{DataBlocks, Sectors};
-use devicemapper::{ThinPoolWorkingStatus, ThinPoolDev};
+use devicemapper::{Device, DM, Sectors, ThinPoolDev};
 
 use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{FilesystemUuid, PoolUuid, RenameAction, Redundancy};
 
 use super::blockdevmgr::BlockDevMgr;
-use super::filesystem::{StratFilesystem, FilesystemStatus};
+use super::filesystem::StratFilesystem;
 use super::metadata::MIN_MDA_SECTORS;
 use super::serde_structs::{PoolSave, Recordable};
 use super::setup::{get_blockdevs, get_metadata};
-use super::thinpool::{META_LOWATER, ThinPool};
+use super::thinpool::ThinPool;
 
 pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
 
@@ -106,85 +103,10 @@ impl StratPool {
         self.block_devs.save_state(data.as_bytes())
     }
 
-    /// Return an extend size for the physical space backing a pool
-    /// TODO: returning the current size will double the space provisoned to
-    /// back the pool.  We should determine if this is a reasonable value.
-    fn extend_size(&self, current_size: DataBlocks) -> DataBlocks {
-        current_size
-    }
-
-    /// Expand the physical space allocated to a pool by the value from extend_size()
-    /// Return the number of DataBlocks added
-    fn extend_data(&mut self, dm: &DM, current_size: DataBlocks) -> EngineResult<DataBlocks> {
-        let extend_size = self.extend_size(current_size);
-        if let Some(new_data_regions) =
-            self.block_devs
-                .alloc_space(*extend_size * DATA_BLOCK_SIZE) {
-            self.thin_pool.extend_data(dm, new_data_regions)?;
-        } else {
-            let err_msg = format!("Insufficient space to accomodate request for {} data blocks",
-                                  *extend_size);
-            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
-        }
-        Ok(extend_size)
-    }
-
     pub fn check(&mut self) -> () {
-        #![allow(match_same_arms)]
-        let dm = DM::new().unwrap();
-
-        let result = match self.thin_pool.check(&dm) {
-            Ok(r) => r,
-            Err(_) => {
-                error!("Could not get thinpool status");
-                // TODO: Take pool offline?
-                return;
-            }
-        };
-
-        match result.thinpool {
-            dm::ThinPoolStatus::Good(wstatus, usage) => {
-                match wstatus {
-                    ThinPoolWorkingStatus::Good => {}
-                    ThinPoolWorkingStatus::ReadOnly => {
-                        // TODO: why is pool r/o and how do we get it
-                        // rw again?
-                    }
-                    ThinPoolWorkingStatus::OutOfSpace => {
-                        // TODO: Add more space if possible, or
-                        // prevent further usage
-                        // Should never happen -- we should be extending first!
-                    }
-                    ThinPoolWorkingStatus::NeedsCheck => {
-                        // TODO: Take pool offline?
-                        // TODO: run thin_check
-                    }
-                }
-
-                if usage.used_meta > usage.total_meta - META_LOWATER {
-                    // TODO: Extend meta device
-                }
-
-                if usage.used_data > usage.total_data - DATA_LOWATER {
-                    // Request expansion of physical space allocated to the pool
-                    match self.extend_data(&dm, usage.total_data) {
-                        #![allow(single_match)]
-                        Ok(_) => {}
-                        Err(_) => {} // TODO: Take pool offline?
-                    }
-                }
-            }
-            dm::ThinPoolStatus::Fail => {
-                // TODO: Take pool offline?
-                // TODO: Run thin_check
-            }
-        };
-
-        for fs_status in result.filesystems {
-            if let FilesystemStatus::Failed = fs_status {
-                // TODO: filesystem failed, how to recover?
-            }
-        }
+        self.thin_pool
+            .check(&DM::new().unwrap(), &mut self.block_devs)
+            .unwrap_or(error!("Thin pool check did not succeed"))
     }
 
     /// Teardown a pool.

@@ -9,7 +9,7 @@ dependencies = [
  "crc 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "custom_derive 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "dbus 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "devicemapper 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "devicemapper 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "enum_derive 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.30 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -153,7 +153,7 @@ dependencies = [
 
 [[package]]
 name = "devicemapper"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitflags 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -664,7 +664,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum crc 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bc1914fae6f18ae347320f0ba5e4fc270e17c037ea621fe41ec7e8adf67d11b0"
 "checksum custom_derive 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "ef8ae57c4978a2acd8b869ce6b9ca1dfe817bff704c220209fdef2c0b75a01b9"
 "checksum dbus 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "4aee01fb76ada3e5e7ca642ea6664ebf7308a810739ca2aca44909a1191ac254"
-"checksum devicemapper 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d04f21eae5209a38a692f246c16ad9f9f0773b0e1431551c99a23f7f084a4f72"
+"checksum devicemapper 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4fe37d54ca5e6a0b4a653f2967383f7b24d3d2d3a58917ef4c276130b9964994"
 "checksum dtoa 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "80c8b71fd71146990a9742fc06dcbbde19161a267e0ad4e572c35162f4578c90"
 "checksum either 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "18785c1ba806c258137c937e44ada9ee7e69a37e3c72077542cd2f069d78562a"
 "checksum enum_derive 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "406ac2a8c9eedf8af9ee1489bee9e50029278a6456c740f7454cf8a158abc816"

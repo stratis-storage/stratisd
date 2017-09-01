@@ -19,8 +19,8 @@ use self::devicemapper::Sectors;
 use self::devicemapper::consts::SECTOR_SIZE;
 
 use libstratis::engine::Engine;
-use libstratis::engine::strat_engine::blockdevmgr::{BlockDevMgr, initialize, resolve_devices};
-use libstratis::engine::strat_engine::device::write_sectors;
+use libstratis::engine::strat_engine::blockdevmgr::{BlockDevMgr, initialize};
+use libstratis::engine::strat_engine::device::{resolve_devices, write_sectors};
 use libstratis::engine::strat_engine::engine::DevOwnership;
 use libstratis::engine::strat_engine::metadata::{StaticHeader, BDA_STATIC_HDR_SECTORS,
                                                  MIN_MDA_SECTORS};

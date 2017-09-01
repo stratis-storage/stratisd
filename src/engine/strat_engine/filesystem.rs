@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use devicemapper::{Bytes, DM, Sectors, ThinDev, ThinDevId, ThinStatus, ThinPoolDev};
+use devicemapper::{Bytes, DmDevice, DM, Sectors, ThinDev, ThinDevId, ThinStatus, ThinPoolDev};
 use devicemapper::consts::{IEC, SECTOR_SIZE};
 
 use nix::sys::statvfs::statvfs;
@@ -43,7 +43,7 @@ impl StratFilesystem {
                       -> EngineResult<StratFilesystem> {
         let fs = StratFilesystem::setup(fs_id, name, thin_dev);
 
-        create_fs(fs.devnode()?.as_path())?;
+        create_fs(fs.devnode().as_path())?;
         Ok(fs)
     }
 
@@ -97,7 +97,7 @@ impl StratFilesystem {
     pub fn get_mount_point(&self) -> EngineResult<PathBuf> {
         let output = Command::new("df")
             .arg("--output=target")
-            .arg(&self.devnode()?)
+            .arg(&self.devnode())
             .output()?;
         if output.status.success() {
             let output_str = String::from_utf8_lossy(&output.stdout);
@@ -139,8 +139,8 @@ impl HasUuid for StratFilesystem {
 }
 
 impl Filesystem for StratFilesystem {
-    fn devnode(&self) -> EngineResult<PathBuf> {
-        Ok(self.thin_dev.devnode()?)
+    fn devnode(&self) -> PathBuf {
+        self.thin_dev.devnode()
     }
 }
 

@@ -23,10 +23,10 @@ use self::devicemapper::{DmName, DM};
 use self::devicemapper::LinearDev;
 use self::devicemapper::Segment;
 use self::devicemapper::{DataBlocks, Sectors};
-use self::devicemapper::{ThinDev, ThinDevId, ThinPoolDev};
+use self::devicemapper::{DmDevice, ThinDev, ThinDevId, ThinPoolDev};
 
-use libstratis::engine::strat_engine::blockdevmgr::{initialize, resolve_devices};
-use libstratis::engine::strat_engine::device::{blkdev_size, wipe_sectors};
+use libstratis::engine::strat_engine::blockdevmgr::initialize;
+use libstratis::engine::strat_engine::device::{blkdev_size, resolve_devices, wipe_sectors};
 use libstratis::engine::strat_engine::filesystem::create_fs;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 
@@ -54,7 +54,7 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
             .unwrap();
     let lineardev_size = blkdev_size(&OpenOptions::new()
                                           .read(true)
-                                          .open(lineardev.devnode().unwrap())
+                                          .open(lineardev.devnode())
                                           .unwrap())
             .unwrap();
     assert!(total_blockdev_size.bytes() == lineardev_size);
@@ -85,10 +85,7 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
     // stale data will cause the device to appear as an existing meta rather
     // than a new one.  Clear the entire device to be safe.  Stratis implements
     // the same approach when constructing a thin pool.
-    wipe_sectors(&metadata_dev.devnode().unwrap(),
-                 Sectors(0),
-                 metadata_dev.size().unwrap())
-            .unwrap();
+    wipe_sectors(&metadata_dev.devnode(), Sectors(0), metadata_dev.size()).unwrap();
 
 
     let data_dev =
@@ -111,10 +108,10 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
                                 Sectors(300000))
             .unwrap();
 
-    create_fs(&thin_dev.devnode().unwrap()).unwrap();
+    create_fs(&thin_dev.devnode()).unwrap();
 
     let tmp_dir = TempDir::new("stratis_testing").unwrap();
-    mount(Some(&thin_dev.devnode().unwrap()),
+    mount(Some(&thin_dev.devnode()),
           tmp_dir.path(),
           Some("xfs"),
           MsFlags::empty(),

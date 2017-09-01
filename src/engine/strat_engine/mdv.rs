@@ -17,7 +17,7 @@ use nix::mount::{MsFlags, mount, umount};
 use nix::unistd::fsync;
 use serde_json;
 
-use devicemapper::{DM, LinearDev, Segment};
+use devicemapper::{DmDevice, DM, LinearDev, Segment};
 
 use super::super::engine::HasUuid;
 use super::super::errors::EngineResult;
@@ -42,7 +42,7 @@ pub struct MetadataVol {
 impl MetadataVol {
     /// Initialize a new Metadata Volume.
     pub fn initialize(pool_uuid: &PoolUuid, dev: LinearDev) -> EngineResult<MetadataVol> {
-        create_fs(dev.devnode()?.as_path())?;
+        create_fs(dev.devnode().as_path())?;
         MetadataVol::setup(pool_uuid, dev)
     }
 
@@ -63,7 +63,7 @@ impl MetadataVol {
             }
         }
 
-        if let Err(err) = mount(Some(&dev.devnode()?),
+        if let Err(err) = mount(Some(&dev.devnode()),
                                 &mount_pt,
                                 Some("xfs"),
                                 MsFlags::empty(),

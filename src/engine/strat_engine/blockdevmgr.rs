@@ -4,11 +4,9 @@
 
 // Code to handle a collection of block devices.
 
-use std::io;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{thread_rng, sample};
@@ -22,7 +20,7 @@ use super::super::types::{DevUuid, PoolUuid};
 
 use super::cleanup::wipe_blockdevs;
 use super::blockdev::BlockDev;
-use super::device::blkdev_size;
+use super::device::{blkdev_size, resolve_devices};
 use super::engine::DevOwnership;
 use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};
 use super::range_alloc::RangeAllocator;
@@ -30,16 +28,6 @@ use super::serde_structs::{BlockDevSave, Recordable};
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 const MAX_NUM_TO_WRITE: usize = 10;
-
-/// Resolve a list of Paths of some sort to a set of unique Devices.
-/// Return an IOError if there was a problem resolving any particular device.
-pub fn resolve_devices(paths: &[&Path]) -> io::Result<HashSet<Device>> {
-    paths
-        .iter()
-        .map(|p| Device::from_str(&p.to_string_lossy()))
-        .collect()
-}
-
 
 #[derive(Debug)]
 pub struct BlockDevMgr {
@@ -201,7 +189,7 @@ impl Recordable<HashMap<Uuid, BlockDevSave>> for BlockDevMgr {
 /// Initialize multiple blockdevs at once. This allows all of them
 /// to be checked for usability before writing to any of them.
 pub fn initialize(pool_uuid: &PoolUuid,
-                  devices: HashSet<Device>,
+                  devices: HashMap<Device, &Path>,
                   mda_size: Sectors,
                   force: bool)
                   -> EngineResult<Vec<BlockDev>> {
@@ -211,14 +199,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
     /// Returns a tuple with the device's path, its size in bytes,
     /// its ownership as determined by calling determine_ownership(),
     /// and an open File handle, all of which are needed later.
-    pub fn dev_info(dev: &Device) -> EngineResult<(PathBuf, Bytes, DevOwnership, File)> {
-        let devnode = dev.devnode()
-            .ok_or_else(|| {
-                            EngineError::Engine(ErrorEnum::NotFound,
-                                                format!("could not get device node from dev {}",
-                                                        dev.dstr()))
-                        })?;
-
+    pub fn dev_info(devnode: &Path) -> EngineResult<(&Path, Bytes, DevOwnership, File)> {
         let mut f = OpenOptions::new()
             .read(true)
             .write(true)
@@ -233,11 +214,11 @@ pub fn initialize(pool_uuid: &PoolUuid,
     /// If there is an error finding out the info, return that error.
     /// Also, return an error if a device is not appropriate for this pool.
     #[allow(type_complexity)]
-    fn filter_devs<I>(dev_infos: I,
-                      pool_uuid: &PoolUuid,
-                      force: bool)
-                      -> EngineResult<Vec<(Device, (PathBuf, Bytes, File))>>
-        where I: Iterator<Item = (Device, EngineResult<(PathBuf, Bytes, DevOwnership, File)>)>
+    fn filter_devs<'a, I>(dev_infos: I,
+                          pool_uuid: &PoolUuid,
+                          force: bool)
+                          -> EngineResult<Vec<(Device, (&'a Path, Bytes, File))>>
+        where I: Iterator<Item = (Device, EngineResult<(&'a Path, Bytes, DevOwnership, File)>)>
     {
         let mut add_devs = Vec::new();
         for (dev, dev_result) in dev_infos {
@@ -278,7 +259,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
 
     validate_mda_size(mda_size)?;
 
-    let dev_infos = devices.into_iter().map(|d: Device| (d, dev_info(&d)));
+    let dev_infos = devices.into_iter().map(|(d, p)| (d, dev_info(p)));
 
     let add_devs = filter_devs(dev_infos, pool_uuid, force)?;
 
@@ -294,7 +275,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
             let allocator = RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())])
                 .expect("bda.size() < bda.dev_size() and single range");
 
-            bds.push(BlockDev::new(dev, devnode, bda, allocator));
+            bds.push(BlockDev::new(dev, devnode.to_owned(), bda, allocator));
         } else {
             // TODO: check the return values and update state machine on failure
             let _ = BDA::wipe(&mut f);

@@ -6,11 +6,12 @@
 extern crate devicemapper;
 extern crate env_logger;
 
+use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use self::devicemapper::{DmName, DM};
+use self::devicemapper::{Device, DmName, DM};
 use self::devicemapper::Sectors;
 use self::devicemapper::consts::SECTOR_SIZE;
 use self::devicemapper::ThinDev;
@@ -18,6 +19,7 @@ use self::devicemapper::ThinDev;
 use libstratis::engine::{Engine, Pool};
 use libstratis::engine::engine::HasUuid;
 use libstratis::engine::strat_engine::StratEngine;
+use libstratis::engine::strat_engine::device::resolve_devices;
 use libstratis::engine::strat_engine::pool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE,
                                              StratPool};
 use libstratis::engine::types::{Redundancy, RenameAction};
@@ -39,10 +41,7 @@ pub fn test_thinpool_expand(paths: &[&Path]) -> () {
         .first()
         .unwrap();
 
-    let devnode = pool.get_filesystem(&fs_uuid)
-        .unwrap()
-        .devnode()
-        .unwrap();
+    let devnode = pool.get_filesystem(&fs_uuid).unwrap().devnode();
     // Braces to ensure f is closed before destroy
     {
         let mut f = OpenOptions::new().write(true).open(devnode).unwrap();
@@ -137,7 +136,11 @@ pub fn test_thinpool_thindev_destroy(paths: &[&Path]) -> () {
     // Check that destroyed fs is not present in MDV. If the record
     // had been left on the MDV that didn't match a thin_id in the
     // thinpool, ::setup() will fail.
-    let paths2: Vec<_> = paths.into_iter().map(|x| x.to_path_buf()).collect();
+    let paths2: HashMap<Device, PathBuf> = resolve_devices(paths)
+        .unwrap()
+        .into_iter()
+        .map(|(d, p)| (d, p.to_owned()))
+        .collect();
     let pool = StratPool::setup(pool_uuid, &paths2).unwrap();
 
     // This also should never happen, given the previous two parts of

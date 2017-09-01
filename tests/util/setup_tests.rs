@@ -45,9 +45,9 @@ use libstratis::engine::strat_engine::StratEngine;
 /// 6. Verify that get_metadata() return an error. initialize() only
 /// initializes block devices, it does not write metadata.
 pub fn test_initialize(paths: &[&Path]) -> () {
-    assert!(paths.len() > 2);
+    assert!(paths.len() > 1);
 
-    let (paths1, paths2) = paths.split_at(2);
+    let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
     let unique_devices = resolve_devices(paths1).unwrap();
     let uuid1 = Uuid::new_v4();
@@ -87,9 +87,9 @@ pub fn test_initialize(paths: &[&Path]) -> () {
 /// 4. Use get_metadata to find metadata for each pool and verify correctness.
 /// 5. Teardown the engine and repeat.
 pub fn test_basic_metadata(paths: &[&Path]) {
-    assert!(paths.len() > 2);
+    assert!(paths.len() > 1);
 
-    let (paths1, paths2) = paths.split_at(2);
+    let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
     let mut engine = StratEngine::initialize().unwrap();
 
@@ -137,9 +137,9 @@ pub fn test_basic_metadata(paths: &[&Path]) {
 /// 5. Initialize the engine.
 /// 6. Verify that pools can be found again.
 pub fn test_setup(paths: &[&Path]) {
-    assert!(paths.len() > 2);
+    assert!(paths.len() > 1);
 
-    let (paths1, paths2) = paths.split_at(2);
+    let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
     let mut engine = StratEngine::initialize().unwrap();
 

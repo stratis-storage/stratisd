@@ -17,7 +17,7 @@ use nix::mount::{MsFlags, mount, umount};
 use nix::unistd::fsync;
 use serde_json;
 
-use devicemapper::{DmDevice, DM, LinearDev, Segment};
+use devicemapper::{DmDevice, DM, LinearDev};
 
 use super::super::engine::HasUuid;
 use super::super::errors::EngineResult;
@@ -92,7 +92,7 @@ impl MetadataVol {
     // ensure file contents are not truncated if operation is
     // interrupted.
     pub fn save_fs(&self, fs: &StratFilesystem) -> EngineResult<()> {
-        let data = serde_json::to_string(&fs.record()?)?;
+        let data = serde_json::to_string(&fs.record())?;
         let path = self.mount_pt
             .join(FILESYSTEM_DIR)
             .join(fs.uuid().simple().to_string())
@@ -174,11 +174,6 @@ impl MetadataVol {
         }
 
         Ok(filesystems)
-    }
-
-    /// Return the segments used.
-    pub fn segments(&self) -> &[Segment] {
-        self.dev.segments()
     }
 
     /// Tear down a Metadata Volume.

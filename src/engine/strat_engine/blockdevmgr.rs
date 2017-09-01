@@ -30,6 +30,40 @@ const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 const MAX_NUM_TO_WRITE: usize = 10;
 
 #[derive(Debug)]
+pub struct BlkDevSegment {
+    pub uuid: DevUuid,
+    pub segment: Segment,
+}
+
+impl BlkDevSegment {
+    pub fn new(uuid: DevUuid, segment: Segment) -> BlkDevSegment {
+        BlkDevSegment { uuid, segment }
+    }
+
+    pub fn to_segment(&self) -> Segment {
+        self.segment.clone()
+    }
+}
+
+impl Recordable<Vec<(Uuid, Sectors, Sectors)>> for Vec<BlkDevSegment> {
+    fn record(&self) -> Vec<(Uuid, Sectors, Sectors)> {
+        self.iter()
+            .map(|bseg| (bseg.uuid, bseg.segment.start, bseg.segment.length))
+            .collect::<Vec<_>>()
+    }
+}
+
+/// Build a Vec<Segment> from BlkDevSegments. This is useful for calls
+/// to the devicemapper library.
+pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<Segment> {
+    bsegs
+        .into_iter()
+        .map(|bseg| bseg.to_segment())
+        .collect::<Vec<_>>()
+}
+
+
+#[derive(Debug)]
 pub struct BlockDevMgr {
     block_devs: Vec<BlockDev>,
     last_update_time: Option<DateTime<Utc>>,
@@ -53,14 +87,14 @@ impl BlockDevMgr {
         Ok(BlockDevMgr::new(initialize(pool_uuid, devices, mda_size, force)?))
     }
 
-    /// Obtain a BlockDev by its Device.
-    pub fn get_by_device(&self, device: Device) -> Option<&BlockDev> {
-        self.block_devs.iter().find(|d| d.device() == &device)
-    }
+    /// Get a function that maps UUIDs to Devices.
+    pub fn uuid_to_devno(&self) -> Box<Fn(&DevUuid) -> Option<Device>> {
+        let uuid_map: HashMap<DevUuid, Device> = self.block_devs
+            .iter()
+            .map(|bd| (*bd.uuid(), *bd.device()))
+            .collect();
 
-    // Obtain a BlockDev by its UUID.
-    pub fn get_by_uuid(&self, uuid: &DevUuid) -> Option<&BlockDev> {
-        self.block_devs.iter().find(|d| d.uuid() == uuid)
+        Box::new(move |uuid: &DevUuid| -> Option<Device> { uuid_map.get(uuid).cloned() })
     }
 
     pub fn add(&mut self,
@@ -76,12 +110,12 @@ impl BlockDevMgr {
     }
 
     pub fn destroy_all(self) -> EngineResult<()> {
-        wipe_blockdevs(self.block_devs)
+        wipe_blockdevs(&self.block_devs)
     }
 
     /// If available space is less than size, return None, else return
     /// the segments allocated.
-    pub fn alloc_space(&mut self, size: Sectors) -> Option<Vec<Segment>> {
+    pub fn alloc_space(&mut self, size: Sectors) -> Option<Vec<BlkDevSegment>> {
         let mut needed: Sectors = size;
         let mut segs = Vec::new();
 
@@ -95,7 +129,12 @@ impl BlockDevMgr {
             }
 
             let (gotten, r_segs) = bd.request_space(needed);
-            segs.extend(r_segs);
+            let blkdev_segs = r_segs
+                .into_iter()
+                .map(|(start, length)| {
+                         BlkDevSegment::new(*bd.uuid(), Segment::new(*bd.device(), start, length))
+                     });
+            segs.extend(blkdev_segs);
             needed -= gotten;
         }
 
@@ -177,11 +216,11 @@ impl BlockDevMgr {
     }
 }
 
-impl Recordable<HashMap<Uuid, BlockDevSave>> for BlockDevMgr {
-    fn record(&self) -> EngineResult<HashMap<Uuid, BlockDevSave>> {
+impl Recordable<HashMap<DevUuid, BlockDevSave>> for BlockDevMgr {
+    fn record(&self) -> HashMap<Uuid, BlockDevSave> {
         self.block_devs
             .iter()
-            .map(|bd| bd.record().and_then(|bdsave| Ok((*bd.uuid(), bdsave))))
+            .map(|bd| (*bd.uuid(), bd.record()))
             .collect()
     }
 }
@@ -279,7 +318,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
         } else {
             // TODO: check the return values and update state machine on failure
             let _ = BDA::wipe(&mut f);
-            let _ = wipe_blockdevs(bds);
+            let _ = wipe_blockdevs(&bds);
 
             return Err(bda.unwrap_err());
         }

@@ -10,61 +10,105 @@ use std::process::Command;
 use uuid::Uuid;
 
 use devicemapper as dm;
-use devicemapper::{DM, DmDevice, DataBlocks, DmError, LinearDev, MetaBlocks, Sectors, Segment,
-                   ThinDev, ThinDevId, ThinPoolDev};
+use devicemapper::{DM, DataBlocks, DmDevice, DmError, LinearDev, MetaBlocks, Sectors, Segment,
+                   ThinDev, ThinDevId, ThinPoolDev, ThinPoolWorkingStatus};
 use devicemapper::ErrorEnum::CheckFailed;
 
 use super::super::consts::IEC;
 use super::super::engine::{Filesystem, HasName};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
-use super::super::types::{PoolUuid, FilesystemUuid, RenameAction};
+use super::super::types::{DevUuid, PoolUuid, FilesystemUuid, RenameAction};
 
+use super::blockdevmgr::{BlockDevMgr, BlkDevSegment, map_to_dm};
+use super::device::wipe_sectors;
 use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, ThinRole, format_flex_name,
                       format_thinpool_name, format_thin_name};
 use super::filesystem::{StratFilesystem, FilesystemStatus};
 use super::mdv::MetadataVol;
-use super::serde_structs::{FilesystemSave, Recordable, ThinPoolDevSave};
+use super::serde_structs::{FilesystemSave, FlexDevsSave, Recordable, ThinPoolDevSave};
 
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
-pub const META_LOWATER: MetaBlocks = MetaBlocks(512);
+const META_LOWATER: MetaBlocks = MetaBlocks(512);
 
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
-/// A ThinPool struct contains the thinpool itself, but also the spare
-/// segments for its metadata device.
+const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4096);
+pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
+const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
+
+
+/// A ThinPool struct contains the thinpool itself, the spare
+/// segments for its metadata device, and the filesystems and filesystem
+/// metadata associated with it.
 #[derive(Debug)]
 pub struct ThinPool {
     thin_pool: ThinPoolDev,
-    meta_spare: Vec<Segment>,
+    meta_segments: Vec<BlkDevSegment>,
+    meta_spare_segments: Vec<BlkDevSegment>,
+    data_segments: Vec<BlkDevSegment>,
+    mdv_segments: Vec<BlkDevSegment>,
     id_gen: ThinDevIdPool,
     filesystems: Table<StratFilesystem>,
     mdv: MetadataVol,
 }
 
-/// A struct returning the status of the distinct parts of the
-/// thinpool.
-pub struct ThinPoolStatus {
-    /// The status of the thinpool itself.
-    pub thinpool: dm::ThinPoolStatus,
-    /// The status of the filesystems within the thinpool.
-    pub filesystems: Vec<FilesystemStatus>,
-}
-
 impl ThinPool {
     /// Make a new thin pool.
-    #[allow(too_many_arguments)]
     pub fn new(pool_uuid: PoolUuid,
                dm: &DM,
                data_block_size: Sectors,
                low_water_mark: DataBlocks,
-               spare_segments: Vec<Segment>,
-               meta_dev: LinearDev,
-               data_dev: LinearDev,
-               mdv: MetadataVol)
+               block_mgr: &mut BlockDevMgr)
                -> EngineResult<ThinPool> {
+        if block_mgr.avail_space() < ThinPool::initial_size() {
+            let err_msg = format!("Space on pool must be at least {}, available space is only {}",
+                                  ThinPool::initial_size().bytes(),
+                                  block_mgr.avail_space().bytes());
+            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+        }
+
+        let meta_segments = block_mgr
+            .alloc_space(ThinPool::initial_metadata_size())
+            .expect("blockmgr must not fail, already checked for space");
+
+        let spare_segments = block_mgr
+            .alloc_space(ThinPool::initial_metadata_size())
+            .expect("blockmgr must not fail, already checked for space");
+
+        let data_segments = block_mgr
+            .alloc_space(ThinPool::initial_data_size())
+            .expect("blockmgr must not fail, already checked for space");
+
+        let mdv_segments = block_mgr
+            .alloc_space(ThinPool::initial_mdv_size())
+            .expect("blockmgr must not fail, already checked for space");
+
+        // When constructing a thin-pool, Stratis reserves the first N
+        // sectors on a block device by creating a linear device with a
+        // starting offset. DM writes the super block in the first block.
+        // DM requires this first block to be zeros when the meta data for
+        // the thin-pool is initially created. If we don't zero the
+        // superblock DM issue error messages because it triggers code paths
+        // that are trying to re-adopt the device with the attributes that
+        // have been passed.
+        let meta_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
+                                      dm,
+                                      map_to_dm(&meta_segments))?;
+        wipe_sectors(&meta_dev.devnode(),
+                     Sectors(0),
+                     ThinPool::initial_metadata_size())?;
+
+        let data_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinData),
+                                      dm,
+                                      map_to_dm(&data_segments))?;
+
+        let mdv_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
+        let mdv_dev = LinearDev::new(&mdv_name, dm, map_to_dm(&mdv_segments))?;
+        let mdv = MetadataVol::initialize(&pool_uuid, mdv_dev)?;
+
         let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
         let thinpool_dev = ThinPoolDev::new(name.as_ref(),
                                             dm,
@@ -74,7 +118,10 @@ impl ThinPool {
                                             data_dev)?;
         Ok(ThinPool {
                thin_pool: thinpool_dev,
-               meta_spare: spare_segments,
+               meta_segments: meta_segments,
+               meta_spare_segments: spare_segments,
+               data_segments: data_segments,
+               mdv_segments: mdv_segments,
                id_gen: ThinDevIdPool::new_from_ids(&[]),
                filesystems: Table::default(),
                mdv: mdv,
@@ -88,43 +135,88 @@ impl ThinPool {
     /// If initial setup fails due to a thin_check failure, attempt to fix
     /// the problem by running thin_repair. If failure recurs, return an
     /// error.
-    #[allow(too_many_arguments)]
     pub fn setup(pool_uuid: PoolUuid,
                  dm: &DM,
                  data_block_size: Sectors,
                  low_water_mark: DataBlocks,
-                 thin_ids: &[ThinDevId],
-                 spare_segments: Vec<Segment>,
-                 meta_dev: LinearDev,
-                 data_dev: LinearDev,
-                 mdv: MetadataVol,
-                 fs_save: Vec<FilesystemSave>)
+                 flex_devs: &FlexDevsSave,
+                 bd_mgr: &BlockDevMgr)
                  -> EngineResult<ThinPool> {
+        let uuid_to_devno = bd_mgr.uuid_to_devno();
+        let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> EngineResult<BlkDevSegment> {
+            let device = uuid_to_devno(&triple.0)
+                .ok_or_else(|| {
+                                EngineError::Engine(ErrorEnum::NotFound,
+                                                    format!("missing device for UUID {:?}",
+                                                            &triple.0))
+                            })?;
+            Ok(BlkDevSegment::new(triple.0, Segment::new(device, triple.1, triple.2)))
+        };
+
+        let mdv_segments = flex_devs
+            .meta_dev
+            .iter()
+            .map(&mapper)
+            .collect::<EngineResult<Vec<_>>>()?;
+
+        let meta_segments = flex_devs
+            .thin_meta_dev
+            .iter()
+            .map(&mapper)
+            .collect::<EngineResult<Vec<_>>>()?;
+
+        let data_segments = flex_devs
+            .thin_data_dev
+            .iter()
+            .map(&mapper)
+            .collect::<EngineResult<Vec<_>>>()?;
+
+        let spare_segments = flex_devs
+            .thin_meta_dev_spare
+            .iter()
+            .map(&mapper)
+            .collect::<EngineResult<Vec<_>>>()?;
+
+        let meta_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
+                                      dm,
+                                      map_to_dm(&meta_segments))?;
+
+        let data_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinData),
+                                      dm,
+                                      map_to_dm(&data_segments))?;
+
+
         let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
 
-        let res = match ThinPoolDev::setup(name.as_ref(),
-                                           dm,
-                                           data_block_size,
-                                           low_water_mark,
-                                           meta_dev,
-                                           data_dev) {
-            Ok(dev) => Ok((dev, spare_segments)),
-            Err(DmError::Dm(CheckFailed(meta_dev, data_dev), _)) => {
-                attempt_thin_repair(pool_uuid, dm, meta_dev, spare_segments)
-                    .and_then(|(new_meta_dev, new_spare_segments)| {
-                        ThinPoolDev::setup(name.as_ref(),
-                                           dm,
-                                           data_block_size,
-                                           low_water_mark,
-                                           new_meta_dev,
-                                           data_dev)
-                                .map(|dev| (dev, new_spare_segments))
-                                .map_err(|e| e.into())
-                    })
-            }
-            Err(e) => Err(e.into()),
-        };
-        let (thinpool_dev, spare_segments) = res?;
+        let (thinpool_dev, meta_segments, spare_segments) =
+            match ThinPoolDev::setup(&name,
+                                     dm,
+                                     data_block_size,
+                                     low_water_mark,
+                                     meta_dev,
+                                     data_dev) {
+                Ok(dev) => Ok((dev, meta_segments, spare_segments)),
+                Err(DmError::Dm(CheckFailed(meta_dev, data_dev), _)) => {
+                    attempt_thin_repair(pool_uuid, dm, meta_dev, &spare_segments)
+                        .and_then(|new_meta_dev| {
+                            ThinPoolDev::setup(&name,
+                                               dm,
+                                               data_block_size,
+                                               low_water_mark,
+                                               new_meta_dev,
+                                               data_dev)
+                                    .map(|dev| (dev, spare_segments, meta_segments))
+                                    .map_err(|e| e.into())
+                        })
+                }
+                Err(e) => Err(e.into()),
+            }?;
+
+        let mdv_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::MetadataVolume),
+                                     dm,
+                                     map_to_dm(&mdv_segments))?;
+        let mdv = MetadataVol::setup(&pool_uuid, mdv_dev)?;
+        let filesystem_metadatas = mdv.filesystems()?;
 
         // TODO: not fail completely if one filesystem setup fails?
         let filesystems = {
@@ -139,7 +231,7 @@ impl ThinPool {
                 Ok(StratFilesystem::setup(fssave.uuid, &fssave.name, thin_dev))
             };
 
-            fs_save
+            filesystem_metadatas
                 .iter()
                 .map(get_filesystem)
                 .collect::<EngineResult<Vec<_>>>()?
@@ -154,18 +246,83 @@ impl ThinPool {
             }
         }
 
+        let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
         Ok(ThinPool {
                thin_pool: thinpool_dev,
-               meta_spare: spare_segments,
-               id_gen: ThinDevIdPool::new_from_ids(thin_ids),
+               meta_segments: meta_segments,
+               meta_spare_segments: spare_segments,
+               data_segments: data_segments,
+               mdv_segments: mdv_segments,
+               id_gen: ThinDevIdPool::new_from_ids(&thin_ids),
                filesystems: fs_table,
                mdv: mdv,
            })
     }
 
-    /// The status of the thin pool as calculated by DM.
-    pub fn check(&mut self, dm: &DM) -> EngineResult<ThinPoolStatus> {
-        let thinpool = self.thin_pool.status(dm)?;
+
+    /// Initial size for a pool.
+    fn initial_size() -> Sectors {
+        // One extra meta for spare
+        ThinPool::initial_metadata_size() * 2u64 + ThinPool::initial_data_size() +
+        ThinPool::initial_mdv_size()
+    }
+
+    /// Initial size for a pool's meta data device.
+    fn initial_metadata_size() -> Sectors {
+        INITIAL_META_SIZE.sectors()
+    }
+
+    /// Initial size for a pool's data device.
+    fn initial_data_size() -> Sectors {
+        *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE
+    }
+
+    /// Initial size for a pool's filesystem metadata volume.
+    fn initial_mdv_size() -> Sectors {
+        INITIAL_MDV_SIZE
+    }
+
+    /// Run status checks and take actions on the thinpool and its components.
+    pub fn check(&mut self, dm: &DM, bd_mgr: &mut BlockDevMgr) -> EngineResult<()> {
+        #![allow(match_same_arms)]
+        let thinpool: dm::ThinPoolStatus = self.thin_pool.status(dm)?;
+        match thinpool {
+            dm::ThinPoolStatus::Good(wstatus, usage) => {
+                match wstatus {
+                    ThinPoolWorkingStatus::Good => {}
+                    ThinPoolWorkingStatus::ReadOnly => {
+                        // TODO: why is pool r/o and how do we get it
+                        // rw again?
+                    }
+                    ThinPoolWorkingStatus::OutOfSpace => {
+                        // TODO: Add more space if possible, or
+                        // prevent further usage
+                        // Should never happen -- we should be extending first!
+                    }
+                    ThinPoolWorkingStatus::NeedsCheck => {
+                        // TODO: Take pool offline?
+                        // TODO: run thin_check
+                    }
+                }
+
+                if usage.used_meta > usage.total_meta - META_LOWATER {
+                    // TODO: Extend meta device
+                }
+
+                if usage.used_data > usage.total_data - DATA_LOWATER {
+                    // Request expansion of physical space allocated to the pool
+                    match self.extend_thinpool(dm, usage.total_data, bd_mgr) {
+                        #![allow(single_match)]
+                        Ok(_) => {}
+                        Err(_) => {} // TODO: Take pool offline?
+                    }
+                }
+            }
+            dm::ThinPoolStatus::Fail => {
+                // TODO: Take pool offline?
+                // TODO: Run thin_check
+            }
+        };
         self.mdv.check()?;
 
         let filesystems = self.filesystems
@@ -174,10 +331,12 @@ impl ThinPool {
             .map(|fs| fs.check(dm))
             .collect::<EngineResult<Vec<_>>>()?;
 
-        Ok(ThinPoolStatus {
-               thinpool,
-               filesystems,
-           })
+        for fs_status in filesystems {
+            if let FilesystemStatus::Failed = fs_status {
+                // TODO: filesystem failed, how to recover?
+            }
+        }
+        Ok(())
     }
 
     /// Tear down the components managed here: filesystems, the MDV,
@@ -196,34 +355,66 @@ impl ThinPool {
         Ok(())
     }
 
-    /// Get an immutable reference to the sparse segments of the ThinPool.
-    pub fn spare_segments(&self) -> &[Segment] {
-        &self.meta_spare
-    }
-
-    /// The segments belonging to the thin pool meta device.
-    pub fn thin_pool_meta_segments(&self) -> &[Segment] {
-        self.thin_pool.meta_dev().segments()
-    }
-
-    /// The segments belonging to the thin pool data device.
-    pub fn thin_pool_data_segments(&self) -> &[Segment] {
-        self.thin_pool.data_dev().segments()
-    }
-
-    /// The segments belonging to the MDV.
-    pub fn thin_pool_mdv_segments(&self) -> &[Segment] {
-        self.mdv.segments()
-    }
-
     /// Get the devicemapper::ThinPoolDev for this pool. Used for testing.
     pub fn thinpooldev(&self) -> &ThinPoolDev {
         &self.thin_pool
     }
 
+    /// Expand the physical space allocated to a pool.
+    /// The physical space is always doubled, and the method fails if the
+    /// requested amount of space is not available.
+    /// Return the number of DataBlocks added.
+    // TODO: Refine this method. Doubling the size may not always be correct,
+    // and a hard fail if the requested size is not available may not be
+    // correct either.
+    fn extend_thinpool(&mut self,
+                       dm: &DM,
+                       current_size: DataBlocks,
+                       bd_mgr: &mut BlockDevMgr)
+                       -> EngineResult<DataBlocks> {
+        let extend_size = current_size;
+        if let Some(new_data_regions) = bd_mgr.alloc_space(*extend_size * DATA_BLOCK_SIZE) {
+            self.extend_data(dm, new_data_regions)?;
+        } else {
+            let err_msg = format!("Insufficient space to accomodate request for {} data blocks",
+                                  *extend_size);
+            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+        }
+        Ok(extend_size)
+    }
+
     /// Extend the thinpool with new data regions.
-    pub fn extend_data(&mut self, dm: &DM, segs: Vec<Segment>) -> EngineResult<()> {
-        Ok(self.thin_pool.extend_data(dm, segs)?)
+    fn extend_data(&mut self, dm: &DM, new_segs: Vec<BlkDevSegment>) -> EngineResult<()> {
+        self.thin_pool.extend_data(dm, map_to_dm(&new_segs))?;
+
+        // Last existing and first new may be contiguous. Coalesce into
+        // a single BlkDevSegment if so.
+        let coalesced_new_first = {
+            match new_segs.first() {
+                Some(new_first) => {
+                    let old_last = self.data_segments
+                        .last_mut()
+                        .expect("thin pool must always have some data segments");
+                    if old_last.uuid == new_first.uuid &&
+                       (old_last.segment.start + old_last.segment.length ==
+                        new_first.segment.start) {
+                        old_last.segment.length += new_first.segment.length;
+                        true
+                    } else {
+                        false
+                    }
+                }
+                None => false,
+            }
+        };
+
+        if coalesced_new_first {
+            self.data_segments.extend(new_segs.into_iter().skip(1));
+        } else {
+            self.data_segments.extend(new_segs);
+        }
+
+        Ok(())
     }
 
     /// The number of physical sectors in use, that is, unavailable for storage
@@ -240,7 +431,10 @@ impl ThinPool {
             }
         };
 
-        let spare_total = self.spare_segments().iter().map(|s| s.length).sum();
+        let spare_total = self.meta_spare_segments
+            .iter()
+            .map(|s| s.segment.length)
+            .sum();
         let meta_dev_total = self.thin_pool
             .meta_dev()
             .segments()
@@ -248,7 +442,10 @@ impl ThinPool {
             .map(|s| s.length)
             .sum();
 
-        let mdv_total = self.mdv.segments().iter().map(|s| s.length).sum();
+        let mdv_total = self.mdv_segments
+            .iter()
+            .map(|s| s.segment.length)
+            .sum();
 
         Ok(data_dev_used + spare_total + meta_dev_total + mdv_total)
     }
@@ -286,7 +483,7 @@ impl ThinPool {
     /// Create a filesystem within the thin pool. Given name must not
     /// already be in use.
     pub fn create_filesystem(&mut self,
-                             pool_uuid: &Uuid,
+                             pool_uuid: &PoolUuid,
                              name: &str,
                              dm: &DM,
                              size: Option<Sectors>)
@@ -340,9 +537,20 @@ impl ThinPool {
     }
 }
 
+impl Recordable<FlexDevsSave> for ThinPool {
+    fn record(&self) -> FlexDevsSave {
+        FlexDevsSave {
+            meta_dev: self.mdv_segments.record(),
+            thin_meta_dev: self.meta_segments.record(),
+            thin_data_dev: self.data_segments.record(),
+            thin_meta_dev_spare: self.meta_spare_segments.record(),
+        }
+    }
+}
+
 impl Recordable<ThinPoolDevSave> for ThinPool {
-    fn record(&self) -> EngineResult<ThinPoolDevSave> {
-        Ok(ThinPoolDevSave { data_block_size: self.thin_pool.data_block_size() })
+    fn record(&self) -> ThinPoolDevSave {
+        ThinPoolDevSave { data_block_size: self.thin_pool.data_block_size() }
     }
 }
 
@@ -352,12 +560,11 @@ impl Recordable<ThinPoolDevSave> for ThinPool {
 fn attempt_thin_repair(pool_uuid: PoolUuid,
                        dm: &DM,
                        meta_dev: LinearDev,
-                       mut spare_segments: Vec<Segment>)
-                       -> EngineResult<(LinearDev, Vec<Segment>)> {
-    let mut new_meta_dev = LinearDev::new(format_flex_name(&pool_uuid, FlexRole::ThinMetaSpare)
-                                              .as_ref(),
+                       spare_segments: &[BlkDevSegment])
+                       -> EngineResult<LinearDev> {
+    let mut new_meta_dev = LinearDev::new(&format_flex_name(&pool_uuid, FlexRole::ThinMetaSpare),
                                           dm,
-                                          spare_segments.drain(..).collect())?;
+                                          map_to_dm(spare_segments))?;
 
 
     if !Command::new("thin_repair")
@@ -372,19 +579,8 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
     }
 
     let name = meta_dev.name().to_owned();
-    let new_spare_segments = meta_dev
-        .segments()
-        .iter()
-        .map(|x| {
-                 Segment {
-                     start: x.start,
-                     length: x.length,
-                     device: x.device,
-                 }
-             })
-        .collect();
     meta_dev.teardown(dm)?;
     new_meta_dev.set_name(dm, name.as_ref())?;
 
-    Ok((new_meta_dev, new_spare_segments))
+    Ok(new_meta_dev)
 }

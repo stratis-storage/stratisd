@@ -151,51 +151,49 @@ fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
 
 #[test]
 pub fn real_test_force_flag_stratis() {
-    test_with_spec(DeviceLimits::Exactly(2), test_force_flag_stratis);
-    test_with_spec(DeviceLimits::Exactly(3), test_force_flag_stratis);
+    test_with_spec(DeviceLimits::AtLeast(1), test_force_flag_stratis);
 }
 
 
 #[test]
 pub fn real_test_linear_device() {
-    test_with_spec(DeviceLimits::Exactly(2), test_linear_device);
-    test_with_spec(DeviceLimits::Exactly(3), test_linear_device);
+    test_with_spec(DeviceLimits::AtLeast(1), test_linear_device);
 }
 
 
 #[test]
 pub fn real_test_thinpool_device() {
-    test_with_spec(DeviceLimits::Exactly(3), test_thinpool_device);
+    test_with_spec(DeviceLimits::AtLeast(1), test_thinpool_device);
 }
 
 #[test]
 pub fn real_test_thinpool_expand() {
-    test_with_spec(DeviceLimits::Exactly(3), test_thinpool_expand);
+    test_with_spec(DeviceLimits::AtLeast(1), test_thinpool_expand);
 }
 
 #[test]
 pub fn real_test_thinpool_thindev_destroy() {
-    test_with_spec(DeviceLimits::Exactly(3), test_thinpool_thindev_destroy);
+    test_with_spec(DeviceLimits::AtLeast(1), test_thinpool_thindev_destroy);
 }
 
 #[test]
 pub fn real_test_pool_blockdevs() {
-    test_with_spec(DeviceLimits::Exactly(3), test_pool_blockdevs);
+    test_with_spec(DeviceLimits::AtLeast(1), test_pool_blockdevs);
 }
 
 #[test]
 pub fn real_test_force_flag_dirty() {
-    test_with_spec(DeviceLimits::Exactly(3), test_force_flag_dirty);
+    test_with_spec(DeviceLimits::AtLeast(1), test_force_flag_dirty);
 }
 
 #[test]
 pub fn real_test_teardown() {
-    test_with_spec(DeviceLimits::Exactly(2), test_teardown);
+    test_with_spec(DeviceLimits::AtLeast(1), test_teardown);
 }
 
 #[test]
 pub fn real_test_initialize() {
-    test_with_spec(DeviceLimits::Exactly(4), test_initialize);
+    test_with_spec(DeviceLimits::AtLeast(2), test_initialize);
 }
 
 #[test]
@@ -205,35 +203,35 @@ pub fn real_test_empty_pool() {
 
 #[test]
 pub fn real_test_basic_metadata() {
-    test_with_spec(DeviceLimits::Exactly(4), test_basic_metadata);
+    test_with_spec(DeviceLimits::AtLeast(2), test_basic_metadata);
 }
 
 #[test]
 pub fn real_test_setup() {
-    test_with_spec(DeviceLimits::Exactly(4), test_setup);
+    test_with_spec(DeviceLimits::AtLeast(2), test_setup);
 }
 
 #[test]
 pub fn real_test_pool_rename() {
-    test_with_spec(DeviceLimits::Exactly(2), test_pool_rename);
+    test_with_spec(DeviceLimits::AtLeast(1), test_pool_rename);
 }
 
 #[test]
 pub fn real_test_blockdevmgr_used() {
-    test_with_spec(DeviceLimits::Exactly(2), test_blockdevmgr_used);
+    test_with_spec(DeviceLimits::AtLeast(1), test_blockdevmgr_used);
 }
 
 #[test]
 pub fn real_test_filesystem_rename() {
-    test_with_spec(DeviceLimits::Exactly(2), test_filesystem_rename);
+    test_with_spec(DeviceLimits::AtLeast(1), test_filesystem_rename);
 }
 
 #[test]
 pub fn real_test_pool_setup() {
-    test_with_spec(DeviceLimits::Exactly(2), test_pool_setup);
+    test_with_spec(DeviceLimits::AtLeast(1), test_pool_setup);
 }
 
 #[test]
 pub fn real_test_xfs_expand() {
-    test_with_spec(DeviceLimits::Exactly(3), test_xfs_expand);
+    test_with_spec(DeviceLimits::AtLeast(1), test_xfs_expand);
 }

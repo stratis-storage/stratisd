@@ -162,11 +162,11 @@ pub struct StaticHeader {
 }
 
 impl StaticHeader {
-    pub fn new(pool_uuid: &PoolUuid,
-               dev_uuid: &DevUuid,
-               mda_size: Sectors,
-               blkdev_size: Sectors)
-               -> StaticHeader {
+    fn new(pool_uuid: &PoolUuid,
+           dev_uuid: &DevUuid,
+           mda_size: Sectors,
+           blkdev_size: Sectors)
+           -> StaticHeader {
         StaticHeader {
             blkdev_size: blkdev_size,
             pool_uuid: pool_uuid.clone(),

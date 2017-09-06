@@ -30,6 +30,10 @@ const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)
 
 const STRAT_MAGIC: &'static [u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
+const SIGBLOCK_REGION_ONE: (usize, usize) = (SECTOR_SIZE, 2 * SECTOR_SIZE);
+const SIGBLOCK_REGION_TWO: (usize, usize) = (9 * SECTOR_SIZE, 10 * SECTOR_SIZE);
+
+
 #[derive(Debug)]
 pub struct BDA {
     header: StaticHeader,
@@ -177,35 +181,42 @@ impl StaticHeader {
         }
     }
 
+
+    /// Read data from f into buffer of length _BDA_STATIC_HDR_SIZE.
+    /// Return a newly constructed buffer and the number of bytes read.
+    fn read_into_buf<F>(f: &mut F) -> EngineResult<([u8; _BDA_STATIC_HDR_SIZE], usize)>
+        where F: Read + Seek
+    {
+        f.seek(SeekFrom::Start(0))?;
+        let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
+        let bytes = f.read(&mut buf)?;
+        Ok((buf, bytes))
+    }
+
     /// Try to find a valid StaticHeader on a device.
     /// If there is no StaticHeader on the device, return None.
     /// If there is a problem reading a header, return an error.
     fn setup<F>(f: &mut F) -> EngineResult<Option<StaticHeader>>
         where F: Read + Seek
     {
-        f.seek(SeekFrom::Start(0))?;
-        let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
-        f.read(&mut buf)?;
-
-        // TODO: repair static header if one incorrect?
-        // Note: this would require some adjustment or some revision to
-        // setup_from_buf().
-        StaticHeader::setup_from_buf(&buf)
+        let (buf, bytes) = StaticHeader::read_into_buf(f)?;
+        StaticHeader::setup_from_buf(&buf, bytes)
     }
 
     /// Try to find a valid StaticHeader in a buffer.
     /// If there is an error in reading the first, try the next. If there is
     /// no error in reading the first, assume it is correct, i.e., do not
     /// verify that it matches the next.
-    /// Return None if the static header's magic number is wrong.
-    fn setup_from_buf(buf: &[u8; _BDA_STATIC_HDR_SIZE]) -> EngineResult<Option<StaticHeader>> {
-        let sigblock_spots = [&buf[SECTOR_SIZE..2 * SECTOR_SIZE],
-                              &buf[9 * SECTOR_SIZE..10 * SECTOR_SIZE]];
-
-        for buf in &sigblock_spots {
-            match StaticHeader::sigblock_from_buf(buf) {
-                Ok(val) => return Ok(val),
-                _ => continue,
+    /// Return None if the static header's magic number is wrong or if there
+    /// is insufficient data in the buffer to read the magic number.
+    fn setup_from_buf(buf: &[u8; _BDA_STATIC_HDR_SIZE],
+                      bytes: usize)
+                      -> EngineResult<Option<StaticHeader>> {
+        // TODO: repair static header if one incorrect?
+        for &(start, end) in &[SIGBLOCK_REGION_ONE, SIGBLOCK_REGION_TWO] {
+            let region_length = if bytes < start { 0 } else { bytes - start };
+            if let Ok(val) = StaticHeader::sigblock_from_buf(&buf[start..end], region_length) {
+                return Ok(val);
             }
         }
 
@@ -217,17 +228,13 @@ impl StaticHeader {
     pub fn determine_ownership<F>(f: &mut F) -> EngineResult<DevOwnership>
         where F: Read + Seek
     {
-
-
-        f.seek(SeekFrom::Start(0))?;
-        let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
-        f.read(&mut buf)?;
+        let (buf, bytes) = StaticHeader::read_into_buf(f)?;
 
         // Using setup() as a test of ownership sets a high bar. It is
         // not sufficient to have STRAT_MAGIC to be considered "Ours",
         // it must also have correct CRC, no weird stuff in fields,
         // etc!
-        match StaticHeader::setup_from_buf(&buf) {
+        match StaticHeader::setup_from_buf(&buf, bytes) {
             Ok(Some(sh)) => Ok(DevOwnership::Ours(sh.pool_uuid)),
             Ok(None) => {
                 if buf.iter().any(|x| *x != 0) {
@@ -257,12 +264,25 @@ impl StaticHeader {
 
     /// Build a StaticHeader from a SECTOR_SIZE buf that was read from
     /// a blockdev.
-    fn sigblock_from_buf(buf: &[u8]) -> EngineResult<Option<StaticHeader>> {
-
+    /// Returns None if Stratis magic number not found. This may occur because
+    /// the number of bytes read is not enough to contain the magic number.
+    /// Returns an error if the buf does not contain SECTOR_SIZE bytes of data
+    /// but the Stratis magic number was read.
+    fn sigblock_from_buf(buf: &[u8], bytes: usize) -> EngineResult<Option<StaticHeader>> {
         assert_eq!(buf.len(), SECTOR_SIZE);
 
-        if &buf[4..20] != STRAT_MAGIC {
+        if bytes < 20 || &buf[4..20] != STRAT_MAGIC {
             return Ok(None);
+        }
+
+        // If a partial Stratis header, return immediately with the real
+        // problem instead of with distracting information about non-matching
+        // crc.
+        if bytes < SECTOR_SIZE {
+            let err_msg = format!("Only {} bytes in buffer, static header requires {}",
+                                  bytes,
+                                  SECTOR_SIZE);
+            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
         }
 
         let crc = crc32::checksum_ieee(&buf[4..SECTOR_SIZE]);
@@ -838,6 +858,38 @@ mod tests {
     }
 
     #[test]
+    /// Construct a BDA input stream of all 0s of size _BDA_STATIC_HDR_SIZE.
+    /// Verify that loading the StaticHeader and loading the BDA yield None.
+    fn all_zero_bda() {
+        let mut buf = Cursor::new(vec![0u8; _BDA_STATIC_HDR_SIZE]);
+        assert!(StaticHeader::setup(&mut buf).unwrap().is_none());
+        assert!(BDA::load(&mut buf).unwrap().is_none());
+    }
+
+    #[test]
+    /// Make a buffer that is too short to have a StaticHeader on it.
+    /// Verify that loading the Static Header and loading the BDA yield None.
+    fn very_short_bda() {
+        let mut buf = Cursor::new(vec![0u8; SECTOR_SIZE]);
+        assert!(StaticHeader::setup(&mut buf).unwrap().is_none());
+        assert!(BDA::load(&mut buf).unwrap().is_none());
+    }
+
+    #[test]
+    /// Make a buffer just large enough to contain a single static header.
+    /// Verify that the StaticHeader is read and that there is a failure reading
+    /// the BDA.
+    fn just_one_static_header() {
+        let mut vec = vec![0u8; 2 * SECTOR_SIZE];
+        vec[SECTOR_SIZE..2 * SECTOR_SIZE].clone_from_slice(&random_static_header(0, 0)
+                                                                .sigblock_to_buf());
+        let mut buf = Cursor::new(vec);
+        assert!(StaticHeader::setup(&mut buf).unwrap().is_some());
+
+        assert!(BDA::load(&mut buf).is_err());
+    }
+
+    #[test]
     /// Construct an arbitrary StaticHeader object.
     /// Initialize a BDA.
     /// Verify that the last update time is None.
@@ -992,7 +1044,9 @@ mod tests {
         fn static_header(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
             let sh1 = random_static_header(blkdev_size, mda_size_factor);
             let buf = sh1.sigblock_to_buf();
-            let sh2 = StaticHeader::sigblock_from_buf(&buf).unwrap().unwrap();
+            let sh2 = StaticHeader::sigblock_from_buf(&buf, buf.len())
+                .unwrap()
+                .unwrap();
             TestResult::from_bool(sh1.pool_uuid == sh2.pool_uuid && sh1.dev_uuid == sh2.dev_uuid &&
                                   sh1.blkdev_size == sh2.blkdev_size &&
                                   sh1.mda_size == sh2.mda_size &&

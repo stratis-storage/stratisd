@@ -309,7 +309,8 @@ pub fn initialize(pool_uuid: &PoolUuid,
                                   pool_uuid,
                                   &Uuid::new_v4(),
                                   mda_size,
-                                  dev_size.sectors());
+                                  dev_size.sectors(),
+                                  Utc::now().timestamp() as u64);
         if let Ok(bda) = bda {
             let allocator = RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())])
                 .expect("bda.size() < bda.dev_size() and single range");

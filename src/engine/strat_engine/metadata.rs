@@ -250,7 +250,7 @@ impl StaticHeader {
         LittleEndian::write_u64(&mut buf[96..104], *self.mda_size);
         LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size);
 
-        let hdr_crc = crc32::checksum_ieee(&buf[4..SECTOR_SIZE]);
+        let hdr_crc = crc32::checksum_castagnoli(&buf[4..SECTOR_SIZE]);
         LittleEndian::write_u32(&mut buf[..4], hdr_crc);
         buf
     }
@@ -265,7 +265,7 @@ impl StaticHeader {
             return Ok(None);
         }
 
-        let crc = crc32::checksum_ieee(&buf[4..SECTOR_SIZE]);
+        let crc = crc32::checksum_castagnoli(&buf[4..SECTOR_SIZE]);
         if crc != LittleEndian::read_u32(&buf[..4]) {
             return Err(EngineError::Engine(ErrorEnum::Invalid, "header CRC invalid".into()));
         }
@@ -422,7 +422,7 @@ mod mda {
             let header = MDAHeader {
                 last_updated: *time,
                 used: used,
-                data_crc: crc32::checksum_ieee(data),
+                data_crc: crc32::checksum_castagnoli(data),
             };
             let hdr_buf = header.to_buf();
 
@@ -537,7 +537,7 @@ mod mda {
         fn from_buf(buf: &[u8; _MDA_REGION_HDR_SIZE],
                     region_size: Bytes)
                     -> EngineResult<Option<MDAHeader>> {
-            if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_ieee(&buf[4..]) {
+            if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_castagnoli(&buf[4..]) {
                 return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region header CRC".into()));
             }
 
@@ -572,7 +572,7 @@ mod mda {
             LittleEndian::write_u64(&mut buf[16..24], self.last_updated.timestamp() as u64);
             LittleEndian::write_u32(&mut buf[24..28], self.last_updated.timestamp_subsec_nanos());
 
-            let buf_crc = crc32::checksum_ieee(&buf[4.._MDA_REGION_HDR_SIZE]);
+            let buf_crc = crc32::checksum_castagnoli(&buf[4.._MDA_REGION_HDR_SIZE]);
             LittleEndian::write_u32(&mut buf[..4], buf_crc);
 
             buf
@@ -598,7 +598,7 @@ mod mda {
 
             f.read_exact(&mut data_buf)?;
 
-            if self.data_crc != crc32::checksum_ieee(&data_buf) {
+            if self.data_crc != crc32::checksum_castagnoli(&data_buf) {
                 return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region data CRC".into()));
             }
             Ok(data_buf)
@@ -689,7 +689,7 @@ mod mda {
                 let header = MDAHeader {
                     last_updated: Utc.timestamp(sec, nsec),
                     used: Bytes(data.len() as u64),
-                    data_crc: crc32::checksum_ieee(&data),
+                    data_crc: crc32::checksum_castagnoli(&data),
                 };
                 let buf = header.to_buf();
                 let mda1 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
@@ -714,7 +714,7 @@ mod mda {
             let header = MDAHeader {
                 last_updated: Utc::now(),
                 used: Bytes(data.len() as u64),
-                data_crc: crc32::checksum_ieee(&data),
+                data_crc: crc32::checksum_castagnoli(&data),
             };
             let mut buf = header.to_buf();
             LittleEndian::write_u32(&mut buf[..4], 0u32);
@@ -729,7 +729,7 @@ mod mda {
             let header = MDAHeader {
                 last_updated: Utc::now(),
                 used: Bytes(data.len() as u64),
-                data_crc: crc32::checksum_ieee(&data),
+                data_crc: crc32::checksum_castagnoli(&data),
             };
             let buf = header.to_buf();
             assert!(MDAHeader::from_buf(&buf, MDA_REGION_HDR_SIZE).is_err());

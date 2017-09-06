@@ -42,12 +42,17 @@ impl BDA {
                          pool_uuid: &Uuid,
                          dev_uuid: &Uuid,
                          mda_size: Sectors,
-                         blkdev_size: Sectors)
+                         blkdev_size: Sectors,
+                         initialization_time: u64)
                          -> EngineResult<BDA>
         where F: Seek + Write
     {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
-        let header = StaticHeader::new(pool_uuid, dev_uuid, mda_size, blkdev_size);
+        let header = StaticHeader::new(pool_uuid,
+                                       dev_uuid,
+                                       mda_size,
+                                       blkdev_size,
+                                       initialization_time);
         let hdr_buf = header.sigblock_to_buf();
 
         // Write 8K header. Static_Header copies go in sectors 1 and 9.
@@ -159,14 +164,17 @@ pub struct StaticHeader {
     mda_size: Sectors,
     reserved_size: Sectors,
     flags: u64,
+    /// Seconds portion of DateTime<Utc> value.
+    initialization_time: u64,
 }
 
 impl StaticHeader {
-    pub fn new(pool_uuid: &PoolUuid,
-               dev_uuid: &DevUuid,
-               mda_size: Sectors,
-               blkdev_size: Sectors)
-               -> StaticHeader {
+    fn new(pool_uuid: &PoolUuid,
+           dev_uuid: &DevUuid,
+           mda_size: Sectors,
+           blkdev_size: Sectors,
+           initialization_time: u64)
+           -> StaticHeader {
         StaticHeader {
             blkdev_size: blkdev_size,
             pool_uuid: pool_uuid.clone(),
@@ -174,6 +182,7 @@ impl StaticHeader {
             mda_size: mda_size,
             reserved_size: MDA_RESERVED_SECTORS,
             flags: 0,
+            initialization_time: initialization_time,
         }
     }
 
@@ -249,6 +258,7 @@ impl StaticHeader {
         buf[64..96].clone_from_slice(self.dev_uuid.simple().to_string().as_bytes());
         LittleEndian::write_u64(&mut buf[96..104], *self.mda_size);
         LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size);
+        LittleEndian::write_u64(&mut buf[120..128], self.initialization_time);
 
         let hdr_crc = crc32::checksum_castagnoli(&buf[4..SECTOR_SIZE]);
         LittleEndian::write_u32(&mut buf[..4], hdr_crc);
@@ -286,6 +296,7 @@ impl StaticHeader {
                     mda_size: mda_size,
                     reserved_size: Sectors(LittleEndian::read_u64(&buf[104..112])),
                     flags: 0,
+                    initialization_time: LittleEndian::read_u64(&buf[120..128]),
                 }))
     }
 }
@@ -757,7 +768,11 @@ mod tests {
         let dev_uuid = Uuid::new_v4();
         let mda_size = MIN_MDA_SECTORS + Sectors((mda_size_factor * 4) as u64);
         let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
-        StaticHeader::new(&pool_uuid, &dev_uuid, mda_size, blkdev_size)
+        StaticHeader::new(&pool_uuid,
+                          &dev_uuid,
+                          mda_size,
+                          blkdev_size,
+                          Utc::now().timestamp() as u64)
     }
 
     #[test]
@@ -811,7 +826,8 @@ mod tests {
                             &sh.pool_uuid,
                             &sh.dev_uuid,
                             sh.mda_size,
-                            sh.blkdev_size)
+                            sh.blkdev_size,
+                            Utc::now().timestamp() as u64)
                     .unwrap();
             let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
             match ownership {
@@ -849,7 +865,8 @@ mod tests {
                                       &sh.pool_uuid,
                                       &sh.dev_uuid,
                                       sh.mda_size,
-                                      sh.blkdev_size)
+                                      sh.blkdev_size,
+                                      Utc::now().timestamp() as u64)
                     .unwrap();
             TestResult::from_bool(bda.last_update_time().is_none())
         }
@@ -872,7 +889,8 @@ mod tests {
                                       &sh.pool_uuid,
                                       &sh.dev_uuid,
                                       sh.mda_size,
-                                      sh.blkdev_size)
+                                      sh.blkdev_size,
+                                      Utc::now().timestamp() as u64)
                 .unwrap();
 
         let timestamp0 = Utc::now();
@@ -915,7 +933,8 @@ mod tests {
                                           &sh.pool_uuid,
                                           &sh.dev_uuid,
                                           sh.mda_size,
-                                          sh.blkdev_size)
+                                          sh.blkdev_size,
+                                          Utc::now().timestamp() as u64)
                     .unwrap();
             let current_time = Utc::now();
             bda.save_state(&current_time, &state, &mut buf).unwrap();
@@ -997,7 +1016,8 @@ mod tests {
                                   sh1.blkdev_size == sh2.blkdev_size &&
                                   sh1.mda_size == sh2.mda_size &&
                                   sh1.reserved_size == sh2.reserved_size &&
-                                  sh1.flags == sh2.flags)
+                                  sh1.flags == sh2.flags &&
+                                  sh1.initialization_time == sh2.initialization_time)
         }
 
         QuickCheck::new()

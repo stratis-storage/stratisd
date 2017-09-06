@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{Seek, Write, SeekFrom};
+use std::io::{BufWriter, Seek, Write, SeekFrom};
 use std::fs::OpenOptions;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::prelude::AsRawFd;
@@ -17,6 +17,7 @@ use nix::sys::stat::{S_IFBLK, S_IFMT};
 use devicemapper::consts::SECTOR_SIZE;
 use devicemapper::{Bytes, Device, Sectors};
 
+use super::super::consts::IEC;
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);
@@ -36,7 +37,8 @@ pub fn write_sectors<P: AsRef<Path>>(path: P,
                                      length: Sectors,
                                      buf: &[u8; SECTOR_SIZE])
                                      -> EngineResult<()> {
-    let mut f = OpenOptions::new().write(true).open(path)?;
+    let mut f = BufWriter::with_capacity(IEC::Mi as usize,
+                                         OpenOptions::new().write(true).open(path)?);
 
     f.seek(SeekFrom::Start(*offset))?;
     for _ in 0..*length {

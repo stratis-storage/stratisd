@@ -52,7 +52,7 @@ impl RealTestDev {
     }
 
     fn as_path(&self) -> &Path {
-        &self.path.as_path()
+        &self.path
     }
 }
 

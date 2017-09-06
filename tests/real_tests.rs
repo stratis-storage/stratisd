@@ -45,8 +45,9 @@ pub struct RealTestDev {
 }
 
 impl RealTestDev {
-    /// Construct a new test device
-    pub fn new(path: &str) -> RealTestDev {
+    /// Construct a new test device for the given path.
+    /// Wipe initial MiB to clear metadata.
+    pub fn new(path: &Path) -> RealTestDev {
         wipe_sectors(path, Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
         RealTestDev { path: PathBuf::from(path) }
     }
@@ -143,7 +144,10 @@ fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
     init_logger();
     let runs = get_devices(limits).unwrap();
     for run_paths in runs {
-        let devices: Vec<_> = run_paths.iter().map(|x| RealTestDev::new(x)).collect();
+        let devices: Vec<_> = run_paths
+            .iter()
+            .map(|x| RealTestDev::new(Path::new(x)))
+            .collect();
         test(&devices.iter().map(|x| x.as_path()).collect::<Vec<_>>());
     }
 }

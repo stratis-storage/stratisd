@@ -22,9 +22,11 @@ use self::uuid::Uuid;
 use self::devicemapper::{DmName, DM};
 use self::devicemapper::LinearDev;
 use self::devicemapper::Segment;
-use self::devicemapper::{DataBlocks, Sectors};
+
+use self::devicemapper::{Bytes, DataBlocks, Sectors};
 use self::devicemapper::{DmDevice, ThinDev, ThinDevId, ThinPoolDev};
 
+use libstratis::engine::IEC;
 use libstratis::engine::strat_engine::blockdevmgr::initialize;
 use libstratis::engine::strat_engine::device::{blkdev_size, resolve_devices, wipe_sectors};
 use libstratis::engine::strat_engine::filesystem::create_fs;
@@ -87,11 +89,20 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
                        vec![meta_segment])
                 .unwrap();
 
-    // Clear the meta data device.  If the first block is not all zeros - the
+    // Clear the first MiB of the meta data device.  If the first block is not all zeros - the
     // stale data will cause the device to appear as an existing meta rather
+<<<<<<< HEAD
     // than a new one.  Clear the entire device to be safe.  Stratis implements
     // the same approach when constructing a thin pool.
     wipe_sectors(&metadata_dev.devnode(), Sectors(0), metadata_dev.size()).unwrap();
+=======
+    // than a new one.
+    wipe_sectors(&metadata_dev.devnode().unwrap(),
+                 Sectors(0),
+                 Bytes(IEC::Mi).sectors())
+            .unwrap();
+
+>>>>>>> Only clear the first MiB of a meta device.  Writing the entire device
 
     let (data_start, data_length) = data_blockdev.avail_range();
     let data_segment = Segment::new(*data_blockdev.device(), data_start, data_length);

@@ -10,6 +10,7 @@ extern crate serde_json;
 
 mod util;
 
+use std::cmp;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
@@ -61,9 +62,16 @@ impl Drop for RealTestDev {
     }
 }
 
-/// Set up count devices from configuration file.
-/// Wipe first MiB on each device.
-fn get_devices(count: u8) -> Option<Vec<RealTestDev>> {
+enum DeviceLimits {
+    Exactly(usize),
+    AtLeast(usize),
+    #[allow(dead_code)]
+    Range(usize, usize), // inclusive
+}
+
+/// Return one or more lists of device nodes to use, based upon the
+/// constraints. Returns None if constraints can't be met.
+fn get_devices(limits: DeviceLimits) -> Option<Vec<Vec<String>>> {
 
     let file = OpenOptions::new()
         .read(true)
@@ -75,114 +83,155 @@ fn get_devices(count: u8) -> Option<Vec<RealTestDev>> {
         .unwrap()
         .as_array()
         .unwrap();
-    if devpaths.len() < count as usize {
+
+    // Convert enum to [lower, Option<upper>) values
+    let (lower, maybe_upper) = match limits {
+        DeviceLimits::Exactly(num) => (num, Some(num + 1)),
+        DeviceLimits::AtLeast(num) => (num, None),
+        DeviceLimits::Range(lower, upper) => {
+            assert!(lower < upper);
+            (lower, Some(upper + 1))
+        }
+    };
+
+    // Check these values against available blockdevs
+    let avail = devpaths.len();
+    if lower > avail {
         return None;
     }
-    let devices: Vec<RealTestDev> = devpaths
+    let maybe_upper = {
+        if lower == avail {
+            None
+        } else {
+            match maybe_upper {
+                None => Some(avail),
+                Some(upper) => {
+                    if lower + 1 == upper {
+                        None
+                    } else {
+                        Some(cmp::min(upper - 1, avail))
+                    }
+                }
+            }
+        }
+    };
+
+    let low_paths: Vec<String> = devpaths
         .iter()
-        .take(count as usize)
-        .map(|x| RealTestDev::new(x.as_str().unwrap()))
+        .take(lower)
+        .map(|x| x.as_str().unwrap().to_owned())
         .collect();
 
-    Some(devices)
+    if let Some(upper) = maybe_upper {
+        let high_paths: Vec<String> = devpaths
+            .iter()
+            .take(upper)
+            .map(|x| x.as_str().unwrap().to_owned())
+            .collect();
+        Some(vec![low_paths, high_paths])
+    } else {
+        Some(vec![low_paths])
+    }
 }
 
-/// Run test on count real devices.
-fn test_with_spec<F>(count: u8, test: F) -> ()
+/// Run test on real devices, using given constraints. Constraints may result
+/// in multiple invocations of the test, with differing numbers of block
+/// devices.
+fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
     where F: Fn(&[&Path]) -> ()
 {
     init_logger();
-    let devices = get_devices(count).unwrap();
-    let device_paths: Vec<&Path> = devices.iter().map(|x| x.as_path()).collect();
-    test(&device_paths);
+    let runs = get_devices(limits).unwrap();
+    for run_paths in runs {
+        let devices: Vec<_> = run_paths.iter().map(|x| RealTestDev::new(x)).collect();
+        test(&devices.iter().map(|x| x.as_path()).collect::<Vec<_>>());
+    }
 }
 
 
 #[test]
 pub fn real_test_force_flag_stratis() {
-    test_with_spec(2, test_force_flag_stratis);
-    test_with_spec(3, test_force_flag_stratis);
+    test_with_spec(DeviceLimits::AtLeast(1), test_force_flag_stratis);
 }
 
 
 #[test]
 pub fn real_test_linear_device() {
-    test_with_spec(2, test_linear_device);
-    test_with_spec(3, test_linear_device);
+    test_with_spec(DeviceLimits::AtLeast(1), test_linear_device);
 }
 
 
 #[test]
 pub fn real_test_thinpool_device() {
-    test_with_spec(3, test_thinpool_device);
+    test_with_spec(DeviceLimits::AtLeast(1), test_thinpool_device);
 }
 
 #[test]
 pub fn real_test_thinpool_expand() {
-    test_with_spec(3, test_thinpool_expand);
+    test_with_spec(DeviceLimits::AtLeast(1), test_thinpool_expand);
 }
 
 #[test]
 pub fn real_test_thinpool_thindev_destroy() {
-    test_with_spec(3, test_thinpool_thindev_destroy);
+    test_with_spec(DeviceLimits::AtLeast(1), test_thinpool_thindev_destroy);
 }
 
 #[test]
 pub fn real_test_pool_blockdevs() {
-    test_with_spec(3, test_pool_blockdevs);
+    test_with_spec(DeviceLimits::AtLeast(1), test_pool_blockdevs);
 }
 
 #[test]
 pub fn real_test_force_flag_dirty() {
-    test_with_spec(3, test_force_flag_dirty);
+    test_with_spec(DeviceLimits::AtLeast(1), test_force_flag_dirty);
 }
 
 #[test]
 pub fn real_test_teardown() {
-    test_with_spec(2, test_teardown);
+    test_with_spec(DeviceLimits::AtLeast(1), test_teardown);
 }
 
 #[test]
 pub fn real_test_initialize() {
-    test_with_spec(4, test_initialize);
+    test_with_spec(DeviceLimits::AtLeast(2), test_initialize);
 }
 
 #[test]
 pub fn real_test_empty_pool() {
-    test_with_spec(0, test_empty_pool)
+    test_with_spec(DeviceLimits::Exactly(0), test_empty_pool)
 }
 
 #[test]
 pub fn real_test_basic_metadata() {
-    test_with_spec(4, test_basic_metadata);
+    test_with_spec(DeviceLimits::AtLeast(2), test_basic_metadata);
 }
 
 #[test]
 pub fn real_test_setup() {
-    test_with_spec(4, test_setup);
+    test_with_spec(DeviceLimits::AtLeast(2), test_setup);
 }
 
 #[test]
 pub fn real_test_pool_rename() {
-    test_with_spec(2, test_pool_rename);
+    test_with_spec(DeviceLimits::AtLeast(1), test_pool_rename);
 }
 
 #[test]
 pub fn real_test_blockdevmgr_used() {
-    test_with_spec(2, test_blockdevmgr_used);
+    test_with_spec(DeviceLimits::AtLeast(1), test_blockdevmgr_used);
 }
 
 #[test]
 pub fn real_test_filesystem_rename() {
-    test_with_spec(2, test_filesystem_rename);
+    test_with_spec(DeviceLimits::AtLeast(1), test_filesystem_rename);
 }
 
 #[test]
 pub fn real_test_pool_setup() {
-    test_with_spec(2, test_pool_setup);
+    test_with_spec(DeviceLimits::AtLeast(1), test_pool_setup);
 }
 
 #[test]
 pub fn real_test_xfs_expand() {
-    test_with_spec(3, test_xfs_expand);
+    test_with_spec(DeviceLimits::AtLeast(1), test_xfs_expand);
 }

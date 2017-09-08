@@ -19,13 +19,15 @@ use self::nix::mount::{MsFlags, MNT_DETACH, mount, umount2};
 use self::tempdir::TempDir;
 use self::uuid::Uuid;
 
+use self::devicemapper::Bytes;
+use self::devicemapper::consts::IEC;
 use self::devicemapper::{DmName, DM};
 use self::devicemapper::LinearDev;
 use self::devicemapper::Segment;
 use self::devicemapper::{DataBlocks, Sectors};
 use self::devicemapper::{DmDevice, ThinDev, ThinDevId, ThinPoolDev};
 
-use libstratis::engine::strat_engine::blockdevmgr::initialize;
+use libstratis::engine::strat_engine::blockdevmgr::{BlockDevMgr, initialize, map_to_dm};
 use libstratis::engine::strat_engine::device::{blkdev_size, resolve_devices, wipe_sectors};
 use libstratis::engine::strat_engine::filesystem::create_fs;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
@@ -74,17 +76,17 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
                                  false)
             .unwrap();
 
-    let (metadata_blockdev, data_blockdev) = (initialized.first().unwrap(),
-                                              initialized.last().unwrap());
+    let mut bd_mgr = BlockDevMgr::new(initialized);
 
     let dm = DM::new().unwrap();
 
-    let (meta_start, meta_length) = metadata_blockdev.avail_range();
-    let meta_segment = Segment::new(*metadata_blockdev.device(), meta_start, meta_length);
+    let meta_segs = bd_mgr
+        .alloc_space(Bytes(16 * IEC::Mi).sectors())
+        .unwrap();
     let metadata_dev =
         LinearDev::new(DmName::new("stratis_testing_thinpool_metadata").expect("valid format"),
                        &dm,
-                       vec![meta_segment])
+                       map_to_dm(&meta_segs))
                 .unwrap();
 
     // Clear the meta data device.  If the first block is not all zeros - the
@@ -93,12 +95,11 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
     // the same approach when constructing a thin pool.
     wipe_sectors(&metadata_dev.devnode(), Sectors(0), metadata_dev.size()).unwrap();
 
-    let (data_start, data_length) = data_blockdev.avail_range();
-    let data_segment = Segment::new(*data_blockdev.device(), data_start, data_length);
+    let data_segs = bd_mgr.alloc_space(Bytes(IEC::Gi).sectors()).unwrap();
     let data_dev =
         LinearDev::new(DmName::new("stratis_testing_thinpool_datadev").expect("valid format"),
                        &dm,
-                       vec![data_segment])
+                       map_to_dm(&data_segs))
                 .unwrap();
     let thinpool_dev =
         ThinPoolDev::new(DmName::new("stratis_testing_thinpool").expect("valid format"),

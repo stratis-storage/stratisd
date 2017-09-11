@@ -18,7 +18,7 @@ use devicemapper::Device;
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 use super::super::types::PoolUuid;
 
-use super::blockdev::BlockDev;
+use super::blockdev::StratBlockDev;
 use super::device::{blkdev_size, devnode_to_devno};
 use super::engine::DevOwnership;
 use super::metadata::{BDA, StaticHeader};
@@ -166,7 +166,7 @@ pub fn get_metadata(pool_uuid: PoolUuid,
 pub fn get_blockdevs(pool_uuid: PoolUuid,
                      pool_save: &PoolSave,
                      devnodes: &HashMap<Device, PathBuf>)
-                     -> EngineResult<Vec<BlockDev>> {
+                     -> EngineResult<Vec<StratBlockDev>> {
     let segments = pool_save
         .flex_devs
         .meta_dev
@@ -198,7 +198,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                     RangeAllocator::new(actual_size,
                                         segment_table.get(bda.dev_uuid()).unwrap_or(&vec![]))?;
 
-                blockdevs.push(BlockDev::new(*device, devnode.to_owned(), bda, allocator));
+                blockdevs.push(StratBlockDev::new(*device, devnode.to_owned(), bda, allocator));
             }
         }
     }

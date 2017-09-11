@@ -20,16 +20,20 @@ use super::serde_structs::{BlockDevSave, Recordable};
 
 
 #[derive(Debug)]
-pub struct BlockDev {
+pub struct StratBlockDev {
     dev: Device,
     pub devnode: PathBuf,
     bda: BDA,
     used: RangeAllocator,
 }
 
-impl BlockDev {
-    pub fn new(dev: Device, devnode: PathBuf, bda: BDA, allocator: RangeAllocator) -> BlockDev {
-        BlockDev {
+impl StratBlockDev {
+    pub fn new(dev: Device,
+               devnode: PathBuf,
+               bda: BDA,
+               allocator: RangeAllocator)
+               -> StratBlockDev {
+        StratBlockDev {
             dev: dev,
             devnode: devnode,
             bda: bda,
@@ -114,7 +118,7 @@ impl BlockDev {
     }
 }
 
-impl Recordable<BlockDevSave> for BlockDev {
+impl Recordable<BlockDevSave> for StratBlockDev {
     fn record(&self) -> BlockDevSave {
         BlockDevSave { devnode: self.devnode.clone() }
     }

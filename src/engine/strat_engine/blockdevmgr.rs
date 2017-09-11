@@ -19,7 +19,7 @@ use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{DevUuid, PoolUuid};
 
 use super::cleanup::wipe_blockdevs;
-use super::blockdev::BlockDev;
+use super::blockdev::StratBlockDev;
 use super::device::{blkdev_size, resolve_devices};
 use super::engine::DevOwnership;
 use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};
@@ -65,19 +65,19 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<Segment> {
 
 #[derive(Debug)]
 pub struct BlockDevMgr {
-    block_devs: Vec<BlockDev>,
+    block_devs: Vec<StratBlockDev>,
     last_update_time: Option<DateTime<Utc>>,
 }
 
 impl BlockDevMgr {
-    pub fn new(block_devs: Vec<BlockDev>) -> BlockDevMgr {
+    pub fn new(block_devs: Vec<StratBlockDev>) -> BlockDevMgr {
         BlockDevMgr {
             block_devs: block_devs,
             last_update_time: None,
         }
     }
 
-    /// Initialize a new BlockDevMgr with specified pool and devices.
+    /// Initialize a new StratBlockDevMgr with specified pool and devices.
     pub fn initialize(pool_uuid: &PoolUuid,
                       paths: &[&Path],
                       mda_size: Sectors,
@@ -231,7 +231,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
                   devices: HashMap<Device, &Path>,
                   mda_size: Sectors,
                   force: bool)
-                  -> EngineResult<Vec<BlockDev>> {
+                  -> EngineResult<Vec<StratBlockDev>> {
 
     /// Get device information, returns an error if problem with obtaining
     /// that information.
@@ -302,7 +302,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
 
     let add_devs = filter_devs(dev_infos, pool_uuid, force)?;
 
-    let mut bds: Vec<BlockDev> = Vec::new();
+    let mut bds: Vec<StratBlockDev> = Vec::new();
     for (dev, (devnode, dev_size, mut f)) in add_devs {
 
         let bda = BDA::initialize(&mut f,
@@ -315,7 +315,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
             let allocator = RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())])
                 .expect("bda.size() < bda.dev_size() and single range");
 
-            bds.push(BlockDev::new(dev, devnode.to_owned(), bda, allocator));
+            bds.push(StratBlockDev::new(dev, devnode.to_owned(), bda, allocator));
         } else {
             // TODO: check the return values and update state machine on failure
             let _ = BDA::wipe(&mut f);

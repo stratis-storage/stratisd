@@ -48,11 +48,18 @@ pub struct LoopTestDev {
 
 impl LoopTestDev {
     pub fn new(lc: &LoopControl, path: &Path) -> LoopTestDev {
-        OpenOptions::new()
+        let mut f = OpenOptions::new()
             .read(true)
             .write(true)
-            .open(path)
+            .create(true)
+            .open(&path)
             .unwrap();
+
+        // the proper way to do this is fallocate, but nix doesn't implement yet.
+        // TODO: see https://github.com/nix-rust/nix/issues/596
+        f.seek(SeekFrom::Start(IEC::Gi)).unwrap();
+        f.write(&[0]).unwrap();
+        f.flush().unwrap();
 
         let ld = lc.next_free().unwrap();
         ld.attach(path, 0).unwrap();
@@ -89,22 +96,7 @@ fn get_devices(count: u8, dir: &TempDir) -> Vec<LoopTestDev> {
 
     for index in 0..count {
         let path = dir.path().join(format!("store{}", &index));
-        let mut f = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(&path)
-            .unwrap();
-
-        // the proper way to do this is fallocate, but nix doesn't implement yet.
-        // TODO: see https://github.com/nix-rust/nix/issues/596
-        f.seek(SeekFrom::Start(IEC::Gi)).unwrap();
-        f.write(&[0]).unwrap();
-        f.flush().unwrap();
-
-        let ltd = LoopTestDev::new(&lc, &path);
-
-        loop_devices.push(ltd);
+        loop_devices.push(LoopTestDev::new(&lc, &path));
     }
     loop_devices
 }

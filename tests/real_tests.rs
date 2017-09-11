@@ -72,7 +72,7 @@ enum DeviceLimits {
 
 /// Get a list of counts of devices to use for tests.
 /// None of the counts can be greater than avail.
-fn get_device_counts(limits: DeviceLimits, avail: usize) -> Option<Vec<usize>> {
+fn get_device_counts(limits: DeviceLimits, avail: usize) -> Vec<usize> {
     // Convert enum to [lower, Option<upper>) values
     let (lower, maybe_upper) = match limits {
         DeviceLimits::Exactly(num) => (num, Some(num + 1)),
@@ -83,12 +83,15 @@ fn get_device_counts(limits: DeviceLimits, avail: usize) -> Option<Vec<usize>> {
         }
     };
 
+    let mut counts = vec![];
+
     // Check these values against available blockdevs
     if lower > avail {
-        return None;
+        return counts;
     }
 
-    let mut counts = vec![lower];
+    counts.push(lower);
+
     if lower != avail {
         match maybe_upper {
             None => counts.push(avail),
@@ -100,37 +103,7 @@ fn get_device_counts(limits: DeviceLimits, avail: usize) -> Option<Vec<usize>> {
         }
     }
 
-    Some(counts)
-}
-
-/// Return one or more lists of device nodes to use, based upon the
-/// constraints. Returns None if constraints can't be met.
-fn get_devices(limits: DeviceLimits) -> Option<Vec<Vec<String>>> {
-
-    let file = OpenOptions::new()
-        .read(true)
-        .open("tests/test_config.json")
-        .unwrap();
-    let config: Value = from_reader(&file).unwrap();
-    let devpaths = config
-        .get("ok_to_destroy_dev_array_key")
-        .unwrap()
-        .as_array()
-        .unwrap();
-
-    get_device_counts(limits, devpaths.len()).map(|counts| {
-        counts
-            .iter()
-            .map(|num| {
-                     devpaths
-                         .iter()
-                         .take(*num)
-                         .map(|d| d.as_str().unwrap().to_owned())
-                         .collect()
-                 })
-            .collect()
-    })
-
+    counts
 }
 
 /// Run test on real devices, using given constraints. Constraints may result
@@ -139,13 +112,32 @@ fn get_devices(limits: DeviceLimits) -> Option<Vec<Vec<String>>> {
 fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
     where F: Fn(&[&Path]) -> ()
 {
+    let file = OpenOptions::new()
+        .read(true)
+        .open("tests/test_config.json")
+        .unwrap();
+    let config: Value = from_reader(&file).unwrap();
+    let devpaths: Vec<_> = config
+        .get("ok_to_destroy_dev_array_key")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| Path::new(x.as_str().unwrap()))
+        .collect();
+
+    let counts = get_device_counts(limits, devpaths.len());
+
+    assert!(!counts.is_empty());
+
     init_logger();
-    let runs = get_devices(limits).unwrap();
+
+    let runs = counts
+        .iter()
+        .map(|num| devpaths.iter().take(*num).collect::<Vec<_>>());
+
     for run_paths in runs {
-        let devices: Vec<_> = run_paths
-            .iter()
-            .map(|x| RealTestDev::new(Path::new(x)))
-            .collect();
+        let devices: Vec<_> = run_paths.iter().map(|x| RealTestDev::new(x)).collect();
         test(&devices.iter().map(|x| x.as_path()).collect::<Vec<_>>());
     }
 }

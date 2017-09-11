@@ -376,8 +376,8 @@ impl ThinPool {
         if let Some(new_data_regions) = bd_mgr.alloc_space(*extend_size * DATA_BLOCK_SIZE) {
             self.extend_data(dm, new_data_regions)?;
         } else {
-            let err_msg = format!("Insufficient space to accomodate request for {} data blocks",
-                                  *extend_size);
+            let err_msg = format!("Insufficient space to accomodate request for {}",
+                                  extend_size);
             return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
         }
         Ok(extend_size)

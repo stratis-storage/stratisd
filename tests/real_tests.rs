@@ -70,6 +70,39 @@ enum DeviceLimits {
     Range(usize, usize), // inclusive
 }
 
+/// Get a list of counts of devices to use for tests.
+/// None of the counts can be greater than avail.
+fn get_device_counts(limits: DeviceLimits, avail: usize) -> Option<Vec<usize>> {
+    // Convert enum to [lower, Option<upper>) values
+    let (lower, maybe_upper) = match limits {
+        DeviceLimits::Exactly(num) => (num, Some(num + 1)),
+        DeviceLimits::AtLeast(num) => (num, None),
+        DeviceLimits::Range(lower, upper) => {
+            assert!(lower < upper);
+            (lower, Some(upper + 1))
+        }
+    };
+
+    // Check these values against available blockdevs
+    if lower > avail {
+        return None;
+    }
+
+    let mut counts = vec![lower];
+    if lower != avail {
+        match maybe_upper {
+            None => counts.push(avail),
+            Some(upper) => {
+                if lower + 1 < upper {
+                    counts.push(cmp::min(upper - 1, avail))
+                }
+            }
+        }
+    }
+
+    Some(counts)
+}
+
 /// Return one or more lists of device nodes to use, based upon the
 /// constraints. Returns None if constraints can't be met.
 fn get_devices(limits: DeviceLimits) -> Option<Vec<Vec<String>>> {
@@ -85,54 +118,19 @@ fn get_devices(limits: DeviceLimits) -> Option<Vec<Vec<String>>> {
         .as_array()
         .unwrap();
 
-    // Convert enum to [lower, Option<upper>) values
-    let (lower, maybe_upper) = match limits {
-        DeviceLimits::Exactly(num) => (num, Some(num + 1)),
-        DeviceLimits::AtLeast(num) => (num, None),
-        DeviceLimits::Range(lower, upper) => {
-            assert!(lower < upper);
-            (lower, Some(upper + 1))
-        }
-    };
-
-    // Check these values against available blockdevs
-    let avail = devpaths.len();
-    if lower > avail {
-        return None;
-    }
-    let maybe_upper = {
-        if lower == avail {
-            None
-        } else {
-            match maybe_upper {
-                None => Some(avail),
-                Some(upper) => {
-                    if lower + 1 == upper {
-                        None
-                    } else {
-                        Some(cmp::min(upper - 1, avail))
-                    }
-                }
-            }
-        }
-    };
-
-    let low_paths: Vec<String> = devpaths
-        .iter()
-        .take(lower)
-        .map(|x| x.as_str().unwrap().to_owned())
-        .collect();
-
-    if let Some(upper) = maybe_upper {
-        let high_paths: Vec<String> = devpaths
+    get_device_counts(limits, devpaths.len()).map(|counts| {
+        counts
             .iter()
-            .take(upper)
-            .map(|x| x.as_str().unwrap().to_owned())
-            .collect();
-        Some(vec![low_paths, high_paths])
-    } else {
-        Some(vec![low_paths])
-    }
+            .map(|num| {
+                     devpaths
+                         .iter()
+                         .take(*num)
+                         .map(|d| d.as_str().unwrap().to_owned())
+                         .collect()
+                 })
+            .collect()
+    })
+
 }
 
 /// Run test on real devices, using given constraints. Constraints may result

@@ -15,6 +15,7 @@ use uuid::Uuid;
 use devicemapper::{Bytes, Device, Sectors, Segment};
 
 use super::super::consts::IEC;
+use super::super::engine::BlockDev;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{DevUuid, PoolUuid};
 
@@ -187,6 +188,14 @@ impl BlockDevMgr {
             let err_msg = "Failed to save metadata to even one device in pool";
             Err(EngineError::Engine(ErrorEnum::Error, err_msg.into()))
         }
+    }
+
+    /// Get references to managed blockdevs.
+    pub fn blockdevs(&self) -> Vec<&BlockDev> {
+        self.block_devs
+            .iter()
+            .map(|bd| bd as &BlockDev)
+            .collect()
     }
 
     // SIZE methods

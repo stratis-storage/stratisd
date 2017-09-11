@@ -16,7 +16,7 @@ use uuid::Uuid;
 use devicemapper::Sectors;
 
 use super::super::consts::IEC;
-use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
+use super::super::engine::{Filesystem, BlockDev, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{FilesystemUuid, PoolUuid, RenameAction, Redundancy};
@@ -158,6 +158,13 @@ impl Pool for SimPool {
         self.filesystems
             .into_iter()
             .map(|x| x as &Filesystem)
+            .collect()
+    }
+
+    fn blockdevs(&self) -> Vec<&BlockDev> {
+        self.block_devs
+            .iter()
+            .map(|(_, bd)| bd as &BlockDev)
             .collect()
     }
 }

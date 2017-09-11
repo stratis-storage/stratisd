@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 
 use devicemapper::{Device, Sectors};
 
+use super::super::engine::{BlockDev, HasUuid};
 use super::super::errors::EngineResult;
 use super::super::types::{DevUuid, PoolUuid};
 
@@ -115,6 +116,18 @@ impl StratBlockDev {
     /// self.max_metadata_size() < self.metadata_size()
     pub fn max_metadata_size(&self) -> Sectors {
         self.bda.max_data_size()
+    }
+}
+
+impl HasUuid for StratBlockDev {
+    fn uuid(&self) -> &DevUuid {
+        &self.bda.dev_uuid()
+    }
+}
+
+impl BlockDev for StratBlockDev {
+    fn devnode(&self) -> PathBuf {
+        self.devnode.clone()
     }
 }
 

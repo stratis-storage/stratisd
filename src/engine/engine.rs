@@ -5,12 +5,13 @@
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use devicemapper::Sectors;
 
 use super::errors::EngineResult;
-use super::types::{FilesystemUuid, PoolUuid, RenameAction};
+use super::types::{BlockDevState, FilesystemUuid, PoolUuid, DevUuid, RenameAction};
 
 pub trait HasUuid: Debug {
     fn uuid(&self) -> Uuid;
@@ -26,8 +27,27 @@ pub trait Filesystem: HasName + HasUuid {
 }
 
 pub trait BlockDev: HasUuid {
-    /// path of the device node
+    /// Get the path of the device node for this device.
     fn devnode(&self) -> PathBuf;
+
+    /// Get the user-settable string associated with this blockdev.
+    fn user_info(&self) -> Option<&str>;
+
+    /// Set the user-settable string associated with this blockdev.
+    fn set_user_info(&mut self, user_info: Option<&str>) -> bool;
+
+    /// Get the hardware ID for this blockdev.
+    fn hardware_info(&self) -> Option<&str>;
+
+    /// The time that this blockdev was initialized by Stratis, rounded down
+    /// to the nearest second.
+    fn initialization_time(&self) -> DateTime<Utc>;
+
+    /// The usable size of the device, not counting Stratis overhead.
+    fn total_size(&self) -> Sectors;
+
+    /// The current state of the blockdev.
+    fn state(&self) -> BlockDevState;
 }
 
 pub trait Pool: HasName + HasUuid {
@@ -41,10 +61,10 @@ pub trait Pool: HasName + HasUuid {
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>>;
 
     /// Adds blockdevs specified by paths to pool.
-    /// Returns a list of device nodes corresponding to devices actually added.
+    /// Returns a list of uuids corresponding to devices actually added.
     /// Returns an error if a blockdev can not be added because it is owned
     /// or there was an error while reading or writing a blockdev.
-    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>>;
+    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>>;
 
     /// Destroy the pool.
     /// Precondition: All filesystems belonging to this pool must be
@@ -72,12 +92,6 @@ pub trait Pool: HasName + HasUuid {
     /// Rename this pool.
     fn rename(&mut self, name: &str) -> ();
 
-    /// Get the filesystem in this pool with this UUID.
-    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<&Filesystem>;
-
-    /// Get the mutable filesystem in this pool with this UUID.
-    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<&mut Filesystem>;
-
     /// The total number of Sectors belonging to this pool.
     /// There are no exclusions, so this number includes overhead sectors
     /// of all sorts, sectors allocated for every sort of metadata by
@@ -94,14 +108,28 @@ pub trait Pool: HasName + HasUuid {
     /// Get all the filesystems belonging to this pool.
     fn filesystems(&self) -> Vec<&Filesystem>;
 
+    /// Get the filesystem in this pool with this UUID.
+    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<&Filesystem>;
+
+    /// Get the mutable filesystem in this pool with this UUID.
+    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<&mut Filesystem>;
+
     /// Get all the blockdevs that make up this pool.
     fn blockdevs(&self) -> Vec<&BlockDev>;
+
+    /// Get the blockdev in this pool with this UUID.
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<&BlockDev>;
+
+    /// Get the mutable filesystem in this pool with this UUID.
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<&mut BlockDev>;
+
+    /// Save the state of the pool. FIXME, see #614.
+    fn save_state(&mut self) -> EngineResult<()>;
 }
 
 pub trait Engine: Debug {
     /// Create a Stratis pool.
-    /// Returns the UUID of the newly created pool and the blockdevs the
-    /// pool contains.
+    /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a
     /// supported redundancy.
     fn create_pool(&mut self,
@@ -109,7 +137,7 @@ pub trait Engine: Debug {
                    blockdev_paths: &[&Path],
                    redundancy: Option<u16>,
                    force: bool)
-                   -> EngineResult<(PoolUuid, Vec<PathBuf>)>;
+                   -> EngineResult<PoolUuid>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.

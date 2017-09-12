@@ -15,7 +15,7 @@ use devicemapper::{Device, DM, Sectors, ThinPoolDev};
 
 use super::super::engine::{Filesystem, BlockDev, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::{FilesystemUuid, PoolUuid, RenameAction, Redundancy};
+use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, RenameAction, Redundancy};
 
 use super::blockdevmgr::BlockDevMgr;
 use super::filesystem::StratFilesystem;
@@ -44,7 +44,7 @@ impl StratPool {
                       paths: &[&Path],
                       redundancy: Redundancy,
                       force: bool)
-                      -> EngineResult<(StratPool, Vec<PathBuf>)> {
+                      -> EngineResult<StratPool> {
         let pool_uuid = Uuid::new_v4();
 
         let mut block_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
@@ -58,8 +58,6 @@ impl StratPool {
             }
         };
 
-        let devnodes = block_mgr.devnodes();
-
         let mut pool = StratPool {
             name: name.to_owned(),
             pool_uuid: pool_uuid,
@@ -70,7 +68,7 @@ impl StratPool {
 
         pool.write_metadata()?;
 
-        Ok((pool, devnodes))
+        Ok(pool)
     }
 
     /// Setup a StratPool using its UUID and the list of devnodes it has.
@@ -163,10 +161,10 @@ impl Pool for StratPool {
         Ok(result)
     }
 
-    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
-        let bdev_paths = self.block_devs.add(paths, force)?;
+    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
+        let bdev_info = self.block_devs.add(paths, force)?;
         self.write_metadata()?;
-        Ok(bdev_paths)
+        Ok(bdev_info)
     }
 
     fn destroy(self) -> EngineResult<()> {
@@ -200,18 +198,6 @@ impl Pool for StratPool {
         self.name = name.to_owned();
     }
 
-    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<&Filesystem> {
-        self.thin_pool
-            .get_filesystem_by_uuid(uuid)
-            .map(|fs| fs as &Filesystem)
-    }
-
-    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<&mut Filesystem> {
-        self.thin_pool
-            .get_mut_filesystem_by_uuid(uuid)
-            .map(|fs| fs as &mut Filesystem)
-    }
-
     fn total_physical_size(&self) -> Sectors {
         self.block_devs.current_capacity()
     }
@@ -226,8 +212,32 @@ impl Pool for StratPool {
         self.thin_pool.filesystems()
     }
 
+    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<&Filesystem> {
+        self.thin_pool
+            .get_filesystem_by_uuid(uuid)
+            .map(|fs| fs as &Filesystem)
+    }
+
+    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<&mut Filesystem> {
+        self.thin_pool
+            .get_mut_filesystem_by_uuid(uuid)
+            .map(|fs| fs as &mut Filesystem)
+    }
+
     fn blockdevs(&self) -> Vec<&BlockDev> {
         self.block_devs.blockdevs()
+    }
+
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<&BlockDev> {
+        self.block_devs.get_blockdev_by_uuid(uuid)
+    }
+
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
+        self.block_devs.get_mut_blockdev_by_uuid(uuid)
+    }
+
+    fn save_state(&mut self) -> EngineResult<()> {
+        self.write_metadata()
     }
 }
 

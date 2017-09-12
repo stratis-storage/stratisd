@@ -103,20 +103,25 @@ pub fn test_force_flag_stratis(paths: &[&Path]) -> () {
 /// releases all blockdevs.
 pub fn test_pool_blockdevs(paths: &[&Path]) -> () {
     let mut engine = StratEngine::initialize().unwrap();
-    let (uuid, blockdevs) = engine
+    let uuid = engine
         .create_pool("test_pool", paths, None, true)
         .unwrap();
-    assert!(blockdevs
-                .iter()
-                .all(|path| {
-                         StaticHeader::determine_ownership(&mut OpenOptions::new()
-                                                                    .read(true)
-                                                                    .open(path)
-                                                                    .unwrap())
-                                 .unwrap() == DevOwnership::Ours(uuid)
-                     }));
+    {
+        let blockdevs = engine.get_pool(uuid).unwrap().blockdevs();
+        let paths: Vec<_> = blockdevs.iter().map(|bd| bd.devnode()).collect();
+        assert!(paths
+                    .iter()
+                    .all(|path| {
+                             StaticHeader::determine_ownership(&mut OpenOptions::new()
+                                                                        .read(true)
+                                                                        .open(path)
+                                                                        .unwrap())
+                                     .unwrap() ==
+                             DevOwnership::Ours(uuid)
+                         }));
+    }
     engine.destroy_pool(uuid).unwrap();
-    assert!(blockdevs
+    assert!(paths
                 .iter()
                 .all(|path| {
                          StaticHeader::determine_ownership(&mut OpenOptions::new()

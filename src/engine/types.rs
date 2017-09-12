@@ -15,6 +15,15 @@ pub enum RenameAction {
     Renamed,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum BlockDevState {
+    Missing,
+    Bad,
+    Spare,
+    NotInUse,
+    InUse,
+}
+
 /// Redundancy classifications which the engine allows for pools.
 custom_derive! {
     #[derive(Debug, Eq, PartialEq, EnumDisplay,

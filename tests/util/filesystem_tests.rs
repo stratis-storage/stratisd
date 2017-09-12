@@ -36,8 +36,8 @@ pub fn test_xfs_expand(paths: &[&Path]) -> () {
     // the low water mark.
     let fs_size = FILESYSTEM_LOWATER + Bytes(IEC::Mi).sectors();
 
-    let (mut pool, _) =
-        StratPool::initialize("stratis_test_pool", &dm, paths, Redundancy::NONE, true).unwrap();
+    let mut pool = StratPool::initialize("stratis_test_pool", &dm, paths, Redundancy::NONE, true)
+        .unwrap();
     let &(_, fs_uuid) = pool.create_filesystems(&[("stratis_test_filesystem", Some(fs_size))])
         .unwrap()
         .first()

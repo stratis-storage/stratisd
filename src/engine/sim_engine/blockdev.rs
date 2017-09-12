@@ -7,10 +7,15 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use chrono::{TimeZone, Utc};
+
 use uuid::Uuid;
 
+use devicemapper::{Bytes, Sectors, IEC};
+
+use super::super::errors::EngineResult;
 use super::super::engine::{BlockDev, HasUuid};
-use super::super::types::DevUuid;
+use super::super::types::{BlockDevState, DevUuid};
 
 use super::randomization::Randomizer;
 
@@ -19,12 +24,41 @@ use super::randomization::Randomizer;
 pub struct SimDev {
     pub devnode: PathBuf,
     rdm: Rc<RefCell<Randomizer>>,
-    uuid: Uuid,
+    pub uuid: Uuid,
+    location: Option<String>,
+    disk_id: Option<String>,
+    initialization_time: u64,
 }
 
 impl BlockDev for SimDev {
     fn devnode(&self) -> PathBuf {
         self.devnode.clone()
+    }
+
+    fn user_id(&self) -> &Option<String> {
+        &self.location
+    }
+
+    fn set_user_id(&mut self, location: Option<&str>) -> EngineResult<()> {
+        self.location = location.map(|x| x.to_owned());
+        Ok(())
+    }
+
+    fn hardware_id(&self) -> &Option<String> {
+        &self.disk_id
+    }
+
+    fn initialization_time(&self) -> String {
+        Utc.timestamp(self.initialization_time as i64, 0)
+            .to_rfc3339()
+    }
+
+    fn total_size(&self) -> Sectors {
+        Bytes(IEC::Gi).sectors()
+    }
+
+    fn state(&self) -> BlockDevState {
+        BlockDevState::InUse
     }
 }
 
@@ -41,6 +75,9 @@ impl SimDev {
             devnode: devnode.to_owned(),
             rdm: rdm,
             uuid: Uuid::new_v4(),
+            location: None,
+            disk_id: None,
+            initialization_time: Utc::now().timestamp() as u64,
         }
     }
 }

@@ -200,7 +200,18 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                     RangeAllocator::new(actual_size,
                                         segment_table.get(&bda.dev_uuid()).unwrap_or(&vec![]))?;
 
-                blockdevs.push(StratBlockDev::new(*device, devnode.to_owned(), bda, allocator));
+                let (location, disk_id) = pool_save
+                    .block_devs
+                    .get(&bda.dev_uuid())
+                    .map(|bd_save| (bd_save.location.clone(), bd_save.disk_id.clone()))
+                    .unwrap_or((None, None));
+
+                blockdevs.push(StratBlockDev::new(*device,
+                                                  devnode.to_owned(),
+                                                  bda,
+                                                  allocator,
+                                                  location,
+                                                  disk_id));
             }
         }
     }

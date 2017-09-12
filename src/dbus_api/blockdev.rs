@@ -1,0 +1,283 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+use dbus;
+use dbus::Message;
+use dbus::MessageItem;
+use dbus::arg::IterAppend;
+use dbus::tree::Access;
+use dbus::tree::EmitsChangedSignal;
+use dbus::tree::Factory;
+use dbus::tree::MTFn;
+use dbus::tree::MethodErr;
+use dbus::tree::MethodInfo;
+use dbus::tree::MethodResult;
+use dbus::tree::PropInfo;
+
+use uuid::Uuid;
+
+use super::super::engine::BlockDev;
+use super::super::engine::types::BlockDevState;
+
+use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
+
+use super::util::STRATIS_BASE_PATH;
+use super::util::STRATIS_BASE_SERVICE;
+use super::util::code_to_message_items;
+use super::util::get_next_arg;
+use super::util::get_parent;
+use super::util::get_uuid;
+use super::util::ok_message_items;
+
+
+pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
+                                parent: dbus::Path<'static>,
+                                uuid: Uuid)
+                                -> dbus::Path<'a> {
+    let f = Factory::new_fn();
+
+    let set_userid_method = f.method("SetUserId", (), set_user_id)
+        .in_arg(("id", "s"))
+        .out_arg(("changed", "b"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
+
+    let devnode_property = f.property::<&str, _>("Devnode", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_blockdev_devnode);
+
+    let hardware_id_property = f.property::<&str, _>("HardwareId", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_blockdev_hardware_id);
+
+    let user_id_property = f.property::<&str, _>("UserId", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_blockdev_user_id);
+
+    let initialization_time_property = f.property::<&str, _>("InitializationTime", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_blockdev_initialization_time);
+
+    let total_physical_size_property = f.property::<&str, _>("TotalPhysicalSize", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::False)
+        .on_get(get_blockdev_physical_size);
+
+    let state_property = f.property::<&str, _>("State", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::False)
+        .on_get(get_blockdev_state);
+
+    let pool_property = f.property::<&dbus::Path, _>("Pool", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_parent);
+
+    let uuid_property = f.property::<&str, _>("Uuid", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_uuid);
+
+    let object_name = format!("{}/{}",
+                              STRATIS_BASE_PATH,
+                              dbus_context.get_next_id().to_string());
+
+    let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "blockdev");
+
+    let object_path = f.object_path(object_name, Some(OPContext::new(parent, uuid)))
+        .introspectable()
+        .add(f.interface(interface_name, ())
+                 .add_m(set_userid_method)
+                 .add_p(devnode_property)
+                 .add_p(hardware_id_property)
+                 .add_p(initialization_time_property)
+                 .add_p(total_physical_size_property)
+                 .add_p(pool_property)
+                 .add_p(state_property)
+                 .add_p(user_id_property)
+                 .add_p(uuid_property));
+
+    let path = object_path.get_name().to_owned();
+    dbus_context.actions.borrow_mut().push_add(object_path);
+    path
+}
+
+fn set_user_id(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+
+    let new_id: &str = get_next_arg(&mut iter, 0)?;
+
+    let dbus_context = m.tree.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let default_return = MessageItem::Bool(false);
+
+    let blockdev_path = m.tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let blockdev_data = get_data!(blockdev_path; default_return; return_message);
+
+    let pool_path = get_parent!(m; blockdev_data; default_return; return_message);
+    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+
+    let mut engine = dbus_context.engine.borrow_mut();
+    let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+
+    let blockdev_uuid = &blockdev_data.uuid;
+    let id_changed = {
+        let blockdev =
+            pool.get_mut_blockdev(blockdev_uuid)
+                .ok_or_else(|| {
+                                MethodErr::failed(&format!("no blockdev with uuid {}",
+                                                           &blockdev_uuid))
+                            })?;
+
+        let id_changed = blockdev.user_id() != &Some(new_id.to_owned());
+
+        blockdev
+            .set_user_id(Some(new_id))
+            .map_err(|err| {
+                         MethodErr::failed(&format!("set_user_id failed for object path {}: {}",
+                                                    object_path,
+                                                    err))
+                     })?;
+        id_changed
+    };
+
+    pool.save_state()
+        .map_err(|err| {
+                     MethodErr::failed(&format!("Could not save state for object path {}: {}",
+                                                object_path,
+                                                err))
+                 })?;
+
+
+    let (rc, rs) = ok_message_items();
+    let msg = return_message.append3(MessageItem::Bool(id_changed), rc, rs);
+
+    Ok(vec![msg])
+}
+
+
+/// Get a blockdev property and place it on the D-Bus. The property is
+/// found by means of the getter method which takes a reference to a
+/// blockdev and obtains the property from the blockdev.
+fn get_blockdev_property<F>(i: &mut IterAppend,
+                            p: &PropInfo<MTFn<TData>, TData>,
+                            getter: F)
+                            -> Result<(), MethodErr>
+    where F: Fn(&BlockDev) -> Result<MessageItem, MethodErr>
+{
+    let dbus_context = p.tree.get_data();
+    let object_path = p.path.get_name();
+
+    let blockdev_path = p.tree
+        .get(object_path)
+        .expect("tree must contain implicit argument");
+
+    let blockdev_data =
+        blockdev_path
+            .get_data()
+            .as_ref()
+            .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
+
+    let pool_path = p.tree
+        .get(&blockdev_data.parent)
+        .ok_or_else(|| {
+                        MethodErr::failed(&format!("no path for parent object path {}",
+                                                   &blockdev_data.parent))
+                    })?;
+
+    let pool_uuid = pool_path
+        .get_data()
+        .as_ref()
+        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?
+        .uuid;
+
+    let engine = dbus_context.engine.borrow();
+    let pool =
+        engine
+            .get_pool(pool_uuid)
+            .ok_or_else(|| {
+                            MethodErr::failed(&format!("no pool corresponding to uuid {}",
+                                                       &pool_uuid))
+                        })?;
+    let blockdev_uuid = &blockdev_data.uuid;
+    let blockdev =
+        pool.get_blockdev(blockdev_uuid)
+            .ok_or_else(|| MethodErr::failed(&format!("noblockdev with uuid {}", &blockdev_uuid)))?;
+    i.append(getter(blockdev)?);
+    Ok(())
+}
+
+/// Get the devnode for an object path.
+fn get_blockdev_devnode(i: &mut IterAppend,
+                        p: &PropInfo<MTFn<TData>, TData>)
+                        -> Result<(), MethodErr> {
+    get_blockdev_property(i,
+                          p,
+                          |p| Ok(MessageItem::Str(format!("{}", p.devnode().display()))))
+}
+
+fn get_blockdev_hardware_id(i: &mut IterAppend,
+                            p: &PropInfo<MTFn<TData>, TData>)
+                            -> Result<(), MethodErr> {
+    fn get_hardware_id(blockdev: &BlockDev) -> Result<MessageItem, MethodErr> {
+        match *blockdev.hardware_id() {
+            Some(ref id) => Ok(MessageItem::Str(id.to_owned())),
+            None => Ok(MessageItem::Str("".to_owned())),
+        }
+    }
+
+    get_blockdev_property(i, p, get_hardware_id)
+}
+
+fn get_blockdev_user_id(i: &mut IterAppend,
+                        p: &PropInfo<MTFn<TData>, TData>)
+                        -> Result<(), MethodErr> {
+    fn get_user_id(blockdev: &BlockDev) -> Result<MessageItem, MethodErr> {
+        match *blockdev.user_id() {
+            Some(ref id) => Ok(MessageItem::Str(id.to_owned())),
+            None => Ok(MessageItem::Str("".to_owned())),
+        }
+    }
+
+    get_blockdev_property(i, p, get_user_id)
+}
+
+fn get_blockdev_initialization_time(i: &mut IterAppend,
+                                    p: &PropInfo<MTFn<TData>, TData>)
+                                    -> Result<(), MethodErr> {
+    get_blockdev_property(i, p, |p| Ok(MessageItem::Str(p.initialization_time())))
+}
+
+fn get_blockdev_physical_size(i: &mut IterAppend,
+                              p: &PropInfo<MTFn<TData>, TData>)
+                              -> Result<(), MethodErr> {
+    get_blockdev_property(i,
+                          p,
+                          |p| Ok(MessageItem::Str(format!("{}", *p.total_size()))))
+}
+
+fn get_blockdev_state(i: &mut IterAppend,
+                      p: &PropInfo<MTFn<TData>, TData>)
+                      -> Result<(), MethodErr> {
+    fn get_state(blockdev: &BlockDev) -> Result<MessageItem, MethodErr> {
+        let state = match blockdev.state() {
+            BlockDevState::Missing => "Missing".into(),
+            BlockDevState::Bad => "Bad".into(),
+            BlockDevState::Spare => "Spare".into(),
+            BlockDevState::NotInUse => "Not-in-use".into(),
+            BlockDevState::InUse => "In-use".into(),
+        };
+        Ok(MessageItem::Str(state))
+    }
+
+    get_blockdev_property(i, p, get_state)
+}

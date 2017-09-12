@@ -7,13 +7,13 @@
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 
 use devicemapper::{Device, Sectors};
 
 use super::super::engine::{BlockDev, HasUuid};
 use super::super::errors::EngineResult;
-use super::super::types::{DevUuid, PoolUuid};
+use super::super::types::{BlockDevState, DevUuid, PoolUuid};
 
 use super::metadata::BDA;
 use super::range_alloc::RangeAllocator;
@@ -26,19 +26,25 @@ pub struct StratBlockDev {
     pub devnode: PathBuf,
     bda: BDA,
     used: RangeAllocator,
+    pub location: Option<String>,
+    pub disk_id: Option<String>,
 }
 
 impl StratBlockDev {
     pub fn new(dev: Device,
                devnode: PathBuf,
                bda: BDA,
-               allocator: RangeAllocator)
+               allocator: RangeAllocator,
+               location: Option<String>,
+               disk_id: Option<String>)
                -> StratBlockDev {
         StratBlockDev {
             dev: dev,
             devnode: devnode,
             bda: bda,
             used: allocator,
+            location: location,
+            disk_id: disk_id,
         }
     }
 
@@ -117,6 +123,11 @@ impl StratBlockDev {
     pub fn max_metadata_size(&self) -> Sectors {
         self.bda.max_data_size()
     }
+
+    /// Timestamp when the device was initialized.
+    pub fn initialization_time(&self) -> u64 {
+        self.bda.initialization_time()
+    }
 }
 
 impl HasUuid for StratBlockDev {
@@ -129,10 +140,40 @@ impl BlockDev for StratBlockDev {
     fn devnode(&self) -> PathBuf {
         self.devnode.clone()
     }
+
+    fn user_id(&self) -> &Option<String> {
+        &self.location
+    }
+
+    fn set_user_id(&mut self, location: Option<&str>) -> EngineResult<()> {
+        self.location = location.map(|x| x.to_owned());
+        Ok(())
+    }
+
+    fn hardware_id(&self) -> &Option<String> {
+        &self.disk_id
+    }
+
+    fn initialization_time(&self) -> String {
+        Utc.timestamp(self.initialization_time() as i64, 0)
+            .to_rfc3339()
+    }
+
+    fn total_size(&self) -> Sectors {
+        self.bda.dev_size()
+    }
+
+    fn state(&self) -> BlockDevState {
+        BlockDevState::InUse
+    }
 }
 
 impl Recordable<BlockDevSave> for StratBlockDev {
     fn record(&self) -> BlockDevSave {
-        BlockDevSave { devnode: self.devnode.clone() }
+        BlockDevSave {
+            dev: Some(self.devnode.clone()),
+            location: self.location.clone(),
+            disk_id: self.disk_id.clone(),
+        }
     }
 }

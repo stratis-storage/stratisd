@@ -5,6 +5,7 @@
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use devicemapper::Sectors;
@@ -26,14 +27,25 @@ pub trait Filesystem: HasName + HasUuid {
 }
 
 pub trait BlockDev: HasUuid {
-    /// path of the device node
+    /// Get the path of the device node for this device.
     fn devnode(&self) -> PathBuf;
 
+    /// Get the user-settable string associated with this blockdev.
     fn user_id(&self) -> &Option<String>;
-    fn set_user_id(&mut self, location: Option<&str>) -> EngineResult<()>;
+
+    /// Set the user-settable string associated with this blockdev.
+    fn set_user_id(&mut self, user_id: Option<&str>) -> EngineResult<()>;
+
+    /// Get the hardware ID for this blockdev.
     fn hardware_id(&self) -> &Option<String>;
-    fn initialization_time(&self) -> String;
+
+    /// The time that this blockdev was initialized by Stratis.
+    fn initialization_time(&self) -> DateTime<Utc>;
+
+    /// The usable size of the device, not counting Stratis overhead.
     fn total_size(&self) -> Sectors;
+
+    /// The current state of the blockdev.
     fn state(&self) -> BlockDevState;
 }
 

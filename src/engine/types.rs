@@ -15,6 +15,7 @@ pub enum RenameAction {
     Renamed,
 }
 
+/// See Design Doc section 10.2.1 for more details.
 #[derive(Debug, PartialEq, Eq)]
 pub enum BlockDevState {
     Missing,

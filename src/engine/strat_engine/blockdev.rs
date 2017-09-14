@@ -26,8 +26,8 @@ pub struct StratBlockDev {
     pub devnode: PathBuf,
     bda: BDA,
     used: RangeAllocator,
-    pub location: Option<String>,
-    pub disk_id: Option<String>,
+    location: Option<String>,
+    disk_id: Option<String>,
 }
 
 impl StratBlockDev {
@@ -123,11 +123,6 @@ impl StratBlockDev {
     pub fn max_metadata_size(&self) -> Sectors {
         self.bda.max_data_size()
     }
-
-    /// Timestamp when the device was initialized.
-    pub fn initialization_time(&self) -> u64 {
-        self.bda.initialization_time()
-    }
 }
 
 impl HasUuid for StratBlockDev {
@@ -154,16 +149,16 @@ impl BlockDev for StratBlockDev {
         &self.disk_id
     }
 
-    fn initialization_time(&self) -> String {
-        Utc.timestamp(self.initialization_time() as i64, 0)
-            .to_rfc3339()
+    fn initialization_time(&self) -> DateTime<Utc> {
+        Utc.timestamp(self.bda.initialization_time() as i64, 0)
     }
 
     fn total_size(&self) -> Sectors {
-        self.bda.dev_size()
+        self.current_capacity()
     }
 
     fn state(&self) -> BlockDevState {
+        // TODO: Implement states for blockdevs
         BlockDevState::InUse
     }
 }

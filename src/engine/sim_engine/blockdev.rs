@@ -7,8 +7,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use chrono::{TimeZone, Utc};
-
+use chrono::{DateTime, TimeZone, Utc};
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors, IEC};
@@ -48,9 +47,8 @@ impl BlockDev for SimDev {
         &self.disk_id
     }
 
-    fn initialization_time(&self) -> String {
+    fn initialization_time(&self) -> DateTime<Utc> {
         Utc.timestamp(self.initialization_time as i64, 0)
-            .to_rfc3339()
     }
 
     fn total_size(&self) -> Sectors {

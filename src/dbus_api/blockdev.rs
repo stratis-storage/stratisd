@@ -254,7 +254,9 @@ fn get_blockdev_user_id(i: &mut IterAppend,
 fn get_blockdev_initialization_time(i: &mut IterAppend,
                                     p: &PropInfo<MTFn<TData>, TData>)
                                     -> Result<(), MethodErr> {
-    get_blockdev_property(i, p, |p| Ok(MessageItem::Str(p.initialization_time())))
+    get_blockdev_property(i,
+                          p,
+                          |p| Ok(MessageItem::Str(p.initialization_time().to_rfc3339())))
 }
 
 fn get_blockdev_physical_size(i: &mut IterAppend,

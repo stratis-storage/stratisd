@@ -12,9 +12,9 @@ use uuid::Uuid;
 use devicemapper as dm;
 use devicemapper::{DM, DataBlocks, DmDevice, DmError, LinearDev, MetaBlocks, Sectors, Segment,
                    ThinDev, ThinDevId, ThinPoolDev, ThinPoolWorkingStatus};
+use devicemapper::consts::IEC;
 use devicemapper::ErrorEnum::CheckFailed;
 
-use super::super::consts::IEC;
 use super::super::engine::{Filesystem, HasName};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;

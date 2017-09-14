@@ -13,9 +13,8 @@ use std::vec::Vec;
 
 use uuid::Uuid;
 
-use devicemapper::Sectors;
+use devicemapper::{IEC, Sectors};
 
-use super::super::consts::IEC;
 use super::super::engine::{Filesystem, BlockDev, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;

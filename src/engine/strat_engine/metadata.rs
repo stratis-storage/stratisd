@@ -10,10 +10,8 @@ use chrono::{DateTime, Utc};
 use crc::crc32;
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Sectors};
-use devicemapper::consts::SECTOR_SIZE;
+use devicemapper::{Bytes, IEC, SECTOR_SIZE, Sectors};
 
-use super::super::consts::IEC;
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 use super::super::types::{DevUuid, PoolUuid};
 
@@ -752,11 +750,9 @@ mod mda {
 mod tests {
     use std::io::Cursor;
 
-    use devicemapper::{Bytes, Sectors};
+    use devicemapper::{Bytes, IEC, Sectors};
     use quickcheck::{QuickCheck, TestResult};
     use uuid::Uuid;
-
-    use super::super::super::consts::IEC;
 
     use super::super::engine::DevOwnership;
     use super::*;

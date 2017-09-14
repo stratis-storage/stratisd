@@ -17,9 +17,7 @@ use self::nix::mount::{MsFlags, mount, umount};
 
 use self::tempdir::TempDir;
 
-use self::devicemapper::consts::IEC;
-use self::devicemapper::{Bytes, DM};
-use self::devicemapper::consts::SECTOR_SIZE;
+use self::devicemapper::{Bytes, DM, IEC, SECTOR_SIZE};
 
 use libstratis::engine::Pool;
 use libstratis::engine::Filesystem;

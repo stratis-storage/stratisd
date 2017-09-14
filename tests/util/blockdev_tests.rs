@@ -15,8 +15,7 @@ use std::path::Path;
 
 use self::uuid::Uuid;
 
-use self::devicemapper::Sectors;
-use self::devicemapper::consts::SECTOR_SIZE;
+use self::devicemapper::{SECTOR_SIZE, Sectors};
 
 use libstratis::engine::Engine;
 use libstratis::engine::strat_engine::blockdevmgr::{BlockDevMgr, initialize};

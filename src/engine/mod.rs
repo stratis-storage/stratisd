@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-pub use self::consts::IEC;
+pub use devicemapper::{IEC, SECTOR_SIZE};
 
 pub use self::engine::BlockDev;
 pub use self::engine::Engine;
@@ -28,7 +28,6 @@ mod macros;
 // strat_engine is public so that integration tests can access its internals.
 pub mod strat_engine;
 
-mod consts;
 #[allow(module_inception)]
 pub mod engine;
 mod errors;

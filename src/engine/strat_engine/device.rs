@@ -14,10 +14,8 @@ use std::path::Path;
 
 use nix::sys::stat::{S_IFBLK, S_IFMT};
 
-use devicemapper::consts::SECTOR_SIZE;
-use devicemapper::{Bytes, Device, Sectors};
+use devicemapper::{Bytes, Device, IEC, SECTOR_SIZE, Sectors};
 
-use super::super::consts::IEC;
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);

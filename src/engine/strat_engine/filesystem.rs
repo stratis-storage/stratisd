@@ -5,8 +5,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use devicemapper::{Bytes, DmDevice, DM, Sectors, ThinDev, ThinDevId, ThinStatus, ThinPoolDev};
-use devicemapper::consts::{IEC, SECTOR_SIZE};
+use devicemapper::{Bytes, DmDevice, DM, IEC, SECTOR_SIZE, Sectors, ThinDev, ThinDevId, ThinStatus,
+                   ThinPoolDev};
 
 use nix::sys::statvfs::statvfs;
 use nix::sys::statvfs::vfs::Statvfs;

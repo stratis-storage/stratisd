@@ -11,10 +11,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use self::devicemapper::{Device, DmName, DM};
-use self::devicemapper::Sectors;
-use self::devicemapper::consts::SECTOR_SIZE;
-use self::devicemapper::ThinDev;
+use self::devicemapper::{Device, DmName, DM, SECTOR_SIZE, Sectors, ThinDev};
 
 use libstratis::engine::{Engine, Pool};
 use libstratis::engine::engine::HasUuid;

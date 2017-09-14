@@ -19,13 +19,8 @@ use self::nix::mount::{MsFlags, MNT_DETACH, mount, umount2};
 use self::tempdir::TempDir;
 use self::uuid::Uuid;
 
-use self::devicemapper::Bytes;
-use self::devicemapper::consts::IEC;
-use self::devicemapper::{DmName, DM};
-use self::devicemapper::LinearDev;
-use self::devicemapper::Segment;
-use self::devicemapper::{DataBlocks, Sectors};
-use self::devicemapper::{DmDevice, ThinDev, ThinDevId, ThinPoolDev};
+use self::devicemapper::{Bytes, DM, DataBlocks, DmDevice, DmName, IEC, LinearDev, Sectors,
+                         Segment, ThinDev, ThinDevId, ThinPoolDev};
 
 use libstratis::engine::strat_engine::blockdevmgr::{BlockDevMgr, initialize, map_to_dm};
 use libstratis::engine::strat_engine::device::{blkdev_size, resolve_devices, wipe_sectors};

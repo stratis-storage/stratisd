@@ -6,20 +6,10 @@ extern crate libstratis;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
-extern crate devicemapper;
 extern crate clap;
-extern crate nix;
-extern crate crc;
-extern crate byteorder;
-extern crate uuid;
 extern crate dbus;
 extern crate term;
-extern crate rand;
-extern crate serde;
 extern crate libc;
-
-extern crate custom_derive;
-extern crate enum_derive;
 
 #[cfg(test)]
 extern crate quickcheck;

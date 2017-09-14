@@ -19,8 +19,8 @@ use loopdev::{LoopControl, LoopDevice};
 use tempdir::TempDir;
 
 use devicemapper::{Bytes, Sectors};
+use devicemapper::consts::IEC;
 
-use libstratis::engine::IEC;
 use libstratis::engine::strat_engine::device::wipe_sectors;
 
 use util::logger::init_logger;

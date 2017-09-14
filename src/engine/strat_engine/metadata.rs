@@ -11,9 +11,8 @@ use crc::crc32;
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors};
-use devicemapper::consts::SECTOR_SIZE;
+use devicemapper::consts::{IEC, SECTOR_SIZE};
 
-use super::super::consts::IEC;
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 use super::super::types::{DevUuid, PoolUuid};
 
@@ -753,10 +752,10 @@ mod tests {
     use std::io::Cursor;
 
     use devicemapper::{Bytes, Sectors};
+    use devicemapper::consts::IEC;
+
     use quickcheck::{QuickCheck, TestResult};
     use uuid::Uuid;
-
-    use super::super::super::consts::IEC;
 
     use super::super::engine::DevOwnership;
     use super::*;

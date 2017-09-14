@@ -175,8 +175,8 @@ impl StaticHeader {
            -> StaticHeader {
         StaticHeader {
             blkdev_size: blkdev_size,
-            pool_uuid: pool_uuid.clone(),
-            dev_uuid: dev_uuid.clone(),
+            pool_uuid: *pool_uuid,
+            dev_uuid: *dev_uuid,
             mda_size: mda_size,
             reserved_size: MDA_RESERVED_SECTORS,
             flags: 0,

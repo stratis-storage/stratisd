@@ -57,7 +57,7 @@ impl Engine for SimEngine {
             .values()
             .map(|p| p.devnode.clone())
             .collect();
-        let uuid = pool.uuid().clone();
+        let uuid = *pool.uuid();
         self.pools.insert(pool);
 
         Ok((uuid, bdev_paths))

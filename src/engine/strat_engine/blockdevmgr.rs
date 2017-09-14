@@ -12,9 +12,8 @@ use chrono::{DateTime, Duration, Utc};
 use rand::{thread_rng, sample};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Device, Sectors, Segment};
+use devicemapper::{Bytes, Device, IEC, Sectors, Segment};
 
-use super::super::consts::IEC;
 use super::super::engine::BlockDev;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{DevUuid, PoolUuid};

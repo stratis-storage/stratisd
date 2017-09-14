@@ -19,13 +19,8 @@ use self::nix::mount::{MsFlags, MNT_DETACH, mount, umount2};
 use self::tempdir::TempDir;
 use self::uuid::Uuid;
 
-use self::devicemapper::Bytes;
-use self::devicemapper::consts::IEC;
-use self::devicemapper::{DmName, DM};
-use self::devicemapper::LinearDev;
-use self::devicemapper::Segment;
-use self::devicemapper::{DataBlocks, Sectors};
-use self::devicemapper::{DmDevice, ThinDev, ThinDevId, ThinPoolDev};
+use self::devicemapper::{Bytes, DM, DataBlocks, DmDevice, DmName, IEC, LinearDev, Sectors,
+                         Segment, ThinDev, ThinDevId, ThinPoolDev};
 
 use libstratis::engine::strat_engine::blockdevmgr::{BlockDevMgr, initialize, map_to_dm};
 use libstratis::engine::strat_engine::device::{blkdev_size, resolve_devices, wipe_sectors};
@@ -53,9 +48,9 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
         .collect::<Vec<_>>();
 
     let dm = DM::new().unwrap();
-    let lineardev = LinearDev::new(DmName::new("stratis_testing_linear").expect("valid format"),
-                                   &dm,
-                                   segments)
+    let lineardev = LinearDev::setup(DmName::new("stratis_testing_linear").expect("valid format"),
+                                     &dm,
+                                     segments)
             .unwrap();
     let lineardev_size = blkdev_size(&OpenOptions::new()
                                           .read(true)
@@ -84,9 +79,9 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
         .alloc_space(Bytes(16 * IEC::Mi).sectors())
         .unwrap();
     let metadata_dev =
-        LinearDev::new(DmName::new("stratis_testing_thinpool_metadata").expect("valid format"),
-                       &dm,
-                       map_to_dm(&meta_segs))
+        LinearDev::setup(DmName::new("stratis_testing_thinpool_metadata").expect("valid format"),
+                         &dm,
+                         map_to_dm(&meta_segs))
                 .unwrap();
 
     // Clear the meta data device.  If the first block is not all zeros - the
@@ -97,9 +92,9 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
 
     let data_segs = bd_mgr.alloc_space(Bytes(IEC::Gi).sectors()).unwrap();
     let data_dev =
-        LinearDev::new(DmName::new("stratis_testing_thinpool_datadev").expect("valid format"),
-                       &dm,
-                       map_to_dm(&data_segs))
+        LinearDev::setup(DmName::new("stratis_testing_thinpool_datadev").expect("valid format"),
+                         &dm,
+                         map_to_dm(&data_segs))
                 .unwrap();
     let thinpool_dev =
         ThinPoolDev::new(DmName::new("stratis_testing_thinpool").expect("valid format"),

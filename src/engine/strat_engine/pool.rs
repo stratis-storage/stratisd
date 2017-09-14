@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use devicemapper::{Device, DM, Sectors, ThinPoolDev};
 
-use super::super::engine::{Filesystem, HasName, HasUuid, Pool};
+use super::super::engine::{Filesystem, BlockDev, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{FilesystemUuid, PoolUuid, RenameAction, Redundancy};
 
@@ -217,6 +217,10 @@ impl Pool for StratPool {
 
     fn filesystems(&self) -> Vec<&Filesystem> {
         self.thin_pool.filesystems()
+    }
+
+    fn blockdevs(&self) -> Vec<&BlockDev> {
+        self.block_devs.blockdevs()
     }
 }
 

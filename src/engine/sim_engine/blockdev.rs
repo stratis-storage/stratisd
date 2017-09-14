@@ -7,7 +7,10 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use super::super::engine::Dev;
+use uuid::Uuid;
+
+use super::super::engine::{BlockDev, HasUuid};
+use super::super::types::DevUuid;
 
 use super::randomization::Randomizer;
 
@@ -16,9 +19,20 @@ use super::randomization::Randomizer;
 pub struct SimDev {
     pub devnode: PathBuf,
     rdm: Rc<RefCell<Randomizer>>,
+    uuid: Uuid,
 }
 
-impl Dev for SimDev {}
+impl BlockDev for SimDev {
+    fn devnode(&self) -> PathBuf {
+        self.devnode.clone()
+    }
+}
+
+impl HasUuid for SimDev {
+    fn uuid(&self) -> &DevUuid {
+        &self.uuid
+    }
+}
 
 impl SimDev {
     /// Generates a new device from any devnode.
@@ -26,6 +40,7 @@ impl SimDev {
         SimDev {
             devnode: devnode.to_owned(),
             rdm: rdm,
+            uuid: Uuid::new_v4(),
         }
     }
 }

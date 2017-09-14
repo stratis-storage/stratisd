@@ -20,9 +20,12 @@ pub trait HasName: Debug {
     fn name(&self) -> &str;
 }
 
-pub trait Dev: Debug {}
-
 pub trait Filesystem: HasName + HasUuid {
+    /// path of the device node
+    fn devnode(&self) -> PathBuf;
+}
+
+pub trait BlockDev: HasUuid {
     /// path of the device node
     fn devnode(&self) -> PathBuf;
 }
@@ -90,6 +93,9 @@ pub trait Pool: HasName + HasUuid {
 
     /// Get all the filesystems belonging to this pool.
     fn filesystems(&self) -> Vec<&Filesystem>;
+
+    /// Get all the blockdevs that make up this pool.
+    fn blockdevs(&self) -> Vec<&BlockDev>;
 }
 
 pub trait Engine: Debug {

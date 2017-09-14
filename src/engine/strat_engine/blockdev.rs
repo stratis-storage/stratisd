@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 
 use devicemapper::{Device, Sectors};
 
+use super::super::engine::{BlockDev, HasUuid};
 use super::super::errors::EngineResult;
 use super::super::types::{DevUuid, PoolUuid};
 
@@ -20,16 +21,20 @@ use super::serde_structs::{BlockDevSave, Recordable};
 
 
 #[derive(Debug)]
-pub struct BlockDev {
+pub struct StratBlockDev {
     dev: Device,
     pub devnode: PathBuf,
     bda: BDA,
     used: RangeAllocator,
 }
 
-impl BlockDev {
-    pub fn new(dev: Device, devnode: PathBuf, bda: BDA, allocator: RangeAllocator) -> BlockDev {
-        BlockDev {
+impl StratBlockDev {
+    pub fn new(dev: Device,
+               devnode: PathBuf,
+               bda: BDA,
+               allocator: RangeAllocator)
+               -> StratBlockDev {
+        StratBlockDev {
             dev: dev,
             devnode: devnode,
             bda: bda,
@@ -114,7 +119,19 @@ impl BlockDev {
     }
 }
 
-impl Recordable<BlockDevSave> for BlockDev {
+impl HasUuid for StratBlockDev {
+    fn uuid(&self) -> &DevUuid {
+        &self.bda.dev_uuid()
+    }
+}
+
+impl BlockDev for StratBlockDev {
+    fn devnode(&self) -> PathBuf {
+        self.devnode.clone()
+    }
+}
+
+impl Recordable<BlockDevSave> for StratBlockDev {
     fn record(&self) -> BlockDevSave {
         BlockDevSave { devnode: self.devnode.clone() }
     }

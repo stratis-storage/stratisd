@@ -7,13 +7,13 @@
 use super::super::engine::HasUuid;
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 
-use super::blockdev::BlockDev;
+use super::blockdev::StratBlockDev;
 use super::pool::StratPool;
 
 /// Wipe some blockdevs of their identifying headers.
 /// Return an error if any of the blockdevs could not be wiped.
 /// If an error occurs while wiping a blockdev, attempt to wipe all remaining.
-pub fn wipe_blockdevs(blockdevs: &[BlockDev]) -> EngineResult<()> {
+pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> EngineResult<()> {
     let mut unerased_devnodes = Vec::new();
 
     for bd in blockdevs {

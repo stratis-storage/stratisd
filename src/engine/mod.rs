@@ -4,7 +4,7 @@
 
 pub use self::consts::IEC;
 
-pub use self::engine::Dev;
+pub use self::engine::BlockDev;
 pub use self::engine::Engine;
 pub use self::engine::Filesystem;
 pub use self::engine::Pool;

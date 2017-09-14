@@ -15,6 +15,7 @@ use super::super::super::engine::{FilesystemUuid, PoolUuid};
 
 const FORMAT_VERSION: u16 = 1;
 
+#[derive(Clone, Copy)]
 pub enum FlexRole {
     MetadataVolume,
     ThinData,
@@ -33,6 +34,7 @@ impl Display for FlexRole {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum ThinRole {
     Filesystem(FilesystemUuid),
 }
@@ -45,6 +47,7 @@ impl Display for ThinRole {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum ThinPoolRole {
     Pool,
 }

@@ -121,7 +121,7 @@ impl StratBlockDev {
 
 impl HasUuid for StratBlockDev {
     fn uuid(&self) -> &DevUuid {
-        &self.bda.dev_uuid()
+        self.bda.dev_uuid()
     }
 }
 

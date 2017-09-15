@@ -175,8 +175,8 @@ impl StaticHeader {
            -> StaticHeader {
         StaticHeader {
             blkdev_size: blkdev_size,
-            pool_uuid: pool_uuid.clone(),
-            dev_uuid: dev_uuid.clone(),
+            pool_uuid: *pool_uuid,
+            dev_uuid: *dev_uuid,
             mda_size: mda_size,
             reserved_size: MDA_RESERVED_SECTORS,
             flags: 0,
@@ -190,8 +190,11 @@ impl StaticHeader {
     fn setup<F>(f: &mut F) -> EngineResult<Option<StaticHeader>>
         where F: Read + Seek
     {
+        #![allow(unused_io_amount)]
         f.seek(SeekFrom::Start(0))?;
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
+
+        // FIXME: See https://github.com/stratis-storage/stratisd/pull/476
         f.read(&mut buf)?;
 
         // TODO: repair static header if one incorrect?
@@ -224,10 +227,12 @@ impl StaticHeader {
     pub fn determine_ownership<F>(f: &mut F) -> EngineResult<DevOwnership>
         where F: Read + Seek
     {
-
+        #![allow(unused_io_amount)]
 
         f.seek(SeekFrom::Start(0))?;
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
+
+        // FIXME: See https://github.com/stratis-storage/stratisd/pull/476
         f.read(&mut buf)?;
 
         // Using setup() as a test of ownership sets a high bar. It is

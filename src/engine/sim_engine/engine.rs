@@ -47,7 +47,7 @@ impl Engine for SimEngine {
             .map(|x| *x)
             .collect::<Vec<&Path>>();
 
-        let pool = SimPool::new(self.rdm.clone(), name, &devices, redundancy);
+        let pool = SimPool::new(Rc::clone(&self.rdm), name, &devices, redundancy);
 
         if self.rdm.borrow_mut().throw_die() {
             return Err(EngineError::Engine(ErrorEnum::Error, "X".into()));
@@ -57,7 +57,7 @@ impl Engine for SimEngine {
             .values()
             .map(|p| p.devnode.clone())
             .collect();
-        let uuid = pool.uuid().clone();
+        let uuid = *pool.uuid();
         self.pools.insert(pool);
 
         Ok((uuid, bdev_paths))

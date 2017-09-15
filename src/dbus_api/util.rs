@@ -36,6 +36,7 @@ pub fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr
 
 /// Translates an engine error to a dbus error.
 pub fn engine_to_dbus_err(err: &EngineError) -> (DbusErrorEnum, String) {
+    #![allow(match_same_arms)]
     let error = match *err {
         EngineError::Engine(ref e, _) => {
             match *e {

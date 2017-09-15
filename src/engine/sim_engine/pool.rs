@@ -44,14 +44,14 @@ impl SimPool {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs = devices
             .iter()
-            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
+            .map(|p| (p.to_path_buf(), SimDev::new(Rc::clone(&rdm), p)));
         SimPool {
             name: name.to_owned(),
             pool_uuid: Uuid::new_v4(),
             block_devs: HashMap::from_iter(device_pairs),
             filesystems: Table::default(),
             redundancy: redundancy,
-            rdm: rdm.clone(),
+            rdm: Rc::clone(&rdm),
         }
     }
 
@@ -64,11 +64,11 @@ impl SimPool {
 
 impl Pool for SimPool {
     fn add_blockdevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<PathBuf>> {
-        let rdm = self.rdm.clone();
+        let rdm = Rc::clone(&self.rdm);
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs = devices
             .iter()
-            .map(|p| (p.to_path_buf(), SimDev::new(rdm.clone(), p)));
+            .map(|p| (p.to_path_buf(), SimDev::new(Rc::clone(&rdm), p)));
         self.block_devs.extend(device_pairs);
         Ok(devices.iter().map(|d| d.to_path_buf()).collect())
     }

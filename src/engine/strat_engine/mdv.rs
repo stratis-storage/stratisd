@@ -83,6 +83,23 @@ impl MetadataVol {
             }
         }
 
+        for dir_e in read_dir(mount_pt.join(FILESYSTEM_DIR))? {
+            let dir_e = dir_e?;
+
+            // Clean up any lingering .temp files. These should only
+            // exist if there was a crash during save_fs().
+            if dir_e.path().ends_with(".temp") {
+                match remove_file(dir_e.path()) {
+                    Err(err) => {
+                        debug!("could not remove file {:?}: {}",
+                               dir_e.path(),
+                               err.description())
+                    }
+                    Ok(_) => debug!("Cleaning up temp file {:?}", dir_e.path()),
+                }
+            }
+        }
+
         Ok(MetadataVol { dev, mount_pt })
     }
 
@@ -127,28 +144,6 @@ impl MetadataVol {
         if let Err(err) = remove_file(fs_path) {
             if err.kind() != ErrorKind::NotFound {
                 return Err(From::from(err));
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Check the current state of the MDV.
-    pub fn check(&self) -> EngineResult<()> {
-        for dir_e in read_dir(self.mount_pt.join(FILESYSTEM_DIR))? {
-            let dir_e = dir_e?;
-
-            // Clean up any lingering .temp files. These should only
-            // exist if there was a crash during save_fs().
-            if dir_e.path().ends_with(".temp") {
-                match remove_file(dir_e.path()) {
-                    Err(err) => {
-                        debug!("could not remove file {:?}: {}",
-                               dir_e.path(),
-                               err.description())
-                    }
-                    Ok(_) => debug!("Cleaning up temp file {:?}", dir_e.path()),
-                }
             }
         }
 

@@ -95,17 +95,17 @@ impl ThinPool {
         // have been passed.
         let meta_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
                                         dm,
-                                        map_to_dm(&meta_segments))?;
+                                        &map_to_dm(&meta_segments))?;
         wipe_sectors(&meta_dev.devnode(),
                      Sectors(0),
                      ThinPool::initial_metadata_size())?;
 
         let data_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::ThinData),
                                         dm,
-                                        map_to_dm(&data_segments))?;
+                                        &map_to_dm(&data_segments))?;
 
         let mdv_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
-        let mdv_dev = LinearDev::setup(&mdv_name, dm, map_to_dm(&mdv_segments))?;
+        let mdv_dev = LinearDev::setup(&mdv_name, dm, &map_to_dm(&mdv_segments))?;
         let mdv = MetadataVol::initialize(&pool_uuid, mdv_dev)?;
 
         let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
@@ -178,11 +178,11 @@ impl ThinPool {
 
         let meta_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
                                         dm,
-                                        map_to_dm(&meta_segments))?;
+                                        &map_to_dm(&meta_segments))?;
 
         let data_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::ThinData),
                                         dm,
-                                        map_to_dm(&data_segments))?;
+                                        &map_to_dm(&data_segments))?;
 
 
         let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
@@ -213,7 +213,7 @@ impl ThinPool {
 
         let mdv_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::MetadataVolume),
                                        dm,
-                                       map_to_dm(&mdv_segments))?;
+                                       &map_to_dm(&mdv_segments))?;
         let mdv = MetadataVol::setup(&pool_uuid, mdv_dev)?;
         let filesystem_metadatas = mdv.filesystems()?;
 
@@ -384,7 +384,7 @@ impl ThinPool {
 
     /// Extend the thinpool with new data regions.
     fn extend_data(&mut self, dm: &DM, new_segs: Vec<BlkDevSegment>) -> EngineResult<()> {
-        self.thin_pool.extend_data(dm, map_to_dm(&new_segs))?;
+        self.thin_pool.extend_data(dm, &map_to_dm(&new_segs))?;
 
         // Last existing and first new may be contiguous. Coalesce into
         // a single BlkDevSegment if so.
@@ -564,7 +564,7 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
     let mut new_meta_dev = LinearDev::setup(&format_flex_name(&pool_uuid,
                                                               FlexRole::ThinMetaSpare),
                                             dm,
-                                            map_to_dm(spare_segments))?;
+                                            &map_to_dm(spare_segments))?;
 
 
     if !Command::new("thin_repair")

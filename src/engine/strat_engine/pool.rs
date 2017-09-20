@@ -105,6 +105,7 @@ impl StratPool {
 
     pub fn check(&mut self) -> () {
         self.thin_pool
+            // FIXME: It's wrong to invite a crash with an unwrap() here.
             .check(&DM::new().unwrap(), &mut self.block_devs)
             .unwrap_or(error!("Thin pool check did not succeed"))
     }

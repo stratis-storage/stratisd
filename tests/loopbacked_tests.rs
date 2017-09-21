@@ -42,6 +42,14 @@ use util::setup_tests::test_setup;
 use util::simple_tests::test_empty_pool;
 use util::simple_tests::test_teardown;
 
+/// Ways of specifying range of numbers of devices to use for tests.
+/// Unlike real tests, there is no AtLeast constructor, as, at least in theory
+/// there is no upper bound to the number of loop devices that can be made.
+enum DeviceLimits {
+    Exactly(usize),
+    Range(usize, usize), // inclusive
+}
+
 pub struct LoopTestDev {
     ld: LoopDevice,
 }
@@ -87,10 +95,21 @@ impl Drop for LoopTestDev {
     }
 }
 
+/// Get a list of counts of devices to use for tests.
+fn get_device_counts(limits: DeviceLimits) -> Vec<usize> {
+    match limits {
+        DeviceLimits::Exactly(num) => vec![num],
+        DeviceLimits::Range(lower, upper) => {
+            assert!(lower < upper);
+            vec![lower, upper]
+        }
+    }
+}
+
 /// Setup count loop backed devices in dir.
 /// Make sure each loop device is backed by a 1 GiB file.
 /// Wipe the first 1 MiB of the file.
-fn get_devices(count: u8, dir: &TempDir) -> Vec<LoopTestDev> {
+fn get_devices(count: usize, dir: &TempDir) -> Vec<LoopTestDev> {
     let lc = LoopControl::open().unwrap();
     let mut loop_devices = Vec::new();
 
@@ -102,109 +121,111 @@ fn get_devices(count: u8, dir: &TempDir) -> Vec<LoopTestDev> {
 }
 
 
-/// Set up count loopbacked devices.
-/// Then, run the designated test.
-/// Then, take down the loop devices.
-fn test_with_spec<F>(count: u8, test: F) -> ()
+/// Run the designated tests according to the specification.
+fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
     where F: Fn(&[&Path]) -> ()
 {
+    let counts = get_device_counts(limits);
+
     init_logger();
-    let tmpdir = TempDir::new("stratis").unwrap();
-    let loop_devices: Vec<LoopTestDev> = get_devices(count, &tmpdir);
-    let device_paths: Vec<PathBuf> = loop_devices.iter().map(|x| x.get_path()).collect();
-    let device_paths: Vec<&Path> = device_paths.iter().map(|x| x.as_path()).collect();
 
-    test(&device_paths);
-
+    for count in counts {
+        let tmpdir = TempDir::new("stratis").unwrap();
+        let loop_devices: Vec<LoopTestDev> = get_devices(count, &tmpdir);
+        let device_paths: Vec<PathBuf> = loop_devices.iter().map(|x| x.get_path()).collect();
+        let device_paths: Vec<&Path> = device_paths.iter().map(|x| x.as_path()).collect();
+        test(&device_paths);
+    }
 }
 
 
 #[test]
 pub fn loop_test_force_flag_stratis() {
-    test_with_spec(1, test_force_flag_stratis);
-    test_with_spec(2, test_force_flag_stratis);
-    test_with_spec(3, test_force_flag_stratis);
+    test_with_spec(DeviceLimits::Range(1, 3), test_force_flag_stratis);
 }
 
 
 #[test]
 pub fn loop_test_linear_device() {
-    test_with_spec(2, test_linear_device);
-    test_with_spec(3, test_linear_device);
+    test_with_spec(DeviceLimits::Range(1, 3), test_linear_device);
 }
 
 
 #[test]
 pub fn loop_test_thinpool_device() {
-    test_with_spec(3, test_thinpool_device);
+    /// This test requires more than 1 GiB.
+    test_with_spec(DeviceLimits::Range(2, 3), test_thinpool_device);
 }
 
 #[test]
 pub fn loop_test_thinpool_expand() {
-    test_with_spec(3, test_thinpool_expand);
+    /// This test requires more than 1 GiB.
+    test_with_spec(DeviceLimits::Range(2, 3), test_thinpool_expand);
 }
 
 #[test]
 pub fn loop_test_thinpool_thindev_destroy() {
-    test_with_spec(3, test_thinpool_thindev_destroy);
+    /// This test requires more than 1 GiB.
+    test_with_spec(DeviceLimits::Range(2, 3), test_thinpool_thindev_destroy);
 }
 
 #[test]
 pub fn loop_test_pool_blockdevs() {
-    test_with_spec(3, test_pool_blockdevs);
+    /// This test requires more than 1 GiB.
+    test_with_spec(DeviceLimits::Range(2, 3), test_pool_blockdevs);
 }
 
 #[test]
 pub fn loop_test_force_flag_dirty() {
-    test_with_spec(3, test_force_flag_dirty);
+    test_with_spec(DeviceLimits::Range(1, 3), test_force_flag_dirty);
 }
 
 #[test]
 pub fn loop_test_teardown() {
-    test_with_spec(2, test_teardown);
+    test_with_spec(DeviceLimits::Range(1, 3), test_teardown);
 }
 
 #[test]
 pub fn loop_test_initialize() {
-    test_with_spec(4, test_initialize);
+    test_with_spec(DeviceLimits::Range(2, 3), test_initialize);
 }
 
 #[test]
 pub fn loop_test_empty_pool() {
-    test_with_spec(0, test_empty_pool);
+    test_with_spec(DeviceLimits::Exactly(0), test_empty_pool);
 }
 
 #[test]
 pub fn loop_test_basic_metadata() {
-    test_with_spec(4, test_basic_metadata);
+    test_with_spec(DeviceLimits::Range(2, 3), test_basic_metadata);
 }
 
 #[test]
 pub fn loop_test_setup() {
-    test_with_spec(4, test_setup);
+    test_with_spec(DeviceLimits::Range(2, 3), test_setup);
 }
 
 #[test]
 pub fn loop_test_pool_rename() {
-    test_with_spec(2, test_pool_rename);
+    test_with_spec(DeviceLimits::Range(1, 3), test_pool_rename);
 }
 
 #[test]
 pub fn loop_test_blockdevmgr_used() {
-    test_with_spec(2, test_blockdevmgr_used);
+    test_with_spec(DeviceLimits::Range(1, 3), test_blockdevmgr_used);
 }
 
 #[test]
 pub fn loop_test_filesystem_rename() {
-    test_with_spec(2, test_filesystem_rename);
+    test_with_spec(DeviceLimits::Range(1, 3), test_filesystem_rename);
 }
 
 #[test]
 pub fn loop_test_pool_setup() {
-    test_with_spec(2, test_pool_setup);
+    test_with_spec(DeviceLimits::Range(1, 3), test_pool_setup);
 }
 
 #[test]
 pub fn loop_test_xfs_expand() {
-    test_with_spec(3, test_xfs_expand);
+    test_with_spec(DeviceLimits::Range(1, 3), test_xfs_expand);
 }

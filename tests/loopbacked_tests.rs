@@ -55,6 +55,8 @@ pub struct LoopTestDev {
 }
 
 impl LoopTestDev {
+    /// Create a new loopbacked device.
+    /// Create its backing store of 1 GiB wiping the first 1 MiB.
     pub fn new(lc: &LoopControl, path: &Path) -> LoopTestDev {
         let mut f = OpenOptions::new()
             .read(true)
@@ -80,10 +82,12 @@ impl LoopTestDev {
         LoopTestDev { ld: ld }
     }
 
+    /// Get the device node of the loopbacked device.
     fn get_path(&self) -> PathBuf {
         self.ld.get_path().unwrap()
     }
 
+    /// Detach the loop device from its backing store.
     pub fn detach(&self) {
         self.ld.detach().unwrap()
     }
@@ -107,8 +111,6 @@ fn get_device_counts(limits: DeviceLimits) -> Vec<usize> {
 }
 
 /// Setup count loop backed devices in dir.
-/// Make sure each loop device is backed by a 1 GiB file.
-/// Wipe the first 1 MiB of the file.
 fn get_devices(count: usize, dir: &TempDir) -> Vec<LoopTestDev> {
     let lc = LoopControl::open().unwrap();
     let mut loop_devices = Vec::new();

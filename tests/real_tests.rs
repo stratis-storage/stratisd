@@ -52,6 +52,7 @@ impl RealTestDev {
         RealTestDev { path: PathBuf::from(path) }
     }
 
+    /// Get the device node of the device.
     fn as_path(&self) -> &Path {
         &self.path
     }

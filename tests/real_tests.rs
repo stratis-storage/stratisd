@@ -45,14 +45,16 @@ pub struct RealTestDev {
 }
 
 impl RealTestDev {
-    /// Construct a new test device
-    pub fn new(path: &str) -> RealTestDev {
+    /// Construct a new test device for the given path.
+    /// Wipe initial MiB to clear metadata.
+    pub fn new(path: &Path) -> RealTestDev {
         wipe_sectors(path, Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
         RealTestDev { path: PathBuf::from(path) }
     }
 
+    /// Get the device node of the device.
     fn as_path(&self) -> &Path {
-        &self.path.as_path()
+        &self.path
     }
 }
 
@@ -69,21 +71,9 @@ enum DeviceLimits {
     Range(usize, usize), // inclusive
 }
 
-/// Return one or more lists of device nodes to use, based upon the
-/// constraints. Returns None if constraints can't be met.
-fn get_devices(limits: DeviceLimits) -> Option<Vec<Vec<String>>> {
-
-    let file = OpenOptions::new()
-        .read(true)
-        .open("tests/test_config.json")
-        .unwrap();
-    let config: Value = from_reader(&file).unwrap();
-    let devpaths = config
-        .get("ok_to_destroy_dev_array_key")
-        .unwrap()
-        .as_array()
-        .unwrap();
-
+/// Get a list of counts of devices to use for tests.
+/// None of the counts can be greater than avail.
+fn get_device_counts(limits: DeviceLimits, avail: usize) -> Vec<usize> {
     // Convert enum to [lower, Option<upper>) values
     let (lower, maybe_upper) = match limits {
         DeviceLimits::Exactly(num) => (num, Some(num + 1)),
@@ -94,44 +84,27 @@ fn get_devices(limits: DeviceLimits) -> Option<Vec<Vec<String>>> {
         }
     };
 
+    let mut counts = vec![];
+
     // Check these values against available blockdevs
-    let avail = devpaths.len();
     if lower > avail {
-        return None;
+        return counts;
     }
-    let maybe_upper = {
-        if lower == avail {
-            None
-        } else {
-            match maybe_upper {
-                None => Some(avail),
-                Some(upper) => {
-                    if lower + 1 == upper {
-                        None
-                    } else {
-                        Some(cmp::min(upper - 1, avail))
-                    }
+
+    counts.push(lower);
+
+    if lower != avail {
+        match maybe_upper {
+            None => counts.push(avail),
+            Some(upper) => {
+                if lower + 1 < upper {
+                    counts.push(cmp::min(upper - 1, avail))
                 }
             }
         }
-    };
-
-    let low_paths: Vec<String> = devpaths
-        .iter()
-        .take(lower)
-        .map(|x| x.as_str().unwrap().to_owned())
-        .collect();
-
-    if let Some(upper) = maybe_upper {
-        let high_paths: Vec<String> = devpaths
-            .iter()
-            .take(upper)
-            .map(|x| x.as_str().unwrap().to_owned())
-            .collect();
-        Some(vec![low_paths, high_paths])
-    } else {
-        Some(vec![low_paths])
     }
+
+    counts
 }
 
 /// Run test on real devices, using given constraints. Constraints may result
@@ -140,8 +113,30 @@ fn get_devices(limits: DeviceLimits) -> Option<Vec<Vec<String>>> {
 fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
     where F: Fn(&[&Path]) -> ()
 {
+    let file = OpenOptions::new()
+        .read(true)
+        .open("tests/test_config.json")
+        .unwrap();
+    let config: Value = from_reader(&file).unwrap();
+    let devpaths: Vec<_> = config
+        .get("ok_to_destroy_dev_array_key")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| Path::new(x.as_str().unwrap()))
+        .collect();
+
+    let counts = get_device_counts(limits, devpaths.len());
+
+    assert!(!counts.is_empty());
+
     init_logger();
-    let runs = get_devices(limits).unwrap();
+
+    let runs = counts
+        .iter()
+        .map(|num| devpaths.iter().take(*num).collect::<Vec<_>>());
+
     for run_paths in runs {
         let devices: Vec<_> = run_paths.iter().map(|x| RealTestDev::new(x)).collect();
         test(&devices.iter().map(|x| x.as_path()).collect::<Vec<_>>());

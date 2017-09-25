@@ -22,7 +22,7 @@ import unittest
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import Pool
-from stratisd_client_dbus import StratisdErrorsGen
+from stratisd_client_dbus import StratisdErrors
 from stratisd_client_dbus import get_object
 from stratisd_client_dbus import pools
 
@@ -50,7 +50,6 @@ class Destroy1TestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        self._errors = StratisdErrorsGen.get_object()
         Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
 
     def tearDown(self):
@@ -72,7 +71,7 @@ class Destroy1TestCase(unittest.TestCase):
         Success should occur on a bogus object path.
         """
         (_, rc, _) = Manager.Methods.DestroyPool(self._proxy, pool="/")
-        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(rc, StratisdErrors.OK)
 
 
 class Destroy2TestCase(unittest.TestCase):
@@ -90,7 +89,6 @@ class Destroy2TestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        self._errors = StratisdErrorsGen.get_object()
         Manager.Methods.CreatePool(
            self._proxy,
            name=self._POOLNAME,
@@ -118,7 +116,7 @@ class Destroy2TestCase(unittest.TestCase):
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
         pool2 = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
 
-        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(rc, StratisdErrors.OK)
         self.assertIsNone(pool2)
         self.assertTrue(result)
 
@@ -140,7 +138,6 @@ class Destroy3TestCase(unittest.TestCase):
 
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        self._errors = StratisdErrorsGen.get_object()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
            self._proxy,
            name=self._POOLNAME,
@@ -165,7 +162,7 @@ class Destroy3TestCase(unittest.TestCase):
         (pool, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
 
         (result, rc, _) = Manager.Methods.DestroyPool(self._proxy, pool=pool)
-        self.assertEqual(rc, self._errors.BUSY)
+        self.assertEqual(rc, StratisdErrors.BUSY)
         self.assertEqual(result, False)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
@@ -187,7 +184,6 @@ class Destroy4TestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        self._errors = StratisdErrorsGen.get_object()
         Manager.Methods.CreatePool(
            self._proxy,
            name=self._POOLNAME,
@@ -213,7 +209,7 @@ class Destroy4TestCase(unittest.TestCase):
 
         (result, rc, _) = Manager.Methods.DestroyPool(self._proxy, pool=pool)
 
-        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(rc, StratisdErrors.OK)
         self.assertEqual(result, True)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)

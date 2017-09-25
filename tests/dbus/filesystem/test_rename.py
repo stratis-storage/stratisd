@@ -23,7 +23,7 @@ from stratisd_client_dbus import Filesystem
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import Pool
-from stratisd_client_dbus import StratisdErrorsGen
+from stratisd_client_dbus import StratisdErrors
 from stratisd_client_dbus import filesystems
 from stratisd_client_dbus import get_object
 
@@ -51,7 +51,6 @@ class SetNameTestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        self._errors = StratisdErrorsGen.get_object()
         ((self._pool_object_path, _), _, _) = Manager.Methods.CreatePool(
            self._proxy,
            name=self._POOLNAME,
@@ -83,7 +82,7 @@ class SetNameTestCase(unittest.TestCase):
            name=self._fs_name
         )
 
-        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(rc, StratisdErrors.OK)
         self.assertFalse(result)
 
     def testNewName(self):
@@ -93,7 +92,7 @@ class SetNameTestCase(unittest.TestCase):
         filesystem = get_object(self._filesystem_object_path)
         (result, rc, _) = Filesystem.Methods.SetName(filesystem, name="new")
 
-        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(rc, StratisdErrors.OK)
         self.assertTrue(result)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)

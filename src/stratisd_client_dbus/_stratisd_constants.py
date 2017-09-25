@@ -16,54 +16,19 @@
 Representing stratisd contants.
 """
 
-import abc
-
-from ._connection import get_object
-
-from ._constants import TOP_OBJECT
-
-from ._implementation import Manager
+from enum import IntEnum
 
 
-class StratisdConstantsGen(abc.ABC):
+class StratisdErrors(IntEnum):
     """
-    Meta class for generating classes that define constants as class-level
-    attributes.
+    Stratisd Errors
     """
-    # pylint: disable=too-few-public-methods
+    OK = 0
+    ERROR = 1
 
-    _CLASSNAME = abc.abstractproperty(doc="the name of the class to construct")
-    _METHOD = abc.abstractproperty(doc="dbus method")
-
-    @classmethod
-    def get_object(cls): # pragma: no cover
-        """
-        Read the available list from the bus.
-
-        :return: class with class attributes for stratisd constants
-        :rtype: type
-        """
-        values = cls._METHOD(get_object(TOP_OBJECT))
-
-        def iterator():
-            """
-            An iterator over the fields in the class.
-            """
-            the_map = dict(values)
-            for x in the_map:
-                yield x
-
-        fields = dict(values)
-        fields['fields'] = iterator
-
-        return type(cls._CLASSNAME, (object,), fields)
-
-
-class StratisdErrorsGen(StratisdConstantsGen):
-    """
-    Simple class to provide access to published stratisd errors.
-    """
-    # pylint: disable=too-few-public-methods
-
-    _CLASSNAME = 'StratisdErrors'
-    _METHOD = Manager.Properties.ErrorValues.Get
+    ALREADY_EXISTS = 2
+    BUSY = 3
+    IO_ERROR = 4
+    INTERNAL_ERROR = 5
+    NIX_ERROR = 6
+    NOT_FOUND = 7

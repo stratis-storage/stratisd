@@ -27,4 +27,4 @@ from ._managedobjects import pools
 from ._managedobjects import filesystems
 from ._managedobjects import MOPool
 
-from ._stratisd_constants import StratisdErrorsGen
+from ._stratisd_constants import StratisdErrors

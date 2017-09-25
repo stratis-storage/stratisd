@@ -21,7 +21,7 @@ import unittest
 
 from stratisd_client_dbus import MOPool
 from stratisd_client_dbus import Manager
-from stratisd_client_dbus import StratisdErrorsGen
+from stratisd_client_dbus import StratisdErrors
 from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import get_object
 from stratisd_client_dbus import pools
@@ -48,7 +48,6 @@ class Create2TestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        self._errors = StratisdErrorsGen.get_object()
         Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
 
     def tearDown(self):
@@ -76,7 +75,7 @@ class Create2TestCase(unittest.TestCase):
         all_pools = [x for x in pools(managed_objects)]
         result = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
 
-        if rc == self._errors.OK:
+        if rc == StratisdErrors.OK:
             self.assertIsNotNone(result)
             (pool, table) = result
             self.assertEqual(pool, poolpath)
@@ -106,7 +105,7 @@ class Create2TestCase(unittest.TestCase):
            force=False,
            devices=devs
         )
-        self.assertEqual(rc, self._errors.ERROR)
+        self.assertEqual(rc, StratisdErrors.ERROR)
 
 class Create3TestCase(unittest.TestCase):
     """
@@ -122,7 +121,6 @@ class Create3TestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        self._errors = StratisdErrorsGen.get_object()
         Manager.Methods.CreatePool(
            self._proxy,
            name=self._POOLNAME,
@@ -151,7 +149,7 @@ class Create3TestCase(unittest.TestCase):
            force=False,
            devices=_DEVICE_STRATEGY.example()
         )
-        expected_rc = self._errors.ALREADY_EXISTS
+        expected_rc = StratisdErrors.ALREADY_EXISTS
         self.assertEqual(rc, expected_rc)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)

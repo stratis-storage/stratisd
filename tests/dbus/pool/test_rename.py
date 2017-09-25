@@ -22,7 +22,7 @@ import unittest
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import Pool
-from stratisd_client_dbus import StratisdErrorsGen
+from stratisd_client_dbus import StratisdErrors
 from stratisd_client_dbus import get_object
 from stratisd_client_dbus import pools
 
@@ -49,7 +49,6 @@ class SetNameTestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        self._errors = StratisdErrorsGen.get_object()
         ((self._pool_object_path, _), _, _) = Manager.Methods.CreatePool(
            self._proxy,
            name=self._POOLNAME,
@@ -75,7 +74,7 @@ class SetNameTestCase(unittest.TestCase):
            name=self._POOLNAME
         )
 
-        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(rc, StratisdErrors.OK)
         self.assertFalse(result)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
@@ -96,7 +95,7 @@ class SetNameTestCase(unittest.TestCase):
         )
 
         self.assertTrue(result)
-        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(rc, StratisdErrors.OK)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
         self.assertIsNone(

@@ -22,7 +22,7 @@ import unittest
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import Pool
-from stratisd_client_dbus import StratisdErrorsGen
+from stratisd_client_dbus import StratisdErrors
 from stratisd_client_dbus import filesystems
 from stratisd_client_dbus import get_object
 
@@ -49,7 +49,6 @@ class DestroyFSTestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        self._errors = StratisdErrorsGen.get_object()
         self._devs = _DEVICE_STRATEGY.example()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
            self._proxy,
@@ -79,7 +78,7 @@ class DestroyFSTestCase(unittest.TestCase):
         )
 
         self.assertEqual(len(result), 0)
-        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(rc, StratisdErrors.OK)
 
         result = [x for x in filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy))]
         self.assertEqual(len(result), 0)
@@ -93,7 +92,7 @@ class DestroyFSTestCase(unittest.TestCase):
            self._pool_object,
            filesystems=['/']
         )
-        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(rc, StratisdErrors.OK)
         self.assertEqual(len(result), 0)
 
         result = [x for x in filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy))]
@@ -116,7 +115,6 @@ class DestroyFSTestCase1(unittest.TestCase):
         self._service.setUp()
         time.sleep(2)
         self._proxy = get_object(TOP_OBJECT)
-        self._errors = StratisdErrorsGen.get_object()
         self._devs = _DEVICE_STRATEGY.example()
         ((self._poolpath, _), _, _) = Manager.Methods.CreatePool(
            self._proxy,
@@ -150,7 +148,7 @@ class DestroyFSTestCase1(unittest.TestCase):
         )
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(rc, StratisdErrors.OK)
 
         result = [x for x in filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy))]
         self.assertEqual(len(result), 0)
@@ -168,7 +166,7 @@ class DestroyFSTestCase1(unittest.TestCase):
         )
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(rc, StratisdErrors.OK)
 
         result = [x for x in filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy))]
         self.assertEqual(len(result), 0)

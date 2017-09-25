@@ -21,7 +21,7 @@ import unittest
 
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import Pool
-from stratisd_client_dbus import StratisdErrorsGen
+from stratisd_client_dbus import StratisdErrors
 from stratisd_client_dbus import get_object
 
 from stratisd_client_dbus._constants import TOP_OBJECT
@@ -47,7 +47,6 @@ class AddDevsTestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        self._errors = StratisdErrorsGen.get_object()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
            self._proxy,
            name=self._POOLNAME,
@@ -75,7 +74,7 @@ class AddDevsTestCase(unittest.TestCase):
         )
 
         self.assertEqual(len(result), 0)
-        self.assertEqual(rc, self._errors.OK)
+        self.assertEqual(rc, StratisdErrors.OK)
 
     def testSomeDevs(self):
         """
@@ -89,7 +88,7 @@ class AddDevsTestCase(unittest.TestCase):
         )
 
         num_devices_added = len(result)
-        if rc == self._errors.OK:
+        if rc == StratisdErrors.OK:
             self.assertGreater(num_devices_added, 0)
         else:
             self.assertEqual(num_devices_added, 0)

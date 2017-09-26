@@ -546,6 +546,7 @@ fn setup_metadev(dm: &DM,
                  meta_segments: Vec<BlkDevSegment>,
                  spare_segments: Vec<BlkDevSegment>)
                  -> EngineResult<(LinearDev, Vec<BlkDevSegment>, Vec<BlkDevSegment>)> {
+    #![allow(collapsible_if)]
     let mut meta_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
                                         dm,
                                         &map_to_dm(&meta_segments))?;

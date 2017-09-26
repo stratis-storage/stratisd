@@ -10,9 +10,8 @@ use std::process::Command;
 use uuid::Uuid;
 
 use devicemapper as dm;
-use devicemapper::{DM, DataBlocks, DmDevice, DmError, IEC, LinearDev, MetaBlocks, Sectors,
-                   Segment, ThinDev, ThinDevId, ThinPoolDev, ThinPoolWorkingStatus};
-use devicemapper::ErrorEnum::CheckFailed;
+use devicemapper::{DM, DataBlocks, DmDevice, DmName, IEC, LinearDev, MetaBlocks, Sectors, Segment,
+                   ThinDev, ThinDevId, ThinPoolDev, ThinPoolWorkingStatus, device_exists};
 
 use super::super::engine::{Filesystem, HasName};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -95,17 +94,17 @@ impl ThinPool {
         // have been passed.
         let meta_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
                                         dm,
-                                        map_to_dm(&meta_segments))?;
+                                        &map_to_dm(&meta_segments))?;
         wipe_sectors(&meta_dev.devnode(),
                      Sectors(0),
                      ThinPool::initial_metadata_size())?;
 
         let data_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::ThinData),
                                         dm,
-                                        map_to_dm(&data_segments))?;
+                                        &map_to_dm(&data_segments))?;
 
         let mdv_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
-        let mdv_dev = LinearDev::setup(&mdv_name, dm, map_to_dm(&mdv_segments))?;
+        let mdv_dev = LinearDev::setup(&mdv_name, dm, &map_to_dm(&mdv_segments))?;
         let mdv = MetadataVol::initialize(&pool_uuid, mdv_dev)?;
 
         let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
@@ -176,44 +175,26 @@ impl ThinPool {
             .map(&mapper)
             .collect::<EngineResult<Vec<_>>>()?;
 
-        let meta_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
-                                        dm,
-                                        map_to_dm(&meta_segments))?;
+        let thinpool_name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
+        let (meta_dev, meta_segments, spare_segments) =
+            setup_metadev(dm, pool_uuid, &thinpool_name, meta_segments, spare_segments)?;
 
         let data_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::ThinData),
                                         dm,
-                                        map_to_dm(&data_segments))?;
+                                        &map_to_dm(&data_segments))?;
 
 
-        let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
 
-        let (thinpool_dev, meta_segments, spare_segments) =
-            match ThinPoolDev::setup(&name,
-                                     dm,
-                                     data_block_size,
-                                     low_water_mark,
-                                     meta_dev,
-                                     data_dev) {
-                Ok(dev) => Ok((dev, meta_segments, spare_segments)),
-                Err(DmError::Dm(CheckFailed(meta_dev, data_dev), _)) => {
-                    attempt_thin_repair(pool_uuid, dm, meta_dev, &spare_segments)
-                        .and_then(|new_meta_dev| {
-                            ThinPoolDev::setup(&name,
-                                               dm,
-                                               data_block_size,
-                                               low_water_mark,
-                                               new_meta_dev,
-                                               data_dev)
-                                    .map(|dev| (dev, spare_segments, meta_segments))
-                                    .map_err(|e| e.into())
-                        })
-                }
-                Err(e) => Err(e.into()),
-            }?;
+        let thinpool_dev = ThinPoolDev::setup(&thinpool_name,
+                                              dm,
+                                              data_block_size,
+                                              low_water_mark,
+                                              meta_dev,
+                                              data_dev)?;
 
         let mdv_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::MetadataVolume),
                                        dm,
-                                       map_to_dm(&mdv_segments))?;
+                                       &map_to_dm(&mdv_segments))?;
         let mdv = MetadataVol::setup(&pool_uuid, mdv_dev)?;
         let filesystem_metadatas = mdv.filesystems()?;
 
@@ -384,7 +365,7 @@ impl ThinPool {
 
     /// Extend the thinpool with new data regions.
     fn extend_data(&mut self, dm: &DM, new_segs: Vec<BlkDevSegment>) -> EngineResult<()> {
-        self.thin_pool.extend_data(dm, map_to_dm(&new_segs))?;
+        self.thin_pool.extend_data(dm, &map_to_dm(&new_segs))?;
 
         // Last existing and first new may be contiguous. Coalesce into
         // a single BlkDevSegment if so.
@@ -553,9 +534,43 @@ impl Recordable<ThinPoolDevSave> for ThinPool {
     }
 }
 
+/// Setup metadata dev for thinpool.
+/// Attempt to verify that the metadata dev is valid for the given thinpool
+/// using thin_check. If thin_check indicates that the metadata is corrupted
+/// run thin_repair, using the spare segments, to try to repair the metadata
+/// dev. Return the metadata device, the metadata segments, and the
+/// spare segments.
+fn setup_metadev(dm: &DM,
+                 pool_uuid: PoolUuid,
+                 thinpool_name: &DmName,
+                 meta_segments: Vec<BlkDevSegment>,
+                 spare_segments: Vec<BlkDevSegment>)
+                 -> EngineResult<(LinearDev, Vec<BlkDevSegment>, Vec<BlkDevSegment>)> {
+    #![allow(collapsible_if)]
+    let mut meta_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
+                                        dm,
+                                        &map_to_dm(&meta_segments))?;
+
+    if !device_exists(dm, thinpool_name)? {
+        // TODO: Refine policy about failure to run thin_check.
+        // If, e.g., thin_check is unavailable, that doesn't necessarily
+        // mean that data is corrupted.
+        if !Command::new("thin_check")
+                .arg("-q")
+                .arg(&meta_dev.devnode())
+                .status()?
+                .success() {
+            meta_dev = attempt_thin_repair(pool_uuid, dm, meta_dev, &spare_segments)?;
+            return Ok((meta_dev, spare_segments, meta_segments));
+        }
+    }
+
+    Ok((meta_dev, meta_segments, spare_segments))
+}
+
 /// Attempt a thin repair operation on the meta device.
 /// If the operation succeeds, teardown the old meta device,
-/// and return the new meta device and the new spare segments.
+/// and return the new meta device.
 fn attempt_thin_repair(pool_uuid: PoolUuid,
                        dm: &DM,
                        meta_dev: LinearDev,
@@ -564,7 +579,7 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
     let mut new_meta_dev = LinearDev::setup(&format_flex_name(&pool_uuid,
                                                               FlexRole::ThinMetaSpare),
                                             dm,
-                                            map_to_dm(spare_segments))?;
+                                            &map_to_dm(spare_segments))?;
 
 
     if !Command::new("thin_repair")

@@ -22,7 +22,7 @@ use super::blockdevmgr::{BlockDevMgr, BlkDevSegment, map_to_dm};
 use super::device::wipe_sectors;
 use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, ThinRole, format_flex_name,
                       format_thinpool_name, format_thin_name};
-use super::filesystem::{StratFilesystem, FilesystemStatus};
+use super::filesystem::{FilesystemStatus, StratFilesystem};
 use super::mdv::MetadataVol;
 use super::serde_structs::{FilesystemSave, FlexDevsSave, Recordable, ThinPoolDevSave};
 
@@ -477,6 +477,35 @@ impl ThinPool {
         self.filesystems.insert(new_filesystem);
 
         Ok(fs_uuid)
+    }
+
+
+    pub fn snapshot_filesystem(&mut self,
+                               dm: &DM,
+                               pool_uuid: PoolUuid,
+                               filesystem_uuid: FilesystemUuid)
+                               -> EngineResult<FilesystemUuid> {
+        let snapshot_fs_uuid = Uuid::new_v4();
+        let snapshot_name = format_thin_name(&pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));
+        let snapshot_id = self.id_gen.new_id()?;
+        let new_filesystem = match self.get_filesystem_by_uuid(&filesystem_uuid) {
+            Some(filesystem) => {
+                filesystem
+                    .snapshot(dm,
+                              &self.thin_pool,
+                              snapshot_name.as_ref(),
+                              snapshot_fs_uuid,
+                              snapshot_id)?
+            }
+            None => {
+                return Err(EngineError::Engine(ErrorEnum::Error,
+                                               "snapshot_filesystem failed, filesystem not found"
+                                                   .into()));
+            }
+        };
+        self.mdv.save_fs(&new_filesystem)?;
+        self.filesystems.insert(new_filesystem);
+        Ok(snapshot_fs_uuid)
     }
 
     /// Destroy a filesystem within the thin pool.

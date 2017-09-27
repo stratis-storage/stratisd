@@ -12,6 +12,7 @@ extern crate byteorder;
 extern crate uuid;
 extern crate chrono;
 extern crate dbus;
+extern crate tempdir;
 extern crate term;
 extern crate rand;
 extern crate serde;

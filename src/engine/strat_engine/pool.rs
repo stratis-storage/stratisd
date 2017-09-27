@@ -129,6 +129,12 @@ impl StratPool {
     pub fn has_filesystems(&self) -> bool {
         self.thin_pool.has_filesystems()
     }
+
+    pub fn snapshot_filesystem(&mut self, filesystem_uuid: Uuid) -> EngineResult<FilesystemUuid> {
+        let dm = DM::new()?;
+        self.thin_pool
+            .snapshot_filesystem(&dm, self.pool_uuid, filesystem_uuid)
+    }
 }
 
 impl Pool for StratPool {

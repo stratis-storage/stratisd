@@ -154,7 +154,7 @@ impl BlockDev for StratBlockDev {
     }
 
     fn total_size(&self) -> Sectors {
-        self.current_capacity()
+        self.avail_range().1
     }
 
     fn state(&self) -> BlockDevState {

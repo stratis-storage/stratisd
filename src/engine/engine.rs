@@ -60,7 +60,7 @@ pub trait Pool: HasName + HasUuid {
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>>;
 
     /// Adds blockdevs specified by paths to pool.
-    /// Returns a list of device nodes corresponding to devices actually added.
+    /// Returns a list of uuids corresponding to devices actually added.
     /// Returns an error if a blockdev can not be added because it is owned
     /// or there was an error while reading or writing a blockdev.
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>>;

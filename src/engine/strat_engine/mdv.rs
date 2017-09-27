@@ -10,7 +10,7 @@ use std::fs::{create_dir, OpenOptions, read_dir, remove_file, rename};
 use std::io::ErrorKind;
 use std::io::prelude::*;
 use std::os::unix::io::AsRawFd;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use nix;
 use nix::mount::{MsFlags, mount, umount};
@@ -39,6 +39,45 @@ pub struct MetadataVol {
     mount_pt: PathBuf,
 }
 
+/// A helper struct that borrows the MetadataVol and ensures that the MDV is
+/// mounted as long as it is borrowed, and then unmounted.
+#[derive(Debug)]
+struct MountedMDV<'a> {
+    mdv: &'a MetadataVol,
+}
+
+impl<'a> MountedMDV<'a> {
+    /// Borrow the MDV and ensure it's mounted.
+    fn mount(mdv: &MetadataVol) -> EngineResult<MountedMDV> {
+        match mount(Some(&mdv.dev.devnode()),
+                    &mdv.mount_pt,
+                    Some("xfs"),
+                    MsFlags::empty(),
+                    None as Option<&str>) {
+            Err(nix::Error::Sys(nix::Errno::EBUSY)) => {
+                // The device is already mounted at the specified mountpoint
+                Ok(())
+            }
+            Err(err) => Err(err),
+            Ok(_) => Ok(()),
+        }?;
+
+        Ok(MountedMDV { mdv })
+    }
+
+    fn mount_pt(&self) -> &Path {
+        &self.mdv.mount_pt
+    }
+}
+
+impl<'a> Drop for MountedMDV<'a> {
+    fn drop(&mut self) {
+        if let Err(err) = umount(&self.mdv.mount_pt) {
+            warn!("Could not unmount MDV: {}", err)
+        }
+    }
+}
+
 impl MetadataVol {
     /// Initialize a new Metadata Volume.
     pub fn initialize(pool_uuid: &PoolUuid, dev: LinearDev) -> EngineResult<MetadataVol> {
@@ -63,27 +102,36 @@ impl MetadataVol {
             }
         }
 
-        if let Err(err) = mount(Some(&dev.devnode()),
-                                &mount_pt,
-                                Some("xfs"),
-                                MsFlags::empty(),
-                                None as Option<&str>) {
-            match err {
-                nix::Error::Sys(nix::Errno::EBUSY) => {
-                    // EBUSY is the error returned in this context when the
-                    // device is already mounted at the specified mountpoint.
+        let mdv = MetadataVol { dev, mount_pt };
+
+        {
+            let mount = MountedMDV::mount(&mdv)?;
+
+            if let Err(err) = create_dir(mount.mount_pt().join(FILESYSTEM_DIR)) {
+                if err.kind() != ErrorKind::AlreadyExists {
+                    return Err(From::from(err));
                 }
-                _ => return Err(From::from(err)),
+            }
+
+            for dir_e in read_dir(mount.mount_pt().join(FILESYSTEM_DIR))? {
+                let dir_e = dir_e?;
+
+                // Clean up any lingering .temp files. These should only
+                // exist if there was a crash during save_fs().
+                if dir_e.path().ends_with(".temp") {
+                    match remove_file(dir_e.path()) {
+                        Err(err) => {
+                            debug!("could not remove file {:?}: {}",
+                                   dir_e.path(),
+                                   err.description())
+                        }
+                        Ok(_) => debug!("Cleaning up temp file {:?}", dir_e.path()),
+                    }
+                }
             }
         }
 
-        if let Err(err) = create_dir(&mount_pt.join(FILESYSTEM_DIR)) {
-            if err.kind() != ErrorKind::AlreadyExists {
-                return Err(From::from(err));
-            }
-        }
-
-        Ok(MetadataVol { dev, mount_pt })
+        Ok(mdv)
     }
 
     /// Save info on a new filesystem to persistent storage, or update
@@ -99,6 +147,8 @@ impl MetadataVol {
             .with_extension("json");
 
         let temp_path = path.clone().with_extension("temp");
+
+        let _mount = MountedMDV::mount(self)?;
 
         // Braces to ensure f is closed before renaming
         {
@@ -124,31 +174,12 @@ impl MetadataVol {
             .join(FILESYSTEM_DIR)
             .join(fs_uuid.simple().to_string())
             .with_extension("json");
+
+        let _mount = MountedMDV::mount(self)?;
+
         if let Err(err) = remove_file(fs_path) {
             if err.kind() != ErrorKind::NotFound {
                 return Err(From::from(err));
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Check the current state of the MDV.
-    pub fn check(&self) -> EngineResult<()> {
-        for dir_e in read_dir(self.mount_pt.join(FILESYSTEM_DIR))? {
-            let dir_e = dir_e?;
-
-            // Clean up any lingering .temp files. These should only
-            // exist if there was a crash during save_fs().
-            if dir_e.path().ends_with(".temp") {
-                match remove_file(dir_e.path()) {
-                    Err(err) => {
-                        debug!("could not remove file {:?}: {}",
-                               dir_e.path(),
-                               err.description())
-                    }
-                    Ok(_) => debug!("Cleaning up temp file {:?}", dir_e.path()),
-                }
             }
         }
 
@@ -159,7 +190,9 @@ impl MetadataVol {
     pub fn filesystems(&self) -> EngineResult<Vec<FilesystemSave>> {
         let mut filesystems = Vec::new();
 
-        for dir_e in read_dir(self.mount_pt.join(FILESYSTEM_DIR))? {
+        let mount = MountedMDV::mount(self)?;
+
+        for dir_e in read_dir(mount.mount_pt().join(FILESYSTEM_DIR))? {
             let dir_e = dir_e?;
 
             if dir_e.path().ends_with(".temp") {
@@ -178,7 +211,6 @@ impl MetadataVol {
 
     /// Tear down a Metadata Volume.
     pub fn teardown(self, dm: &DM) -> EngineResult<()> {
-        umount(&self.mount_pt)?;
         self.dev.teardown(dm)?;
 
         Ok(())

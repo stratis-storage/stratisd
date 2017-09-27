@@ -303,7 +303,6 @@ impl ThinPool {
                 // TODO: Run thin_check
             }
         };
-        self.mdv.check()?;
 
         let filesystems = self.filesystems
             .borrow_mut()

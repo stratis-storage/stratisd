@@ -32,6 +32,7 @@ use util::dm_tests::test_thinpool_device;
 use util::dm_tests::test_linear_device;
 use util::filesystem_tests::test_xfs_expand;
 use util::pool_tests::test_filesystem_rename;
+use util::pool_tests::test_filesystem_snapshot;
 use util::pool_tests::test_thinpool_expand;
 use util::pool_tests::test_thinpool_thindev_destroy;
 use util::setup_tests::test_basic_metadata;
@@ -230,4 +231,9 @@ pub fn loop_test_pool_setup() {
 #[test]
 pub fn loop_test_xfs_expand() {
     test_with_spec(DeviceLimits::Range(1, 3), test_xfs_expand);
+}
+
+#[test]
+pub fn loop_test_filesystem_snapshot() {
+    test_with_spec(DeviceLimits::Range(2, 3), test_filesystem_snapshot);
 }

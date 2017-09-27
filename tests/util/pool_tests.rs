@@ -5,11 +5,17 @@
 /// Test the functionality of stratis pools.
 extern crate devicemapper;
 extern crate env_logger;
+extern crate uuid;
+extern crate nix;
+extern crate tempdir;
 
 use std::collections::HashMap;
 use std::fs::OpenOptions;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+
+use self::nix::mount::{mount, MsFlags, umount};
+use self::tempdir::TempDir;
 
 use self::devicemapper::{Device, DmName, DM, SECTOR_SIZE, Sectors, ThinDev};
 
@@ -60,6 +66,79 @@ pub fn test_thinpool_expand(paths: &[&Path]) -> () {
     pool.teardown().unwrap();
 }
 
+/// Verify a snapshot has the same files and same contents as the origin.
+pub fn test_filesystem_snapshot(paths: &[&Path]) {
+    let dm = DM::new().unwrap();
+    let (mut pool, _) =
+        StratPool::initialize("stratis_test_pool", &dm, paths, Redundancy::NONE, true).unwrap();
+    let &(_, fs_uuid) = pool.create_filesystems(&[("stratis_test_filesystem", None)])
+        .unwrap()
+        .first()
+        .unwrap();
+    let write_buf = &[8u8; SECTOR_SIZE];
+    let file_count = 10;
+    let source_tmp_dir = TempDir::new("stratis_testing").unwrap();
+    {
+        // to allow mutable borrow of pool
+        let filesystem = pool.get_filesystem(&fs_uuid).unwrap();
+        mount(Some(&filesystem.devnode()),
+              source_tmp_dir.path(),
+              Some("xfs"),
+              MsFlags::empty(),
+              None as Option<&str>)
+                .unwrap();
+        for i in 0..file_count {
+            let file_path = source_tmp_dir
+                .path()
+                .join(format!("stratis_test{}.txt", i));
+            let mut f = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(file_path)
+                .unwrap();
+            f.write_all(write_buf).unwrap();
+            f.flush().unwrap();
+
+        }
+
+    }
+    // Run a check to expand the pool. The space initially allocated
+    // to a pool is close to consumed by the filesystem and few files
+    // written above. If we attempt to update the UUID on the snapshot
+    // without expanding the pool, the pool will go into out-of-data-space
+    // (queue IO) mode, causing the test to fail. Calling pool.check() will
+    // compare the data space used by the pool to the data space allocated
+    // and expand when there is less than DATA_LOWATER space remaining.
+    // TODO: Make use of a way (not as yet existing) to explicitly extend
+    // pool to the necessary size
+    pool.check().unwrap();
+
+    let snapshot_uuid = pool.snapshot_filesystem(fs_uuid).unwrap();
+    let mut read_buf = [0u8; SECTOR_SIZE];
+    let snapshot_tmp_dir = TempDir::new("stratis_testing").unwrap();
+    {
+        let snapshot_filesystem = pool.get_filesystem(&snapshot_uuid).unwrap();
+        mount(Some(&snapshot_filesystem.devnode()),
+              snapshot_tmp_dir.path(),
+              Some("xfs"),
+              MsFlags::empty(),
+              None as Option<&str>)
+                .unwrap();
+        for i in 0..file_count {
+            let file_path = snapshot_tmp_dir
+                .path()
+                .join(format!("stratis_test{}.txt", i));
+            let mut f = OpenOptions::new().read(true).open(file_path).unwrap();
+            f.read(&mut read_buf).unwrap();
+            assert!(read_buf[0..SECTOR_SIZE] == write_buf[0..SECTOR_SIZE]);
+        }
+    }
+    umount(source_tmp_dir.path()).unwrap();
+    umount(snapshot_tmp_dir.path()).unwrap();
+    pool.destroy_filesystems(&[&fs_uuid, &snapshot_uuid])
+        .unwrap();
+    pool.teardown().unwrap();
+}
 
 /// Verify that a filesystem rename causes the filesystem metadata to be
 /// updated.

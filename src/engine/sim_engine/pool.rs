@@ -44,7 +44,7 @@ impl SimPool {
         let device_pairs = devices
             .iter()
             .map(|p| {
-                     let bd = SimDev::new(rdm.clone(), p);
+                     let bd = SimDev::new(Rc::clone(&rdm), p);
                      (bd.uuid(), bd)
                  });
         SimPool {
@@ -68,12 +68,11 @@ impl SimPool {
 
 impl Pool for SimPool {
     fn add_blockdevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<DevUuid>> {
-        let rdm = Rc::clone(&self.rdm);
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs: Vec<_> = devices
             .iter()
             .map(|p| {
-                     let bd = SimDev::new(rdm.clone(), p);
+                     let bd = SimDev::new(Rc::clone(&self.rdm), p);
                      (bd.uuid(), bd)
                  })
             .collect();

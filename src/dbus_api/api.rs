@@ -74,7 +74,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let mut bd_object_paths = Vec::new();
             for dev_uuid in pool.blockdevs().iter().map(|bd| bd.uuid()) {
                 bd_object_paths
-                    .push(MessageItem::ObjectPath(create_dbus_blockdev(&dbus_context,
+                    .push(MessageItem::ObjectPath(create_dbus_blockdev(dbus_context,
                                                                        pool_object_path.clone(),
                                                                        dev_uuid)));
             }

@@ -76,7 +76,7 @@ impl BlockDevMgr {
             pool_uuid: pool_uuid,
             block_devs: block_devs
                 .into_iter()
-                .map(|bd| (bd.uuid().clone(), bd))
+                .map(|bd| (bd.uuid(), bd))
                 .collect(),
             last_update_time: None,
         }

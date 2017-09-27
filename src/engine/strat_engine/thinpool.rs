@@ -101,7 +101,7 @@ impl ThinPool {
 
         let mdv_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
         let mdv_dev = LinearDev::setup(dm, &mdv_name, None, &map_to_dm(&mdv_segments))?;
-        let mdv = MetadataVol::initialize(&pool_uuid, mdv_dev)?;
+        let mdv = MetadataVol::initialize(pool_uuid, mdv_dev)?;
 
         let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
         let thinpool_dev = ThinPoolDev::new(dm,
@@ -195,7 +195,7 @@ impl ThinPool {
                                        &format_flex_name(&pool_uuid, FlexRole::MetadataVolume),
                                        None,
                                        &map_to_dm(&mdv_segments))?;
-        let mdv = MetadataVol::setup(&pool_uuid, mdv_dev)?;
+        let mdv = MetadataVol::setup(pool_uuid, mdv_dev)?;
         let filesystem_metadatas = mdv.filesystems()?;
 
         // TODO: not fail completely if one filesystem setup fails?

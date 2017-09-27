@@ -43,7 +43,7 @@ impl StratFilesystem {
                       -> EngineResult<StratFilesystem> {
         let fs = StratFilesystem::setup(fs_id, name, thin_dev);
 
-        create_fs(fs.devnode().as_path())?;
+        create_fs(&fs.devnode(), fs_id)?;
         Ok(fs)
     }
 
@@ -178,11 +178,13 @@ pub fn xfs_growfs(mount_point: &Path) -> EngineResult<()> {
 }
 
 /// Create a filesystem on devnode.
-pub fn create_fs(devnode: &Path) -> EngineResult<()> {
+pub fn create_fs(devnode: &Path, uuid: &FilesystemUuid) -> EngineResult<()> {
     if Command::new("mkfs.xfs")
            .arg("-f")
            .arg("-q")
            .arg(&devnode)
+           .arg("-m")
+           .arg(format!("uuid={}", uuid))
            .status()?
            .success() {
         Ok(())

@@ -118,7 +118,7 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
                                 Sectors(300000))
             .unwrap();
 
-    create_fs(&thin_dev.devnode()).unwrap();
+    create_fs(&thin_dev.devnode(), Uuid::new_v4()).unwrap();
 
     let tmp_dir = TempDir::new("stratis_testing").unwrap();
     mount(Some(&thin_dev.devnode()),

@@ -79,13 +79,13 @@ impl<'a> Drop for MountedMDV<'a> {
 
 impl MetadataVol {
     /// Initialize a new Metadata Volume.
-    pub fn initialize(pool_uuid: &PoolUuid, dev: LinearDev) -> EngineResult<MetadataVol> {
-        create_fs(dev.devnode().as_path())?;
+    pub fn initialize(pool_uuid: PoolUuid, dev: LinearDev) -> EngineResult<MetadataVol> {
+        create_fs(&dev.devnode(), pool_uuid)?;
         MetadataVol::setup(pool_uuid, dev)
     }
 
     /// Set up an existing Metadata Volume.
-    pub fn setup(pool_uuid: &PoolUuid, dev: LinearDev) -> EngineResult<MetadataVol> {
+    pub fn setup(pool_uuid: PoolUuid, dev: LinearDev) -> EngineResult<MetadataVol> {
         if let Err(err) = create_dir(DEV_PATH) {
             if err.kind() != ErrorKind::AlreadyExists {
                 return Err(From::from(err));

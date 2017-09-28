@@ -49,13 +49,15 @@ class AddDevsTestCase(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
            self._proxy,
-           name=self._POOLNAME,
-           redundancy=(True, 0),
-           force=False,
-           devices=[]
+           {
+              'name': self._POOLNAME,
+              'redundancy': (True, 0),
+              'force': False,
+              'devices': []
+           }
         )
         self._pool_object = get_object(poolpath)
-        Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
+        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
         """
@@ -69,8 +71,10 @@ class AddDevsTestCase(unittest.TestCase):
         """
         (result, rc, _) = Pool.Methods.AddDevs(
            self._pool_object,
-           force=False,
-           devices=[]
+           {
+              'force': False,
+              'devices': []
+           }
         )
 
         self.assertEqual(len(result), 0)
@@ -83,8 +87,10 @@ class AddDevsTestCase(unittest.TestCase):
         """
         (result, rc, _) = Pool.Methods.AddDevs(
            self._pool_object,
-           force=False,
-           devices=_DEVICE_STRATEGY.example()
+           {
+              'force': False,
+              'devices': _DEVICE_STRATEGY.example()
+           }
         )
 
         num_devices_added = len(result)

@@ -48,7 +48,7 @@ class Create2TestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
+        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
         """
@@ -65,13 +65,16 @@ class Create2TestCase(unittest.TestCase):
         devs = _DEVICE_STRATEGY.example()
         ((poolpath, devnodes), rc, _) = Manager.Methods.CreatePool(
            self._proxy,
-           name=self._POOLNAME,
-           redundancy=(True, 0),
-           force=False,
-           devices=devs
+           {
+              'name': self._POOLNAME,
+              'redundancy': (True, 0),
+              'force': False,
+              'devices': devs
+           }
         )
 
-        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
+        managed_objects = \
+           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         all_pools = [x for x in pools(managed_objects)]
         result = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
 
@@ -100,10 +103,12 @@ class Create2TestCase(unittest.TestCase):
         devs = _DEVICE_STRATEGY.example()
         (_, rc, _) = Manager.Methods.CreatePool(
            self._proxy,
-           name=self._POOLNAME,
-           redundancy=(True, len(redundancy_values)),
-           force=False,
-           devices=devs
+           {
+              'name': self._POOLNAME,
+              'redundancy': (True, len(redundancy_values)),
+              'force': False,
+              'devices': devs
+           }
         )
         self.assertEqual(rc, StratisdErrors.ERROR)
 
@@ -123,12 +128,14 @@ class Create3TestCase(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         Manager.Methods.CreatePool(
            self._proxy,
-           name=self._POOLNAME,
-           redundancy=(True, 0),
-           force=False,
-           devices=_DEVICE_STRATEGY.example()
+           {
+              'name': self._POOLNAME,
+              'redundancy': (True, 0),
+              'force': False,
+              'devices': _DEVICE_STRATEGY.example()
+           }
         )
-        Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
+        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
         """
@@ -140,19 +147,22 @@ class Create3TestCase(unittest.TestCase):
         """
         Create should fail trying to create new pool with same name as previous.
         """
-        pools1 = pools(ObjectManager.Methods.GetManagedObjects(self._proxy))
+        pools1 = pools(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
 
         (_, rc, _) = Manager.Methods.CreatePool(
            self._proxy,
-           name=self._POOLNAME,
-           redundancy=(True, 0),
-           force=False,
-           devices=_DEVICE_STRATEGY.example()
+           {
+              'name': self._POOLNAME,
+              'redundancy': (True, 0),
+              'force': False,
+              'devices': _DEVICE_STRATEGY.example()
+           }
         )
         expected_rc = StratisdErrors.ALREADY_EXISTS
         self.assertEqual(rc, expected_rc)
 
-        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
+        managed_objects = \
+           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         pools2 = [x for x in pools(managed_objects)]
         pool = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
 

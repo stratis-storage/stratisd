@@ -53,13 +53,15 @@ class CreateFSTestCase(unittest.TestCase):
         self._devs = _DEVICE_STRATEGY.example()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
            self._proxy,
-           name=self._POOLNAME,
-           redundancy=(True, 0),
-           force=False,
-           devices=self._devs
+           {
+              'name': self._POOLNAME,
+              'redundancy': (True, 0),
+              'force': False,
+              'devices': self._devs
+           }
         )
         self._pool_object = get_object(poolpath)
-        Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
+        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
         """
@@ -75,14 +77,15 @@ class CreateFSTestCase(unittest.TestCase):
         """
         (result, rc, _) = Pool.Methods.CreateFilesystems(
            self._pool_object,
-           specs=[]
+           {'specs': []}
         )
 
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
 
-        result = [x for x in filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy))]
-        self.assertEqual(len(result), 0)
+        result = \
+           filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        self.assertEqual(len([x for x in result]), 0)
 
     def testDuplicateSpecs(self):
         """
@@ -92,7 +95,7 @@ class CreateFSTestCase(unittest.TestCase):
 
         (result, rc, _) = Pool.Methods.CreateFilesystems(
            self._pool_object,
-           specs=[new_name, new_name]
+           {'specs': [new_name, new_name]}
         )
 
         self.assertEqual(rc, StratisdErrors.OK)
@@ -101,8 +104,9 @@ class CreateFSTestCase(unittest.TestCase):
         (_, fs_name) = result[0]
         self.assertEqual(fs_name, new_name)
 
-        result = [x for x in filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy))]
-        self.assertEqual(len(result), 1)
+        result = \
+           filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        self.assertEqual(len([x for x in result]), 1)
 
 
 class CreateFSTestCase1(unittest.TestCase):
@@ -124,14 +128,19 @@ class CreateFSTestCase1(unittest.TestCase):
         self._devs = _DEVICE_STRATEGY.example()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
            self._proxy,
-           name=self._POOLNAME,
-           redundancy=(True, 0),
-           force=False,
-           devices=self._devs
+           {
+              'name': self._POOLNAME,
+              'redundancy': (True, 0),
+              'force': False,
+              'devices': self._devs
+           }
         )
         self._pool_object = get_object(poolpath)
-        Pool.Methods.CreateFilesystems(self._pool_object, specs=[self._VOLNAME])
-        Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
+        Pool.Methods.CreateFilesystems(
+           self._pool_object,
+           {'specs': [self._VOLNAME]}
+        )
+        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
         """
@@ -147,14 +156,15 @@ class CreateFSTestCase1(unittest.TestCase):
         """
         (result, rc, _) = Pool.Methods.CreateFilesystems(
            self._pool_object,
-           specs=[self._VOLNAME]
+           {'specs': [self._VOLNAME]}
         )
 
         self.assertEqual(rc, StratisdErrors.ALREADY_EXISTS)
         self.assertEqual(len(result), 0)
 
-        result = [x for x in filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy))]
-        self.assertEqual(len(result), 1)
+        result = \
+           filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        self.assertEqual(len([x for x in result]), 1)
 
     def testCreateOne(self):
         """
@@ -165,7 +175,7 @@ class CreateFSTestCase1(unittest.TestCase):
 
         (result, rc, _) = Pool.Methods.CreateFilesystems(
            self._pool_object,
-           specs=[new_name]
+           {'specs': [new_name]}
         )
 
         self.assertEqual(rc, StratisdErrors.OK)
@@ -174,8 +184,9 @@ class CreateFSTestCase1(unittest.TestCase):
         (_, fs_name) = result[0]
         self.assertEqual(fs_name, new_name)
 
-        result = [x for x in filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy))]
-        self.assertEqual(len(result), 2)
+        result = \
+           filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        self.assertEqual(len([x for x in result]), 2)
 
     def testCreateWithConflict(self):
         """
@@ -185,11 +196,12 @@ class CreateFSTestCase1(unittest.TestCase):
         """
         (result, rc, _) = Pool.Methods.CreateFilesystems(
            self._pool_object,
-           specs=[self._VOLNAME, "newname"]
+           {'specs': [self._VOLNAME, "newname"]}
         )
 
         self.assertEqual(rc, StratisdErrors.ALREADY_EXISTS)
         self.assertEqual(len(result), 0)
 
-        result = [x for x in filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy))]
-        self.assertEqual(len(result), 1)
+        result = \
+           filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        self.assertEqual(len([x for x in result]), 1)

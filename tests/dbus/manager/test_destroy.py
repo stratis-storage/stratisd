@@ -50,7 +50,7 @@ class Destroy1TestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
-        Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
+        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
         """
@@ -62,7 +62,8 @@ class Destroy1TestCase(unittest.TestCase):
         """
         Destroy should succeed since there is nothing to pass to DestroyPool.
         """
-        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
+        managed_objects = \
+           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         pool = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
         self.assertIsNone(pool)
 
@@ -70,7 +71,7 @@ class Destroy1TestCase(unittest.TestCase):
         """
         Success should occur on a bogus object path.
         """
-        (_, rc, _) = Manager.Methods.DestroyPool(self._proxy, pool="/")
+        (_, rc, _) = Manager.Methods.DestroyPool(self._proxy, {'pool': "/"})
         self.assertEqual(rc, StratisdErrors.OK)
 
 
@@ -91,12 +92,14 @@ class Destroy2TestCase(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         Manager.Methods.CreatePool(
            self._proxy,
-           name=self._POOLNAME,
-           redundancy=(True, 0),
-           force=False,
-           devices=_DEVICE_STRATEGY.example()
+           {
+              'name': self._POOLNAME,
+              'redundancy': (True, 0),
+              'force': False,
+              'devices': _DEVICE_STRATEGY.example()
+           }
         )
-        Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
+        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
         """
@@ -108,12 +111,15 @@ class Destroy2TestCase(unittest.TestCase):
         """
         The pool was just created, so it must always be possible to destroy it.
         """
-        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
+        managed_objects = \
+           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (pool1, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
 
-        (result, rc, _) = Manager.Methods.DestroyPool(self._proxy, pool=pool1)
+        (result, rc, _) = \
+                Manager.Methods.DestroyPool(self._proxy, {'pool': pool1})
 
-        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
+        managed_objects = \
+           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         pool2 = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
 
         self.assertEqual(rc, StratisdErrors.OK)
@@ -140,13 +146,18 @@ class Destroy3TestCase(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
            self._proxy,
-           name=self._POOLNAME,
-           redundancy=(True, 0),
-           force=False,
-           devices=_DEVICE_STRATEGY.example()
+           {
+              'name': self._POOLNAME,
+              'redundancy': (True, 0),
+              'force': False,
+              'devices': _DEVICE_STRATEGY.example()
+           }
         )
-        Pool.Methods.CreateFilesystems(get_object(poolpath), specs=[self._VOLNAME])
-        Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
+        Pool.Methods.CreateFilesystems(
+           get_object(poolpath),
+           {'specs': [self._VOLNAME]}
+        )
+        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
         """
@@ -158,14 +169,17 @@ class Destroy3TestCase(unittest.TestCase):
         """
         This should fail since the pool has a filesystem on it.
         """
-        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
+        managed_objects = \
+           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (pool, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
 
-        (result, rc, _) = Manager.Methods.DestroyPool(self._proxy, pool=pool)
+        (result, rc, _) = \
+           Manager.Methods.DestroyPool(self._proxy, {'pool': pool})
         self.assertEqual(rc, StratisdErrors.BUSY)
         self.assertEqual(result, False)
 
-        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
+        managed_objects = \
+           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (pool1, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
         self.assertEqual(pool, pool1)
 
@@ -186,12 +200,14 @@ class Destroy4TestCase(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         Manager.Methods.CreatePool(
            self._proxy,
-           name=self._POOLNAME,
-           redundancy=(True, 0),
-           force=False,
-           devices=[]
+           {
+              'name': self._POOLNAME,
+              'redundancy': (True, 0),
+              'force': False,
+              'devices': []
+           }
         )
-        Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
+        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
         """
@@ -204,15 +220,18 @@ class Destroy4TestCase(unittest.TestCase):
         The pool was just created and has no devices. It should always be
         possible to destroy it.
         """
-        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
+        managed_objects = \
+           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (pool, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
 
-        (result, rc, _) = Manager.Methods.DestroyPool(self._proxy, pool=pool)
+        (result, rc, _) = \
+           Manager.Methods.DestroyPool(self._proxy, {'pool': pool})
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertEqual(result, True)
 
-        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
+        managed_objects = \
+           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         self.assertIsNone(
            next(pools(managed_objects, {'Name': self._POOLNAME}), None)
         )

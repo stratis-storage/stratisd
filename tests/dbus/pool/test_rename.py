@@ -51,13 +51,15 @@ class SetNameTestCase(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         ((self._pool_object_path, _), _, _) = Manager.Methods.CreatePool(
            self._proxy,
-           name=self._POOLNAME,
-           redundancy=(True, 0),
-           force=False,
-           devices=_DEVICE_STRATEGY.example()
+           {
+              'name': self._POOLNAME,
+              'redundancy': (True, 0),
+              'force': False,
+              'devices': _DEVICE_STRATEGY.example()
+           }
         )
         self._pool_object = get_object(self._pool_object_path)
-        Manager.Methods.ConfigureSimulator(self._proxy, denominator=8)
+        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
         """
@@ -71,13 +73,14 @@ class SetNameTestCase(unittest.TestCase):
         """
         (result, rc, _) = Pool.Methods.SetName(
            self._pool_object,
-           name=self._POOLNAME
+           {'name': self._POOLNAME}
         )
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertFalse(result)
 
-        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
+        managed_objects = \
+           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         result = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
         self.assertIsNotNone(result)
         (pool, _) = result
@@ -91,13 +94,14 @@ class SetNameTestCase(unittest.TestCase):
 
         (result, rc, _) = Pool.Methods.SetName(
            self._pool_object,
-           name=new_name
+           {'name': new_name}
         )
 
         self.assertTrue(result)
         self.assertEqual(rc, StratisdErrors.OK)
 
-        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy)
+        managed_objects = \
+           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         self.assertIsNone(
            next(pools(managed_objects, {'Name': self._POOLNAME}), None)
         )

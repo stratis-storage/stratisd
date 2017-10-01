@@ -31,12 +31,12 @@ use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 /// Verify that the sum of the lengths of the available range of the
 /// blockdevs in the linear device equals the size of the linear device.
 pub fn test_linear_device(paths: &[&Path]) -> () {
-    let unique_devices = resolve_devices(&paths).unwrap();
+    let unique_devices = resolve_devices(&paths).expect("Devices could not be resolved");
     let initialized = initialize(&Uuid::new_v4(),
                                  unique_devices.clone(),
                                  MIN_MDA_SECTORS,
                                  false)
-            .unwrap();
+            .expect("Block device could not be initialized");
     let total_blockdev_size: Sectors = initialized.iter().map(|i| i.avail_range().1).sum();
 
     let segments = initialized
@@ -51,14 +51,16 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
     let lineardev = LinearDev::setup(DmName::new("stratis_testing_linear").expect("valid format"),
                                      &dm,
                                      &segments)
-            .unwrap();
+            .expect("Linear device could not be set up");
     let lineardev_size = blkdev_size(&OpenOptions::new()
                                           .read(true)
                                           .open(lineardev.devnode())
-                                          .unwrap())
-            .unwrap();
+                                          .expect("Linear device node could not be opened"))
+            .expect("Blockdev size could not be read");
     assert!(total_blockdev_size.bytes() == lineardev_size);
-    lineardev.teardown(&dm).unwrap();
+    lineardev
+        .teardown(&dm)
+        .expect("Kernel's memory of device could not be erased");
 }
 
 

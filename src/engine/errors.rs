@@ -39,7 +39,7 @@ impl fmt::Display for EngineError {
         match *self {
             EngineError::Engine(_, ref msg) => write!(f, "Stratis error: {}", msg),
             EngineError::Io(ref err) => write!(f, "IO error: {}", err),
-            EngineError::Nix(ref err) => write!(f, "Nix error: {}", err.errno().desc()),
+            EngineError::Nix(ref err) => write!(f, "Nix error: {}", err),
             EngineError::Uuid(ref err) => write!(f, "Uuid error: {}", err),
             EngineError::Utf8(ref err) => write!(f, "Utf8 error: {}", err),
             EngineError::Serde(ref err) => write!(f, "Serde error: {}", err),
@@ -53,7 +53,7 @@ impl error::Error for EngineError {
         match *self {
             EngineError::Engine(_, ref msg) => msg,
             EngineError::Io(ref err) => err.description(),
-            EngineError::Nix(ref err) => err.errno().desc(),
+            EngineError::Nix(ref err) => err.description(),
             EngineError::Uuid(_) => "Uuid::ParseError",
             EngineError::Utf8(ref err) => err.description(),
             EngineError::Serde(ref err) => err.description(),

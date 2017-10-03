@@ -4,8 +4,14 @@ ${HOME}/.cargo/bin/cargo-fmt:
 ${HOME}/.cargo/bin/cargo-tree:
 	cargo install cargo-tree
 
+${HOME}/.cargo/bin/cargo-outdated:
+	cargo install cargo-outdated
+
 tree: ${HOME}/.cargo/bin/cargo-tree
 	PATH=${HOME}/.cargo/bin:${PATH} cargo tree
+
+outdated: ${HOME}/.cargo/bin/cargo-outdated
+	PATH=${HOME}/.cargo/bin:${PATH} cargo outdated
 
 fmt: ${HOME}/.cargo/bin/cargo-fmt
 	PATH=${HOME}/.cargo/bin:${PATH} cargo fmt -- --write-mode=diff
@@ -59,10 +65,12 @@ clippy:
 	RUSTFLAGS='-D warnings' cargo build --features "clippy"
 
 .PHONY:
-	fmt
 	build
-	test
+	clippy
 	docs
+	fmt
+	outdated
+	test
 	test-real
 	test-loop
-	clippy
+	tree

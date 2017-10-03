@@ -5,7 +5,6 @@
 // Manage the linear volume that stores metadata on pool levels 5-7.
 
 use std::convert::From;
-use std::error::Error;
 use std::fs::{create_dir, OpenOptions, read_dir, remove_file, rename};
 use std::io::ErrorKind;
 use std::io::prelude::*;
@@ -106,29 +105,15 @@ impl MetadataVol {
 
         {
             let mount = MountedMDV::mount(&mdv)?;
+            let filesystem_path = mount.mount_pt().join(FILESYSTEM_DIR);
 
-            if let Err(err) = create_dir(mount.mount_pt().join(FILESYSTEM_DIR)) {
+            if let Err(err) = create_dir(&filesystem_path) {
                 if err.kind() != ErrorKind::AlreadyExists {
                     return Err(From::from(err));
                 }
             }
 
-            for dir_e in read_dir(mount.mount_pt().join(FILESYSTEM_DIR))? {
-                let dir_e = dir_e?;
-
-                // Clean up any lingering .temp files. These should only
-                // exist if there was a crash during save_fs().
-                if dir_e.path().ends_with(".temp") {
-                    match remove_file(dir_e.path()) {
-                        Err(err) => {
-                            debug!("could not remove file {:?}: {}",
-                                   dir_e.path(),
-                                   err.description())
-                        }
-                        Ok(_) => debug!("Cleaning up temp file {:?}", dir_e.path()),
-                    }
-                }
-            }
+            let _ = remove_temp_files(&filesystem_path)?;
         }
 
         Ok(mdv)
@@ -215,4 +200,24 @@ impl MetadataVol {
 
         Ok(())
     }
+}
+
+/// Remove temp files from the designated directory.
+/// Returns an error if the directory can not be read.
+/// Persists if an individual directory entry can not be read due to an
+/// intermittent IO error.
+/// Returns the following summary values:
+///  * the number of temp files found
+///  * paths of those unremoved, if any
+fn remove_temp_files(dir: &Path) -> EngineResult<(u64, Vec<PathBuf>)> {
+    let mut found = 0;
+    let mut failed = Vec::new();
+    for path in read_dir(dir)?
+    .filter_map(|e| e.ok()) // Just ignore entry on intermittent IO error
+    .map(|e| e.path())
+    .filter(|p| p.ends_with(".temp")) {
+        found += 1;
+        remove_file(&path).unwrap_or_else(|_| failed.push(path));
+    }
+    Ok((found, failed))
 }

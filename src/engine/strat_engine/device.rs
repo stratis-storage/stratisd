@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufWriter, Seek, Write, SeekFrom};
+use std::io::{BufWriter, ErrorKind, Seek, SeekFrom, Write};
 use std::fs::OpenOptions;
 use std::os::linux::fs::MetadataExt;
 use std::os::unix::prelude::AsRawFd;
@@ -64,7 +64,12 @@ pub fn devnode_to_devno(path: &Path) -> EngineResult<Option<u64>> {
                    None
                })
         }
-        Err(err) => Err(err)?,
+        Err(err) => {
+            if err.kind() == ErrorKind::NotFound {
+                return Ok(None);
+            }
+            Err(err)?
+        }
     }
 }
 

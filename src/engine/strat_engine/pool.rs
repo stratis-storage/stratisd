@@ -11,7 +11,7 @@ use std::vec::Vec;
 use serde_json;
 use uuid::Uuid;
 
-use devicemapper::{Device, DM, Sectors};
+use devicemapper::{Device, DM, DmName, DmNameBuf, Sectors, ThinPoolDev};
 
 use super::super::engine::{Filesystem, BlockDev, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -116,6 +116,11 @@ impl StratPool {
 
     pub fn has_filesystems(&self) -> bool {
         self.thin_pool.has_filesystems()
+    }
+
+    /// The names of DM devices belonging to this pool that may generate events
+    pub fn get_eventing_dev_names(&self) -> Vec<DmNameBuf> {
+        self.thin_pool.get_eventing_dev_names()
     }
 }
 

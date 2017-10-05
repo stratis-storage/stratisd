@@ -10,8 +10,9 @@ use std::process::Command;
 use uuid::Uuid;
 
 use devicemapper as dm;
-use devicemapper::{DM, DataBlocks, DmDevice, DmName, IEC, LinearDev, MetaBlocks, Sectors, Segment,
-                   ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatusSummary, device_exists};
+use devicemapper::{DM, DataBlocks, DmDevice, DmName, DmNameBuf, IEC, LinearDev, MetaBlocks,
+                   Sectors, Segment, ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatusSummary,
+                   device_exists};
 
 use super::super::engine::{Filesystem, HasName};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -182,8 +183,6 @@ impl ThinPool {
                                         &format_flex_name(pool_uuid, FlexRole::ThinData),
                                         None,
                                         &map_to_dm(&data_segments))?;
-
-
 
         let thinpool_dev = ThinPoolDev::setup(dm,
                                               &thinpool_name,
@@ -539,6 +538,15 @@ impl ThinPool {
             self.filesystems.insert(filesystem);
             Ok(RenameAction::Renamed)
         }
+    }
+
+    /// The names of DM devices belonging to this pool that may generate events
+    pub fn get_eventing_dev_names(&self) -> Vec<DmNameBuf> {
+        vec![format_flex_name(self.pool_uuid, FlexRole::ThinMeta),
+             format_flex_name(self.pool_uuid, FlexRole::ThinData),
+             format_flex_name(self.pool_uuid, FlexRole::MetadataVolume),
+             format_thinpool_name(self.pool_uuid, ThinPoolRole::Pool)]
+
     }
 }
 

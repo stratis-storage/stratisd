@@ -61,28 +61,22 @@ impl ThinPool {
                low_water_mark: DataBlocks,
                block_mgr: &mut BlockDevMgr)
                -> EngineResult<ThinPool> {
-        if block_mgr.avail_space() < ThinPool::initial_size() {
-            let err_msg = format!("Space on pool must be at least {}, available space is only {}",
-                                  ThinPool::initial_size().bytes(),
-                                  block_mgr.avail_space().bytes());
-            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
-        }
+        let mut segments_list =
+            match block_mgr.alloc_space(&[ThinPool::initial_metadata_size(),
+                                          ThinPool::initial_metadata_size(),
+                                          ThinPool::initial_data_size(),
+                                          ThinPool::initial_mdv_size()]) {
+                Some(sl) => sl,
+                None => {
+                    let err_msg = "Could not allocate sufficient space for thinpool devices.";
+                    return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+                }
+            };
 
-        let meta_segments = block_mgr
-            .alloc_space(ThinPool::initial_metadata_size())
-            .expect("blockmgr must not fail, already checked for space");
-
-        let spare_segments = block_mgr
-            .alloc_space(ThinPool::initial_metadata_size())
-            .expect("blockmgr must not fail, already checked for space");
-
-        let data_segments = block_mgr
-            .alloc_space(ThinPool::initial_data_size())
-            .expect("blockmgr must not fail, already checked for space");
-
-        let mdv_segments = block_mgr
-            .alloc_space(ThinPool::initial_mdv_size())
-            .expect("blockmgr must not fail, already checked for space");
+        let mdv_segments = segments_list.pop().expect("len(segments_list) == 4");
+        let data_segments = segments_list.pop().expect("len(segments_list) == 3");
+        let spare_segments = segments_list.pop().expect("len(segments_list) == 2");
+        let meta_segments = segments_list.pop().expect("len(segments_list) == 1");
 
         // When constructing a thin-pool, Stratis reserves the first N
         // sectors on a block device by creating a linear device with a
@@ -246,14 +240,6 @@ impl ThinPool {
            })
     }
 
-
-    /// Initial size for a pool.
-    fn initial_size() -> Sectors {
-        // One extra meta for spare
-        ThinPool::initial_metadata_size() * 2u64 + ThinPool::initial_data_size() +
-        ThinPool::initial_mdv_size()
-    }
-
     /// Initial size for a pool's meta data device.
     fn initial_metadata_size() -> Sectors {
         INITIAL_META_SIZE.sectors()
@@ -359,8 +345,11 @@ impl ThinPool {
                        bd_mgr: &mut BlockDevMgr)
                        -> EngineResult<DataBlocks> {
         let extend_size = current_size;
-        if let Some(new_data_regions) = bd_mgr.alloc_space(*extend_size * DATA_BLOCK_SIZE) {
-            self.extend_data(dm, new_data_regions)?;
+        if let Some(mut new_data_regions) = bd_mgr.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
+            self.extend_data(dm,
+                             new_data_regions
+                                 .pop()
+                                 .expect("len(new_data_regions) == 1"))?;
         } else {
             let err_msg = format!("Insufficient space to accomodate request for {}",
                                   extend_size);

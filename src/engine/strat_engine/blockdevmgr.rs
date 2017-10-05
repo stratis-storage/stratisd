@@ -113,34 +113,48 @@ impl BlockDevMgr {
         wipe_blockdevs(&self.block_devs)
     }
 
-    /// If available space is less than size, return None, else return
-    /// the segments allocated.
-    pub fn alloc_space(&mut self, size: Sectors) -> Option<Vec<BlkDevSegment>> {
-        let mut needed: Sectors = size;
-        let mut segs = Vec::new();
-
-        if self.avail_space() < size {
+    /// Allocate space according to sizes vector request.
+    /// Return the segments allocated for each request, or None if it was
+    /// not possible to satisfy the request.
+    /// This method is atomic, it either allocates all requested or allocates
+    /// nothing.
+    pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<BlkDevSegment>>> {
+        let total_needed: Sectors = sizes.iter().cloned().sum();
+        if self.avail_space() < total_needed {
             return None;
         }
 
-        for bd in &mut self.block_devs {
-            if needed == Sectors(0) {
-                break;
-            }
+        let mut lists = Vec::new();
+        for &needed in sizes {
+            let mut alloc = Sectors(0);
+            let mut segs = Vec::new();
+            // TODO: Consider greater efficiency for allocation generally.
+            // Over time, the blockdevs at the start will be exhausted. It
+            // might be a good idea to keep an auxiliary structure, so that
+            // only blockdevs with some space left to allocate are accessed.
+            // In the context of this major inefficiency that ensues over time
+            // the obvious but more minor inefficiency of this inner loop is
+            // not worth worrying about.
+            for bd in &mut self.block_devs {
+                if alloc == needed {
+                    break;
+                }
 
-            let (gotten, r_segs) = bd.request_space(needed);
-            let blkdev_segs = r_segs
-                .into_iter()
-                .map(|(start, length)| {
-                         BlkDevSegment::new(*bd.uuid(), Segment::new(*bd.device(), start, length))
-                     });
-            segs.extend(blkdev_segs);
-            needed -= gotten;
+                let (gotten, r_segs) = bd.request_space(needed - alloc);
+                let blkdev_segs = r_segs
+                    .into_iter()
+                    .map(|(start, length)| {
+                             BlkDevSegment::new(*bd.uuid(),
+                                                Segment::new(*bd.device(), start, length))
+                         });
+                segs.extend(blkdev_segs);
+                alloc += gotten;
+            }
+            assert_eq!(alloc, needed);
+            lists.push(segs);
         }
 
-        assert_eq!(needed, Sectors(0));
-
-        Some(segs)
+        Some(lists)
     }
 
     pub fn devnodes(&self) -> Vec<PathBuf> {

@@ -76,9 +76,12 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
 
     let dm = DM::new().unwrap();
 
-    let meta_segs = bd_mgr
-        .alloc_space(Bytes(16 * IEC::Mi).sectors())
+    let mut seg_list = bd_mgr
+        .alloc_space(&[Bytes(16 * IEC::Mi).sectors(), Bytes(IEC::Gi).sectors()])
         .unwrap();
+    let data_segs = seg_list.pop().expect("len(seg_list) == 2");
+    let meta_segs = seg_list.pop().expect("len(seg_list) == 1");
+
     let metadata_dev =
         LinearDev::setup(&dm,
                          DmName::new("stratis_testing_thinpool_metadata").expect("valid format"),
@@ -92,7 +95,6 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
     // the same approach when constructing a thin pool.
     wipe_sectors(&metadata_dev.devnode(), Sectors(0), metadata_dev.size()).unwrap();
 
-    let data_segs = bd_mgr.alloc_space(Bytes(IEC::Gi).sectors()).unwrap();
     let data_dev =
         LinearDev::setup(&dm,
                          DmName::new("stratis_testing_thinpool_datadev").expect("valid format"),

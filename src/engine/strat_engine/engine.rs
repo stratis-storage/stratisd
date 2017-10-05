@@ -2,11 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::collections::HashMap;
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::Path;
 
-use devicemapper::DM;
+use devicemapper::{DM, DmNameBuf};
 
-use super::super::engine::{Engine, HasName, HasUuid, Pool};
+use super::super::engine::{Engine, Eventable, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{DevUuid, PoolUuid, Redundancy, RenameAction};
@@ -14,6 +16,8 @@ use super::super::types::{DevUuid, PoolUuid, Redundancy, RenameAction};
 use super::cleanup::teardown_pools;
 use super::pool::StratPool;
 use super::setup::find_all;
+
+const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DevOwnership {
@@ -25,6 +29,22 @@ pub enum DevOwnership {
 #[derive(Debug)]
 pub struct StratEngine {
     pools: Table<StratPool>,
+    // Maps name of DM devices we are watching to the most recent event number
+    // we've handled for each
+    watched_dev_last_event_nrs: HashMap<DmNameBuf, u32>,
+}
+
+impl Eventable for DM {
+    /// Get file we'd like to have monitored for activity
+    fn get_pollable_fd(&mut self) -> RawFd {
+        self.file().as_raw_fd()
+    }
+
+    fn clear_event(&mut self) -> EngineResult<()> {
+        self.arm_poll()?;
+
+        Ok(())
+    }
 }
 
 impl StratEngine {
@@ -32,9 +52,18 @@ impl StratEngine {
     /// 1. Verify the existance of Stratis /dev directory.
     /// 2. Setup all the pools belonging to the engine.
     ///
+    /// Returns an error if the kernel doesn't support required DM features.
     /// Returns an error if there was an error reading device nodes.
     /// Returns an error if there was an error setting up any of the pools.
     pub fn initialize() -> EngineResult<StratEngine> {
+        let minor_dm_version = DM::new()?.version()?.1;
+        if minor_dm_version < REQUIRED_DM_MINOR_VERSION {
+            let err_msg = format!("Requires DM minor version {} but kernel only supports {}",
+                                  REQUIRED_DM_MINOR_VERSION,
+                                  minor_dm_version);
+            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+        }
+
         let pools = find_all()?;
 
         let mut table = Table::default();
@@ -50,7 +79,10 @@ impl StratEngine {
             }
         }
 
-        Ok(StratEngine { pools: table })
+        Ok(StratEngine {
+               pools: table,
+               watched_dev_last_event_nrs: HashMap::new(),
+           })
     }
 
     /// Teardown Stratis, preparatory to a shutdown.
@@ -121,6 +153,32 @@ impl Engine for StratEngine {
 
     fn pools(&self) -> Vec<&Pool> {
         self.pools.into_iter().map(|x| x as &Pool).collect()
+    }
+
+    fn get_eventable(&mut self) -> EngineResult<Option<Box<Eventable>>> {
+        Ok(Some(Box::new(DM::new()?)))
+    }
+
+    fn evented(&mut self) -> EngineResult<()> {
+        let device_list: HashMap<_, _> = DM::new()?
+            .list_devices()?
+            .into_iter()
+            .map(|(dm_name, _, event_nr)| {
+                     (dm_name, event_nr.expect("Supported DM versions always provide a value"))
+                 })
+            .collect();
+
+        for pool in &mut self.pools {
+            for dm_name in pool.get_eventing_dev_names() {
+                if device_list.get(&dm_name) > self.watched_dev_last_event_nrs.get(&dm_name) {
+                    pool.event_on(&dm_name)?;
+                }
+            }
+        }
+
+        self.watched_dev_last_event_nrs = device_list;
+
+        Ok(())
     }
 }
 

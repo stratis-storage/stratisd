@@ -9,7 +9,7 @@ use std::iter::FromIterator;
 use std::path::Path;
 use std::rc::Rc;
 
-use super::super::engine::{Engine, HasName, HasUuid, Pool};
+use super::super::engine::{Engine, Eventable, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{PoolUuid, Redundancy, RenameAction};
@@ -94,6 +94,14 @@ impl Engine for SimEngine {
 
     fn pools(&self) -> Vec<&Pool> {
         self.pools.into_iter().map(|x| x as &Pool).collect()
+    }
+
+    fn get_eventable(&mut self) -> EngineResult<Option<Box<Eventable>>> {
+        Ok(None)
+    }
+
+    fn evented(&mut self) -> EngineResult<()> {
+        Ok(())
     }
 }
 

@@ -92,24 +92,27 @@ impl ThinPool {
         // superblock DM issue error messages because it triggers code paths
         // that are trying to re-adopt the device with the attributes that
         // have been passed.
-        let meta_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
-                                        dm,
+        let meta_dev = LinearDev::setup(dm,
+                                        &format_flex_name(&pool_uuid, FlexRole::ThinMeta),
+                                        None,
                                         &map_to_dm(&meta_segments))?;
         wipe_sectors(&meta_dev.devnode(),
                      Sectors(0),
                      ThinPool::initial_metadata_size())?;
 
-        let data_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::ThinData),
-                                        dm,
+        let data_dev = LinearDev::setup(dm,
+                                        &format_flex_name(&pool_uuid, FlexRole::ThinData),
+                                        None,
                                         &map_to_dm(&data_segments))?;
 
         let mdv_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
-        let mdv_dev = LinearDev::setup(&mdv_name, dm, &map_to_dm(&mdv_segments))?;
+        let mdv_dev = LinearDev::setup(dm, &mdv_name, None, &map_to_dm(&mdv_segments))?;
         let mdv = MetadataVol::initialize(&pool_uuid, mdv_dev)?;
 
         let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
-        let thinpool_dev = ThinPoolDev::new(name.as_ref(),
-                                            dm,
+        let thinpool_dev = ThinPoolDev::new(dm,
+                                            name.as_ref(),
+                                            None,
                                             data_block_size,
                                             low_water_mark,
                                             meta_dev,
@@ -179,21 +182,24 @@ impl ThinPool {
         let (meta_dev, meta_segments, spare_segments) =
             setup_metadev(dm, pool_uuid, &thinpool_name, meta_segments, spare_segments)?;
 
-        let data_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::ThinData),
-                                        dm,
+        let data_dev = LinearDev::setup(dm,
+                                        &format_flex_name(&pool_uuid, FlexRole::ThinData),
+                                        None,
                                         &map_to_dm(&data_segments))?;
 
 
 
-        let thinpool_dev = ThinPoolDev::setup(&thinpool_name,
-                                              dm,
+        let thinpool_dev = ThinPoolDev::setup(dm,
+                                              &thinpool_name,
+                                              None,
                                               data_block_size,
                                               low_water_mark,
                                               meta_dev,
                                               data_dev)?;
 
-        let mdv_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::MetadataVolume),
-                                       dm,
+        let mdv_dev = LinearDev::setup(dm,
+                                       &format_flex_name(&pool_uuid, FlexRole::MetadataVolume),
+                                       None,
                                        &map_to_dm(&mdv_segments))?;
         let mdv = MetadataVol::setup(&pool_uuid, mdv_dev)?;
         let filesystem_metadatas = mdv.filesystems()?;
@@ -203,8 +209,9 @@ impl ThinPool {
             // Set up a filesystem from its metadata.
             let get_filesystem = |fssave: &FilesystemSave| -> EngineResult<StratFilesystem> {
                 let device_name = format_thin_name(&pool_uuid, ThinRole::Filesystem(fssave.uuid));
-                let thin_dev = ThinDev::setup(device_name.as_ref(),
-                                              dm,
+                let thin_dev = ThinDev::setup(dm,
+                                              device_name.as_ref(),
+                                              None,
                                               &thinpool_dev,
                                               fssave.thin_id,
                                               fssave.size)?;
@@ -469,8 +476,9 @@ impl ThinPool {
                              -> EngineResult<FilesystemUuid> {
         let fs_uuid = Uuid::new_v4();
         let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fs_uuid));
-        let thin_dev = ThinDev::new(device_name.as_ref(),
-                                    dm,
+        let thin_dev = ThinDev::new(dm,
+                                    device_name.as_ref(),
+                                    None,
                                     &self.thin_pool,
                                     self.id_gen.new_id()?,
                                     size.unwrap_or(DEFAULT_THIN_DEV_SIZE))?;
@@ -546,8 +554,9 @@ fn setup_metadev(dm: &DM,
                  spare_segments: Vec<BlkDevSegment>)
                  -> EngineResult<(LinearDev, Vec<BlkDevSegment>, Vec<BlkDevSegment>)> {
     #![allow(collapsible_if)]
-    let mut meta_dev = LinearDev::setup(&format_flex_name(&pool_uuid, FlexRole::ThinMeta),
-                                        dm,
+    let mut meta_dev = LinearDev::setup(dm,
+                                        &format_flex_name(&pool_uuid, FlexRole::ThinMeta),
+                                        None,
                                         &map_to_dm(&meta_segments))?;
 
     if !device_exists(dm, thinpool_name)? {
@@ -575,9 +584,10 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
                        meta_dev: LinearDev,
                        spare_segments: &[BlkDevSegment])
                        -> EngineResult<LinearDev> {
-    let mut new_meta_dev = LinearDev::setup(&format_flex_name(&pool_uuid,
+    let mut new_meta_dev = LinearDev::setup(dm,
+                                            &format_flex_name(&pool_uuid,
                                                               FlexRole::ThinMetaSpare),
-                                            dm,
+                                            None,
                                             &map_to_dm(spare_segments))?;
 
 

@@ -122,8 +122,9 @@ pub fn test_thinpool_thindev_destroy(paths: &[&Path]) -> () {
 
     // Try to setup a thindev that has been destroyed
     let dm = DM::new().unwrap();
-    let thindev = ThinDev::setup(DmName::new("stratis_test_thin_dev").expect("valid format"),
-                                 &dm,
+    let thindev = ThinDev::setup(&dm,
+                                 DmName::new("stratis_test_thin_dev").expect("valid format"),
+                                 None,
                                  pool.thinpooldev(),
                                  fs_id,
                                  Sectors(128u64));

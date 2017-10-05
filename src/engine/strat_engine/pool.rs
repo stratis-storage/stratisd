@@ -103,11 +103,10 @@ impl StratPool {
         self.block_devs.save_state(data.as_bytes())
     }
 
-    pub fn check(&mut self) -> () {
+    pub fn check(&mut self) -> EngineResult<()> {
         self.thin_pool
             // FIXME: It's wrong to invite a crash with an unwrap() here.
             .check(&DM::new().unwrap(), &mut self.block_devs)
-            .unwrap_or(error!("Thin pool check did not succeed"))
     }
 
     /// Teardown a pool.

@@ -91,7 +91,8 @@ macro_rules! rename_pool_pre {
 macro_rules! check_engine {
     ( $s:ident ) => {
         for pool in &mut $s.pools {
-            pool.check();
+            // FIXME: It is not really correct to ignore result of pool.check().
+            let _ = pool.check();
         }
     }
 }

@@ -1,30 +1,20 @@
-os: linux
-group: edge
-
-addons:
-    apt:
-        packages:
-            libdbus-1-dev
-
+sudo: required
 language: rust
+env:
+    matrix:
+        - OS_TYPE=fedora
 
-matrix:
-    include:
-        - rust: stable
-          env: TASK=fmt
-        - rust: stable
-          env: TASK=build
-        - rust: stable
-          env: TASK=docs
-        - rust: stable
-          env: TASK=test
-        - rust: stable
-          sudo: required
-          env: TASK=test-loop
-        - rust: nightly
-          env: TASK=clippy
+services:
+    - docker
+
+before_install:
+    - docker pull $OS_TYPE
 
 branches:
     only: master
 
-script: make -f Makefile $TASK
+script:
+     - travis_wait 30
+         docker run --privileged --rm=true --tty=true
+         -v /dev:/dev:rw -v `pwd`:/stratisd-code:rw $OS_TYPE
+         /bin/bash -c /stratisd-code/tests/docker_travis_test.sh 

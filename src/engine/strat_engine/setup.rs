@@ -37,16 +37,21 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
         let dir_e = dir_e?;
         let devnode = dir_e.path();
 
-        let devno = match devnode_to_devno(&devnode)? {
-            None => continue,
-            Some(devno) => {
-                // If this device has already been processed, continue.
-                if devno_set.insert(devno) {
-                    devno
-                } else {
-                    continue;
+        let devno = match devnode_to_devno(&devnode) {
+            Ok(result) => {
+                match result {
+                    None => continue,
+                    Some(devno) => {
+                        // If this device has already been processed, continue.
+                        if devno_set.insert(devno) {
+                            devno
+                        } else {
+                            continue;
+                        }
+                    }
                 }
             }
+            Err(_) => continue,
         };
 
         let f = OpenOptions::new().read(true).open(&devnode);

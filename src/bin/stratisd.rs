@@ -85,20 +85,51 @@ fn run() -> StratisResult<()> {
 
     let (dbus_conn, mut tree, dbus_context) = libstratis::dbus_api::connect(Rc::clone(&engine))?;
 
-    // Get a list of fds to poll for
-    let mut fds: Vec<_> = dbus_conn
-        .watch_fds()
-        .iter()
-        .map(|w| w.to_pollfd())
-        .collect();
+    let mut fds = Vec::new();
+
+    let mut eventable = engine.borrow_mut().get_eventable()?;
+    let engine_fds_end_idx = match eventable {
+        Some(ref mut evt) => {
+            fds.push(libc::pollfd {
+                         fd: evt.get_pollable_fd(),
+                         revents: 0,
+                         events: libc::POLLIN,
+                     });
+            1
+        }
+        None => 0,
+    };
+
+    // Don't timeout if eventable lets us be event-driven
+    let poll_timeout = if engine_fds_end_idx != 0 { -1 } else { 10000 };
 
     loop {
-        // Poll them with a 10 s timeout
-        let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, 10000) };
-        assert!(r >= 0);
+        // Unconditionally call evented() if engine has no eventable.
+        // This looks like a bad idea, but the only engine that has
+        // no eventable is the sim engine, and for that engine, evented()
+        // is essentially a no-op.
+        if engine_fds_end_idx == 0 {
+            engine.borrow_mut().evented()?;
+        }
 
-        // And handle incoming events
-        for pfd in fds.iter().filter(|pfd| pfd.revents != 0) {
+        // Handle engine fd, if there is one.
+        // If engine has no eventable, there is no engine fd; in that case
+        // the body of the loop is executed zero times.
+        for pfd in fds[..engine_fds_end_idx]
+                .iter_mut()
+                .filter(|pfd| pfd.revents != 0) {
+            pfd.revents = 0;
+            eventable
+                .as_mut()
+                .expect("index < engine_fds_end_idx <=> index == 0 <=> eventable.is_some()")
+                .clear_event()?;
+            engine.borrow_mut().evented()?;
+        }
+
+        // Iterate through D-Bus file descriptors
+        for pfd in fds[engine_fds_end_idx..]
+                .iter()
+                .filter(|pfd| pfd.revents != 0) {
             for item in dbus_conn.watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents)) {
                 if let Err(r) = libstratis::dbus_api::handle(&dbus_conn,
                                                              &item,
@@ -109,8 +140,13 @@ fn run() -> StratisResult<()> {
             }
         }
 
-        // Ask the engine to check its pools
-        engine.borrow_mut().check()
+        // Refresh list of dbus fds to poll for every time. This can change as
+        // D-Bus clients come and go.
+        fds.truncate(engine_fds_end_idx);
+        fds.extend(dbus_conn.watch_fds().iter().map(|w| w.to_pollfd()));
+
+        let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, poll_timeout) };
+        assert!(r >= 0);
     }
 }
 

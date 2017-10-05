@@ -181,6 +181,7 @@ pub fn xfs_growfs(mount_point: &Path) -> EngineResult<()> {
 pub fn create_fs(devnode: &Path) -> EngineResult<()> {
     if Command::new("mkfs.xfs")
            .arg("-f")
+           .arg("-q")
            .arg(&devnode)
            .status()?
            .success() {

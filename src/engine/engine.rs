@@ -31,13 +31,13 @@ pub trait BlockDev: HasUuid {
     fn devnode(&self) -> PathBuf;
 
     /// Get the user-settable string associated with this blockdev.
-    fn user_id(&self) -> &Option<String>;
+    fn user_info(&self) -> Option<&str>;
 
     /// Set the user-settable string associated with this blockdev.
-    fn set_user_id(&mut self, user_id: Option<&str>) -> EngineResult<()>;
+    fn set_user_info(&mut self, user_info: Option<&str>) -> EngineResult<()>;
 
     /// Get the hardware ID for this blockdev.
-    fn hardware_id(&self) -> &Option<String>;
+    fn hardware_info(&self) -> Option<&str>;
 
     /// The time that this blockdev was initialized by Stratis.
     fn initialization_time(&self) -> DateTime<Utc>;
@@ -128,8 +128,7 @@ pub trait Pool: HasName + HasUuid {
 
 pub trait Engine: Debug {
     /// Create a Stratis pool.
-    /// Returns the UUID of the newly created pool and the blockdevs the
-    /// pool contains.
+    /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a
     /// supported redundancy.
     fn create_pool(&mut self,

@@ -203,7 +203,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                 let (location, disk_id) = pool_save
                     .block_devs
                     .get(&bda.dev_uuid())
-                    .map(|bd_save| (bd_save.location.clone(), bd_save.disk_id.clone()))
+                    .map(|bd_save| (bd_save.user_info.clone(), bd_save.hardware_info.clone()))
                     .unwrap_or((None, None));
 
                 blockdevs.push(StratBlockDev::new(*device,

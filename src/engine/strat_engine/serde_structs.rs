@@ -42,9 +42,9 @@ pub struct BlockDevSave {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dev: Option<PathBuf>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub location: Option<String>,
+    pub user_info: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub disk_id: Option<String>,
+    pub hardware_info: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

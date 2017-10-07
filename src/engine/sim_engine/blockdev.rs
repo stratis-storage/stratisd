@@ -24,8 +24,8 @@ pub struct SimDev {
     pub devnode: PathBuf,
     rdm: Rc<RefCell<Randomizer>>,
     pub uuid: Uuid,
-    location: Option<String>,
-    disk_id: Option<String>,
+    user_info: Option<String>,
+    hardware_info: Option<String>,
     initialization_time: u64,
 }
 
@@ -34,17 +34,17 @@ impl BlockDev for SimDev {
         self.devnode.clone()
     }
 
-    fn user_id(&self) -> &Option<String> {
-        &self.location
+    fn user_info(&self) -> Option<&str> {
+        self.user_info.as_ref().map(|x| &**x)
     }
 
-    fn set_user_id(&mut self, location: Option<&str>) -> EngineResult<()> {
-        self.location = location.map(|x| x.to_owned());
+    fn set_user_info(&mut self, user_info: Option<&str>) -> EngineResult<()> {
+        self.user_info = user_info.map(|x| x.to_owned());
         Ok(())
     }
 
-    fn hardware_id(&self) -> &Option<String> {
-        &self.disk_id
+    fn hardware_info(&self) -> Option<&str> {
+        self.hardware_info.as_ref().map(|x| &**x)
     }
 
     fn initialization_time(&self) -> DateTime<Utc> {
@@ -73,8 +73,8 @@ impl SimDev {
             devnode: devnode.to_owned(),
             rdm: rdm,
             uuid: Uuid::new_v4(),
-            location: None,
-            disk_id: None,
+            user_info: None,
+            hardware_info: None,
             initialization_time: Utc::now().timestamp() as u64,
         }
     }

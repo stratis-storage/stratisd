@@ -37,7 +37,7 @@ pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
                                 -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
-    let set_userid_method = f.method("SetUserId", (), set_user_id)
+    let set_userid_method = f.method("SetUserInfo", (), set_user_info)
         .in_arg(("id", "s"))
         .out_arg(("changed", "b"))
         .out_arg(("return_code", "q"))
@@ -48,15 +48,15 @@ pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_blockdev_devnode);
 
-    let hardware_id_property = f.property::<&str, _>("HardwareId", ())
+    let hardware_info_property = f.property::<&str, _>("HardwareId", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
-        .on_get(get_blockdev_hardware_id);
+        .on_get(get_blockdev_hardware_info);
 
-    let user_id_property = f.property::<&str, _>("UserId", ())
+    let user_info_property = f.property::<&str, _>("UserId", ())
         .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::Const)
-        .on_get(get_blockdev_user_id);
+        .emits_changed(EmitsChangedSignal::False)
+        .on_get(get_blockdev_user_info);
 
     let initialization_time_property = f.property::<&str, _>("InitializationTime", ())
         .access(Access::Read)
@@ -68,7 +68,7 @@ pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_physical_size);
 
-    let state_property = f.property::<&str, _>("State", ())
+    let state_property = f.property::<u16, _>("State", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_state);
@@ -94,12 +94,12 @@ pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
         .add(f.interface(interface_name, ())
                  .add_m(set_userid_method)
                  .add_p(devnode_property)
-                 .add_p(hardware_id_property)
+                 .add_p(hardware_info_property)
                  .add_p(initialization_time_property)
                  .add_p(total_physical_size_property)
                  .add_p(pool_property)
                  .add_p(state_property)
-                 .add_p(user_id_property)
+                 .add_p(user_info_property)
                  .add_p(uuid_property));
 
     let path = object_path.get_name().to_owned();
@@ -107,7 +107,7 @@ pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
     path
 }
 
-fn set_user_id(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -138,12 +138,12 @@ fn set_user_id(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                                            &blockdev_uuid))
                             })?;
 
-        let id_changed = blockdev.user_id() != &Some(new_id.to_owned());
+        let id_changed = blockdev.user_info() != Some(new_id);
 
         blockdev
-            .set_user_id(Some(new_id))
+            .set_user_info(Some(new_id))
             .map_err(|err| {
-                         MethodErr::failed(&format!("set_user_id failed for object path {}: {}",
+                         MethodErr::failed(&format!("set_user_info failed for object path {}: {}",
                                                     object_path,
                                                     err))
                      })?;
@@ -225,30 +225,20 @@ fn get_blockdev_devnode(i: &mut IterAppend,
                           |p| Ok(MessageItem::Str(format!("{}", p.devnode().display()))))
 }
 
-fn get_blockdev_hardware_id(i: &mut IterAppend,
-                            p: &PropInfo<MTFn<TData>, TData>)
-                            -> Result<(), MethodErr> {
-    fn get_hardware_id(blockdev: &BlockDev) -> Result<MessageItem, MethodErr> {
-        match *blockdev.hardware_id() {
-            Some(ref id) => Ok(MessageItem::Str(id.to_owned())),
-            None => Ok(MessageItem::Str("".to_owned())),
-        }
-    }
-
-    get_blockdev_property(i, p, get_hardware_id)
+fn get_blockdev_hardware_info(i: &mut IterAppend,
+                              p: &PropInfo<MTFn<TData>, TData>)
+                              -> Result<(), MethodErr> {
+    get_blockdev_property(i,
+                          p,
+                          |p| Ok(MessageItem::Str(p.hardware_info().unwrap_or("").to_owned())))
 }
 
-fn get_blockdev_user_id(i: &mut IterAppend,
-                        p: &PropInfo<MTFn<TData>, TData>)
-                        -> Result<(), MethodErr> {
-    fn get_user_id(blockdev: &BlockDev) -> Result<MessageItem, MethodErr> {
-        match *blockdev.user_id() {
-            Some(ref id) => Ok(MessageItem::Str(id.to_owned())),
-            None => Ok(MessageItem::Str("".to_owned())),
-        }
-    }
-
-    get_blockdev_property(i, p, get_user_id)
+fn get_blockdev_user_info(i: &mut IterAppend,
+                          p: &PropInfo<MTFn<TData>, TData>)
+                          -> Result<(), MethodErr> {
+    get_blockdev_property(i,
+                          p,
+                          |p| Ok(MessageItem::Str(p.user_info().unwrap_or("").to_owned())))
 }
 
 fn get_blockdev_initialization_time(i: &mut IterAppend,
@@ -272,13 +262,13 @@ fn get_blockdev_state(i: &mut IterAppend,
                       -> Result<(), MethodErr> {
     fn get_state(blockdev: &BlockDev) -> Result<MessageItem, MethodErr> {
         let state = match blockdev.state() {
-            BlockDevState::Missing => "Missing".into(),
-            BlockDevState::Bad => "Bad".into(),
-            BlockDevState::Spare => "Spare".into(),
-            BlockDevState::NotInUse => "Not-in-use".into(),
-            BlockDevState::InUse => "In-use".into(),
+            BlockDevState::Missing => 0,
+            BlockDevState::Bad => 1,
+            BlockDevState::Spare => 2,
+            BlockDevState::NotInUse => 3,
+            BlockDevState::InUse => 4,
         };
-        Ok(MessageItem::Str(state))
+        Ok(MessageItem::UInt16(state))
     }
 
     get_blockdev_property(i, p, get_state)

@@ -26,8 +26,8 @@ pub struct StratBlockDev {
     pub devnode: PathBuf,
     bda: BDA,
     used: RangeAllocator,
-    location: Option<String>,
-    disk_id: Option<String>,
+    user_info: Option<String>,
+    hardware_info: Option<String>,
 }
 
 impl StratBlockDev {
@@ -35,16 +35,16 @@ impl StratBlockDev {
                devnode: PathBuf,
                bda: BDA,
                allocator: RangeAllocator,
-               location: Option<String>,
-               disk_id: Option<String>)
+               user_info: Option<String>,
+               hardware_info: Option<String>)
                -> StratBlockDev {
         StratBlockDev {
             dev: dev,
             devnode: devnode,
             bda: bda,
             used: allocator,
-            location: location,
-            disk_id: disk_id,
+            user_info: user_info,
+            hardware_info: hardware_info,
         }
     }
 
@@ -136,17 +136,17 @@ impl BlockDev for StratBlockDev {
         self.devnode.clone()
     }
 
-    fn user_id(&self) -> &Option<String> {
-        &self.location
+    fn user_info(&self) -> Option<&str> {
+        self.user_info.as_ref().map(|x| &**x)
     }
 
-    fn set_user_id(&mut self, location: Option<&str>) -> EngineResult<()> {
-        self.location = location.map(|x| x.to_owned());
+    fn set_user_info(&mut self, user_info: Option<&str>) -> EngineResult<()> {
+        self.user_info = user_info.map(|x| x.to_owned());
         Ok(())
     }
 
-    fn hardware_id(&self) -> &Option<String> {
-        &self.disk_id
+    fn hardware_info(&self) -> Option<&str> {
+        self.hardware_info.as_ref().map(|x| &**x)
     }
 
     fn initialization_time(&self) -> DateTime<Utc> {
@@ -167,8 +167,8 @@ impl Recordable<BlockDevSave> for StratBlockDev {
     fn record(&self) -> BlockDevSave {
         BlockDevSave {
             dev: Some(self.devnode.clone()),
-            location: self.location.clone(),
-            disk_id: self.disk_id.clone(),
+            user_info: self.user_info.clone(),
+            hardware_info: self.hardware_info.clone(),
         }
     }
 }

@@ -52,7 +52,7 @@ pub fn test_thinpool_expand(paths: &[&Path]) -> () {
             // TODO: Actually handle DM events and possibly call extend() directly,
             // depending on the specificity of the events.
             if i == *(*(INITIAL_DATA_SIZE - DATA_LOWATER) * DATA_BLOCK_SIZE) {
-                pool.check();
+                pool.check().unwrap();
             }
         }
     }

@@ -55,7 +55,9 @@ impl SimPool {
         }
     }
 
-    pub fn check(&mut self) -> () {}
+    pub fn check(&mut self) -> EngineResult<()> {
+        Ok(())
+    }
 
     pub fn has_filesystems(&self) -> bool {
         !self.filesystems.is_empty()

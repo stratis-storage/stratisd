@@ -48,8 +48,9 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
         .collect::<Vec<_>>();
 
     let dm = DM::new().unwrap();
-    let lineardev = LinearDev::setup(DmName::new("stratis_testing_linear").expect("valid format"),
-                                     &dm,
+    let lineardev = LinearDev::setup(&dm,
+                                     DmName::new("stratis_testing_linear").expect("valid format"),
+                                     None,
                                      &segments)
             .unwrap();
     let lineardev_size = blkdev_size(&OpenOptions::new()
@@ -79,8 +80,9 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
         .alloc_space(Bytes(16 * IEC::Mi).sectors())
         .unwrap();
     let metadata_dev =
-        LinearDev::setup(DmName::new("stratis_testing_thinpool_metadata").expect("valid format"),
-                         &dm,
+        LinearDev::setup(&dm,
+                         DmName::new("stratis_testing_thinpool_metadata").expect("valid format"),
+                         None,
                          &map_to_dm(&meta_segs))
                 .unwrap();
 
@@ -92,20 +94,23 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
 
     let data_segs = bd_mgr.alloc_space(Bytes(IEC::Gi).sectors()).unwrap();
     let data_dev =
-        LinearDev::setup(DmName::new("stratis_testing_thinpool_datadev").expect("valid format"),
-                         &dm,
+        LinearDev::setup(&dm,
+                         DmName::new("stratis_testing_thinpool_datadev").expect("valid format"),
+                         None,
                          &map_to_dm(&data_segs))
                 .unwrap();
     let thinpool_dev =
-        ThinPoolDev::new(DmName::new("stratis_testing_thinpool").expect("valid format"),
-                         &dm,
+        ThinPoolDev::new(&dm,
+                         DmName::new("stratis_testing_thinpool").expect("valid format"),
+                         None,
                          Sectors(1024),
                          DataBlocks(256000),
                          metadata_dev,
                          data_dev)
                 .unwrap();
-    let thin_dev = ThinDev::new(DmName::new("stratis_testing_thindev").expect("valid format"),
-                                &dm,
+    let thin_dev = ThinDev::new(&dm,
+                                DmName::new("stratis_testing_thindev").expect("valid format"),
+                                None,
                                 &thinpool_dev,
                                 ThinDevId::new_u64(7).expect("7 is small enough"),
                                 Sectors(300000))

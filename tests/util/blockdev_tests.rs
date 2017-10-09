@@ -137,7 +137,7 @@ pub fn test_blockdevmgr_used(paths: &[&Path]) -> () {
                mgr.current_capacity());
 
     let allocated = Sectors(2);
-    mgr.alloc_space(allocated).unwrap();
+    mgr.alloc_space(&[allocated]).unwrap();
     assert_eq!(mgr.avail_space() + allocated + mgr.metadata_size(),
                mgr.current_capacity());
 }

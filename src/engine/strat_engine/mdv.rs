@@ -22,8 +22,9 @@ use super::super::engine::HasUuid;
 use super::super::errors::EngineResult;
 use super::super::types::{FilesystemUuid, PoolUuid};
 
-use super::filesystem::{create_fs, StratFilesystem};
+use super::filesystem::StratFilesystem;
 use super::serde_structs::{FilesystemSave, Recordable};
+use super::util::create_fs;
 
 // TODO: Monitor fs size and extend linear and fs if needed
 // TODO: Document format of stuff on MDV in SWDD (currently ad-hoc)

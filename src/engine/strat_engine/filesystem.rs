@@ -18,6 +18,7 @@ use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::FilesystemUuid;
 
 use super::serde_structs::{FilesystemSave, Recordable};
+use super::util::{create_fs, set_uuid, xfs_growfs};
 
 /// TODO: confirm that 256 MiB leaves enough time for stratisd to respond and extend before
 /// the filesystem is out of space.
@@ -208,51 +209,4 @@ pub fn fs_usage(mount_point: &Path) -> EngineResult<(Bytes, Bytes)> {
     let mut stat = Statvfs::default();
     statvfs(mount_point, &mut stat)?;
     Ok((Bytes(stat.f_bsize * stat.f_blocks), Bytes(stat.f_bsize * (stat.f_blocks - stat.f_bfree))))
-}
-
-/// Use the xfs_growfs command to expand a filesystem mounted at the given
-/// mount point.
-pub fn xfs_growfs(mount_point: &Path) -> EngineResult<()> {
-    if Command::new("xfs_growfs")
-           .arg(mount_point)
-           .arg("-d")
-           .status()?
-           .success() {
-        Ok(())
-    } else {
-        let err_msg = format!("Failed to expand filesystem {:?}", mount_point);
-        Err(EngineError::Engine(ErrorEnum::Error, err_msg))
-    }
-}
-
-/// Create a filesystem on devnode.
-pub fn create_fs(devnode: &Path, uuid: &FilesystemUuid) -> EngineResult<()> {
-    if Command::new("mkfs.xfs")
-           .arg("-f")
-           .arg("-q")
-           .arg(&devnode)
-           .arg("-m")
-           .arg(format!("uuid={}", uuid))
-           .status()?
-           .success() {
-        Ok(())
-    } else {
-        let err_msg = format!("Failed to create new filesystem at {:?}", devnode);
-        Err(EngineError::Engine(ErrorEnum::Error, err_msg))
-    }
-}
-
-/// Generate a new UUID filesystem on the devnode.
-pub fn set_uuid(devnode: &Path, snapshot_fs_uuid: FilesystemUuid) -> EngineResult<()> {
-    if Command::new("xfs_admin")
-           .arg("-U")
-           .arg(format!("{}", snapshot_fs_uuid))
-           .arg(&devnode)
-           .status()?
-           .success() {
-        Ok(())
-    } else {
-        let err_msg = format!("Failed to generate UUID for filesystem at {:?}", devnode);
-        Err(EngineError::Engine(ErrorEnum::Error, err_msg))
-    }
 }

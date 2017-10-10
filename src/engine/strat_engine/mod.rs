@@ -16,5 +16,6 @@ pub mod serde_structs;
 pub mod setup;
 mod range_alloc;
 mod thinpool;
+pub mod util;
 
 pub use self::engine::StratEngine;

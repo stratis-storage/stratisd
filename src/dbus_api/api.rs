@@ -66,9 +66,9 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(pool_uuid) => {
             let pool_object_path: dbus::Path =
                 create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
-            let return_sig = "(oao)";
-            let default_return = MessageItem::Array(vec![], return_sig.into());
-
+            let default_return =
+                MessageItem::Struct(vec![MessageItem::ObjectPath(default_object_path()),
+                                         MessageItem::Array(vec![], "o".into())]);
             let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
             let mut bd_object_paths = Vec::new();
@@ -264,8 +264,9 @@ pub fn connect(engine: Rc<RefCell<Engine>>)
     let (tree, object_path) = get_base_tree(DbusContext::new(engine));
     let dbus_context = tree.get_data().clone();
 
-    // This should never panic as create_dbus_pool() and
-    // create_dbus_filesystem() do not borrow the engine.
+    // This should never panic as create_dbus_pool(),
+    // create_dbus_filesystem(), and create_dbus_blockdev() do not borrow the
+    // engine.
     for pool in local_engine.borrow().pools() {
         let pool_path = create_dbus_pool(&dbus_context, object_path.clone(), pool.uuid());
         for fs_uuid in pool.filesystems().iter().map(|f| f.uuid()) {

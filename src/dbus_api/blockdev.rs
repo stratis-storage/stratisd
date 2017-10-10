@@ -48,12 +48,12 @@ pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_blockdev_devnode);
 
-    let hardware_info_property = f.property::<&str, _>("HardwareId", ())
+    let hardware_info_property = f.property::<&str, _>("HardwareInfo", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_blockdev_hardware_info);
 
-    let user_info_property = f.property::<&str, _>("UserId", ())
+    let user_info_property = f.property::<&str, _>("UserInfo", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_user_info);
@@ -150,6 +150,7 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         id_changed
     };
 
+    // FIXME: engine should decide to save state, not this function
     pool.save_state()
         .map_err(|err| {
                      MethodErr::failed(&format!("Could not save state for object path {}: {}",

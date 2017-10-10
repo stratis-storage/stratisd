@@ -174,18 +174,16 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let result = pool.add_blockdevs(&blockdevs, force);
     let msg = match result {
-        Ok(ref infos) => {
-            let mut return_value = Vec::new();
-            for uuid in infos {
-                let bd_object_path: dbus::Path =
-                    create_dbus_blockdev(dbus_context, object_path.clone(), *uuid);
-                return_value.push(bd_object_path);
-            }
-
-            let return_value = return_value
+        Ok(uuids) => {
+            let return_value = uuids
                 .iter()
-                .map(|p| MessageItem::ObjectPath(p.clone()))
+                .map(|uuid| {
+                         MessageItem::ObjectPath(create_dbus_blockdev(dbus_context,
+                                                                      object_path.clone(),
+                                                                      *uuid))
+                     })
                 .collect();
+
             let return_value = MessageItem::Array(return_value, return_sig.into());
             let (rc, rs) = ok_message_items();
             return_message.append3(return_value, rc, rs)

@@ -27,7 +27,6 @@ use util::blockdev_tests::test_force_flag_dirty;
 use util::blockdev_tests::test_force_flag_stratis;
 use util::blockdev_tests::test_pool_blockdevs;
 use util::dm_tests::test_thinpool_device;
-use util::dm_tests::test_linear_device;
 use util::filesystem_tests::test_xfs_expand;
 use util::pool_tests::test_filesystem_rename;
 use util::pool_tests::test_filesystem_snapshot;
@@ -149,13 +148,6 @@ fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
 pub fn real_test_force_flag_stratis() {
     test_with_spec(DeviceLimits::AtLeast(1), test_force_flag_stratis);
 }
-
-
-#[test]
-pub fn real_test_linear_device() {
-    test_with_spec(DeviceLimits::AtLeast(1), test_linear_device);
-}
-
 
 #[test]
 pub fn real_test_thinpool_device() {

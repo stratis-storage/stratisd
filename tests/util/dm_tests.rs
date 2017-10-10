@@ -20,46 +20,12 @@ use self::tempdir::TempDir;
 use self::uuid::Uuid;
 
 use self::devicemapper::{Bytes, DM, DataBlocks, DmDevice, DmName, IEC, LinearDev, Sectors,
-                         Segment, ThinDev, ThinDevId, ThinPoolDev};
+                         ThinDev, ThinDevId, ThinPoolDev};
 
-use libstratis::engine::strat_engine::blockdevmgr::{BlockDevMgr, initialize, map_to_dm};
-use libstratis::engine::strat_engine::device::{blkdev_size, resolve_devices, wipe_sectors};
+use libstratis::engine::strat_engine::blockdevmgr::{BlockDevMgr, map_to_dm};
+use libstratis::engine::strat_engine::device::wipe_sectors;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
 use libstratis::engine::strat_engine::util::create_fs;
-
-/// Verify that the sum of the lengths of the available range of the
-/// blockdevs in the linear device equals the size of the linear device.
-pub fn test_linear_device(paths: &[&Path]) -> () {
-    let unique_devices = resolve_devices(&paths).unwrap();
-    let initialized = initialize(Uuid::new_v4(),
-                                 unique_devices.clone(),
-                                 MIN_MDA_SECTORS,
-                                 false)
-            .unwrap();
-    let total_blockdev_size: Sectors = initialized.iter().map(|i| i.avail_range().1).sum();
-
-    let segments = initialized
-        .iter()
-        .map(|block_dev| {
-                 let (start, length) = block_dev.avail_range();
-                 Segment::new(*block_dev.device(), start, length)
-             })
-        .collect::<Vec<_>>();
-
-    let dm = DM::new().unwrap();
-    let lineardev = LinearDev::setup(&dm,
-                                     DmName::new("stratis_testing_linear").expect("valid format"),
-                                     None,
-                                     &segments)
-            .unwrap();
-    let lineardev_size = blkdev_size(&OpenOptions::new()
-                                          .read(true)
-                                          .open(lineardev.devnode())
-                                          .unwrap())
-            .unwrap();
-    assert!(total_blockdev_size.bytes() == lineardev_size);
-    lineardev.teardown(&dm).unwrap();
-}
 
 
 /// Verify no errors when writing files to a mounted filesystem on a thin

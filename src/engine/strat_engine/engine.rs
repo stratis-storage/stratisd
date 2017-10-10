@@ -59,11 +59,6 @@ impl StratEngine {
     pub fn teardown(self) -> EngineResult<()> {
         teardown_pools(self.pools.empty())
     }
-
-    /// Get pool as StratPool
-    pub fn get_strat_pool(&self, uuid: PoolUuid) -> Option<&StratPool> {
-        self.pools.get_by_uuid(uuid)
-    }
 }
 
 impl Engine for StratEngine {
@@ -128,5 +123,85 @@ impl Engine for StratEngine {
 
     fn pools(&self) -> Vec<&Pool> {
         self.pools.into_iter().map(|x| x as &Pool).collect()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::super::tests::{loopbacked, real};
+
+    use super::*;
+
+
+    /// Verify that a pool rename causes the pool metadata to get the new name.
+    fn test_pool_rename(paths: &[&Path]) {
+        let mut engine = StratEngine::initialize().unwrap();
+
+        let name1 = "name1";
+        let uuid1 = engine.create_pool(&name1, paths, None, false).unwrap();
+
+        let name2 = "name2";
+        let action = engine.rename_pool(uuid1, name2).unwrap();
+
+        assert_eq!(action, RenameAction::Renamed);
+        engine.teardown().unwrap();
+
+        let engine = StratEngine::initialize().unwrap();
+        let pool_name: String = engine.get_pool(uuid1).unwrap().name().into();
+        assert_eq!(pool_name, name2);
+        engine.teardown().unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_pool_rename() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_pool_rename);
+    }
+
+    #[test]
+    pub fn real_test_pool_rename() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_pool_rename);
+    }
+
+    /// Test engine setup.
+    /// 1. Create two pools.
+    /// 2. Verify that both exist.
+    /// 3. Teardown the engine.
+    /// 4. Verify that pools are gone.
+    /// 5. Initialize the engine.
+    /// 6. Verify that pools can be found again.
+    fn test_setup(paths: &[&Path]) {
+        assert!(paths.len() > 1);
+
+        let (paths1, paths2) = paths.split_at(paths.len() / 2);
+
+        let mut engine = StratEngine::initialize().unwrap();
+
+        let name1 = "name1";
+        let uuid1 = engine.create_pool(&name1, paths1, None, false).unwrap();
+
+        let name2 = "name2";
+        let uuid2 = engine.create_pool(&name2, paths2, None, false).unwrap();
+
+        assert!(engine.get_pool(uuid1).is_some());
+        assert!(engine.get_pool(uuid2).is_some());
+
+        engine.teardown().unwrap();
+
+        let engine = StratEngine::initialize().unwrap();
+
+        assert!(engine.get_pool(uuid1).is_some());
+        assert!(engine.get_pool(uuid2).is_some());
+
+        engine.teardown().unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_setup() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_setup);
+    }
+
+    #[test]
+    pub fn real_test_setup() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_setup);
     }
 }

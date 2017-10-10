@@ -163,6 +163,7 @@ impl BlockDevMgr {
         Some(lists)
     }
 
+    #[allow(dead_code)]
     pub fn devnodes(&self) -> Vec<PathBuf> {
         self.block_devs
             .values()
@@ -365,4 +366,335 @@ pub fn initialize(pool_uuid: PoolUuid,
         }
     }
     Ok(bds)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    use nix::mount::{MNT_DETACH, MsFlags, mount, umount2};
+    use rand;
+    use uuid::Uuid;
+
+
+    use devicemapper::{DM, DataBlocks, DmDevice, DmName, LinearDev, SECTOR_SIZE, ThinDev,
+                       ThinDevId, ThinPoolDev};
+
+    use super::super::device::{resolve_devices, wipe_sectors, write_sectors};
+    use super::super::metadata::{BDA_STATIC_HDR_SECTORS, MIN_MDA_SECTORS};
+    use super::super::setup::{find_all, get_metadata};
+    use super::super::tests::{loopbacked, real};
+    use super::super::tests::tempdir::TempDir;
+    use super::super::util::create_fs;
+
+    use super::*;
+
+    /// Verify that initially,
+    /// current_capacity() - metadata_size() = avail_space().
+    /// After 2 Sectors have been allocated, that amount must also be included
+    /// in balance.
+    fn test_blockdevmgr_used(paths: &[&Path]) -> () {
+        let mut mgr = BlockDevMgr::initialize(Uuid::new_v4(), paths, MIN_MDA_SECTORS, false)
+            .unwrap();
+        assert_eq!(mgr.avail_space() + mgr.metadata_size(),
+                   mgr.current_capacity());
+
+        let allocated = Sectors(2);
+        mgr.alloc_space(&[allocated]).unwrap();
+        assert_eq!(mgr.avail_space() + allocated + mgr.metadata_size(),
+                   mgr.current_capacity());
+    }
+
+    #[test]
+    pub fn loop_test_blockdevmgr_used() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_blockdevmgr_used);
+    }
+
+    #[test]
+    pub fn real_test_blockdevmgr_used() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_blockdevmgr_used);
+    }
+
+    /// Verify that it is impossible to initialize a set of disks of which
+    /// even one is dirty, i.e, has some data written within BDA_STATIC_HDR_SECTORS
+    /// of start of disk. Choose the dirty disk randomly. This means that even
+    /// if our code is broken with respect to this property, this test might
+    /// sometimes succeed.
+    /// FIXME: Consider enriching device specs so that this test will fail
+    /// consistently.
+    /// Verify that force flag allows all dirty disks to be initialized.
+    fn test_force_flag_dirty(paths: &[&Path]) -> () {
+
+        let index = rand::random::<u8>() as usize % paths.len();
+        write_sectors(paths[index],
+                      Sectors(index as u64 % *BDA_STATIC_HDR_SECTORS),
+                      Sectors(1),
+                      &[1u8; SECTOR_SIZE])
+                .unwrap();
+
+        let unique_devices = resolve_devices(&paths).unwrap();
+
+        let uuid = Uuid::new_v4();
+        assert!(initialize(uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).is_err());
+        assert!(paths
+                    .iter()
+                    .enumerate()
+                    .all(|(i, path)| {
+            StaticHeader::determine_ownership(&mut OpenOptions::new()
+                                                       .read(true)
+                                                       .open(path)
+                                                       .unwrap())
+                    .unwrap() ==
+            if i == index {
+                DevOwnership::Theirs
+            } else {
+                DevOwnership::Unowned
+            }
+        }));
+
+        assert!(initialize(uuid, unique_devices.clone(), MIN_MDA_SECTORS, true).is_ok());
+        assert!(paths
+                    .iter()
+                    .all(|path| {
+                             StaticHeader::determine_ownership(&mut OpenOptions::new()
+                                                                        .read(true)
+                                                                        .open(path)
+                                                                        .unwrap())
+                                     .unwrap() ==
+                             DevOwnership::Ours(uuid)
+                         }));
+    }
+
+    #[test]
+    pub fn loop_test_force_flag_dirty() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_force_flag_dirty);
+    }
+
+    #[test]
+    pub fn real_test_force_flag_dirty() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_force_flag_dirty);
+    }
+
+    /// Verify that it is impossible to steal blockdevs from another Stratis
+    /// pool.
+    /// 1. Initialize devices with pool uuid.
+    /// 2. Initializing again with different uuid must fail.
+    /// 3. Initializing again with same pool uuid must succeed, because all the
+    /// devices already belong so there's nothing to do.
+    /// 4. Initializing again with different uuid and force = true also fails.
+    fn test_force_flag_stratis(paths: &[&Path]) -> () {
+        let unique_devices = resolve_devices(&paths).unwrap();
+
+        let uuid = Uuid::new_v4();
+        let uuid2 = Uuid::new_v4();
+
+        initialize(uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).unwrap();
+        assert!(initialize(uuid2, unique_devices.clone(), MIN_MDA_SECTORS, false).is_err());
+
+        assert!(initialize(uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).is_ok());
+
+        // FIXME: this should succeed, but currently it fails, to be extra safe.
+        // See: https://github.com/stratis-storage/stratisd/pull/292
+        assert!(initialize(uuid2, unique_devices.clone(), MIN_MDA_SECTORS, true).is_err());
+    }
+
+    #[test]
+    pub fn loop_test_force_flag_stratis() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3),
+                                   test_force_flag_stratis);
+    }
+
+    #[test]
+    pub fn real_test_force_flag_stratis() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_force_flag_stratis);
+    }
+
+    /// Verify that find_all function locates and assigns pools appropriately.
+    /// 1. Split available paths into 2 discrete sets.
+    /// 2. Initialize the block devices in the first set with a pool uuid.
+    /// 3. Run find_all() and verify that it has found the initialized devices
+    /// and no others.
+    /// 4. Initialize the block devices in the second set with a different pool
+    /// uuid.
+    /// 5. Run find_all() again and verify that both sets of devices are found.
+    /// 6. Verify that get_metadata() return an error. initialize() only
+    /// initializes block devices, it does not write metadata.
+    fn test_initialize(paths: &[&Path]) -> () {
+        assert!(paths.len() > 1);
+
+        let (paths1, paths2) = paths.split_at(paths.len() / 2);
+
+        let unique_devices = resolve_devices(paths1).unwrap();
+        let uuid1 = Uuid::new_v4();
+        initialize(uuid1, unique_devices, MIN_MDA_SECTORS, false).unwrap();
+
+        let pools = find_all().unwrap();
+        assert!(pools.len() == 1);
+        assert!(pools.contains_key(&uuid1));
+        let devices = pools.get(&uuid1).expect("pools.contains_key() was true");
+        assert!(devices.len() == paths1.len());
+
+        let unique_devices = resolve_devices(paths2).unwrap();
+        let uuid2 = Uuid::new_v4();
+        initialize(uuid2, unique_devices, MIN_MDA_SECTORS, false).unwrap();
+
+        let pools = find_all().unwrap();
+        assert!(pools.len() == 2);
+
+        assert!(pools.contains_key(&uuid1));
+        let devices1 = pools.get(&uuid1).expect("pools.contains_key() was true");
+        assert!(devices1.len() == paths1.len());
+
+        assert!(pools.contains_key(&uuid2));
+        let devices2 = pools.get(&uuid2).expect("pools.contains_key() was true");
+        assert!(devices2.len() == paths2.len());
+
+        assert!(pools
+                    .iter()
+                    .map(|(uuid, devs)| get_metadata(*uuid, devs))
+                    .all(|x| x.unwrap().is_none()));
+    }
+
+    #[test]
+    pub fn loop_test_initialize() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_initialize);
+    }
+
+    #[test]
+    pub fn real_test_initialize() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_initialize);
+    }
+
+    /// Test that initialing devices claims all and that destroying
+    /// them releases all.
+    fn test_ownership(paths: &[&Path]) -> () {
+        let uuid = Uuid::new_v4();
+        let initialized = initialize(uuid,
+                                     resolve_devices(paths).unwrap(),
+                                     MIN_MDA_SECTORS,
+                                     false)
+                .unwrap();
+        let bd_mgr = BlockDevMgr::new(uuid, initialized);
+
+        assert!(paths
+                    .iter()
+                    .all(|path| {
+                             StaticHeader::determine_ownership(&mut OpenOptions::new()
+                                                                        .read(true)
+                                                                        .open(path)
+                                                                        .unwrap())
+                                     .unwrap() ==
+                             DevOwnership::Ours(uuid)
+                         }));
+        bd_mgr.destroy_all().unwrap();
+        assert!(paths
+                    .iter()
+                    .all(|path| {
+                             StaticHeader::determine_ownership(&mut OpenOptions::new()
+                                                                        .read(true)
+                                                                        .open(path)
+                                                                        .unwrap())
+                                     .unwrap() == DevOwnership::Unowned
+                         }));
+    }
+
+    #[test]
+    pub fn loop_test_ownership() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_ownership);
+    }
+
+    #[test]
+    pub fn real_test_ownership() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_ownership);
+    }
+
+    /// Verify no errors when writing files to a mounted filesystem on a thin
+    /// device.
+    fn test_thinpool_device(paths: &[&Path]) -> () {
+        let mut bd_mgr = BlockDevMgr::initialize(Uuid::new_v4(), paths, MIN_MDA_SECTORS, false)
+            .unwrap();
+
+        let dm = DM::new().unwrap();
+
+        let mut seg_list = bd_mgr
+            .alloc_space(&[Bytes(16 * IEC::Mi).sectors(), Bytes(IEC::Gi).sectors()])
+            .unwrap();
+        let data_segs = seg_list.pop().expect("len(seg_list) == 2");
+        let meta_segs = seg_list.pop().expect("len(seg_list) == 1");
+
+        let metadata_dev = LinearDev::setup(&dm,
+                                            DmName::new("stratis_testing_thinpool_metadata")
+                                                .expect("valid format"),
+                                            None,
+                                            &map_to_dm(&meta_segs))
+                .unwrap();
+
+        // Clear the meta data device.  If the first block is not all zeros - the
+        // stale data will cause the device to appear as an existing meta rather
+        // than a new one.  Clear the entire device to be safe.  Stratis implements
+        // the same approach when constructing a thin pool.
+        wipe_sectors(&metadata_dev.devnode(), Sectors(0), metadata_dev.size()).unwrap();
+
+        let data_dev =
+            LinearDev::setup(&dm,
+                             DmName::new("stratis_testing_thinpool_datadev").expect("valid format"),
+                             None,
+                             &map_to_dm(&data_segs))
+                    .unwrap();
+        let thinpool_dev =
+            ThinPoolDev::new(&dm,
+                             DmName::new("stratis_testing_thinpool").expect("valid format"),
+                             None,
+                             Sectors(1024),
+                             DataBlocks(256000),
+                             metadata_dev,
+                             data_dev)
+                    .unwrap();
+        let thin_dev = ThinDev::new(&dm,
+                                    DmName::new("stratis_testing_thindev").expect("valid format"),
+                                    None,
+                                    &thinpool_dev,
+                                    ThinDevId::new_u64(7).expect("7 is small enough"),
+                                    Sectors(300000))
+                .unwrap();
+
+        create_fs(&thin_dev.devnode(), Uuid::new_v4()).unwrap();
+
+        let tmp_dir = TempDir::new("stratis_testing").unwrap();
+        mount(Some(&thin_dev.devnode()),
+              tmp_dir.path(),
+              Some("xfs"),
+              MsFlags::empty(),
+              None as Option<&str>)
+                .unwrap();
+        for i in 0..100 {
+            let file_path = tmp_dir.path().join(format!("stratis_test{}.txt", i));
+            writeln!(&OpenOptions::new()
+                          .create(true)
+                          .write(true)
+                          .open(file_path)
+                          .unwrap(),
+                     "data")
+                    .unwrap();
+        }
+        // The MNT_DETACH flags is passed for both loopback and real devs,
+        // it helps with loopback devs and does no harm for real devs.
+        umount2(tmp_dir.path(), MNT_DETACH).unwrap();
+        thin_dev.teardown(&dm).unwrap();
+        thinpool_dev.teardown(&dm).unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_thinpool_device() {
+        // This test requires more than 1 GiB.
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_thinpool_device);
+    }
+
+    #[test]
+    pub fn real_test_thinpool_device() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_thinpool_device);
+    }
+
 }

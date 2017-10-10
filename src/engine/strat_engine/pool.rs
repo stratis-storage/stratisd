@@ -11,14 +11,13 @@ use std::vec::Vec;
 use serde_json;
 use uuid::Uuid;
 
-use devicemapper::{Device, DM, Sectors, ThinPoolDev};
+use devicemapper::{Device, DM, Sectors};
 
 use super::super::engine::{Filesystem, BlockDev, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, RenameAction, Redundancy};
 
 use super::blockdevmgr::BlockDevMgr;
-use super::filesystem::StratFilesystem;
 use super::metadata::MIN_MDA_SECTORS;
 use super::serde_structs::{PoolSave, Recordable};
 use super::setup::{get_blockdevs, get_metadata};
@@ -115,22 +114,11 @@ impl StratPool {
         self.thin_pool.teardown(&DM::new()?)
     }
 
-    /// Look up a filesystem in the pool.
-    pub fn get_mut_strat_filesystem(&mut self,
-                                    uuid: FilesystemUuid)
-                                    -> Option<&mut StratFilesystem> {
-        self.thin_pool.get_mut_filesystem_by_uuid(uuid)
-    }
-
-    /// Get the devicemapper::ThinPoolDev for this pool. Used for testing.
-    pub fn thinpooldev(&self) -> &ThinPoolDev {
-        self.thin_pool.thinpooldev()
-    }
-
     pub fn has_filesystems(&self) -> bool {
         self.thin_pool.has_filesystems()
     }
 
+    #[allow(dead_code)]
     pub fn snapshot_filesystem(&mut self, filesystem_uuid: Uuid) -> EngineResult<FilesystemUuid> {
         let dm = DM::new()?;
         self.thin_pool.snapshot_filesystem(&dm, filesystem_uuid)
@@ -261,5 +249,102 @@ impl Recordable<PoolSave> for StratPool {
             flex_devs: self.thin_pool.record(),
             thinpool_dev: self.thin_pool.record(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::super::types::Redundancy;
+
+    use super::super::setup::find_all;
+    use super::super::tests::{loopbacked, real};
+
+    use super::*;
+
+    /// Verify that metadata can be read from pools.
+    /// 1. Split paths into two separate sets.
+    /// 2. Create pools from the two sets.
+    /// 3. Use find_all() to get the devices in the pool.
+    /// 4. Use get_metadata to find metadata for each pool and verify
+    /// correctness.
+    /// 5. Teardown the engine and repeat.
+    fn test_basic_metadata(paths: &[&Path]) {
+        assert!(paths.len() > 1);
+
+        let (paths1, paths2) = paths.split_at(paths.len() / 2);
+        let dm = DM::new().unwrap();
+
+        let name1 = "name1";
+        let pool1 = StratPool::initialize(&name1, &dm, paths1, Redundancy::NONE, false).unwrap();
+        let uuid1 = pool1.uuid();
+        let metadata1 = pool1.record();
+
+        let name2 = "name2";
+        let pool2 = StratPool::initialize(&name2, &dm, paths2, Redundancy::NONE, false).unwrap();
+        let uuid2 = pool2.uuid();
+        let metadata2 = pool2.record();
+
+        let pools = find_all().unwrap();
+        assert!(pools.len() == 2);
+        let devnodes1 = pools.get(&uuid1).unwrap();
+        let devnodes2 = pools.get(&uuid2).unwrap();
+        let pool_save1 = get_metadata(uuid1, devnodes1).unwrap().unwrap();
+        let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
+        assert!(pool_save1 == metadata1);
+        assert!(pool_save2 == metadata2);
+        let blockdevs1 = get_blockdevs(uuid1, &pool_save1, devnodes1).unwrap();
+        let blockdevs2 = get_blockdevs(uuid2, &pool_save2, devnodes2).unwrap();
+        assert!(blockdevs1.len() == pool_save1.block_devs.len());
+        assert!(blockdevs2.len() == pool_save2.block_devs.len());
+
+        pool1.teardown().unwrap();
+        pool2.teardown().unwrap();
+        let pools = find_all().unwrap();
+        assert!(pools.len() == 2);
+        let devnodes1 = pools.get(&uuid1).unwrap();
+        let devnodes2 = pools.get(&uuid2).unwrap();
+        let pool_save1 = get_metadata(uuid1, devnodes1).unwrap().unwrap();
+        let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
+        assert!(pool_save1 == metadata1);
+        assert!(pool_save2 == metadata2);
+        let blockdevs1 = get_blockdevs(uuid1, &pool_save1, devnodes1).unwrap();
+        let blockdevs2 = get_blockdevs(uuid2, &pool_save2, devnodes2).unwrap();
+        assert!(blockdevs1.len() == pool_save1.block_devs.len());
+        assert!(blockdevs2.len() == pool_save2.block_devs.len());
+    }
+
+    #[test]
+    pub fn loop_test_basic_metadata() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_basic_metadata);
+    }
+
+    #[test]
+    pub fn real_test_basic_metadata() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_basic_metadata);
+    }
+    /// Verify that a pool with no devices does not have the minimum amount of
+    /// space required.
+    fn test_empty_pool(paths: &[&Path]) -> () {
+        assert!(paths.len() == 0);
+        let dm = DM::new().unwrap();
+        assert!(match StratPool::initialize("stratis_test_pool",
+                                            &dm,
+                                            paths,
+                                            Redundancy::NONE,
+                                            true)
+                              .unwrap_err() {
+                    EngineError::Engine(ErrorEnum::Invalid, _) => true,
+                    _ => false,
+                });
+    }
+
+    #[test]
+    pub fn loop_test_empty_pool() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Exactly(0), test_empty_pool);
+    }
+
+    #[test]
+    pub fn real_test_empty_pool() {
+        real::test_with_spec(real::DeviceLimits::Exactly(0), test_empty_pool);
     }
 }

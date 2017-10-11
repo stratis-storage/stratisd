@@ -71,13 +71,14 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                          MessageItem::Array(vec![], "o".into())]);
             let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-            let mut bd_object_paths = Vec::new();
-            for dev_uuid in pool.blockdevs().iter().map(|bd| bd.uuid()) {
-                bd_object_paths
-                    .push(MessageItem::ObjectPath(create_dbus_blockdev(dbus_context,
-                                                                       pool_object_path.clone(),
-                                                                       dev_uuid)));
-            }
+            let bd_object_paths = pool.blockdevs()
+                .iter()
+                .map(|bd| {
+                         MessageItem::ObjectPath(create_dbus_blockdev(dbus_context,
+                                                                      pool_object_path.clone(),
+                                                                      bd.uuid()))
+                     })
+                .collect::<Vec<_>>();
 
             let return_path = MessageItem::ObjectPath(pool_object_path);
             let return_list = MessageItem::Array(bd_object_paths, "o".into());

@@ -58,7 +58,7 @@ pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_user_info);
 
-    let initialization_time_property = f.property::<&str, _>("InitializationTime", ())
+    let initialization_time_property = f.property::<u64, _>("InitializationTime", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_blockdev_initialization_time);
@@ -111,7 +111,10 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let new_id: &str = get_next_arg(&mut iter, 0)?;
+    let new_id: Option<&str> = match get_next_arg(&mut iter, 0)? {
+        "" => None,
+        val => Some(val),
+    };
 
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
@@ -138,26 +141,21 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                                            &blockdev_uuid))
                             })?;
 
-        let id_changed = blockdev.user_info() != Some(new_id);
+        let id_changed = blockdev.user_info() != new_id;
+        blockdev.set_user_info(new_id);
 
-        blockdev
-            .set_user_info(Some(new_id))
-            .map_err(|err| {
-                         MethodErr::failed(&format!("set_user_info failed for object path {}: {}",
-                                                    object_path,
-                                                    err))
-                     })?;
         id_changed
     };
 
     // FIXME: engine should decide to save state, not this function
-    pool.save_state()
-        .map_err(|err| {
-                     MethodErr::failed(&format!("Could not save state for object path {}: {}",
-                                                object_path,
-                                                err))
-                 })?;
-
+    if id_changed {
+        pool.save_state()
+            .map_err(|err| {
+                         MethodErr::failed(&format!("Could not save state for object path {}: {}",
+                                                    object_path,
+                                                    err))
+                     })?;
+    }
 
     let (rc, rs) = ok_message_items();
     let msg = return_message.append3(MessageItem::Bool(id_changed), rc, rs);
@@ -247,7 +245,7 @@ fn get_blockdev_initialization_time(i: &mut IterAppend,
                                     -> Result<(), MethodErr> {
     get_blockdev_property(i,
                           p,
-                          |p| Ok(MessageItem::Str(p.initialization_time().to_rfc3339())))
+                          |p| Ok(MessageItem::UInt64(p.initialization_time().timestamp() as u64)))
 }
 
 fn get_blockdev_physical_size(i: &mut IterAppend,

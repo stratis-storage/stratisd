@@ -140,9 +140,8 @@ impl BlockDev for StratBlockDev {
         self.user_info.as_ref().map(|x| &**x)
     }
 
-    fn set_user_info(&mut self, user_info: Option<&str>) -> EngineResult<()> {
+    fn set_user_info(&mut self, user_info: Option<&str>) -> () {
         self.user_info = user_info.map(|x| x.to_owned());
-        Ok(())
     }
 
     fn hardware_info(&self) -> Option<&str> {

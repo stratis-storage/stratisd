@@ -14,7 +14,5 @@ branches:
 env:
     matrix:
         - TASK=lint
-        - TASK=test
-        - TASK=coverage
 
 script: make -f Makefile $TASK

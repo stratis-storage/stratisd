@@ -35,8 +35,8 @@ setuptools.setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
         ],
     install_requires = [
-       'dbus-python',
-       'into-dbus-python>=0.06'
+       'dbus-client-gen>=0.2',
+       'dbus-python-client-gen>=0.4',
     ],
     package_dir={"": "src"},
     packages=setuptools.find_packages("src"),

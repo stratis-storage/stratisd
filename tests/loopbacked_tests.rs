@@ -156,25 +156,25 @@ pub fn loop_test_linear_device() {
 
 #[test]
 pub fn loop_test_thinpool_device() {
-    /// This test requires more than 1 GiB.
+    // This test requires more than 1 GiB.
     test_with_spec(DeviceLimits::Range(2, 3), test_thinpool_device);
 }
 
 #[test]
 pub fn loop_test_thinpool_expand() {
-    /// This test requires more than 1 GiB.
+    // This test requires more than 1 GiB.
     test_with_spec(DeviceLimits::Range(2, 3), test_thinpool_expand);
 }
 
 #[test]
 pub fn loop_test_thinpool_thindev_destroy() {
-    /// This test requires more than 1 GiB.
+    // This test requires more than 1 GiB.
     test_with_spec(DeviceLimits::Range(2, 3), test_thinpool_thindev_destroy);
 }
 
 #[test]
 pub fn loop_test_pool_blockdevs() {
-    /// This test requires more than 1 GiB.
+    // This test requires more than 1 GiB.
     test_with_spec(DeviceLimits::Range(2, 3), test_pool_blockdevs);
 }
 

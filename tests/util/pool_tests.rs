@@ -149,7 +149,7 @@ pub fn test_filesystem_rename(paths: &[&Path]) {
     let name2 = "name2";
     let (uuid1, _) = engine.create_pool(&name1, paths, None, false).unwrap();
     let fs_uuid = {
-        let mut pool = engine.get_mut_pool(&uuid1).unwrap();
+        let pool = engine.get_mut_pool(&uuid1).unwrap();
         let &(fs_name, fs_uuid) = pool.create_filesystems(&[(name1, None)])
             .unwrap()
             .first()

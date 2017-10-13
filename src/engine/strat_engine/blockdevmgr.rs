@@ -266,19 +266,18 @@ impl Recordable<HashMap<DevUuid, BlockDevSave>> for BlockDevMgr {
 
 /// Initialize multiple blockdevs at once. This allows all of them
 /// to be checked for usability before writing to any of them.
-#[allow(implicit_hasher)]
-pub fn initialize(pool_uuid: PoolUuid,
-                  devices: HashMap<Device, &Path>,
-                  mda_size: Sectors,
-                  force: bool)
-                  -> EngineResult<Vec<StratBlockDev>> {
+fn initialize(pool_uuid: PoolUuid,
+              devices: HashMap<Device, &Path>,
+              mda_size: Sectors,
+              force: bool)
+              -> EngineResult<Vec<StratBlockDev>> {
 
     /// Get device information, returns an error if problem with obtaining
     /// that information.
     /// Returns a tuple with the device's path, its size in bytes,
     /// its ownership as determined by calling determine_ownership(),
     /// and an open File handle, all of which are needed later.
-    pub fn dev_info(devnode: &Path) -> EngineResult<(&Path, Bytes, DevOwnership, File)> {
+    fn dev_info(devnode: &Path) -> EngineResult<(&Path, Bytes, DevOwnership, File)> {
         let mut f = OpenOptions::new()
             .read(true)
             .write(true)

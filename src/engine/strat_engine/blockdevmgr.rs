@@ -29,7 +29,7 @@ use super::serde_structs::{BlockDevSave, Recordable};
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 const MAX_NUM_TO_WRITE: usize = 10;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BlkDevSegment {
     pub uuid: DevUuid,
     pub segment: Segment,

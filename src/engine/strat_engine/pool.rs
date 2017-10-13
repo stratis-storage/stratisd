@@ -80,7 +80,7 @@ impl StratPool {
                             EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no metadata for pool {}", uuid))
                         })?;
-        let bd_mgr = BlockDevMgr::new(get_blockdevs(uuid, &metadata, devnodes)?);
+        let bd_mgr = BlockDevMgr::new(uuid, get_blockdevs(uuid, &metadata, devnodes)?);
         let thinpool = ThinPool::setup(uuid,
                                        &DM::new()?,
                                        metadata.thinpool_dev.data_block_size,
@@ -164,7 +164,7 @@ impl Pool for StratPool {
     }
 
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
-        let bdev_paths = self.block_devs.add(self.pool_uuid, paths, force)?;
+        let bdev_paths = self.block_devs.add(paths, force)?;
         self.write_metadata()?;
         Ok(bdev_paths)
     }

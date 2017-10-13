@@ -65,13 +65,8 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
 /// Verify no errors when writing files to a mounted filesystem on a thin
 /// device.
 pub fn test_thinpool_device(paths: &[&Path]) -> () {
-    let initialized = initialize(Uuid::new_v4(),
-                                 resolve_devices(&paths).unwrap(),
-                                 MIN_MDA_SECTORS,
-                                 false)
-            .unwrap();
-
-    let mut bd_mgr = BlockDevMgr::new(initialized);
+    let mut bd_mgr = BlockDevMgr::initialize(Uuid::new_v4(), paths, MIN_MDA_SECTORS, false)
+        .unwrap();
 
     let dm = DM::new().unwrap();
 

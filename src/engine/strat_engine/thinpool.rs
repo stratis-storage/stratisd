@@ -43,6 +43,7 @@ const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 /// metadata associated with it.
 #[derive(Debug)]
 pub struct ThinPool {
+    pool_uuid: PoolUuid,
     thin_pool: ThinPoolDev,
     meta_segments: Vec<BlkDevSegment>,
     meta_spare_segments: Vec<BlkDevSegment>,
@@ -112,6 +113,7 @@ impl ThinPool {
                                             meta_dev,
                                             data_dev)?;
         Ok(ThinPool {
+               pool_uuid: pool_uuid,
                thin_pool: thinpool_dev,
                meta_segments: meta_segments,
                meta_spare_segments: spare_segments,
@@ -229,6 +231,7 @@ impl ThinPool {
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
         Ok(ThinPool {
+               pool_uuid: pool_uuid,
                thin_pool: thinpool_dev,
                meta_segments: meta_segments,
                meta_spare_segments: spare_segments,
@@ -458,13 +461,12 @@ impl ThinPool {
     /// Create a filesystem within the thin pool. Given name must not
     /// already be in use.
     pub fn create_filesystem(&mut self,
-                             pool_uuid: PoolUuid,
                              name: &str,
                              dm: &DM,
                              size: Option<Sectors>)
                              -> EngineResult<FilesystemUuid> {
         let fs_uuid = Uuid::new_v4();
-        let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fs_uuid));
+        let device_name = format_thin_name(self.pool_uuid, ThinRole::Filesystem(fs_uuid));
         let thin_dev = ThinDev::new(dm,
                                     device_name.as_ref(),
                                     None,
@@ -482,11 +484,11 @@ impl ThinPool {
 
     pub fn snapshot_filesystem(&mut self,
                                dm: &DM,
-                               pool_uuid: PoolUuid,
                                filesystem_uuid: FilesystemUuid)
                                -> EngineResult<FilesystemUuid> {
         let snapshot_fs_uuid = Uuid::new_v4();
-        let snapshot_name = format_thin_name(pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));
+        let snapshot_name = format_thin_name(self.pool_uuid,
+                                             ThinRole::Filesystem(snapshot_fs_uuid));
         let snapshot_id = self.id_gen.new_id()?;
         let new_filesystem = match self.get_filesystem_by_uuid(filesystem_uuid) {
             Some(filesystem) => {

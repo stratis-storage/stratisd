@@ -135,8 +135,7 @@ impl StratPool {
 
     pub fn snapshot_filesystem(&mut self, filesystem_uuid: Uuid) -> EngineResult<FilesystemUuid> {
         let dm = DM::new()?;
-        self.thin_pool
-            .snapshot_filesystem(&dm, self.pool_uuid, filesystem_uuid)
+        self.thin_pool.snapshot_filesystem(&dm, filesystem_uuid)
     }
 }
 
@@ -157,8 +156,7 @@ impl Pool for StratPool {
         let dm = DM::new()?;
         let mut result = Vec::new();
         for (name, size) in names {
-            let fs_uuid = self.thin_pool
-                .create_filesystem(self.pool_uuid, name, &dm, size)?;
+            let fs_uuid = self.thin_pool.create_filesystem(name, &dm, size)?;
             result.push((name, fs_uuid));
         }
 

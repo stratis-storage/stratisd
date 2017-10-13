@@ -24,9 +24,8 @@ use self::devicemapper::{Bytes, DM, DataBlocks, DmDevice, DmName, IEC, LinearDev
 
 use libstratis::engine::strat_engine::blockdevmgr::{BlockDevMgr, initialize, map_to_dm};
 use libstratis::engine::strat_engine::device::{blkdev_size, resolve_devices, wipe_sectors};
-use libstratis::engine::strat_engine::filesystem::create_fs;
 use libstratis::engine::strat_engine::metadata::MIN_MDA_SECTORS;
-
+use libstratis::engine::strat_engine::util::create_fs;
 
 /// Verify that the sum of the lengths of the available range of the
 /// blockdevs in the linear device equals the size of the linear device.
@@ -118,7 +117,7 @@ pub fn test_thinpool_device(paths: &[&Path]) -> () {
                                 Sectors(300000))
             .unwrap();
 
-    create_fs(&thin_dev.devnode()).unwrap();
+    create_fs(&thin_dev.devnode(), Uuid::new_v4()).unwrap();
 
     let tmp_dir = TempDir::new("stratis_testing").unwrap();
     mount(Some(&thin_dev.devnode()),

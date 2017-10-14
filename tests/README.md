@@ -16,8 +16,10 @@ changes to your storage configuration. It is recommended that you run these
 tests only on a dedicated test machine. Running these tests requires that the
 user can sudo as root.
 
-To run the loopbacked devices tests:
-> make test-loop
+To run the loopbacked devices tests (in root of source tree):
+```bash
+ $ make test-loop
+```
 
 This runs all the tests that are enabled for loopbacked devices using
 the Rust integration test framework.
@@ -42,9 +44,10 @@ devices. For example:
 JSON requires commas between list items, but make sure to omit the comma after
 the last list item.
 
-Then:
-
-> make test-real
+Then (in root of source tree):
+```bash
+$ make test-real
+```
 
 Any of the loopbacked device or real device backed tests can be run
 individually.  See the test-loop and test-real targets in the Makefile for

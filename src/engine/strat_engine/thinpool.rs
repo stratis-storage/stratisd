@@ -684,16 +684,13 @@ mod tests {
             }
         }
 
-        // Run a check to expand the pool. The space initially allocated
+        // Double the size of the data device. The space initially allocated
         // to a pool is close to consumed by the filesystem and few files
         // written above. If we attempt to update the UUID on the snapshot
         // without expanding the pool, the pool will go into out-of-data-space
-        // (queue IO) mode, causing the test to fail. Calling pool.check() will
-        // compare the data space used by the pool to the data space allocated
-        // and expand when there is less than DATA_LOWATER space remaining.
-        // TODO: Make use of a way (not as yet existing) to explicitly extend
-        // pool to the necessary size
-        pool.check(&dm, &mut mgr).unwrap();
+        // (queue IO) mode, causing the test to fail.
+        pool.extend_thinpool(&dm, INITIAL_DATA_SIZE, &mut mgr)
+            .unwrap();
 
         let snapshot_uuid = pool.snapshot_filesystem(&dm, fs_uuid).unwrap();
         let mut read_buf = [0u8; SECTOR_SIZE];
@@ -911,12 +908,12 @@ mod tests {
             let buf = &[1u8; SECTOR_SIZE];
             for i in 0..*write_size {
                 f.write_all(buf).unwrap();
-                // Simulate handling a DM event by running a pool check at the point where
-                // the amount of free space in pool has decreased to the DATA_LOWATER value.
-                // TODO: Actually handle DM events and possibly call extend() directly,
-                // depending on the specificity of the events.
+                // Simulate handling a DM event by extending the pool when
+                // the amount of free space in pool has decreased to the
+                // DATA_LOWATER value.
                 if i == *(*(INITIAL_DATA_SIZE - DATA_LOWATER) * DATA_BLOCK_SIZE) {
-                    pool.check(&dm, &mut mgr).unwrap();
+                    pool.extend_thinpool(&dm, INITIAL_DATA_SIZE, &mut mgr)
+                        .unwrap();
                 }
             }
         }

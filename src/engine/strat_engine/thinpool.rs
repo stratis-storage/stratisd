@@ -287,6 +287,8 @@ impl ThinPool {
 
                 if usage.used_data > usage.total_data - DATA_LOWATER {
                     // Request expansion of physical space allocated to the pool
+                    // TODO: we just request that the space be doubled here.
+                    // A more sophisticated approach might be in order.
                     match self.extend_thinpool(dm, usage.total_data, bd_mgr) {
                         #![allow(single_match)]
                         Ok(_) => {}
@@ -330,19 +332,15 @@ impl ThinPool {
         Ok(())
     }
 
-    /// Expand the physical space allocated to a pool.
-    /// The physical space is always doubled, and the method fails if the
-    /// requested amount of space is not available.
+    /// Expand the physical space allocated to a pool by extend_size.
     /// Return the number of DataBlocks added.
-    // TODO: Refine this method. Doubling the size may not always be correct,
-    // and a hard fail if the requested size is not available may not be
-    // correct either.
+    // TODO: Refine this method. A hard fail if the request can not be
+    // satisfied may not be correct.
     fn extend_thinpool(&mut self,
                        dm: &DM,
-                       current_size: DataBlocks,
+                       extend_size: DataBlocks,
                        bd_mgr: &mut BlockDevMgr)
                        -> EngineResult<DataBlocks> {
-        let extend_size = current_size;
         if let Some(mut new_data_regions) = bd_mgr.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
             self.extend_data(dm,
                              &new_data_regions

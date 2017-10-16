@@ -381,7 +381,7 @@ mod tests {
     use devicemapper::{DM, DataBlocks, DmDevice, DmName, LinearDev, SECTOR_SIZE, ThinDev,
                        ThinDevId, ThinPoolDev};
 
-    use super::super::device::{resolve_devices, wipe_sectors, write_sectors};
+    use super::super::device::{wipe_sectors, write_sectors};
     use super::super::metadata::{BDA_STATIC_HDR_SECTORS, MIN_MDA_SECTORS};
     use super::super::setup::{find_all, get_metadata};
     use super::super::tests::{loopbacked, real};
@@ -433,10 +433,8 @@ mod tests {
                       &[1u8; SECTOR_SIZE])
                 .unwrap();
 
-        let unique_devices = resolve_devices(&paths).unwrap();
-
         let uuid = Uuid::new_v4();
-        assert!(initialize(uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).is_err());
+        assert!(BlockDevMgr::initialize(uuid, paths, MIN_MDA_SECTORS, false).is_err());
         assert!(paths
                     .iter()
                     .enumerate()
@@ -453,7 +451,7 @@ mod tests {
             }
         }));
 
-        assert!(initialize(uuid, unique_devices.clone(), MIN_MDA_SECTORS, true).is_ok());
+        assert!(BlockDevMgr::initialize(uuid, paths, MIN_MDA_SECTORS, true).is_ok());
         assert!(paths
                     .iter()
                     .all(|path| {
@@ -484,19 +482,17 @@ mod tests {
     /// devices already belong so there's nothing to do.
     /// 4. Initializing again with different uuid and force = true also fails.
     fn test_force_flag_stratis(paths: &[&Path]) -> () {
-        let unique_devices = resolve_devices(&paths).unwrap();
-
         let uuid = Uuid::new_v4();
         let uuid2 = Uuid::new_v4();
 
-        initialize(uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).unwrap();
-        assert!(initialize(uuid2, unique_devices.clone(), MIN_MDA_SECTORS, false).is_err());
+        BlockDevMgr::initialize(uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        assert!(BlockDevMgr::initialize(uuid2, paths, MIN_MDA_SECTORS, false).is_err());
 
-        assert!(initialize(uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).is_ok());
+        assert!(BlockDevMgr::initialize(uuid, paths, MIN_MDA_SECTORS, false).is_ok());
 
         // FIXME: this should succeed, but currently it fails, to be extra safe.
         // See: https://github.com/stratis-storage/stratisd/pull/292
-        assert!(initialize(uuid2, unique_devices.clone(), MIN_MDA_SECTORS, true).is_err());
+        assert!(BlockDevMgr::initialize(uuid2, paths, MIN_MDA_SECTORS, true).is_err());
     }
 
     #[test]
@@ -525,9 +521,8 @@ mod tests {
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
-        let unique_devices = resolve_devices(paths1).unwrap();
         let uuid1 = Uuid::new_v4();
-        initialize(uuid1, unique_devices, MIN_MDA_SECTORS, false).unwrap();
+        BlockDevMgr::initialize(uuid1, paths1, MIN_MDA_SECTORS, false).unwrap();
 
         let pools = find_all().unwrap();
         assert!(pools.len() == 1);
@@ -535,9 +530,8 @@ mod tests {
         let devices = pools.get(&uuid1).expect("pools.contains_key() was true");
         assert!(devices.len() == paths1.len());
 
-        let unique_devices = resolve_devices(paths2).unwrap();
         let uuid2 = Uuid::new_v4();
-        initialize(uuid2, unique_devices, MIN_MDA_SECTORS, false).unwrap();
+        BlockDevMgr::initialize(uuid2, paths2, MIN_MDA_SECTORS, false).unwrap();
 
         let pools = find_all().unwrap();
         assert!(pools.len() == 2);
@@ -570,12 +564,7 @@ mod tests {
     /// them releases all.
     fn test_ownership(paths: &[&Path]) -> () {
         let uuid = Uuid::new_v4();
-        let initialized = initialize(uuid,
-                                     resolve_devices(paths).unwrap(),
-                                     MIN_MDA_SECTORS,
-                                     false)
-                .unwrap();
-        let bd_mgr = BlockDevMgr::new(uuid, initialized);
+        let bd_mgr = BlockDevMgr::initialize(uuid, paths, MIN_MDA_SECTORS, false).unwrap();
 
         assert!(paths
                     .iter()

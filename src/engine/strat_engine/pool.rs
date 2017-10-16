@@ -104,9 +104,12 @@ impl StratPool {
     }
 
     pub fn check(&mut self) -> EngineResult<()> {
-        self.thin_pool
-            // FIXME: It's wrong to invite a crash with an unwrap() here.
-            .check(&DM::new().unwrap(), &mut self.block_devs)
+        // FIXME: The context should not be created here as this is not
+        // a public method. Ideally the context should be created in the
+        // invoking method, Engine::check(). However, since we hope that
+        // method will go away entirely, we just fix half of the problem
+        // with this method, and leave the rest alone.
+        self.thin_pool.check(&DM::new()?, &mut self.block_devs)
     }
 
     /// Teardown a pool.

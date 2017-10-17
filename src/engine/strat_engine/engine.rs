@@ -4,14 +4,12 @@
 
 use std::path::Path;
 
-use uuid::Uuid;
-
 use devicemapper::DM;
 
 use super::super::engine::{Engine, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
-use super::super::types::{PoolUuid, Redundancy, RenameAction};
+use super::super::types::{DevUuid, PoolUuid, Redundancy, RenameAction};
 
 use super::cleanup::teardown_pools;
 use super::pool::StratPool;
@@ -19,7 +17,7 @@ use super::setup::find_all;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DevOwnership {
-    Ours(Uuid),
+    Ours(PoolUuid, DevUuid),
     Unowned,
     Theirs,
 }

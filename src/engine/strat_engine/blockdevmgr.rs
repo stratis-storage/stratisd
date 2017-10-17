@@ -318,7 +318,7 @@ fn initialize(pool_uuid: PoolUuid,
                         add_devs.push((dev, (devnode, dev_size, f)))
                     }
                 }
-                DevOwnership::Ours(uuid) => {
+                DevOwnership::Ours(uuid, _) => {
                     if pool_uuid != uuid {
                         let error_str = format!("Device {} already belongs to Stratis pool {}",
                                                 devnode.display(),
@@ -433,8 +433,8 @@ mod tests {
                       &[1u8; SECTOR_SIZE])
                 .unwrap();
 
-        let uuid = Uuid::new_v4();
-        assert!(BlockDevMgr::initialize(uuid, paths, MIN_MDA_SECTORS, false).is_err());
+        let pool_uuid = Uuid::new_v4();
+        assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).is_err());
         assert!(paths
                     .iter()
                     .enumerate()
@@ -451,17 +451,19 @@ mod tests {
             }
         }));
 
-        assert!(BlockDevMgr::initialize(uuid, paths, MIN_MDA_SECTORS, true).is_ok());
+        assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, true).is_ok());
         assert!(paths
                     .iter()
                     .all(|path| {
-                             StaticHeader::determine_ownership(&mut OpenOptions::new()
-                                                                        .read(true)
-                                                                        .open(path)
-                                                                        .unwrap())
-                                     .unwrap() ==
-                             DevOwnership::Ours(uuid)
-                         }));
+            match StaticHeader::determine_ownership(&mut OpenOptions::new()
+                                                             .read(true)
+                                                             .open(path)
+                                                             .unwrap())
+                          .unwrap() {
+                DevOwnership::Ours(uuid, _) => pool_uuid == uuid,
+                _ => false,
+            }
+        }));
     }
 
     #[test]
@@ -563,19 +565,21 @@ mod tests {
     /// Test that initialing devices claims all and that destroying
     /// them releases all.
     fn test_ownership(paths: &[&Path]) -> () {
-        let uuid = Uuid::new_v4();
-        let bd_mgr = BlockDevMgr::initialize(uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let pool_uuid = Uuid::new_v4();
+        let bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
 
         assert!(paths
                     .iter()
                     .all(|path| {
-                             StaticHeader::determine_ownership(&mut OpenOptions::new()
-                                                                        .read(true)
-                                                                        .open(path)
-                                                                        .unwrap())
-                                     .unwrap() ==
-                             DevOwnership::Ours(uuid)
-                         }));
+            match StaticHeader::determine_ownership(&mut OpenOptions::new()
+                                                             .read(true)
+                                                             .open(path)
+                                                             .unwrap())
+                          .unwrap() {
+                DevOwnership::Ours(uuid, _) => uuid == pool_uuid,
+                _ => false,
+            }
+        }));
         bd_mgr.destroy_all().unwrap();
         assert!(paths
                     .iter()

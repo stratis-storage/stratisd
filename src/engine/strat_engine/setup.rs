@@ -86,12 +86,12 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
         }
 
         let mut f = f.expect("unreachable if f is err");
-        if let DevOwnership::Ours(uuid) = StaticHeader::determine_ownership(&mut f)? {
+        if let DevOwnership::Ours(pool_uuid, _) = StaticHeader::determine_ownership(&mut f)? {
             // No value should ever be ejected, because duplicate device nodes
             // are filtered out above. Therefore, the return value of insert()
             // might as well be ignored.
             let _ = pool_map
-                .entry(uuid)
+                .entry(pool_uuid)
                 .or_insert_with(HashMap::new)
                 .insert(Device::from(devno), devnode);
         };

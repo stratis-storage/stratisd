@@ -4,7 +4,7 @@
 
 // Code to handle a collection of block devices.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 
@@ -89,7 +89,8 @@ impl BlockDevMgr {
                       force: bool)
                       -> EngineResult<BlockDevMgr> {
         let devices = resolve_devices(paths)?;
-        Ok(BlockDevMgr::new(pool_uuid, initialize(pool_uuid, devices, mda_size, force)?))
+        Ok(BlockDevMgr::new(pool_uuid,
+                            initialize(pool_uuid, devices, mda_size, force, &HashSet::new())?))
     }
 
     /// Get a function that maps UUIDs to Devices.
@@ -104,7 +105,12 @@ impl BlockDevMgr {
 
     pub fn add(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
         let devices = resolve_devices(paths)?;
-        let bds = initialize(self.pool_uuid, devices, MIN_MDA_SECTORS, force)?;
+        let current_uuids = self.block_devs.keys().cloned().collect();
+        let bds = initialize(self.pool_uuid,
+                             devices,
+                             MIN_MDA_SECTORS,
+                             force,
+                             &current_uuids)?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs
             .extend(bds.into_iter().map(|bd| (bd.uuid(), bd)));
@@ -269,7 +275,8 @@ impl Recordable<HashMap<DevUuid, BlockDevSave>> for BlockDevMgr {
 fn initialize(pool_uuid: PoolUuid,
               devices: HashMap<Device, &Path>,
               mda_size: Sectors,
-              force: bool)
+              force: bool,
+              owned_devs: &HashSet<DevUuid>)
               -> EngineResult<Vec<StratBlockDev>> {
 
     /// Get device information, returns an error if problem with obtaining
@@ -294,7 +301,8 @@ fn initialize(pool_uuid: PoolUuid,
     #[allow(type_complexity)]
     fn filter_devs<'a, I>(dev_infos: I,
                           pool_uuid: PoolUuid,
-                          force: bool)
+                          force: bool,
+                          owned_devs: &HashSet<DevUuid>)
                           -> EngineResult<Vec<(Device, (&'a Path, Bytes, File))>>
         where I: Iterator<Item = (Device, EngineResult<(&'a Path, Bytes, DevOwnership, File)>)>
     {
@@ -318,16 +326,18 @@ fn initialize(pool_uuid: PoolUuid,
                         add_devs.push((dev, (devnode, dev_size, f)))
                     }
                 }
-                DevOwnership::Ours(uuid, _) => {
-                    if pool_uuid != uuid {
+                DevOwnership::Ours(uuid, dev_uuid) => {
+                    if pool_uuid == uuid {
+                        if !owned_devs.contains(&dev_uuid) {
+                            let error_str = format!("Device {} with pool UUID is unknown to pool",
+                                                    devnode.display());
+                            return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
+                        }
+                    } else {
                         let error_str = format!("Device {} already belongs to Stratis pool {}",
                                                 devnode.display(),
                                                 uuid);
                         return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
-                    } else {
-                        // Already in this pool (according to its header)
-                        // TODO: Check we already know about it
-                        // if yes, ignore. If no, add it w/o initializing?
                     }
                 }
             }
@@ -339,7 +349,7 @@ fn initialize(pool_uuid: PoolUuid,
 
     let dev_infos = devices.into_iter().map(|(d, p)| (d, dev_info(p)));
 
-    let add_devs = filter_devs(dev_infos, pool_uuid, force)?;
+    let add_devs = filter_devs(dev_infos, pool_uuid, force, owned_devs)?;
 
     let mut bds: Vec<StratBlockDev> = Vec::new();
     for (dev, (devnode, dev_size, mut f)) in add_devs {
@@ -480,32 +490,38 @@ mod tests {
     /// pool.
     /// 1. Initialize devices with pool uuid.
     /// 2. Initializing again with different uuid must fail.
-    /// 3. Initializing again with same pool uuid must succeed, because all the
-    /// devices already belong so there's nothing to do.
+    /// 3. Adding the devices must succeed, because they already belong.
     /// 4. Initializing again with different uuid and force = true also fails.
     fn test_force_flag_stratis(paths: &[&Path]) -> () {
+        assert!(paths.len() > 1);
+        let (paths1, paths2) = paths.split_at(paths.len() / 2);
+
         let uuid = Uuid::new_v4();
         let uuid2 = Uuid::new_v4();
 
-        BlockDevMgr::initialize(uuid, paths, MIN_MDA_SECTORS, false).unwrap();
-        assert!(BlockDevMgr::initialize(uuid2, paths, MIN_MDA_SECTORS, false).is_err());
-
-        assert!(BlockDevMgr::initialize(uuid, paths, MIN_MDA_SECTORS, false).is_ok());
-
+        let mut bd_mgr = BlockDevMgr::initialize(uuid, paths1, MIN_MDA_SECTORS, false).unwrap();
+        assert!(BlockDevMgr::initialize(uuid2, paths1, MIN_MDA_SECTORS, false).is_err());
         // FIXME: this should succeed, but currently it fails, to be extra safe.
         // See: https://github.com/stratis-storage/stratisd/pull/292
-        assert!(BlockDevMgr::initialize(uuid2, paths, MIN_MDA_SECTORS, true).is_err());
+        assert!(BlockDevMgr::initialize(uuid2, paths1, MIN_MDA_SECTORS, true).is_err());
+
+        let original_length = bd_mgr.block_devs.len();
+        assert!(bd_mgr.add(paths1, false).is_ok());
+        assert_eq!(bd_mgr.block_devs.len(), original_length);
+
+        BlockDevMgr::initialize(uuid, paths2, MIN_MDA_SECTORS, false).unwrap();
+        assert!(bd_mgr.add(paths2, false).is_err());
     }
 
     #[test]
     pub fn loop_test_force_flag_stratis() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3),
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3),
                                    test_force_flag_stratis);
     }
 
     #[test]
     pub fn real_test_force_flag_stratis() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_force_flag_stratis);
+        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_force_flag_stratis);
     }
 
     /// Verify that find_all function locates and assigns pools appropriately.

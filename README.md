@@ -53,11 +53,15 @@ GitHub pull requests (PRs).
 
 ### Setting up for development
 
+#### Dbus configuration file
+
 Stratisd runs as root, and requires access to the D-Bus system bus. Thus in
 order to work properly, a D-Bus conf file must exist to grant access, either
 installed by distribution packaging; or manually, by copying `stratisd.conf`
 to `/etc/dbus-1/system.d/`.
 
+
+#### Rust tools
 Stratisd requires Rust 1.17+ and Cargo to build. These may be available via
 your distribution's package manager. If not, [Rustup](https://www.rustup.rs/)
 is available to install and update the Rust toolchain.
@@ -71,18 +75,37 @@ Installation of this specific version can be achieved via:
 cargo install --vers 0.8.3 rustfmt
 ```
 
-Once toolchain is in place, run `cargo build` to build, and then run the
+#### Secondary dependencies
+The rust library dbus-rs has an external dependency on the C dbus library
+[dbus development library](https://www.freedesktop.org/wiki/Software/dbus/).
+Please check with your distributions package manager to locate the needed
+package.
+
+The files needed to build dbus-rs include, but are not limited too:
+
+```
+/usr/include/dbus-1.0/dbus/dbus*.h
+/usr/lib64/libdbus-1.so
+/usr/lib64/pkgconfig/dbus-1.pc
+```
+
+#### Building
+Once toolchain and other dependencies are in place, run `cargo build` to build, and then run the
 `stratisd` executable in `./target/debug/` as root. Pass the `--help` option
 for more information on additional developer options.
 
-To reformat all files to ensure proper formatting, run `cargo fmt`.
+#### Reformatting
+To reformat all files to ensure proper formatting, run `cargo fmt` to ensure
+your changes conform to the expected formatting before submitting a pull request.
 
-### Testing
+#### Testing
 Stratisd incorporates two testing modalities: unit tests, which are defined
 in the source code, and integration tests which can be found in a separate
 tests directory. To run the unit tests:
 
-> make test
+```bash
+$ make test
+```
 
 A description of the integration tests can be found in the tests directory.
 

@@ -59,18 +59,23 @@ impl StratFilesystem {
         }
     }
 
-    /// Create a snapshot of the ThinDev under the filesystem. Return the
-    /// resulting ThinDev to the caller.
+    /// Create a snapshot of the filesystem. Return the resulting filesystem/ThinDev
+    /// to the caller.  Use snapshot_name for the Stratis filesytem name.  Use
+    /// snapshot_dmname for the new name of the ThinDev allocated for the snapshot.
+    /// Mounting a filesytem with a duplicate UUID would require special handling,
+    /// so snapshot_fs_uuid is used to update the new snapshot filesystem so it has
+    /// a unique UUID.
     pub fn snapshot(&self,
                     dm: &DM,
                     thin_pool: &ThinPoolDev,
-                    snapshot_name: &DmName,
+                    snapshot_name: &str,
+                    snapshot_dmname: &DmName,
                     snapshot_fs_uuid: FilesystemUuid,
                     snapshot_thin_id: ThinDevId)
                     -> EngineResult<StratFilesystem> {
 
         match self.thin_dev
-                  .snapshot(dm, thin_pool, snapshot_name, snapshot_thin_id) {
+                  .snapshot(dm, thin_pool, snapshot_dmname, snapshot_thin_id) {
             Ok(thin_dev) => {
                 // If the source is mounted, XFS puts a dummy record in the
                 // log to enforce replay of the snapshot to deal with any
@@ -93,7 +98,7 @@ impl StratFilesystem {
                     umount(tmp_dir.path())?;
                 }
                 set_uuid(&thin_dev.devnode(), snapshot_fs_uuid)?;
-                Ok(StratFilesystem::setup(snapshot_fs_uuid, snapshot_name.as_ref(), thin_dev))
+                Ok(StratFilesystem::setup(snapshot_fs_uuid, snapshot_name, thin_dev))
             }
             Err(e) => {
                 Err(EngineError::Engine(ErrorEnum::Error,

@@ -89,6 +89,13 @@ pub trait Pool: HasName + HasUuid {
                          new_name: &str)
                          -> EngineResult<RenameAction>;
 
+    /// Snapshot filesystem
+    /// Create a CoW snapshot of the origin
+    fn snapshot_filesystem(&mut self,
+                           origin_uuid: FilesystemUuid,
+                           snapshot_name: &str)
+                           -> EngineResult<FilesystemUuid>;
+
     /// Rename this pool.
     fn rename(&mut self, name: &str) -> ();
 

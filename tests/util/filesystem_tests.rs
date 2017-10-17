@@ -44,7 +44,7 @@ pub fn test_xfs_expand(paths: &[&Path]) -> () {
         .unwrap();
     // Braces to ensure f is closed before destroy and the borrow of pool is complete
     {
-        let filesystem = pool.get_mut_strat_filesystem(&fs_uuid).unwrap();
+        let filesystem = pool.get_mut_strat_filesystem(fs_uuid).unwrap();
         // Write 2 MiB of data. The filesystem's free space is now 1 MiB below
         // FILESYSTEM_LOWATER.
         let write_size = Bytes(IEC::Mi * 2).sectors();
@@ -74,6 +74,6 @@ pub fn test_xfs_expand(paths: &[&Path]) -> () {
         assert!(fs_total_bytes > orig_fs_total_bytes);
         umount(tmp_dir.path()).unwrap();
     }
-    pool.destroy_filesystems(&[&fs_uuid]).unwrap();
+    pool.destroy_filesystems(&[fs_uuid]).unwrap();
     pool.teardown().unwrap();
 }

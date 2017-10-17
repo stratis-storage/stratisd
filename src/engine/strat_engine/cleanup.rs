@@ -35,7 +35,7 @@ pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> EngineResult<()> {
 pub fn teardown_pools(pools: Vec<StratPool>) -> EngineResult<()> {
     let mut untorndown_pools = Vec::new();
     for pool in pools {
-        let pool_uuid = *pool.uuid();
+        let pool_uuid = pool.uuid();
         pool.teardown()
             .unwrap_or_else(|_| untorndown_pools.push(pool_uuid));
     }

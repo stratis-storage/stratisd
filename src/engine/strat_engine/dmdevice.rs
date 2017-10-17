@@ -73,7 +73,7 @@ pub fn format_flex_name(pool_uuid: &PoolUuid, role: FlexRole) -> DmNameBuf {
 
 /// Format a name for the thin layer.
 /// Prerequisite: len(format!("{}", FORMAT_VERSION)) < 50
-pub fn format_thin_name(pool_uuid: &PoolUuid, role: ThinRole) -> DmNameBuf {
+pub fn format_thin_name(pool_uuid: PoolUuid, role: ThinRole) -> DmNameBuf {
     DmNameBuf::new(format!("stratis-{}-{}-thin-{}",
                            FORMAT_VERSION,
                            pool_uuid.simple().to_string(),
@@ -83,7 +83,7 @@ pub fn format_thin_name(pool_uuid: &PoolUuid, role: ThinRole) -> DmNameBuf {
 
 /// Format a name for the thin pool layer.
 /// Prerequisite: len(format!("{}", FORMAT_VERSION)) < 81
-pub fn format_thinpool_name(pool_uuid: &PoolUuid, role: ThinPoolRole) -> DmNameBuf {
+pub fn format_thinpool_name(pool_uuid: PoolUuid, role: ThinPoolRole) -> DmNameBuf {
     DmNameBuf::new(format!("stratis-{}-{}-thinpool-{}",
                            FORMAT_VERSION,
                            pool_uuid.simple().to_string(),

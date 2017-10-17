@@ -31,7 +31,7 @@ use libstratis::engine::strat_engine::util::create_fs;
 /// blockdevs in the linear device equals the size of the linear device.
 pub fn test_linear_device(paths: &[&Path]) -> () {
     let unique_devices = resolve_devices(&paths).unwrap();
-    let initialized = initialize(&Uuid::new_v4(),
+    let initialized = initialize(Uuid::new_v4(),
                                  unique_devices.clone(),
                                  MIN_MDA_SECTORS,
                                  false)
@@ -65,7 +65,7 @@ pub fn test_linear_device(paths: &[&Path]) -> () {
 /// Verify no errors when writing files to a mounted filesystem on a thin
 /// device.
 pub fn test_thinpool_device(paths: &[&Path]) -> () {
-    let initialized = initialize(&Uuid::new_v4(),
+    let initialized = initialize(Uuid::new_v4(),
                                  resolve_devices(&paths).unwrap(),
                                  MIN_MDA_SECTORS,
                                  false)

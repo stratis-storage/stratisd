@@ -48,7 +48,7 @@ pub fn test_force_flag_dirty(paths: &[&Path]) -> () {
     let unique_devices = resolve_devices(&paths).unwrap();
 
     let uuid = Uuid::new_v4();
-    assert!(initialize(&uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).is_err());
+    assert!(initialize(uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).is_err());
     assert!(paths
                 .iter()
                 .enumerate()
@@ -62,7 +62,7 @@ pub fn test_force_flag_dirty(paths: &[&Path]) -> () {
         }
     }));
 
-    assert!(initialize(&uuid, unique_devices.clone(), MIN_MDA_SECTORS, true).is_ok());
+    assert!(initialize(uuid, unique_devices.clone(), MIN_MDA_SECTORS, true).is_ok());
     assert!(paths
                 .iter()
                 .all(|path| {
@@ -88,14 +88,14 @@ pub fn test_force_flag_stratis(paths: &[&Path]) -> () {
     let uuid = Uuid::new_v4();
     let uuid2 = Uuid::new_v4();
 
-    initialize(&uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).unwrap();
-    assert!(initialize(&uuid2, unique_devices.clone(), MIN_MDA_SECTORS, false).is_err());
+    initialize(uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).unwrap();
+    assert!(initialize(uuid2, unique_devices.clone(), MIN_MDA_SECTORS, false).is_err());
 
-    assert!(initialize(&uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).is_ok());
+    assert!(initialize(uuid, unique_devices.clone(), MIN_MDA_SECTORS, false).is_ok());
 
     // FIXME: this should succeed, but currently it fails, to be extra safe.
     // See: https://github.com/stratis-storage/stratisd/pull/292
-    assert!(initialize(&uuid2, unique_devices.clone(), MIN_MDA_SECTORS, true).is_err());
+    assert!(initialize(uuid2, unique_devices.clone(), MIN_MDA_SECTORS, true).is_err());
 }
 
 
@@ -115,7 +115,7 @@ pub fn test_pool_blockdevs(paths: &[&Path]) -> () {
                                                                     .unwrap())
                                  .unwrap() == DevOwnership::Ours(uuid)
                      }));
-    engine.destroy_pool(&uuid).unwrap();
+    engine.destroy_pool(uuid).unwrap();
     assert!(blockdevs
                 .iter()
                 .all(|path| {
@@ -132,7 +132,7 @@ pub fn test_pool_blockdevs(paths: &[&Path]) -> () {
 /// balance.
 pub fn test_blockdevmgr_used(paths: &[&Path]) -> () {
     let uuid = Uuid::new_v4();
-    let mut mgr = BlockDevMgr::initialize(&uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+    let mut mgr = BlockDevMgr::initialize(uuid, paths, MIN_MDA_SECTORS, false).unwrap();
     assert_eq!(mgr.avail_space() + mgr.metadata_size(),
                mgr.current_capacity());
 

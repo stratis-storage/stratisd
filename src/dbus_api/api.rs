@@ -113,10 +113,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     };
 
-    let msg = match dbus_context
-              .engine
-              .borrow_mut()
-              .destroy_pool(&pool_uuid) {
+    let msg = match dbus_context.engine.borrow_mut().destroy_pool(pool_uuid) {
         Ok(action) => {
             dbus_context
                 .actions
@@ -266,8 +263,8 @@ pub fn connect(engine: Rc<RefCell<Engine>>)
     // This should never panic as create_dbus_pool() and
     // create_dbus_filesystem() do not borrow the engine.
     for pool in local_engine.borrow().pools() {
-        let pool_path = create_dbus_pool(&dbus_context, object_path.clone(), *pool.uuid());
-        for fs_uuid in pool.filesystems().iter().map(|f| *f.uuid()) {
+        let pool_path = create_dbus_pool(&dbus_context, object_path.clone(), pool.uuid());
+        for fs_uuid in pool.filesystems().iter().map(|f| f.uuid()) {
             create_dbus_filesystem(&dbus_context, pool_path.clone(), fs_uuid);
         }
     }

@@ -103,7 +103,7 @@ impl ThinPool {
         let mdv_dev = LinearDev::setup(dm, &mdv_name, None, &map_to_dm(&mdv_segments))?;
         let mdv = MetadataVol::initialize(pool_uuid, mdv_dev)?;
 
-        let name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
+        let name = format_thinpool_name(pool_uuid, ThinPoolRole::Pool);
         let thinpool_dev = ThinPoolDev::new(dm,
                                             name.as_ref(),
                                             None,
@@ -139,7 +139,7 @@ impl ThinPool {
                  -> EngineResult<ThinPool> {
         let uuid_to_devno = bd_mgr.uuid_to_devno();
         let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> EngineResult<BlkDevSegment> {
-            let device = uuid_to_devno(&triple.0)
+            let device = uuid_to_devno(triple.0)
                 .ok_or_else(|| {
                                 EngineError::Engine(ErrorEnum::NotFound,
                                                     format!("missing device for UUID {:?}",
@@ -172,7 +172,7 @@ impl ThinPool {
             .map(&mapper)
             .collect::<EngineResult<Vec<_>>>()?;
 
-        let thinpool_name = format_thinpool_name(&pool_uuid, ThinPoolRole::Pool);
+        let thinpool_name = format_thinpool_name(pool_uuid, ThinPoolRole::Pool);
         let (meta_dev, meta_segments, spare_segments) =
             setup_metadev(dm, pool_uuid, &thinpool_name, meta_segments, spare_segments)?;
 
@@ -202,7 +202,7 @@ impl ThinPool {
         let filesystems = {
             // Set up a filesystem from its metadata.
             let get_filesystem = |fssave: &FilesystemSave| -> EngineResult<StratFilesystem> {
-                let device_name = format_thin_name(&pool_uuid, ThinRole::Filesystem(fssave.uuid));
+                let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fssave.uuid));
                 let thin_dev = ThinDev::setup(dm,
                                               device_name.as_ref(),
                                               None,
@@ -425,12 +425,12 @@ impl ThinPool {
         Ok(data_dev_used + spare_total + meta_dev_total + mdv_total)
     }
 
-    pub fn get_filesystem_by_uuid(&self, uuid: &FilesystemUuid) -> Option<&StratFilesystem> {
+    pub fn get_filesystem_by_uuid(&self, uuid: FilesystemUuid) -> Option<&StratFilesystem> {
         self.filesystems.get_by_uuid(uuid)
     }
 
     pub fn get_mut_filesystem_by_uuid(&mut self,
-                                      uuid: &FilesystemUuid)
+                                      uuid: FilesystemUuid)
                                       -> Option<&mut StratFilesystem> {
         self.filesystems.get_mut_by_uuid(uuid)
     }
@@ -458,7 +458,7 @@ impl ThinPool {
     /// Create a filesystem within the thin pool. Given name must not
     /// already be in use.
     pub fn create_filesystem(&mut self,
-                             pool_uuid: &PoolUuid,
+                             pool_uuid: PoolUuid,
                              name: &str,
                              dm: &DM,
                              size: Option<Sectors>)
@@ -486,9 +486,9 @@ impl ThinPool {
                                filesystem_uuid: FilesystemUuid)
                                -> EngineResult<FilesystemUuid> {
         let snapshot_fs_uuid = Uuid::new_v4();
-        let snapshot_name = format_thin_name(&pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));
+        let snapshot_name = format_thin_name(pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));
         let snapshot_id = self.id_gen.new_id()?;
-        let new_filesystem = match self.get_filesystem_by_uuid(&filesystem_uuid) {
+        let new_filesystem = match self.get_filesystem_by_uuid(filesystem_uuid) {
             Some(filesystem) => {
                 filesystem
                     .snapshot(dm,
@@ -509,7 +509,7 @@ impl ThinPool {
     }
 
     /// Destroy a filesystem within the thin pool.
-    pub fn destroy_filesystem(&mut self, dm: &DM, uuid: &FilesystemUuid) -> EngineResult<()> {
+    pub fn destroy_filesystem(&mut self, dm: &DM, uuid: FilesystemUuid) -> EngineResult<()> {
         if let Some(fs) = self.filesystems.remove_by_uuid(uuid) {
             fs.destroy(dm, &self.thin_pool)?;
             self.mdv.rm_fs(uuid)?;
@@ -519,7 +519,7 @@ impl ThinPool {
 
     /// Rename a filesystem within the thin pool.
     pub fn rename_filesystem(&mut self,
-                             uuid: &FilesystemUuid,
+                             uuid: FilesystemUuid,
                              new_name: &str)
                              -> EngineResult<RenameAction> {
 

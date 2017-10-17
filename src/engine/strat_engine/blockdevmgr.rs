@@ -78,7 +78,7 @@ impl BlockDevMgr {
     }
 
     /// Initialize a new StratBlockDevMgr with specified pool and devices.
-    pub fn initialize(pool_uuid: &PoolUuid,
+    pub fn initialize(pool_uuid: PoolUuid,
                       paths: &[&Path],
                       mda_size: Sectors,
                       force: bool)
@@ -88,17 +88,17 @@ impl BlockDevMgr {
     }
 
     /// Get a function that maps UUIDs to Devices.
-    pub fn uuid_to_devno(&self) -> Box<Fn(&DevUuid) -> Option<Device>> {
+    pub fn uuid_to_devno(&self) -> Box<Fn(DevUuid) -> Option<Device>> {
         let uuid_map: HashMap<DevUuid, Device> = self.block_devs
             .iter()
-            .map(|bd| (*bd.uuid(), *bd.device()))
+            .map(|bd| (bd.uuid(), *bd.device()))
             .collect();
 
-        Box::new(move |uuid: &DevUuid| -> Option<Device> { uuid_map.get(uuid).cloned() })
+        Box::new(move |uuid: DevUuid| -> Option<Device> { uuid_map.get(&uuid).cloned() })
     }
 
     pub fn add(&mut self,
-               pool_uuid: &PoolUuid,
+               pool_uuid: PoolUuid,
                paths: &[&Path],
                force: bool)
                -> EngineResult<Vec<PathBuf>> {
@@ -144,7 +144,7 @@ impl BlockDevMgr {
                 let blkdev_segs = r_segs
                     .into_iter()
                     .map(|(start, length)| {
-                             BlkDevSegment::new(*bd.uuid(),
+                             BlkDevSegment::new(bd.uuid(),
                                                 Segment::new(*bd.device(), start, length))
                          });
                 segs.extend(blkdev_segs);
@@ -242,14 +242,14 @@ impl Recordable<HashMap<DevUuid, BlockDevSave>> for BlockDevMgr {
     fn record(&self) -> HashMap<Uuid, BlockDevSave> {
         self.block_devs
             .iter()
-            .map(|bd| (*bd.uuid(), bd.record()))
+            .map(|bd| (bd.uuid(), bd.record()))
             .collect()
     }
 }
 
 /// Initialize multiple blockdevs at once. This allows all of them
 /// to be checked for usability before writing to any of them.
-pub fn initialize(pool_uuid: &PoolUuid,
+pub fn initialize(pool_uuid: PoolUuid,
                   devices: HashMap<Device, &Path>,
                   mda_size: Sectors,
                   force: bool)
@@ -276,7 +276,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
     /// Also, return an error if a device is not appropriate for this pool.
     #[allow(type_complexity)]
     fn filter_devs<'a, I>(dev_infos: I,
-                          pool_uuid: &PoolUuid,
+                          pool_uuid: PoolUuid,
                           force: bool)
                           -> EngineResult<Vec<(Device, (&'a Path, Bytes, File))>>
         where I: Iterator<Item = (Device, EngineResult<(&'a Path, Bytes, DevOwnership, File)>)>
@@ -302,7 +302,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
                     }
                 }
                 DevOwnership::Ours(uuid) => {
-                    if *pool_uuid != uuid {
+                    if pool_uuid != uuid {
                         let error_str = format!("Device {} already belongs to Stratis pool {}",
                                                 devnode.display(),
                                                 uuid);
@@ -329,7 +329,7 @@ pub fn initialize(pool_uuid: &PoolUuid,
 
         let bda = BDA::initialize(&mut f,
                                   pool_uuid,
-                                  &Uuid::new_v4(),
+                                  Uuid::new_v4(),
                                   mda_size,
                                   dev_size.sectors(),
                                   Utc::now().timestamp() as u64);

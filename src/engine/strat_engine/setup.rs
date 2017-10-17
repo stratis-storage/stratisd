@@ -115,7 +115,7 @@ pub fn get_metadata(pool_uuid: PoolUuid,
     for devnode in devnodes.values() {
         let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
         if let Some(bda) = bda {
-            if *bda.pool_uuid() == pool_uuid {
+            if bda.pool_uuid() == pool_uuid {
                 bdas.push((devnode, bda));
             }
         }
@@ -186,7 +186,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
     for (device, devnode) in devnodes {
         let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
         if let Some(bda) = bda {
-            if *bda.pool_uuid() == pool_uuid {
+            if bda.pool_uuid() == pool_uuid {
                 let actual_size = blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?
                     .sectors();
 
@@ -196,7 +196,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                 // RangeAllocator::new() will return an error.
                 let allocator =
                     RangeAllocator::new(actual_size,
-                                        segment_table.get(bda.dev_uuid()).unwrap_or(&vec![]))?;
+                                        segment_table.get(&bda.dev_uuid()).unwrap_or(&vec![]))?;
 
                 blockdevs.push(StratBlockDev::new(*device, devnode.to_owned(), bda, allocator));
             }
@@ -204,7 +204,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
     }
 
     // Verify that blockdevs found match blockdevs recorded.
-    let current_uuids: HashSet<_> = blockdevs.iter().map(|b| *b.uuid()).collect();
+    let current_uuids: HashSet<_> = blockdevs.iter().map(|b| b.uuid()).collect();
     let recorded_uuids: HashSet<_> = pool_save.block_devs.keys().cloned().collect();
 
     if current_uuids != recorded_uuids {

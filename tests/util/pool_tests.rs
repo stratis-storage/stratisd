@@ -44,7 +44,7 @@ pub fn test_thinpool_expand(paths: &[&Path]) -> () {
         .first()
         .unwrap();
 
-    let devnode = pool.get_filesystem(&fs_uuid).unwrap().devnode();
+    let devnode = pool.get_filesystem(fs_uuid).unwrap().devnode();
     // Braces to ensure f is closed before destroy
     {
         let mut f = OpenOptions::new().write(true).open(devnode).unwrap();
@@ -62,7 +62,7 @@ pub fn test_thinpool_expand(paths: &[&Path]) -> () {
             }
         }
     }
-    pool.destroy_filesystems(&[&fs_uuid]).unwrap();
+    pool.destroy_filesystems(&[fs_uuid]).unwrap();
     pool.teardown().unwrap();
 }
 
@@ -80,7 +80,7 @@ pub fn test_filesystem_snapshot(paths: &[&Path]) {
     let source_tmp_dir = TempDir::new("stratis_testing").unwrap();
     {
         // to allow mutable borrow of pool
-        let filesystem = pool.get_filesystem(&fs_uuid).unwrap();
+        let filesystem = pool.get_filesystem(fs_uuid).unwrap();
         mount(Some(&filesystem.devnode()),
               source_tmp_dir.path(),
               Some("xfs"),
@@ -117,7 +117,7 @@ pub fn test_filesystem_snapshot(paths: &[&Path]) {
     let mut read_buf = [0u8; SECTOR_SIZE];
     let snapshot_tmp_dir = TempDir::new("stratis_testing").unwrap();
     {
-        let snapshot_filesystem = pool.get_filesystem(&snapshot_uuid).unwrap();
+        let snapshot_filesystem = pool.get_filesystem(snapshot_uuid).unwrap();
         mount(Some(&snapshot_filesystem.devnode()),
               snapshot_tmp_dir.path(),
               Some("xfs"),
@@ -135,7 +135,7 @@ pub fn test_filesystem_snapshot(paths: &[&Path]) {
     }
     umount(source_tmp_dir.path()).unwrap();
     umount(snapshot_tmp_dir.path()).unwrap();
-    pool.destroy_filesystems(&[&fs_uuid, &snapshot_uuid])
+    pool.destroy_filesystems(&[fs_uuid, snapshot_uuid])
         .unwrap();
     pool.teardown().unwrap();
 }
@@ -149,7 +149,7 @@ pub fn test_filesystem_rename(paths: &[&Path]) {
     let name2 = "name2";
     let (uuid1, _) = engine.create_pool(&name1, paths, None, false).unwrap();
     let fs_uuid = {
-        let pool = engine.get_mut_pool(&uuid1).unwrap();
+        let pool = engine.get_mut_pool(uuid1).unwrap();
         let &(fs_name, fs_uuid) = pool.create_filesystems(&[(name1, None)])
             .unwrap()
             .first()
@@ -157,7 +157,7 @@ pub fn test_filesystem_rename(paths: &[&Path]) {
 
         assert_eq!(name1, fs_name);
 
-        let action = pool.rename_filesystem(&fs_uuid, name2).unwrap();
+        let action = pool.rename_filesystem(fs_uuid, name2).unwrap();
         assert_eq!(action, RenameAction::Renamed);
         fs_uuid
     };
@@ -165,9 +165,9 @@ pub fn test_filesystem_rename(paths: &[&Path]) {
 
     let engine = StratEngine::initialize().unwrap();
     let filesystem_name: String = engine
-        .get_pool(&uuid1)
+        .get_pool(uuid1)
         .unwrap()
-        .get_filesystem(&fs_uuid)
+        .get_filesystem(fs_uuid)
         .unwrap()
         .name()
         .into();
@@ -191,13 +191,13 @@ pub fn test_thinpool_thindev_destroy(paths: &[&Path]) -> () {
         .first()
         .unwrap();
 
-    let fs_id = pool.get_mut_strat_filesystem(&fs_uuid)
+    let fs_id = pool.get_mut_strat_filesystem(fs_uuid)
         .unwrap()
         .thin_id();
 
-    pool.destroy_filesystems(&[&fs_uuid]).unwrap();
+    pool.destroy_filesystems(&[fs_uuid]).unwrap();
 
-    let pool_uuid = *pool.uuid();
+    let pool_uuid = pool.uuid();
 
     // Try to setup a thindev that has been destroyed
     let dm = DM::new().unwrap();
@@ -222,6 +222,6 @@ pub fn test_thinpool_thindev_destroy(paths: &[&Path]) -> () {
 
     // This also should never happen, given the previous two parts of
     // this test.
-    assert!(pool.get_filesystem(&fs_uuid).is_none());
+    assert!(pool.get_filesystem(fs_uuid).is_none());
     pool.teardown().unwrap();
 }

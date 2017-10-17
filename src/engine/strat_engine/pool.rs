@@ -47,7 +47,7 @@ impl StratPool {
                       -> EngineResult<(StratPool, Vec<PathBuf>)> {
         let pool_uuid = Uuid::new_v4();
 
-        let mut block_mgr = BlockDevMgr::initialize(&pool_uuid, paths, MIN_MDA_SECTORS, force)?;
+        let mut block_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
 
         let thinpool = ThinPool::new(pool_uuid, dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut block_mgr);
         let thinpool = match thinpool {
@@ -119,7 +119,7 @@ impl StratPool {
 
     /// Look up a filesystem in the pool.
     pub fn get_mut_strat_filesystem(&mut self,
-                                    uuid: &FilesystemUuid)
+                                    uuid: FilesystemUuid)
                                     -> Option<&mut StratFilesystem> {
         self.thin_pool.get_mut_filesystem_by_uuid(uuid)
     }
@@ -158,7 +158,7 @@ impl Pool for StratPool {
         let mut result = Vec::new();
         for (name, size) in names {
             let fs_uuid = self.thin_pool
-                .create_filesystem(&self.pool_uuid, name, &dm, size)?;
+                .create_filesystem(self.pool_uuid, name, &dm, size)?;
             result.push((name, fs_uuid));
         }
 
@@ -166,7 +166,7 @@ impl Pool for StratPool {
     }
 
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
-        let bdev_paths = self.block_devs.add(&self.pool_uuid, paths, force)?;
+        let bdev_paths = self.block_devs.add(self.pool_uuid, paths, force)?;
         self.write_metadata()?;
         Ok(bdev_paths)
     }
@@ -177,22 +177,22 @@ impl Pool for StratPool {
         Ok(())
     }
 
-    fn destroy_filesystems<'a, 'b>(&'a mut self,
-                                   fs_uuids: &[&'b FilesystemUuid])
-                                   -> EngineResult<Vec<&'b FilesystemUuid>> {
+    fn destroy_filesystems<'a>(&'a mut self,
+                               fs_uuids: &[FilesystemUuid])
+                               -> EngineResult<Vec<FilesystemUuid>> {
         let dm = DM::new()?;
 
         let mut removed = Vec::new();
-        for uuid in fs_uuids {
+        for &uuid in fs_uuids {
             self.thin_pool.destroy_filesystem(&dm, uuid)?;
-            removed.push(*uuid);
+            removed.push(uuid);
         }
 
         Ok(removed)
     }
 
     fn rename_filesystem(&mut self,
-                         uuid: &FilesystemUuid,
+                         uuid: FilesystemUuid,
                          new_name: &str)
                          -> EngineResult<RenameAction> {
         self.thin_pool.rename_filesystem(uuid, new_name)
@@ -202,13 +202,13 @@ impl Pool for StratPool {
         self.name = name.to_owned();
     }
 
-    fn get_filesystem(&self, uuid: &FilesystemUuid) -> Option<&Filesystem> {
+    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<&Filesystem> {
         self.thin_pool
             .get_filesystem_by_uuid(uuid)
             .map(|fs| fs as &Filesystem)
     }
 
-    fn get_mut_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem> {
+    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<&mut Filesystem> {
         self.thin_pool
             .get_mut_filesystem_by_uuid(uuid)
             .map(|fs| fs as &mut Filesystem)
@@ -234,8 +234,8 @@ impl Pool for StratPool {
 }
 
 impl HasUuid for StratPool {
-    fn uuid(&self) -> &PoolUuid {
-        &self.pool_uuid
+    fn uuid(&self) -> PoolUuid {
+        self.pool_uuid
     }
 }
 

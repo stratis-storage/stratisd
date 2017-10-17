@@ -182,8 +182,8 @@ impl HasName for StratFilesystem {
 }
 
 impl HasUuid for StratFilesystem {
-    fn uuid(&self) -> &FilesystemUuid {
-        &self.fs_id
+    fn uuid(&self) -> FilesystemUuid {
+        self.fs_id
     }
 }
 

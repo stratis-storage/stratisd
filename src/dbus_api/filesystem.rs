@@ -102,12 +102,12 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let filesystem_data = get_data!(filesystem_path; default_return; return_message);
 
     let pool_path = get_parent!(m; filesystem_data; default_return; return_message);
-    let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let msg = match pool.rename_filesystem(&filesystem_data.uuid, new_name) {
+    let msg = match pool.rename_filesystem(filesystem_data.uuid, new_name) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("pool {} doesn't know about filesystem {}",
                                         pool_uuid,
@@ -171,12 +171,12 @@ fn get_filesystem_property<F>(i: &mut IterAppend,
     let engine = dbus_context.engine.borrow();
     let pool =
         engine
-            .get_pool(&pool_uuid)
+            .get_pool(pool_uuid)
             .ok_or_else(|| {
                             MethodErr::failed(&format!("no pool corresponding to uuid {}",
                                                        &pool_uuid))
                         })?;
-    let filesystem_uuid = &filesystem_data.uuid;
+    let filesystem_uuid = filesystem_data.uuid;
     let filesystem = pool.get_filesystem(filesystem_uuid)
         .ok_or_else(|| {
                         MethodErr::failed(&format!("no name for filesystem with uuid {}",

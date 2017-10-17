@@ -51,7 +51,7 @@ pub fn test_initialize(paths: &[&Path]) -> () {
 
     let unique_devices = resolve_devices(paths1).unwrap();
     let uuid1 = Uuid::new_v4();
-    initialize(&uuid1, unique_devices, MIN_MDA_SECTORS, false).unwrap();
+    initialize(uuid1, unique_devices, MIN_MDA_SECTORS, false).unwrap();
 
     let pools = find_all().unwrap();
     assert!(pools.len() == 1);
@@ -61,7 +61,7 @@ pub fn test_initialize(paths: &[&Path]) -> () {
 
     let unique_devices = resolve_devices(paths2).unwrap();
     let uuid2 = Uuid::new_v4();
-    initialize(&uuid2, unique_devices, MIN_MDA_SECTORS, false).unwrap();
+    initialize(uuid2, unique_devices, MIN_MDA_SECTORS, false).unwrap();
 
     let pools = find_all().unwrap();
     assert!(pools.len() == 2);
@@ -95,11 +95,11 @@ pub fn test_basic_metadata(paths: &[&Path]) {
 
     let name1 = "name1";
     let (uuid1, _) = engine.create_pool(&name1, paths1, None, false).unwrap();
-    let metadata1 = engine.get_strat_pool(&uuid1).unwrap().record();
+    let metadata1 = engine.get_strat_pool(uuid1).unwrap().record();
 
     let name2 = "name2";
     let (uuid2, _) = engine.create_pool(&name2, paths2, None, false).unwrap();
-    let metadata2 = engine.get_strat_pool(&uuid2).unwrap().record();
+    let metadata2 = engine.get_strat_pool(uuid2).unwrap().record();
 
     let pools = find_all().unwrap();
     assert!(pools.len() == 2);
@@ -149,15 +149,15 @@ pub fn test_setup(paths: &[&Path]) {
     let name2 = "name2";
     let (uuid2, _) = engine.create_pool(&name2, paths2, None, false).unwrap();
 
-    assert!(engine.get_pool(&uuid1).is_some());
-    assert!(engine.get_pool(&uuid2).is_some());
+    assert!(engine.get_pool(uuid1).is_some());
+    assert!(engine.get_pool(uuid2).is_some());
 
     engine.teardown().unwrap();
 
     let engine = StratEngine::initialize().unwrap();
 
-    assert!(engine.get_pool(&uuid1).is_some());
-    assert!(engine.get_pool(&uuid2).is_some());
+    assert!(engine.get_pool(uuid1).is_some());
+    assert!(engine.get_pool(uuid2).is_some());
 
     engine.teardown().unwrap();
 }
@@ -170,13 +170,13 @@ pub fn test_pool_rename(paths: &[&Path]) {
     let (uuid1, _) = engine.create_pool(&name1, paths, None, false).unwrap();
 
     let name2 = "name2";
-    let action = engine.rename_pool(&uuid1, name2).unwrap();
+    let action = engine.rename_pool(uuid1, name2).unwrap();
 
     assert_eq!(action, RenameAction::Renamed);
     engine.teardown().unwrap();
 
     let engine = StratEngine::initialize().unwrap();
-    let pool_name: String = engine.get_pool(&uuid1).unwrap().name().into();
+    let pool_name: String = engine.get_pool(uuid1).unwrap().name().into();
     assert_eq!(pool_name, name2);
     engine.teardown().unwrap();
 }
@@ -194,7 +194,7 @@ pub fn test_pool_setup(paths: &[&Path]) {
     let tmp_dir = TempDir::new("stratis_testing").unwrap();
     let new_file = tmp_dir.path().join("stratis_test.txt");
     {
-        let fs = pool.get_filesystem(&fs_uuid).unwrap();
+        let fs = pool.get_filesystem(fs_uuid).unwrap();
         mount(Some(&fs.devnode()),
               tmp_dir.path(),
               Some("xfs"),
@@ -215,9 +215,9 @@ pub fn test_pool_setup(paths: &[&Path]) {
         .into_iter()
         .map(|(d, p)| (d, p.to_owned()))
         .collect();
-    let new_pool = StratPool::setup(*pool.uuid(), &paths2).unwrap();
+    let new_pool = StratPool::setup(pool.uuid(), &paths2).unwrap();
 
-    assert!(new_pool.get_filesystem(&fs_uuid).is_some());
+    assert!(new_pool.get_filesystem(fs_uuid).is_some());
 
     umount2(tmp_dir.path(), MNT_DETACH).unwrap();
     pool.teardown().unwrap();

@@ -96,7 +96,7 @@ impl BlockDevMgr {
     pub fn uuid_to_devno(&self) -> Box<Fn(DevUuid) -> Option<Device>> {
         let uuid_map: HashMap<DevUuid, Device> = self.block_devs
             .iter()
-            .map(|(_, bd)| (bd.uuid(), *bd.device()))
+            .map(|(uuid, bd)| (*uuid, *bd.device()))
             .collect();
 
         Box::new(move |uuid: DevUuid| -> Option<Device> { uuid_map.get(&uuid).cloned() })

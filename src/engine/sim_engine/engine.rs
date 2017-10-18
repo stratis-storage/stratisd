@@ -181,7 +181,7 @@ mod tests {
         let mut engine = SimEngine::default();
         engine.create_pool(name, &[], None, false).unwrap();
         assert!(match engine.create_pool(name, &[], None, false) {
-                    Ok(uuid) => engine.get_pool(&uuid).unwrap().blockdevs().is_empty(),
+                    Ok(uuid) => engine.get_pool(uuid).unwrap().blockdevs().is_empty(),
                     Err(_) => false,
                 });
     }
@@ -207,7 +207,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let devices = vec![Path::new(path), Path::new(path)];
         assert!(match engine.create_pool("name", &devices, None, false) {
-                    Ok(uuid) => engine.get_pool(&uuid).unwrap().blockdevs().len() == 1,
+                    Ok(uuid) => engine.get_pool(uuid).unwrap().blockdevs().len() == 1,
                     _ => false,
                 });
     }

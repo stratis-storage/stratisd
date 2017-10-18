@@ -69,8 +69,8 @@ pub fn test_thinpool_expand(paths: &[&Path]) -> () {
 /// Verify a snapshot has the same files and same contents as the origin.
 pub fn test_filesystem_snapshot(paths: &[&Path]) {
     let dm = DM::new().unwrap();
-    let (mut pool, _) =
-        StratPool::initialize("stratis_test_pool", &dm, paths, Redundancy::NONE, true).unwrap();
+    let mut pool = StratPool::initialize("stratis_test_pool", &dm, paths, Redundancy::NONE, true)
+        .unwrap();
     let &(_, fs_uuid) = pool.create_filesystems(&[("stratis_test_filesystem", None)])
         .unwrap()
         .first()

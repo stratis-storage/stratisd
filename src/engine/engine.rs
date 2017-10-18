@@ -13,7 +13,7 @@ use super::errors::EngineResult;
 use super::types::{FilesystemUuid, PoolUuid, RenameAction};
 
 pub trait HasUuid: Debug {
-    fn uuid(&self) -> &Uuid;
+    fn uuid(&self) -> Uuid;
 }
 
 pub trait HasName: Debug {
@@ -55,9 +55,9 @@ pub trait Pool: HasName + HasUuid {
     /// Returns a list of the filesystems found, and actually destroyed.
     /// This list will be a subset of the uuids passed in fs_uuids.
     /// Precondition: All filesystems given must be unmounted.
-    fn destroy_filesystems<'a, 'b>(&'a mut self,
-                                   fs_uuids: &[&'b FilesystemUuid])
-                                   -> EngineResult<Vec<&'b FilesystemUuid>>;
+    fn destroy_filesystems<'a>(&'a mut self,
+                               fs_uuids: &[FilesystemUuid])
+                               -> EngineResult<Vec<FilesystemUuid>>;
 
     /// Rename filesystem
     /// Rename pool with uuid to new_name.
@@ -65,7 +65,7 @@ pub trait Pool: HasName + HasUuid {
     /// new_name is already in use.
     /// The result indicate whether an action was performed, and if not, why.
     fn rename_filesystem(&mut self,
-                         uuid: &FilesystemUuid,
+                         uuid: FilesystemUuid,
                          new_name: &str)
                          -> EngineResult<RenameAction>;
 
@@ -73,10 +73,10 @@ pub trait Pool: HasName + HasUuid {
     fn rename(&mut self, name: &str) -> ();
 
     /// Get the filesystem in this pool with this UUID.
-    fn get_filesystem(&self, uuid: &FilesystemUuid) -> Option<&Filesystem>;
+    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<&Filesystem>;
 
     /// Get the mutable filesystem in this pool with this UUID.
-    fn get_mut_filesystem(&mut self, uuid: &FilesystemUuid) -> Option<&mut Filesystem>;
+    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<&mut Filesystem>;
 
     /// The total number of Sectors belonging to this pool.
     /// There are no exclusions, so this number includes overhead sectors
@@ -114,19 +114,19 @@ pub trait Engine: Debug {
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.
     /// Returns true if some action was necessary, otherwise false.
-    fn destroy_pool(&mut self, uuid: &PoolUuid) -> EngineResult<bool>;
+    fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool>;
 
     /// Rename pool with uuid to new_name.
     /// Raises an error if the mapping can't be applied because
     /// new_name is already in use.
     /// Returns true if it was necessary to perform an action, false if not.
-    fn rename_pool(&mut self, uuid: &PoolUuid, new_name: &str) -> EngineResult<RenameAction>;
+    fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> EngineResult<RenameAction>;
 
     /// Find the pool designated by uuid.
-    fn get_pool(&self, uuid: &PoolUuid) -> Option<&Pool>;
+    fn get_pool(&self, uuid: PoolUuid) -> Option<&Pool>;
 
     /// Get a mutable referent to the pool designated by uuid.
-    fn get_mut_pool(&mut self, uuid: &PoolUuid) -> Option<&mut Pool>;
+    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<&mut Pool>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.

@@ -37,8 +37,8 @@ pub struct BDA {
 impl BDA {
     /// Initialize a blockdev with a Stratis BDA.
     pub fn initialize<F>(mut f: &mut F,
-                         pool_uuid: &Uuid,
-                         dev_uuid: &Uuid,
+                         pool_uuid: Uuid,
+                         dev_uuid: Uuid,
                          mda_size: Sectors,
                          blkdev_size: Sectors,
                          initialization_time: u64)
@@ -129,13 +129,13 @@ impl BDA {
     }
 
     /// The UUID of the device.
-    pub fn dev_uuid(&self) -> &DevUuid {
-        &self.header.dev_uuid
+    pub fn dev_uuid(&self) -> DevUuid {
+        self.header.dev_uuid
     }
 
     /// The UUID of the device's pool.
-    pub fn pool_uuid(&self) -> &PoolUuid {
-        &self.header.pool_uuid
+    pub fn pool_uuid(&self) -> PoolUuid {
+        self.header.pool_uuid
     }
 
     /// The size of the device.
@@ -167,16 +167,16 @@ pub struct StaticHeader {
 }
 
 impl StaticHeader {
-    fn new(pool_uuid: &PoolUuid,
-           dev_uuid: &DevUuid,
+    fn new(pool_uuid: PoolUuid,
+           dev_uuid: DevUuid,
            mda_size: Sectors,
            blkdev_size: Sectors,
            initialization_time: u64)
            -> StaticHeader {
         StaticHeader {
             blkdev_size: blkdev_size,
-            pool_uuid: *pool_uuid,
-            dev_uuid: *dev_uuid,
+            pool_uuid: pool_uuid,
+            dev_uuid: dev_uuid,
             mda_size: mda_size,
             reserved_size: MDA_RESERVED_SECTORS,
             flags: 0,
@@ -769,8 +769,8 @@ mod tests {
         let dev_uuid = Uuid::new_v4();
         let mda_size = MIN_MDA_SECTORS + Sectors((mda_size_factor * 4) as u64);
         let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
-        StaticHeader::new(&pool_uuid,
-                          &dev_uuid,
+        StaticHeader::new(pool_uuid,
+                          dev_uuid,
                           mda_size,
                           blkdev_size,
                           Utc::now().timestamp() as u64)
@@ -824,8 +824,8 @@ mod tests {
             }
 
             BDA::initialize(&mut buf,
-                            &sh.pool_uuid,
-                            &sh.dev_uuid,
+                            sh.pool_uuid,
+                            sh.dev_uuid,
                             sh.mda_size,
                             sh.blkdev_size,
                             Utc::now().timestamp() as u64)
@@ -863,8 +863,8 @@ mod tests {
             let sh = random_static_header(blkdev_size, mda_size_factor);
             let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
             let bda = BDA::initialize(&mut buf,
-                                      &sh.pool_uuid,
-                                      &sh.dev_uuid,
+                                      sh.pool_uuid,
+                                      sh.dev_uuid,
                                       sh.mda_size,
                                       sh.blkdev_size,
                                       Utc::now().timestamp() as u64)
@@ -887,8 +887,8 @@ mod tests {
         let sh = random_static_header(0, 0);
         let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
         let mut bda = BDA::initialize(&mut buf,
-                                      &sh.pool_uuid,
-                                      &sh.dev_uuid,
+                                      sh.pool_uuid,
+                                      sh.dev_uuid,
                                       sh.mda_size,
                                       sh.blkdev_size,
                                       Utc::now().timestamp() as u64)
@@ -931,8 +931,8 @@ mod tests {
             let sh = random_static_header(blkdev_size, mda_size_factor);
             let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
             let mut bda = BDA::initialize(&mut buf,
-                                          &sh.pool_uuid,
-                                          &sh.dev_uuid,
+                                          sh.pool_uuid,
+                                          sh.dev_uuid,
                                           sh.mda_size,
                                           sh.blkdev_size,
                                           Utc::now().timestamp() as u64)

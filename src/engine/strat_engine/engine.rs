@@ -62,7 +62,7 @@ impl StratEngine {
     }
 
     /// Get pool as StratPool
-    pub fn get_strat_pool(&self, uuid: &PoolUuid) -> Option<&StratPool> {
+    pub fn get_strat_pool(&self, uuid: PoolUuid) -> Option<&StratPool> {
         self.pools.get_by_uuid(uuid)
     }
 }
@@ -88,16 +88,16 @@ impl Engine for StratEngine {
         let dm = DM::new()?;
         let (pool, devnodes) = StratPool::initialize(name, &dm, blockdev_paths, redundancy, force)?;
 
-        let uuid = *pool.uuid();
+        let uuid = pool.uuid();
         self.pools.insert(pool);
         Ok((uuid, devnodes))
     }
 
-    fn destroy_pool(&mut self, uuid: &PoolUuid) -> EngineResult<bool> {
+    fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool> {
         destroy_pool!{self; uuid}
     }
 
-    fn rename_pool(&mut self, uuid: &PoolUuid, new_name: &str) -> EngineResult<RenameAction> {
+    fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> EngineResult<RenameAction> {
         let old_name = rename_pool_pre!(self; uuid; new_name);
 
         let mut pool = self.pools
@@ -115,11 +115,11 @@ impl Engine for StratEngine {
         }
     }
 
-    fn get_pool(&self, uuid: &PoolUuid) -> Option<&Pool> {
+    fn get_pool(&self, uuid: PoolUuid) -> Option<&Pool> {
         get_pool!(self; uuid)
     }
 
-    fn get_mut_pool(&mut self, uuid: &PoolUuid) -> Option<&mut Pool> {
+    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<&mut Pool> {
         get_mut_pool!(self; uuid)
     }
 

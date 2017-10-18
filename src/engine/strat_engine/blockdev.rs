@@ -69,12 +69,12 @@ impl StratBlockDev {
     }
 
     /// The device's UUID.
-    pub fn uuid(&self) -> &DevUuid {
+    pub fn uuid(&self) -> DevUuid {
         self.bda.dev_uuid()
     }
 
     /// The device's pool's UUID.
-    pub fn pool_uuid(&self) -> &PoolUuid {
+    pub fn pool_uuid(&self) -> PoolUuid {
         self.bda.pool_uuid()
     }
 
@@ -120,7 +120,7 @@ impl StratBlockDev {
 }
 
 impl HasUuid for StratBlockDev {
-    fn uuid(&self) -> &DevUuid {
+    fn uuid(&self) -> DevUuid {
         self.bda.dev_uuid()
     }
 }

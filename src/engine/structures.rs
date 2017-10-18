@@ -72,8 +72,8 @@ impl<T: HasName + HasUuid> Table<T> {
     }
 
     /// Returns true if map has an item corresponding to this uuid, else false.
-    pub fn contains_uuid(&self, uuid: &Uuid) -> bool {
-        self.uuid_map.contains_key(uuid)
+    pub fn contains_uuid(&self, uuid: Uuid) -> bool {
+        self.uuid_map.contains_key(&uuid)
     }
 
     /// Get item by name.
@@ -82,8 +82,10 @@ impl<T: HasName + HasUuid> Table<T> {
     }
 
     /// Get item by uuid.
-    pub fn get_by_uuid(&self, uuid: &Uuid) -> Option<&T> {
-        self.uuid_map.get(uuid).map(|index| &self.items[*index])
+    pub fn get_by_uuid(&self, uuid: Uuid) -> Option<&T> {
+        self.uuid_map
+            .get(&uuid)
+            .map(|index| &self.items[*index])
     }
 
     /// Get mutable item by name.
@@ -96,8 +98,8 @@ impl<T: HasName + HasUuid> Table<T> {
     }
 
     /// Get mutable item by uuid.
-    pub fn get_mut_by_uuid(&mut self, uuid: &Uuid) -> Option<&mut T> {
-        if let Some(index) = self.uuid_map.get(uuid) {
+    pub fn get_mut_by_uuid(&mut self, uuid: Uuid) -> Option<&mut T> {
+        if let Some(index) = self.uuid_map.get(&uuid) {
             Some(&mut self.items[*index])
         } else {
             None
@@ -113,12 +115,12 @@ impl<T: HasName + HasUuid> Table<T> {
                                      .last()
                                      .expect("name_map is non-empty <-> items is non-empty");
                 self.name_map.insert(last_item.name().into(), index);
-                self.uuid_map.insert(*last_item.uuid(), index);
+                self.uuid_map.insert(last_item.uuid(), index);
             }
 
             // Remove the item we want to remove and also the uuid mapping
             let item = self.items.swap_remove(index);
-            self.uuid_map.remove(item.uuid());
+            self.uuid_map.remove(&item.uuid());
 
             // Remove the name again, in case there is only one item.
             self.name_map.remove(name);
@@ -130,15 +132,15 @@ impl<T: HasName + HasUuid> Table<T> {
     }
 
     /// Removes the item corresponding to the uuid if there is one.
-    pub fn remove_by_uuid(&mut self, uuid: &Uuid) -> Option<T> {
-        if let Some(index) = self.uuid_map.remove(uuid) {
+    pub fn remove_by_uuid(&mut self, uuid: Uuid) -> Option<T> {
+        if let Some(index) = self.uuid_map.remove(&uuid) {
             // Insert mappings for the about-to-be swapped element
             {
                 let last_item = &self.items
                                      .last()
                                      .expect("uuid_map is non-empty <-> items is non-empty");
                 self.name_map.insert(last_item.name().into(), index);
-                self.uuid_map.insert(*last_item.uuid(), index);
+                self.uuid_map.insert(last_item.uuid(), index);
             }
 
             // Remove the item we want to remove and also the uuid mapping
@@ -146,7 +148,7 @@ impl<T: HasName + HasUuid> Table<T> {
             self.name_map.remove(item.name());
 
             // Remove the uuid again, in case there is only one item.
-            self.uuid_map.remove(uuid);
+            self.uuid_map.remove(&uuid);
 
             Some(item)
         } else {
@@ -166,7 +168,7 @@ impl<T: HasName + HasUuid> Table<T> {
         let future_last_index = self.items.len();
         self.name_map
             .insert(item.name().into(), future_last_index);
-        self.uuid_map.insert(*item.uuid(), future_last_index);
+        self.uuid_map.insert(item.uuid(), future_last_index);
 
         self.items.push(item);
 
@@ -208,7 +210,7 @@ mod tests {
             let name = items[i].name();
             let uuid = items[i].uuid();
             assert!(name_map.get(name).unwrap() == &i);
-            assert!(uuid_map.get(uuid).unwrap() == &i);
+            assert!(uuid_map.get(&uuid).unwrap() == &i);
         }
 
         for name in name_map.keys() {
@@ -216,15 +218,15 @@ mod tests {
             assert!(items[*index].name() == name);
         }
 
-        for uuid in uuid_map.keys() {
-            let index = uuid_map.get(uuid).unwrap();
+        for &uuid in uuid_map.keys() {
+            let index = uuid_map.get(&uuid).unwrap();
             assert!(items[*index].uuid() == uuid);
         }
 
     }
 
     impl TestThing {
-        pub fn new(name: &str, uuid: &Uuid) -> TestThing {
+        pub fn new(name: &str, uuid: Uuid) -> TestThing {
             TestThing {
                 name: name.to_owned(),
                 uuid: uuid.clone(),
@@ -234,8 +236,8 @@ mod tests {
     }
 
     impl HasUuid for TestThing {
-        fn uuid(&self) -> &Uuid {
-            &self.uuid
+        fn uuid(&self) -> Uuid {
+            self.uuid
         }
     }
 
@@ -256,12 +258,12 @@ mod tests {
 
         let uuid = Uuid::new_v4();
         let name = "name";
-        t.insert(TestThing::new(&name, &uuid));
+        t.insert(TestThing::new(&name, uuid));
         table_invariant(&t);
 
         assert!(t.get_by_name(&name).is_some());
-        assert!(t.get_by_uuid(&uuid).is_some());
-        let thing = t.remove_by_uuid(&uuid);
+        assert!(t.get_by_uuid(uuid).is_some());
+        let thing = t.remove_by_uuid(uuid);
         table_invariant(&t);
         assert!(thing.is_some());
         let mut thing = thing.unwrap();
@@ -271,7 +273,7 @@ mod tests {
         table_invariant(&t);
 
         assert!(t.get_by_name(&name).is_none());
-        assert!(t.get_by_uuid(&uuid).is_none());
+        assert!(t.get_by_uuid(uuid).is_none());
     }
 
     #[test]
@@ -286,7 +288,7 @@ mod tests {
 
         let uuid = Uuid::new_v4();
         let name = "name";
-        let thing = TestThing::new(&name, &uuid);
+        let thing = TestThing::new(&name, uuid);
         let thing_key = thing.stuff;
         let displaced = t.insert(thing);
         table_invariant(&t);
@@ -296,11 +298,11 @@ mod tests {
 
         // t now contains the inserted thing.
         assert!(t.contains_name(&name));
-        assert!(t.contains_uuid(&uuid));
-        assert!(t.get_by_uuid(&uuid).unwrap().stuff == thing_key);
+        assert!(t.contains_uuid(uuid));
+        assert!(t.get_by_uuid(uuid).unwrap().stuff == thing_key);
 
         // Add another thing with the same keys.
-        let thing2 = TestThing::new(&name, &uuid);
+        let thing2 = TestThing::new(&name, uuid);
         let thing_key2 = thing2.stuff;
         let displaced = t.insert(thing2);
         table_invariant(&t);
@@ -309,12 +311,12 @@ mod tests {
         assert!(displaced.len() == 1);
         let ref displaced_item = displaced[0];
         assert!(displaced_item.name() == name);
-        assert!(displaced_item.uuid() == &uuid);
+        assert!(displaced_item.uuid() == uuid);
 
         // But it contains a thing with the same keys.
         assert!(t.contains_name(&name));
-        assert!(t.contains_uuid(&uuid));
-        assert!(t.get_by_uuid(&uuid).unwrap().stuff == thing_key2);
+        assert!(t.contains_uuid(uuid));
+        assert!(t.get_by_uuid(uuid).unwrap().stuff == thing_key2);
         assert!(t.len() == 1);
     }
 
@@ -327,7 +329,7 @@ mod tests {
 
         let uuid = Uuid::new_v4();
         let name = "name";
-        let thing = TestThing::new(&name, &uuid);
+        let thing = TestThing::new(&name, uuid);
         let thing_key = thing.stuff;
 
         // There was nothing in the table before, so displaced is empty.
@@ -337,11 +339,11 @@ mod tests {
 
         // t now contains thing.
         assert!(t.contains_name(&name));
-        assert!(t.contains_uuid(&uuid));
+        assert!(t.contains_uuid(uuid));
 
         // Insert new item with different UUID.
         let uuid2 = Uuid::new_v4();
-        let thing2 = TestThing::new(&name, &uuid2);
+        let thing2 = TestThing::new(&name, uuid2);
         let thing_key2 = thing2.stuff;
         let displaced = t.insert(thing2);
         table_invariant(&t);
@@ -350,14 +352,14 @@ mod tests {
         assert!(displaced.len() == 1);
         let ref displaced_item = displaced[0];
         assert!(displaced_item.name() == name);
-        assert!(displaced_item.uuid() == &uuid);
+        assert!(displaced_item.uuid() == uuid);
         assert!(displaced_item.stuff == thing_key);
 
         // The table contains the new item and has no memory of the old.
         assert!(t.contains_name(&name));
-        assert!(t.contains_uuid(&uuid2));
-        assert!(!t.contains_uuid(&uuid));
-        assert!(t.get_by_uuid(&uuid2).unwrap().stuff == thing_key2);
+        assert!(t.contains_uuid(uuid2));
+        assert!(!t.contains_uuid(uuid));
+        assert!(t.get_by_uuid(uuid2).unwrap().stuff == thing_key2);
         assert!(t.get_by_name(&name).unwrap().stuff == thing_key2);
         assert!(t.len() == 1);
     }

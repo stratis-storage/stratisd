@@ -155,7 +155,7 @@ impl MetadataVol {
     }
 
     /// Remove info on a filesystem from persistent storage.
-    pub fn rm_fs(&self, fs_uuid: &FilesystemUuid) -> EngineResult<()> {
+    pub fn rm_fs(&self, fs_uuid: FilesystemUuid) -> EngineResult<()> {
         let fs_path = self.mount_pt
             .join(FILESYSTEM_DIR)
             .join(fs_uuid.simple().to_string())

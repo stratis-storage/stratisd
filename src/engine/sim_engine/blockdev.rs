@@ -29,8 +29,8 @@ impl BlockDev for SimDev {
 }
 
 impl HasUuid for SimDev {
-    fn uuid(&self) -> &DevUuid {
-        &self.uuid
+    fn uuid(&self) -> DevUuid {
+        self.uuid
     }
 }
 

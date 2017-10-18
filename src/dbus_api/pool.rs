@@ -53,7 +53,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_path = m.tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
@@ -108,7 +108,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_path = m.tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
@@ -121,7 +121,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     }
 
-    let result = pool.destroy_filesystems(&filesystem_map.keys().collect::<Vec<&Uuid>>());
+    let result = pool.destroy_filesystems(&filesystem_map.keys().cloned().collect::<Vec<Uuid>>());
     let msg = match result {
         Ok(ref uuids) => {
             for uuid in uuids {
@@ -164,7 +164,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_path = m.tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = &get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
@@ -212,7 +212,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match dbus_context
               .engine
               .borrow_mut()
-              .rename_pool(&pool_uuid, new_name) {
+              .rename_pool(pool_uuid, new_name) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", &pool_uuid);
             let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, error_message);
@@ -259,7 +259,7 @@ fn get_pool_property<F>(i: &mut IterAppend,
     let engine = dbus_context.engine.borrow();
     let pool =
         engine
-            .get_pool(&pool_uuid)
+            .get_pool(pool_uuid)
             .ok_or_else(|| {
                             MethodErr::failed(&format!("no pool corresponding to uuid {}",
                                                        &pool_uuid))

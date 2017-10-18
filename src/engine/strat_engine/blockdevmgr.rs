@@ -65,13 +65,15 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<Segment> {
 
 #[derive(Debug)]
 pub struct BlockDevMgr {
+    pool_uuid: PoolUuid,
     block_devs: Vec<StratBlockDev>,
     last_update_time: Option<DateTime<Utc>>,
 }
 
 impl BlockDevMgr {
-    pub fn new(block_devs: Vec<StratBlockDev>) -> BlockDevMgr {
+    pub fn new(pool_uuid: PoolUuid, block_devs: Vec<StratBlockDev>) -> BlockDevMgr {
         BlockDevMgr {
+            pool_uuid: pool_uuid,
             block_devs: block_devs,
             last_update_time: None,
         }
@@ -84,7 +86,7 @@ impl BlockDevMgr {
                       force: bool)
                       -> EngineResult<BlockDevMgr> {
         let devices = resolve_devices(paths)?;
-        Ok(BlockDevMgr::new(initialize(pool_uuid, devices, mda_size, force)?))
+        Ok(BlockDevMgr::new(pool_uuid, initialize(pool_uuid, devices, mda_size, force)?))
     }
 
     /// Get a function that maps UUIDs to Devices.
@@ -97,13 +99,9 @@ impl BlockDevMgr {
         Box::new(move |uuid: DevUuid| -> Option<Device> { uuid_map.get(&uuid).cloned() })
     }
 
-    pub fn add(&mut self,
-               pool_uuid: PoolUuid,
-               paths: &[&Path],
-               force: bool)
-               -> EngineResult<Vec<PathBuf>> {
+    pub fn add(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
         let devices = resolve_devices(paths)?;
-        let bds = initialize(pool_uuid, devices, MIN_MDA_SECTORS, force)?;
+        let bds = initialize(self.pool_uuid, devices, MIN_MDA_SECTORS, force)?;
         let bdev_paths = bds.iter().map(|p| p.devnode.clone()).collect();
         self.block_devs.extend(bds);
         Ok(bdev_paths)

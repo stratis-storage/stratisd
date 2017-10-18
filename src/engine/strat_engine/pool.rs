@@ -80,7 +80,7 @@ impl StratPool {
                             EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no metadata for pool {}", uuid))
                         })?;
-        let bd_mgr = BlockDevMgr::new(get_blockdevs(uuid, &metadata, devnodes)?);
+        let bd_mgr = BlockDevMgr::new(uuid, get_blockdevs(uuid, &metadata, devnodes)?);
         let thinpool = ThinPool::setup(uuid,
                                        &DM::new()?,
                                        metadata.thinpool_dev.data_block_size,
@@ -135,8 +135,7 @@ impl StratPool {
 
     pub fn snapshot_filesystem(&mut self, filesystem_uuid: Uuid) -> EngineResult<FilesystemUuid> {
         let dm = DM::new()?;
-        self.thin_pool
-            .snapshot_filesystem(&dm, self.pool_uuid, filesystem_uuid)
+        self.thin_pool.snapshot_filesystem(&dm, filesystem_uuid)
     }
 }
 
@@ -157,8 +156,7 @@ impl Pool for StratPool {
         let dm = DM::new()?;
         let mut result = Vec::new();
         for (name, size) in names {
-            let fs_uuid = self.thin_pool
-                .create_filesystem(self.pool_uuid, name, &dm, size)?;
+            let fs_uuid = self.thin_pool.create_filesystem(name, &dm, size)?;
             result.push((name, fs_uuid));
         }
 
@@ -166,7 +164,7 @@ impl Pool for StratPool {
     }
 
     fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<PathBuf>> {
-        let bdev_paths = self.block_devs.add(self.pool_uuid, paths, force)?;
+        let bdev_paths = self.block_devs.add(paths, force)?;
         self.write_metadata()?;
         Ok(bdev_paths)
     }

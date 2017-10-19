@@ -354,6 +354,7 @@ pub fn initialize(pool_uuid: PoolUuid,
             let allocator = RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())])
                 .expect("bda.size() < bda.dev_size() and single range");
 
+            // TODO: support getting hw info and passing in here. See #615
             bds.push(StratBlockDev::new(dev, devnode.to_owned(), bda, allocator, None, None));
         } else {
             // TODO: check the return values and update state machine on failure

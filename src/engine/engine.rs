@@ -34,7 +34,7 @@ pub trait BlockDev: HasUuid {
     fn user_info(&self) -> Option<&str>;
 
     /// Set the user-settable string associated with this blockdev.
-    fn set_user_info(&mut self, user_info: Option<&str>) -> ();
+    fn set_user_info(&mut self, user_info: Option<&str>) -> bool;
 
     /// Get the hardware ID for this blockdev.
     fn hardware_info(&self) -> Option<&str>;

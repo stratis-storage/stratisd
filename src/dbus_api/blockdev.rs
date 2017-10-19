@@ -139,10 +139,7 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                                        blockdev_data.uuid))
                         })?;
 
-        let id_changed = blockdev.user_info() != new_id;
-        blockdev.set_user_info(new_id);
-
-        id_changed
+        blockdev.set_user_info(new_id)
     };
 
     // FIXME: engine should decide to save state, not this function
@@ -208,7 +205,7 @@ fn get_blockdev_property<F>(i: &mut IterAppend,
     let blockdev =
         pool.get_blockdev(blockdev_data.uuid)
             .ok_or_else(|| {
-                            MethodErr::failed(&format!("noblockdev with uuid {}",
+                            MethodErr::failed(&format!("no blockdev with uuid {}",
                                                        blockdev_data.uuid))
                         })?;
     i.append(getter(blockdev)?);

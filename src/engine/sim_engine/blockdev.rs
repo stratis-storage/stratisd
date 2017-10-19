@@ -37,8 +37,13 @@ impl BlockDev for SimDev {
         self.user_info.as_ref().map(|x| &**x)
     }
 
-    fn set_user_info(&mut self, user_info: Option<&str>) -> () {
-        self.user_info = user_info.map(|x| x.to_owned());
+    fn set_user_info(&mut self, user_info: Option<&str>) -> bool {
+        if self.user_info.as_ref().map(|x| &**x) != user_info {
+            self.user_info = user_info.map(|x| x.to_owned());
+            true
+        } else {
+            false
+        }
     }
 
     fn hardware_info(&self) -> Option<&str> {

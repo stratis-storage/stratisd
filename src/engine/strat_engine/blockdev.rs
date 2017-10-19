@@ -167,7 +167,7 @@ impl BlockDev for StratBlockDev {
 impl Recordable<BlockDevSave> for StratBlockDev {
     fn record(&self) -> BlockDevSave {
         BlockDevSave {
-            dev: Some(self.devnode.clone()),
+            devnode: Some(self.devnode.clone()),
             user_info: self.user_info.clone(),
             hardware_info: self.hardware_info.clone(),
         }

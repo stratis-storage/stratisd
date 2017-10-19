@@ -228,11 +228,11 @@ impl Pool for StratPool {
         self.block_devs.blockdevs()
     }
 
-    fn get_blockdev(&self, uuid: &DevUuid) -> Option<&BlockDev> {
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<&BlockDev> {
         self.block_devs.get_blockdev_by_uuid(uuid)
     }
 
-    fn get_mut_blockdev(&mut self, uuid: &DevUuid) -> Option<&mut BlockDev> {
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
         self.block_devs.get_mut_blockdev_by_uuid(uuid)
     }
 

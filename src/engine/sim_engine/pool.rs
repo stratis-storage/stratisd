@@ -175,13 +175,13 @@ impl Pool for SimPool {
             .collect()
     }
 
-    fn get_blockdev(&self, uuid: &DevUuid) -> Option<&BlockDev> {
-        self.block_devs.get(uuid).map(|p| p as &BlockDev)
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<&BlockDev> {
+        self.block_devs.get(&uuid).map(|p| p as &BlockDev)
     }
 
-    fn get_mut_blockdev(&mut self, uuid: &DevUuid) -> Option<&mut BlockDev> {
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
         self.block_devs
-            .get_mut(uuid)
+            .get_mut(&uuid)
             .map(|p| p as &mut BlockDev)
     }
 

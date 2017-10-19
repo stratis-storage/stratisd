@@ -217,13 +217,13 @@ impl BlockDevMgr {
             .collect()
     }
 
-    pub fn get_blockdev_by_uuid(&self, uuid: &DevUuid) -> Option<&BlockDev> {
-        self.block_devs.get(uuid).map(|bd| bd as &BlockDev)
+    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<&BlockDev> {
+        self.block_devs.get(&uuid).map(|bd| bd as &BlockDev)
     }
 
-    pub fn get_mut_blockdev_by_uuid(&mut self, uuid: &DevUuid) -> Option<&mut BlockDev> {
+    pub fn get_mut_blockdev_by_uuid(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
         self.block_devs
-            .get_mut(uuid)
+            .get_mut(&uuid)
             .map(|bd| bd as &mut BlockDev)
     }
 

@@ -20,9 +20,9 @@ use super::randomization::Randomizer;
 #[derive(Debug)]
 /// A simulated device.
 pub struct SimDev {
-    pub devnode: PathBuf,
+    devnode: PathBuf,
     rdm: Rc<RefCell<Randomizer>>,
-    pub uuid: Uuid,
+    uuid: Uuid,
     user_info: Option<String>,
     hardware_info: Option<String>,
     initialization_time: u64,

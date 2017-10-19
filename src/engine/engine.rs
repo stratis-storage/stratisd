@@ -39,7 +39,8 @@ pub trait BlockDev: HasUuid {
     /// Get the hardware ID for this blockdev.
     fn hardware_info(&self) -> Option<&str>;
 
-    /// The time that this blockdev was initialized by Stratis.
+    /// The time that this blockdev was initialized by Stratis, rounded down
+    /// to the nearest second.
     fn initialization_time(&self) -> DateTime<Utc>;
 
     /// The usable size of the device, not counting Stratis overhead.
@@ -117,12 +118,12 @@ pub trait Pool: HasName + HasUuid {
     fn blockdevs(&self) -> Vec<&BlockDev>;
 
     /// Get the blockdev in this pool with this UUID.
-    fn get_blockdev(&self, uuid: &DevUuid) -> Option<&BlockDev>;
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<&BlockDev>;
 
     /// Get the mutable filesystem in this pool with this UUID.
-    fn get_mut_blockdev(&mut self, uuid: &DevUuid) -> Option<&mut BlockDev>;
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<&mut BlockDev>;
 
-    /// Save the state of the pool.
+    /// Save the state of the pool. FIXME, see #614.
     fn save_state(&mut self) -> EngineResult<()>;
 }
 

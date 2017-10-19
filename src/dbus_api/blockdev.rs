@@ -132,14 +132,12 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let blockdev_uuid = &blockdev_data.uuid;
     let id_changed = {
-        let blockdev =
-            pool.get_mut_blockdev(blockdev_uuid)
-                .ok_or_else(|| {
-                                MethodErr::failed(&format!("no blockdev with uuid {}",
-                                                           &blockdev_uuid))
-                            })?;
+        let blockdev = pool.get_mut_blockdev(blockdev_data.uuid)
+            .ok_or_else(|| {
+                            MethodErr::failed(&format!("no blockdev with uuid {}",
+                                                       blockdev_data.uuid))
+                        })?;
 
         let id_changed = blockdev.user_info() != new_id;
         blockdev.set_user_info(new_id);
@@ -207,10 +205,12 @@ fn get_blockdev_property<F>(i: &mut IterAppend,
                             MethodErr::failed(&format!("no pool corresponding to uuid {}",
                                                        &pool_uuid))
                         })?;
-    let blockdev_uuid = &blockdev_data.uuid;
     let blockdev =
-        pool.get_blockdev(blockdev_uuid)
-            .ok_or_else(|| MethodErr::failed(&format!("noblockdev with uuid {}", &blockdev_uuid)))?;
+        pool.get_blockdev(blockdev_data.uuid)
+            .ok_or_else(|| {
+                            MethodErr::failed(&format!("noblockdev with uuid {}",
+                                                       blockdev_data.uuid))
+                        })?;
     i.append(getter(blockdev)?);
     Ok(())
 }

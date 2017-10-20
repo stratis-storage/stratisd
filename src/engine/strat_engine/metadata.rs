@@ -627,8 +627,7 @@ mod mda {
                                            format!("metadata length {} exceeds region available {}",
                                                    used,
                                                    // available region > header size
-                                                   available - MDA_REGION_HDR_SIZE)
-                                                   .into()));
+                                                   available - MDA_REGION_HDR_SIZE)));
         };
         Ok(())
     }

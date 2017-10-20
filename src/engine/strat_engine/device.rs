@@ -87,7 +87,7 @@ pub fn resolve_devices<'a>(paths: &'a [&Path]) -> EngineResult<HashMap<Device, &
             }
             None => {
                 let err_msg = format!("path {} does not refer to a block device", path.display());
-                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
             }
         }
     }

@@ -141,12 +141,7 @@ impl BlockDev for StratBlockDev {
     }
 
     fn set_user_info(&mut self, user_info: Option<&str>) -> bool {
-        if self.user_info.as_ref().map(|x| &**x) != user_info {
-            self.user_info = user_info.map(|x| x.to_owned());
-            true
-        } else {
-            false
-        }
+        set_blockdev_user_info!(self; user_info)
     }
 
     fn hardware_info(&self) -> Option<&str> {

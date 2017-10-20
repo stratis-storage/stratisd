@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::path::Path;
-use std::path::PathBuf;
 
 use uuid::Uuid;
 
@@ -77,7 +76,7 @@ impl Engine for StratEngine {
                    blockdev_paths: &[&Path],
                    redundancy: Option<u16>,
                    force: bool)
-                   -> EngineResult<(PoolUuid, Vec<PathBuf>)> {
+                   -> EngineResult<PoolUuid> {
 
         let redundancy = calculate_redundancy!(redundancy);
 
@@ -86,11 +85,11 @@ impl Engine for StratEngine {
         }
 
         let dm = DM::new()?;
-        let (pool, devnodes) = StratPool::initialize(name, &dm, blockdev_paths, redundancy, force)?;
+        let pool = StratPool::initialize(name, &dm, blockdev_paths, redundancy, force)?;
 
         let uuid = pool.uuid();
         self.pools.insert(pool);
-        Ok((uuid, devnodes))
+        Ok(uuid)
     }
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool> {

@@ -96,3 +96,14 @@ macro_rules! check_engine {
         }
     }
 }
+
+macro_rules! set_blockdev_user_info {
+    ( $s:ident; $info:ident ) => {
+        if $s.user_info.as_ref().map(|x| &**x) != $info {
+            $s.user_info = $info.map(|x| x.to_owned());
+            true
+        } else {
+            false
+        }
+    }
+}

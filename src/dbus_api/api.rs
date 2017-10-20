@@ -32,6 +32,7 @@ use engine::{Engine, Redundancy};
 use stratis::VERSION;
 
 use super::filesystem::create_dbus_filesystem;
+use super::blockdev::create_dbus_blockdev;
 use super::pool::create_dbus_pool;
 use super::types::{DeferredAction, DbusContext, DbusErrorEnum, TData};
 use super::util::STRATIS_BASE_PATH;
@@ -56,27 +57,31 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
-    let result = dbus_context
-        .engine
-        .borrow_mut()
-        .create_pool(name, &blockdevs, tuple_to_option(redundancy), force);
+    let mut engine = dbus_context.engine.borrow_mut();
+    let result = engine.create_pool(name, &blockdevs, tuple_to_option(redundancy), force);
 
     let return_message = message.method_return();
 
     let msg = match result {
-        Ok((uuid, devnodes)) => {
+        Ok(pool_uuid) => {
             let pool_object_path: dbus::Path =
-                create_dbus_pool(dbus_context, object_path.clone(), uuid);
-            let paths = devnodes
+                create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
+            let default_return =
+                MessageItem::Struct(vec![MessageItem::ObjectPath(default_object_path()),
+                                         MessageItem::Array(vec![], "o".into())]);
+            let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+
+            let bd_object_paths = pool.blockdevs()
                 .iter()
-                .map(|d| {
-                         d.to_str()
-                             .expect("'d' originated in the 'devs' D-Bus argument")
-                             .into()
-                     });
-            let paths = paths.map(MessageItem::Str).collect();
+                .map(|bd| {
+                         MessageItem::ObjectPath(create_dbus_blockdev(dbus_context,
+                                                                      pool_object_path.clone(),
+                                                                      bd.uuid()))
+                     })
+                .collect::<Vec<_>>();
+
             let return_path = MessageItem::ObjectPath(pool_object_path);
-            let return_list = MessageItem::Array(paths, "s".into());
+            let return_list = MessageItem::Array(bd_object_paths, "o".into());
             let return_value = MessageItem::Struct(vec![return_path, return_list]);
             let (rc, rs) = ok_message_items();
             return_message.append3(return_value, rc, rs)
@@ -201,7 +206,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
         .in_arg(("redundancy", "(bq)"))
         .in_arg(("force", "b"))
         .in_arg(("devices", "as"))
-        .out_arg(("result", "(oas)"))
+        .out_arg(("result", "(oao)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
@@ -260,12 +265,16 @@ pub fn connect(engine: Rc<RefCell<Engine>>)
     let (tree, object_path) = get_base_tree(DbusContext::new(engine));
     let dbus_context = tree.get_data().clone();
 
-    // This should never panic as create_dbus_pool() and
-    // create_dbus_filesystem() do not borrow the engine.
+    // This should never panic as create_dbus_pool(),
+    // create_dbus_filesystem(), and create_dbus_blockdev() do not borrow the
+    // engine.
     for pool in local_engine.borrow().pools() {
         let pool_path = create_dbus_pool(&dbus_context, object_path.clone(), pool.uuid());
         for fs_uuid in pool.filesystems().iter().map(|f| f.uuid()) {
             create_dbus_filesystem(&dbus_context, pool_path.clone(), fs_uuid);
+        }
+        for dev_uuid in pool.blockdevs().iter().map(|bd| bd.uuid()) {
+            create_dbus_blockdev(&dbus_context, pool_path.clone(), dev_uuid);
         }
     }
 

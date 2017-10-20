@@ -32,11 +32,11 @@ use libstratis::engine::types::{Redundancy, RenameAction};
 /// INITIAL_DATA_SIZE.  If we are able to write more sectors to the filesystem
 /// than are initially allocated to the pool, the pool must have been expanded.
 pub fn test_thinpool_expand(paths: &[&Path]) -> () {
-    let (mut pool, _) = StratPool::initialize("stratis_test_pool",
-                                              &DM::new().unwrap(),
-                                              paths,
-                                              Redundancy::NONE,
-                                              true)
+    let mut pool = StratPool::initialize("stratis_test_pool",
+                                         &DM::new().unwrap(),
+                                         paths,
+                                         Redundancy::NONE,
+                                         true)
             .unwrap();
 
     let &(_, fs_uuid) = pool.create_filesystems(&[("stratis_test_filesystem", None)])
@@ -69,8 +69,8 @@ pub fn test_thinpool_expand(paths: &[&Path]) -> () {
 /// Verify a snapshot has the same files and same contents as the origin.
 pub fn test_filesystem_snapshot(paths: &[&Path]) {
     let dm = DM::new().unwrap();
-    let (mut pool, _) =
-        StratPool::initialize("stratis_test_pool", &dm, paths, Redundancy::NONE, true).unwrap();
+    let mut pool = StratPool::initialize("stratis_test_pool", &dm, paths, Redundancy::NONE, true)
+        .unwrap();
     let &(_, fs_uuid) = pool.create_filesystems(&[("stratis_test_filesystem", None)])
         .unwrap()
         .first()
@@ -147,7 +147,7 @@ pub fn test_filesystem_rename(paths: &[&Path]) {
 
     let name1 = "name1";
     let name2 = "name2";
-    let (uuid1, _) = engine.create_pool(&name1, paths, None, false).unwrap();
+    let uuid1 = engine.create_pool(&name1, paths, None, false).unwrap();
     let fs_uuid = {
         let pool = engine.get_mut_pool(uuid1).unwrap();
         let &(fs_name, fs_uuid) = pool.create_filesystems(&[(name1, None)])
@@ -180,11 +180,11 @@ pub fn test_filesystem_rename(paths: &[&Path]) {
 /// from the thinpool, by attempting to reinstantiate it using the
 /// same thin id and verifying that it fails.
 pub fn test_thinpool_thindev_destroy(paths: &[&Path]) -> () {
-    let (mut pool, _) = StratPool::initialize("stratis_test_pool",
-                                              &DM::new().unwrap(),
-                                              paths,
-                                              Redundancy::NONE,
-                                              true)
+    let mut pool = StratPool::initialize("stratis_test_pool",
+                                         &DM::new().unwrap(),
+                                         paths,
+                                         Redundancy::NONE,
+                                         true)
             .unwrap();
     let &(_, fs_uuid) = pool.create_filesystems(&[("stratis_test_filesystem", None)])
         .unwrap()

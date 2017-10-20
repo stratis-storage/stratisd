@@ -7,13 +7,13 @@
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 
 use devicemapper::{Device, Sectors};
 
 use super::super::engine::{BlockDev, HasUuid};
 use super::super::errors::EngineResult;
-use super::super::types::{DevUuid, PoolUuid};
+use super::super::types::{BlockDevState, DevUuid, PoolUuid};
 
 use super::metadata::BDA;
 use super::range_alloc::RangeAllocator;
@@ -26,19 +26,25 @@ pub struct StratBlockDev {
     pub devnode: PathBuf,
     bda: BDA,
     used: RangeAllocator,
+    user_info: Option<String>,
+    hardware_info: Option<String>,
 }
 
 impl StratBlockDev {
     pub fn new(dev: Device,
                devnode: PathBuf,
                bda: BDA,
-               allocator: RangeAllocator)
+               allocator: RangeAllocator,
+               user_info: Option<String>,
+               hardware_info: Option<String>)
                -> StratBlockDev {
         StratBlockDev {
             dev: dev,
             devnode: devnode,
             bda: bda,
             used: allocator,
+            user_info: user_info,
+            hardware_info: hardware_info,
         }
     }
 
@@ -129,10 +135,41 @@ impl BlockDev for StratBlockDev {
     fn devnode(&self) -> PathBuf {
         self.devnode.clone()
     }
+
+    fn user_info(&self) -> Option<&str> {
+        self.user_info.as_ref().map(|x| &**x)
+    }
+
+    fn set_user_info(&mut self, user_info: Option<&str>) -> bool {
+        set_blockdev_user_info!(self; user_info)
+    }
+
+    fn hardware_info(&self) -> Option<&str> {
+        self.hardware_info.as_ref().map(|x| &**x)
+    }
+
+    fn initialization_time(&self) -> DateTime<Utc> {
+        // This cast will result in an incorrect, negative value starting in
+        // the year 292,277,026,596. :-)
+        Utc.timestamp(self.bda.initialization_time() as i64, 0)
+    }
+
+    fn total_size(&self) -> Sectors {
+        self.avail_range().1
+    }
+
+    fn state(&self) -> BlockDevState {
+        // TODO: Implement states for blockdevs
+        BlockDevState::InUse
+    }
 }
 
 impl Recordable<BlockDevSave> for StratBlockDev {
     fn record(&self) -> BlockDevSave {
-        BlockDevSave { devnode: self.devnode.clone() }
+        BlockDevSave {
+            devnode: Some(self.devnode.clone()),
+            user_info: self.user_info.clone(),
+            hardware_info: self.hardware_info.clone(),
+        }
     }
 }

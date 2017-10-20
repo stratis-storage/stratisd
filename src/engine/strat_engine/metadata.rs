@@ -152,6 +152,11 @@ impl BDA {
     pub fn max_data_size(&self) -> Sectors {
         self.regions.max_data_size()
     }
+
+    /// Timestamp when the device was initialized.
+    pub fn initialization_time(&self) -> u64 {
+        self.header.initialization_time
+    }
 }
 
 #[derive(Debug)]

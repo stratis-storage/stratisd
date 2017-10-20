@@ -26,6 +26,7 @@ use devicemapper::Sectors;
 
 use engine::{Pool, RenameAction};
 
+use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
@@ -158,7 +159,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let return_sig = "s";
+    let return_sig = "o";
     let default_return = MessageItem::Array(vec![], return_sig.into());
 
     let pool_path = m.tree
@@ -171,25 +172,29 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
-    let msg = match pool.add_blockdevs(&blockdevs, force) {
-        Ok(devnodes) => {
-            let paths = devnodes
+    let result = pool.add_blockdevs(&blockdevs, force);
+    let msg = match result {
+        Ok(uuids) => {
+            let return_value = uuids
                 .iter()
-                .map(|d| {
-                         d.to_str()
-                             .expect("'d' originated in the 'devs' D-Bus argument")
-                             .into()
-                     });
-            let paths = paths.map(MessageItem::Str).collect();
+                .map(|uuid| {
+                         MessageItem::ObjectPath(create_dbus_blockdev(dbus_context,
+                                                                      object_path.clone(),
+                                                                      *uuid))
+                     })
+                .collect();
+
+            let return_value = MessageItem::Array(return_value, return_sig.into());
             let (rc, rs) = ok_message_items();
-            return_message.append3(MessageItem::Array(paths, return_sig.into()), rc, rs)
+            return_message.append3(return_value, rc, rs)
         }
-        Err(x) => {
-            let (rc, rs) = engine_to_dbus_err(&x);
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err(&err);
             let (rc, rs) = code_to_message_items(rc, rs);
             return_message.append3(default_return, rc, rs)
         }
     };
+
     Ok(vec![msg])
 }
 
@@ -320,7 +325,7 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,
     let add_devs_method = f.method("AddDevs", (), add_devs)
         .in_arg(("force", "b"))
         .in_arg(("devices", "as"))
-        .out_arg(("results", "as"))
+        .out_arg(("results", "ao"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

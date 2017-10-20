@@ -39,7 +39,12 @@ pub struct PoolSave {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockDevSave {
-    pub devnode: PathBuf,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub devnode: Option<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_info: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hardware_info: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

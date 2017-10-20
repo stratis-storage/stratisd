@@ -94,11 +94,11 @@ pub fn test_basic_metadata(paths: &[&Path]) {
     let mut engine = StratEngine::initialize().unwrap();
 
     let name1 = "name1";
-    let (uuid1, _) = engine.create_pool(&name1, paths1, None, false).unwrap();
+    let uuid1 = engine.create_pool(&name1, paths1, None, false).unwrap();
     let metadata1 = engine.get_strat_pool(uuid1).unwrap().record();
 
     let name2 = "name2";
-    let (uuid2, _) = engine.create_pool(&name2, paths2, None, false).unwrap();
+    let uuid2 = engine.create_pool(&name2, paths2, None, false).unwrap();
     let metadata2 = engine.get_strat_pool(uuid2).unwrap().record();
 
     let pools = find_all().unwrap();
@@ -144,10 +144,10 @@ pub fn test_setup(paths: &[&Path]) {
     let mut engine = StratEngine::initialize().unwrap();
 
     let name1 = "name1";
-    let (uuid1, _) = engine.create_pool(&name1, paths1, None, false).unwrap();
+    let uuid1 = engine.create_pool(&name1, paths1, None, false).unwrap();
 
     let name2 = "name2";
-    let (uuid2, _) = engine.create_pool(&name2, paths2, None, false).unwrap();
+    let uuid2 = engine.create_pool(&name2, paths2, None, false).unwrap();
 
     assert!(engine.get_pool(uuid1).is_some());
     assert!(engine.get_pool(uuid2).is_some());
@@ -167,7 +167,7 @@ pub fn test_pool_rename(paths: &[&Path]) {
     let mut engine = StratEngine::initialize().unwrap();
 
     let name1 = "name1";
-    let (uuid1, _) = engine.create_pool(&name1, paths, None, false).unwrap();
+    let uuid1 = engine.create_pool(&name1, paths, None, false).unwrap();
 
     let name2 = "name2";
     let action = engine.rename_pool(uuid1, name2).unwrap();
@@ -187,7 +187,7 @@ pub fn test_pool_rename(paths: &[&Path]) {
 pub fn test_pool_setup(paths: &[&Path]) {
     let dm = DM::new().unwrap();
 
-    let (mut pool, _) = StratPool::initialize("name", &dm, paths, Redundancy::NONE, false).unwrap();
+    let mut pool = StratPool::initialize("name", &dm, paths, Redundancy::NONE, false).unwrap();
 
     let (_, fs_uuid) = pool.create_filesystems(&[("fsname", None)]).unwrap()[0];
 

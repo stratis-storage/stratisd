@@ -200,7 +200,21 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                     RangeAllocator::new(actual_size,
                                         segment_table.get(&bda.dev_uuid()).unwrap_or(&vec![]))?;
 
-                blockdevs.push(StratBlockDev::new(*device, devnode.to_owned(), bda, allocator));
+                let bd_save = pool_save
+                    .block_devs
+                    .get(&bda.dev_uuid())
+                    .ok_or_else(|| {
+                                    let err_msg = format!("Blockdev {} not found in metadata",
+                                                          bda.dev_uuid());
+                                    EngineError::Engine(ErrorEnum::NotFound, err_msg)
+                                })?;
+
+                blockdevs.push(StratBlockDev::new(*device,
+                                                  devnode.to_owned(),
+                                                  bda,
+                                                  allocator,
+                                                  bd_save.user_info.clone(),
+                                                  bd_save.hardware_info.clone()));
             }
         }
     }

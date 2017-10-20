@@ -247,6 +247,7 @@ impl Recordable<HashMap<DevUuid, BlockDevSave>> for BlockDevMgr {
 
 /// Initialize multiple blockdevs at once. This allows all of them
 /// to be checked for usability before writing to any of them.
+#[allow(implicit_hasher)]
 pub fn initialize(pool_uuid: PoolUuid,
                   devices: HashMap<Device, &Path>,
                   mda_size: Sectors,

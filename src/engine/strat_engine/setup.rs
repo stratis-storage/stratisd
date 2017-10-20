@@ -206,7 +206,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                     .ok_or_else(|| {
                                     let err_msg = format!("Blockdev {} not found in metadata",
                                                           bda.dev_uuid());
-                                    EngineError::Engine(ErrorEnum::NotFound, err_msg.into())
+                                    EngineError::Engine(ErrorEnum::NotFound, err_msg)
                                 })?;
 
                 blockdevs.push(StratBlockDev::new(*device,

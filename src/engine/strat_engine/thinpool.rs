@@ -350,9 +350,9 @@ impl ThinPool {
         let extend_size = current_size;
         if let Some(mut new_data_regions) = bd_mgr.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
             self.extend_data(dm,
-                             new_data_regions
-                                 .pop()
-                                 .expect("len(new_data_regions) == 1"))?;
+                             &new_data_regions
+                                  .pop()
+                                  .expect("len(new_data_regions) == 1"))?;
         } else {
             let err_msg = format!("Insufficient space to accomodate request for {}",
                                   extend_size);
@@ -362,15 +362,16 @@ impl ThinPool {
     }
 
     /// Extend the thinpool with new data regions.
-    fn extend_data(&mut self, dm: &DM, new_segs: Vec<BlkDevSegment>) -> EngineResult<()> {
-        self.thin_pool.extend_data(dm, &map_to_dm(&new_segs))?;
+    fn extend_data(&mut self, dm: &DM, new_segs: &[BlkDevSegment]) -> EngineResult<()> {
+        let mut segments = Vec::with_capacity(self.data_segments.len() + new_segs.len());
+        segments.extend_from_slice(&self.data_segments);
 
         // Last existing and first new may be contiguous. Coalesce into
         // a single BlkDevSegment if so.
         let coalesced_new_first = {
             match new_segs.first() {
                 Some(new_first) => {
-                    let old_last = self.data_segments
+                    let old_last = segments
                         .last_mut()
                         .expect("thin pool must always have some data segments");
                     if old_last.uuid == new_first.uuid &&
@@ -387,10 +388,14 @@ impl ThinPool {
         };
 
         if coalesced_new_first {
-            self.data_segments.extend(new_segs.into_iter().skip(1));
+            segments.extend_from_slice(&new_segs[1..]);
         } else {
-            self.data_segments.extend(new_segs);
+            segments.extend_from_slice(new_segs);
         }
+
+        self.thin_pool
+            .set_data_segments(dm, &map_to_dm(&segments))?;
+        self.data_segments = segments;
 
         Ok(())
     }

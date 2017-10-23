@@ -62,7 +62,7 @@ impl Display for ThinPoolRole {
 
 /// Format a name for the flex layer.
 /// Prerequisite: len(format!("{}", FORMAT_VERSION)) < 72
-pub fn format_flex_name(pool_uuid: &PoolUuid, role: FlexRole) -> DmNameBuf {
+pub fn format_flex_name(pool_uuid: PoolUuid, role: FlexRole) -> DmNameBuf {
     DmNameBuf::new(format!("stratis-{}-{}-flex-{}",
                            FORMAT_VERSION,
                            pool_uuid.simple().to_string(),

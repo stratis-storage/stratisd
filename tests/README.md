@@ -1,11 +1,6 @@
-# Integration Tests for stratisd
+# Unsafe Unit Tests for stratisd
 
 A collection of tests intended to test the different layers of stratis
-
-## Organization
-
-Integration tests go in the stratisd/tests directory (unit tests go in each file
-they're testing).
 
 ## Running the tests
 
@@ -48,7 +43,3 @@ Then (in root of source tree):
 ```bash
 $ make test-real
 ```
-
-Any of the loopbacked device or real device backed tests can be run
-individually.  See the test-loop and test-real targets in the Makefile for
-examples.

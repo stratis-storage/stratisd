@@ -229,6 +229,7 @@ impl StaticHeader {
     }
 
     /// Determine the ownership of a device.
+    /// If the device is owned by Stratis, return its device UUID.
     pub fn determine_ownership<F>(f: &mut F) -> EngineResult<DevOwnership>
         where F: Read + Seek
     {
@@ -245,7 +246,7 @@ impl StaticHeader {
         // it must also have correct CRC, no weird stuff in fields,
         // etc!
         match StaticHeader::setup_from_buf(&buf) {
-            Ok(Some(sh)) => Ok(DevOwnership::Ours(sh.pool_uuid)),
+            Ok(Some(sh)) => Ok(DevOwnership::Ours(sh.pool_uuid, sh.dev_uuid)),
             Ok(None) => {
                 if buf.iter().any(|x| *x != 0) {
                     Ok(DevOwnership::Theirs)
@@ -819,7 +820,6 @@ mod tests {
     fn prop_test_ownership() {
         fn test_ownership(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
             let sh = random_static_header(blkdev_size, mda_size_factor);
-            let pool_uuid = sh.pool_uuid;
             let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
             let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
             match ownership {
@@ -836,8 +836,8 @@ mod tests {
                     .unwrap();
             let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
             match ownership {
-                DevOwnership::Ours(uuid) => {
-                    if pool_uuid != uuid {
+                DevOwnership::Ours(pool_uuid, dev_uuid) => {
+                    if sh.pool_uuid != pool_uuid || sh.dev_uuid != dev_uuid {
                         return TestResult::failed();
                     }
                 }

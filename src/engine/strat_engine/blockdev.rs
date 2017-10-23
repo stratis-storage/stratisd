@@ -80,11 +80,13 @@ impl StratBlockDev {
     }
 
     /// The device's pool's UUID.
+    #[allow(dead_code)]
     pub fn pool_uuid(&self) -> PoolUuid {
         self.bda.pool_uuid()
     }
 
     /// Last time metadata was written to this device.
+    #[allow(dead_code)]
     pub fn last_update_time(&self) -> Option<&DateTime<Utc>> {
         self.bda.last_update_time()
     }
@@ -98,6 +100,7 @@ impl StratBlockDev {
     // ALL SIZE METHODS
 
     /// The size of the device as recorded in the metadata.
+    #[allow(dead_code)]
     pub fn recorded_size(&self) -> Sectors {
         self.bda.dev_size()
     }

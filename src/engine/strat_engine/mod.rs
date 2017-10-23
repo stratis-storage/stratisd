@@ -3,19 +3,22 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 mod blockdev;
-pub mod blockdevmgr;
+mod blockdevmgr;
 mod cleanup;
-pub mod device;
-pub mod dmdevice;
-pub mod engine;
-pub mod metadata;
+mod device;
+mod dmdevice;
+mod engine;
+mod metadata;
 mod mdv;
-pub mod filesystem;
-pub mod pool;
-pub mod serde_structs;
-pub mod setup;
+mod filesystem;
+mod pool;
+mod serde_structs;
+mod setup;
 mod range_alloc;
 mod thinpool;
 pub mod util;
 
 pub use self::engine::StratEngine;
+
+#[cfg(test)]
+mod tests;

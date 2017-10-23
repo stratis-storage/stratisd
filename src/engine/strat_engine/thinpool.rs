@@ -287,6 +287,8 @@ impl ThinPool {
 
                 if usage.used_data > usage.total_data - DATA_LOWATER {
                     // Request expansion of physical space allocated to the pool
+                    // TODO: we just request that the space be doubled here.
+                    // A more sophisticated approach might be in order.
                     match self.extend_thinpool(dm, usage.total_data, bd_mgr) {
                         #![allow(single_match)]
                         Ok(_) => {}
@@ -330,24 +332,15 @@ impl ThinPool {
         Ok(())
     }
 
-    /// Get the devicemapper::ThinPoolDev for this pool. Used for testing.
-    pub fn thinpooldev(&self) -> &ThinPoolDev {
-        &self.thin_pool
-    }
-
-    /// Expand the physical space allocated to a pool.
-    /// The physical space is always doubled, and the method fails if the
-    /// requested amount of space is not available.
+    /// Expand the physical space allocated to a pool by extend_size.
     /// Return the number of DataBlocks added.
-    // TODO: Refine this method. Doubling the size may not always be correct,
-    // and a hard fail if the requested size is not available may not be
-    // correct either.
+    // TODO: Refine this method. A hard fail if the request can not be
+    // satisfied may not be correct.
     fn extend_thinpool(&mut self,
                        dm: &DM,
-                       current_size: DataBlocks,
+                       extend_size: DataBlocks,
                        bd_mgr: &mut BlockDevMgr)
                        -> EngineResult<DataBlocks> {
-        let extend_size = current_size;
         if let Some(mut new_data_regions) = bd_mgr.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
             self.extend_data(dm,
                              &new_data_regions
@@ -487,6 +480,7 @@ impl ThinPool {
     }
 
 
+    #[allow(dead_code)]
     pub fn snapshot_filesystem(&mut self,
                                dm: &DM,
                                filesystem_uuid: FilesystemUuid)
@@ -632,4 +626,376 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
     new_meta_dev.set_name(dm, name.as_ref())?;
 
     Ok(new_meta_dev)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs::OpenOptions;
+    use std::io::{Read, Write};
+    use std::path::Path;
+
+    use nix::mount::{MNT_DETACH, MsFlags, mount, umount, umount2};
+    use uuid::Uuid;
+
+    use devicemapper::{Bytes, SECTOR_SIZE};
+
+    use super::super::filesystem::{FILESYSTEM_LOWATER, fs_usage};
+    use super::super::metadata::MIN_MDA_SECTORS;
+    use super::super::tests::{loopbacked, real};
+    use super::super::tests::tempdir::TempDir;
+
+    use super::*;
+
+    /// Verify a snapshot has the same files and same contents as the origin.
+    fn test_filesystem_snapshot(paths: &[&Path]) {
+        let pool_uuid = Uuid::new_v4();
+        let dm = DM::new().unwrap();
+        let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut pool = ThinPool::new(pool_uuid, &dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut mgr)
+            .unwrap();
+
+        let fs_uuid = pool.create_filesystem("stratis_test_filesystem", &dm, None)
+            .unwrap();
+
+        let write_buf = &[8u8; SECTOR_SIZE];
+        let file_count = 10;
+
+        let source_tmp_dir = TempDir::new("stratis_testing").unwrap();
+        {
+            // to allow mutable borrow of pool
+            let filesystem = pool.get_filesystem_by_uuid(fs_uuid).unwrap();
+            mount(Some(&filesystem.devnode()),
+                  source_tmp_dir.path(),
+                  Some("xfs"),
+                  MsFlags::empty(),
+                  None as Option<&str>)
+                    .unwrap();
+            for i in 0..file_count {
+                let file_path = source_tmp_dir
+                    .path()
+                    .join(format!("stratis_test{}.txt", i));
+                let mut f = OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .open(file_path)
+                    .unwrap();
+                f.write_all(write_buf).unwrap();
+                f.flush().unwrap();
+            }
+        }
+
+        // Double the size of the data device. The space initially allocated
+        // to a pool is close to consumed by the filesystem and few files
+        // written above. If we attempt to update the UUID on the snapshot
+        // without expanding the pool, the pool will go into out-of-data-space
+        // (queue IO) mode, causing the test to fail.
+        pool.extend_thinpool(&dm, INITIAL_DATA_SIZE, &mut mgr)
+            .unwrap();
+
+        let snapshot_uuid = pool.snapshot_filesystem(&dm, fs_uuid).unwrap();
+        let mut read_buf = [0u8; SECTOR_SIZE];
+        let snapshot_tmp_dir = TempDir::new("stratis_testing").unwrap();
+        {
+            let snapshot_filesystem = pool.get_filesystem_by_uuid(snapshot_uuid).unwrap();
+            mount(Some(&snapshot_filesystem.devnode()),
+                  snapshot_tmp_dir.path(),
+                  Some("xfs"),
+                  MsFlags::empty(),
+                  None as Option<&str>)
+                    .unwrap();
+            for i in 0..file_count {
+                let file_path = snapshot_tmp_dir
+                    .path()
+                    .join(format!("stratis_test{}.txt", i));
+                let mut f = OpenOptions::new().read(true).open(file_path).unwrap();
+                f.read(&mut read_buf).unwrap();
+                assert!(read_buf[0..SECTOR_SIZE] == write_buf[0..SECTOR_SIZE]);
+            }
+        }
+        umount(source_tmp_dir.path()).unwrap();
+        umount(snapshot_tmp_dir.path()).unwrap();
+        pool.destroy_filesystem(&dm, fs_uuid).unwrap();
+        pool.destroy_filesystem(&dm, snapshot_uuid).unwrap();
+        pool.teardown(&dm).unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_filesystem_snapshot() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3),
+                                   test_filesystem_snapshot);
+    }
+
+    #[test]
+    pub fn real_test_filesystem_snapshot() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_filesystem_snapshot);
+    }
+
+    /// Verify that a filesystem rename causes the filesystem metadata to be
+    /// updated.
+    fn test_filesystem_rename(paths: &[&Path]) {
+        let name1 = "name1";
+        let name2 = "name2";
+
+        let pool_uuid = Uuid::new_v4();
+        let dm = DM::new().unwrap();
+        let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut pool = ThinPool::new(pool_uuid, &dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut mgr)
+            .unwrap();
+
+        let fs_uuid = pool.create_filesystem(&name1, &dm, None).unwrap();
+
+        let action = pool.rename_filesystem(fs_uuid, name2).unwrap();
+        assert_eq!(action, RenameAction::Renamed);
+        let flexdevs: FlexDevsSave = pool.record();
+        pool.teardown(&dm).unwrap();
+
+        let pool = ThinPool::setup(pool_uuid,
+                                   &dm,
+                                   DATA_BLOCK_SIZE,
+                                   DATA_LOWATER,
+                                   &flexdevs,
+                                   &mgr)
+                .unwrap();
+
+        assert_eq!(pool.get_filesystem_by_uuid(fs_uuid).unwrap().name(), name2);
+        pool.teardown(&dm).unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_filesystem_rename() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3),
+                                   test_filesystem_rename);
+    }
+
+    #[test]
+    pub fn real_test_filesystem_rename() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_filesystem_rename);
+    }
+
+    /// Verify that setting up a pool when the pool has not been previously torn
+    /// down does not fail. Clutter the original pool with a filesystem with
+    /// some data on it.
+    fn test_pool_setup(paths: &[&Path]) {
+        let pool_uuid = Uuid::new_v4();
+        let dm = DM::new().unwrap();
+        let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut pool = ThinPool::new(pool_uuid, &dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut mgr)
+            .unwrap();
+
+        let fs_uuid = pool.create_filesystem("fsname", &dm, None).unwrap();
+
+        let tmp_dir = TempDir::new("stratis_testing").unwrap();
+        let new_file = tmp_dir.path().join("stratis_test.txt");
+        {
+            let fs = pool.get_filesystem_by_uuid(fs_uuid).unwrap();
+            mount(Some(&fs.devnode()),
+                  tmp_dir.path(),
+                  Some("xfs"),
+                  MsFlags::empty(),
+                  None as Option<&str>)
+                    .unwrap();
+            writeln!(&OpenOptions::new()
+                          .create(true)
+                          .write(true)
+                          .open(new_file)
+                          .unwrap(),
+                     "data")
+                    .unwrap();
+        }
+
+        let new_pool = ThinPool::setup(pool_uuid,
+                                       &dm,
+                                       DATA_BLOCK_SIZE,
+                                       DATA_LOWATER,
+                                       &pool.record(),
+                                       &mgr)
+                .unwrap();
+
+        assert!(new_pool.get_filesystem_by_uuid(fs_uuid).is_some());
+
+        umount2(tmp_dir.path(), MNT_DETACH).unwrap();
+        pool.destroy_filesystem(&dm, fs_uuid).unwrap();
+        pool.teardown(&dm).unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_pool_setup() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_pool_setup);
+    }
+
+    #[test]
+    pub fn real_test_pool_setup() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_pool_setup);
+    }
+    /// Verify that destroy_filesystems actually deallocates the space
+    /// from the thinpool, by attempting to reinstantiate it using the
+    /// same thin id and verifying that it fails.
+    fn test_thindev_destroy(paths: &[&Path]) -> () {
+        let pool_uuid = Uuid::new_v4();
+        let dm = DM::new().unwrap();
+        let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut pool = ThinPool::new(pool_uuid, &dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut mgr)
+            .unwrap();
+        let fs_name = "stratis_test_filesystem";
+        let fs_uuid = pool.create_filesystem(&fs_name, &dm, None).unwrap();
+        let thin_id = pool.get_filesystem_by_uuid(fs_uuid).unwrap().thin_id();
+        let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fs_uuid));
+        let thindev = ThinDev::setup(&dm,
+                                     device_name.as_ref(),
+                                     None,
+                                     &pool.thin_pool,
+                                     thin_id,
+                                     DEFAULT_THIN_DEV_SIZE);
+        assert!(thindev.is_ok());
+        pool.destroy_filesystem(&dm, fs_uuid).unwrap();
+
+        let thindev = ThinDev::setup(&dm,
+                                     device_name.as_ref(),
+                                     None,
+                                     &pool.thin_pool,
+                                     thin_id,
+                                     DEFAULT_THIN_DEV_SIZE);
+        assert!(thindev.is_err());
+        let flexdevs: FlexDevsSave = pool.record();
+        pool.teardown(&dm).unwrap();
+
+        // Check that destroyed fs is not present in MDV. If the record
+        // had been left on the MDV that didn't match a thin_id in the
+        // thinpool, ::setup() will fail.
+        let pool = ThinPool::setup(pool_uuid,
+                                   &dm,
+                                   DATA_BLOCK_SIZE,
+                                   DATA_LOWATER,
+                                   &flexdevs,
+                                   &mgr)
+                .unwrap();
+
+        assert!(pool.get_filesystem_by_uuid(fs_uuid).is_none());
+        pool.teardown(&dm).unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_thindev_destroy() {
+        // This test requires more than 1 GiB.
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_thindev_destroy);
+    }
+
+    #[test]
+    pub fn real_test_thindev_destroy() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_thindev_destroy);
+    }
+
+    /// Verify that the physical space allocated to a pool is expanded when
+    /// the number of sectors written to a thin-dev in the pool exceeds the
+    /// INITIAL_DATA_SIZE.  If we are able to write more sectors to the
+    /// filesystem than are initially allocated to the pool, the pool must
+    /// have been expanded.
+    fn test_thinpool_expand(paths: &[&Path]) -> () {
+        let pool_uuid = Uuid::new_v4();
+        let dm = DM::new().unwrap();
+        let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut pool = ThinPool::new(pool_uuid, &dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut mgr)
+            .unwrap();
+        let fs_name = "stratis_test_filesystem";
+        let fs_uuid = pool.create_filesystem(&fs_name, &dm, None).unwrap();
+
+        let devnode = pool.get_filesystem_by_uuid(fs_uuid).unwrap().devnode();
+        // Braces to ensure f is closed before destroy
+        {
+            let mut f = OpenOptions::new().write(true).open(devnode).unwrap();
+            // Write 1 more sector than is initially allocated to a pool
+            let write_size = *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE + Sectors(1);
+            let buf = &[1u8; SECTOR_SIZE];
+            for i in 0..*write_size {
+                f.write_all(buf).unwrap();
+                // Simulate handling a DM event by extending the pool when
+                // the amount of free space in pool has decreased to the
+                // DATA_LOWATER value.
+                if i == *(*(INITIAL_DATA_SIZE - DATA_LOWATER) * DATA_BLOCK_SIZE) {
+                    pool.extend_thinpool(&dm, INITIAL_DATA_SIZE, &mut mgr)
+                        .unwrap();
+                }
+            }
+        }
+        pool.destroy_filesystem(&dm, fs_uuid).unwrap();
+        pool.teardown(&dm).unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_thinpool_expand() {
+        // This test requires more than 1 GiB.
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_thinpool_expand);
+    }
+
+    #[test]
+    pub fn real_test_thinpool_expand() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_thinpool_expand);
+    }
+
+    /// Verify that the logical space allocated to a filesystem is expanded when
+    /// the number of sectors written to the filesystem causes the free space to
+    /// dip below the FILESYSTEM_LOWATER mark. Verify that the space has been
+    /// expanded by calling filesystem.check() then looking at the total space
+    /// compared to the original size.
+    fn test_xfs_expand(paths: &[&Path]) -> () {
+        let pool_uuid = Uuid::new_v4();
+        let dm = DM::new().unwrap();
+        let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut pool = ThinPool::new(pool_uuid, &dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut mgr)
+            .unwrap();
+
+        // Create a filesytem as small as possible.  Allocate 1 MiB bigger than
+        // the low water mark.
+        let fs_size = FILESYSTEM_LOWATER + Bytes(IEC::Mi).sectors();
+
+        let fs_name = "stratis_test_filesystem";
+        let fs_uuid = pool.create_filesystem(&fs_name, &dm, Some(fs_size))
+            .unwrap();
+
+        // Braces to ensure f is closed before destroy and the borrow of
+        // pool is complete
+        {
+            let filesystem = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
+            // Write 2 MiB of data. The filesystem's free space is now 1 MiB
+            // below FILESYSTEM_LOWATER.
+            let write_size = Bytes(IEC::Mi * 2).sectors();
+            let tmp_dir = TempDir::new("stratis_testing").unwrap();
+            mount(Some(&filesystem.devnode()),
+                  tmp_dir.path(),
+                  Some("xfs"),
+                  MsFlags::empty(),
+                  None as Option<&str>)
+                    .unwrap();
+            let buf = &[1u8; SECTOR_SIZE];
+            for i in 0..*write_size {
+                let file_path = tmp_dir.path().join(format!("stratis_test{}.txt", i));
+                let mut f = OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .open(file_path)
+                    .unwrap();
+                if f.write_all(buf).is_err() {
+                    break;
+                }
+            }
+            let (orig_fs_total_bytes, _) = fs_usage(&tmp_dir.path()).unwrap();
+            // Simulate handling a DM event by running a filesystem check.
+            filesystem.check(&dm).unwrap();
+            let (fs_total_bytes, _) = fs_usage(&tmp_dir.path()).unwrap();
+            assert!(fs_total_bytes > orig_fs_total_bytes);
+            umount(tmp_dir.path()).unwrap();
+        }
+        pool.destroy_filesystem(&dm, fs_uuid).unwrap();
+        pool.teardown(&dm).unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_xfs_expand() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_xfs_expand);
+    }
+
+    #[test]
+    pub fn real_test_xfs_expand() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_xfs_expand);
+    }
 }

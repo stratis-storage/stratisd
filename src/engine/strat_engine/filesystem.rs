@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use devicemapper::{Bytes, DmDevice, DM, DmName, IEC, SECTOR_SIZE, Sectors, ThinDev, ThinDevId,
+use devicemapper::{Bytes, DmDevice, DmName, DM, IEC, SECTOR_SIZE, Sectors, ThinDev, ThinDevId,
                    ThinStatus, ThinPoolDev};
 
 use nix::sys::statvfs::statvfs;
@@ -132,6 +132,7 @@ impl StratFilesystem {
     }
 
     /// The thin id for the thin device that backs this filesystem.
+    #[cfg(test)]
     pub fn thin_id(&self) -> ThinDevId {
         self.thin_dev.id()
     }

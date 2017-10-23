@@ -38,7 +38,7 @@ Development mailing list: stratis-devel@lists.fedorahosted.org, -- subscribe
 
 #### IRC
 
-irc.freenode.net #stratis-storage. 
+irc.freenode.net #stratis-storage.
 
 ## For Developers
 
@@ -99,15 +99,17 @@ To reformat all files to ensure proper formatting, run `cargo fmt` to ensure
 your changes conform to the expected formatting before submitting a pull request.
 
 #### Testing
-Stratisd incorporates two testing modalities: unit tests, which are defined
-in the source code, and integration tests which can be found in a separate
-tests directory. To run the unit tests:
+Stratisd incorporates two testing modalities:
+* safe unit tests, which can be run without affecting your storage configuration
+* unsafe unit tests, which may create and destroy devices during execution
+
+To run the safe unit tests:
 
 ```bash
 $ make test
 ```
 
-A description of the integration tests can be found in the tests directory.
+For a description of the unsafe unit tests, necessary setup steps, and how to run them, see `tests/README.md`.
 
 ## Licensing
 

@@ -88,7 +88,7 @@ impl ThinPool {
         // that are trying to re-adopt the device with the attributes that
         // have been passed.
         let meta_dev = LinearDev::setup(dm,
-                                        &format_flex_name(&pool_uuid, FlexRole::ThinMeta),
+                                        &format_flex_name(pool_uuid, FlexRole::ThinMeta),
                                         None,
                                         &map_to_dm(&meta_segments))?;
         wipe_sectors(&meta_dev.devnode(),
@@ -96,11 +96,11 @@ impl ThinPool {
                      ThinPool::initial_metadata_size())?;
 
         let data_dev = LinearDev::setup(dm,
-                                        &format_flex_name(&pool_uuid, FlexRole::ThinData),
+                                        &format_flex_name(pool_uuid, FlexRole::ThinData),
                                         None,
                                         &map_to_dm(&data_segments))?;
 
-        let mdv_name = format_flex_name(&pool_uuid, FlexRole::MetadataVolume);
+        let mdv_name = format_flex_name(pool_uuid, FlexRole::MetadataVolume);
         let mdv_dev = LinearDev::setup(dm, &mdv_name, None, &map_to_dm(&mdv_segments))?;
         let mdv = MetadataVol::initialize(pool_uuid, mdv_dev)?;
 
@@ -179,7 +179,7 @@ impl ThinPool {
             setup_metadev(dm, pool_uuid, &thinpool_name, meta_segments, spare_segments)?;
 
         let data_dev = LinearDev::setup(dm,
-                                        &format_flex_name(&pool_uuid, FlexRole::ThinData),
+                                        &format_flex_name(pool_uuid, FlexRole::ThinData),
                                         None,
                                         &map_to_dm(&data_segments))?;
 
@@ -194,7 +194,7 @@ impl ThinPool {
                                               data_dev)?;
 
         let mdv_dev = LinearDev::setup(dm,
-                                       &format_flex_name(&pool_uuid, FlexRole::MetadataVolume),
+                                       &format_flex_name(pool_uuid, FlexRole::MetadataVolume),
                                        None,
                                        &map_to_dm(&mdv_segments))?;
         let mdv = MetadataVol::setup(pool_uuid, mdv_dev)?;
@@ -574,7 +574,7 @@ fn setup_metadev(dm: &DM,
                  -> EngineResult<(LinearDev, Vec<BlkDevSegment>, Vec<BlkDevSegment>)> {
     #![allow(collapsible_if)]
     let mut meta_dev = LinearDev::setup(dm,
-                                        &format_flex_name(&pool_uuid, FlexRole::ThinMeta),
+                                        &format_flex_name(pool_uuid, FlexRole::ThinMeta),
                                         None,
                                         &map_to_dm(&meta_segments))?;
 
@@ -604,8 +604,7 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
                        spare_segments: &[BlkDevSegment])
                        -> EngineResult<LinearDev> {
     let mut new_meta_dev = LinearDev::setup(dm,
-                                            &format_flex_name(&pool_uuid,
-                                                              FlexRole::ThinMetaSpare),
+                                            &format_flex_name(pool_uuid, FlexRole::ThinMetaSpare),
                                             None,
                                             &map_to_dm(spare_segments))?;
 

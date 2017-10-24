@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::cell::{Cell, RefCell};
+use std::collections::HashSet;
 use std::collections::vec_deque::{Drain, VecDeque};
 use std::convert::From;
 use std::rc::Rc;
@@ -67,6 +68,7 @@ pub enum DeferredAction {
 pub struct OPContext {
     pub parent: Path<'static>,
     pub uuid: Uuid,
+    pub children: RefCell<HashSet<Path<'static>>>,
 }
 
 impl OPContext {
@@ -74,6 +76,7 @@ impl OPContext {
         OPContext {
             parent: parent,
             uuid: uuid,
+            children: RefCell::new(HashSet::new()),
         }
     }
 }

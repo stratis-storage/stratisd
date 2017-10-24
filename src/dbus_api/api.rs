@@ -64,26 +64,35 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(pool_uuid) => {
-            let pool_object_path: dbus::Path =
-                create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
+            let pool_object_path = create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
             let default_return =
                 MessageItem::Struct(vec![MessageItem::ObjectPath(default_object_path()),
                                          MessageItem::Array(vec![], "o".into())]);
             let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-            let bd_object_paths = pool.blockdevs()
-                .iter()
-                .map(|bd| {
-                         MessageItem::ObjectPath(create_dbus_blockdev(dbus_context,
-                                                                      pool_object_path.clone(),
-                                                                      bd.uuid()))
-                     })
-                .collect::<Vec<_>>();
+            let bd_object_paths = {
+                let pool_data = get_data!(pool_object_path; default_return; return_message);
+                pool.blockdevs()
+                    .iter()
+                    .map(|bd| {
+                             let path =
+                                 create_dbus_blockdev(dbus_context,
+                                                      pool_object_path.get_name().to_owned(),
+                                                      bd.uuid());
+                             pool_data.children.borrow_mut().insert(path.clone());
+                             MessageItem::ObjectPath(path)
+                         })
+                    .collect::<Vec<_>>()
+            };
 
-            let return_path = MessageItem::ObjectPath(pool_object_path);
+            let return_path = MessageItem::ObjectPath(pool_object_path.get_name().to_owned());
             let return_list = MessageItem::Array(bd_object_paths, "o".into());
             let return_value = MessageItem::Struct(vec![return_path, return_list]);
             let (rc, rs) = ok_message_items();
+            dbus_context
+                .actions
+                .borrow_mut()
+                .push_add(pool_object_path);
             return_message.append3(return_value, rc, rs)
         }
         Err(x) => {
@@ -110,16 +119,25 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Bool(false);
     let return_message = message.method_return();
 
-    let pool_uuid = match m.tree.get(&object_path) {
-        Some(pool_path) => get_data!(pool_path; default_return; return_message).uuid,
+    let pool_data = match m.tree.get(&object_path) {
+        Some(pool_path) => get_data!(pool_path; default_return; return_message),
         None => {
             let (rc, rs) = ok_message_items();
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
 
-    let msg = match dbus_context.engine.borrow_mut().destroy_pool(pool_uuid) {
+    let msg = match dbus_context
+              .engine
+              .borrow_mut()
+              .destroy_pool(pool_data.uuid) {
         Ok(action) => {
+            // Remove the blockdev objects first.
+            let mut children = pool_data.children.borrow_mut();
+            for child in children.drain() {
+                dbus_context.actions.borrow_mut().push_remove(child);
+            }
+
             dbus_context
                 .actions
                 .borrow_mut()
@@ -271,11 +289,23 @@ pub fn connect(engine: Rc<RefCell<Engine>>)
     for pool in local_engine.borrow().pools() {
         let pool_path = create_dbus_pool(&dbus_context, object_path.clone(), pool.uuid());
         for fs_uuid in pool.filesystems().iter().map(|f| f.uuid()) {
-            create_dbus_filesystem(&dbus_context, pool_path.clone(), fs_uuid);
+            create_dbus_filesystem(&dbus_context, pool_path.get_name().to_owned(), fs_uuid);
         }
-        for dev_uuid in pool.blockdevs().iter().map(|bd| bd.uuid()) {
-            create_dbus_blockdev(&dbus_context, pool_path.clone(), dev_uuid);
+
+        {
+            let pool_data = pool_path.get_data();
+            for dev_uuid in pool.blockdevs().iter().map(|bd| bd.uuid()) {
+                let path =
+                    create_dbus_blockdev(&dbus_context, pool_path.get_name().to_owned(), dev_uuid);
+                pool_data
+                    .as_ref()
+                    .unwrap()
+                    .children
+                    .borrow_mut()
+                    .insert(path);
+            }
         }
+        dbus_context.actions.borrow_mut().push_add(pool_path);
     }
 
     tree.set_registered(&c, true)?;

@@ -32,29 +32,43 @@ pub fn create_fs(devnode: &Path, uuid: Uuid) -> EngineResult<()> {
 /// Use the xfs_growfs command to expand a filesystem mounted at the given
 /// mount point.
 pub fn xfs_growfs(mount_point: &Path) -> EngineResult<()> {
-    if Command::new("xfs_growfs")
-           .arg(mount_point)
-           .arg("-d")
-           .status()?
-           .success() {
+
+    let result = Command::new("xfs_growfs")
+        .arg(mount_point)
+        .arg("-d")
+        .output()?;
+
+    if result.status.success() {
         Ok(())
     } else {
-        let err_msg = format!("Failed to expand filesystem {:?}", mount_point);
+        let std_out_txt = String::from_utf8_lossy(&result.stdout);
+        let std_err_txt = String::from_utf8_lossy(&result.stderr);
+        let err_msg = format!("Failed to expand filesystem {:?} stdout: {} stderr: {}",
+                              mount_point,
+                              std_out_txt,
+                              std_err_txt);
         Err(EngineError::Engine(ErrorEnum::Error, err_msg))
     }
 }
 
 /// Set a new UUID for filesystem on the devnode.
 pub fn set_uuid(devnode: &Path, uuid: Uuid) -> EngineResult<()> {
-    if Command::new("xfs_admin")
-           .arg("-U")
-           .arg(format!("{}", uuid))
-           .arg(&devnode)
-           .status()?
-           .success() {
+
+    let result = Command::new("xfs_admin")
+        .arg("-U")
+        .arg(format!("{}", uuid))
+        .arg(&devnode)
+        .output()?;
+
+    if result.status.success() {
         Ok(())
     } else {
-        let err_msg = format!("Failed to set UUID for filesystem at {:?}", devnode);
+        let std_out_txt = String::from_utf8_lossy(&result.stdout);
+        let std_err_txt = String::from_utf8_lossy(&result.stderr);
+        let err_msg = format!("Failed to set UUID for filesystem {:?} stdout: {} stderr: {}",
+                              devnode,
+                              std_out_txt,
+                              std_err_txt);
         Err(EngineError::Engine(ErrorEnum::Error, err_msg))
     }
 }

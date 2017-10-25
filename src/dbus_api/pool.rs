@@ -180,12 +180,13 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let return_value = uuids
                 .into_iter()
                 .map(|uuid| {
-                    let path =
-                        create_dbus_blockdev(dbus_context, pool_path.get_name().to_owned(), uuid);
                     let pool_data = op_data
                         .pool()
                         .expect("pools must contain pool enum variant");
-                    pool_data.children.borrow_mut().insert(path.clone());
+                    let path = create_dbus_blockdev(dbus_context,
+                                                    pool_path.get_name().to_owned(),
+                                                    uuid,
+                                                    pool_data);
                     MessageItem::ObjectPath(path)
                 })
                 .collect();

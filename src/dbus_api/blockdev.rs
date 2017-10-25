@@ -20,7 +20,7 @@ use uuid::Uuid;
 use super::super::engine::BlockDev;
 use super::super::engine::types::BlockDevState;
 
-use super::types::{DbusContext, DbusErrorEnum, OPContext, OPType, TData};
+use super::types::{DbusContext, DbusErrorEnum, OPContext, OPType, OPTypePool, TData};
 
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
@@ -33,7 +33,8 @@ use super::util::ok_message_items;
 
 pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
                                 parent: dbus::Path<'static>,
-                                uuid: Uuid)
+                                uuid: Uuid,
+                                pool_data: &OPTypePool)
                                 -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
@@ -105,6 +106,7 @@ pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
+    pool_data.children.borrow_mut().insert(path.clone());
     path
 }
 

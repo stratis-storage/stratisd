@@ -81,8 +81,8 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                              let path =
                                  create_dbus_blockdev(dbus_context,
                                                       pool_object_path.get_name().to_owned(),
-                                                      bd.uuid());
-                             pool_data.children.borrow_mut().insert(path.clone());
+                                                      bd.uuid(),
+                                                      pool_data);
                              MessageItem::ObjectPath(path)
                          })
                     .collect::<Vec<_>>()
@@ -299,18 +299,17 @@ pub fn connect(engine: Rc<RefCell<Engine>>)
         }
 
         {
-            let pool_data = pool_path.get_data();
+            let op_data = pool_path.get_data();
             for dev_uuid in pool.blockdevs().iter().map(|bd| bd.uuid()) {
-                let path =
-                    create_dbus_blockdev(&dbus_context, pool_path.get_name().to_owned(), dev_uuid);
-                pool_data
+                let pool_data = op_data
                     .as_ref()
                     .expect("pools must have valid context")
                     .pool()
-                    .expect("pools must contain pool enum variant")
-                    .children
-                    .borrow_mut()
-                    .insert(path);
+                    .expect("pools must contain pool enum variant");
+                create_dbus_blockdev(&dbus_context,
+                                     pool_path.get_name().to_owned(),
+                                     dev_uuid,
+                                     pool_data);
             }
         }
         dbus_context.actions.borrow_mut().push_add(pool_path);

@@ -71,7 +71,10 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
             let bd_object_paths = {
-                let pool_data = get_data!(pool_object_path; default_return; return_message);
+                let op_data = get_data!(pool_object_path; default_return; return_message);
+                let pool_data = op_data
+                    .pool()
+                    .expect("pools must contain pool enum variant");
                 pool.blockdevs()
                     .iter()
                     .map(|bd| {
@@ -119,7 +122,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = MessageItem::Bool(false);
     let return_message = message.method_return();
 
-    let pool_data = match m.tree.get(&object_path) {
+    let op_data = match m.tree.get(&object_path) {
         Some(pool_path) => get_data!(pool_path; default_return; return_message),
         None => {
             let (rc, rs) = ok_message_items();
@@ -130,9 +133,12 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match dbus_context
               .engine
               .borrow_mut()
-              .destroy_pool(pool_data.uuid) {
+              .destroy_pool(op_data.uuid) {
         Ok(action) => {
             // Remove the blockdev objects first.
+            let pool_data = op_data
+                .pool()
+                .expect("pools must contain pool enum variant");
             let mut children = pool_data.children.borrow_mut();
             for child in children.drain() {
                 dbus_context.actions.borrow_mut().push_remove(child);
@@ -299,7 +305,9 @@ pub fn connect(engine: Rc<RefCell<Engine>>)
                     create_dbus_blockdev(&dbus_context, pool_path.get_name().to_owned(), dev_uuid);
                 pool_data
                     .as_ref()
-                    .unwrap()
+                    .expect("pools must have valid context")
+                    .pool()
+                    .expect("pools must contain pool enum variant")
                     .children
                     .borrow_mut()
                     .insert(path);

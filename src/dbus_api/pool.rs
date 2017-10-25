@@ -29,7 +29,7 @@ use engine::{Pool, RenameAction};
 
 use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;
-use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
+use super::types::{DbusContext, DbusErrorEnum, OPContext, OPType, OPTypePool, TData};
 
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
@@ -166,8 +166,8 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_path = m.tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_data = get_data!(pool_path; default_return; return_message);
-    let pool_uuid = pool_data.uuid;
+    let op_data = get_data!(pool_path; default_return; return_message);
+    let pool_uuid = op_data.uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
@@ -180,12 +180,14 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let return_value = uuids
                 .into_iter()
                 .map(|uuid| {
-                         let path = create_dbus_blockdev(dbus_context,
-                                                         pool_path.get_name().to_owned(),
-                                                         uuid);
-                         pool_data.children.borrow_mut().insert(path.clone());
-                         MessageItem::ObjectPath(path)
-                     })
+                    let path =
+                        create_dbus_blockdev(dbus_context, pool_path.get_name().to_owned(), uuid);
+                    let pool_data = op_data
+                        .pool()
+                        .expect("pools must contain pool enum variant");
+                    pool_data.children.borrow_mut().insert(path.clone());
+                    MessageItem::ObjectPath(path)
+                })
                 .collect();
 
             let return_value = MessageItem::Array(return_value, return_sig.into());
@@ -365,7 +367,8 @@ pub fn create_dbus_pool(dbus_context: &DbusContext,
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "pool");
 
-    f.object_path(object_name, Some(OPContext::new(parent, uuid)))
+    f.object_path(object_name,
+                     Some(OPContext::new(parent, uuid, OPType::Pool(OPTypePool::default()))))
         .introspectable()
         .add(f.interface(interface_name, ())
                  .add_m(create_filesystems_method)

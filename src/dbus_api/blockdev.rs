@@ -20,7 +20,7 @@ use uuid::Uuid;
 use super::super::engine::BlockDev;
 use super::super::engine::types::BlockDevState;
 
-use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
+use super::types::{DbusContext, DbusErrorEnum, OPContext, OPType, TData};
 
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
@@ -89,7 +89,8 @@ pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "blockdev");
 
-    let object_path = f.object_path(object_name, Some(OPContext::new(parent, uuid)))
+    let object_path = f.object_path(object_name,
+                                    Some(OPContext::new(parent, uuid, OPType::Blockdev)))
         .introspectable()
         .add(f.interface(interface_name, ())
                  .add_m(set_userid_method)

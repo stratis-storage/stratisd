@@ -479,22 +479,24 @@ impl ThinPool {
         Ok(fs_uuid)
     }
 
-
-    #[allow(dead_code)]
+    /// Create a filesystem snapshot of the origin.  Given origin_uuid
+    /// must exist.  Returns the Uuid of the new filesystem.
     pub fn snapshot_filesystem(&mut self,
                                dm: &DM,
-                               filesystem_uuid: FilesystemUuid)
+                               origin_uuid: FilesystemUuid,
+                               snapshot_name: &str)
                                -> EngineResult<FilesystemUuid> {
         let snapshot_fs_uuid = Uuid::new_v4();
-        let snapshot_name = format_thin_name(self.pool_uuid,
-                                             ThinRole::Filesystem(snapshot_fs_uuid));
+        let snapshot_dmname = format_thin_name(self.pool_uuid,
+                                               ThinRole::Filesystem(snapshot_fs_uuid));
         let snapshot_id = self.id_gen.new_id()?;
-        let new_filesystem = match self.get_filesystem_by_uuid(filesystem_uuid) {
+        let new_filesystem = match self.get_filesystem_by_uuid(origin_uuid) {
             Some(filesystem) => {
                 filesystem
                     .snapshot(dm,
                               &self.thin_pool,
-                              snapshot_name.as_ref(),
+                              snapshot_name,
+                              snapshot_dmname.as_ref(),
                               snapshot_fs_uuid,
                               snapshot_id)?
             }
@@ -691,7 +693,8 @@ mod tests {
         pool.extend_thinpool(&dm, INITIAL_DATA_SIZE, &mut mgr)
             .unwrap();
 
-        let snapshot_uuid = pool.snapshot_filesystem(&dm, fs_uuid).unwrap();
+        let snapshot_uuid = pool.snapshot_filesystem(&dm, fs_uuid, "test_snapshot")
+            .unwrap();
         let mut read_buf = [0u8; SECTOR_SIZE];
         let snapshot_tmp_dir = TempDir::new("stratis_testing").unwrap();
         {

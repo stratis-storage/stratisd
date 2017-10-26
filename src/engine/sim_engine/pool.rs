@@ -119,6 +119,21 @@ impl Pool for SimPool {
         Ok(result)
     }
 
+    fn snapshot_filesystem(&mut self,
+                           origin_uuid: FilesystemUuid,
+                           snapshot_name: &str)
+                           -> EngineResult<FilesystemUuid> {
+        let uuid = Uuid::new_v4();
+        let snapshot = match self.get_filesystem(origin_uuid) {
+            Some(_filesystem) => SimFilesystem::new(uuid, snapshot_name),
+            None => {
+                return Err(EngineError::Engine(ErrorEnum::NotFound, origin_uuid.to_string()));
+            }
+        };
+        self.filesystems.insert(snapshot);
+        Ok(uuid)
+    }
+
     fn rename_filesystem(&mut self,
                          uuid: FilesystemUuid,
                          new_name: &str)

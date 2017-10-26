@@ -30,14 +30,8 @@ use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
-use super::util::STRATIS_BASE_PATH;
-use super::util::STRATIS_BASE_SERVICE;
-use super::util::code_to_message_items;
-use super::util::engine_to_dbus_err;
-use super::util::get_next_arg;
-use super::util::get_uuid;
-use super::util::ok_message_items;
-
+use super::util::{code_to_message_items, default_object_path, engine_to_dbus_err, get_next_arg,
+                  get_uuid, ok_message_items, STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
@@ -146,6 +140,52 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return_message.append3(default_return, rc, rs)
         }
     };
+    Ok(vec![msg])
+}
+
+fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+
+    let filesystem: dbus::Path<'static> = get_next_arg(&mut iter, 0)?;
+    let snapshot_name: &str = get_next_arg(&mut iter, 0)?;
+
+    let dbus_context = m.tree.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let default_return = MessageItem::ObjectPath(default_object_path());
+
+    let pool_path = m.tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+
+    let fs_uuid = match m.tree.get(&filesystem) {
+        Some(op) => get_data!(op; default_return; return_message).uuid,
+        None => {
+            let message = format!("no data for object path {}", filesystem);
+            let (rc, rs) = code_to_message_items(DbusErrorEnum::NOTFOUND, message);
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
+        }
+    };
+
+    let mut engine = dbus_context.engine.borrow_mut();
+    let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+
+    let msg = match pool.snapshot_filesystem(fs_uuid, snapshot_name) {
+        Ok(uuid) => {
+            let fs_object_path: dbus::Path =
+                create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
+            let (rc, rs) = ok_message_items();
+            return_message.append3(MessageItem::ObjectPath(fs_object_path), rc, rs)
+        }
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err(&err);
+            let (rc, rs) = code_to_message_items(rc, rs);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+
     Ok(vec![msg])
 }
 
@@ -335,6 +375,13 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
+    let snapshot_method = f.method("SnapshotFilesystem", (), snapshot_filesystem)
+        .in_arg(("origin", "o"))
+        .in_arg(("snapshot_name", "s"))
+        .out_arg(("result", "o"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
+
     let name_property = f.property::<&str, _>("Name", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
@@ -366,6 +413,7 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,
         .add(f.interface(interface_name, ())
                  .add_m(create_filesystems_method)
                  .add_m(destroy_filesystems_method)
+                 .add_m(snapshot_method)
                  .add_m(add_devs_method)
                  .add_m(rename_method)
                  .add_p(name_property)

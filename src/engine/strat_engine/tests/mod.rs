@@ -7,5 +7,6 @@ extern crate log;
 pub extern crate tempdir;
 
 mod logger;
+mod util;
 pub mod loopbacked;
 pub mod real;

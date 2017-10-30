@@ -3,4 +3,4 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 
-pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");

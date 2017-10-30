@@ -13,8 +13,8 @@ use engine::{EngineError, ErrorEnum};
 
 use super::types::{DbusErrorEnum, TData};
 
-pub const STRATIS_BASE_PATH: &'static str = "/org/storage/stratis1";
-pub const STRATIS_BASE_SERVICE: &'static str = "org.storage.stratis1";
+pub const STRATIS_BASE_PATH: &str = "/org/storage/stratis1";
+pub const STRATIS_BASE_SERVICE: &str = "org.storage.stratis1";
 
 /// Convert a tuple as option to an Option type
 pub fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {

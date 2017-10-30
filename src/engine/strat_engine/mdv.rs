@@ -29,9 +29,9 @@ use super::util::create_fs;
 // TODO: Monitor fs size and extend linear and fs if needed
 // TODO: Document format of stuff on MDV in SWDD (currently ad-hoc)
 
-const DEV_PATH: &'static str = "/dev/stratis";
+const DEV_PATH: &str = "/dev/stratis";
 
-const FILESYSTEM_DIR: &'static str = "filesystems";
+const FILESYSTEM_DIR: &str = "filesystems";
 
 #[derive(Debug)]
 pub struct MetadataVol {

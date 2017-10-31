@@ -34,7 +34,7 @@ use stratis::VERSION;
 use super::filesystem::create_dbus_filesystem;
 use super::blockdev::create_dbus_blockdev;
 use super::pool::create_dbus_pool;
-use super::types::{DeferredAction, DbusContext, DbusErrorEnum, TData};
+use super::types::{ActionQueue, DeferredAction, DbusContext, DbusErrorEnum, TData};
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
 use super::util::code_to_message_items;
@@ -262,7 +262,7 @@ pub fn connect(engine: Rc<RefCell<Engine>>)
 
     let local_engine = Rc::clone(&engine);
 
-    let (tree, object_path) = get_base_tree(DbusContext::new(engine));
+    let (mut tree, object_path) = get_base_tree(DbusContext::new(engine));
     let dbus_context = tree.get_data().clone();
 
     // This should never panic as create_dbus_pool(),
@@ -282,7 +282,30 @@ pub fn connect(engine: Rc<RefCell<Engine>>)
 
     c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32)?;
 
+    process_deferred_actions(&c, &mut tree, &dbus_context.actions)?;
+
     Ok((c, tree, dbus_context))
+}
+
+/// Update the dbus tree with deferred adds and removes.
+fn process_deferred_actions(c: &Connection,
+                            tree: &mut Tree<MTFn<TData>, TData>,
+                            actions: &Rc<RefCell<ActionQueue>>)
+                            -> Result<(), dbus::Error> {
+    let mut b_actions = actions.borrow_mut();
+    for action in b_actions.drain() {
+        match action {
+            DeferredAction::Add(path) => {
+                c.register_object_path(path.get_name())?;
+                tree.insert(path);
+            }
+            DeferredAction::Remove(path) => {
+                c.unregister_object_path(&path);
+                tree.remove(&path);
+            }
+        }
+    }
+    Ok(())
 }
 
 pub fn handle(c: &Connection,
@@ -299,19 +322,7 @@ pub fn handle(c: &Connection,
             }
         }
 
-        let mut b_actions = dbus_context.actions.borrow_mut();
-        for action in b_actions.drain() {
-            match action {
-                DeferredAction::Add(path) => {
-                    c.register_object_path(path.get_name())?;
-                    tree.insert(path);
-                }
-                DeferredAction::Remove(path) => {
-                    c.unregister_object_path(&path);
-                    tree.remove(&path);
-                }
-            }
-        }
+        process_deferred_actions(c, tree, &dbus_context.actions)?;
     }
 
     Ok(())

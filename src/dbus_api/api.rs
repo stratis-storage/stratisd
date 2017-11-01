@@ -282,7 +282,7 @@ pub fn connect(engine: Rc<RefCell<Engine>>)
 
     c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32)?;
 
-    process_deferred_actions(&c, &mut tree, &dbus_context.actions)?;
+    process_deferred_actions(&c, &mut tree, &mut dbus_context.actions.borrow_mut())?;
 
     Ok((c, tree, dbus_context))
 }
@@ -290,10 +290,9 @@ pub fn connect(engine: Rc<RefCell<Engine>>)
 /// Update the dbus tree with deferred adds and removes.
 fn process_deferred_actions(c: &Connection,
                             tree: &mut Tree<MTFn<TData>, TData>,
-                            actions: &Rc<RefCell<ActionQueue>>)
+                            actions: &mut ActionQueue)
                             -> Result<(), dbus::Error> {
-    let mut b_actions = actions.borrow_mut();
-    for action in b_actions.drain() {
+    for action in actions.drain() {
         match action {
             DeferredAction::Add(path) => {
                 c.register_object_path(path.get_name())?;
@@ -322,7 +321,7 @@ pub fn handle(c: &Connection,
             }
         }
 
-        process_deferred_actions(c, tree, &dbus_context.actions)?;
+        process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut())?;
     }
 
     Ok(())

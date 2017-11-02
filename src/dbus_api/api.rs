@@ -2,8 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::borrow::Cow;
-use std::fmt::Display;
 use std::path::Path;
 use std::vec::Vec;
 use std::rc::Rc;
@@ -28,7 +26,7 @@ use dbus::tree::PropInfo;
 use dbus::tree::Tree;
 use dbus::ConnectionItem;
 
-use engine::{Engine, Redundancy};
+use engine::Engine;
 use stratis::VERSION;
 
 use super::filesystem::create_dbus_filesystem;
@@ -136,32 +134,6 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn get_list_items<T, I>(i: &mut IterAppend, iter: I) -> Result<(), MethodErr>
-    where T: Display + Into<u16>,
-          I: Iterator<Item = T>
-{
-    let msg_vec = iter.map(|item| {
-                               MessageItem::Struct(vec![MessageItem::Str(format!("{}", item)),
-                                                        MessageItem::UInt16(item.into())])
-                           })
-        .collect::<Vec<MessageItem>>();
-    i.append(MessageItem::Array(msg_vec, Cow::Borrowed("(sq)")));
-    Ok(())
-}
-
-fn get_error_values(i: &mut IterAppend,
-                    _p: &PropInfo<MTFn<TData>, TData>)
-                    -> Result<(), MethodErr> {
-    get_list_items(i, DbusErrorEnum::iter_variants())
-}
-
-
-fn get_redundancy_values(i: &mut IterAppend,
-                         _p: &PropInfo<MTFn<TData>, TData>)
-                         -> Result<(), MethodErr> {
-    get_list_items(i, Redundancy::iter_variants())
-}
-
 fn get_version(i: &mut IterAppend, _p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
     i.append(VERSION);
     Ok(())
@@ -221,18 +193,6 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let redundancy_values_property =
-        f.property::<Array<(&str, u16), &Iterator<Item = (&str, u16)>>, _>("RedundancyValues", ())
-            .access(Access::Read)
-            .emits_changed(EmitsChangedSignal::Const)
-            .on_get(get_redundancy_values);
-
-    let error_values_property =
-        f.property::<Array<(&str, u16), &Iterator<Item = (&str, u16)>>, _>("ErrorValues", ())
-            .access(Access::Read)
-            .emits_changed(EmitsChangedSignal::Const)
-            .on_get(get_error_values);
-
     let version_property = f.property::<&str, _>("Version", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
@@ -247,8 +207,6 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
                  .add_m(create_pool_method)
                  .add_m(destroy_pool_method)
                  .add_m(configure_simulator_method)
-                 .add_p(error_values_property)
-                 .add_p(redundancy_values_property)
                  .add_p(version_property));
 
     let path = obj_path.get_name().to_owned();

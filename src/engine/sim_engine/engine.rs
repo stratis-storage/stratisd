@@ -46,7 +46,7 @@ impl Engine for SimEngine {
             .map(|x| *x)
             .collect::<Vec<&Path>>();
 
-        let pool = SimPool::new(Rc::clone(&self.rdm), name, &devices, redundancy);
+        let pool = SimPool::new(&Rc::clone(&self.rdm), name, &devices, redundancy);
 
         if self.rdm.borrow_mut().throw_die() {
             return Err(EngineError::Engine(ErrorEnum::Error, "X".into()));

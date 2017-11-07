@@ -34,7 +34,7 @@ pub struct SimPool {
 }
 
 impl SimPool {
-    pub fn new(rdm: Rc<RefCell<Randomizer>>,
+    pub fn new(rdm: &Rc<RefCell<Randomizer>>,
                name: &str,
                paths: &[&Path],
                redundancy: Redundancy)
@@ -44,7 +44,7 @@ impl SimPool {
         let device_pairs = devices
             .iter()
             .map(|p| {
-                     let bd = SimDev::new(Rc::clone(&rdm), p);
+                     let bd = SimDev::new(Rc::clone(rdm), p);
                      (bd.uuid(), bd)
                  });
         SimPool {
@@ -53,7 +53,7 @@ impl SimPool {
             block_devs: HashMap::from_iter(device_pairs),
             filesystems: Table::default(),
             redundancy: redundancy,
-            rdm: Rc::clone(&rdm),
+            rdm: Rc::clone(rdm),
         }
     }
 

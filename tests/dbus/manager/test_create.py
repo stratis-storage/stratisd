@@ -98,14 +98,12 @@ class Create2TestCase(unittest.TestCase):
         """
         Creation should always fail if RAID value is wrong.
         """
-        redundancy_values = Manager.Properties.RedundancyValues.Get(self._proxy)
-
         devs = _DEVICE_STRATEGY.example()
         (_, rc, _) = Manager.Methods.CreatePool(
            self._proxy,
            {
               'name': self._POOLNAME,
-              'redundancy': (True, len(redundancy_values)),
+              'redundancy': (True, 1),
               'force': False,
               'devices': devs
            }

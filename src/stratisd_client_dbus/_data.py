@@ -38,7 +38,7 @@ SPECS = {
 <arg name="redundancy" type="(bq)" direction="in"/>
 <arg name="force" type="b" direction="in"/>
 <arg name="devices" type="as" direction="in"/>
-<arg name="result" type="(oas)" direction="out"/>
+<arg name="result" type="(oao)" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
 </method>
@@ -48,12 +48,6 @@ SPECS = {
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
 </method>
-<property name="ErrorValues" type="a(sq)" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
-</property>
-<property name="RedundancyValues" type="a(sq)" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
-</property>
 <property name="Version" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
 </property>

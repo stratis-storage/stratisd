@@ -23,6 +23,7 @@ from ._implementation import Manager
 from ._implementation import ObjectManager
 from ._implementation import Pool
 
+from ._managedobjects import blockdevs
 from ._managedobjects import pools
 from ._managedobjects import filesystems
 from ._managedobjects import MOPool

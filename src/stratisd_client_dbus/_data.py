@@ -117,5 +117,40 @@ SPECS = {
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
 </property>
 </interface>
+""",
+"org.storage.stratis1.blockdev":
+"""
+<interface name="org.storage.stratis1.blockdev">
+<method name="SetUserInfo">
+<arg name="id" type="s" direction="in"/>
+<arg name="changed" type="b" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<property name="Devnode" type="s" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
+</property>
+<property name="HardwareInfo" type="s" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
+</property>
+<property name="InitializationTime" type="t" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
+</property>
+<property name="Pool" type="o" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
+</property>
+<property name="State" type="q" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
+</property>
+<property name="TotalPhysicalSize" type="s" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
+</property>
+<property name="UserInfo" type="s" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
+</property>
+<property name="Uuid" type="s" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
+</property>
+</interface>
 """
 }

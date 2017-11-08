@@ -3,11 +3,11 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use devicemapper::{Bytes, DmDevice, DmName, DM, IEC, SECTOR_SIZE, Sectors, ThinDev, ThinDevId,
                    ThinStatus, ThinPoolDev};
 
+use mnt::{MountParam, MountIter};
 use nix::sys::statvfs::statvfs;
 use nix::sys::statvfs::vfs::Statvfs;
 use nix::mount::{mount, MsFlags, umount};
@@ -149,20 +149,35 @@ impl StratFilesystem {
         current_size
     }
 
-    /// Get the mount_point for this filesystem
-    /// TODO Replace this code with something less brittle
+    /// Get one (non-deterministic in the presence of errors) of the mount_point(s) for the file
+    /// system that is contained on the block device referred to as self.devnode(), i.e. the device
+    /// node, while ignoring parse errors as long as at least one mount point is found.
     pub fn get_mount_point(&self) -> EngineResult<Option<PathBuf>> {
-        let output = Command::new("df")
-            .arg("--output=target")
-            .arg(&self.devnode())
-            .output()?;
-        if output.status.success() {
-            let output_str = String::from_utf8_lossy(&output.stdout);
-            return Ok(output_str.lines().last().map(PathBuf::from));
+        let device_node = self.devnode();
+        let search = device_node.to_str().ok_or_else(|| EngineError::Engine(ErrorEnum::Error,
+                                    format!("Unable to represent devnode as string {:?}", *self)))?;
+
+        let m_iter = MountIter::new_from_proc()
+            .map_err(|e| {
+                         EngineError::Engine(ErrorEnum::Error,
+                                             format!("Error reading /proc/mounts {:?}", e))
+                     })?;
+
+        let mut last_error: Option<String> = None;
+        for mp in m_iter {
+            match mp {
+                Ok(mount) => {
+                    if mount.contains(&MountParam::Spec(search)) {
+                        return Ok(Some(mount.file));
+                    }
+                }
+                Err(e) => {
+                    last_error = Some(format!("Error during parsing {:?} {:?}", *self, e));
+                }
+            }
         }
-        Err(EngineError::Engine(ErrorEnum::Error,
-                                format!("Failed to get filesystem mountpoint for {:?}",
-                                        self.devnode())))
+
+        last_error.map_or(Ok(None), |e| Err(EngineError::Engine(ErrorEnum::Error, e)))
     }
 
     /// Tear down the filesystem.

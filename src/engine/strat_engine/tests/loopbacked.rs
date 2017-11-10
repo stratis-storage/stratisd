@@ -14,6 +14,7 @@ use self::loopdev::{LoopControl, LoopDevice};
 
 use super::logger::init_logger;
 use super::tempdir::TempDir;
+use super::util::clean_up;
 
 use super::super::device::wipe_sectors;
 
@@ -34,6 +35,7 @@ impl LoopTestDev {
     /// Create a new loopbacked device.
     /// Create its backing store of 1 GiB wiping the first 1 MiB.
     pub fn new(lc: &LoopControl, path: &Path) -> LoopTestDev {
+        clean_up();
         let mut f = OpenOptions::new()
             .read(true)
             .write(true)
@@ -71,6 +73,7 @@ impl LoopTestDev {
 
 impl Drop for LoopTestDev {
     fn drop(&mut self) {
+        clean_up();
         self.detach()
     }
 }

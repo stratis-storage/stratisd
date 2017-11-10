@@ -13,6 +13,7 @@ use serde_json::{Value, from_reader};
 use devicemapper::{Bytes, IEC, Sectors};
 
 use super::logger::init_logger;
+use super::util::clean_up;
 
 use super::super::device::wipe_sectors;
 
@@ -24,6 +25,7 @@ impl RealTestDev {
     /// Construct a new test device for the given path.
     /// Wipe initial MiB to clear metadata.
     pub fn new(path: &Path) -> RealTestDev {
+        clean_up();
         wipe_sectors(path, Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
         RealTestDev { path: PathBuf::from(path) }
     }
@@ -36,6 +38,7 @@ impl RealTestDev {
 
 impl Drop for RealTestDev {
     fn drop(&mut self) {
+        clean_up();
         wipe_sectors(&self.path, Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
     }
 }

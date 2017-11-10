@@ -59,22 +59,12 @@ impl LoopTestDev {
 
         LoopTestDev { ld: ld }
     }
-
-    /// Get the device node of the loopbacked device.
-    fn get_path(&self) -> PathBuf {
-        self.ld.get_path().unwrap()
-    }
-
-    /// Detach the loop device from its backing store.
-    pub fn detach(&self) {
-        self.ld.detach().unwrap()
-    }
 }
 
 impl Drop for LoopTestDev {
     fn drop(&mut self) {
         clean_up();
-        self.detach()
+        self.ld.detach().unwrap()
     }
 }
 
@@ -113,7 +103,10 @@ pub fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
     for count in counts {
         let tmpdir = TempDir::new("stratis").unwrap();
         let loop_devices: Vec<LoopTestDev> = get_devices(count, &tmpdir);
-        let device_paths: Vec<PathBuf> = loop_devices.iter().map(|x| x.get_path()).collect();
+        let device_paths: Vec<PathBuf> = loop_devices
+            .iter()
+            .map(|x| x.ld.get_path().unwrap())
+            .collect();
         let device_paths: Vec<&Path> = device_paths.iter().map(|x| x.as_path()).collect();
         test(&device_paths);
     }

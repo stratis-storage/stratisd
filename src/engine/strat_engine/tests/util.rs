@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use devicemapper::{DM, DmFlags, DevId};
 
-use nix::mount::umount;
+use nix::mount::{MNT_DETACH, umount2};
 use mnt::get_submounts;
 
 /// Attempt to remove all device mapper devices which match the stratis naming convention.
@@ -37,7 +37,7 @@ fn stratis_filesystems_unmount() {
             .unwrap()
             .iter()
             .filter(|m| m.file.to_str().map_or(false, |s| s.contains("stratis"))) {
-        umount(&m.file).unwrap();
+        umount2(&m.file, MNT_DETACH).unwrap();
     }
 }
 

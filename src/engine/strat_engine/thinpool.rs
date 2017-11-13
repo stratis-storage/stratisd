@@ -635,7 +635,7 @@ mod tests {
     use std::io::{Read, Write};
     use std::path::Path;
 
-    use nix::mount::{MNT_DETACH, MsFlags, mount, umount, umount2};
+    use nix::mount::{MsFlags, mount, umount};
     use uuid::Uuid;
 
     use devicemapper::{Bytes, SECTOR_SIZE};
@@ -711,14 +711,9 @@ mod tests {
                     .join(format!("stratis_test{}.txt", i));
                 let mut f = OpenOptions::new().read(true).open(file_path).unwrap();
                 f.read(&mut read_buf).unwrap();
-                assert!(read_buf[0..SECTOR_SIZE] == write_buf[0..SECTOR_SIZE]);
+                assert_eq!(read_buf[0..SECTOR_SIZE], write_buf[0..SECTOR_SIZE]);
             }
         }
-        umount(source_tmp_dir.path()).unwrap();
-        umount(snapshot_tmp_dir.path()).unwrap();
-        pool.destroy_filesystem(&dm, fs_uuid).unwrap();
-        pool.destroy_filesystem(&dm, snapshot_uuid).unwrap();
-        pool.teardown(&dm).unwrap();
     }
 
     #[test]
@@ -760,7 +755,6 @@ mod tests {
                 .unwrap();
 
         assert_eq!(pool.get_filesystem_by_uuid(fs_uuid).unwrap().name(), name2);
-        pool.teardown(&dm).unwrap();
     }
 
     #[test]
@@ -814,10 +808,6 @@ mod tests {
                 .unwrap();
 
         assert!(new_pool.get_filesystem_by_uuid(fs_uuid).is_some());
-
-        umount2(tmp_dir.path(), MNT_DETACH).unwrap();
-        pool.destroy_filesystem(&dm, fs_uuid).unwrap();
-        pool.teardown(&dm).unwrap();
     }
 
     #[test]
@@ -873,7 +863,6 @@ mod tests {
                 .unwrap();
 
         assert!(pool.get_filesystem_by_uuid(fs_uuid).is_none());
-        pool.teardown(&dm).unwrap();
     }
 
     #[test]
@@ -919,8 +908,6 @@ mod tests {
                 }
             }
         }
-        pool.destroy_filesystem(&dm, fs_uuid).unwrap();
-        pool.teardown(&dm).unwrap();
     }
 
     #[test]
@@ -987,8 +974,6 @@ mod tests {
             assert!(fs_total_bytes > orig_fs_total_bytes);
             umount(tmp_dir.path()).unwrap();
         }
-        pool.destroy_filesystem(&dm, fs_uuid).unwrap();
-        pool.teardown(&dm).unwrap();
     }
 
     #[test]

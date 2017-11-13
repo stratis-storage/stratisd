@@ -209,18 +209,18 @@ mod tests {
         for i in 0..items.len() {
             let name = items[i].name();
             let uuid = items[i].uuid();
-            assert!(name_map.get(name).unwrap() == &i);
-            assert!(uuid_map.get(&uuid).unwrap() == &i);
+            assert_eq!(name_map.get(name).unwrap(), &i);
+            assert_eq!(uuid_map.get(&uuid).unwrap(), &i);
         }
 
         for name in name_map.keys() {
             let index = name_map.get(name).unwrap();
-            assert!(items[*index].name() == name);
+            assert_eq!(items[*index].name(), name);
         }
 
         for &uuid in uuid_map.keys() {
             let index = uuid_map.get(&uuid).unwrap();
-            assert!(items[*index].uuid() == uuid);
+            assert_eq!(items[*index].uuid(), uuid);
         }
 
     }
@@ -299,7 +299,7 @@ mod tests {
         // t now contains the inserted thing.
         assert!(t.contains_name(&name));
         assert!(t.contains_uuid(uuid));
-        assert!(t.get_by_uuid(uuid).unwrap().stuff == thing_key);
+        assert_eq!(t.get_by_uuid(uuid).unwrap().stuff, thing_key);
 
         // Add another thing with the same keys.
         let thing2 = TestThing::new(&name, uuid);
@@ -308,16 +308,16 @@ mod tests {
         table_invariant(&t);
 
         // It has displaced the old thing.
-        assert!(displaced.len() == 1);
+        assert_eq!(displaced.len(), 1);
         let ref displaced_item = displaced[0];
-        assert!(displaced_item.name() == name);
-        assert!(displaced_item.uuid() == uuid);
+        assert_eq!(displaced_item.name(), name);
+        assert_eq!(displaced_item.uuid(), uuid);
 
         // But it contains a thing with the same keys.
         assert!(t.contains_name(&name));
         assert!(t.contains_uuid(uuid));
-        assert!(t.get_by_uuid(uuid).unwrap().stuff == thing_key2);
-        assert!(t.len() == 1);
+        assert_eq!(t.get_by_uuid(uuid).unwrap().stuff, thing_key2);
+        assert_eq!(t.len(), 1);
     }
 
     #[test]
@@ -349,18 +349,18 @@ mod tests {
         table_invariant(&t);
 
         // The items displaced consist exactly of the first item.
-        assert!(displaced.len() == 1);
+        assert_eq!(displaced.len(), 1);
         let ref displaced_item = displaced[0];
-        assert!(displaced_item.name() == name);
-        assert!(displaced_item.uuid() == uuid);
-        assert!(displaced_item.stuff == thing_key);
+        assert_eq!(displaced_item.name(), name);
+        assert_eq!(displaced_item.uuid(), uuid);
+        assert_eq!(displaced_item.stuff, thing_key);
 
         // The table contains the new item and has no memory of the old.
         assert!(t.contains_name(&name));
         assert!(t.contains_uuid(uuid2));
         assert!(!t.contains_uuid(uuid));
-        assert!(t.get_by_uuid(uuid2).unwrap().stuff == thing_key2);
-        assert!(t.get_by_name(&name).unwrap().stuff == thing_key2);
-        assert!(t.len() == 1);
+        assert_eq!(t.get_by_uuid(uuid2).unwrap().stuff, thing_key2);
+        assert_eq!(t.get_by_name(&name).unwrap().stuff, thing_key2);
+        assert_eq!(t.len(), 1);
     }
 }

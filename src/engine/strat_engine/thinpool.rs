@@ -711,7 +711,7 @@ mod tests {
                     .join(format!("stratis_test{}.txt", i));
                 let mut f = OpenOptions::new().read(true).open(file_path).unwrap();
                 f.read(&mut read_buf).unwrap();
-                assert!(read_buf[0..SECTOR_SIZE] == write_buf[0..SECTOR_SIZE]);
+                assert_eq!(read_buf[0..SECTOR_SIZE], write_buf[0..SECTOR_SIZE]);
             }
         }
         umount(source_tmp_dir.path()).unwrap();

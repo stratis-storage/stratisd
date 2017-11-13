@@ -287,32 +287,32 @@ mod tests {
         let metadata2 = pool2.record();
 
         let pools = find_all().unwrap();
-        assert!(pools.len() == 2);
+        assert_eq!(pools.len(), 2);
         let devnodes1 = pools.get(&uuid1).unwrap();
         let devnodes2 = pools.get(&uuid2).unwrap();
         let pool_save1 = get_metadata(uuid1, devnodes1).unwrap().unwrap();
         let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
-        assert!(pool_save1 == metadata1);
-        assert!(pool_save2 == metadata2);
+        assert_eq!(pool_save1, metadata1);
+        assert_eq!(pool_save2, metadata2);
         let blockdevs1 = get_blockdevs(uuid1, &pool_save1, devnodes1).unwrap();
         let blockdevs2 = get_blockdevs(uuid2, &pool_save2, devnodes2).unwrap();
-        assert!(blockdevs1.len() == pool_save1.block_devs.len());
-        assert!(blockdevs2.len() == pool_save2.block_devs.len());
+        assert_eq!(blockdevs1.len(), pool_save1.block_devs.len());
+        assert_eq!(blockdevs2.len(), pool_save2.block_devs.len());
 
         pool1.teardown().unwrap();
         pool2.teardown().unwrap();
         let pools = find_all().unwrap();
-        assert!(pools.len() == 2);
+        assert_eq!(pools.len(), 2);
         let devnodes1 = pools.get(&uuid1).unwrap();
         let devnodes2 = pools.get(&uuid2).unwrap();
         let pool_save1 = get_metadata(uuid1, devnodes1).unwrap().unwrap();
         let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
-        assert!(pool_save1 == metadata1);
-        assert!(pool_save2 == metadata2);
+        assert_eq!(pool_save1, metadata1);
+        assert_eq!(pool_save2, metadata2);
         let blockdevs1 = get_blockdevs(uuid1, &pool_save1, devnodes1).unwrap();
         let blockdevs2 = get_blockdevs(uuid2, &pool_save2, devnodes2).unwrap();
-        assert!(blockdevs1.len() == pool_save1.block_devs.len());
-        assert!(blockdevs2.len() == pool_save2.block_devs.len());
+        assert_eq!(blockdevs1.len(), pool_save1.block_devs.len());
+        assert_eq!(blockdevs2.len(), pool_save2.block_devs.len());
     }
 
     #[test]
@@ -327,7 +327,7 @@ mod tests {
     /// Verify that a pool with no devices does not have the minimum amount of
     /// space required.
     fn test_empty_pool(paths: &[&Path]) -> () {
-        assert!(paths.len() == 0);
+        assert_eq!(paths.len(), 0);
         let dm = DM::new().unwrap();
         assert!(match StratPool::initialize("stratis_test_pool",
                                             &dm,

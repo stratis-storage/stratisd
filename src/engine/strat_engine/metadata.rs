@@ -900,7 +900,7 @@ mod tests {
 
         let timestamp0 = Utc::now();
         let timestamp1 = Utc::now();
-        assert!(timestamp0 != timestamp1);
+        assert_ne!(timestamp0, timestamp1);
 
         let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
         bda.save_state(&timestamp1, &data, &mut buf).unwrap();
@@ -910,7 +910,7 @@ mod tests {
 
         let timestamp2 = Utc::now();
         let timestamp3 = Utc::now();
-        assert!(timestamp2 != timestamp3);
+        assert_ne!(timestamp2, timestamp3);
 
         bda.save_state(&timestamp3, &data, &mut buf).unwrap();
 

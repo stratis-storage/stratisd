@@ -538,24 +538,24 @@ mod tests {
         BlockDevMgr::initialize(uuid1, paths1, MIN_MDA_SECTORS, false).unwrap();
 
         let pools = find_all().unwrap();
-        assert!(pools.len() == 1);
+        assert_eq!(pools.len(), 1);
         assert!(pools.contains_key(&uuid1));
         let devices = pools.get(&uuid1).expect("pools.contains_key() was true");
-        assert!(devices.len() == paths1.len());
+        assert_eq!(devices.len(), paths1.len());
 
         let uuid2 = Uuid::new_v4();
         BlockDevMgr::initialize(uuid2, paths2, MIN_MDA_SECTORS, false).unwrap();
 
         let pools = find_all().unwrap();
-        assert!(pools.len() == 2);
+        assert_eq!(pools.len(), 2);
 
         assert!(pools.contains_key(&uuid1));
         let devices1 = pools.get(&uuid1).expect("pools.contains_key() was true");
-        assert!(devices1.len() == paths1.len());
+        assert_eq!(devices1.len(), paths1.len());
 
         assert!(pools.contains_key(&uuid2));
         let devices2 = pools.get(&uuid2).expect("pools.contains_key() was true");
-        assert!(devices2.len() == paths2.len());
+        assert_eq!(devices2.len(), paths2.len());
 
         assert!(pools
                     .iter()

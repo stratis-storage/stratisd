@@ -21,7 +21,7 @@ use engine::RenameAction;
 
 use super::super::engine::Filesystem;
 
-use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
+use super::types::{DbusContext, DbusErrorEnum, OPContext, OPType, TData};
 
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
@@ -71,7 +71,8 @@ pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext,
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "filesystem");
 
-    let object_path = f.object_path(object_name, Some(OPContext::new(parent, uuid)))
+    let object_path = f.object_path(object_name,
+                                    Some(OPContext::new(parent, uuid, OPType::Filesystem)))
         .introspectable()
         .add(f.interface(interface_name, ())
                  .add_m(rename_method)

@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::cell::{Cell, RefCell};
+use std::collections::HashSet;
 use std::collections::vec_deque::{Drain, VecDeque};
 use std::convert::From;
 use std::rc::Rc;
@@ -60,6 +61,19 @@ pub enum DeferredAction {
     Remove(Path<'static>),
 }
 
+/// Pool-specific data stored in the OPContext.
+#[derive(Debug, Default)]
+pub struct OPTypePool {
+    pub children: RefCell<HashSet<Path<'static>>>,
+}
+
+#[derive(Debug)]
+pub enum OPType {
+    Pool(OPTypePool),
+    Blockdev,
+    Filesystem,
+}
+
 /// Context for an object path.
 /// Contains the object path of the parent as a Path and the UUID of the
 /// object itself.
@@ -67,13 +81,22 @@ pub enum DeferredAction {
 pub struct OPContext {
     pub parent: Path<'static>,
     pub uuid: Uuid,
+    pub op_type: OPType,
 }
 
 impl OPContext {
-    pub fn new(parent: Path<'static>, uuid: Uuid) -> OPContext {
+    pub fn new(parent: Path<'static>, uuid: Uuid, op_type: OPType) -> OPContext {
         OPContext {
             parent: parent,
             uuid: uuid,
+            op_type: op_type,
+        }
+    }
+
+    pub fn pool(&self) -> Option<&OPTypePool> {
+        match self.op_type {
+            OPType::Pool(ref optp) => Some(optp),
+            _ => None,
         }
     }
 }

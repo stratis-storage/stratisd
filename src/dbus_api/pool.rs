@@ -18,6 +18,7 @@ use dbus::tree::MethodErr;
 use dbus::tree::MTFn;
 use dbus::tree::MethodResult;
 use dbus::tree::MethodInfo;
+use dbus::tree::ObjectPath;
 use dbus::tree::PropInfo;
 
 use uuid::Uuid;
@@ -28,7 +29,7 @@ use engine::{Pool, RenameAction};
 
 use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;
-use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
+use super::types::{DbusContext, DbusErrorEnum, OPContext, OPType, OPTypePool, TData};
 
 use super::util::{code_to_message_items, default_object_path, engine_to_dbus_err, get_next_arg,
                   get_uuid, ok_message_items, STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
@@ -205,7 +206,8 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_path = m.tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let op_data = get_data!(pool_path; default_return; return_message);
+    let pool_uuid = op_data.uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
@@ -216,12 +218,17 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match result {
         Ok(uuids) => {
             let return_value = uuids
-                .iter()
+                .into_iter()
                 .map(|uuid| {
-                         MessageItem::ObjectPath(create_dbus_blockdev(dbus_context,
-                                                                      object_path.clone(),
-                                                                      *uuid))
-                     })
+                    let pool_data = op_data
+                        .pool()
+                        .expect("pools must contain pool enum variant");
+                    let path = create_dbus_blockdev(dbus_context,
+                                                    pool_path.get_name().to_owned(),
+                                                    uuid,
+                                                    pool_data);
+                    MessageItem::ObjectPath(path)
+                })
                 .collect();
 
             let return_value = MessageItem::Array(return_value, return_sig.into());
@@ -343,10 +350,10 @@ fn get_pool_total_physical_size(i: &mut IterAppend,
                       |p| Ok(MessageItem::Str(format!("{}", *p.total_physical_size()))))
 }
 
-pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,
-                            parent: dbus::Path<'static>,
-                            uuid: Uuid)
-                            -> dbus::Path<'a> {
+pub fn create_dbus_pool(dbus_context: &DbusContext,
+                        parent: dbus::Path<'static>,
+                        uuid: Uuid)
+                        -> ObjectPath<MTFn<TData>, TData> {
 
     let f = Factory::new_fn();
 
@@ -408,7 +415,8 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "pool");
 
-    let object_path = f.object_path(object_name, Some(OPContext::new(parent, uuid)))
+    f.object_path(object_name,
+                     Some(OPContext::new(parent, uuid, OPType::Pool(OPTypePool::default()))))
         .introspectable()
         .add(f.interface(interface_name, ())
                  .add_m(create_filesystems_method)
@@ -419,9 +427,5 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,
                  .add_p(name_property)
                  .add_p(total_physical_size_property)
                  .add_p(total_physical_used_property)
-                 .add_p(uuid_property));
-
-    let path = object_path.get_name().to_owned();
-    dbus_context.actions.borrow_mut().push_add(object_path);
-    path
+                 .add_p(uuid_property))
 }

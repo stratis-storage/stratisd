@@ -147,7 +147,6 @@ mod test {
         let engine = StratEngine::initialize().unwrap();
         let pool_name: String = engine.get_pool(uuid1).unwrap().name().into();
         assert_eq!(pool_name, name2);
-        engine.teardown().unwrap();
     }
 
     #[test]
@@ -189,8 +188,6 @@ mod test {
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());
-
-        engine.teardown().unwrap();
     }
 
     #[test]

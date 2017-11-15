@@ -18,6 +18,9 @@ matrix:
           env: TASK=docs
         - rust: stable
           env: TASK=test
+        - rust: stable
+          env: TASK=test-travis
+          sudo: required
         - rust: nightly
           env: TASK=clippy
 

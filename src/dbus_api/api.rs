@@ -11,7 +11,6 @@ use dbus;
 use dbus::Connection;
 use dbus::BusType;
 use dbus::Message;
-use dbus::MessageItem;
 use dbus::NameFlag;
 use dbus::arg::Array;
 use dbus::arg::IterAppend;
@@ -36,7 +35,6 @@ use super::types::{ActionQueue, DeferredAction, DbusContext, DbusErrorEnum, TDat
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
 use super::util::code_to_message_items;
-use super::util::default_object_path;
 use super::util::engine_to_dbus_err;
 use super::util::get_next_arg;
 use super::util::ok_message_items;
@@ -60,37 +58,27 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let return_message = message.method_return();
 
+    let default_return: (dbus::Path, Vec<dbus::Path>) = (dbus::Path::default(), Vec::new());
+
     let msg = match result {
         Ok(pool_uuid) => {
             let pool_object_path: dbus::Path =
                 create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
-            let default_return =
-                MessageItem::Struct(vec![MessageItem::ObjectPath(default_object_path()),
-                                         MessageItem::Array(vec![], "o".into())]);
+
             let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
             let bd_object_paths = pool.blockdevs()
                 .iter()
-                .map(|bd| {
-                         MessageItem::ObjectPath(create_dbus_blockdev(dbus_context,
-                                                                      pool_object_path.clone(),
-                                                                      bd.uuid()))
-                     })
+                .map(|bd| create_dbus_blockdev(dbus_context, pool_object_path.clone(), bd.uuid()))
                 .collect::<Vec<_>>();
 
-            let return_path = MessageItem::ObjectPath(pool_object_path);
-            let return_list = MessageItem::Array(bd_object_paths, "o".into());
-            let return_value = MessageItem::Struct(vec![return_path, return_list]);
             let (rc, rs) = ok_message_items();
-            return_message.append3(return_value, rc, rs)
+            return_message.append3((pool_object_path, bd_object_paths), rc, rs)
         }
         Err(x) => {
-            let return_path = MessageItem::ObjectPath(default_object_path());
-            let return_list = MessageItem::Array(vec![], "s".into());
-            let return_value = MessageItem::Struct(vec![return_path, return_list]);
             let (rc, rs) = engine_to_dbus_err(&x);
             let (rc, rs) = code_to_message_items(rc, rs);
-            return_message.append3(return_value, rc, rs)
+            return_message.append3(default_return, rc, rs)
         }
     };
     Ok(vec![msg])
@@ -105,7 +93,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let dbus_context = m.tree.get_data();
 
-    let default_return = MessageItem::Bool(false);
+    let default_return = false;
     let return_message = message.method_return();
 
     let pool_uuid = match m.tree.get(&object_path) {
@@ -123,7 +111,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 .borrow_mut()
                 .push_remove(object_path);
             let (rc, rs) = ok_message_items();
-            return_message.append3(MessageItem::Bool(action), rc, rs)
+            return_message.append3(action, rc, rs)
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err(&err);

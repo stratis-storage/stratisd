@@ -8,7 +8,6 @@ use std::vec::Vec;
 
 use dbus;
 use dbus::Message;
-use dbus::MessageItem;
 use dbus::arg::Array;
 use dbus::arg::IterAppend;
 use dbus::tree::Access;
@@ -30,8 +29,8 @@ use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
-use super::util::{code_to_message_items, default_object_path, engine_to_dbus_err, get_next_arg,
-                  get_uuid, ok_message_items, STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
+use super::util::{code_to_message_items, engine_to_dbus_err, get_next_arg, get_uuid,
+                  ok_message_items, STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
@@ -42,8 +41,8 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let return_sig = "(os)";
-    let default_return = MessageItem::Array(vec![], return_sig.into());
+    let default_return: Vec<(dbus::Path, &str)> = Vec::new();
+
 
     let pool_path = m.tree
         .get(object_path)
@@ -67,14 +66,6 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 return_value.push((fs_object_path, name));
             }
 
-            let return_value = return_value
-                .iter()
-                .map(|x| {
-                         MessageItem::Struct(vec![MessageItem::ObjectPath(x.0.clone()),
-                                                  MessageItem::Str((*x.1).into())])
-                     })
-                .collect();
-            let return_value = MessageItem::Array(return_value, return_sig.into());
             let (rc, rs) = ok_message_items();
             return_message.append3(return_value, rc, rs)
         }
@@ -97,8 +88,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let return_sig = "s";
-    let default_return = MessageItem::Array(vec![], return_sig.into());
+    let default_return: Vec<&str> = Vec::new();
 
     let pool_path = m.tree
         .get(object_path)
@@ -127,12 +117,12 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 dbus_context.actions.borrow_mut().push_remove(op);
             }
 
-            let return_value = uuids
+            let return_value: Vec<String> = uuids
                 .iter()
-                .map(|n| MessageItem::Str(format!("{}", n.simple())))
+                .map(|n| format!("{}", n.simple()))
                 .collect();
             let (rc, rs) = ok_message_items();
-            return_message.append3(MessageItem::Array(return_value, return_sig.into()), rc, rs)
+            return_message.append3(return_value, rc, rs)
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err(&err);
@@ -153,7 +143,7 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let default_return = MessageItem::ObjectPath(default_object_path());
+    let default_return = dbus::Path::default();
 
     let pool_path = m.tree
         .get(object_path)
@@ -177,7 +167,7 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let fs_object_path: dbus::Path =
                 create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
             let (rc, rs) = ok_message_items();
-            return_message.append3(MessageItem::ObjectPath(fs_object_path), rc, rs)
+            return_message.append3(fs_object_path, rc, rs)
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err(&err);
@@ -199,8 +189,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let return_sig = "o";
-    let default_return = MessageItem::Array(vec![], return_sig.into());
+    let default_return: Vec<dbus::Path> = Vec::new();
 
     let pool_path = m.tree
         .get(object_path)
@@ -217,14 +206,9 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(uuids) => {
             let return_value = uuids
                 .iter()
-                .map(|uuid| {
-                         MessageItem::ObjectPath(create_dbus_blockdev(dbus_context,
-                                                                      object_path.clone(),
-                                                                      *uuid))
-                     })
-                .collect();
+                .map(|uuid| create_dbus_blockdev(dbus_context, object_path.clone(), *uuid))
+                .collect::<Vec<_>>();
 
-            let return_value = MessageItem::Array(return_value, return_sig.into());
             let (rc, rs) = ok_message_items();
             return_message.append3(return_value, rc, rs)
         }
@@ -247,7 +231,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let default_return = MessageItem::Bool(false);
+    let default_return = false;
 
     let pool_path = m.tree
         .get(object_path)
@@ -265,11 +249,11 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
         Ok(RenameAction::Identity) => {
             let (rc, rs) = ok_message_items();
-            return_message.append3(MessageItem::Bool(false), rc, rs)
+            return_message.append3(false, rc, rs)
         }
         Ok(RenameAction::Renamed) => {
             let (rc, rs) = ok_message_items();
-            return_message.append3(MessageItem::Bool(true), rc, rs)
+            return_message.append3(true, rc, rs)
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err(&err);
@@ -283,11 +267,12 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 /// Get a pool property and place it on the D-Bus. The property is
 /// found by means of the getter method which takes a reference to a
 /// Pool and obtains the property from the pool.
-fn get_pool_property<F>(i: &mut IterAppend,
-                        p: &PropInfo<MTFn<TData>, TData>,
-                        getter: F)
-                        -> Result<(), MethodErr>
-    where F: Fn(&Pool) -> Result<MessageItem, MethodErr>
+fn get_pool_property<F, R>(i: &mut IterAppend,
+                           p: &PropInfo<MTFn<TData>, TData>,
+                           getter: F)
+                           -> Result<(), MethodErr>
+    where F: Fn(&Pool) -> Result<R, MethodErr>,
+          R: dbus::arg::Append
 {
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
@@ -315,20 +300,20 @@ fn get_pool_property<F>(i: &mut IterAppend,
 }
 
 fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |p| Ok(MessageItem::Str(p.name().to_owned())))
+    get_pool_property(i, p, |p| Ok(p.name().to_owned()))
 }
 
 fn get_pool_total_physical_used(i: &mut IterAppend,
                                 p: &PropInfo<MTFn<TData>, TData>)
                                 -> Result<(), MethodErr> {
-    fn get_used(pool: &Pool) -> Result<MessageItem, MethodErr> {
+    fn get_used(pool: &Pool) -> Result<String, MethodErr> {
         let err_func = |_| {
             MethodErr::failed(&format!("no total physical size computed for pool with uuid {}",
                                        pool.uuid()))
         };
 
         pool.total_physical_used()
-            .map(|u| Ok(MessageItem::Str(format!("{}", *u))))
+            .map(|u| Ok(format!("{}", *u)))
             .map_err(err_func)?
     }
 
@@ -338,9 +323,7 @@ fn get_pool_total_physical_used(i: &mut IterAppend,
 fn get_pool_total_physical_size(i: &mut IterAppend,
                                 p: &PropInfo<MTFn<TData>, TData>)
                                 -> Result<(), MethodErr> {
-    get_pool_property(i,
-                      p,
-                      |p| Ok(MessageItem::Str(format!("{}", *p.total_physical_size()))))
+    get_pool_property(i, p, |p| Ok(format!("{}", *p.total_physical_size())))
 }
 
 pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,

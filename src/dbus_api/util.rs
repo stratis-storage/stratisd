@@ -5,7 +5,6 @@
 use std::error::Error;
 
 use dbus;
-use dbus::MessageItem;
 use dbus::arg::{ArgType, Iter, IterAppend};
 use dbus::tree::{MethodErr, MTFn, PropInfo};
 
@@ -59,18 +58,14 @@ pub fn engine_to_dbus_err(err: &EngineError) -> (DbusErrorEnum, String) {
 
 /// Convenience function to convert a return code and a string to
 /// appropriately typed MessageItems.
-pub fn code_to_message_items(code: DbusErrorEnum, mes: String) -> (MessageItem, MessageItem) {
-    (MessageItem::UInt16(code.into()), MessageItem::Str(mes))
+pub fn code_to_message_items(code: DbusErrorEnum, mes: String) -> (u16, String) {
+    (code.into(), mes)
 }
 
 /// Convenience function to directly yield MessageItems for OK code and message.
-pub fn ok_message_items() -> (MessageItem, MessageItem) {
+pub fn ok_message_items() -> (u16, String) {
     let code = DbusErrorEnum::OK;
     code_to_message_items(code, code.get_error_string().into())
-}
-
-pub fn default_object_path<'a>() -> dbus::Path<'a> {
-    dbus::Path::new("/").expect("'/' is guaranteed to be a valid Path")
 }
 
 /// Get the UUID for an object path.
@@ -85,7 +80,7 @@ pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<
             .as_ref()
             .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
-    i.append(MessageItem::Str(format!("{}", data.uuid.simple())));
+    i.append(format!("{}", data.uuid.simple()));
     Ok(())
 }
 
@@ -102,6 +97,6 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Resul
             .as_ref()
             .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
-    i.append(MessageItem::ObjectPath(data.parent.clone()));
+    i.append(data.parent.clone());
     Ok(())
 }

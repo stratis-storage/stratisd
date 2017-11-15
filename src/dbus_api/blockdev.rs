@@ -26,7 +26,8 @@ use super::util::STRATIS_BASE_SERVICE;
 use super::util::get_next_arg;
 use super::util::get_parent;
 use super::util::get_uuid;
-use super::util::ok_message_items;
+use super::util::msg_code_ok;
+use super::util::msg_string_ok;
 
 
 pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
@@ -150,8 +151,7 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                      })?;
     }
 
-    let (rc, rs) = ok_message_items();
-    let msg = return_message.append3(id_changed, rc, rs);
+    let msg = return_message.append3(id_changed, msg_code_ok(), msg_string_ok());
 
     Ok(vec![msg])
 }

@@ -28,7 +28,8 @@ use super::util::engine_to_dbus_err_tuple;
 use super::util::get_next_arg;
 use super::util::get_parent;
 use super::util::get_uuid;
-use super::util::ok_message_items;
+use super::util::msg_code_ok;
+use super::util::msg_string_ok;
 
 
 pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext,
@@ -114,13 +115,9 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return_message.append3(default_return, rc, rs)
         }
         Ok(RenameAction::Identity) => {
-            let (rc, rs) = ok_message_items();
-            return_message.append3(default_return, rc, rs)
+            return_message.append3(default_return, msg_code_ok(), msg_string_ok())
         }
-        Ok(RenameAction::Renamed) => {
-            let (rc, rs) = ok_message_items();
-            return_message.append3(true, rc, rs)
-        }
+        Ok(RenameAction::Renamed) => return_message.append3(true, msg_code_ok(), msg_string_ok()),
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)

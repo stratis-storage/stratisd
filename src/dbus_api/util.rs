@@ -57,10 +57,14 @@ pub fn engine_to_dbus_err_tuple(err: &EngineError) -> (u16, String) {
     (error.into(), err.description().to_owned())
 }
 
-/// Convenience function to directly yield MessageItems for OK code and message.
-pub fn ok_message_items() -> (u16, String) {
-    let code = DbusErrorEnum::OK;
-    (code.into(), code.get_error_string().into())
+/// Convenience function to get the error value for "OK"
+pub fn msg_code_ok() -> u16 {
+    DbusErrorEnum::OK.into()
+}
+
+/// Convenience function to get the error string for "OK"
+pub fn msg_string_ok() -> String {
+    DbusErrorEnum::OK.get_error_string().to_owned()
 }
 
 /// Get the UUID for an object path.

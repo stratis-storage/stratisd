@@ -36,7 +36,8 @@ use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
 use super::util::engine_to_dbus_err_tuple;
 use super::util::get_next_arg;
-use super::util::ok_message_items;
+use super::util::msg_code_ok;
+use super::util::msg_string_ok;
 use super::util::tuple_to_option;
 
 fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -71,8 +72,9 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 .map(|bd| create_dbus_blockdev(dbus_context, pool_object_path.clone(), bd.uuid()))
                 .collect::<Vec<_>>();
 
-            let (rc, rs) = ok_message_items();
-            return_message.append3((pool_object_path, bd_object_paths), rc, rs)
+            return_message.append3((pool_object_path, bd_object_paths),
+                                   msg_code_ok(),
+                                   msg_string_ok())
         }
         Err(x) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&x);
@@ -97,8 +99,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid = match m.tree.get(&object_path) {
         Some(pool_path) => get_data!(pool_path; default_return; return_message).uuid,
         None => {
-            let (rc, rs) = ok_message_items();
-            return Ok(vec![return_message.append3(default_return, rc, rs)]);
+            return Ok(vec![return_message.append3(default_return, msg_code_ok(), msg_string_ok())]);
         }
     };
 
@@ -108,8 +109,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 .actions
                 .borrow_mut()
                 .push_remove(object_path);
-            let (rc, rs) = ok_message_items();
-            return_message.append3(action, rc, rs)
+            return_message.append3(action, msg_code_ok(), msg_string_ok())
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
@@ -139,10 +139,7 @@ fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
 
     let msg = match result {
-        Ok(_) => {
-            let (rc, rs) = ok_message_items();
-            return_message.append2(rc, rs)
-        }
+        Ok(_) => return_message.append2(msg_code_ok(), msg_string_ok()),
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append2(rc, rs)

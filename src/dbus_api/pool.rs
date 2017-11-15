@@ -29,7 +29,7 @@ use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
-use super::util::{engine_to_dbus_err_tuple, get_next_arg, get_uuid, ok_message_items,
+use super::util::{engine_to_dbus_err_tuple, get_next_arg, get_uuid, msg_code_ok, msg_string_ok,
                   STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -66,8 +66,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 return_value.push((fs_object_path, name));
             }
 
-            let (rc, rs) = ok_message_items();
-            return_message.append3(return_value, rc, rs)
+            return_message.append3(return_value, msg_code_ok(), msg_string_ok())
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
@@ -120,8 +119,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 .iter()
                 .map(|n| format!("{}", n.simple()))
                 .collect();
-            let (rc, rs) = ok_message_items();
-            return_message.append3(return_value, rc, rs)
+            return_message.append3(return_value, msg_code_ok(), msg_string_ok())
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
@@ -164,8 +162,7 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(uuid) => {
             let fs_object_path: dbus::Path =
                 create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
-            let (rc, rs) = ok_message_items();
-            return_message.append3(fs_object_path, rc, rs)
+            return_message.append3(fs_object_path, msg_code_ok(), msg_string_ok())
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
@@ -206,8 +203,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 .map(|uuid| create_dbus_blockdev(dbus_context, object_path.clone(), *uuid))
                 .collect::<Vec<_>>();
 
-            let (rc, rs) = ok_message_items();
-            return_message.append3(return_value, rc, rs)
+            return_message.append3(return_value, msg_code_ok(), msg_string_ok())
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
@@ -243,14 +239,8 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let (rc, rs) = (u16::from(DbusErrorEnum::INTERNAL_ERROR), error_message);
             return_message.append3(default_return, rc, rs)
         }
-        Ok(RenameAction::Identity) => {
-            let (rc, rs) = ok_message_items();
-            return_message.append3(false, rc, rs)
-        }
-        Ok(RenameAction::Renamed) => {
-            let (rc, rs) = ok_message_items();
-            return_message.append3(true, rc, rs)
-        }
+        Ok(RenameAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),
+        Ok(RenameAction::Renamed) => return_message.append3(true, msg_code_ok(), msg_string_ok()),
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)

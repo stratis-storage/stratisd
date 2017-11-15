@@ -29,7 +29,7 @@ use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
-use super::util::{code_to_message_items, engine_to_dbus_err, get_next_arg, get_uuid,
+use super::util::{code_to_message_items, engine_to_dbus_err_tuple, get_next_arg, get_uuid,
                   ok_message_items, STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -70,8 +70,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return_message.append3(return_value, rc, rs)
         }
         Err(err) => {
-            let (rc, rs) = engine_to_dbus_err(&err);
-            let (rc, rs) = code_to_message_items(rc, rs);
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)
         }
     };
@@ -125,8 +124,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return_message.append3(return_value, rc, rs)
         }
         Err(err) => {
-            let (rc, rs) = engine_to_dbus_err(&err);
-            let (rc, rs) = code_to_message_items(rc, rs);
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)
         }
     };
@@ -170,8 +168,7 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return_message.append3(fs_object_path, rc, rs)
         }
         Err(err) => {
-            let (rc, rs) = engine_to_dbus_err(&err);
-            let (rc, rs) = code_to_message_items(rc, rs);
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)
         }
     };
@@ -213,8 +210,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return_message.append3(return_value, rc, rs)
         }
         Err(err) => {
-            let (rc, rs) = engine_to_dbus_err(&err);
-            let (rc, rs) = code_to_message_items(rc, rs);
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)
         }
     };
@@ -256,8 +252,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return_message.append3(true, rc, rs)
         }
         Err(err) => {
-            let (rc, rs) = engine_to_dbus_err(&err);
-            let (rc, rs) = code_to_message_items(rc, rs);
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)
         }
     };

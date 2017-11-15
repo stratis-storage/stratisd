@@ -33,8 +33,9 @@ pub fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr
 }
 
 
-/// Translates an engine error to a dbus error.
-pub fn engine_to_dbus_err(err: &EngineError) -> (DbusErrorEnum, String) {
+/// Translates an engine error to the (errorcode, string) tuple that Stratis
+/// D-Bus methods return.
+pub fn engine_to_dbus_err_tuple(err: &EngineError) -> (u16, String) {
     #![allow(match_same_arms)]
     let error = match *err {
         EngineError::Engine(ref e, _) => {
@@ -53,7 +54,7 @@ pub fn engine_to_dbus_err(err: &EngineError) -> (DbusErrorEnum, String) {
         EngineError::Serde(_) => DbusErrorEnum::INTERNAL_ERROR,
         EngineError::DM(_) => DbusErrorEnum::INTERNAL_ERROR,
     };
-    (error, err.description().to_owned())
+    (error.into(), err.description().to_owned())
 }
 
 /// Convenience function to convert a return code and a string to

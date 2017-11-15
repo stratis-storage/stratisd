@@ -25,7 +25,7 @@ use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
 use super::util::code_to_message_items;
-use super::util::engine_to_dbus_err;
+use super::util::engine_to_dbus_err_tuple;
 use super::util::get_next_arg;
 use super::util::get_parent;
 use super::util::get_uuid;
@@ -123,8 +123,7 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return_message.append3(true, rc, rs)
         }
         Err(err) => {
-            let (rc, rs) = engine_to_dbus_err(&err);
-            let (rc, rs) = code_to_message_items(rc, rs);
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)
         }
     };

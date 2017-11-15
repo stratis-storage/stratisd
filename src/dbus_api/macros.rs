@@ -11,7 +11,7 @@ macro_rules! get_data {
             data
         } else {
             let message = format!("no data for object path {}", $path.get_name());
-            let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, message);
+            let (rc, rs) = (u16::from(DbusErrorEnum::INTERNAL_ERROR), message);
             return Ok(vec![$message.append3($default, rc, rs)]);
         }
     }
@@ -26,7 +26,7 @@ macro_rules! get_parent {
             parent
         } else {
             let message = format!("no path for object path {}", $data.parent);
-            let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, message);
+            let (rc, rs) = (u16::from(DbusErrorEnum::INTERNAL_ERROR), message);
             return Ok(vec![$message.append3($default, rc, rs)]);
         }
     }
@@ -41,7 +41,7 @@ macro_rules! get_mut_pool {
         } else {
             let message = format!("engine does not know about pool with uuid {}",
                                   $uuid);
-            let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, message);
+            let (rc, rs) = (u16::from(DbusErrorEnum::INTERNAL_ERROR), message);
             return Ok(vec![$message.append3($default, rc, rs)]);
         }
     }

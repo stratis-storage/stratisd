@@ -24,7 +24,6 @@ use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
-use super::util::code_to_message_items;
 use super::util::engine_to_dbus_err_tuple;
 use super::util::get_next_arg;
 use super::util::get_parent;
@@ -111,7 +110,7 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let error_message = format!("pool {} doesn't know about filesystem {}",
                                         pool_uuid,
                                         filesystem_data.uuid);
-            let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, error_message);
+            let (rc, rs) = (u16::from(DbusErrorEnum::INTERNAL_ERROR), error_message);
             return_message.append3(default_return, rc, rs)
         }
         Ok(RenameAction::Identity) => {

@@ -34,7 +34,6 @@ use super::pool::create_dbus_pool;
 use super::types::{ActionQueue, DeferredAction, DbusContext, DbusErrorEnum, TData};
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
-use super::util::code_to_message_items;
 use super::util::engine_to_dbus_err_tuple;
 use super::util::get_next_arg;
 use super::util::ok_message_items;

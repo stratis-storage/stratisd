@@ -23,7 +23,6 @@ use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
-use super::util::code_to_message_items;
 use super::util::get_next_arg;
 use super::util::get_parent;
 use super::util::get_uuid;

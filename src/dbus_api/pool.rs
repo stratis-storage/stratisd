@@ -29,8 +29,8 @@ use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
-use super::util::{code_to_message_items, engine_to_dbus_err_tuple, get_next_arg, get_uuid,
-                  ok_message_items, STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
+use super::util::{engine_to_dbus_err_tuple, get_next_arg, get_uuid, ok_message_items,
+                  STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
@@ -152,7 +152,7 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Some(op) => get_data!(op; default_return; return_message).uuid,
         None => {
             let message = format!("no data for object path {}", filesystem);
-            let (rc, rs) = code_to_message_items(DbusErrorEnum::NOTFOUND, message);
+            let (rc, rs) = (u16::from(DbusErrorEnum::NOTFOUND), message);
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
@@ -240,7 +240,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
               .rename_pool(pool_uuid, new_name) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", &pool_uuid);
-            let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, error_message);
+            let (rc, rs) = (u16::from(DbusErrorEnum::INTERNAL_ERROR), error_message);
             return_message.append3(default_return, rc, rs)
         }
         Ok(RenameAction::Identity) => {

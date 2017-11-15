@@ -421,6 +421,11 @@ mod tests {
         real::test_with_spec(real::DeviceLimits::AtLeast(1), test_blockdevmgr_used);
     }
 
+    #[test]
+    pub fn travis_test_blockdevmgr_used() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_blockdevmgr_used);
+    }
+
     /// Verify that it is impossible to initialize a set of disks of which
     /// even one is dirty, i.e, has some data written within BDA_STATIC_HDR_SECTORS
     /// of start of disk. Choose the dirty disk randomly. This means that even
@@ -481,6 +486,11 @@ mod tests {
         real::test_with_spec(real::DeviceLimits::AtLeast(1), test_force_flag_dirty);
     }
 
+    #[test]
+    pub fn travis_test_force_flag_dirty() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_force_flag_dirty);
+    }
+
     /// Verify that it is impossible to steal blockdevs from another Stratis
     /// pool.
     /// 1. Initialize devices with pool uuid.
@@ -517,6 +527,12 @@ mod tests {
     #[test]
     pub fn real_test_force_flag_stratis() {
         real::test_with_spec(real::DeviceLimits::AtLeast(2), test_force_flag_stratis);
+    }
+
+    #[test]
+    pub fn travis_test_force_flag_stratis() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3),
+                                   test_force_flag_stratis);
     }
 
     /// Verify that find_all function locates and assigns pools appropriately.
@@ -573,6 +589,11 @@ mod tests {
         real::test_with_spec(real::DeviceLimits::AtLeast(2), test_initialize);
     }
 
+    #[test]
+    pub fn travis_test_initialize() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_initialize);
+    }
+
     /// Test that initialing devices claims all and that destroying
     /// them releases all.
     fn test_ownership(paths: &[&Path]) -> () {
@@ -611,5 +632,10 @@ mod tests {
     #[test]
     pub fn real_test_ownership() {
         real::test_with_spec(real::DeviceLimits::AtLeast(1), test_ownership);
+    }
+
+    #[test]
+    pub fn travis_test_ownership() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_ownership);
     }
 }

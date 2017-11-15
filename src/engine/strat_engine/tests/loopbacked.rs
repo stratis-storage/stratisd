@@ -6,6 +6,7 @@ extern crate loopdev;
 
 use std::fs::OpenOptions;
 use std::io::{Seek, SeekFrom, Write};
+use std::panic;
 use std::path::{Path, PathBuf};
 
 use devicemapper::{Bytes, IEC, Sectors};
@@ -35,7 +36,6 @@ impl LoopTestDev {
     /// Create a new loopbacked device.
     /// Create its backing store of 1 GiB wiping the first 1 MiB.
     pub fn new(lc: &LoopControl, path: &Path) -> LoopTestDev {
-        clean_up();
         let mut f = OpenOptions::new()
             .read(true)
             .write(true)
@@ -63,7 +63,6 @@ impl LoopTestDev {
 
 impl Drop for LoopTestDev {
     fn drop(&mut self) {
-        clean_up();
         self.ld.detach().unwrap()
     }
 }
@@ -94,7 +93,7 @@ fn get_devices(count: usize, dir: &TempDir) -> Vec<LoopTestDev> {
 
 /// Run the designated tests according to the specification.
 pub fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
-    where F: Fn(&[&Path]) -> ()
+    where F: Fn(&[&Path]) -> () + panic::RefUnwindSafe
 {
     let counts = get_device_counts(limits);
 
@@ -108,6 +107,13 @@ pub fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
             .map(|x| x.ld.get_path().unwrap())
             .collect();
         let device_paths: Vec<&Path> = device_paths.iter().map(|x| x.as_path()).collect();
-        test(&device_paths);
+
+        clean_up().unwrap();
+
+        let result = panic::catch_unwind(|| { test(&device_paths); });
+        let tear_down = clean_up();
+
+        result.unwrap();
+        tear_down.unwrap();
     }
 }

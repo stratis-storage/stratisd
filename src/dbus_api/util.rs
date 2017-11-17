@@ -5,7 +5,6 @@
 use std::error::Error;
 
 use dbus;
-use dbus::MessageItem;
 use dbus::arg::{ArgType, Iter, IterAppend};
 use dbus::tree::{MethodErr, MTFn, PropInfo};
 
@@ -34,8 +33,9 @@ pub fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr
 }
 
 
-/// Translates an engine error to a dbus error.
-pub fn engine_to_dbus_err(err: &EngineError) -> (DbusErrorEnum, String) {
+/// Translates an engine error to the (errorcode, string) tuple that Stratis
+/// D-Bus methods return.
+pub fn engine_to_dbus_err_tuple(err: &EngineError) -> (u16, String) {
     #![allow(match_same_arms)]
     let error = match *err {
         EngineError::Engine(ref e, _) => {
@@ -54,23 +54,17 @@ pub fn engine_to_dbus_err(err: &EngineError) -> (DbusErrorEnum, String) {
         EngineError::Serde(_) => DbusErrorEnum::INTERNAL_ERROR,
         EngineError::DM(_) => DbusErrorEnum::INTERNAL_ERROR,
     };
-    (error, err.description().to_owned())
+    (error.into(), err.description().to_owned())
 }
 
-/// Convenience function to convert a return code and a string to
-/// appropriately typed MessageItems.
-pub fn code_to_message_items(code: DbusErrorEnum, mes: String) -> (MessageItem, MessageItem) {
-    (MessageItem::UInt16(code.into()), MessageItem::Str(mes))
+/// Convenience function to get the error value for "OK"
+pub fn msg_code_ok() -> u16 {
+    DbusErrorEnum::OK.into()
 }
 
-/// Convenience function to directly yield MessageItems for OK code and message.
-pub fn ok_message_items() -> (MessageItem, MessageItem) {
-    let code = DbusErrorEnum::OK;
-    code_to_message_items(code, code.get_error_string().into())
-}
-
-pub fn default_object_path<'a>() -> dbus::Path<'a> {
-    dbus::Path::new("/").expect("'/' is guaranteed to be a valid Path")
+/// Convenience function to get the error string for "OK"
+pub fn msg_string_ok() -> String {
+    DbusErrorEnum::OK.get_error_string().to_owned()
 }
 
 /// Get the UUID for an object path.
@@ -85,7 +79,7 @@ pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<
             .as_ref()
             .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
-    i.append(MessageItem::Str(format!("{}", data.uuid.simple())));
+    i.append(format!("{}", data.uuid.simple()));
     Ok(())
 }
 
@@ -102,6 +96,6 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Resul
             .as_ref()
             .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
-    i.append(MessageItem::ObjectPath(data.parent.clone()));
+    i.append(data.parent.clone());
     Ok(())
 }

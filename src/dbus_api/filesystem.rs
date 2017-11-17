@@ -4,7 +4,6 @@
 
 use dbus;
 use dbus::Message;
-use dbus::MessageItem;
 use dbus::arg::IterAppend;
 use dbus::tree::Access;
 use dbus::tree::EmitsChangedSignal;
@@ -25,12 +24,12 @@ use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
-use super::util::code_to_message_items;
-use super::util::engine_to_dbus_err;
+use super::util::engine_to_dbus_err_tuple;
 use super::util::get_next_arg;
 use super::util::get_parent;
 use super::util::get_uuid;
-use super::util::ok_message_items;
+use super::util::msg_code_ok;
+use super::util::msg_string_ok;
 
 
 pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext,
@@ -94,7 +93,7 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let default_return = MessageItem::Bool(false);
+    let default_return = false;
 
     let filesystem_path = m.tree
         .get(object_path)
@@ -112,20 +111,15 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let error_message = format!("pool {} doesn't know about filesystem {}",
                                         pool_uuid,
                                         filesystem_data.uuid);
-            let (rc, rs) = code_to_message_items(DbusErrorEnum::INTERNAL_ERROR, error_message);
+            let (rc, rs) = (u16::from(DbusErrorEnum::INTERNAL_ERROR), error_message);
             return_message.append3(default_return, rc, rs)
         }
         Ok(RenameAction::Identity) => {
-            let (rc, rs) = ok_message_items();
-            return_message.append3(default_return, rc, rs)
+            return_message.append3(default_return, msg_code_ok(), msg_string_ok())
         }
-        Ok(RenameAction::Renamed) => {
-            let (rc, rs) = ok_message_items();
-            return_message.append3(MessageItem::Bool(true), rc, rs)
-        }
+        Ok(RenameAction::Renamed) => return_message.append3(true, msg_code_ok(), msg_string_ok()),
         Err(err) => {
-            let (rc, rs) = engine_to_dbus_err(&err);
-            let (rc, rs) = code_to_message_items(rc, rs);
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)
         }
     };
@@ -136,11 +130,12 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 /// Get a filesystem property and place it on the D-Bus. The property is
 /// found by means of the getter method which takes a reference to a
 /// Filesystem and obtains the property from the filesystem.
-fn get_filesystem_property<F>(i: &mut IterAppend,
-                              p: &PropInfo<MTFn<TData>, TData>,
-                              getter: F)
-                              -> Result<(), MethodErr>
-    where F: Fn(&Filesystem) -> Result<MessageItem, MethodErr>
+fn get_filesystem_property<F, R>(i: &mut IterAppend,
+                                 p: &PropInfo<MTFn<TData>, TData>,
+                                 getter: F)
+                                 -> Result<(), MethodErr>
+    where F: Fn(&Filesystem) -> Result<R, MethodErr>,
+          R: dbus::arg::Append
 {
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
@@ -190,16 +185,11 @@ fn get_filesystem_property<F>(i: &mut IterAppend,
 fn get_filesystem_devnode(i: &mut IterAppend,
                           p: &PropInfo<MTFn<TData>, TData>)
                           -> Result<(), MethodErr> {
-
-    fn get_devnode(filesystem: &Filesystem) -> Result<MessageItem, MethodErr> {
-        Ok(MessageItem::Str(format!("{}", filesystem.devnode().display())))
-    }
-
-    get_filesystem_property(i, p, get_devnode)
+    get_filesystem_property(i, p, |fs| Ok(format!("{}", fs.devnode().display())))
 }
 
 fn get_filesystem_name(i: &mut IterAppend,
                        p: &PropInfo<MTFn<TData>, TData>)
                        -> Result<(), MethodErr> {
-    get_filesystem_property(i, p, |f| Ok(MessageItem::Str(f.name().to_owned())))
+    get_filesystem_property(i, p, |f| Ok(f.name().to_owned()))
 }

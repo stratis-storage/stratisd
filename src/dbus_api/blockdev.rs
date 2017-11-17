@@ -4,7 +4,6 @@
 
 use dbus;
 use dbus::Message;
-use dbus::MessageItem;
 use dbus::arg::IterAppend;
 use dbus::tree::Access;
 use dbus::tree::EmitsChangedSignal;
@@ -24,11 +23,11 @@ use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
-use super::util::code_to_message_items;
 use super::util::get_next_arg;
 use super::util::get_parent;
 use super::util::get_uuid;
-use super::util::ok_message_items;
+use super::util::msg_code_ok;
+use super::util::msg_string_ok;
 
 
 pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
@@ -119,7 +118,7 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let default_return = MessageItem::Bool(false);
+    let default_return = false;
 
     let blockdev_path = m.tree
         .get(object_path)
@@ -152,8 +151,7 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                      })?;
     }
 
-    let (rc, rs) = ok_message_items();
-    let msg = return_message.append3(MessageItem::Bool(id_changed), rc, rs);
+    let msg = return_message.append3(id_changed, msg_code_ok(), msg_string_ok());
 
     Ok(vec![msg])
 }
@@ -162,11 +160,12 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 /// Get a blockdev property and place it on the D-Bus. The property is
 /// found by means of the getter method which takes a reference to a
 /// blockdev and obtains the property from the blockdev.
-fn get_blockdev_property<F>(i: &mut IterAppend,
-                            p: &PropInfo<MTFn<TData>, TData>,
-                            getter: F)
-                            -> Result<(), MethodErr>
-    where F: Fn(&BlockDev) -> Result<MessageItem, MethodErr>
+fn get_blockdev_property<F, R>(i: &mut IterAppend,
+                               p: &PropInfo<MTFn<TData>, TData>,
+                               getter: F)
+                               -> Result<(), MethodErr>
+    where F: Fn(&BlockDev) -> Result<R, MethodErr>,
+          R: dbus::arg::Append
 {
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
@@ -216,55 +215,45 @@ fn get_blockdev_property<F>(i: &mut IterAppend,
 fn get_blockdev_devnode(i: &mut IterAppend,
                         p: &PropInfo<MTFn<TData>, TData>)
                         -> Result<(), MethodErr> {
-    get_blockdev_property(i,
-                          p,
-                          |p| Ok(MessageItem::Str(format!("{}", p.devnode().display()))))
+    get_blockdev_property(i, p, |p| Ok(format!("{}", p.devnode().display())))
 }
 
 fn get_blockdev_hardware_info(i: &mut IterAppend,
                               p: &PropInfo<MTFn<TData>, TData>)
                               -> Result<(), MethodErr> {
-    get_blockdev_property(i,
-                          p,
-                          |p| Ok(MessageItem::Str(p.hardware_info().unwrap_or("").to_owned())))
+    get_blockdev_property(i, p, |p| Ok(p.hardware_info().unwrap_or("").to_owned()))
 }
 
 fn get_blockdev_user_info(i: &mut IterAppend,
                           p: &PropInfo<MTFn<TData>, TData>)
                           -> Result<(), MethodErr> {
-    get_blockdev_property(i,
-                          p,
-                          |p| Ok(MessageItem::Str(p.user_info().unwrap_or("").to_owned())))
+    get_blockdev_property(i, p, |p| Ok(p.user_info().unwrap_or("").to_owned()))
 }
 
 fn get_blockdev_initialization_time(i: &mut IterAppend,
                                     p: &PropInfo<MTFn<TData>, TData>)
                                     -> Result<(), MethodErr> {
-    get_blockdev_property(i,
-                          p,
-                          |p| Ok(MessageItem::UInt64(p.initialization_time().timestamp() as u64)))
+    get_blockdev_property(i, p, |p| Ok(p.initialization_time().timestamp() as u64))
 }
 
 fn get_blockdev_physical_size(i: &mut IterAppend,
                               p: &PropInfo<MTFn<TData>, TData>)
                               -> Result<(), MethodErr> {
-    get_blockdev_property(i,
-                          p,
-                          |p| Ok(MessageItem::Str(format!("{}", *p.total_size()))))
+    get_blockdev_property(i, p, |p| Ok(format!("{}", *p.total_size())))
 }
 
 fn get_blockdev_state(i: &mut IterAppend,
                       p: &PropInfo<MTFn<TData>, TData>)
                       -> Result<(), MethodErr> {
-    fn get_state(blockdev: &BlockDev) -> Result<MessageItem, MethodErr> {
-        let state = match blockdev.state() {
+    fn get_state(blockdev: &BlockDev) -> Result<u16, MethodErr> {
+        let state: u16 = match blockdev.state() {
             BlockDevState::Missing => 0,
             BlockDevState::Bad => 1,
             BlockDevState::Spare => 2,
             BlockDevState::NotInUse => 3,
             BlockDevState::InUse => 4,
         };
-        Ok(MessageItem::UInt16(state))
+        Ok(state)
     }
 
     get_blockdev_property(i, p, get_state)

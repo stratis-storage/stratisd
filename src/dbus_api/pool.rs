@@ -110,9 +110,11 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             for uuid in uuids {
                 let op = filesystem_map
                     .get(uuid)
-                    .expect("'uuids' is a subset of filesystem_map.keys()")
-                    .clone();
-                dbus_context.actions.borrow_mut().push_remove(op);
+                    .expect("'uuids' is a subset of filesystem_map.keys()");
+                dbus_context
+                    .actions
+                    .borrow_mut()
+                    .push_remove(op, m.tree);
             }
 
             let return_value: Vec<String> = uuids

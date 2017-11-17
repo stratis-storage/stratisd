@@ -8,7 +8,7 @@ use std::convert::From;
 use std::rc::Rc;
 
 use dbus::Path;
-use dbus::tree::{DataType, MTFn, ObjectPath};
+use dbus::tree::{DataType, MTFn, ObjectPath, Tree};
 
 use uuid::Uuid;
 
@@ -127,9 +127,24 @@ impl ActionQueue {
         self.queue.push_back(DeferredAction::Add(object_path))
     }
 
-    /// Push a Remove action onto the back of the queue.
-    pub fn push_remove(&mut self, object_path: Path<'static>) {
-        self.queue.push_back(DeferredAction::Remove(object_path))
+    /// Push Remove actions for a path and its immediate descendants. Not
+    /// recursive, since no multi-level parent-child relationships currently
+    /// exist.
+    // Note: Path x is a child of path y if x's context's parent field is y.
+    pub fn push_remove(&mut self, item: &Path<'static>, tree: &Tree<MTFn<TData>, TData>) -> () {
+        for opath in tree.iter()
+                .filter(|opath| {
+                            opath
+                                .get_data()
+                                .as_ref()
+                                .map_or(false, |op_cxt| op_cxt.parent == *item)
+                        }) {
+            self.queue
+                .push_back(DeferredAction::Remove(opath.get_name().clone()))
+        }
+
+        self.queue
+            .push_back(DeferredAction::Remove(item.clone()))
     }
 
     /// Drain the queue.

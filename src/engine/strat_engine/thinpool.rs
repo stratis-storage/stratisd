@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use devicemapper as dm;
 use devicemapper::{DM, DataBlocks, DmDevice, DmName, IEC, LinearDev, MetaBlocks, Sectors, Segment,
-                   ThinDev, ThinDevId, ThinPoolDev, ThinPoolWorkingStatus, device_exists};
+                   ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatusSummary, device_exists};
 
 use super::super::engine::{Filesystem, HasName};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -263,24 +263,21 @@ impl ThinPool {
         #![allow(match_same_arms)]
         let thinpool: dm::ThinPoolStatus = self.thin_pool.status(dm)?;
         match thinpool {
-            dm::ThinPoolStatus::Good(wstatus, usage) => {
-                match wstatus {
-                    ThinPoolWorkingStatus::Good => {}
-                    ThinPoolWorkingStatus::ReadOnly => {
+            dm::ThinPoolStatus::Working(ref status) => {
+                match status.summary {
+                    ThinPoolStatusSummary::Good => {}
+                    ThinPoolStatusSummary::ReadOnly => {
                         // TODO: why is pool r/o and how do we get it
                         // rw again?
                     }
-                    ThinPoolWorkingStatus::OutOfSpace => {
+                    ThinPoolStatusSummary::OutOfSpace => {
                         // TODO: Add more space if possible, or
                         // prevent further usage
                         // Should never happen -- we should be extending first!
                     }
-                    ThinPoolWorkingStatus::NeedsCheck => {
-                        // TODO: Take pool offline?
-                        // TODO: run thin_check
-                    }
                 }
 
+                let usage = &status.usage;
                 if usage.used_meta > usage.total_meta - META_LOWATER {
                     // TODO: Extend meta device
                 }
@@ -400,7 +397,7 @@ impl ThinPool {
     // in use on the data device.
     pub fn total_physical_used(&self) -> EngineResult<Sectors> {
         let data_dev_used = match self.thin_pool.status(&DM::new()?)? {
-            dm::ThinPoolStatus::Good(_, usage) => *usage.used_data * DATA_BLOCK_SIZE,
+            dm::ThinPoolStatus::Working(ref status) => *status.usage.used_data * DATA_BLOCK_SIZE,
             _ => {
                 let err_msg = "thin pool failed, could not obtain usage";
                 return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));

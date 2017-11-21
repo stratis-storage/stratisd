@@ -5,15 +5,10 @@
 macro_rules! calculate_redundancy {
     ( $redundancy:ident ) => {
         match $redundancy {
-            None => Redundancy::NONE,
+            None | Some(0) => Redundancy::NONE,
             Some(n) => {
-                match Redundancy::iter_variants().nth(n as usize) {
-                    None => {
-                        let message = format!("code {} does not correspond to any redundancy", n);
-                        return Err(EngineError::Engine(ErrorEnum::Error, message));
-                    }
-                    Some(r) => r
-                }
+                let message = format!("code {} does not correspond to any redundancy", n);
+                return Err(EngineError::Engine(ErrorEnum::Error, message));
             }
         }
     }

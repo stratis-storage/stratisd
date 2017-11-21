@@ -14,10 +14,8 @@ use uuid::Uuid;
 
 use engine::Engine;
 
-custom_derive! {
-    #[derive(Copy, Clone, EnumDisplay,
-             IterVariants(StratisDBusErrorVariants),
-             IterVariantNames(StratisDBusErrorVariantNames))]
+macro_attr! {
+    #[derive(Clone, Copy)]
     #[allow(non_camel_case_types)]
     pub enum DbusErrorEnum {
         OK,

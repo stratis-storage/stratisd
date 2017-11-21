@@ -26,9 +26,8 @@ pub enum BlockDevState {
 }
 
 /// Redundancy classifications which the engine allows for pools.
-custom_derive! {
-    #[derive(Debug, Eq, PartialEq, EnumDisplay,
-             IterVariants(RedundancyVariants))]
+macro_attr! {
+    #[derive(Debug, Eq, PartialEq)]
     #[allow(non_camel_case_types)]
     /// Redundancy specification for a pool.
     pub enum Redundancy {

@@ -15,7 +15,7 @@ use uuid::Uuid;
 use engine::Engine;
 
 macro_attr! {
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, Debug)]
     #[allow(non_camel_case_types)]
     pub enum DbusErrorEnum {
         OK,

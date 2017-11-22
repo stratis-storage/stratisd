@@ -8,7 +8,7 @@ dependencies = [
  "clippy 0.0.174 (registry+https://github.com/rust-lang/crates.io-index)",
  "crc 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "dbus 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "devicemapper 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "devicemapper 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "error-chain 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.31 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -165,11 +165,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "custom_derive"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
 name = "dbghelp-sys"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -189,15 +184,15 @@ dependencies = [
 
 [[package]]
 name = "devicemapper"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitflags 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "custom_derive 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "error-chain 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.31 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "macro-attr 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "newtype_derive 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "nix 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -757,10 +752,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum clippy 0.0.174 (registry+https://github.com/rust-lang/crates.io-index)" = "1b03ded6eba74b16dbeb598be58e874bc72f6cf12f7ccc577b328091e1d4392a"
 "checksum clippy_lints 0.0.174 (registry+https://github.com/rust-lang/crates.io-index)" = "9b8e508648d6d41040e0061f45fc5562b3af5c8a7d67853f15841fb531c8e984"
 "checksum crc 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bc1914fae6f18ae347320f0ba5e4fc270e17c037ea621fe41ec7e8adf67d11b0"
-"checksum custom_derive 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "ef8ae57c4978a2acd8b869ce6b9ca1dfe817bff704c220209fdef2c0b75a01b9"
 "checksum dbghelp-sys 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "97590ba53bcb8ac28279161ca943a924d1fd4a8fb3fa63302591647c4fc5b850"
 "checksum dbus 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "796755704353dc297bf81c1461b17244d3d1c6fb018e0fb3f43f3223555118f5"
-"checksum devicemapper 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)" = "30c22c89a127f41c200830bb295cbf7bbe9055f9807a8ce0b7ad72d302433f67"
+"checksum devicemapper 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)" = "16236bd4b74984105b9ee5b7e4217b66ad9a64bfdddca7d0c2673583f22efcdc"
 "checksum dtoa 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "80c8b71fd71146990a9742fc06dcbbde19161a267e0ad4e572c35162f4578c90"
 "checksum either 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "18785c1ba806c258137c937e44ada9ee7e69a37e3c72077542cd2f069d78562a"
 "checksum env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "15abd780e45b3ea4f76b4e9a26ff4843258dd8a3eed2775a0e7368c2e7936c2f"

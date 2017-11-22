@@ -6,6 +6,7 @@ extern crate serde_json;
 
 use std::cmp;
 use std::fs::OpenOptions;
+use std::panic;
 use std::path::{Path, PathBuf};
 
 use serde_json::{Value, from_reader};
@@ -25,7 +26,6 @@ impl RealTestDev {
     /// Construct a new test device for the given path.
     /// Wipe initial MiB to clear metadata.
     pub fn new(path: &Path) -> RealTestDev {
-        clean_up();
         wipe_sectors(path, Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
         RealTestDev { path: PathBuf::from(path) }
     }
@@ -38,7 +38,6 @@ impl RealTestDev {
 
 impl Drop for RealTestDev {
     fn drop(&mut self) {
-        clean_up();
         wipe_sectors(&self.path, Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
     }
 }
@@ -90,7 +89,7 @@ fn get_device_counts(limits: DeviceLimits, avail: usize) -> Vec<usize> {
 /// in multiple invocations of the test, with differing numbers of block
 /// devices.
 pub fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
-    where F: Fn(&[&Path]) -> ()
+    where F: Fn(&[&Path]) -> () + panic::RefUnwindSafe
 {
     let file = OpenOptions::new()
         .read(true)
@@ -118,6 +117,14 @@ pub fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
 
     for run_paths in runs {
         let devices: Vec<_> = run_paths.iter().map(|x| RealTestDev::new(x)).collect();
-        test(&devices.iter().map(|x| x.as_path()).collect::<Vec<_>>());
+
+        clean_up().unwrap();
+
+        let result =
+            panic::catch_unwind(|| test(&devices.iter().map(|x| x.as_path()).collect::<Vec<_>>()));
+        let tear_down = clean_up();
+
+        result.unwrap();
+        tear_down.unwrap();
     }
 }

@@ -24,6 +24,10 @@ extern crate serde_json;
 extern crate log;
 
 #[cfg(test)]
+#[macro_use]
+extern crate error_chain;
+
+#[cfg(test)]
 extern crate quickcheck;
 
 pub mod engine;

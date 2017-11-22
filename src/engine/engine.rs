@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::fmt::Debug;
+use std::os::unix::io::RawFd;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
@@ -172,4 +173,22 @@ pub trait Engine: Debug {
 
     /// Get all pools belonging to this engine.
     fn pools(&self) -> Vec<&Pool>;
+
+    /// If the engine would like to include an event in the message loop, it
+    /// may return an Eventable from this method.
+    fn get_eventable(&mut self) -> EngineResult<Option<Box<Eventable>>>;
+
+    /// Notify the engine that an event has occurred on the Eventable.
+    fn evented(&mut self) -> EngineResult<()>;
+}
+
+/// Allows an Engine to include a fd in the event loop. See
+/// Engine::get_eventable() and Engine::evented().
+pub trait Eventable {
+    /// Get fd the engine would like to monitor for activity
+    fn get_pollable_fd(&mut self) -> RawFd;
+
+    /// Assuming level-triggered semantics, clear the event that caused the
+    /// Eventable to trigger.
+    fn clear_event(&mut self) -> EngineResult<()>;
 }

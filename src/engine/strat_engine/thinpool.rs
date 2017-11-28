@@ -26,6 +26,7 @@ use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, ThinRole, format_fl
 use super::filesystem::{FilesystemStatus, StratFilesystem};
 use super::mdv::MetadataVol;
 use super::serde_structs::{FilesystemSave, FlexDevsSave, Recordable, ThinPoolDevSave};
+use super::util::execute_cmd;
 
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
@@ -589,11 +590,11 @@ fn setup_metadev(dm: &DM,
         // TODO: Refine policy about failure to run thin_check.
         // If, e.g., thin_check is unavailable, that doesn't necessarily
         // mean that data is corrupted.
-        if !Command::new("thin_check")
-                .arg("-q")
-                .arg(&meta_dev.devnode())
-                .status()?
-                .success() {
+        if !execute_cmd(Command::new("thin_check")
+                            .arg("-q")
+                            .arg(&meta_dev.devnode()),
+                        &format!("thin_check failed for pool {}", thinpool_name))
+                    .is_ok() {
             meta_dev = attempt_thin_repair(pool_uuid, dm, meta_dev, &spare_segments)?;
             return Ok((meta_dev, spare_segments, meta_segments));
         }
@@ -615,17 +616,12 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
                                             None,
                                             &map_to_dm(spare_segments))?;
 
-
-    if !Command::new("thin_repair")
-            .arg("-i")
-            .arg(&meta_dev.devnode())
-            .arg("-o")
-            .arg(&new_meta_dev.devnode())
-            .status()?
-            .success() {
-        return Err(EngineError::Engine(ErrorEnum::Error,
-                                       "thin_repair failed, pool unusable".into()));
-    }
+    execute_cmd(Command::new("thin_repair")
+                    .arg("-i")
+                    .arg(&meta_dev.devnode())
+                    .arg("-o")
+                    .arg(&new_meta_dev.devnode()),
+                &format!("thin_repair failed, pool ({:?}) unusable", pool_uuid))?;
 
     let name = meta_dev.name().to_owned();
     meta_dev.teardown(dm)?;

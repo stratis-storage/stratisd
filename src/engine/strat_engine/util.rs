@@ -30,27 +30,27 @@ pub fn execute_cmd(cmd: &mut Command, error_msg: &str) -> EngineResult<()> {
 
 /// Create a filesystem on devnode.
 pub fn create_fs(devnode: &Path, uuid: Uuid) -> EngineResult<()> {
-    return execute_cmd(Command::new("mkfs.xfs")
-                           .arg("-f")
-                           .arg("-q")
-                           .arg(&devnode)
-                           .arg("-m")
-                           .arg(format!("uuid={}", uuid)),
-                       &format!("Failed to create new filesystem at {:?}", devnode));
+    execute_cmd(Command::new("mkfs.xfs")
+                    .arg("-f")
+                    .arg("-q")
+                    .arg(&devnode)
+                    .arg("-m")
+                    .arg(format!("uuid={}", uuid)),
+                &format!("Failed to create new filesystem at {:?}", devnode))
 }
 
 /// Use the xfs_growfs command to expand a filesystem mounted at the given
 /// mount point.
 pub fn xfs_growfs(mount_point: &Path) -> EngineResult<()> {
-    return execute_cmd(Command::new("xfs_growfs").arg(mount_point).arg("-d"),
-                       &format!("Failed to expand filesystem {:?}", mount_point));
+    execute_cmd(Command::new("xfs_growfs").arg(mount_point).arg("-d"),
+                &format!("Failed to expand filesystem {:?}", mount_point))
 }
 
 /// Set a new UUID for filesystem on the devnode.
 pub fn set_uuid(devnode: &Path, uuid: Uuid) -> EngineResult<()> {
-    return execute_cmd(Command::new("xfs_admin")
-                           .arg("-U")
-                           .arg(format!("{}", uuid))
-                           .arg(&devnode),
-                       &format!("Failed to set UUID for filesystem {:?}", devnode));
+    execute_cmd(Command::new("xfs_admin")
+                    .arg("-U")
+                    .arg(format!("{}", uuid))
+                    .arg(&devnode),
+                &format!("Failed to set UUID for filesystem {:?}", devnode))
 }

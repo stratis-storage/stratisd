@@ -14,6 +14,7 @@ use super::super::structures::Table;
 use super::super::types::{DevUuid, PoolUuid, Redundancy, RenameAction};
 
 use super::cleanup::teardown_pools;
+use super::devlinks;
 use super::pool::StratPool;
 use super::setup::find_all;
 
@@ -79,10 +80,14 @@ impl StratEngine {
             }
         }
 
-        Ok(StratEngine {
-               pools: table,
-               watched_dev_last_event_nrs: HashMap::new(),
-           })
+        let engine = StratEngine {
+            pools: table,
+            watched_dev_last_event_nrs: HashMap::new(),
+        };
+
+        devlinks::setup_devlinks(engine.pools().into_iter())?;
+
+        Ok(engine)
     }
 
     /// Teardown Stratis, preparatory to a shutdown.
@@ -113,12 +118,29 @@ impl Engine for StratEngine {
         let pool = StratPool::initialize(name, &dm, blockdev_paths, redundancy, force)?;
 
         let uuid = pool.uuid();
+        devlinks::pool_added(pool.name())?;
         self.pools.insert(pool);
+
         Ok(uuid)
     }
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool> {
-        destroy_pool!{self; uuid}
+        if let Some(pool) = self.pools.get_by_uuid(uuid) {
+            if pool.has_filesystems() {
+                return Err(EngineError::Engine(ErrorEnum::Busy,
+                                               "filesystems remaining on pool".into()));
+            };
+        } else {
+            return Ok(false);
+        }
+
+        let pool = self.pools
+            .remove_by_uuid(uuid)
+            .expect("Must succeed since self.pools.get_by_uuid() returned a value");
+        let pool_name = pool.name().to_owned();
+        pool.destroy()?;
+        devlinks::pool_removed(&pool_name)?;
+        Ok(true)
     }
 
     fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> EngineResult<RenameAction> {
@@ -135,6 +157,7 @@ impl Engine for StratEngine {
             Err(err)
         } else {
             self.pools.insert(pool);
+            devlinks::pool_renamed(&old_name, new_name)?;
             Ok(RenameAction::Renamed)
         }
     }

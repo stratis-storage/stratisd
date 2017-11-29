@@ -59,7 +59,19 @@ impl Engine for SimEngine {
     }
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool> {
-        destroy_pool!{self; uuid}
+        if let Some(pool) = self.pools.get_by_uuid(uuid) {
+            if pool.has_filesystems() {
+                return Err(EngineError::Engine(ErrorEnum::Busy,
+                                               "filesystems remaining on pool".into()));
+            };
+        } else {
+            return Ok(false);
+        }
+        self.pools
+            .remove_by_uuid(uuid)
+            .expect("Must succeed since self.pool.get_by_uuid() returned a value")
+            .destroy()?;
+        Ok(true)
     }
 
     fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> EngineResult<RenameAction> {

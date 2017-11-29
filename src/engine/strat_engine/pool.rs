@@ -161,9 +161,11 @@ impl Pool for StratPool {
 
         // TODO: Roll back on filesystem initialization failure.
         let dm = DM::new()?;
+        let pool_name = self.name().to_owned();
         let mut result = Vec::new();
         for (name, size) in names {
-            let fs_uuid = self.thin_pool.create_filesystem(name, &dm, size)?;
+            let fs_uuid = self.thin_pool
+                .create_filesystem(&pool_name, name, &dm, size)?;
             result.push((name, fs_uuid));
         }
 
@@ -189,7 +191,8 @@ impl Pool for StratPool {
 
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
-            self.thin_pool.destroy_filesystem(&dm, uuid)?;
+            self.thin_pool
+                .destroy_filesystem(&dm, &self.name, uuid)?;
             removed.push(uuid);
         }
 
@@ -200,7 +203,8 @@ impl Pool for StratPool {
                          uuid: FilesystemUuid,
                          new_name: &str)
                          -> EngineResult<RenameAction> {
-        self.thin_pool.rename_filesystem(uuid, new_name)
+        self.thin_pool
+            .rename_filesystem(&self.name, uuid, new_name)
     }
 
     fn rename(&mut self, name: &str) {
@@ -225,8 +229,9 @@ impl Pool for StratPool {
                            origin_uuid: FilesystemUuid,
                            snapshot_name: &str)
                            -> EngineResult<FilesystemUuid> {
+        let pool_name = self.name().to_owned();
         self.thin_pool
-            .snapshot_filesystem(&DM::new()?, origin_uuid, snapshot_name)
+            .snapshot_filesystem(&DM::new()?, &pool_name, origin_uuid, snapshot_name)
     }
 
     fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<&Filesystem> {

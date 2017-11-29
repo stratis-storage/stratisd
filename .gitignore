@@ -10,3 +10,4 @@ target
 .project 
 .settings
 tests/test_config.json
+.testing

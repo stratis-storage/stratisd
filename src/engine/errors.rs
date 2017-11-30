@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+extern crate libudev;
+
 use std::io;
 use std::fmt;
 use std::error;
@@ -32,6 +34,7 @@ pub enum EngineError {
     Utf8(str::Utf8Error),
     Serde(serde_json::error::Error),
     DM(devicemapper::DmError),
+    Udev(libudev::Error),
 }
 
 impl fmt::Display for EngineError {
@@ -44,6 +47,7 @@ impl fmt::Display for EngineError {
             EngineError::Utf8(ref err) => write!(f, "Utf8 error: {}", err),
             EngineError::Serde(ref err) => write!(f, "Serde error: {}", err),
             EngineError::DM(ref err) => write!(f, "DM error: {}", err),
+            EngineError::Udev(ref err) => write!(f, "udev error: {}", err),
         }
     }
 }
@@ -58,6 +62,7 @@ impl error::Error for EngineError {
             EngineError::Utf8(ref err) => err.description(),
             EngineError::Serde(ref err) => err.description(),
             EngineError::DM(ref err) => err.description(),
+            EngineError::Udev(ref err) => err.description(),
         }
     }
 }
@@ -97,5 +102,11 @@ impl From<serde_json::error::Error> for EngineError {
 impl From<devicemapper::DmError> for EngineError {
     fn from(err: devicemapper::DmError) -> EngineError {
         EngineError::DM(err)
+    }
+}
+
+impl From<libudev::Error> for EngineError {
+    fn from(err: libudev::Error) -> EngineError {
+        EngineError::Udev(err)
     }
 }

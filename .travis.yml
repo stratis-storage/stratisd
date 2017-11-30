@@ -4,7 +4,8 @@ group: edge
 addons:
     apt:
         packages:
-            libdbus-1-dev
+          - libdbus-1-dev
+          - libudev-dev
 
 language: rust
 

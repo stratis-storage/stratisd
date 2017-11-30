@@ -25,6 +25,7 @@ use super::engine::DevOwnership;
 use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};
 use super::range_alloc::RangeAllocator;
 use super::serde_structs::{BlockDevSave, Recordable};
+use super::util::hw_lookup;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 const MAX_NUM_TO_WRITE: usize = 10;
@@ -364,8 +365,11 @@ fn initialize(pool_uuid: PoolUuid,
             let allocator = RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())])
                 .expect("bda.size() < bda.dev_size() and single range");
 
-            // TODO: support getting hw info and passing in here. See #615
-            bds.push(StratBlockDev::new(dev, devnode.to_owned(), bda, allocator, None, None));
+            let hw_id = match hw_lookup(devnode) {
+                Ok(id) => id,
+                Err(_) => None,  // TODO: Log this failure so that it can be addressed.
+            };
+            bds.push(StratBlockDev::new(dev, devnode.to_owned(), bda, allocator, None, hw_id));
         } else {
             // TODO: check the return values and update state machine on failure
             let _ = BDA::wipe(&mut f);

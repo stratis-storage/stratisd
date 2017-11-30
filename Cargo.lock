@@ -1,6 +1,6 @@
 [root]
 name = "libstratis"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "byteorder 0.3.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",

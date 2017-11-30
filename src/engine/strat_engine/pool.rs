@@ -21,7 +21,7 @@ use super::blockdevmgr::BlockDevMgr;
 use super::metadata::MIN_MDA_SECTORS;
 use super::serde_structs::{PoolSave, Recordable};
 use super::setup::{get_blockdevs, get_metadata};
-use super::thinpool::ThinPool;
+use super::thinpool::{ThinPool, ThinPoolSizeParams};
 
 pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
 
@@ -48,7 +48,12 @@ impl StratPool {
 
         let mut block_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
 
-        let thinpool = ThinPool::new(pool_uuid, dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut block_mgr);
+        let thinpool = ThinPool::new(pool_uuid,
+                                     dm,
+                                     &ThinPoolSizeParams::default(),
+                                     DATA_BLOCK_SIZE,
+                                     DATA_LOWATER,
+                                     &mut block_mgr);
         let thinpool = match thinpool {
             Ok(thinpool) => thinpool,
             Err(err) => {

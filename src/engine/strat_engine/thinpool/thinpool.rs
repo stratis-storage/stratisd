@@ -40,6 +40,37 @@ pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
 const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 
 
+pub struct ThinPoolSizeParams {
+    meta_size: MetaBlocks,
+    data_size: DataBlocks,
+    mdv_size: Sectors,
+}
+
+impl ThinPoolSizeParams {
+    /// The number of Sectors in the MetaBlocks.
+    pub fn meta_size(&self) -> Sectors {
+        self.meta_size.sectors()
+    }
+    /// The number of Sectors in the DataBlocks.
+    pub fn data_size(&self) -> Sectors {
+        *self.data_size * DATA_BLOCK_SIZE
+    }
+    /// MDV size
+    pub fn mdv_size(&self) -> Sectors {
+        self.mdv_size
+    }
+}
+
+impl Default for ThinPoolSizeParams {
+    fn default() -> ThinPoolSizeParams {
+        ThinPoolSizeParams {
+            meta_size: INITIAL_META_SIZE,
+            data_size: INITIAL_DATA_SIZE,
+            mdv_size: INITIAL_MDV_SIZE,
+        }
+    }
+}
+
 /// A ThinPool struct contains the thinpool itself, the spare
 /// segments for its metadata device, and the filesystems and filesystem
 /// metadata associated with it.
@@ -60,15 +91,16 @@ impl ThinPool {
     /// Make a new thin pool.
     pub fn new(pool_uuid: PoolUuid,
                dm: &DM,
+               thin_pool_size: &ThinPoolSizeParams,
                data_block_size: Sectors,
                low_water_mark: DataBlocks,
                block_mgr: &mut BlockDevMgr)
                -> EngineResult<ThinPool> {
         let mut segments_list =
-            match block_mgr.alloc_space(&[ThinPool::initial_metadata_size(),
-                                          ThinPool::initial_metadata_size(),
-                                          ThinPool::initial_data_size(),
-                                          ThinPool::initial_mdv_size()]) {
+            match block_mgr.alloc_space(&[thin_pool_size.meta_size(),
+                                          thin_pool_size.meta_size(),
+                                          thin_pool_size.data_size(),
+                                          thin_pool_size.mdv_size()]) {
                 Some(sl) => sl,
                 None => {
                     let err_msg = "Could not allocate sufficient space for thinpool devices.";
@@ -93,9 +125,7 @@ impl ThinPool {
                                         &format_flex_name(pool_uuid, FlexRole::ThinMeta),
                                         None,
                                         &map_to_dm(&meta_segments))?;
-        wipe_sectors(&meta_dev.devnode(),
-                     Sectors(0),
-                     ThinPool::initial_metadata_size())?;
+        wipe_sectors(&meta_dev.devnode(), Sectors(0), thin_pool_size.meta_size())?;
 
         let data_dev = LinearDev::setup(dm,
                                         &format_flex_name(pool_uuid, FlexRole::ThinData),
@@ -243,20 +273,6 @@ impl ThinPool {
            })
     }
 
-    /// Initial size for a pool's meta data device.
-    fn initial_metadata_size() -> Sectors {
-        INITIAL_META_SIZE.sectors()
-    }
-
-    /// Initial size for a pool's data device.
-    fn initial_data_size() -> Sectors {
-        *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE
-    }
-
-    /// Initial size for a pool's filesystem metadata volume.
-    fn initial_mdv_size() -> Sectors {
-        INITIAL_MDV_SIZE
-    }
 
     /// Run status checks and take actions on the thinpool and its components.
     pub fn check(&mut self, dm: &DM, bd_mgr: &mut BlockDevMgr) -> EngineResult<()> {
@@ -654,8 +670,13 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
-        let mut pool = ThinPool::new(pool_uuid, &dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut mgr)
-            .unwrap();
+        let mut pool = ThinPool::new(pool_uuid,
+                                     &dm,
+                                     &ThinPoolSizeParams::default(),
+                                     DATA_BLOCK_SIZE,
+                                     DATA_LOWATER,
+                                     &mut mgr)
+                .unwrap();
 
         let fs_uuid = pool.create_filesystem("stratis_test_filesystem", &dm, None)
             .unwrap();
@@ -738,8 +759,13 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
-        let mut pool = ThinPool::new(pool_uuid, &dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut mgr)
-            .unwrap();
+        let mut pool = ThinPool::new(pool_uuid,
+                                     &dm,
+                                     &ThinPoolSizeParams::default(),
+                                     DATA_BLOCK_SIZE,
+                                     DATA_LOWATER,
+                                     &mut mgr)
+                .unwrap();
 
         let fs_uuid = pool.create_filesystem(&name1, &dm, None).unwrap();
 
@@ -777,8 +803,13 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
-        let mut pool = ThinPool::new(pool_uuid, &dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut mgr)
-            .unwrap();
+        let mut pool = ThinPool::new(pool_uuid,
+                                     &dm,
+                                     &ThinPoolSizeParams::default(),
+                                     DATA_BLOCK_SIZE,
+                                     DATA_LOWATER,
+                                     &mut mgr)
+                .unwrap();
 
         let fs_uuid = pool.create_filesystem("fsname", &dm, None).unwrap();
 
@@ -828,8 +859,13 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
-        let mut pool = ThinPool::new(pool_uuid, &dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut mgr)
-            .unwrap();
+        let mut pool = ThinPool::new(pool_uuid,
+                                     &dm,
+                                     &ThinPoolSizeParams::default(),
+                                     DATA_BLOCK_SIZE,
+                                     DATA_LOWATER,
+                                     &mut mgr)
+                .unwrap();
         let fs_name = "stratis_test_filesystem";
         let fs_uuid = pool.create_filesystem(&fs_name, &dm, None).unwrap();
         let thin_id = pool.get_filesystem_by_uuid(fs_uuid).unwrap().thin_id();
@@ -887,8 +923,13 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
-        let mut pool = ThinPool::new(pool_uuid, &dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut mgr)
-            .unwrap();
+        let mut pool = ThinPool::new(pool_uuid,
+                                     &dm,
+                                     &ThinPoolSizeParams::default(),
+                                     DATA_BLOCK_SIZE,
+                                     DATA_LOWATER,
+                                     &mut mgr)
+                .unwrap();
         let fs_name = "stratis_test_filesystem";
         let fs_uuid = pool.create_filesystem(&fs_name, &dm, None).unwrap();
 
@@ -932,8 +973,13 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
-        let mut pool = ThinPool::new(pool_uuid, &dm, DATA_BLOCK_SIZE, DATA_LOWATER, &mut mgr)
-            .unwrap();
+        let mut pool = ThinPool::new(pool_uuid,
+                                     &dm,
+                                     &ThinPoolSizeParams::default(),
+                                     DATA_BLOCK_SIZE,
+                                     DATA_LOWATER,
+                                     &mut mgr)
+                .unwrap();
 
         // Create a filesytem as small as possible.  Allocate 1 MiB bigger than
         // the low water mark.

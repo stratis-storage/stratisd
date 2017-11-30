@@ -9,4 +9,5 @@ mod mdv;
 mod thinpool;
 mod util;
 
-pub use self::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE, ThinPool};
+pub use self::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE, ThinPool,
+                         ThinPoolSizeParams};

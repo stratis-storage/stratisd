@@ -254,7 +254,7 @@ impl ThinPool {
         let mut fs_table = Table::default();
         for fs in filesystems {
             let evicted = fs_table.insert(fs);
-            if !evicted.is_empty() {
+            if evicted.is_some() {
                 let err_msg = "filesystems with duplicate UUID or name specified in metadata";
                 return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
             }
@@ -332,7 +332,7 @@ impl ThinPool {
 
         let filesystems = self.filesystems
             .borrow_mut()
-            .into_iter()
+            .iter_mut()
             .map(|fs| fs.check(dm))
             .collect::<EngineResult<Vec<_>>>()?;
 
@@ -349,7 +349,7 @@ impl ThinPool {
     pub fn teardown(self, dm: &DM) -> EngineResult<()> {
         // Must succeed in tearing down all filesystems before the
         // thinpool..
-        for fs in self.filesystems.empty() {
+        for fs in self.filesystems {
             fs.teardown(dm)?;
         }
         self.thin_pool.teardown(dm)?;
@@ -475,7 +475,7 @@ impl ThinPool {
 
     pub fn filesystems(&self) -> Vec<&Filesystem> {
         self.filesystems
-            .into_iter()
+            .iter()
             .map(|x| x as &Filesystem)
             .collect()
     }

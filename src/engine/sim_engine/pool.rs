@@ -166,7 +166,7 @@ impl Pool for SimPool {
 
     fn filesystems(&self) -> Vec<&Filesystem> {
         self.filesystems
-            .into_iter()
+            .iter()
             .map(|x| x as &Filesystem)
             .collect()
     }

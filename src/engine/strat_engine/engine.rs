@@ -85,9 +85,9 @@ impl StratEngine {
             match StratPool::setup(&dm, *pool_uuid, devices) {
                 Ok(pool) => {
                     let evicted = table.insert(pool);
-                    if !evicted.is_empty() {
+                    if evicted.is_some() {
                         // TODO: update state machine on failure.
-                        let _ = teardown_pools(table.empty());
+                        let _ = teardown_pools(table);
                         let err_msg = "found two pools with the same name";
                         return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
                     }
@@ -112,7 +112,7 @@ impl StratEngine {
 
     /// Teardown Stratis, preparatory to a shutdown.
     pub fn teardown(self) -> EngineResult<()> {
-        teardown_pools(self.pools.empty())
+        teardown_pools(self.pools)
     }
 }
 
@@ -262,7 +262,7 @@ impl Engine for StratEngine {
     }
 
     fn pools(&self) -> Vec<&Pool> {
-        self.pools.into_iter().map(|x| x as &Pool).collect()
+        self.pools.iter().map(|x| x as &Pool).collect()
     }
 
     fn get_eventable(&mut self) -> EngineResult<Option<Box<Eventable>>> {

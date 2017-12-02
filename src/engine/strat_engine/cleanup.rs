@@ -6,6 +6,7 @@
 
 use super::super::engine::HasUuid;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::structures::Table;
 
 use super::blockdev::StratBlockDev;
 use super::pool::StratPool;
@@ -32,7 +33,7 @@ pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> EngineResult<()> {
 }
 
 /// Teardown pools.
-pub fn teardown_pools(pools: Vec<StratPool>) -> EngineResult<()> {
+pub fn teardown_pools(pools: Table<StratPool>) -> EngineResult<()> {
     let mut untorndown_pools = Vec::new();
     for pool in pools {
         let pool_uuid = pool.uuid();

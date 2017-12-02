@@ -118,7 +118,7 @@ impl Engine for SimEngine {
     }
 
     fn pools(&self) -> Vec<&Pool> {
-        self.pools.into_iter().map(|x| x as &Pool).collect()
+        self.pools.iter().map(|x| x as &Pool).collect()
     }
 
     fn get_eventable(&mut self) -> EngineResult<Option<Box<Eventable>>> {

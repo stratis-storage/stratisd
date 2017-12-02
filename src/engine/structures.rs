@@ -363,4 +363,48 @@ mod tests {
         assert_eq!(t.get_by_name(&name).unwrap().stuff, thing_key2);
         assert_eq!(t.len(), 1);
     }
+
+    #[test]
+    /// Insert a thing and then insert another thing with the same uuid.
+    /// The previously inserted thing should be returned.
+    fn insert_same_uuid() {
+        let mut t: Table<TestThing> = Table::default();
+        table_invariant(&t);
+
+        let uuid = Uuid::new_v4();
+        let name = "name";
+        let thing = TestThing::new(&name, uuid);
+        let thing_key = thing.stuff;
+
+        // There was nothing in the table before, so displaced is empty.
+        let displaced = t.insert(thing);
+        table_invariant(&t);
+        assert!(displaced.is_empty());
+
+        // t now contains thing.
+        assert!(t.contains_name(&name));
+        assert!(t.contains_uuid(uuid));
+
+        // Insert new item with different UUID.
+        let name2 = "name2";
+        let thing2 = TestThing::new(&name2, uuid);
+        let thing_key2 = thing2.stuff;
+        let displaced = t.insert(thing2);
+        table_invariant(&t);
+
+        // The items displaced consist exactly of the first item.
+        assert_eq!(displaced.len(), 1);
+        let ref displaced_item = displaced[0];
+        assert_eq!(displaced_item.name(), name);
+        assert_eq!(displaced_item.uuid(), uuid);
+        assert_eq!(displaced_item.stuff, thing_key);
+
+        // The table contains the new item and has no memory of the old.
+        assert!(t.contains_uuid(uuid));
+        assert!(t.contains_name(name2));
+        assert!(!t.contains_name(name));
+        assert_eq!(t.get_by_uuid(uuid).unwrap().stuff, thing_key2);
+        assert_eq!(t.get_by_name(&name2).unwrap().stuff, thing_key2);
+        assert_eq!(t.len(), 1);
+    }
 }

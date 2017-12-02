@@ -134,7 +134,7 @@ impl Engine for StratEngine {
         let pool = StratPool::initialize(&dm, name, blockdev_paths, redundancy, force)?;
 
         let uuid = pool.uuid();
-        devlinks::pool_added(pool.name())?;
+        devlinks::pool_added(&*pool.name())?;
         self.pools.insert(pool);
 
         Ok(uuid)
@@ -173,7 +173,7 @@ impl Engine for StratEngine {
                     //
                     // We will also _not_ exit the daemon as we do in initialize as we were
                     // previously up and running for some duration of time.
-                    if !self.pools.contains_name(pool.name()) {
+                    if !self.pools.contains_name(&*pool.name()) {
                         self.pools.insert(pool);
                         Some(pool_uuid)
                     } else {
@@ -313,7 +313,7 @@ mod test {
         engine.teardown().unwrap();
 
         let engine = StratEngine::initialize().unwrap();
-        let pool_name: String = engine.get_pool(uuid1).unwrap().name().into();
+        let pool_name: String = engine.get_pool(uuid1).unwrap().name().to_owned();
         assert_eq!(pool_name, name2);
     }
 

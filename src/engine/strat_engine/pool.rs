@@ -14,6 +14,7 @@ use devicemapper::{DM, Device, DmName, DmNameBuf, Sectors};
 
 use super::super::engine::{BlockDev, Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::structures::Name;
 use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, Redundancy, RenameAction};
 
 use super::blockdevmgr::BlockDevMgr;
@@ -26,7 +27,7 @@ pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
 
 #[derive(Debug)]
 pub struct StratPool {
-    name: String,
+    name: Name,
     pool_uuid: PoolUuid,
     block_devs: BlockDevMgr,
     redundancy: Redundancy,
@@ -62,7 +63,7 @@ impl StratPool {
         };
 
         let mut pool = StratPool {
-            name: name.to_owned(),
+            name: Name::new(name.to_owned()),
             pool_uuid,
             block_devs: block_mgr,
             redundancy,
@@ -93,7 +94,7 @@ impl StratPool {
                                        &bd_mgr)?;
 
         Ok(StratPool {
-               name: metadata.name,
+               name: Name::new(metadata.name),
                pool_uuid: uuid,
                block_devs: bd_mgr,
                redundancy: Redundancy::NONE,
@@ -219,7 +220,7 @@ impl Pool for StratPool {
     }
 
     fn rename(&mut self, name: &str) {
-        self.name = name.to_owned();
+        self.name = Name::new(name.to_owned());
     }
 
     fn total_physical_size(&self) -> Sectors {
@@ -272,15 +273,15 @@ impl HasUuid for StratPool {
 }
 
 impl HasName for StratPool {
-    fn name(&self) -> &str {
-        &self.name
+    fn name(&self) -> Name {
+        self.name.clone()
     }
 }
 
 impl Recordable<PoolSave> for StratPool {
     fn record(&self) -> PoolSave {
         PoolSave {
-            name: self.name.clone(),
+            name: self.name.to_owned(),
             block_devs: self.block_devs.record(),
             flex_devs: self.thin_pool.record(),
             thinpool_dev: self.thin_pool.record(),

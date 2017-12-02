@@ -15,6 +15,7 @@ use tempdir::TempDir;
 
 use super::super::super::engine::{Filesystem, HasName, HasUuid};
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::structures::Name;
 use super::super::super::types::FilesystemUuid;
 
 use super::super::serde_structs::{FilesystemSave, Recordable};
@@ -27,8 +28,8 @@ pub const FILESYSTEM_LOWATER: Sectors = Sectors(256 * IEC::Mi / (SECTOR_SIZE as 
 
 #[derive(Debug)]
 pub struct StratFilesystem {
+    name: Name,
     fs_id: FilesystemUuid,
-    name: String,
     thin_dev: ThinDev,
 }
 
@@ -55,7 +56,7 @@ impl StratFilesystem {
     pub fn setup(fs_id: FilesystemUuid, name: &str, thin_dev: ThinDev) -> StratFilesystem {
         StratFilesystem {
             fs_id,
-            name: name.to_owned(),
+            name: Name::new(name.to_owned()),
             thin_dev,
         }
     }
@@ -189,7 +190,7 @@ impl StratFilesystem {
 
     /// Set the name of this filesystem to name.
     pub fn rename(&mut self, name: &str) {
-        self.name = name.to_owned();
+        self.name = Name::new(name.to_owned());
     }
 
     /// Destroy the filesystem.
@@ -200,8 +201,8 @@ impl StratFilesystem {
 }
 
 impl HasName for StratFilesystem {
-    fn name(&self) -> &str {
-        &self.name
+    fn name(&self) -> Name {
+        self.name.clone()
     }
 }
 
@@ -220,7 +221,7 @@ impl Filesystem for StratFilesystem {
 impl Recordable<FilesystemSave> for StratFilesystem {
     fn record(&self) -> FilesystemSave {
         FilesystemSave {
-            name: self.name.clone(),
+            name: self.name.to_owned(),
             uuid: self.fs_id,
             thin_id: self.thin_dev.id(),
             size: self.thin_dev.size(),

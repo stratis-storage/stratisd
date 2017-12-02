@@ -499,7 +499,9 @@ impl ThinPool {
 
         let new_filesystem = StratFilesystem::initialize(fs_uuid, name, thin_dev)?;
         self.mdv.save_fs(&new_filesystem)?;
-        devlinks::filesystem_added(pool_name, new_filesystem.name(), &new_filesystem.devnode())?;
+        devlinks::filesystem_added(pool_name,
+                                   &*new_filesystem.name(),
+                                   &new_filesystem.devnode())?;
         self.filesystems.insert(new_filesystem);
 
         Ok(fs_uuid)
@@ -534,7 +536,9 @@ impl ThinPool {
             }
         };
         self.mdv.save_fs(&new_filesystem)?;
-        devlinks::filesystem_added(pool_name, new_filesystem.name(), &new_filesystem.devnode())?;
+        devlinks::filesystem_added(pool_name,
+                                   &*new_filesystem.name(),
+                                   &new_filesystem.devnode())?;
         self.filesystems.insert(new_filesystem);
 
         Ok(snapshot_fs_uuid)
@@ -850,7 +854,8 @@ mod tests {
                                    &mgr)
                 .unwrap();
 
-        assert_eq!(pool.get_filesystem_by_uuid(fs_uuid).unwrap().name(), name2);
+        assert_eq!(&*pool.get_filesystem_by_uuid(fs_uuid).unwrap().name(),
+                   name2);
     }
 
     #[test]

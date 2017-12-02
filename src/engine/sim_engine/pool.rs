@@ -16,7 +16,7 @@ use devicemapper::{IEC, Sectors};
 
 use super::super::engine::{BlockDev, Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::structures::Table;
+use super::super::structures::{Name, Table};
 use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, Redundancy, RenameAction};
 
 use super::blockdev::SimDev;
@@ -25,7 +25,7 @@ use super::randomization::Randomizer;
 
 #[derive(Debug)]
 pub struct SimPool {
-    name: String,
+    name: Name,
     pool_uuid: PoolUuid,
     pub block_devs: HashMap<DevUuid, SimDev>,
     pub filesystems: Table<SimFilesystem>,
@@ -48,7 +48,7 @@ impl SimPool {
                      (bd.uuid(), bd)
                  });
         SimPool {
-            name: name.to_owned(),
+            name: Name::new(name.to_owned()),
             pool_uuid: Uuid::new_v4(),
             block_devs: HashMap::from_iter(device_pairs),
             filesystems: Table::default(),
@@ -151,7 +151,7 @@ impl Pool for SimPool {
     }
 
     fn rename(&mut self, name: &str) {
-        self.name = name.to_owned();
+        self.name = Name::new(name.to_owned());
     }
 
     fn total_physical_size(&self) -> Sectors {
@@ -212,8 +212,8 @@ impl HasUuid for SimPool {
 }
 
 impl HasName for SimPool {
-    fn name(&self) -> &str {
-        &self.name
+    fn name(&self) -> Name {
+        self.name.clone()
     }
 }
 

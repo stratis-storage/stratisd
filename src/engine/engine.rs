@@ -11,6 +11,8 @@ use uuid::Uuid;
 
 use devicemapper::{Device, Sectors};
 
+use super::structures::Name;
+
 use super::errors::EngineResult;
 use super::types::{BlockDevState, DevUuid, FilesystemUuid, PoolUuid, RenameAction};
 
@@ -19,7 +21,7 @@ pub trait HasUuid: Debug {
 }
 
 pub trait HasName: Debug {
-    fn name(&self) -> &str;
+    fn name(&self) -> Name;
 }
 
 pub trait Filesystem: HasName + HasUuid {

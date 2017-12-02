@@ -31,11 +31,11 @@ pub fn setup_devlinks<'a, I: Iterator<Item = &'a Pool>>(pools: I) -> EngineResul
         .collect::<Result<HashSet<_>, _>>()?;
 
     for pool in pools {
-        if !existing_dirs.remove(pool.name()) {
-            pool_added(pool.name())?;
+        if !existing_dirs.remove(&*pool.name()) {
+            pool_added(&*pool.name())?;
         }
 
-        let pool_path: PathBuf = vec![DEV_PATH, pool.name()].iter().collect();
+        let pool_path: PathBuf = vec![DEV_PATH, &*pool.name()].iter().collect();
 
         let mut existing_files = fs::read_dir(pool_path)?
             .map(|dir_e| {
@@ -44,12 +44,12 @@ pub fn setup_devlinks<'a, I: Iterator<Item = &'a Pool>>(pools: I) -> EngineResul
             .collect::<Result<HashSet<_>, _>>()?;
 
         for fs in pool.filesystems() {
-            filesystem_added(pool.name(), fs.name(), &fs.devnode())?;
-            existing_files.remove(fs.name());
+            filesystem_added(&*pool.name(), &*fs.name(), &fs.devnode())?;
+            existing_files.remove(&*fs.name());
         }
 
         for leftover in existing_files {
-            filesystem_removed(pool.name(), &leftover)?;
+            filesystem_removed(&*pool.name(), &leftover)?;
         }
     }
 

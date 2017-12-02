@@ -5,25 +5,27 @@
 use std::path::PathBuf;
 
 use super::super::engine::{Filesystem, HasName, HasUuid};
+use super::super::structures::Name;
 use super::super::types::FilesystemUuid;
+
 
 #[derive(Debug)]
 pub struct SimFilesystem {
     fs_id: FilesystemUuid,
-    name: String,
+    name: Name,
 }
 
 impl SimFilesystem {
     pub fn new(fs_id: FilesystemUuid, name: &str) -> SimFilesystem {
         SimFilesystem {
             fs_id,
-            name: name.to_owned(),
+            name: Name::new(name.to_owned()),
         }
     }
 
     /// Set the name of this filesystem to name.
     pub fn rename(&mut self, name: &str) {
-        self.name = name.to_owned();
+        self.name = Name::new(name.to_owned());
     }
 }
 
@@ -34,8 +36,8 @@ impl Filesystem for SimFilesystem {
 }
 
 impl HasName for SimFilesystem {
-    fn name(&self) -> &str {
-        &self.name
+    fn name(&self) -> Name {
+        self.name.clone()
     }
 }
 

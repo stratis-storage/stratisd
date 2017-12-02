@@ -5,17 +5,53 @@
 use std::collections::HashMap;
 use std::iter::IntoIterator;
 use std::slice::{Iter, IterMut};
+use std::rc::Rc;
+use std::borrow::Borrow;
+use std::ops::Deref;
+use std::fmt;
 
 use uuid::Uuid;
 
 use super::engine::{HasName, HasUuid};
 
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct Name(Rc<String>);
+
+impl Name {
+    pub fn new(name: String) -> Name {
+        Name(Rc::new(name))
+    }
+
+    pub fn to_owned(&self) -> String {
+        self.0.deref().to_owned()
+    }
+}
+
+impl Deref for Name {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Borrow<str> for Name {
+    fn borrow(&self) -> &str {
+        &**self.0
+    }
+}
+
+impl fmt::Display for Name {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 /// Map UUID and name to T items.
 #[derive(Debug)]
 pub struct Table<T: HasName + HasUuid> {
     items: Vec<T>,
-    name_map: HashMap<String, usize>,
+    name_map: HashMap<Name, usize>,
     uuid_map: HashMap<Uuid, usize>,
 }
 
@@ -145,7 +181,7 @@ impl<T: HasName + HasUuid> Table<T> {
 
             // Remove the item we want to remove and also the uuid mapping
             let item = self.items.swap_remove(index);
-            self.name_map.remove(item.name());
+            self.name_map.remove(&*item.name());
 
             // Remove the uuid again, in case there is only one item.
             self.uuid_map.remove(&uuid);
@@ -162,7 +198,7 @@ impl<T: HasName + HasUuid> Table<T> {
     /// item, and may have two entries if the uuid and the name map to
     /// different items.
     pub fn insert(&mut self, item: T) -> Vec<T> {
-        let name_item = self.remove_by_name(item.name());
+        let name_item = self.remove_by_name(&*item.name());
         let uuid_item = self.remove_by_uuid(item.uuid());
 
         let future_last_index = self.items.len();
@@ -189,11 +225,11 @@ mod tests {
 
     use super::super::engine::{HasName, HasUuid};
 
-    use super::Table;
+    use super::{Name, Table};
 
     #[derive(Debug)]
     struct TestThing {
-        name: String,
+        name: Name,
         uuid: Uuid,
         stuff: u32,
     }
@@ -209,13 +245,13 @@ mod tests {
         for i in 0..items.len() {
             let name = items[i].name();
             let uuid = items[i].uuid();
-            assert_eq!(name_map.get(name).unwrap(), &i);
+            assert_eq!(name_map.get(&*name).unwrap(), &i);
             assert_eq!(uuid_map.get(&uuid).unwrap(), &i);
         }
 
         for name in name_map.keys() {
             let index = name_map.get(name).unwrap();
-            assert_eq!(items[*index].name(), name);
+            assert_eq!(&items[*index].name(), name);
         }
 
         for &uuid in uuid_map.keys() {
@@ -228,7 +264,7 @@ mod tests {
     impl TestThing {
         pub fn new(name: &str, uuid: Uuid) -> TestThing {
             TestThing {
-                name: name.to_owned(),
+                name: Name::new(name.to_owned()),
                 uuid: uuid.clone(),
                 stuff: rand::random::<u32>(),
             }
@@ -242,8 +278,8 @@ mod tests {
     }
 
     impl HasName for TestThing {
-        fn name(&self) -> &str {
-            &self.name
+        fn name(&self) -> Name {
+            self.name.clone()
         }
     }
 
@@ -310,7 +346,7 @@ mod tests {
         // It has displaced the old thing.
         assert_eq!(displaced.len(), 1);
         let ref displaced_item = displaced[0];
-        assert_eq!(displaced_item.name(), name);
+        assert_eq!(&*displaced_item.name(), name);
         assert_eq!(displaced_item.uuid(), uuid);
 
         // But it contains a thing with the same keys.
@@ -351,7 +387,7 @@ mod tests {
         // The items displaced consist exactly of the first item.
         assert_eq!(displaced.len(), 1);
         let ref displaced_item = displaced[0];
-        assert_eq!(displaced_item.name(), name);
+        assert_eq!(&*displaced_item.name(), name);
         assert_eq!(displaced_item.uuid(), uuid);
         assert_eq!(displaced_item.stuff, thing_key);
 
@@ -395,7 +431,7 @@ mod tests {
         // The items displaced consist exactly of the first item.
         assert_eq!(displaced.len(), 1);
         let ref displaced_item = displaced[0];
-        assert_eq!(displaced_item.name(), name);
+        assert_eq!(&*displaced_item.name(), name);
         assert_eq!(displaced_item.uuid(), uuid);
         assert_eq!(displaced_item.stuff, thing_key);
 

@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 /// Utilities to support Stratis.
-extern crate libudev;
+extern crate udev as libudev;
 
 use std::path::Path;
 use std::process::Command;

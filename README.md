@@ -81,12 +81,23 @@ The rust library dbus-rs has an external dependency on the C dbus library
 Please check with your distributions package manager to locate the needed
 package.
 
-The files needed to build dbus-rs include, but are not limited too:
+The files needed to build dbus-rs include, but are not limited to:
 
 ```
 /usr/include/dbus-1.0/dbus/dbus*.h
 /usr/lib64/libdbus-1.so
 /usr/lib64/pkgconfig/dbus-1.pc
+```
+
+Also, the rust library libudev-sys has an dependency on the C libudev library.
+Please check with your distributions package manager to locate the needed
+package (e.g libudev-dev for Debian-based, systemd-devel for Fedora RPM-based
+Linux distributions).
+
+At least, you need to include:
+
+```
+/usr/lib64/pkgconfig/libudev.pc
 ```
 
 #### Building

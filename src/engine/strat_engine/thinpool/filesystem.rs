@@ -13,11 +13,12 @@ use nix::sys::statvfs::vfs::Statvfs;
 use nix::mount::{mount, MsFlags, umount};
 use tempdir::TempDir;
 
-use super::super::engine::{Filesystem, HasName, HasUuid};
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::FilesystemUuid;
+use super::super::super::engine::{Filesystem, HasName, HasUuid};
+use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::types::FilesystemUuid;
 
-use super::serde_structs::{FilesystemSave, Recordable};
+use super::super::serde_structs::{FilesystemSave, Recordable};
+
 use super::util::{create_fs, set_uuid, xfs_growfs};
 
 /// TODO: confirm that 256 MiB leaves enough time for stratisd to respond and extend before

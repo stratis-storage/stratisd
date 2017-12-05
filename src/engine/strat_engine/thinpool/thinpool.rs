@@ -14,20 +14,20 @@ use devicemapper::{DM, DataBlocks, DmDevice, DmName, DmNameBuf, IEC, LinearDev, 
                    Sectors, Segment, ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatusSummary,
                    device_exists};
 
-use super::super::engine::{Filesystem, HasName};
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::structures::Table;
-use super::super::types::{DevUuid, PoolUuid, FilesystemUuid, RenameAction};
+use super::super::super::engine::{Filesystem, HasName};
+use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::structures::Table;
+use super::super::super::types::{DevUuid, PoolUuid, FilesystemUuid, RenameAction};
 
-use super::blockdevmgr::{BlockDevMgr, BlkDevSegment, map_to_dm};
-use super::device::wipe_sectors;
+use super::super::blockdevmgr::{BlockDevMgr, BlkDevSegment, map_to_dm};
+use super::super::device::wipe_sectors;
+use super::super::serde_structs::{FilesystemSave, FlexDevsSave, Recordable, ThinPoolDevSave};
+
 use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, ThinRole, format_flex_name,
                       format_thinpool_name, format_thin_name};
 use super::filesystem::{FilesystemStatus, StratFilesystem};
 use super::mdv::MetadataVol;
-use super::serde_structs::{FilesystemSave, FlexDevsSave, Recordable, ThinPoolDevSave};
 use super::util::execute_cmd;
-
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
@@ -110,10 +110,10 @@ impl ThinPool {
         let thinpool_dev = ThinPoolDev::new(dm,
                                             name.as_ref(),
                                             None,
-                                            data_block_size,
-                                            low_water_mark,
                                             meta_dev,
-                                            data_dev)?;
+                                            data_dev,
+                                            data_block_size,
+                                            low_water_mark)?;
         Ok(ThinPool {
                pool_uuid: pool_uuid,
                thin_pool: thinpool_dev,
@@ -188,10 +188,10 @@ impl ThinPool {
         let thinpool_dev = ThinPoolDev::setup(dm,
                                               &thinpool_name,
                                               None,
-                                              data_block_size,
-                                              low_water_mark,
                                               meta_dev,
-                                              data_dev)?;
+                                              data_dev,
+                                              data_block_size,
+                                              low_water_mark)?;
 
         let mdv_dev = LinearDev::setup(dm,
                                        &format_flex_name(pool_uuid, FlexRole::MetadataVolume),
@@ -208,9 +208,9 @@ impl ThinPool {
                 let thin_dev = ThinDev::setup(dm,
                                               device_name.as_ref(),
                                               None,
+                                              fssave.size,
                                               &thinpool_dev,
-                                              fssave.thin_id,
-                                              fssave.size)?;
+                                              fssave.thin_id)?;
                 Ok(StratFilesystem::setup(fssave.uuid, &fssave.name, thin_dev))
             };
 
@@ -465,9 +465,9 @@ impl ThinPool {
         let thin_dev = ThinDev::new(dm,
                                     device_name.as_ref(),
                                     None,
+                                    size.unwrap_or(DEFAULT_THIN_DEV_SIZE),
                                     &self.thin_pool,
-                                    self.id_gen.new_id()?,
-                                    size.unwrap_or(DEFAULT_THIN_DEV_SIZE))?;
+                                    self.id_gen.new_id()?)?;
 
         let new_filesystem = StratFilesystem::initialize(fs_uuid, name, thin_dev)?;
         self.mdv.save_fs(&new_filesystem)?;
@@ -641,10 +641,11 @@ mod tests {
 
     use devicemapper::{Bytes, SECTOR_SIZE};
 
+    use super::super::super::metadata::MIN_MDA_SECTORS;
+    use super::super::super::tests::{loopbacked, real};
+    use super::super::super::tests::tempdir::TempDir;
+
     use super::super::filesystem::{FILESYSTEM_LOWATER, fs_usage};
-    use super::super::metadata::MIN_MDA_SECTORS;
-    use super::super::tests::{loopbacked, real};
-    use super::super::tests::tempdir::TempDir;
 
     use super::*;
 
@@ -836,18 +837,18 @@ mod tests {
         let thindev = ThinDev::setup(&dm,
                                      device_name.as_ref(),
                                      None,
+                                     DEFAULT_THIN_DEV_SIZE,
                                      &pool.thin_pool,
-                                     thin_id,
-                                     DEFAULT_THIN_DEV_SIZE);
+                                     thin_id);
         assert!(thindev.is_ok());
         pool.destroy_filesystem(&dm, fs_uuid).unwrap();
 
         let thindev = ThinDev::setup(&dm,
                                      device_name.as_ref(),
                                      None,
+                                     DEFAULT_THIN_DEV_SIZE,
                                      &pool.thin_pool,
-                                     thin_id,
-                                     DEFAULT_THIN_DEV_SIZE);
+                                     thin_id);
         assert!(thindev.is_err());
         let flexdevs: FlexDevsSave = pool.record();
         pool.teardown(&dm).unwrap();

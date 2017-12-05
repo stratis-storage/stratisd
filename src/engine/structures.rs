@@ -11,13 +11,13 @@ use engine::Name;
 
 /// Map UUID and name to T items.
 #[derive(Debug)]
-pub struct Table<T: HasName + HasUuid> {
+pub struct Table<T> {
     name_to_uuid: HashMap<Name, Uuid>,
     items: HashMap<Uuid, (Name, T)>,
 }
 
 
-impl<T: HasName + HasUuid> Default for Table<T> {
+impl<T> Default for Table<T> {
     fn default() -> Table<T> {
         Table {
             name_to_uuid: HashMap::default(),
@@ -31,11 +31,13 @@ pub struct Iter<'a, T: 'a> {
 }
 
 impl<'a, T> Iterator for Iter<'a, T> {
-    type Item = &'a T;
+    type Item = (&'a Name, &'a Uuid, &'a T);
 
     #[inline]
-    fn next(&mut self) -> Option<&'a T> {
-        self.items.next().map(|(_, &(_, ref item))| item)
+    fn next(&mut self) -> Option<(&'a Name, &'a Uuid, &'a T)> {
+        self.items
+            .next()
+            .map(|(uuid, &(ref name, ref item))| (&*name, uuid, item))
     }
 
     #[inline]
@@ -49,13 +51,13 @@ pub struct IterMut<'a, T: 'a> {
 }
 
 impl<'a, T> Iterator for IterMut<'a, T> {
-    type Item = &'a mut T;
+    type Item = (&'a Name, &'a Uuid, &'a mut T);
 
     #[inline]
-    fn next(&mut self) -> Option<&'a mut T> {
+    fn next(&mut self) -> Option<(&'a Name, &'a Uuid, &'a mut T)> {
         self.items
             .next()
-            .map(|(_, &mut (_, ref mut item))| item)
+            .map(|(uuid, &mut (ref name, ref mut item))| (&*name, uuid, item))
     }
 
     #[inline]
@@ -69,11 +71,13 @@ pub struct IntoIter<T> {
 }
 
 impl<T> Iterator for IntoIter<T> {
-    type Item = T;
+    type Item = (Name, Uuid, T);
 
     #[inline]
-    fn next(&mut self) -> Option<T> {
-        self.items.next().map(|(_, (_, item))| item)
+    fn next(&mut self) -> Option<(Name, Uuid, T)> {
+        self.items
+            .next()
+            .map(|(uuid, (name, item))| (name, uuid, item))
     }
 
     #[inline]
@@ -82,10 +86,8 @@ impl<T> Iterator for IntoIter<T> {
     }
 }
 
-impl<T> IntoIterator for Table<T>
-    where T: HasName + HasUuid
-{
-    type Item = T;
+impl<T> IntoIterator for Table<T> {
+    type Item = (Name, Uuid, T);
     type IntoIter = IntoIter<T>;
 
     fn into_iter(self) -> IntoIter<T> {
@@ -93,10 +95,8 @@ impl<T> IntoIterator for Table<T>
     }
 }
 
-impl<'a, T> IntoIterator for &'a Table<T>
-    where T: HasName + HasUuid
-{
-    type Item = &'a T;
+impl<'a, T> IntoIterator for &'a Table<T> {
+    type Item = (&'a Name, &'a Uuid, &'a T);
     type IntoIter = Iter<'a, T>;
 
     fn into_iter(self) -> Iter<'a, T> {
@@ -104,10 +104,8 @@ impl<'a, T> IntoIterator for &'a Table<T>
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut Table<T>
-    where T: HasName + HasUuid
-{
-    type Item = &'a mut T;
+impl<'a, T> IntoIterator for &'a mut Table<T> {
+    type Item = (&'a Name, &'a Uuid, &'a mut T);
     type IntoIter = IterMut<'a, T>;
 
     fn into_iter(self) -> IterMut<'a, T> {
@@ -118,9 +116,7 @@ impl<'a, T> IntoIterator for &'a mut Table<T>
 /// All operations are O(1), although Name lookups are slightly disadvantaged
 /// vs. Uuid lookups. In order to rename a T item, it must be removed,
 /// renamed, and reinserted under the new name.
-impl<T> Table<T>
-    where T: HasName + HasUuid
-{
+impl<T> Table<T> {
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
     }
@@ -152,47 +148,49 @@ impl<T> Table<T>
     }
 
     /// Get item by name.
-    pub fn get_by_name(&self, name: &str) -> Option<&T> {
+    pub fn get_by_name(&self, name: &str) -> Option<(Uuid, &T)> {
         self.name_to_uuid
             .get(&*name)
-            .and_then(|uuid| self.items.get(uuid).map(|&(_, ref item)| item))
+            .and_then(|uuid| self.items.get(uuid).map(|&(_, ref item)| (*uuid, item)))
     }
 
     /// Get item by uuid.
-    pub fn get_by_uuid(&self, uuid: Uuid) -> Option<&T> {
-        self.items.get(&uuid).map(|&(_, ref item)| item)
+    pub fn get_by_uuid(&self, uuid: Uuid) -> Option<(Name, &T)> {
+        self.items
+            .get(&uuid)
+            .map(|&(ref name, ref item)| (name.clone(), item))
     }
 
     /// Get mutable item by name.
-    pub fn get_mut_by_name(&mut self, name: &str) -> Option<&mut T> {
+    pub fn get_mut_by_name(&mut self, name: &str) -> Option<(Uuid, &mut T)> {
         let uuid = match self.name_to_uuid.get(name) {
             Some(uuid) => *uuid,
             None => return None,
         };
         self.items
             .get_mut(&uuid)
-            .map(|&mut (_, ref mut item)| item)
+            .map(|&mut (_, ref mut item)| (uuid, item))
     }
 
     /// Get mutable item by uuid.
-    pub fn get_mut_by_uuid(&mut self, uuid: Uuid) -> Option<&mut T> {
+    pub fn get_mut_by_uuid(&mut self, uuid: Uuid) -> Option<(Name, &mut T)> {
         self.items
             .get_mut(&uuid)
-            .map(|&mut (_, ref mut item)| item)
+            .map(|&mut (ref name, ref mut item)| (name.clone(), item))
     }
 
     /// Removes the item corresponding to name if there is one.
-    pub fn remove_by_name(&mut self, name: &str) -> Option<T> {
+    pub fn remove_by_name(&mut self, name: &str) -> Option<(Uuid, T)> {
         if let Some(uuid) = self.name_to_uuid.remove(name) {
-            self.items.remove(&uuid).map(|(_, item)| item)
+            self.items.remove(&uuid).map(|(_, item)| (uuid, item))
         } else {
             None
         }
     }
 
     /// Removes the item corresponding to the uuid if there is one.
-    pub fn remove_by_uuid(&mut self, uuid: Uuid) -> Option<T> {
-        if let Some((_, item)) = self.items.remove(&uuid) {
+    pub fn remove_by_uuid(&mut self, uuid: Uuid) -> Option<(Name, T)> {
+        if let Some(item) = self.items.remove(&uuid) {
             let name = self.name_to_uuid
                 .iter()
                 .find(|&(_, item_uuid)| *item_uuid == uuid)
@@ -208,28 +206,28 @@ impl<T> Table<T>
 
     /// Inserts an item for given uuid and name.
     /// Possibly returns the item displaced.
-    pub fn insert(&mut self, item: T) -> Option<T> {
-        match self.name_to_uuid.insert(item.name(), item.uuid()) {
+    pub fn insert(&mut self, name: Name, uuid: Uuid, item: T) -> Option<(Name, Uuid, T)> {
+        match self.name_to_uuid.insert(name.clone(), uuid) {
             Some(old_uuid) => {
                 // (existing name, _)
-                match self.items.insert(item.uuid(), (item.name(), item)) {
+                match self.items.insert(uuid, (name, item)) {
                     // (existing name, existing uuid)
-                    Some((_, old_item)) => Some(old_item),
+                    Some((old_name, old_item)) => Some((old_name, uuid, old_item)),
                     // (existing name, new uuid)
                     None => {
-                        let (_, old_item) = self.items.remove(&old_uuid).expect("should be there");
-                        Some(old_item)
+                        let (old_name, old_item) =
+                            self.items.remove(&old_uuid).expect("should be there");
+                        Some((old_name, old_uuid, old_item))
                     }
                 }
             }
             None => {
                 // (new name, existing uuid)
-                if let Some((old_name, old_item)) =
-                    self.items.insert(item.uuid(), (item.name(), item)) {
-                    self.name_to_uuid
+                if let Some((old_name, old_item)) = self.items.insert(uuid, (name, item)) {
+                    let old_uuid = self.name_to_uuid
                         .remove(&old_name)
                         .expect("should be there");
-                    Some(old_item)
+                    Some((old_name, old_uuid, old_item))
                 } else {
                     // (new name, new uuid)
                     None
@@ -245,22 +243,20 @@ mod tests {
     use rand;
     use uuid::Uuid;
 
-    use super::super::engine::{HasName, HasUuid};
+    use engine::Name;
 
-    use super::{Name, Table};
+    use super::Table;
 
     #[derive(Debug)]
     struct TestThing {
-        name: Name,
+        name: String,
         uuid: Uuid,
         stuff: u32,
     }
 
     // A global invariant checker for the table.
     // Verifies proper relationship between internal data structures.
-    fn table_invariant<T>(table: &Table<T>) -> ()
-        where T: HasName + HasUuid
-    {
+    fn table_invariant<T>(table: &Table<T>) -> () {
         for (uuid, &(ref name, _)) in &table.items {
             assert_eq!(*uuid, *table.name_to_uuid.get(name).unwrap())
         }
@@ -272,22 +268,10 @@ mod tests {
     impl TestThing {
         pub fn new(name: &str, uuid: Uuid) -> TestThing {
             TestThing {
-                name: Name::new(name.to_owned()),
+                name: name.to_owned(),
                 uuid: uuid.clone(),
                 stuff: rand::random::<u32>(),
             }
-        }
-    }
-
-    impl HasUuid for TestThing {
-        fn uuid(&self) -> Uuid {
-            self.uuid
-        }
-    }
-
-    impl HasName for TestThing {
-        fn name(&self) -> Name {
-            self.name.clone()
         }
     }
 
@@ -302,7 +286,9 @@ mod tests {
 
         let uuid = Uuid::new_v4();
         let name = "name";
-        t.insert(TestThing::new(&name, uuid));
+        t.insert(Name::new(name.to_owned()),
+                 uuid,
+                 TestThing::new(&name, uuid));
         table_invariant(&t);
 
         assert!(t.get_by_name(&name).is_some());
@@ -311,7 +297,7 @@ mod tests {
         table_invariant(&t);
         assert!(thing.is_some());
         let mut thing = thing.unwrap();
-        thing.stuff = 0;
+        thing.1.stuff = 0;
         assert!(t.is_empty());
         assert!(t.remove_by_name(&name).is_none());
         table_invariant(&t);
@@ -334,7 +320,7 @@ mod tests {
         let name = "name";
         let thing = TestThing::new(&name, uuid);
         let thing_key = thing.stuff;
-        let displaced = t.insert(thing);
+        let displaced = t.insert(Name::new(name.to_owned()), uuid, thing);
         table_invariant(&t);
 
         // There was nothing previously, so displaced must be empty.
@@ -343,25 +329,25 @@ mod tests {
         // t now contains the inserted thing.
         assert!(t.contains_name(&name));
         assert!(t.contains_uuid(uuid));
-        assert_eq!(t.get_by_uuid(uuid).unwrap().stuff, thing_key);
+        assert!(t.get_by_uuid(uuid).unwrap().1.stuff == thing_key);
 
         // Add another thing with the same keys.
         let thing2 = TestThing::new(&name, uuid);
         let thing_key2 = thing2.stuff;
-        let displaced = t.insert(thing2);
+        let displaced = t.insert(Name::new(name.to_owned()), uuid, thing2);
         table_invariant(&t);
 
         // It has displaced the old thing.
         assert!(displaced.is_some());
         let ref displaced_item = displaced.unwrap();
-        assert_eq!(&*displaced_item.name(), name);
-        assert_eq!(displaced_item.uuid(), uuid);
+        assert!(&*displaced_item.0 == name);
+        assert!(displaced_item.1 == uuid);
 
         // But it contains a thing with the same keys.
         assert!(t.contains_name(&name));
         assert!(t.contains_uuid(uuid));
-        assert_eq!(t.get_by_uuid(uuid).unwrap().stuff, thing_key2);
-        assert_eq!(t.len(), 1);
+        assert!(t.get_by_uuid(uuid).unwrap().1.stuff == thing_key2);
+        assert!(t.len() == 1);
     }
 
     #[test]
@@ -377,7 +363,7 @@ mod tests {
         let thing_key = thing.stuff;
 
         // There was nothing in the table before, so displaced is empty.
-        let displaced = t.insert(thing);
+        let displaced = t.insert(Name::new(name.to_owned()), uuid, thing);
         table_invariant(&t);
         assert!(displaced.is_none());
 
@@ -389,23 +375,23 @@ mod tests {
         let uuid2 = Uuid::new_v4();
         let thing2 = TestThing::new(&name, uuid2);
         let thing_key2 = thing2.stuff;
-        let displaced = t.insert(thing2);
+        let displaced = t.insert(Name::new(name.to_owned()), uuid2, thing2);
         table_invariant(&t);
 
         // The items displaced consist exactly of the first item.
         assert!(displaced.is_some());
         let ref displaced_item = displaced.unwrap();
-        assert_eq!(&*displaced_item.name(), name);
-        assert_eq!(displaced_item.uuid(), uuid);
-        assert_eq!(displaced_item.stuff, thing_key);
+        assert!(&*displaced_item.0 == name);
+        assert!(displaced_item.1 == uuid);
+        assert!(displaced_item.2.stuff == thing_key);
 
         // The table contains the new item and has no memory of the old.
         assert!(t.contains_name(&name));
         assert!(t.contains_uuid(uuid2));
         assert!(!t.contains_uuid(uuid));
-        assert_eq!(t.get_by_uuid(uuid2).unwrap().stuff, thing_key2);
-        assert_eq!(t.get_by_name(&name).unwrap().stuff, thing_key2);
-        assert_eq!(t.len(), 1);
+        assert!(t.get_by_uuid(uuid2).unwrap().1.stuff == thing_key2);
+        assert!(t.get_by_name(&name).unwrap().1.stuff == thing_key2);
+        assert!(t.len() == 1);
     }
 
     #[test]
@@ -421,7 +407,7 @@ mod tests {
         let thing_key = thing.stuff;
 
         // There was nothing in the table before, so displaced is empty.
-        let displaced = t.insert(thing);
+        let displaced = t.insert(Name::new(name.to_owned()), uuid, thing);
         table_invariant(&t);
         assert!(displaced.is_none());
 
@@ -433,22 +419,22 @@ mod tests {
         let name2 = "name2";
         let thing2 = TestThing::new(&name2, uuid);
         let thing_key2 = thing2.stuff;
-        let displaced = t.insert(thing2);
+        let displaced = t.insert(Name::new(name2.to_owned()), uuid, thing2);
         table_invariant(&t);
 
         // The items displaced consist exactly of the first item.
         assert!(displaced.is_some());
         let ref displaced_item = displaced.unwrap();
-        assert_eq!(&*displaced_item.name(), name);
-        assert_eq!(displaced_item.uuid(), uuid);
-        assert_eq!(displaced_item.stuff, thing_key);
+        assert!(&*displaced_item.0 == name);
+        assert!(displaced_item.1 == uuid);
+        assert!(displaced_item.2.stuff == thing_key);
 
         // The table contains the new item and has no memory of the old.
         assert!(t.contains_uuid(uuid));
         assert!(t.contains_name(name2));
         assert!(!t.contains_name(name));
-        assert_eq!(t.get_by_uuid(uuid).unwrap().stuff, thing_key2);
-        assert_eq!(t.get_by_name(&name2).unwrap().stuff, thing_key2);
-        assert_eq!(t.len(), 1);
+        assert!(t.get_by_uuid(uuid).unwrap().1.stuff == thing_key2);
+        assert!(t.get_by_name(&name2).unwrap().1.stuff == thing_key2);
+        assert!(t.len() == 1);
     }
 }

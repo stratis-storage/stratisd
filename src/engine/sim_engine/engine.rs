@@ -13,10 +13,10 @@ use std::rc::Rc;
 
 use devicemapper::Device;
 
-use super::super::engine::{Engine, Eventable, HasName, HasUuid, Pool};
+use super::super::engine::{Engine, Eventable, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
-use super::super::types::{PoolUuid, Redundancy, RenameAction};
+use super::super::types::{PoolUuid, Name, Redundancy, RenameAction};
 
 use super::pool::SimPool;
 use super::randomization::Randomizer;
@@ -50,16 +50,16 @@ impl Engine for SimEngine {
             .map(|x| *x)
             .collect::<Vec<&Path>>();
 
-        let pool = SimPool::new(&Rc::clone(&self.rdm), name, &devices, redundancy);
+        let (pool_uuid, pool) = SimPool::new(&Rc::clone(&self.rdm), &devices, redundancy);
 
         if self.rdm.borrow_mut().throw_die() {
             return Err(EngineError::Engine(ErrorEnum::Error, "X".into()));
         }
 
-        let uuid = pool.uuid();
-        self.pools.insert(pool);
+        self.pools
+            .insert(Name::new(name.to_owned()), pool_uuid, pool);
 
-        Ok(uuid)
+        Ok(pool_uuid)
     }
 
     fn block_evaluate(&mut self,
@@ -72,7 +72,7 @@ impl Engine for SimEngine {
     }
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool> {
-        if let Some(pool) = self.pools.get_by_uuid(uuid) {
+        if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
             if pool.has_filesystems() {
                 return Err(EngineError::Engine(ErrorEnum::Busy,
                                                "filesystems remaining on pool".into()));
@@ -83,6 +83,7 @@ impl Engine for SimEngine {
         self.pools
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pool.get_by_uuid() returned a value")
+            .1
             .destroy()?;
         Ok(true)
     }
@@ -90,20 +91,20 @@ impl Engine for SimEngine {
     fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> EngineResult<RenameAction> {
         rename_pool_pre!(self; uuid; new_name);
 
-        let mut pool = self.pools
+        let (_, pool) = self.pools
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
-        pool.rename(new_name);
 
-        self.pools.insert(pool);
+        self.pools
+            .insert(Name::new(new_name.to_owned()), uuid, pool);
         Ok(RenameAction::Renamed)
     }
 
-    fn get_pool(&self, uuid: PoolUuid) -> Option<&Pool> {
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &Pool)> {
         get_pool!(self; uuid)
     }
 
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<&mut Pool> {
+    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut Pool)> {
         get_mut_pool!(self; uuid)
     }
 
@@ -117,8 +118,11 @@ impl Engine for SimEngine {
         check_engine!(self)
     }
 
-    fn pools(&self) -> Vec<&Pool> {
-        self.pools.iter().map(|x| x as &Pool).collect()
+    fn pools(&self) -> Vec<(Name, PoolUuid, &Pool)> {
+        self.pools
+            .iter()
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &Pool))
+            .collect()
     }
 
     fn get_eventable(&mut self) -> EngineResult<Option<Box<Eventable>>> {
@@ -196,12 +200,14 @@ mod tests {
     /// Destroying a pool with filesystems should fail
     fn destroy_pool_w_filesystem() {
         let mut engine = SimEngine::default();
+        let pool_name = "pool_name";
         let uuid = engine
-            .create_pool("name", &[Path::new("/s/d")], None, false)
+            .create_pool(pool_name, &[Path::new("/s/d")], None, false)
             .unwrap();
         {
-            let pool = engine.get_mut_pool(uuid).unwrap();
-            pool.create_filesystems(&[("test", None)]).unwrap();
+            let pool = engine.get_mut_pool(uuid).unwrap().1;
+            pool.create_filesystems(pool_name, &[("test", None)])
+                .unwrap();
         }
         assert!(engine.destroy_pool(uuid).is_err());
     }
@@ -214,7 +220,14 @@ mod tests {
         let mut engine = SimEngine::default();
         engine.create_pool(name, &[], None, false).unwrap();
         assert!(match engine.create_pool(name, &[], None, false) {
-                    Ok(uuid) => engine.get_pool(uuid).unwrap().blockdevs().is_empty(),
+                    Ok(uuid) => {
+                        engine
+                            .get_pool(uuid)
+                            .unwrap()
+                            .1
+                            .blockdevs()
+                            .is_empty()
+                    }
                     Err(_) => false,
                 });
     }
@@ -240,7 +253,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let devices = vec![Path::new(path), Path::new(path)];
         assert!(match engine.create_pool("name", &devices, None, false) {
-                    Ok(uuid) => engine.get_pool(uuid).unwrap().blockdevs().len() == 1,
+                    Ok(uuid) => engine.get_pool(uuid).unwrap().1.blockdevs().len() == 1,
                     _ => false,
                 });
     }

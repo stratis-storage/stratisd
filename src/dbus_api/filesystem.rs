@@ -10,7 +10,7 @@ use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInf
 
 use uuid::Uuid;
 
-use engine::RenameAction;
+use engine::{Name, RenameAction};
 
 use super::super::engine::Filesystem;
 
@@ -92,9 +92,9 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let msg = match pool.rename_filesystem(filesystem_data.uuid, new_name) {
+    let msg = match pool.rename_filesystem(&pool_name, filesystem_data.uuid, new_name) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("pool {} doesn't know about filesystem {}",
                                         pool_uuid,
@@ -122,7 +122,7 @@ fn get_filesystem_property<F, R>(i: &mut IterAppend,
                                  p: &PropInfo<MTFn<TData>, TData>,
                                  getter: F)
                                  -> Result<(), MethodErr>
-    where F: Fn(&Filesystem) -> Result<R, MethodErr>,
+    where F: Fn((Name, &Filesystem)) -> Result<R, MethodErr>,
           R: dbus::arg::Append
 {
     let dbus_context = p.tree.get_data();
@@ -152,7 +152,7 @@ fn get_filesystem_property<F, R>(i: &mut IterAppend,
         .uuid;
 
     let engine = dbus_context.engine.borrow();
-    let pool =
+    let (_, pool) =
         engine
             .get_pool(pool_uuid)
             .ok_or_else(|| {
@@ -160,12 +160,12 @@ fn get_filesystem_property<F, R>(i: &mut IterAppend,
                                                        &pool_uuid))
                         })?;
     let filesystem_uuid = filesystem_data.uuid;
-    let filesystem = pool.get_filesystem(filesystem_uuid)
+    let context = pool.get_filesystem(filesystem_uuid)
         .ok_or_else(|| {
                         MethodErr::failed(&format!("no name for filesystem with uuid {}",
                                                    &filesystem_uuid))
                     })?;
-    i.append(getter(filesystem)?);
+    i.append(getter(context)?);
     Ok(())
 }
 
@@ -173,11 +173,11 @@ fn get_filesystem_property<F, R>(i: &mut IterAppend,
 fn get_filesystem_devnode(i: &mut IterAppend,
                           p: &PropInfo<MTFn<TData>, TData>)
                           -> Result<(), MethodErr> {
-    get_filesystem_property(i, p, |fs| Ok(format!("{}", fs.devnode().display())))
+    get_filesystem_property(i, p, |(_, fs)| Ok(format!("{}", fs.devnode().display())))
 }
 
 fn get_filesystem_name(i: &mut IterAppend,
                        p: &PropInfo<MTFn<TData>, TData>)
                        -> Result<(), MethodErr> {
-    get_filesystem_property(i, p, |f| Ok(f.name().to_owned()))
+    get_filesystem_property(i, p, |(name, _)| Ok(name.to_owned()))
 }

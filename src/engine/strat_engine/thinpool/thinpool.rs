@@ -14,15 +14,15 @@ use devicemapper as dm;
 use devicemapper::{DM, DataBlocks, DmDevice, DmName, DmNameBuf, IEC, LinearDev, MetaBlocks,
                    Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatusSummary, device_exists};
 
-use super::super::super::engine::{Filesystem, HasName};
+use super::super::super::engine::Filesystem;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::structures::Table;
-use super::super::super::types::{DevUuid, FilesystemUuid, PoolUuid, RenameAction};
+use super::super::super::types::{DevUuid, FilesystemUuid, Name, PoolUuid, RenameAction};
 
 use super::super::blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment, map_to_dm};
 use super::super::device::wipe_sectors;
 use super::super::devlinks;
-use super::super::serde_structs::{FilesystemSave, FlexDevsSave, Recordable, ThinPoolDevSave};
+use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
 use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, ThinRole, format_flex_name,
                       format_thin_name, format_thinpool_name};
@@ -139,7 +139,7 @@ impl ThinPool {
 
         let name = format_thinpool_name(pool_uuid, ThinPoolRole::Pool);
         let thinpool_dev = ThinPoolDev::new(dm,
-                                            name.as_ref(),
+                                            &name,
                                             None,
                                             meta_dev,
                                             data_dev,
@@ -232,28 +232,25 @@ impl ThinPool {
         let filesystem_metadatas = mdv.filesystems()?;
 
         // TODO: not fail completely if one filesystem setup fails?
-        let filesystems = {
-            // Set up a filesystem from its metadata.
-            let get_filesystem = |fssave: &FilesystemSave| -> EngineResult<StratFilesystem> {
+        let filesystems = filesystem_metadatas
+            .iter()
+            .map(|fssave| {
                 let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fssave.uuid));
                 let thin_dev = ThinDev::setup(dm,
-                                              device_name.as_ref(),
+                                              &device_name,
                                               None,
                                               fssave.size,
                                               &thinpool_dev,
                                               fssave.thin_id)?;
-                Ok(StratFilesystem::setup(fssave.uuid, &fssave.name, thin_dev))
-            };
-
-            filesystem_metadatas
-                .iter()
-                .map(get_filesystem)
-                .collect::<EngineResult<Vec<_>>>()?
-        };
+                Ok((Name::new(fssave.name.to_owned()),
+                    fssave.uuid,
+                    StratFilesystem::setup(thin_dev)))
+            })
+            .collect::<EngineResult<Vec<_>>>()?;
 
         let mut fs_table = Table::default();
-        for fs in filesystems {
-            let evicted = fs_table.insert(fs);
+        for (name, uuid, fs) in filesystems {
+            let evicted = fs_table.insert(name, uuid, fs);
             if evicted.is_some() {
                 let err_msg = "filesystems with duplicate UUID or name specified in metadata";
                 return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
@@ -333,7 +330,7 @@ impl ThinPool {
         let filesystems = self.filesystems
             .borrow_mut()
             .iter_mut()
-            .map(|fs| fs.check(dm))
+            .map(|(_, _, fs)| fs.check(dm))
             .collect::<EngineResult<Vec<_>>>()?;
 
         for fs_status in filesystems {
@@ -349,7 +346,7 @@ impl ThinPool {
     pub fn teardown(self, dm: &DM) -> EngineResult<()> {
         // Must succeed in tearing down all filesystems before the
         // thinpool..
-        for fs in self.filesystems {
+        for (_, _, fs) in self.filesystems {
             fs.teardown(dm)?;
         }
         self.thin_pool.teardown(dm)?;
@@ -450,22 +447,24 @@ impl ThinPool {
         Ok(data_dev_used + spare_total + meta_dev_total + mdv_total)
     }
 
-    pub fn get_filesystem_by_uuid(&self, uuid: FilesystemUuid) -> Option<&StratFilesystem> {
+    pub fn get_filesystem_by_uuid(&self, uuid: FilesystemUuid) -> Option<(Name, &StratFilesystem)> {
         self.filesystems.get_by_uuid(uuid)
     }
 
     pub fn get_mut_filesystem_by_uuid(&mut self,
                                       uuid: FilesystemUuid)
-                                      -> Option<&mut StratFilesystem> {
+                                      -> Option<(Name, &mut StratFilesystem)> {
         self.filesystems.get_mut_by_uuid(uuid)
     }
 
     #[allow(dead_code)]
-    pub fn get_filesystem_by_name(&self, name: &str) -> Option<&StratFilesystem> {
+    pub fn get_filesystem_by_name(&self, name: &str) -> Option<(FilesystemUuid, &StratFilesystem)> {
         self.filesystems.get_by_name(name)
     }
 
-    pub fn get_mut_filesystem_by_name(&mut self, name: &str) -> Option<&mut StratFilesystem> {
+    pub fn get_mut_filesystem_by_name(&mut self,
+                                      name: &str)
+                                      -> Option<(FilesystemUuid, &mut StratFilesystem)> {
         self.filesystems.get_mut_by_name(name)
     }
 
@@ -473,10 +472,10 @@ impl ThinPool {
         !self.filesystems.is_empty()
     }
 
-    pub fn filesystems(&self) -> Vec<&Filesystem> {
+    pub fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)> {
         self.filesystems
             .iter()
-            .map(|x| x as &Filesystem)
+            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &Filesystem))
             .collect()
     }
 
@@ -491,18 +490,17 @@ impl ThinPool {
         let fs_uuid = Uuid::new_v4();
         let device_name = format_thin_name(self.pool_uuid, ThinRole::Filesystem(fs_uuid));
         let thin_dev = ThinDev::new(dm,
-                                    device_name.as_ref(),
+                                    &device_name,
                                     None,
                                     size.unwrap_or(DEFAULT_THIN_DEV_SIZE),
                                     &self.thin_pool,
                                     self.id_gen.new_id()?)?;
 
-        let new_filesystem = StratFilesystem::initialize(fs_uuid, name, thin_dev)?;
-        self.mdv.save_fs(&new_filesystem)?;
-        devlinks::filesystem_added(pool_name,
-                                   &*new_filesystem.name(),
-                                   &new_filesystem.devnode())?;
-        self.filesystems.insert(new_filesystem);
+        let new_filesystem = StratFilesystem::initialize(fs_uuid, thin_dev)?;
+        let name = Name::new(name.to_owned());
+        self.mdv.save_fs(&name, fs_uuid, &new_filesystem)?;
+        devlinks::filesystem_added(pool_name, &name, &new_filesystem.devnode())?;
+        self.filesystems.insert(name, fs_uuid, new_filesystem);
 
         Ok(fs_uuid)
     }
@@ -520,12 +518,13 @@ impl ThinPool {
                                                ThinRole::Filesystem(snapshot_fs_uuid));
         let snapshot_id = self.id_gen.new_id()?;
         let new_filesystem = match self.get_filesystem_by_uuid(origin_uuid) {
-            Some(filesystem) => {
+            Some((fs_name, filesystem)) => {
                 filesystem
                     .snapshot(dm,
                               &self.thin_pool,
                               snapshot_name,
-                              snapshot_dmname.as_ref(),
+                              &snapshot_dmname,
+                              &fs_name,
                               snapshot_fs_uuid,
                               snapshot_id)?
             }
@@ -535,12 +534,12 @@ impl ThinPool {
                                                    .into()));
             }
         };
-        self.mdv.save_fs(&new_filesystem)?;
-        devlinks::filesystem_added(pool_name,
-                                   &*new_filesystem.name(),
-                                   &new_filesystem.devnode())?;
-        self.filesystems.insert(new_filesystem);
-
+        let new_fs_name = Name::new(snapshot_name.to_owned());
+        self.mdv
+            .save_fs(&new_fs_name, snapshot_fs_uuid, &new_filesystem)?;
+        devlinks::filesystem_added(pool_name, &new_fs_name, &new_filesystem.devnode())?;
+        self.filesystems
+            .insert(new_fs_name, snapshot_fs_uuid, new_filesystem);
         Ok(snapshot_fs_uuid)
     }
 
@@ -550,9 +549,7 @@ impl ThinPool {
                               pool_name: &str,
                               uuid: FilesystemUuid)
                               -> EngineResult<()> {
-
-        if let Some(fs) = self.filesystems.remove_by_uuid(uuid) {
-            let fs_name = fs.name().to_owned();
+        if let Some((fs_name, fs)) = self.filesystems.remove_by_uuid(uuid) {
             fs.destroy(dm, &self.thin_pool)?;
             self.mdv.rm_fs(uuid)?;
             devlinks::filesystem_removed(pool_name, &fs_name)?;
@@ -568,20 +565,20 @@ impl ThinPool {
                              -> EngineResult<RenameAction> {
 
         let old_name = rename_filesystem_pre!(self; uuid; new_name);
+        let new_name = Name::new(new_name.to_owned());
 
-        let mut filesystem =
-            self.filesystems
-                .remove_by_uuid(uuid)
-                .expect("Must succeed since self.filesystems.get_by_uuid() returned a value");
+        let filesystem = self.filesystems
+            .remove_by_uuid(uuid)
+            .expect("Must succeed since self.filesystems.get_by_uuid() returned a value")
+            .1;
 
-        filesystem.rename(new_name);
-        if let Err(err) = self.mdv.save_fs(&filesystem) {
-            filesystem.rename(&old_name);
-            self.filesystems.insert(filesystem);
+        if let Err(err) = self.mdv.save_fs(&new_name, uuid, &filesystem) {
+            self.filesystems.insert(old_name, uuid, filesystem);
             Err(err)
         } else {
-            self.filesystems.insert(filesystem);
-            devlinks::filesystem_renamed(pool_name, &old_name, new_name)?;
+            self.filesystems
+                .insert(new_name.clone(), uuid, filesystem);
+            devlinks::filesystem_renamed(pool_name, &old_name, &new_name)?;
             Ok(RenameAction::Renamed)
         }
     }
@@ -705,7 +702,7 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
 
     let name = meta_dev.name().to_owned();
     meta_dev.teardown(dm)?;
-    new_meta_dev.set_name(dm, name.as_ref())?;
+    new_meta_dev.set_name(dm, &name)?;
 
     Ok(new_meta_dev)
 }
@@ -754,7 +751,7 @@ mod tests {
         let source_tmp_dir = TempDir::new("stratis_testing").unwrap();
         {
             // to allow mutable borrow of pool
-            let filesystem = pool.get_filesystem_by_uuid(fs_uuid).unwrap();
+            let (_, filesystem) = pool.get_filesystem_by_uuid(fs_uuid).unwrap();
             mount(Some(&filesystem.devnode()),
                   source_tmp_dir.path(),
                   Some("xfs"),
@@ -788,7 +785,7 @@ mod tests {
         let mut read_buf = [0u8; SECTOR_SIZE];
         let snapshot_tmp_dir = TempDir::new("stratis_testing").unwrap();
         {
-            let snapshot_filesystem = pool.get_filesystem_by_uuid(snapshot_uuid).unwrap();
+            let (_, snapshot_filesystem) = pool.get_filesystem_by_uuid(snapshot_uuid).unwrap();
             mount(Some(&snapshot_filesystem.devnode()),
                   snapshot_tmp_dir.path(),
                   Some("xfs"),
@@ -854,8 +851,7 @@ mod tests {
                                    &mgr)
                 .unwrap();
 
-        assert_eq!(&*pool.get_filesystem_by_uuid(fs_uuid).unwrap().name(),
-                   name2);
+        assert_eq!(&*pool.get_filesystem_by_uuid(fs_uuid).unwrap().0, name2);
     }
 
     #[test]
@@ -893,7 +889,7 @@ mod tests {
         let tmp_dir = TempDir::new("stratis_testing").unwrap();
         let new_file = tmp_dir.path().join("stratis_test.txt");
         {
-            let fs = pool.get_filesystem_by_uuid(fs_uuid).unwrap();
+            let (_, fs) = pool.get_filesystem_by_uuid(fs_uuid).unwrap();
             mount(Some(&fs.devnode()),
                   tmp_dir.path(),
                   Some("xfs"),
@@ -947,12 +943,15 @@ mod tests {
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name).unwrap();
         let fs_name = "stratis_test_filesystem";
-        let fs_uuid = pool.create_filesystem(pool_name, fs_name, &dm, None)
+        let fs_uuid = pool.create_filesystem(pool_name, &fs_name, &dm, None)
             .unwrap();
-        let thin_id = pool.get_filesystem_by_uuid(fs_uuid).unwrap().thin_id();
+        let thin_id = pool.get_filesystem_by_uuid(fs_uuid)
+            .unwrap()
+            .1
+            .thin_id();
         let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fs_uuid));
         let thindev = ThinDev::setup(&dm,
-                                     device_name.as_ref(),
+                                     &device_name,
                                      None,
                                      DEFAULT_THIN_DEV_SIZE,
                                      &pool.thin_pool,
@@ -961,7 +960,7 @@ mod tests {
         pool.destroy_filesystem(&dm, pool_name, fs_uuid).unwrap();
 
         let thindev = ThinDev::setup(&dm,
-                                     device_name.as_ref(),
+                                     &device_name,
                                      None,
                                      DEFAULT_THIN_DEV_SIZE,
                                      &pool.thin_pool,
@@ -1069,7 +1068,10 @@ mod tests {
         let fs_uuid = pool.create_filesystem(pool_name, fs_name, &dm, None)
             .unwrap();
 
-        let devnode = pool.get_filesystem_by_uuid(fs_uuid).unwrap().devnode();
+        let devnode = pool.get_filesystem_by_uuid(fs_uuid)
+            .unwrap()
+            .1
+            .devnode();
         // Braces to ensure f is closed before destroy
         {
             let mut f = OpenOptions::new().write(true).open(devnode).unwrap();
@@ -1131,7 +1133,7 @@ mod tests {
         // Braces to ensure f is closed before destroy and the borrow of
         // pool is complete
         {
-            let filesystem = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
+            let filesystem = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap().1;
             // Write 2 MiB of data. The filesystem's free space is now 1 MiB
             // below FILESYSTEM_LOWATER.
             let write_size = Bytes(IEC::Mi * 2).sectors();

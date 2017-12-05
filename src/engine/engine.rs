@@ -11,25 +11,15 @@ use uuid::Uuid;
 
 use devicemapper::{Device, Sectors};
 
-use super::structures::Name;
-
 use super::errors::EngineResult;
-use super::types::{BlockDevState, DevUuid, FilesystemUuid, PoolUuid, RenameAction};
+use super::types::{BlockDevState, DevUuid, FilesystemUuid, Name, PoolUuid, RenameAction};
 
-pub trait HasUuid: Debug {
-    fn uuid(&self) -> Uuid;
-}
-
-pub trait HasName: Debug {
-    fn name(&self) -> Name;
-}
-
-pub trait Filesystem: HasName + HasUuid {
+pub trait Filesystem: Debug {
     /// path of the device node
     fn devnode(&self) -> PathBuf;
 }
 
-pub trait BlockDev: HasUuid {
+pub trait BlockDev: Debug {
     /// Get the path of the device node for this device.
     fn devnode(&self) -> PathBuf;
 
@@ -53,13 +43,14 @@ pub trait BlockDev: HasUuid {
     fn state(&self) -> BlockDevState;
 }
 
-pub trait Pool: HasName + HasUuid {
+pub trait Pool: Debug {
     /// Creates the filesystems specified by specs.
     /// Returns a list of the names of filesystems actually created.
     /// Returns an error if any of the specified names are already in use
     /// for filesystems in this pool. If the same name is passed multiple
     /// times, the size associated with the last item is used.
     fn create_filesystems<'a, 'b>(&'a mut self,
+                                  pool_name: &str,
                                   specs: &[(&'b str, Option<Sectors>)])
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>>;
 
@@ -67,7 +58,11 @@ pub trait Pool: HasName + HasUuid {
     /// Returns a list of uuids corresponding to devices actually added.
     /// Returns an error if a blockdev can not be added because it is owned
     /// or there was an error while reading or writing a blockdev.
-    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>>;
+    fn add_blockdevs(&mut self,
+                     pool_name: &str,
+                     paths: &[&Path],
+                     force: bool)
+                     -> EngineResult<Vec<DevUuid>>;
 
     /// Destroy the pool.
     /// Precondition: All filesystems belonging to this pool must be
@@ -79,6 +74,7 @@ pub trait Pool: HasName + HasUuid {
     /// This list will be a subset of the uuids passed in fs_uuids.
     /// Precondition: All filesystems given must be unmounted.
     fn destroy_filesystems<'a>(&'a mut self,
+                               pool_name: &str,
                                fs_uuids: &[FilesystemUuid])
                                -> EngineResult<Vec<FilesystemUuid>>;
 
@@ -88,6 +84,7 @@ pub trait Pool: HasName + HasUuid {
     /// new_name is already in use.
     /// The result indicate whether an action was performed, and if not, why.
     fn rename_filesystem(&mut self,
+                         pool_name: &str,
                          uuid: FilesystemUuid,
                          new_name: &str)
                          -> EngineResult<RenameAction>;
@@ -95,12 +92,10 @@ pub trait Pool: HasName + HasUuid {
     /// Snapshot filesystem
     /// Create a CoW snapshot of the origin
     fn snapshot_filesystem(&mut self,
+                           pool_name: &str,
                            origin_uuid: FilesystemUuid,
                            snapshot_name: &str)
                            -> EngineResult<FilesystemUuid>;
-
-    /// Rename this pool.
-    fn rename(&mut self, name: &str) -> ();
 
     /// The total number of Sectors belonging to this pool.
     /// There are no exclusions, so this number includes overhead sectors
@@ -116,16 +111,16 @@ pub trait Pool: HasName + HasUuid {
     fn total_physical_used(&self) -> EngineResult<Sectors>;
 
     /// Get all the filesystems belonging to this pool.
-    fn filesystems(&self) -> Vec<&Filesystem>;
+    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)>;
 
     /// Get the filesystem in this pool with this UUID.
-    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<&Filesystem>;
+    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &Filesystem)>;
 
     /// Get the mutable filesystem in this pool with this UUID.
-    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<&mut Filesystem>;
+    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<(Name, &mut Filesystem)>;
 
     /// Get all the blockdevs that make up this pool.
-    fn blockdevs(&self) -> Vec<&BlockDev>;
+    fn blockdevs(&self) -> Vec<(Uuid, &BlockDev)>;
 
     /// Get the blockdev in this pool with this UUID.
     fn get_blockdev(&self, uuid: DevUuid) -> Option<&BlockDev>;
@@ -134,7 +129,7 @@ pub trait Pool: HasName + HasUuid {
     fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<&mut BlockDev>;
 
     /// Save the state of the pool. FIXME, see #614.
-    fn save_state(&mut self) -> EngineResult<()>;
+    fn save_state(&mut self, pool_name: &str) -> EngineResult<()>;
 }
 
 pub trait Engine: Debug {
@@ -169,10 +164,10 @@ pub trait Engine: Debug {
     fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> EngineResult<RenameAction>;
 
     /// Find the pool designated by uuid.
-    fn get_pool(&self, uuid: PoolUuid) -> Option<&Pool>;
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &Pool)>;
 
     /// Get a mutable referent to the pool designated by uuid.
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<&mut Pool>;
+    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut Pool)>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.
@@ -182,7 +177,7 @@ pub trait Engine: Debug {
     fn check(&mut self) -> ();
 
     /// Get all pools belonging to this engine.
-    fn pools(&self) -> Vec<&Pool>;
+    fn pools(&self) -> Vec<(Name, PoolUuid, &Pool)>;
 
     /// If the engine would like to include an event in the message loop, it
     /// may return an Eventable from this method.

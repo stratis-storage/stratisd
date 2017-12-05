@@ -14,7 +14,7 @@ use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInf
                  PropInfo, Tree};
 use uuid::Uuid;
 
-use engine::{Engine, Pool};
+use engine::{Engine, Pool, PoolUuid};
 use stratis::VERSION;
 
 use super::blockdev::create_dbus_blockdev;
@@ -49,11 +49,13 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let pool_object_path: dbus::Path =
                 create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
 
-            let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+            let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
             let bd_object_paths = pool.blockdevs()
                 .iter()
-                .map(|bd| create_dbus_blockdev(dbus_context, pool_object_path.clone(), bd.uuid()))
+                .map(|&(uuid, _)| {
+                         create_dbus_blockdev(dbus_context, pool_object_path.clone(), uuid)
+                     })
                 .collect::<Vec<_>>();
 
             return_message.append3((pool_object_path, bd_object_paths),
@@ -179,12 +181,15 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
 }
 
 /// Given an Pool, create all the needed dbus objects to represent it.
-fn register_pool_dbus(dbus_context: &DbusContext, pool: &Pool, object_path: &dbus::Path<'static>) {
-    let pool_path = create_dbus_pool(dbus_context, object_path.clone(), pool.uuid());
-    for fs_uuid in pool.filesystems().iter().map(|f| f.uuid()) {
+fn register_pool_dbus(dbus_context: &DbusContext,
+                      pool_uuid: PoolUuid,
+                      pool: &Pool,
+                      object_path: &dbus::Path<'static>) {
+    let pool_path = create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
+    for (_, fs_uuid, _) in pool.filesystems() {
         create_dbus_filesystem(dbus_context, pool_path.clone(), fs_uuid);
     }
-    for dev_uuid in pool.blockdevs().iter().map(|bd| bd.uuid()) {
+    for (dev_uuid, _) in pool.blockdevs() {
         create_dbus_blockdev(dbus_context, pool_path.clone(), dev_uuid);
     }
 }
@@ -202,8 +207,8 @@ pub fn connect<'a>
     let dbus_context = tree.get_data().clone();
 
     // This should never panic as register_pool_dbus does not borrow the engine.
-    for pool in local_engine.borrow().pools() {
-        register_pool_dbus(&dbus_context, pool, &object_path);
+    for (_, pool_uuid, pool) in local_engine.borrow().pools() {
+        register_pool_dbus(&dbus_context, pool_uuid, pool, &object_path);
     }
 
     tree.set_registered(&c, true)?;
@@ -223,8 +228,8 @@ pub fn register_pool(c: &Connection,
                      object_path: &dbus::Path<'static>)
                      -> Result<(), dbus::Error> {
 
-    if let Some(pool) = engine.borrow().get_pool(pool_uuid) {
-        register_pool_dbus(dbus_context, pool, object_path);
+    if let Some((_, pool)) = engine.borrow().get_pool(pool_uuid) {
+        register_pool_dbus(dbus_context, pool_uuid, pool, object_path);
         return process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut());
     }
     Ok(())

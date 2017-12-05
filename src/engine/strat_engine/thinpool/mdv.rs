@@ -18,12 +18,11 @@ use serde_json;
 
 use devicemapper::{DM, DmDevice, LinearDev};
 
-use super::super::super::engine::HasUuid;
 use super::super::super::errors::EngineResult;
-use super::super::super::types::{FilesystemUuid, PoolUuid};
+use super::super::super::types::{FilesystemUuid, Name, PoolUuid};
 
 use super::super::devlinks::DEV_PATH;
-use super::super::serde_structs::{FilesystemSave, Recordable};
+use super::super::serde_structs::FilesystemSave;
 
 use super::util::create_fs;
 
@@ -122,11 +121,15 @@ impl MetadataVol {
     // Write to a temp file and then rename to actual filename, to
     // ensure file contents are not truncated if operation is
     // interrupted.
-    pub fn save_fs(&self, fs: &StratFilesystem) -> EngineResult<()> {
-        let data = serde_json::to_string(&fs.record())?;
+    pub fn save_fs(&self,
+                   name: &Name,
+                   uuid: FilesystemUuid,
+                   fs: &StratFilesystem)
+                   -> EngineResult<()> {
+        let data = serde_json::to_string(&fs.record(name, uuid))?;
         let path = self.mount_pt
             .join(FILESYSTEM_DIR)
-            .join(fs.uuid().simple().to_string())
+            .join(uuid.simple().to_string())
             .with_extension("json");
 
         let temp_path = path.clone().with_extension("temp");

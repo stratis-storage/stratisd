@@ -18,13 +18,15 @@ use serde_json;
 
 use devicemapper::{DmDevice, DM, LinearDev};
 
-use super::super::engine::HasUuid;
-use super::super::errors::EngineResult;
-use super::super::types::{FilesystemUuid, PoolUuid};
+use super::super::super::engine::HasUuid;
+use super::super::super::errors::EngineResult;
+use super::super::super::types::{FilesystemUuid, PoolUuid};
+
+use super::super::serde_structs::{FilesystemSave, Recordable};
+
+use super::util::create_fs;
 
 use super::filesystem::StratFilesystem;
-use super::serde_structs::{FilesystemSave, Recordable};
-use super::util::create_fs;
 
 // TODO: Monitor fs size and extend linear and fs if needed
 // TODO: Document format of stuff on MDV in SWDD (currently ad-hoc)

@@ -9,9 +9,9 @@ use std::fmt::Display;
 
 use devicemapper::{DmNameBuf, ThinDevId};
 
-use super::super::errors::EngineResult;
+use super::super::super::errors::EngineResult;
 
-use super::super::super::engine::{FilesystemUuid, PoolUuid};
+use super::super::super::super::engine::{FilesystemUuid, PoolUuid};
 
 const FORMAT_VERSION: u16 = 1;
 

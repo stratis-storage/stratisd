@@ -5,6 +5,7 @@
 /// Code to handle management of a pool's thinpool device.
 
 use std::borrow::BorrowMut;
+use std::cmp;
 use std::process::Command;
 
 use uuid::Uuid;
@@ -295,14 +296,18 @@ impl ThinPool {
 
                 let usage = &status.usage;
                 if usage.used_meta > usage.total_meta - META_LOWATER {
-                    // TODO: Extend meta device
+                    match self.extend_thinpool_meta(dm, usage.total_meta, bd_mgr) {
+                        #![allow(single_match)]
+                        Ok(_) => {}
+                        Err(_) => {} // TODO: Take pool offline?
+                    }
                 }
 
                 if usage.used_data > usage.total_data - DATA_LOWATER {
                     // Request expansion of physical space allocated to the pool
                     // TODO: we just request that the space be doubled here.
                     // A more sophisticated approach might be in order.
-                    match self.extend_thinpool(dm, usage.total_data, bd_mgr) {
+                    match self.extend_thinpool(dm, status.usage.total_data, bd_mgr) {
                         #![allow(single_match)]
                         Ok(_) => {}
                         Err(_) => {} // TODO: Take pool offline?
@@ -367,8 +372,25 @@ impl ThinPool {
         Ok(extend_size)
     }
 
+    /// Expand the physical space allocated to a pool meta by extend_size.
+    /// Return the number of MetaBlocks added.
+    fn extend_thinpool_meta(&mut self,
+                            dm: &DM,
+                            extend_size: MetaBlocks,
+                            bd_mgr: &mut BlockDevMgr)
+                            -> EngineResult<MetaBlocks> {
+        if let Some(mut new_meta_regions) = bd_mgr.alloc_space(&[extend_size.sectors()]) {
+            self.extend_meta(dm,
+                             &new_meta_regions
+                                  .pop()
+                                  .expect("len(new_meta_regions) == 1"))?;
         } else {
+            let err_msg = format!("Insufficient space to accomodate request for {}",
+                                  extend_size);
+            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
         }
+        Ok(extend_size)
+    }
 
 
     /// Extend the thinpool with new data regions.
@@ -377,6 +399,16 @@ impl ThinPool {
         self.thin_pool
             .set_data_segments(dm, &map_to_dm(&segments))?;
         self.data_segments = segments;
+
+        Ok(())
+    }
+
+    /// Extend the thinpool meta device with additional segments.
+    fn extend_meta(&mut self, dm: &DM, new_segs: &[BlkDevSegment]) -> EngineResult<()> {
+        let segments = get_coalesced_segments(&self.meta_segments, &new_segs.to_vec());
+        self.thin_pool
+            .set_meta_segments(dm, &map_to_dm(&segments))?;
+        self.meta_segments = segments;
 
         Ok(())
     }

@@ -308,12 +308,11 @@ impl ThinPool {
                     }
                 }
 
-                if status.usage.used_data >
-                   cmp::max(status.usage.total_data, DATA_LOWATER) - DATA_LOWATER {
+                if usage.used_data > cmp::max(usage.total_data, DATA_LOWATER) - DATA_LOWATER {
                     // Request expansion of physical space allocated to the pool
                     // TODO: we just request that the space be doubled here.
                     // A more sophisticated approach might be in order.
-                    match self.extend_thinpool(dm, status.usage.total_data, bd_mgr) {
+                    match self.extend_thinpool(dm, usage.total_data, bd_mgr) {
                         #![allow(single_match)]
                         Ok(_) => {}
                         Err(_) => {} // TODO: Take pool offline?
@@ -949,6 +948,57 @@ mod tests {
                 .unwrap();
 
         assert!(pool.get_filesystem_by_uuid(fs_uuid).is_none());
+    }
+
+    #[test]
+    pub fn loop_test_meta_expand() {
+        // This test requires more than 1 GiB.
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_meta_expand);
+    }
+
+    #[test]
+    pub fn real_test_meta_expand() {
+        real::test_with_spec(real::DeviceLimits::Range(2, 3), test_meta_expand);
+    }
+
+    /// Verify that the meta device backing a ThinPool is expanded when meta
+    /// utilization exceeds the META_LOWATER mark, by creating a ThinPool with
+    /// a meta device smaller than the META_LOWATER.
+    fn test_meta_expand(paths: &[&Path]) -> () {
+        let pool_uuid = Uuid::new_v4();
+        let dm = DM::new().unwrap();
+        let small_meta_size = MetaBlocks(16);
+        let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        // Create a ThinPool with a very small meta device.
+        let mut thin_pool = ThinPool::new(pool_uuid,
+                                          &dm,
+                                          &ThinPoolSizeParams {
+                                               meta_size: small_meta_size,
+                                               ..Default::default()
+                                           },
+                                          DATA_BLOCK_SIZE,
+                                          DATA_LOWATER,
+                                          &mut mgr)
+                .unwrap();
+
+        match thin_pool.thin_pool.status(&dm).unwrap() {
+            dm::ThinPoolStatus::Working(ref status) => {
+                let usage = &status.usage;
+                assert_eq!(usage.total_meta, small_meta_size);
+            }
+            dm::ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
+        }
+        // The meta device is smaller than META_LOWATER, so it should be expanded
+        // in the thin_pool.check() call.
+        thin_pool.check(&dm, &mut mgr).unwrap();
+        match thin_pool.thin_pool.status(&dm).unwrap() {
+            dm::ThinPoolStatus::Working(ref status) => {
+                let usage = &status.usage;
+                // validate that the meta has been expanded.
+                assert!(usage.total_meta > small_meta_size);
+            }
+            dm::ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
+        }
     }
 
     #[test]

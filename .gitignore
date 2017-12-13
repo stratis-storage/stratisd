@@ -9,4 +9,5 @@
 target
 .project 
 .settings
+.vscode
 tests/test_config.json

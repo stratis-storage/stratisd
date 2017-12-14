@@ -12,7 +12,7 @@ use chrono::{DateTime, Duration, Utc};
 use rand::{thread_rng, seq};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Device, IEC, Sectors, Segment};
+use devicemapper::{Bytes, CacheDev, Device, IEC, Sectors, Segment};
 
 use super::super::engine::BlockDev;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -68,17 +68,22 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<Segment> {
 pub struct BlockDevMgr {
     pool_uuid: PoolUuid,
     block_devs: HashMap<DevUuid, StratBlockDev>,
+    cache_dev: Option<CacheDev>,
     last_update_time: Option<DateTime<Utc>>,
 }
 
 impl BlockDevMgr {
-    pub fn new(pool_uuid: PoolUuid, block_devs: Vec<StratBlockDev>) -> BlockDevMgr {
+    pub fn new(pool_uuid: PoolUuid,
+               block_devs: Vec<StratBlockDev>,
+               cache_dev: Option<CacheDev>)
+               -> BlockDevMgr {
         BlockDevMgr {
             pool_uuid: pool_uuid,
             block_devs: block_devs
                 .into_iter()
                 .map(|bd| (bd.uuid(), bd))
                 .collect(),
+            cache_dev: cache_dev,
             last_update_time: None,
         }
     }
@@ -91,7 +96,8 @@ impl BlockDevMgr {
                       -> EngineResult<BlockDevMgr> {
         let devices = resolve_devices(paths)?;
         Ok(BlockDevMgr::new(pool_uuid,
-                            initialize(pool_uuid, devices, mda_size, force, &HashSet::new())?))
+                            initialize(pool_uuid, devices, mda_size, force, &HashSet::new())?,
+                            None))
     }
 
     /// Get a function that maps UUIDs to Devices.

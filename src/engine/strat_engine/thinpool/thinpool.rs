@@ -303,7 +303,8 @@ impl ThinPool {
                     }
                 }
 
-                if usage.used_data > usage.total_data - DATA_LOWATER {
+                if status.usage.used_data >
+                   cmp::max(status.usage.total_data, DATA_LOWATER) - DATA_LOWATER {
                     // Request expansion of physical space allocated to the pool
                     // TODO: we just request that the space be doubled here.
                     // A more sophisticated approach might be in order.

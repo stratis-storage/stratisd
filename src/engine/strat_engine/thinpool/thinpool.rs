@@ -295,7 +295,7 @@ impl ThinPool {
                 }
 
                 let usage = &status.usage;
-                if usage.used_meta > usage.total_meta - META_LOWATER {
+                if usage.used_meta > cmp::max(usage.total_meta, META_LOWATER) - META_LOWATER {
                     match self.extend_thinpool_meta(dm, usage.total_meta, bd_mgr) {
                         #![allow(single_match)]
                         Ok(_) => {}

@@ -364,11 +364,11 @@ impl ThinPool {
                        extend_size: DataBlocks,
                        bd_mgr: &mut BlockDevMgr)
                        -> EngineResult<DataBlocks> {
-        if let Some(mut new_data_regions) = bd_mgr.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
+        if let Some(new_data_regions) = bd_mgr.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
             self.extend_data(dm,
-                             &new_data_regions
-                                  .pop()
-                                  .expect("len(new_data_regions) == 1"))?;
+                             new_data_regions
+                                 .first()
+                                 .expect("len(new_data_regions) == 1"))?;
         } else {
             let err_msg = format!("Insufficient space to accomodate request for {}",
                                   extend_size);
@@ -384,11 +384,11 @@ impl ThinPool {
                             extend_size: MetaBlocks,
                             bd_mgr: &mut BlockDevMgr)
                             -> EngineResult<MetaBlocks> {
-        if let Some(mut new_meta_regions) = bd_mgr.alloc_space(&[extend_size.sectors()]) {
+        if let Some(new_meta_regions) = bd_mgr.alloc_space(&[extend_size.sectors()]) {
             self.extend_meta(dm,
-                             &new_meta_regions
-                                  .pop()
-                                  .expect("len(new_meta_regions) == 1"))?;
+                             new_meta_regions
+                                 .first()
+                                 .expect("len(new_meta_regions) == 1"))?;
         } else {
             let err_msg = format!("Insufficient space to accomodate request for {}",
                                   extend_size);

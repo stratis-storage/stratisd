@@ -2,11 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+extern crate libc;
+
 use std::collections::HashMap;
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use devicemapper::{DM, DmNameBuf};
+use devicemapper::{DM, Device, DmNameBuf};
 
 use super::super::engine::{Engine, Eventable, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -16,7 +18,7 @@ use super::super::types::{DevUuid, PoolUuid, Redundancy, RenameAction};
 use super::cleanup::teardown_pools;
 use super::devlinks;
 use super::pool::StratPool;
-use super::setup::find_all;
+use super::setup::{find_all, is_stratis_device};
 
 const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 
@@ -30,6 +32,11 @@ pub enum DevOwnership {
 #[derive(Debug)]
 pub struct StratEngine {
     pools: Table<StratPool>,
+
+    // Map of stratis devices that have been found but one or more stratis block devices are missing
+    // which prevents the associated pools from being setup.
+    incomplete_pools: HashMap<PoolUuid, HashMap<Device, PathBuf>>,
+
     // Maps name of DM devices we are watching to the most recent event number
     // we've handled for each
     watched_dev_last_event_nrs: HashMap<DmNameBuf, u32>,
@@ -52,10 +59,13 @@ impl StratEngine {
     /// Setup a StratEngine.
     /// 1. Verify the existence of Stratis /dev directory.
     /// 2. Setup all the pools belonging to the engine.
+    ///    a. Places any devices which belong to a pool, but are not complete
+    ///       in the incomplete pools data structure.
     ///
     /// Returns an error if the kernel doesn't support required DM features.
     /// Returns an error if there was an error reading device nodes.
-    /// Returns an error if there was an error setting up any of the pools.
+    /// Returns an error and tears down all the pools if we find a pool with a
+    /// duplicate name found.
     pub fn initialize() -> EngineResult<StratEngine> {
         let dm = DM::new()?;
         let minor_dm_version = dm.version()?.1;
@@ -69,20 +79,29 @@ impl StratEngine {
         let pools = find_all()?;
 
         let mut table = Table::default();
+        let mut incomplete_pools = HashMap::new();
+
         for (pool_uuid, devices) in &pools {
-            let evicted = table.insert(StratPool::setup(&dm, *pool_uuid, devices)?);
-            if !evicted.is_empty() {
-
-                // TODO: update state machine on failure.
-                let _ = teardown_pools(table.empty());
-
-                let err_msg = "found two pools with the same id or name";
-                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+            match StratPool::setup(&dm, *pool_uuid, devices) {
+                Ok(pool) => {
+                    let evicted = table.insert(pool);
+                    if !evicted.is_empty() {
+                        // TODO: update state machine on failure.
+                        let _ = teardown_pools(table.empty());
+                        let err_msg = "found two pools with the same name";
+                        return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+                    }
+                }
+                Err(_) => {
+                    // Unable to setup pool, it might become complete later.
+                    incomplete_pools.insert(*pool_uuid, devices.clone());
+                }
             }
         }
 
         let engine = StratEngine {
             pools: table,
+            incomplete_pools,
             watched_dev_last_event_nrs: HashMap::new(),
         };
 
@@ -119,6 +138,73 @@ impl Engine for StratEngine {
         self.pools.insert(pool);
 
         Ok(uuid)
+    }
+
+    /// Evaluate a device node & devicemapper::Device to see if it's a valid
+    /// stratis device.  If all the devices are present in the pool and the pool isn't already
+    /// up and running, it will get setup and the pool uuid will be returned.
+    ///
+    /// Returns an error if the status of the block device can not be evaluated.
+    fn block_evaluate(&mut self,
+                      dev_node: PathBuf,
+                      device: Device)
+                      -> EngineResult<Option<PoolUuid>> {
+        let dm = DM::new()?;
+        if let Some(pool_uuid) = is_stratis_device(&dev_node)? {
+            if self.pools.contains_uuid(pool_uuid) {
+                // TODO: Handle the case where we have found a device for an already active pool
+                // ref. https://github.com/stratis-storage/stratisd/issues/748
+                warn!("udev add: pool {} is already known, ignoring device {:?}!",
+                      pool_uuid,
+                      dev_node);
+                Ok(None)
+            } else {
+
+                let mut devices = self.incomplete_pools
+                    .remove(&pool_uuid)
+                    .or_else(|| Some(HashMap::new()))
+                    .expect("We just retrieved or created a HashMap");
+                devices.insert(device, dev_node);
+
+                let rc = if let Ok(pool) = StratPool::setup(&dm, pool_uuid, &devices) {
+                    // We know we have a unique uuid, but the pools table requires a unique name too
+                    // so we will ensure unique before we insert as we don't want to change the
+                    // existing state if we have a conflict.
+                    //
+                    // We will also _not_ exit the daemon as we do in initialize as we were
+                    // previously up and running for some duration of time.
+                    if !self.pools.contains_name(pool.name()) {
+                        self.pools.insert(pool);
+                        Some(pool_uuid)
+                    } else {
+                        let dev_paths = devices
+                            .values()
+                            .map(|p| p.to_str().expect("Expecting valid device path!"))
+                            .collect::<Vec<&str>>()
+                            .join(", ");
+
+                        self.incomplete_pools.insert(pool_uuid, devices);
+
+                        error!("udev add: duplicate pool name {:?} for uuid {:?}, \
+                                devices[{}], failing to setup complete pool!",
+                               pool.name(),
+                               pool_uuid,
+                               dev_paths);
+                        if let Err(e) = pool.teardown() {
+                            error!("Error while tearing down pool with duplicate name! {:?}!",
+                                   e);
+                        }
+                        None
+                    }
+                } else {
+                    self.incomplete_pools.insert(pool_uuid, devices);
+                    None
+                };
+                Ok(rc)
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool> {

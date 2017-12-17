@@ -12,4 +12,4 @@ mod pool;
 mod types;
 mod util;
 
-pub use self::api::{connect, handle};
+pub use self::api::{connect, handle, register_pool};

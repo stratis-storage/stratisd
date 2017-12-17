@@ -4,9 +4,9 @@
 
 // Utilities to support Stratis.
 
-extern crate libudev;
-
 use std::path::Path;
+
+use libudev;
 
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 

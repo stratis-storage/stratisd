@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use devicemapper::Sectors;
+use devicemapper::{Sectors, Device};
 
 use super::errors::EngineResult;
 use super::types::{BlockDevState, FilesystemUuid, PoolUuid, DevUuid, RenameAction};
@@ -146,6 +146,14 @@ pub trait Engine: Debug {
                    redundancy: Option<u16>,
                    force: bool)
                    -> EngineResult<PoolUuid>;
+
+    /// Evaluate a device node & devicemapper::Device to see if it's a valid
+    /// stratis device.  If all the devices are present in the pool and the pool isn't already
+    /// up and running, it will get setup and the pool uuid will be returned.
+    fn block_evaluate(&mut self,
+                      dev_node: PathBuf,
+                      device: Device)
+                      -> EngineResult<Option<PoolUuid>>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.

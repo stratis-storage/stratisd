@@ -2,12 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+extern crate libc;
+
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::collections::hash_map::RandomState;
 use std::iter::FromIterator;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
+
+use devicemapper::Device;
 
 use super::super::engine::{Engine, Eventable, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -56,6 +60,15 @@ impl Engine for SimEngine {
         self.pools.insert(pool);
 
         Ok(uuid)
+    }
+
+    fn block_evaluate(&mut self,
+                      dev_node: PathBuf,
+                      device: Device)
+                      -> EngineResult<Option<PoolUuid>> {
+        assert_ne!(dev_node, PathBuf::from("/"));
+        assert_ne!(libc::dev_t::from(device), 0);
+        Ok(None)
     }
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool> {

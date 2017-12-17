@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+extern crate devicemapper;
 extern crate libstratis;
 #[macro_use]
 extern crate log;
@@ -10,15 +11,18 @@ extern crate clap;
 #[cfg(feature="dbus_enabled")]
 extern crate dbus;
 extern crate libc;
+extern crate libudev;
 
 #[cfg(test)]
 extern crate quickcheck;
 
+use std::cell::RefCell;
 use std::env;
 use std::error::Error;
-use std::rc::Rc;
-use std::cell::RefCell;
+use std::os::unix::io::AsRawFd;
+use std::path::PathBuf;
 use std::process::exit;
+use std::rc::Rc;
 
 use clap::{App, Arg};
 use env_logger::LogBuilder;
@@ -26,6 +30,8 @@ use log::{LogLevelFilter, SetLoggerError};
 
 #[cfg(feature="dbus_enabled")]
 use dbus::WatchEvent;
+
+use devicemapper::Device;
 
 use libstratis::engine::{Engine, SimEngine, StratEngine};
 use libstratis::stratis::{StratisResult, StratisError, VERSION};
@@ -53,6 +59,25 @@ fn initialize_log(debug: bool) -> Result<(), SetLoggerError> {
     builder.init()
 }
 
+/// Given a udev event check to see if it's an add and if it is return the device node and
+/// devicemapper::Device.
+fn handle_udev_add(event: &libudev::Event) -> Option<(PathBuf, Device)> {
+    if event.event_type() == libudev::EventType::Add {
+        let device = event.device();
+        return device
+                   .devnode()
+                   .and_then(|devnode| {
+                                 device
+                                     .devnum()
+                                     .and_then(|devnum| {
+                                                   Some((PathBuf::from(devnode),
+                                                         Device::from(devnum)))
+                                               })
+                             });
+    }
+    None
+}
+
 fn run() -> StratisResult<()> {
 
     let matches = App::new("stratis")
@@ -69,6 +94,18 @@ fn run() -> StratisResult<()> {
     initialize_log(matches.is_present("debug"))
         .expect("This is the first and only invocation of this method; it must succeed.");
 
+    // We must setup a udev listener before we initialize the
+    // engine. It is possible that a device may appear after the engine has read the
+    // /dev directory but before it has completed initialization. Unless the udev
+    // event has been recorded, the engine will be unaware of the existence of the
+    // device.
+    // This is especially important since stratisd is required to be able to run
+    // during early boot.
+    let context = libudev::Context::new()?;
+    let mut monitor = libudev::Monitor::new(&context)?;
+    monitor.match_subsystem_devtype("block", "disk")?;
+    let mut udev = monitor.listen()?;
+
     let engine: Rc<RefCell<Engine>> = {
         if matches.is_present("sim") {
             info!("Using SimEngine");
@@ -79,54 +116,109 @@ fn run() -> StratisResult<()> {
         }
     };
 
-    #[cfg(feature="dbus_enabled")]
-    let (dbus_conn, mut tree, dbus_context) = libstratis::dbus_api::connect(Rc::clone(&engine))?;
+    /*
+    The file descriptor array indexes are laid out in the following:
+
+    0   == Always udev fd index
+    1   == engine index if eventable
+    1/2 == Start of dbus client file descriptor(s), 1 if engine is not eventable, else 2
+    */
+    const FD_INDEX_UDEV: usize = 0;
+    const FD_INDEX_ENGINE: usize = 1;
+
 
     let mut fds = Vec::new();
 
+    fds.push(libc::pollfd {
+                 fd: udev.as_raw_fd(),
+                 revents: 0,
+                 events: libc::POLLIN,
+             });
+
     let mut eventable = engine.borrow_mut().get_eventable()?;
-    let engine_fds_end_idx = match eventable {
+
+    // The variable _dbus_client_index_start is only used when dbus support is compiled in, thus
+    // we denote the value as not needed to compile when dbus support is not included.
+    let (engine_eventable, poll_timeout, _dbus_client_index_start) = match eventable {
         Some(ref mut evt) => {
             fds.push(libc::pollfd {
                          fd: evt.get_pollable_fd(),
                          revents: 0,
                          events: libc::POLLIN,
                      });
-            1
+
+            // Don't timeout if eventable, we are event driven
+            (true, -1, FD_INDEX_ENGINE + 1)
         }
-        None => 0,
+
+        // We periodically need to timeout as we are not event driven
+        None => (false, 10000, FD_INDEX_ENGINE),
     };
 
-    // Don't timeout if eventable lets us be event-driven
-    let poll_timeout = if engine_fds_end_idx != 0 { -1 } else { 10000 };
+    #[cfg(feature="dbus_enabled")]
+    let (mut dbus_conn, mut tree, base_object_path, mut dbus_context) =
+        libstratis::dbus_api::connect(Rc::clone(&engine))?;
 
     loop {
-        // Unconditionally call evented() if engine has no eventable.
-        // This looks like a bad idea, but the only engine that has
-        // no eventable is the sim engine, and for that engine, evented()
-        // is essentially a no-op.
-        if engine_fds_end_idx == 0 {
-            engine.borrow_mut().evented()?;
+        // Process any udev block events
+        if fds[FD_INDEX_UDEV].revents != 0 {
+            loop {
+                match udev.receive_event() {
+                    Some(event) => {
+                        if let Some((devnode, device)) = handle_udev_add(&event) {
+
+                            // If block evaluate returns an error we are going to ignore it as
+                            // there is nothing we can do for a device we are getting errors with.
+                            let pool_uuid = engine
+                                .borrow_mut()
+                                .block_evaluate(devnode, device)
+                                .unwrap_or(None);
+
+                            // We need to pretend that we aren't using the variable _pool_uuid so
+                            // that we can conditionally compile out the register_pool when dbus
+                            // is not enabled.
+                            if let Some(_pool_uuid) = pool_uuid {
+                                #[cfg(feature="dbus_enabled")]
+                                libstratis::dbus_api::register_pool(&mut dbus_conn,
+                                                                    Rc::clone(&engine),
+                                                                    &mut dbus_context,
+                                                                    &mut tree,
+                                                                    _pool_uuid,
+                                                                    &base_object_path)?;
+                            }
+                        }
+                    }
+                    None => {
+                        break;
+                    }
+                };
+            }
         }
 
-        // Handle engine fd, if there is one.
-        // If engine has no eventable, there is no engine fd; in that case
-        // the body of the loop is executed zero times.
-        for pfd in fds[..engine_fds_end_idx]
-                .iter_mut()
-                .filter(|pfd| pfd.revents != 0) {
-            pfd.revents = 0;
-            eventable
-                .as_mut()
-                .expect("index < engine_fds_end_idx <=> index == 0 <=> eventable.is_some()")
-                .clear_event()?;
+        // Handle engine events, if the engine is eventable
+        if engine_eventable {
+            if fds[FD_INDEX_ENGINE].revents != 0 {
+                fds[FD_INDEX_ENGINE].revents = 0;
+
+                eventable
+                    .as_mut()
+                    .expect("eventable.is_some()")
+                    .clear_event()?;
+
+                engine.borrow_mut().evented()?;
+            }
+        } else {
+            // Unconditionally call evented() if engine has no eventable.
+            // This looks like a bad idea, but the only engine that has
+            // no eventable is the sim engine, and for that engine, evented()
+            // is essentially a no-op.
             engine.borrow_mut().evented()?;
         }
 
         // Iterate through D-Bus file descriptors (if enabled)
         #[cfg(feature="dbus_enabled")]
         {
-            for pfd in fds[engine_fds_end_idx..]
+            for pfd in fds[_dbus_client_index_start..]
                     .iter()
                     .filter(|pfd| pfd.revents != 0) {
                 for item in dbus_conn.watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents)) {
@@ -141,7 +233,7 @@ fn run() -> StratisResult<()> {
 
             // Refresh list of dbus fds to poll for every time. This can change as
             // D-Bus clients come and go.
-            fds.truncate(engine_fds_end_idx);
+            fds.truncate(_dbus_client_index_start);
 
             fds.extend(dbus_conn.watch_fds().iter().map(|w| w.to_pollfd()));
         }

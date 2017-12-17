@@ -24,8 +24,9 @@ use dbus::tree::MethodInfo;
 use dbus::tree::PropInfo;
 use dbus::tree::Tree;
 use dbus::ConnectionItem;
+use uuid::Uuid;
 
-use engine::Engine;
+use engine::{Engine, Pool};
 use stratis::VERSION;
 
 use super::filesystem::create_dbus_filesystem;
@@ -194,9 +195,22 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
     (base_tree.add(obj_path), path)
 }
 
+/// Given an Pool, create all the needed dbus objects to represent it.
+fn register_pool_dbus(dbus_context: &DbusContext, pool: &Pool, object_path: &dbus::Path<'static>) {
+    let pool_path = create_dbus_pool(dbus_context, object_path.clone(), pool.uuid());
+    for fs_uuid in pool.filesystems().iter().map(|f| f.uuid()) {
+        create_dbus_filesystem(dbus_context, pool_path.clone(), fs_uuid);
+    }
+    for dev_uuid in pool.blockdevs().iter().map(|bd| bd.uuid()) {
+        create_dbus_blockdev(dbus_context, pool_path.clone(), dev_uuid);
+    }
+}
+
+/// Connect a stratis engine to dbus.
 #[allow(type_complexity)]
-pub fn connect(engine: Rc<RefCell<Engine>>)
-               -> Result<(Connection, Tree<MTFn<TData>, TData>, DbusContext), dbus::Error> {
+pub fn connect<'a>
+    (engine: Rc<RefCell<Engine>>)
+     -> Result<(Connection, Tree<MTFn<TData>, TData>, dbus::Path<'a>, DbusContext), dbus::Error> {
     let c = Connection::get_private(BusType::System)?;
 
     let local_engine = Rc::clone(&engine);
@@ -204,26 +218,33 @@ pub fn connect(engine: Rc<RefCell<Engine>>)
     let (mut tree, object_path) = get_base_tree(DbusContext::new(engine));
     let dbus_context = tree.get_data().clone();
 
-    // This should never panic as create_dbus_pool(),
-    // create_dbus_filesystem(), and create_dbus_blockdev() do not borrow the
-    // engine.
+    // This should never panic as register_pool_dbus does not borrow the engine.
     for pool in local_engine.borrow().pools() {
-        let pool_path = create_dbus_pool(&dbus_context, object_path.clone(), pool.uuid());
-        for fs_uuid in pool.filesystems().iter().map(|f| f.uuid()) {
-            create_dbus_filesystem(&dbus_context, pool_path.clone(), fs_uuid);
-        }
-        for dev_uuid in pool.blockdevs().iter().map(|bd| bd.uuid()) {
-            create_dbus_blockdev(&dbus_context, pool_path.clone(), dev_uuid);
-        }
+        register_pool_dbus(&dbus_context, pool, &object_path);
     }
 
     tree.set_registered(&c, true)?;
-
     c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32)?;
 
     process_deferred_actions(&c, &mut tree, &mut dbus_context.actions.borrow_mut())?;
 
-    Ok((c, tree, dbus_context))
+    Ok((c, tree, object_path, dbus_context))
+}
+
+/// Given the UUID of a pool, register all the pertinent information with dbus.
+pub fn register_pool(c: &Connection,
+                     engine: Rc<RefCell<Engine>>,
+                     dbus_context: &DbusContext,
+                     tree: &mut Tree<MTFn<TData>, TData>,
+                     pool_uuid: Uuid,
+                     object_path: &dbus::Path<'static>)
+                     -> Result<(), dbus::Error> {
+
+    if let Some(pool) = engine.borrow().get_pool(pool_uuid) {
+        register_pool_dbus(dbus_context, pool, object_path);
+        return process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut());
+    }
+    Ok(())
 }
 
 /// Update the dbus tree with deferred adds and removes.

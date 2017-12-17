@@ -4,8 +4,6 @@
 
 // Utilities to support Stratis.
 
-extern crate libudev;
-
 use std::path::Path;
 use std::process::Command;
 

@@ -108,7 +108,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             dbus_context
                 .actions
                 .borrow_mut()
-                .push_remove(object_path);
+                .push_remove(&object_path, m.tree);
             return_message.append3(action, msg_code_ok(), msg_string_ok())
         }
         Err(err) => {

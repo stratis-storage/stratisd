@@ -5,7 +5,7 @@
 // Manage the linear volume that stores metadata on pool levels 5-7.
 
 use std::convert::From;
-use std::fs::{create_dir, OpenOptions, read_dir, remove_file, rename};
+use std::fs::{create_dir, remove_dir, OpenOptions, read_dir, remove_file, rename};
 use std::io::ErrorKind;
 use std::io::prelude::*;
 use std::os::unix::io::AsRawFd;
@@ -51,6 +51,12 @@ struct MountedMDV<'a> {
 impl<'a> MountedMDV<'a> {
     /// Borrow the MDV and ensure it's mounted.
     fn mount(mdv: &MetadataVol) -> EngineResult<MountedMDV> {
+        if let Err(err) = create_dir(&mdv.mount_pt) {
+            if err.kind() != ErrorKind::AlreadyExists {
+                return Err(From::from(err));
+            }
+        }
+
         match mount(Some(&mdv.dev.devnode()),
                     &mdv.mount_pt,
                     Some("xfs"),
@@ -75,7 +81,9 @@ impl<'a> MountedMDV<'a> {
 impl<'a> Drop for MountedMDV<'a> {
     fn drop(&mut self) {
         if let Err(err) = umount(&self.mdv.mount_pt) {
-            warn!("Could not unmount MDV: {}", err)
+            warn!("Could not unmount MDV: {}", err);
+        } else if let Err(err) = remove_dir(&self.mdv.mount_pt) {
+            warn!("Could not remove MDV mountpoint: {}", err);
         }
     }
 }
@@ -97,12 +105,6 @@ impl MetadataVol {
 
         let filename = format!(".mdv-{}", pool_uuid.simple());
         let mount_pt: PathBuf = vec![DEV_PATH, &filename].iter().collect();
-
-        if let Err(err) = create_dir(&mount_pt) {
-            if err.kind() != ErrorKind::AlreadyExists {
-                return Err(From::from(err));
-            }
-        }
 
         let mdv = MetadataVol { dev, mount_pt };
 

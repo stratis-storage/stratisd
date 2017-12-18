@@ -296,7 +296,12 @@ impl ThinPool {
 
                 let usage = &status.usage;
                 if usage.used_meta > cmp::max(usage.total_meta, META_LOWATER) - META_LOWATER {
-                    match self.extend_thinpool_meta(dm, usage.total_meta, bd_mgr) {
+                    // Request expansion of physical space allocated to the pool
+                    // meta device.
+                    // TODO: we just request that the space be doubled here.
+                    // A more sophisticated approach might be in order.
+                    let meta_extend_size = usage.total_meta;
+                    match self.extend_thinpool_meta(dm, meta_extend_size, bd_mgr) {
                         #![allow(single_match)]
                         Ok(_) => {}
                         Err(_) => {} // TODO: Take pool offline?

@@ -74,7 +74,7 @@ class Destroy1TestCase(unittest.TestCase):
         (_, rc, _) = Manager.Methods.DestroyPool(self._proxy, {'pool': "/"})
         self.assertEqual(rc, StratisdErrors.OK)
 
-@unittest.skip("skip test case until stratid PR #660 is merged")
+
 class Destroy2TestCase(unittest.TestCase):
     """
     Test 'destroy' on database which contains the given pool and an unknown

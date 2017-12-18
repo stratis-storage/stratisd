@@ -13,13 +13,13 @@ use std::path::PathBuf;
 use nix::Errno;
 use serde_json;
 
-use devicemapper::Device;
+use devicemapper::{Device, devnode_to_devno};
 
 use super::super::errors::{EngineResult, EngineError, ErrorEnum};
 use super::super::types::PoolUuid;
 
 use super::blockdev::StratBlockDev;
-use super::device::{blkdev_size, devnode_to_devno};
+use super::device::blkdev_size;
 use super::engine::DevOwnership;
 use super::metadata::{BDA, StaticHeader};
 use super::range_alloc::RangeAllocator;

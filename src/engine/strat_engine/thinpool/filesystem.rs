@@ -115,7 +115,7 @@ impl StratFilesystem {
     /// TODO: deal with the thindev in a Fail state.
     pub fn check(&mut self, dm: &DM) -> EngineResult<FilesystemStatus> {
         match self.thin_dev.status(dm)? {
-            ThinStatus::Good(_) => {
+            ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.get_mount_point()? {
                     let (fs_total_bytes, fs_total_used_bytes) = fs_usage(&mount_point)?;
                     let free_bytes = fs_total_bytes - fs_total_used_bytes;

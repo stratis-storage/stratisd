@@ -23,8 +23,10 @@ from ._implementation import Manager
 from ._implementation import ObjectManager
 from ._implementation import Pool
 
+from ._managedobjects import blockdevs
 from ._managedobjects import pools
 from ._managedobjects import filesystems
+from ._managedobjects import MOBlockDev
 from ._managedobjects import MOPool
 
 from ._stratisd_constants import StratisdErrors

@@ -22,7 +22,9 @@ import unittest
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import Pool
+from stratisd_client_dbus import MOBlockDev
 from stratisd_client_dbus import StratisdErrors
+from stratisd_client_dbus import blockdevs
 from stratisd_client_dbus import get_object
 from stratisd_client_dbus import pools
 
@@ -74,7 +76,7 @@ class Destroy1TestCase(unittest.TestCase):
         (_, rc, _) = Manager.Methods.DestroyPool(self._proxy, {'pool': "/"})
         self.assertEqual(rc, StratisdErrors.OK)
 
-@unittest.skip("skip test case until stratid PR #660 is merged")
+
 class Destroy2TestCase(unittest.TestCase):
     """
     Test 'destroy' on database which contains the given pool and an unknown
@@ -90,13 +92,14 @@ class Destroy2TestCase(unittest.TestCase):
         self._service.setUp()
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
+        self._devices = _DEVICE_STRATEGY.example()
         Manager.Methods.CreatePool(
            self._proxy,
            {
               'name': self._POOLNAME,
               'redundancy': (True, 0),
               'force': False,
-              'devices': _DEVICE_STRATEGY.example()
+              'devices': self._devices
            }
         )
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
@@ -114,17 +117,24 @@ class Destroy2TestCase(unittest.TestCase):
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (pool1, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
+        blockdevs1 = blockdevs(managed_objects, {'Pool': pool1})
+        self.assertEqual(
+           frozenset(MOBlockDev(b).Devnode() for (_, b) in blockdevs1),
+           frozenset(d for d in self._devices)
+        )
 
         (result, rc, _) = \
                 Manager.Methods.DestroyPool(self._proxy, {'pool': pool1})
 
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        blockdevs2 = blockdevs(managed_objects, {'Pool': pool1})
         pool2 = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertIsNone(pool2)
         self.assertTrue(result)
+        self.assertEqual(len(list(blockdevs2)), 0)
 
 
 class Destroy3TestCase(unittest.TestCase):

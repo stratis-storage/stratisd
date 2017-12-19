@@ -15,14 +15,15 @@ use serde_json;
 
 use devicemapper::{Device, devnode_to_devno};
 
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::PoolUuid;
+use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::types::PoolUuid;
+
+use super::super::engine::DevOwnership;
+use super::super::serde_structs::PoolSave;
 
 use super::blockdev::StratBlockDev;
 use super::device::blkdev_size;
-use super::engine::DevOwnership;
 use super::metadata::{BDA, StaticHeader};
-use super::serde_structs::PoolSave;
 
 
 /// Determine if devnode is a stratis device, if it is we will add  pool uuid and device

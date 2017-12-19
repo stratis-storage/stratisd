@@ -16,10 +16,8 @@ use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction};
 
-use super::blockdevmgr::BlockDevMgr;
-use super::metadata::MIN_MDA_SECTORS;
+use super::physical::{BlockDevMgr, MIN_MDA_SECTORS, get_blockdevs, get_metadata};
 use super::serde_structs::{PoolSave, Recordable};
-use super::setup::{get_blockdevs, get_metadata};
 use super::thinpool::{ThinPool, ThinPoolSizeParams};
 
 pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
@@ -274,7 +272,7 @@ impl Pool for StratPool {
 mod tests {
     use super::super::super::types::Redundancy;
 
-    use super::super::setup::find_all;
+    use super::super::physical::find_all;
     use super::super::tests::{loopbacked, real};
 
     use super::*;

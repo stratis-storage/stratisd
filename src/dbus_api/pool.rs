@@ -21,8 +21,6 @@ use dbus::tree::PropInfo;
 
 use uuid::Uuid;
 
-use devicemapper::Sectors;
-
 use engine::{Pool, RenameAction};
 
 use super::blockdev::create_dbus_blockdev;
@@ -52,10 +50,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let result =
-        pool.create_filesystems(&filesystems
-                                     .map(|x| (x, None))
-                                     .collect::<Vec<(&str, Option<Sectors>)>>());
+    let result = pool.create_filesystems(&filesystems.collect::<Vec<_>>());
 
     let msg = match result {
         Ok(ref infos) => {

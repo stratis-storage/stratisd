@@ -99,17 +99,17 @@ impl Pool for SimPool {
     }
 
     fn create_filesystems<'a, 'b>(&'a mut self,
-                                  specs: &[(&'b str, Option<Sectors>)])
+                                  specs: &[&'b str])
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
-        let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
-        for name in names.keys() {
+        let names: HashSet<_> = HashSet::from_iter(specs);
+        for name in &names {
             if self.filesystems.contains_name(name) {
                 return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
             }
         }
 
         let mut result = Vec::new();
-        for name in names.keys() {
+        for name in names {
             let uuid = Uuid::new_v4();
             let new_filesystem = SimFilesystem::new(uuid, name);
             self.filesystems.insert(new_filesystem);
@@ -250,7 +250,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let uuid = engine.create_pool("name", &[], None, false).unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap();
-        let infos = pool.create_filesystems(&[("old_name", None)]).unwrap();
+        let infos = pool.create_filesystems(&["old_name"]).unwrap();
         assert!(match pool.rename_filesystem(infos[0].1, "new_name") {
                     Ok(RenameAction::Renamed) => true,
                     _ => false,
@@ -265,8 +265,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let uuid = engine.create_pool("name", &[], None, false).unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap();
-        let results = pool.create_filesystems(&[(old_name, None), (new_name, None)])
-            .unwrap();
+        let results = pool.create_filesystems(&[old_name, new_name]).unwrap();
         let old_uuid = results.iter().find(|x| x.0 == old_name).unwrap().1;
         assert!(match pool.rename_filesystem(old_uuid, new_name) {
                     Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
@@ -314,7 +313,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let uuid = engine.create_pool("name", &[], None, false).unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap();
-        let fs_results = pool.create_filesystems(&[("fs_name", None)]).unwrap();
+        let fs_results = pool.create_filesystems(&["fs_name"]).unwrap();
         let fs_uuid = fs_results[0].1;
         assert!(match pool.destroy_filesystems(&[fs_uuid, Uuid::new_v4()]) {
                     Ok(filesystems) => filesystems == vec![fs_uuid],
@@ -344,7 +343,7 @@ mod tests {
             .create_pool("pool_name", &[], None, false)
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap();
-        assert!(match pool.create_filesystems(&[("name", None)]) {
+        assert!(match pool.create_filesystems(&["name"]) {
                     Ok(names) => (names.len() == 1) & (names[0].0 == "name"),
                     _ => false,
                 });
@@ -359,8 +358,8 @@ mod tests {
             .create_pool("pool_name", &[], None, false)
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap();
-        pool.create_filesystems(&[(fs_name, None)]).unwrap();
-        assert!(match pool.create_filesystems(&[(fs_name, None)]) {
+        pool.create_filesystems(&[fs_name]).unwrap();
+        assert!(match pool.create_filesystems(&[fs_name]) {
                     Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
                     _ => false,
                 });
@@ -375,7 +374,7 @@ mod tests {
             .create_pool("pool_name", &[], None, false)
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap();
-        assert!(match pool.create_filesystems(&[(fs_name, None), (fs_name, None)]) {
+        assert!(match pool.create_filesystems(&[fs_name, fs_name]) {
                     Ok(names) => (names.len() == 1) & (names[0].0 == fs_name),
                     _ => false,
                 });

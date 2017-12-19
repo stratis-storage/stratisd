@@ -16,7 +16,7 @@ use devicemapper::{Bytes, IEC, Sectors};
 use super::logger::init_logger;
 use super::util::clean_up;
 
-use super::super::device::wipe_sectors;
+use super::super::physical::wipe_sectors;
 
 pub struct RealTestDev {
     path: PathBuf,

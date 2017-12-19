@@ -14,8 +14,8 @@ use super::super::structures::Table;
 use super::super::types::{DevUuid, PoolUuid, Redundancy, RenameAction};
 
 use super::cleanup::teardown_pools;
+use super::physical::find_all;
 use super::pool::StratPool;
-use super::setup::find_all;
 
 const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 

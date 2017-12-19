@@ -14,17 +14,18 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, Device, IEC, Sectors, Segment};
 
-use super::super::engine::BlockDev;
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::{DevUuid, PoolUuid};
+use super::super::super::engine::BlockDev;
+use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::types::{DevUuid, PoolUuid};
 
-use super::cleanup::wipe_blockdevs;
+use super::super::engine::DevOwnership;
+use super::super::serde_structs::{BlockDevSave, Recordable};
+
 use super::blockdev::StratBlockDev;
+use super::cleanup::wipe_blockdevs;
 use super::device::{blkdev_size, resolve_devices};
-use super::engine::DevOwnership;
 use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};
 use super::range_alloc::RangeAllocator;
-use super::serde_structs::{BlockDevSave, Recordable};
 use super::util::hw_lookup;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
@@ -393,10 +394,11 @@ mod tests {
 
     use devicemapper::SECTOR_SIZE;
 
+    use super::super::super::tests::{loopbacked, real};
+
     use super::super::device::write_sectors;
     use super::super::metadata::{BDA_STATIC_HDR_SECTORS, MIN_MDA_SECTORS};
     use super::super::setup::{find_all, get_metadata};
-    use super::super::tests::{loopbacked, real};
 
     use super::*;
 

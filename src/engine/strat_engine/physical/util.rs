@@ -7,7 +7,7 @@ extern crate libudev;
 
 use std::path::Path;
 
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 
 /// Lookup the WWN from the udev db using the device node eg. /dev/sda
 pub fn hw_lookup(dev_node_search: &Path) -> EngineResult<Option<String>> {

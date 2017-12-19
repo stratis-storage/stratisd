@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 use devicemapper::Sectors;
 
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 
 #[derive(Debug)]
 pub struct RangeAllocator {

@@ -57,7 +57,7 @@ impl StratPool {
         let thinpool = match thinpool {
             Ok(thinpool) => thinpool,
             Err(err) => {
-                let _ = block_mgr.destroy_all();
+                let _ = block_mgr.destroy_all(dm);
                 return Err(err);
             }
         };
@@ -166,8 +166,9 @@ impl Pool for StratPool {
     }
 
     fn destroy(self) -> EngineResult<()> {
-        self.thin_pool.teardown(&DM::new()?)?;
-        self.block_devs.destroy_all()?;
+        let dm = DM::new()?;
+        self.thin_pool.teardown(&dm)?;
+        self.block_devs.destroy_all(&dm)?;
         Ok(())
     }
 

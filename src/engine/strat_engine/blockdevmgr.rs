@@ -12,7 +12,7 @@ use chrono::{DateTime, Duration, Utc};
 use rand::{thread_rng, seq};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, CacheDev, Device, IEC, Sectors, Segment};
+use devicemapper::{Bytes, CacheDev, Device, DM, DmDevice, IEC, Sectors, Segment};
 
 use super::super::engine::BlockDev;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -124,7 +124,10 @@ impl BlockDevMgr {
         Ok(bdev_uuids)
     }
 
-    pub fn destroy_all(mut self) -> EngineResult<()> {
+    pub fn destroy_all(mut self, dm: &DM) -> EngineResult<()> {
+        if let Some(cache_dev) = self.cache_dev {
+            cache_dev.teardown(dm)?;
+        }
         let bds = self.block_devs
             .drain()
             .map(|(_, bd)| bd)
@@ -615,7 +618,9 @@ mod tests {
                 _ => false,
             }
         }));
-        bd_mgr.destroy_all().unwrap();
+
+        let dm = DM::new().unwrap();
+        bd_mgr.destroy_all(&dm).unwrap();
         assert!(paths
                     .iter()
                     .all(|path| {

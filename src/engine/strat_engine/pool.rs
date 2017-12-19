@@ -151,9 +151,16 @@ impl Pool for StratPool {
         // TODO: Roll back on filesystem initialization failure.
         let dm = DM::new()?;
         let mut result = Vec::new();
-        for name in names {
-            let fs_uuid = self.thin_pool.create_filesystem(name, &dm, None)?;
-            result.push((*name, fs_uuid));
+        let mut names_iter = names.into_iter();
+        if let Some(first_name) = names_iter.next() {
+            let first_uuid = self.thin_pool.create_filesystem(first_name, &dm, None)?;
+            result.push((*first_name, first_uuid));
+
+            for name in names_iter {
+                let fs_uuid = self.thin_pool
+                    .snapshot_filesystem(&dm, first_uuid, name)?;
+                result.push((*name, fs_uuid));
+            }
         }
 
         Ok(result)

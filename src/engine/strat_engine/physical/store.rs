@@ -15,6 +15,7 @@ use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::serde_structs::{Recordable, BlockDevSave};
 
+use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{BlkDevSegment, BlockDevMgr};
 
 #[derive(Debug)]
@@ -24,8 +25,8 @@ pub struct Store {
 
 impl Store {
     /// Make a Store object from blockdevs that already belong to Stratis.
-    pub fn new(block_mgr: BlockDevMgr) -> Store {
-        Store { block_mgr: block_mgr }
+    pub fn new(pool_uuid: PoolUuid, block_devs: Vec<StratBlockDev>) -> Store {
+        Store { block_mgr: BlockDevMgr::new(pool_uuid, block_devs, None) }
     }
 
     /// Initialize a Store object, by initializing the specified devs.
@@ -34,7 +35,7 @@ impl Store {
                       mda_size: Sectors,
                       force: bool)
                       -> EngineResult<Store> {
-        Ok(Store::new(BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?))
+        Ok(Store { block_mgr: BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)? })
     }
 
     pub fn add(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {

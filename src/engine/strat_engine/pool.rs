@@ -16,7 +16,7 @@ use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction};
 
-use super::physical::{BlockDevMgr, MIN_MDA_SECTORS, Store, get_blockdevs, get_metadata};
+use super::physical::{MIN_MDA_SECTORS, Store, get_blockdevs, get_metadata};
 use super::serde_structs::{PoolSave, Recordable};
 use super::thinpool::{ThinPool, ThinPoolSizeParams};
 
@@ -78,8 +78,7 @@ impl StratPool {
                             EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no metadata for pool {}", uuid))
                         })?;
-        let bd_mgr = BlockDevMgr::new(uuid, get_blockdevs(uuid, &metadata, devnodes)?, None);
-        let store = Store::new(bd_mgr);
+        let store = Store::new(uuid, get_blockdevs(uuid, &metadata, devnodes)?);
         let thinpool = ThinPool::setup(dm,
                                        uuid,
                                        metadata.thinpool_dev.data_block_size,

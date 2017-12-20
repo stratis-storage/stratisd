@@ -9,8 +9,10 @@ mod device;
 mod metadata;
 mod range_alloc;
 mod setup;
+mod store;
 mod util;
 
 pub use self::blockdevmgr::{BlockDevMgr, BlkDevSegment, map_to_dm};
 pub use self::metadata::MIN_MDA_SECTORS;
 pub use self::setup::{find_all, get_blockdevs, get_metadata};
+pub use self::store::Store;

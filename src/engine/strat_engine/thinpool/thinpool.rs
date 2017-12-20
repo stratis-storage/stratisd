@@ -23,7 +23,7 @@ use super::super::devlinks;
 use super::super::device::wipe_sectors;
 use super::super::dmnames::{FlexRole, ThinPoolRole, ThinRole, format_flex_name,
                             format_thinpool_name, format_thin_name};
-use super::super::physical::{BlockDevMgr, BlkDevSegment, Segment, map_to_dm};
+use super::super::physical::{BlkDevSegment, Segment, Store, map_to_dm};
 use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
 use super::filesystem::{FilesystemStatus, StratFilesystem};
@@ -96,7 +96,7 @@ impl ThinPool {
                thin_pool_size: &ThinPoolSizeParams,
                data_block_size: Sectors,
                low_water_mark: DataBlocks,
-               block_mgr: &mut BlockDevMgr)
+               block_mgr: &mut Store)
                -> EngineResult<ThinPool> {
         let mut segments_list =
             match block_mgr.alloc_space(&[thin_pool_size.meta_size(),
@@ -171,7 +171,7 @@ impl ThinPool {
                  data_block_size: Sectors,
                  low_water_mark: DataBlocks,
                  flex_devs: &FlexDevsSave,
-                 bd_mgr: &BlockDevMgr)
+                 bd_mgr: &Store)
                  -> EngineResult<ThinPool> {
         let uuid_to_devno = bd_mgr.uuid_to_devno();
         let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> EngineResult<BlkDevSegment> {
@@ -276,7 +276,7 @@ impl ThinPool {
     /// Run status checks and take actions on the thinpool and its components.
     /// Returns a bool communicating if a configuration change requiring a
     /// metadata save has been made.
-    pub fn check(&mut self, dm: &DM, bd_mgr: &mut BlockDevMgr) -> EngineResult<bool> {
+    pub fn check(&mut self, dm: &DM, bd_mgr: &mut Store) -> EngineResult<bool> {
         #![allow(match_same_arms)]
 
         let mut should_save: bool = false;
@@ -365,7 +365,7 @@ impl ThinPool {
     fn extend_thinpool(&mut self,
                        dm: &DM,
                        extend_size: DataBlocks,
-                       bd_mgr: &mut BlockDevMgr)
+                       bd_mgr: &mut Store)
                        -> EngineResult<DataBlocks> {
         if let Some(new_data_regions) = bd_mgr.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
             self.extend_data(dm,
@@ -385,7 +385,7 @@ impl ThinPool {
     fn extend_thinpool_meta(&mut self,
                             dm: &DM,
                             extend_size: MetaBlocks,
-                            bd_mgr: &mut BlockDevMgr)
+                            bd_mgr: &mut Store)
                             -> EngineResult<MetaBlocks> {
         if let Some(new_meta_regions) = bd_mgr.alloc_space(&[extend_size.sectors()]) {
             self.extend_meta(dm,
@@ -732,7 +732,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(pool_uuid,
                                      &dm,
                                      &ThinPoolSizeParams::default(),
@@ -824,7 +824,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(pool_uuid,
                                      &dm,
                                      &ThinPoolSizeParams::default(),
@@ -873,7 +873,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(pool_uuid,
                                      &dm,
                                      &ThinPoolSizeParams::default(),
@@ -933,7 +933,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(pool_uuid,
                                      &dm,
                                      &ThinPoolSizeParams::default(),
@@ -1002,7 +1002,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         let small_meta_size = MetaBlocks(16);
-        let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         // Create a ThinPool with a very small meta device.
         let mut thin_pool = ThinPool::new(pool_uuid,
                                           &dm,
@@ -1055,7 +1055,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(pool_uuid,
                                      &dm,
                                      &ThinPoolSizeParams::default(),
@@ -1112,7 +1112,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let mut mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(pool_uuid,
                                      &dm,
                                      &ThinPoolSizeParams::default(),

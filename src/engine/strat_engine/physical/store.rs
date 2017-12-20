@@ -15,6 +15,7 @@ use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::serde_structs::{Recordable, BlockDevSave};
 
+use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{BlkDevSegment, BlockDevMgr};
 
 #[derive(Debug)]
@@ -24,9 +25,12 @@ pub struct Store {
 }
 
 impl Store {
-    pub fn new(block_mgr: BlockDevMgr, cache: Option<CacheDev>) -> Store {
+    pub fn new(pool_uuid: PoolUuid,
+               block_devs: Vec<StratBlockDev>,
+               cache: Option<CacheDev>)
+               -> Store {
         Store {
-            block_mgr: block_mgr,
+            block_mgr: BlockDevMgr::new(pool_uuid, block_devs),
             cache: cache,
         }
     }
@@ -36,8 +40,10 @@ impl Store {
                       mda_size: Sectors,
                       force: bool)
                       -> EngineResult<Store> {
-        Ok(Store::new(BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?,
-                      None))
+        Ok(Store {
+               block_mgr: BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?,
+               cache: None,
+           })
     }
 
     pub fn add(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {

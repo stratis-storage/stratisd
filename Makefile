@@ -14,7 +14,11 @@ outdated: ${HOME}/.cargo/bin/cargo-outdated
 	PATH=${HOME}/.cargo/bin:${PATH} cargo outdated
 
 fmt: ${HOME}/.cargo/bin/cargo-fmt
-	PATH=${HOME}/.cargo/bin:${PATH} cargo fmt -- --write-mode=diff
+	PATH=${HOME}/.cargo/bin:${PATH} cargo fmt
+
+travis_fmt:
+	rustup run stable cargo install rustfmt --vers 0.8.3 --force
+	cargo fmt -- --write-mode=diff
 
 build:
 	RUSTFLAGS='-D warnings' cargo build

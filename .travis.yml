@@ -12,7 +12,7 @@ language: rust
 matrix:
     include:
         - rust: stable
-          env: TASK=fmt
+          env: TASK=travis_fmt
         - rust: stable
           env: TASK=build
         - rust: stable

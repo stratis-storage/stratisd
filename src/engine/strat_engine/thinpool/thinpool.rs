@@ -30,7 +30,7 @@ use super::filesystem::{FilesystemStatus, StratFilesystem};
 use super::mdv::MetadataVol;
 use super::util::execute_cmd;
 
-pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
+pub const DATA_BLOCK_SIZE: Sectors = Sectors(128);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
 const META_LOWATER: MetaBlocks = MetaBlocks(512);
 

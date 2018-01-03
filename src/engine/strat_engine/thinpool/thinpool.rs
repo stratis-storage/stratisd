@@ -37,7 +37,7 @@ const META_LOWATER: MetaBlocks = MetaBlocks(512);
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
 const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4096);
-pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
+pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(12288);
 const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 
 

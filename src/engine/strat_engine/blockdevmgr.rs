@@ -9,7 +9,7 @@ use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Duration, Utc};
-use rand::{thread_rng, sample};
+use rand::{thread_rng, seq};
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Device, IEC, Sectors, Segment};
@@ -203,7 +203,8 @@ impl BlockDevMgr {
 
         // TODO: consider making selection not entirely random, i.e, ensuring
         // distribution of metadata over different paths.
-        let saved = sample(&mut thread_rng(), candidates, MAX_NUM_TO_WRITE)
+        let saved = seq::sample_iter(&mut thread_rng(), candidates, MAX_NUM_TO_WRITE)
+            .unwrap_or_else(|e| e)
             .iter_mut()
             .fold(false,
                   |acc, b| acc | b.save_state(&stamp_time, metadata).is_ok());

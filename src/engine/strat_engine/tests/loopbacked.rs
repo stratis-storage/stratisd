@@ -50,12 +50,9 @@ impl LoopTestDev {
         f.flush().unwrap();
 
         let ld = lc.next_free().unwrap();
-        ld.attach(path, 0).unwrap();
+        ld.attach_file(path).unwrap();
         // Wipe 1 MiB at the beginning, as data sits around on the files.
-        wipe_sectors(&ld.get_path().unwrap(),
-                     Sectors(0),
-                     Bytes(IEC::Mi).sectors())
-                .unwrap();
+        wipe_sectors(&ld.path().unwrap(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
 
         LoopTestDev { ld: ld }
     }
@@ -104,7 +101,7 @@ pub fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
         let loop_devices: Vec<LoopTestDev> = get_devices(count, &tmpdir);
         let device_paths: Vec<PathBuf> = loop_devices
             .iter()
-            .map(|x| x.ld.get_path().unwrap())
+            .map(|x| x.ld.path().unwrap())
             .collect();
         let device_paths: Vec<&Path> = device_paths.iter().map(|x| x.as_path()).collect();
 

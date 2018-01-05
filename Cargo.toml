@@ -32,4 +32,4 @@ features = ["serde", "v4"]
 
 [dev-dependencies]
 quickcheck = "0.6"
-loopdev = "0.1.1"
+loopdev = "0.2"

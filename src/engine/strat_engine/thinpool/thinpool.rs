@@ -30,14 +30,14 @@ use super::filesystem::{FilesystemStatus, StratFilesystem};
 use super::mdv::MetadataVol;
 use super::util::execute_cmd;
 
-pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
+pub const DATA_BLOCK_SIZE: Sectors = Sectors(128);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
 const META_LOWATER: MetaBlocks = MetaBlocks(512);
 
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
 const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4096);
-pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
+pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(12288);
 const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 
 
@@ -798,7 +798,8 @@ mod tests {
     }
 
     /// Verify that a filesystem rename causes the filesystem metadata to be
-    /// updated.
+    /// updated. Verify that usage does not change because a filesystem is
+    /// renamed.
     fn test_filesystem_rename(paths: &[&Path]) {
         let name1 = "name1";
         let name2 = "name2";
@@ -814,10 +815,29 @@ mod tests {
                                      &mut mgr)
                 .unwrap();
 
+        let orig_data = match pool.thin_pool.status(&dm).unwrap() {
+            dm::ThinPoolStatus::Working(ref status) => status.usage.used_data,
+            dm::ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
+        };
+        assert_eq!(orig_data, DataBlocks(0));
+
         let fs_uuid = pool.create_filesystem(&name1, &dm, None).unwrap();
+
+        let data_1 = match pool.thin_pool.status(&dm).unwrap() {
+            dm::ThinPoolStatus::Working(ref status) => status.usage.used_data,
+            dm::ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
+        };
+        assert!(data_1 > orig_data);
+        assert!(data_1 < DataBlocks(10));
 
         let action = pool.rename_filesystem(fs_uuid, name2).unwrap();
         assert_eq!(action, RenameAction::Renamed);
+        let data_2 = match pool.thin_pool.status(&dm).unwrap() {
+            dm::ThinPoolStatus::Working(ref status) => status.usage.used_data,
+            dm::ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
+        };
+        assert_eq!(data_2, data_1);
+
         let flexdevs: FlexDevsSave = pool.record();
         pool.teardown(&dm).unwrap();
 
@@ -830,6 +850,12 @@ mod tests {
                 .unwrap();
 
         assert_eq!(pool.get_filesystem_by_uuid(fs_uuid).unwrap().name(), name2);
+
+        let data_3 = match pool.thin_pool.status(&dm).unwrap() {
+            dm::ThinPoolStatus::Working(ref status) => status.usage.used_data,
+            dm::ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
+        };
+        assert_eq!(data_3, data_2);
     }
 
     #[test]

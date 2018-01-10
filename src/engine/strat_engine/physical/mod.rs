@@ -12,6 +12,5 @@ mod setup;
 mod util;
 
 pub use self::blockdevmgr::{BlockDevMgr, BlkDevSegment, map_to_dm};
-pub use self::device::wipe_sectors;
 pub use self::metadata::MIN_MDA_SECTORS;
 pub use self::setup::{find_all, get_blockdevs, get_metadata};

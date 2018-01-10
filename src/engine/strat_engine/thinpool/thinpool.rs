@@ -276,8 +276,13 @@ impl ThinPool {
 
 
     /// Run status checks and take actions on the thinpool and its components.
-    pub fn check(&mut self, dm: &DM, bd_mgr: &mut BlockDevMgr) -> EngineResult<()> {
+    /// Returns a bool communicating if a configuration change requiring a
+    /// metadata save has been made.
+    pub fn check(&mut self, dm: &DM, bd_mgr: &mut BlockDevMgr) -> EngineResult<bool> {
         #![allow(match_same_arms)]
+
+        let mut should_save: bool = false;
+
         let thinpool: dm::ThinPoolStatus = self.thin_pool.status(dm)?;
         match thinpool {
             dm::ThinPoolStatus::Working(ref status) => {
@@ -303,7 +308,7 @@ impl ThinPool {
                     let meta_extend_size = usage.total_meta;
                     match self.extend_thinpool_meta(dm, meta_extend_size, bd_mgr) {
                         #![allow(single_match)]
-                        Ok(_) => {}
+                        Ok(_) => should_save = true,
                         Err(_) => {} // TODO: Take pool offline?
                     }
                 }
@@ -314,7 +319,7 @@ impl ThinPool {
                     // A more sophisticated approach might be in order.
                     match self.extend_thinpool(dm, usage.total_data, bd_mgr) {
                         #![allow(single_match)]
-                        Ok(_) => {}
+                        Ok(_) => should_save = true,
                         Err(_) => {} // TODO: Take pool offline?
                     }
                 }
@@ -336,7 +341,7 @@ impl ThinPool {
                 // TODO: filesystem failed, how to recover?
             }
         }
-        Ok(())
+        Ok(should_save)
     }
 
     /// Tear down the components managed here: filesystems, the MDV,

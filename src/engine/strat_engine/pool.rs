@@ -111,7 +111,10 @@ impl StratPool {
         // invoking method, Engine::check(). However, since we hope that
         // method will go away entirely, we just fix half of the problem
         // with this method, and leave the rest alone.
-        self.thin_pool.check(&DM::new()?, &mut self.block_devs)
+        if self.thin_pool.check(&DM::new()?, &mut self.block_devs)? {
+            self.write_metadata()?;
+        }
+        Ok(())
     }
 
     /// Teardown a pool.
@@ -128,10 +131,18 @@ impl StratPool {
         self.thin_pool.get_eventing_dev_names()
     }
 
-    pub fn event_on(&mut self, _dm_name: &DmName) -> EngineResult<()> {
-        // TODO: Just check the device that evented. Currently checks
-        // everything.
-        self.check()
+    /// Called when a DM device in this pool has generated an event.
+    // TODO: Just check the device that evented. Currently checks
+    // everything.
+    pub fn event_on(&mut self, dm_name: &DmName) -> EngineResult<()> {
+        assert!(self.thin_pool
+                    .get_eventing_dev_names()
+                    .iter()
+                    .any(|x| dm_name == &**x));
+        if self.thin_pool.check(&DM::new()?, &mut self.block_devs)? {
+            self.write_metadata()?;
+        }
+        Ok(())
     }
 }
 

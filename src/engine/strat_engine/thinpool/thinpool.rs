@@ -436,12 +436,8 @@ impl ThinPool {
             .iter()
             .map(|s| s.segment.length)
             .sum();
-        let meta_dev_total = self.thin_pool
-            .meta_dev()
-            .segments()
-            .iter()
-            .map(|s| s.length)
-            .sum();
+
+        let meta_dev_total = self.thin_pool.meta_dev().size();
 
         let mdv_total = self.mdv_segments
             .iter()

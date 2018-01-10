@@ -20,7 +20,8 @@ use super::super::super::structures::Table;
 use super::super::super::types::{DevUuid, FilesystemUuid, Name, PoolUuid, RenameAction};
 
 use super::super::devlinks;
-use super::super::physical::{BlockDevMgr, BlkDevSegment, Segment, map_to_dm, wipe_sectors};
+use super::super::device::wipe_sectors;
+use super::super::physical::{BlockDevMgr, BlkDevSegment, Segment, map_to_dm};
 use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
 use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, ThinRole, format_flex_name,

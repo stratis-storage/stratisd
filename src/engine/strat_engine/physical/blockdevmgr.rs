@@ -442,9 +442,9 @@ mod tests {
 
     use devicemapper::SECTOR_SIZE;
 
+    use super::super::super::device::write_sectors;
     use super::super::super::tests::{loopbacked, real};
 
-    use super::super::device::write_sectors;
     use super::super::metadata::{BDA_STATIC_HDR_SECTORS, MIN_MDA_SECTORS};
     use super::super::setup::{find_all, get_metadata};
 

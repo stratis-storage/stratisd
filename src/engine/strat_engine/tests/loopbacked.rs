@@ -17,7 +17,7 @@ use super::logger::init_logger;
 use super::tempdir::TempDir;
 use super::util::clean_up;
 
-use super::super::physical::wipe_sectors;
+use super::super::device::wipe_sectors;
 
 
 /// Ways of specifying range of numbers of devices to use for tests.

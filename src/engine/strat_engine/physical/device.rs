@@ -5,12 +5,11 @@
 // Functions for dealing with devices.
 
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
-use std::io::{BufWriter, Seek, SeekFrom, Write};
+use std::fs::File;
 use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
 
-use devicemapper::{Bytes, Device, IEC, SECTOR_SIZE, Sectors, devnode_to_devno};
+use devicemapper::{Bytes, Device, devnode_to_devno};
 
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 
@@ -23,29 +22,6 @@ pub fn blkdev_size(file: &File) -> EngineResult<Bytes> {
         Err(x) => Err(EngineError::Nix(x)),
         Ok(_) => Ok(Bytes(val)),
     }
-}
-
-/// Write buf at offset length times.
-pub fn write_sectors<P: AsRef<Path>>(path: P,
-                                     offset: Sectors,
-                                     length: Sectors,
-                                     buf: &[u8; SECTOR_SIZE])
-                                     -> EngineResult<()> {
-    let mut f = BufWriter::with_capacity(IEC::Mi as usize,
-                                         OpenOptions::new().write(true).open(path)?);
-
-    f.seek(SeekFrom::Start(*offset))?;
-    for _ in 0..*length {
-        f.write_all(buf)?;
-    }
-
-    f.flush()?;
-    Ok(())
-}
-
-/// Zero sectors at the given offset for length sectors.
-pub fn wipe_sectors<P: AsRef<Path>>(path: P, offset: Sectors, length: Sectors) -> EngineResult<()> {
-    write_sectors(path, offset, length, &[0u8; SECTOR_SIZE])
 }
 
 

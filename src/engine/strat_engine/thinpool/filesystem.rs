@@ -230,5 +230,9 @@ impl Recordable<FilesystemSave> for StratFilesystem {
 pub fn fs_usage(mount_point: &Path) -> EngineResult<(Bytes, Bytes)> {
     let mut stat = Statvfs::default();
     statvfs(mount_point, &mut stat)?;
-    Ok((Bytes(stat.f_bsize * stat.f_blocks), Bytes(stat.f_bsize * (stat.f_blocks - stat.f_bfree))))
+
+    // stat.f_bsize is type c_ulong, which is 32 bits on some archs. Upcast.
+    let f_bsize = stat.f_bsize as u64;
+
+    Ok((Bytes(f_bsize * stat.f_blocks), Bytes(f_bsize * (stat.f_blocks - stat.f_bfree))))
 }

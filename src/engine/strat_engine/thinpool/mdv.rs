@@ -13,10 +13,12 @@ use std::path::{Path, PathBuf};
 
 use nix;
 use nix::mount::{MsFlags, mount, umount};
+use nix::sys::statvfs::vfs::Statvfs;
 use nix::unistd::fsync;
 use serde_json;
 
 use devicemapper::{DmDevice, DM, LinearDev};
+use devicemapper::IEC::Mi;
 
 use super::super::super::engine::HasUuid;
 use super::super::super::errors::EngineResult;
@@ -24,7 +26,7 @@ use super::super::super::types::{FilesystemUuid, PoolUuid};
 
 use super::super::serde_structs::{FilesystemSave, Recordable};
 
-use super::util::create_fs;
+use super::util::{create_fs, xfs_growfs};
 
 use super::filesystem::StratFilesystem;
 
@@ -34,6 +36,8 @@ use super::filesystem::StratFilesystem;
 const DEV_PATH: &str = "/dev/stratis";
 
 const FILESYSTEM_DIR: &str = "filesystems";
+
+const MIN_MDV_AVAIL_BYTES: u64 = 4 * Mi;
 
 #[derive(Debug)]
 pub struct MetadataVol {
@@ -154,6 +158,24 @@ impl MetadataVol {
         }
 
         rename(temp_path, path)?;
+
+        // Check if our MDV needs enlarging
+        let fsinfo = Statvfs::for_path(&self.mount_pt)?;
+        let avail_bytes = fsinfo.f_bsize * fsinfo.f_bavail;
+        if avail_bytes < MIN_MDV_AVAIL_BYTES {
+            let mut segs = self.dev.segments().to_vec();
+            // Double the size
+            let added_space = self.dev.size();
+            let new_segs = block_devs.alloc_space(added_space);
+            match new_space {
+                None => debug!("Could not alloc {} sectors to extend MDV!", added_space),
+                Some(space) => {
+                    segs.extend(space);
+                    self.dev.set_segments(&DM::new()?, &segs);
+                    xfs_growfs(&self.mount_pt)?;
+                }
+            }
+        }
 
         Ok(())
     }

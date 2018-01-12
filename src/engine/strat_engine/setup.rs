@@ -157,7 +157,7 @@ pub fn get_metadata(pool_uuid: PoolUuid,
     // If no data has yet returned, we have an error. That is, we should have
     // some metadata, because we have a most recent time, but we failed to
     // get any.
-    let err_str = "timestamp indicates data was written, but no data succesfully read";
+    let err_str = "timestamp indicates data was written, but no data successfully read";
     Err(EngineError::Engine(ErrorEnum::NotFound, err_str.into()))
 }
 

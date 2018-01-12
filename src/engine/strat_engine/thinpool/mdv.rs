@@ -63,7 +63,7 @@ impl<'a> MountedMDV<'a> {
                     MsFlags::empty(),
                     None as Option<&str>) {
             Err(nix::Error::Sys(nix::Errno::EBUSY)) => {
-                // The device is already mounted at the specified mountpoint
+                // The device is already mounted at the specified mount point
                 Ok(())
             }
             Err(err) => Err(err),
@@ -83,7 +83,7 @@ impl<'a> Drop for MountedMDV<'a> {
         if let Err(err) = umount(&self.mdv.mount_pt) {
             warn!("Could not unmount MDV: {}", err);
         } else if let Err(err) = remove_dir(&self.mdv.mount_pt) {
-            warn!("Could not remove MDV mountpoint: {}", err);
+            warn!("Could not remove MDV mount point: {}", err);
         }
     }
 }

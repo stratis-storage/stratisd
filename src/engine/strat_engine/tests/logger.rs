@@ -8,7 +8,7 @@ use std::sync::{Once, ONCE_INIT};
 
 static LOGGER_INIT: Once = ONCE_INIT;
 
-/// Initialzie the logger once.  More than one init() attempt returns
+/// Initialize the logger once.  More than one init() attempt returns
 /// errors.
 pub fn init_logger() {
     LOGGER_INIT.call_once(|| {

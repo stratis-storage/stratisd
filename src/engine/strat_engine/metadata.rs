@@ -392,7 +392,7 @@ mod mda {
             // Load a single region at the location specified by index.
             // If it appears that no metadata has been written at the location
             // return None. If it appears that there is metadata, but it has
-            // been corrrupted, return an error.
+            // been corrupted, return an error.
             let mut load_a_region = |index: usize| -> EngineResult<Option<MDAHeader>> {
                 let mut hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
                 f.seek(SeekFrom::Start(MDARegions::mda_offset(header_size,
@@ -599,7 +599,7 @@ mod mda {
         }
 
         /// Given a pre-seek()ed File, load the MDA region and return the contents.
-        /// Return an error if the data can not be read, since the existance
+        /// Return an error if the data can not be read, since the existence
         /// of the MDAHeader implies that the data must be available.
         // MDAHeader cannot seek because it doesn't know which region it's in
         fn load_region<F>(&self, f: &mut F) -> EngineResult<Vec<u8>>

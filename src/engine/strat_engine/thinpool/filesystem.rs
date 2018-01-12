@@ -61,9 +61,9 @@ impl StratFilesystem {
     }
 
     /// Create a snapshot of the filesystem. Return the resulting filesystem/ThinDev
-    /// to the caller.  Use snapshot_name for the Stratis filesytem name.  Use
+    /// to the caller.  Use snapshot_name for the Stratis filesystem name.  Use
     /// snapshot_dmname for the new name of the ThinDev allocated for the snapshot.
-    /// Mounting a filesytem with a duplicate UUID would require special handling,
+    /// Mounting a filesystem with a duplicate UUID would require special handling,
     /// so snapshot_fs_uuid is used to update the new snapshot filesystem so it has
     /// a unique UUID.
     pub fn snapshot(&self,
@@ -144,7 +144,7 @@ impl StratFilesystem {
     }
 
     /// Return an extend size for the thindev under the filesystem
-    /// TODO: returning the current size will double the space provisoned to
+    /// TODO: returning the current size will double the space provisioned to
     /// the thin device.  We should determine if this is a reasonable value.
     fn extend_size(&self, current_size: Sectors) -> Sectors {
         current_size

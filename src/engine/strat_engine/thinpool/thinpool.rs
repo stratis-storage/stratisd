@@ -375,7 +375,7 @@ impl ThinPool {
                                  .first()
                                  .expect("len(new_data_regions) == 1"))?;
         } else {
-            let err_msg = format!("Insufficient space to accomodate request for {}",
+            let err_msg = format!("Insufficient space to accommodate request for {}",
                                   extend_size);
             return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
         }
@@ -395,7 +395,7 @@ impl ThinPool {
                                  .first()
                                  .expect("len(new_meta_regions) == 1"))?;
         } else {
-            let err_msg = format!("Insufficient space to accomodate request for {}",
+            let err_msg = format!("Insufficient space to accommodate request for {}",
                                   extend_size);
             return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
         }
@@ -1080,7 +1080,7 @@ mod tests {
                                      &mut mgr)
                 .unwrap();
 
-        // Create a filesytem as small as possible.  Allocate 1 MiB bigger than
+        // Create a filesystem as small as possible.  Allocate 1 MiB bigger than
         // the low water mark.
         let fs_size = FILESYSTEM_LOWATER + Bytes(IEC::Mi).sectors();
 

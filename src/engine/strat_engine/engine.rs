@@ -49,7 +49,7 @@ impl Eventable for DM {
 
 impl StratEngine {
     /// Setup a StratEngine.
-    /// 1. Verify the existance of Stratis /dev directory.
+    /// 1. Verify the existence of Stratis /dev directory.
     /// 2. Setup all the pools belonging to the engine.
     ///
     /// Returns an error if the kernel doesn't support required DM features.

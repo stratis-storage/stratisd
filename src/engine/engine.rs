@@ -58,7 +58,7 @@ pub trait Pool: HasName + HasUuid {
     /// for filesystems in this pool. If the same name is passed multiple
     /// times, the size associated with the last item is used.
     fn create_filesystems<'a, 'b>(&'a mut self,
-                                  specs: &[(&'b str, Option<Sectors>)])
+                                  specs: &[&'b str])
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>>;
 
     /// Adds blockdevs specified by paths to pool.

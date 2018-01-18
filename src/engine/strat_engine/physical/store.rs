@@ -20,10 +20,23 @@ use super::super::serde_structs::{Recordable, BlockDevSave};
 use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{BlkDevSegment, BlockDevMgr};
 
+/// For organizing cache management.
+#[derive(Debug)]
+struct Cache {
+    cache: CacheDev,
+}
+
+impl Cache {
+    /// Create a new Cache from an existing devicemapper cache device
+    pub fn new(cache: CacheDev) -> Cache {
+        Cache { cache: cache }
+    }
+}
+
 #[derive(Debug)]
 pub struct Store {
     block_mgr: BlockDevMgr,
-    cache: Option<CacheDev>,
+    cache: Option<Cache>,
 }
 
 impl Store {
@@ -35,7 +48,7 @@ impl Store {
                -> Store {
         Store {
             block_mgr: BlockDevMgr::new(pool_uuid, block_devs, last_update_time),
-            cache: cache,
+            cache: cache.map(Cache::new),
         }
     }
 
@@ -48,7 +61,7 @@ impl Store {
                       -> EngineResult<Store> {
         Ok(Store {
                block_mgr: BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?,
-               cache: cache,
+               cache: cache.map(Cache::new),
            })
     }
 

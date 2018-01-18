@@ -7,6 +7,8 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use chrono::{DateTime, Utc};
+
 use devicemapper::{CacheDev, Device, Sectors};
 
 use super::super::super::engine::BlockDev;
@@ -28,10 +30,11 @@ impl Store {
     /// Construct an object that represents an existing physical layer.
     pub fn new(pool_uuid: PoolUuid,
                block_devs: Vec<StratBlockDev>,
-               cache: Option<CacheDev>)
+               cache: Option<CacheDev>,
+               last_update_time: Option<DateTime<Utc>>)
                -> Store {
         Store {
-            block_mgr: BlockDevMgr::new(pool_uuid, block_devs),
+            block_mgr: BlockDevMgr::new(pool_uuid, block_devs, last_update_time),
             cache: cache,
         }
     }

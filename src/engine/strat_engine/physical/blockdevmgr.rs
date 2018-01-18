@@ -73,14 +73,18 @@ pub struct BlockDevMgr {
 }
 
 impl BlockDevMgr {
-    pub fn new(pool_uuid: PoolUuid, block_devs: Vec<StratBlockDev>) -> BlockDevMgr {
+    /// Make a struct that represents an existing BlockDevMgr.
+    pub fn new(pool_uuid: PoolUuid,
+               block_devs: Vec<StratBlockDev>,
+               last_update_time: Option<DateTime<Utc>>)
+               -> BlockDevMgr {
         BlockDevMgr {
             pool_uuid: pool_uuid,
             block_devs: block_devs
                 .into_iter()
                 .map(|bd| (bd.uuid(), bd))
                 .collect(),
-            last_update_time: None,
+            last_update_time: last_update_time,
         }
     }
 
@@ -92,7 +96,8 @@ impl BlockDevMgr {
                       -> EngineResult<BlockDevMgr> {
         let devices = resolve_devices(paths)?;
         Ok(BlockDevMgr::new(pool_uuid,
-                            initialize(pool_uuid, devices, mda_size, force, &HashSet::new())?))
+                            initialize(pool_uuid, devices, mda_size, force, &HashSet::new())?,
+                            None))
     }
 
     /// Get a function that maps UUIDs to Devices.

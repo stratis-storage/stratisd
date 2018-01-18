@@ -44,7 +44,7 @@ impl StratPool {
                       -> EngineResult<StratPool> {
         let pool_uuid = Uuid::new_v4();
 
-        let mut block_mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
+        let mut block_mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, None, force)?;
 
         let thinpool = ThinPool::new(pool_uuid,
                                      dm,

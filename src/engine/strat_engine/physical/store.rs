@@ -43,11 +43,12 @@ impl Store {
     pub fn initialize(pool_uuid: PoolUuid,
                       paths: &[&Path],
                       mda_size: Sectors,
+                      cache: Option<CacheDev>,
                       force: bool)
                       -> EngineResult<Store> {
         Ok(Store {
                block_mgr: BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?,
-               cache: None,
+               cache: cache,
            })
     }
 

@@ -15,15 +15,16 @@ use serde_json;
 
 use devicemapper::{Device, devnode_to_devno};
 
-use super::super::errors::{EngineResult, EngineError, ErrorEnum};
-use super::super::types::PoolUuid;
+use super::super::super::errors::{EngineResult, EngineError, ErrorEnum};
+use super::super::super::types::PoolUuid;
+
+use super::super::engine::DevOwnership;
+use super::super::serde_structs::PoolSave;
 
 use super::blockdev::StratBlockDev;
 use super::device::blkdev_size;
-use super::engine::DevOwnership;
 use super::metadata::{BDA, StaticHeader};
 use super::range_alloc::RangeAllocator;
-use super::serde_structs::PoolSave;
 
 
 /// Find all Stratis devices.

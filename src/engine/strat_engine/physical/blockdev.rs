@@ -11,13 +11,14 @@ use chrono::{DateTime, TimeZone, Utc};
 
 use devicemapper::{Device, Sectors};
 
-use super::super::engine::{BlockDev, HasUuid};
-use super::super::errors::EngineResult;
-use super::super::types::{BlockDevState, DevUuid, PoolUuid};
+use super::super::super::engine::{BlockDev, HasUuid};
+use super::super::super::errors::EngineResult;
+use super::super::super::types::{BlockDevState, DevUuid, PoolUuid};
+
+use super::super::serde_structs::{BlockDevSave, Recordable};
 
 use super::metadata::BDA;
 use super::range_alloc::RangeAllocator;
-use super::serde_structs::{BlockDevSave, Recordable};
 
 
 #[derive(Debug)]

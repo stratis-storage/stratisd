@@ -22,16 +22,24 @@ from dbus_python_client_gen import make_class
 
 from ._data import SPECS
 
+TIME_OUT = 120  # In seconds
+
 ObjectManager = make_class(
    "ObjectManager",
-   ET.fromstring(SPECS['org.freedesktop.DBus.ObjectManager'])
+   ET.fromstring(SPECS['org.freedesktop.DBus.ObjectManager']),
+   TIME_OUT
 )
 Manager = make_class(
    "Manager",
-   ET.fromstring(SPECS['org.storage.stratis1.Manager'])
+   ET.fromstring(SPECS['org.storage.stratis1.Manager']),
+   TIME_OUT
 )
 Filesystem = make_class(
    "Filesystem",
-   ET.fromstring(SPECS['org.storage.stratis1.filesystem'])
+   ET.fromstring(SPECS['org.storage.stratis1.filesystem']),
+   TIME_OUT
 )
-Pool = make_class("Pool", ET.fromstring(SPECS['org.storage.stratis1.pool']))
+Pool = make_class(
+   "Pool", ET.fromstring(SPECS['org.storage.stratis1.pool']),
+   TIME_OUT
+)

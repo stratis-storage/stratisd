@@ -111,7 +111,7 @@ pub struct BlockDevMgr {
 }
 
 impl BlockDevMgr {
-    /// Create a new BlockDevMgr struct
+    /// Make a struct that represents an existing BlockDevMgr.
     pub fn new(pool_uuid: PoolUuid,
                block_devs: Vec<StratBlockDev>,
                last_update_time: Option<DateTime<Utc>>)

@@ -78,7 +78,7 @@ impl StratPool {
                             EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no metadata for pool {}", uuid))
                         })?;
-        let store = Store::new(uuid, get_blockdevs(uuid, &metadata, devnodes)?);
+        let store = Store::new(uuid, get_blockdevs(uuid, &metadata, devnodes)?, None);
         let thinpool = ThinPool::setup(dm,
                                        uuid,
                                        metadata.thinpool_dev.data_block_size,

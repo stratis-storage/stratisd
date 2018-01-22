@@ -6,13 +6,13 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{thread_rng, seq};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Device, IEC, Sectors, Segment};
+use devicemapper::{Bytes, CacheDev, Device, DM, DmDevice, IEC, Sectors, Segment};
 
 use super::super::engine::BlockDev;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -68,17 +68,22 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<Segment> {
 pub struct BlockDevMgr {
     pool_uuid: PoolUuid,
     block_devs: HashMap<DevUuid, StratBlockDev>,
+    cache_dev: Option<CacheDev>,
     last_update_time: Option<DateTime<Utc>>,
 }
 
 impl BlockDevMgr {
-    pub fn new(pool_uuid: PoolUuid, block_devs: Vec<StratBlockDev>) -> BlockDevMgr {
+    pub fn new(pool_uuid: PoolUuid,
+               block_devs: Vec<StratBlockDev>,
+               cache_dev: Option<CacheDev>)
+               -> BlockDevMgr {
         BlockDevMgr {
             pool_uuid: pool_uuid,
             block_devs: block_devs
                 .into_iter()
                 .map(|bd| (bd.uuid(), bd))
                 .collect(),
+            cache_dev: cache_dev,
             last_update_time: None,
         }
     }
@@ -91,7 +96,8 @@ impl BlockDevMgr {
                       -> EngineResult<BlockDevMgr> {
         let devices = resolve_devices(paths)?;
         Ok(BlockDevMgr::new(pool_uuid,
-                            initialize(pool_uuid, devices, mda_size, force, &HashSet::new())?))
+                            initialize(pool_uuid, devices, mda_size, force, &HashSet::new())?,
+                            None))
     }
 
     /// Get a function that maps UUIDs to Devices.
@@ -118,7 +124,10 @@ impl BlockDevMgr {
         Ok(bdev_uuids)
     }
 
-    pub fn destroy_all(mut self) -> EngineResult<()> {
+    pub fn destroy_all(mut self, dm: &DM) -> EngineResult<()> {
+        if let Some(cache_dev) = self.cache_dev {
+            cache_dev.teardown(dm)?;
+        }
         let bds = self.block_devs
             .drain()
             .map(|(_, bd)| bd)
@@ -168,14 +177,6 @@ impl BlockDevMgr {
         }
 
         Some(lists)
-    }
-
-    #[allow(dead_code)]
-    pub fn devnodes(&self) -> Vec<PathBuf> {
-        self.block_devs
-            .values()
-            .map(|d| d.devnode.clone())
-            .collect()
     }
 
     /// Write the given data to all blockdevs marking with current time.
@@ -617,7 +618,9 @@ mod tests {
                 _ => false,
             }
         }));
-        bd_mgr.destroy_all().unwrap();
+
+        let dm = DM::new().unwrap();
+        bd_mgr.destroy_all(&dm).unwrap();
         assert!(paths
                     .iter()
                     .all(|path| {

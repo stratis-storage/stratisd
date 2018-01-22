@@ -57,7 +57,7 @@ impl StratPool {
         let thinpool = match thinpool {
             Ok(thinpool) => thinpool,
             Err(err) => {
-                let _ = block_mgr.destroy_all();
+                let _ = block_mgr.destroy_all(dm);
                 return Err(err);
             }
         };
@@ -82,7 +82,7 @@ impl StratPool {
                             EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no metadata for pool {}", uuid))
                         })?;
-        let bd_mgr = BlockDevMgr::new(uuid, get_blockdevs(uuid, &metadata, devnodes)?);
+        let bd_mgr = BlockDevMgr::new(uuid, get_blockdevs(uuid, &metadata, devnodes)?, None);
         let thinpool = ThinPool::setup(uuid,
                                        &DM::new()?,
                                        metadata.thinpool_dev.data_block_size,
@@ -177,8 +177,9 @@ impl Pool for StratPool {
     }
 
     fn destroy(self) -> EngineResult<()> {
-        self.thin_pool.teardown(&DM::new()?)?;
-        self.block_devs.destroy_all()?;
+        let dm = DM::new()?;
+        self.thin_pool.teardown(&dm)?;
+        self.block_devs.destroy_all(&dm)?;
         Ok(())
     }
 

@@ -21,7 +21,7 @@ travis_fmt:
 	cargo fmt -- --write-mode=diff
 
 build:
-	RUSTFLAGS='-D warnings' cargo build
+	RUSTFLAGS='-D warnings' cargo build --features "dbus_enabled"
 
 test-loop:
 	sudo env "PATH=${PATH}" RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test loop_

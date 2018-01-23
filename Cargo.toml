@@ -4,7 +4,7 @@ version = "0.1.4"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.com>"]
 
 [dependencies]
-dbus = "0.6.1"
+dbus = {version = "0.6.1", optional = true}
 clap = "2"
 nix = "0.9"
 devicemapper = "0.15"
@@ -33,3 +33,6 @@ features = ["serde", "v4"]
 [dev-dependencies]
 quickcheck = "0.6"
 loopdev = "0.2"
+
+[features]
+dbus_enabled = ["dbus"]

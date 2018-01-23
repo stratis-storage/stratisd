@@ -14,23 +14,6 @@ macro_rules! calculate_redundancy {
     }
 }
 
-macro_rules! destroy_pool {
-    ( $s:ident; $uuid: ident) => {
-        if let Some(ref pool) = $s.pools.get_by_uuid($uuid) {
-            if pool.has_filesystems() {
-                return Err(EngineError::Engine(
-                    ErrorEnum::Busy, "filesystems remaining on pool".into()));
-            };
-        } else {
-            return Ok(false);
-        }
-        $s.pools.remove_by_uuid($uuid)
-             .expect("Must succeed since $s.pool.get_by_uuid() returned a value")
-             .destroy()?;
-        Ok(true)
-    }
-}
-
 macro_rules! get_pool {
     ( $s:ident; $uuid:ident ) => {
         $s.pools.get_by_uuid($uuid).map(|p| p as &Pool)

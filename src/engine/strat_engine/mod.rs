@@ -13,6 +13,7 @@ mod serde_structs;
 mod setup;
 mod range_alloc;
 mod thinpool;
+mod devlinks;
 mod util;
 
 pub use self::engine::StratEngine;

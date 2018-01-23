@@ -47,6 +47,8 @@ impl Store {
         self.block_mgr.add(paths, force)
     }
 
+    // TODO: We will not be allocating BlkDevSegments any more, because
+    // we will be allocating from the DM device.
     pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<BlkDevSegment>>> {
         self.block_mgr.alloc_space(sizes)
     }

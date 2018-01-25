@@ -16,7 +16,6 @@ extern crate chrono;
 extern crate dbus;
 
 extern crate tempdir;
-extern crate term;
 extern crate rand;
 extern crate serde;
 extern crate mnt;

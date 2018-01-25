@@ -7,6 +7,7 @@ extern crate libstratis;
 extern crate log;
 extern crate env_logger;
 extern crate clap;
+#[cfg(feature="dbus_enabled")]
 extern crate dbus;
 extern crate term;
 extern crate libc;
@@ -24,6 +25,8 @@ use std::process::exit;
 use clap::{App, Arg};
 use log::LogLevelFilter;
 use env_logger::LogBuilder;
+
+#[cfg(feature="dbus_enabled")]
 use dbus::WatchEvent;
 
 use libstratis::engine::{Engine, SimEngine, StratEngine};
@@ -83,6 +86,7 @@ fn run() -> StratisResult<()> {
         }
     };
 
+    #[cfg(feature="dbus_enabled")]
     let (dbus_conn, mut tree, dbus_context) = libstratis::dbus_api::connect(Rc::clone(&engine))?;
 
     let mut fds = Vec::new();
@@ -126,24 +130,28 @@ fn run() -> StratisResult<()> {
             engine.borrow_mut().evented()?;
         }
 
-        // Iterate through D-Bus file descriptors
-        for pfd in fds[engine_fds_end_idx..]
-                .iter()
-                .filter(|pfd| pfd.revents != 0) {
-            for item in dbus_conn.watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents)) {
-                if let Err(r) = libstratis::dbus_api::handle(&dbus_conn,
-                                                             &item,
-                                                             &mut tree,
-                                                             &dbus_context) {
-                    write_or_panic(From::from(r));
+        // Iterate through D-Bus file descriptors (if enabled)
+        #[cfg(feature="dbus_enabled")]
+        {
+            for pfd in fds[engine_fds_end_idx..]
+                    .iter()
+                    .filter(|pfd| pfd.revents != 0) {
+                for item in dbus_conn.watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents)) {
+                    if let Err(r) = libstratis::dbus_api::handle(&dbus_conn,
+                                                                 &item,
+                                                                 &mut tree,
+                                                                 &dbus_context) {
+                        write_or_panic(From::from(r));
+                    }
                 }
             }
-        }
 
-        // Refresh list of dbus fds to poll for every time. This can change as
-        // D-Bus clients come and go.
-        fds.truncate(engine_fds_end_idx);
-        fds.extend(dbus_conn.watch_fds().iter().map(|w| w.to_pollfd()));
+            // Refresh list of dbus fds to poll for every time. This can change as
+            // D-Bus clients come and go.
+            fds.truncate(engine_fds_end_idx);
+
+            fds.extend(dbus_conn.watch_fds().iter().map(|w| w.to_pollfd()));
+        }
 
         let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, poll_timeout) };
         assert!(r >= 0);

@@ -11,7 +11,10 @@ extern crate crc;
 extern crate byteorder;
 extern crate uuid;
 extern crate chrono;
+
+#[cfg(feature="dbus_enabled")]
 extern crate dbus;
+
 extern crate tempdir;
 extern crate term;
 extern crate rand;
@@ -31,7 +34,10 @@ extern crate error_chain;
 extern crate quickcheck;
 
 pub mod engine;
+
+#[cfg(feature="dbus_enabled")]
 pub mod dbus_api;
+
 pub mod stratis;
 
 

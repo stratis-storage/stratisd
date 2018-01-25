@@ -18,12 +18,11 @@ use serde_json;
 
 use devicemapper::{DmDevice, DM, LinearDev};
 
-use super::super::devlinks::DEV_PATH;
-
 use super::super::super::engine::HasUuid;
 use super::super::super::errors::EngineResult;
 use super::super::super::types::{FilesystemUuid, PoolUuid};
 
+use super::super::devlinks::DEV_PATH;
 use super::super::serde_structs::{FilesystemSave, Recordable};
 
 use super::util::create_fs;

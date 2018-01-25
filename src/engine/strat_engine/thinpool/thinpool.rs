@@ -22,8 +22,8 @@ use super::super::super::types::{DevUuid, PoolUuid, FilesystemUuid, RenameAction
 
 use super::super::blockdevmgr::{BlockDevMgr, BlkDevSegment, map_to_dm};
 use super::super::device::wipe_sectors;
-use super::super::serde_structs::{FilesystemSave, FlexDevsSave, Recordable, ThinPoolDevSave};
 use super::super::devlinks;
+use super::super::serde_structs::{FilesystemSave, FlexDevsSave, Recordable, ThinPoolDevSave};
 
 use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, ThinRole, format_flex_name,
                       format_thinpool_name, format_thin_name};

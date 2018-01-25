@@ -31,13 +31,13 @@ use super::filesystem::{FilesystemStatus, StratFilesystem};
 use super::mdv::MetadataVol;
 use super::util::execute_cmd;
 
-pub const DATA_BLOCK_SIZE: Sectors = Sectors(2048);
+pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
 const META_LOWATER: MetaBlocks = MetaBlocks(512);
 
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
-const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4096);
+const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
 pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
 const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 

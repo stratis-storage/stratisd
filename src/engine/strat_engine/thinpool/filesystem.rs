@@ -183,7 +183,8 @@ impl StratFilesystem {
 
     /// Tear down the filesystem.
     pub fn teardown(self, dm: &DM) -> EngineResult<()> {
-        Ok(self.thin_dev.teardown(dm)?)
+        self.thin_dev.teardown(dm)?;
+        Ok(())
     }
 
     /// Set the name of this filesystem to name.
@@ -193,7 +194,8 @@ impl StratFilesystem {
 
     /// Destroy the filesystem.
     pub fn destroy(self, dm: &DM, thin_pool: &ThinPoolDev) -> EngineResult<()> {
-        Ok(self.thin_dev.destroy(dm, thin_pool)?)
+        self.thin_dev.destroy(dm, thin_pool)?;
+        Ok(())
     }
 }
 

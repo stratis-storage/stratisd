@@ -58,6 +58,24 @@ impl Display for ThinPoolRole {
     }
 }
 
+#[allow(dead_code)]
+#[derive(Clone, Copy)]
+pub enum PhysicalRole {
+    Cache,
+    Meta,
+    Origin,
+}
+
+impl Display for PhysicalRole {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            PhysicalRole::Cache => write!(f, "cache"),
+            PhysicalRole::Meta => write!(f, "meta"),
+            PhysicalRole::Origin => write!(f, "origin"),
+        }
+    }
+}
+
 /// Format a name for the flex layer.
 /// Prerequisite: len(format!("{}", FORMAT_VERSION)) < 72
 pub fn format_flex_name(pool_uuid: PoolUuid, role: FlexRole) -> DmNameBuf {
@@ -87,4 +105,15 @@ pub fn format_thinpool_name(pool_uuid: PoolUuid, role: ThinPoolRole) -> DmNameBu
                            pool_uuid.simple().to_string(),
                            role))
             .expect("FORMAT_VERSION display_length < 81")
+}
+
+#[allow(dead_code)]
+/// Format a name for the dm device that contains the physical layer.
+/// Prerequisite: len(format!("{}", FORMAT_VERSION) < 79
+pub fn format_physical_name(pool_uuid: PoolUuid, role: PhysicalRole) -> DmNameBuf {
+    DmNameBuf::new(format!("stratis-{}-{}-physical-{}",
+                           FORMAT_VERSION,
+                           pool_uuid.simple().to_string(),
+                           role))
+            .expect("FORMAT_VERSION display_length < 78")
 }

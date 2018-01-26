@@ -218,6 +218,8 @@ impl RangeAllocator {
     /// Attempt to allocate. Returns number of sectors allocated (may
     /// be less than request, including zero) and a Vec<(offset,
     /// length)> of sectors successfully allocated.
+    /// If all available sectors are desired, use available() method to
+    /// discover that amount.
     pub fn request(&mut self, amount: Sectors) -> (Sectors, Vec<(Sectors, Sectors)>) {
         let mut segs = Vec::new();
         let mut needed = amount;
@@ -255,6 +257,7 @@ mod tests {
     /// 6. Verify that the maximum available, 28, were returned in two ranges.
     /// 7. Remove two adjacent ranges of total length 60 sectors.
     /// 8. Verify that number of available sectors is 60, used is 68.
+    /// 9. Request all available, then verify that nothing is left.
     fn test_allocator_allocations() {
         let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
 
@@ -278,6 +281,10 @@ mod tests {
         allocator.remove_ranges(&good_remove_ranges);
         assert_eq!(allocator.used(), Sectors(68));
         assert_eq!(allocator.available(), Sectors(60));
+
+        let available = allocator.available();
+        allocator.request(available);
+        assert_eq!(allocator.available(), Sectors(0));
     }
 
     #[test]

@@ -22,6 +22,8 @@ use super::blockdevmgr::{BlkDevSegment, BlockDevMgr};
 
 #[derive(Debug)]
 pub struct Store {
+    /// This block_mgr handles the data block devices; devices dedicated to
+    /// other things, like the cache, are handled separately.
     block_mgr: BlockDevMgr,
 }
 

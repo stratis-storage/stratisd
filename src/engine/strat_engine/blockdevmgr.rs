@@ -6,7 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{thread_rng, seq};
@@ -168,14 +168,6 @@ impl BlockDevMgr {
         }
 
         Some(lists)
-    }
-
-    #[allow(dead_code)]
-    pub fn devnodes(&self) -> Vec<PathBuf> {
-        self.block_devs
-            .values()
-            .map(|d| d.devnode.clone())
-            .collect()
     }
 
     /// Write the given data to all blockdevs marking with current time.

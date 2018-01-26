@@ -21,13 +21,14 @@ use super::super::super::types::{DevUuid, FilesystemUuid, Name, PoolUuid, Rename
 
 use super::super::devlinks;
 use super::super::device::wipe_sectors;
+use super::super::dmnames::{FlexRole, ThinPoolRole, ThinRole, format_flex_name,
+                            format_thinpool_name, format_thin_name};
 use super::super::physical::{BlockDevMgr, BlkDevSegment, Segment, map_to_dm};
 use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
-use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, ThinRole, format_flex_name,
-                      format_thin_name, format_thinpool_name};
 use super::filesystem::{FilesystemStatus, StratFilesystem};
 use super::mdv::MetadataVol;
+use super::thinids::ThinDevIdPool;
 use super::util::execute_cmd;
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);

@@ -5,6 +5,7 @@
 mod cleanup;
 mod device;
 mod devlinks;
+mod dmnames;
 mod engine;
 mod physical;
 mod pool;

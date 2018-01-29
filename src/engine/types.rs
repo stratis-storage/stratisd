@@ -30,6 +30,14 @@ pub enum BlockDevState {
     InUse,
 }
 
+/// Blockdev tier. Used to distinguish between blockdevs used for
+/// data and blockdevs used for a cache.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BlockDevTier {
+    Data,
+    Cache,
+}
+
 /// Redundancy classifications which the engine allows for pools.
 macro_attr! {
     #[derive(Debug, Eq, PartialEq)]

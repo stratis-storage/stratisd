@@ -9,13 +9,11 @@ extern crate env_logger;
 extern crate clap;
 #[cfg(feature="dbus_enabled")]
 extern crate dbus;
-extern crate term;
 extern crate libc;
 
 #[cfg(test)]
 extern crate quickcheck;
 
-use std::io::Write;
 use std::env;
 use std::error::Error;
 use std::rc::Rc;
@@ -32,21 +30,9 @@ use dbus::WatchEvent;
 use libstratis::engine::{Engine, SimEngine, StratEngine};
 use libstratis::stratis::{StratisResult, StratisError, VERSION};
 
-/// Try to write the error from the program to stderr, vehemently.
-/// Return an error if stderr unavailable or writing was a failure.
-fn write_err(err: StratisError) -> StratisResult<()> {
-    let mut out = term::stderr().ok_or(StratisError::StderrNotFound)?;
-    out.fg(term::color::RED)?;
-    writeln!(out, "{}", err.description())?;
-    out.reset()?;
-    Ok(())
-}
-
 /// If writing a program error to stderr fails, panic.
-fn write_or_panic(err: StratisError) -> () {
-    if let Err(e) = write_err(err) {
-        panic!("Unable to write to stderr: {}", e)
-    }
+fn print_err(err: StratisError) -> () {
+    eprintln!("{}", err.description());
 }
 
 fn run() -> StratisResult<()> {
@@ -141,7 +127,7 @@ fn run() -> StratisResult<()> {
                                                                  &item,
                                                                  &mut tree,
                                                                  &dbus_context) {
-                        write_or_panic(From::from(r));
+                        print_err(From::from(r));
                     }
                 }
             }
@@ -162,7 +148,7 @@ fn main() {
     let error_code = match run() {
         Ok(_) => 0,
         Err(err) => {
-            write_or_panic(err);
+            print_err(err);
             1
         }
     };

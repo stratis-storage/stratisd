@@ -9,8 +9,6 @@ use std::io;
 #[cfg(feature="dbus_enabled")]
 use dbus;
 
-use term;
-
 use engine::EngineError;
 
 pub type StratisResult<T> = Result<T, StratisError>;
@@ -23,8 +21,6 @@ pub enum StratisError {
 
     #[cfg(feature="dbus_enabled")]
     Dbus(dbus::Error),
-
-    Term(term::Error),
 }
 
 impl fmt::Display for StratisError {
@@ -40,8 +36,6 @@ impl fmt::Display for StratisError {
             StratisError::Dbus(ref err) => {
                 write!(f, "Dbus error: {}", err.message().unwrap_or("Unknown"))
             }
-
-            StratisError::Term(ref err) => write!(f, "Term error: {}", err),
         }
     }
 }
@@ -55,8 +49,6 @@ impl Error for StratisError {
 
             #[cfg(feature="dbus_enabled")]
             StratisError::Dbus(ref err) => err.message().unwrap_or("D-Bus Error"),
-
-            StratisError::Term(ref err) => Error::description(err),
         }
     }
 
@@ -68,8 +60,6 @@ impl Error for StratisError {
 
             #[cfg(feature="dbus_enabled")]
             StratisError::Dbus(ref err) => Some(err),
-
-            StratisError::Term(ref err) => Some(err),
         }
     }
 }
@@ -84,12 +74,6 @@ impl From<io::Error> for StratisError {
 impl From<dbus::Error> for StratisError {
     fn from(err: dbus::Error) -> StratisError {
         StratisError::Dbus(err)
-    }
-}
-
-impl From<term::Error> for StratisError {
-    fn from(err: term::Error) -> StratisError {
-        StratisError::Term(err)
     }
 }
 

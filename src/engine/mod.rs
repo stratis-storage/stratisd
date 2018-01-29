@@ -17,6 +17,7 @@ pub use self::sim_engine::SimEngine;
 pub use self::strat_engine::StratEngine;
 
 pub use self::types::BlockDevState;
+pub use self::types::BlockDevTier;
 pub use self::types::DevUuid;
 pub use self::types::FilesystemUuid;
 pub use self::types::PoolUuid;

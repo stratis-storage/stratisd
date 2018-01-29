@@ -14,7 +14,8 @@ use devicemapper::{DM, Device, DmName, DmNameBuf, Sectors};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::{DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction};
+use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
+                          RenameAction};
 
 use super::backstore::{Backstore, MIN_MDA_SECTORS, get_metadata};
 use super::serde_structs::{PoolSave, Recordable};
@@ -199,8 +200,13 @@ impl Pool for StratPool {
     fn add_blockdevs(&mut self,
                      pool_name: &str,
                      paths: &[&Path],
+                     tier: BlockDevTier,
                      force: bool)
                      -> EngineResult<Vec<DevUuid>> {
+        if tier == BlockDevTier::Cache {
+            return Err(EngineError::Engine(ErrorEnum::Invalid, "UNIMPLEMENTED".into()));
+        }
+
         let dm = DM::new()?;
         let bdev_info = self.backstore.add(&dm, paths, force)?;
         self.write_metadata(pool_name)?;
@@ -277,12 +283,16 @@ impl Pool for StratPool {
         self.backstore.blockdevs()
     }
 
-    fn get_blockdev(&self, uuid: DevUuid) -> Option<&BlockDev> {
-        self.backstore.get_blockdev_by_uuid(uuid)
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
+        self.backstore
+            .get_blockdev_by_uuid(uuid)
+            .and_then(|bd| Some((BlockDevTier::Data, bd)))
     }
 
-    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
-        self.backstore.get_mut_blockdev_by_uuid(uuid)
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)> {
+        self.backstore
+            .get_mut_blockdev_by_uuid(uuid)
+            .and_then(|bd| Some((BlockDevTier::Data, bd)))
     }
 
     fn save_state(&mut self, pool_name: &str) -> EngineResult<()> {

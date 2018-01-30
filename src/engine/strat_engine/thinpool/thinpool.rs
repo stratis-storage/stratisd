@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-/// Code to handle management of a pool's thinpool device.
+// Code to handle management of a pool's thinpool device.
 
 use std::borrow::BorrowMut;
 use std::cmp;

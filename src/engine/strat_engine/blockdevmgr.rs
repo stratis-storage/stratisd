@@ -12,7 +12,8 @@ use chrono::{DateTime, Duration, Utc};
 use rand::{thread_rng, seq};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Device, IEC, Sectors, Segment};
+use devicemapper::{Bytes, Device, IEC, Sectors, LinearDevTargetParams, LinearTargetParams,
+                   TargetLine};
 
 use super::super::engine::BlockDev;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -29,6 +30,30 @@ use super::util::hw_lookup;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 const MAX_NUM_TO_WRITE: usize = 10;
+
+
+/// struct to represent a continuous set of sectors on a disk
+#[derive(Debug, Clone)]
+pub struct Segment {
+    /// The offset into the device where this segment starts.
+    pub start: Sectors,
+    /// The length of the segment.
+    pub length: Sectors,
+    /// The device the segment is within.
+    pub device: Device,
+}
+
+
+impl Segment {
+    /// Create a new Segment with given attributes
+    pub fn new(device: Device, start: Sectors, length: Sectors) -> Segment {
+        Segment {
+            device: device,
+            start: start,
+            length: length,
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct BlkDevSegment {
@@ -54,13 +79,27 @@ impl Recordable<Vec<(Uuid, Sectors, Sectors)>> for Vec<BlkDevSegment> {
     }
 }
 
-/// Build a Vec<Segment> from BlkDevSegments. This is useful for calls
+/// Build a LinearDevTargetTable from BlkDevSegments. This is useful for calls
 /// to the devicemapper library.
-pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<Segment> {
-    bsegs
+pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParams>> {
+    let mut table = Vec::new();
+    let mut logical_start_offset = Sectors(0);
+
+    let segments = bsegs
         .into_iter()
         .map(|bseg| bseg.to_segment())
-        .collect::<Vec<_>>()
+        .collect::<Vec<_>>();
+    for segment in segments {
+        let (physical_start_offset, length) = (segment.start, segment.length);
+        let params = LinearTargetParams::new(segment.device, physical_start_offset);
+        let line = TargetLine::new(logical_start_offset,
+                                   length,
+                                   LinearDevTargetParams::Linear(params));
+        table.push(line);
+        logical_start_offset += length;
+    }
+
+    table
 }
 
 

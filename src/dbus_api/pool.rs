@@ -22,8 +22,8 @@ use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
-use super::util::{engine_to_dbus_err_tuple, get_next_arg, get_uuid, msg_code_ok, msg_string_ok,
-                  STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
+use super::util::{build_propchanged, engine_to_dbus_err_tuple, get_next_arg, get_uuid,
+                  msg_code_ok, msg_string_ok, STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
@@ -210,7 +210,13 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> Meth
         }
     };
 
-    Ok(vec![msg])
+    let sig_msg = build_propchanged(
+        "TotalPhysicalSize",
+        &*pool.total_physical_size().to_string(),
+        object_path,
+    );
+
+    Ok(vec![msg, sig_msg])
 }
 
 fn add_datadevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -237,7 +243,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let msg = match dbus_context
+    let msgs = match dbus_context
         .engine
         .borrow_mut()
         .rename_pool(pool_uuid, new_name)
@@ -245,16 +251,22 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", &pool_uuid);
             let (rc, rs) = (u16::from(DbusErrorEnum::INTERNAL_ERROR), error_message);
-            return_message.append3(default_return, rc, rs)
+            vec![return_message.append3(default_return, rc, rs)]
         }
-        Ok(RenameAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),
-        Ok(RenameAction::Renamed) => return_message.append3(true, msg_code_ok(), msg_string_ok()),
+        Ok(RenameAction::Identity) => vec![
+            return_message.append3(false, msg_code_ok(), msg_string_ok()),
+        ],
+        Ok(RenameAction::Renamed) => vec![
+            return_message.append3(true, msg_code_ok(), msg_string_ok()),
+            build_propchanged("Name", new_name, object_path),
+        ],
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
-            return_message.append3(default_return, rc, rs)
+            vec![return_message.append3(default_return, rc, rs)]
         }
     };
-    Ok(vec![msg])
+
+    Ok(msgs)
 }
 
 /// Get a pool property and place it on the D-Bus. The property is
@@ -371,12 +383,12 @@ pub fn create_dbus_pool<'a>(
 
     let name_property = f.property::<&str, _>("Name", ())
         .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
+        .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_name);
 
     let total_physical_size_property = f.property::<&str, _>("TotalPhysicalSize", ())
         .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
+        .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_total_physical_size);
 
     let total_physical_used_property = f.property::<&str, _>("TotalPhysicalUsed", ())

@@ -10,8 +10,7 @@ use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInf
 
 use uuid::Uuid;
 
-use super::super::engine::BlockDev;
-use super::super::engine::types::BlockDevState;
+use super::super::engine::{BlockDev, BlockDevState};
 
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 

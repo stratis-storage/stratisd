@@ -21,8 +21,8 @@ use std::cell::RefCell;
 use std::process::exit;
 
 use clap::{App, Arg};
-use log::LogLevelFilter;
 use env_logger::LogBuilder;
+use log::{LogLevelFilter, SetLoggerError};
 
 #[cfg(feature="dbus_enabled")]
 use dbus::WatchEvent;
@@ -33,6 +33,24 @@ use libstratis::stratis::{StratisResult, StratisError, VERSION};
 /// If writing a program error to stderr fails, panic.
 fn print_err(err: StratisError) -> () {
     eprintln!("{}", err.description());
+}
+
+/// Configure and initialize the logger.
+/// If debug is true, log at debug level. Otherwise read log configuration
+/// parameters from the environment if RUST_LOG is set. Otherwise, just
+/// accept the default configuration.
+fn initialize_log(debug: bool) -> Result<(), SetLoggerError> {
+    let mut builder = LogBuilder::new();
+    if debug {
+        builder.filter(Some("stratisd"), LogLevelFilter::Debug);
+        builder.filter(Some("libstratis"), LogLevelFilter::Debug);
+    } else {
+        if let Ok(s) = env::var("RUST_LOG") {
+            builder.parse(&s);
+        }
+    };
+
+    builder.init()
 }
 
 fn run() -> StratisResult<()> {
@@ -48,19 +66,8 @@ fn run() -> StratisResult<()> {
                  .help("Use simulator engine"))
         .get_matches();
 
-    let mut builder = LogBuilder::new();
-    if matches.is_present("debug") {
-        builder.filter(Some("stratisd"), LogLevelFilter::Debug);
-        builder.filter(Some("libstratis"), LogLevelFilter::Debug);
-    } else {
-        if let Ok(s) = env::var("RUST_LOG") {
-            builder.parse(&s);
-        }
-    };
-
-    builder
-        .init()
-        .expect("This is the first and only initialization of the logger; it must succeed");
+    initialize_log(matches.is_present("debug"))
+        .expect("This is the first and only invocation of this method; it must succeed.");
 
     let engine: Rc<RefCell<Engine>> = {
         if matches.is_present("sim") {

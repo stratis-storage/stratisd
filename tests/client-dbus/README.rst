@@ -17,6 +17,10 @@ To run the existing D-Bus tests, ensure that your PYTHONPATH includes the
 src directory, set the environment variable STRATISD, to the location of your
 Stratis executable, and: ::
 
+    > export PYTHONPATH=src:../../../dbus-client-gen/src:../../../\
+dbus-python-client-gen/src:../../../into-dbus-python/src:../../../\
+dbus-signature-pyparsing/src
+    > export STRATISD=../../target/debug/stratisd
     > make dbus-tests
 
 Contributing

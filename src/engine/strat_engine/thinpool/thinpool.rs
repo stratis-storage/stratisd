@@ -23,7 +23,7 @@ use super::super::devlinks;
 use super::super::device::wipe_sectors;
 use super::super::dmnames::{FlexRole, ThinPoolRole, ThinRole, format_flex_name,
                             format_thinpool_name, format_thin_name};
-use super::super::physical::{BlkDevSegment, Segment, Store, map_to_dm};
+use super::super::physical::{BlkDevSegment, Segment, Store, get_coalesced_segments, map_to_dm};
 use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
 use super::filesystem::{FilesystemStatus, StratFilesystem};
@@ -609,41 +609,6 @@ impl Recordable<ThinPoolDevSave> for ThinPool {
     fn record(&self) -> ThinPoolDevSave {
         ThinPoolDevSave { data_block_size: self.thin_pool.data_block_size() }
     }
-}
-
-/// Coalesce existing BlkDevSegment values with newly allocated segments.
-fn get_coalesced_segments(current_segs: &[BlkDevSegment],
-                          new_segs: &[BlkDevSegment])
-                          -> Vec<BlkDevSegment> {
-    let mut segments = Vec::with_capacity(current_segs.len() + new_segs.len());
-    segments.extend_from_slice(current_segs);
-
-    // Last existing and first new may be contiguous. Coalesce into
-    // a single BlkDevSegment if so.
-    let coalesced_new_first = {
-        match new_segs.first() {
-            Some(new_first) => {
-                let old_last = segments
-                    .last_mut()
-                    .expect("thin pool must always have some data segments");
-                if old_last.uuid == new_first.uuid &&
-                   (old_last.segment.start + old_last.segment.length == new_first.segment.start) {
-                    old_last.segment.length += new_first.segment.length;
-                    true
-                } else {
-                    false
-                }
-            }
-            None => false,
-        }
-    };
-
-    if coalesced_new_first {
-        segments.extend_from_slice(&new_segs[1..]);
-    } else {
-        segments.extend_from_slice(new_segs);
-    }
-    segments
 }
 
 /// Setup metadata dev for thinpool.

@@ -12,7 +12,7 @@ mod setup;
 mod store;
 mod util;
 
-pub use self::blockdevmgr::{BlkDevSegment, Segment, map_to_dm};
+pub use self::blockdevmgr::{BlkDevSegment, Segment, get_coalesced_segments, map_to_dm};
 pub use self::metadata::MIN_MDA_SECTORS;
 pub use self::setup::{find_all, get_blockdevs, get_metadata, is_stratis_device};
 pub use self::store::Store;

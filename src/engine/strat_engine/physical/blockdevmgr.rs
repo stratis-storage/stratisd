@@ -79,6 +79,41 @@ impl Recordable<Vec<(Uuid, Sectors, Sectors)>> for Vec<BlkDevSegment> {
     }
 }
 
+/// Coalesce existing BlkDevSegment values with newly allocated segments.
+pub fn get_coalesced_segments(left: &[BlkDevSegment],
+                              right: &[BlkDevSegment])
+                              -> Vec<BlkDevSegment> {
+    if left.is_empty() {
+        return right.to_vec();
+    }
+    if right.is_empty() {
+        return left.to_vec();
+    }
+
+    let mut segments = Vec::with_capacity(left.len() + right.len());
+    segments.extend_from_slice(left);
+
+    // Last existing and first new may be contiguous.
+    let coalesced = {
+        let right_first = right.first().expect("!right.is_empty()");
+        let left_last = segments.last_mut().expect("!left.is_empty()");
+        if left_last.uuid == right_first.uuid &&
+           (left_last.segment.start + left_last.segment.length == right_first.segment.start) {
+            left_last.segment.length += right_first.segment.length;
+            true
+        } else {
+            false
+        }
+    };
+
+    if coalesced {
+        segments.extend_from_slice(&right[1..]);
+    } else {
+        segments.extend_from_slice(right);
+    }
+    segments
+}
+
 /// Build a linear dev target table from BlkDevSegments. This is useful for
 /// calls to the devicemapper library.
 pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParams>> {

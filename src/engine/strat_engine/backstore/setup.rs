@@ -15,14 +15,15 @@ use serde_json;
 
 use devicemapper::{Device, devnode_to_devno};
 
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::PoolUuid;
+use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::types::PoolUuid;
+
+use super::super::engine::DevOwnership;
+use super::super::serde_structs::{BackstoreSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
 use super::device::blkdev_size;
-use super::engine::DevOwnership;
 use super::metadata::{BDA, StaticHeader};
-use super::serde_structs::PoolSave;
 
 
 /// Determine if devnode is a stratis device, if it is we will add  pool uuid and device
@@ -163,20 +164,15 @@ pub fn get_metadata(pool_uuid: PoolUuid,
 }
 
 /// Get all the blockdevs corresponding to this pool that can be obtained from
-/// the given devices.
+/// the given devices. Return them in the order in which they were written
+/// in the metadata.
 /// Returns an error if the blockdevs obtained do not match the metadata.
 #[allow(implicit_hasher)]
 pub fn get_blockdevs(pool_uuid: PoolUuid,
-                     pool_save: &PoolSave,
+                     backstore_save: &BackstoreSave,
                      devnodes: &HashMap<Device, PathBuf>)
                      -> EngineResult<Vec<StratBlockDev>> {
-    let flex_devs = &pool_save.flex_devs;
-    let segments = flex_devs
-        .meta_dev
-        .iter()
-        .chain(flex_devs.thin_meta_dev.iter())
-        .chain(flex_devs.thin_data_dev.iter())
-        .chain(flex_devs.thin_meta_dev_spare.iter());
+    let segments = &backstore_save.segments;
 
     let mut segment_table = HashMap::new();
     for seg in segments {
@@ -194,7 +190,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                 let actual_size = blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?
                     .sectors();
 
-                let bd_save = pool_save
+                let bd_save = backstore_save
                     .block_devs
                     .get(&bda.dev_uuid())
                     .ok_or_else(|| {
@@ -221,7 +217,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
 
     // Verify that blockdevs found match blockdevs recorded.
     let current_uuids: HashSet<_> = blockdevs.iter().map(|b| b.uuid()).collect();
-    let recorded_uuids: HashSet<_> = pool_save.block_devs.keys().cloned().collect();
+    let recorded_uuids: HashSet<_> = backstore_save.block_devs.keys().cloned().collect();
 
     if current_uuids != recorded_uuids {
         let err_msg = "Recorded block dev UUIDs != discovered blockdev UUIDs";

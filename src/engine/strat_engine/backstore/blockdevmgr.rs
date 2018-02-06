@@ -15,16 +15,17 @@ use uuid::Uuid;
 use devicemapper::{Bytes, Device, IEC, LinearDevTargetParams, LinearTargetParams, Sectors,
                    TargetLine};
 
-use super::super::engine::BlockDev;
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::{DevUuid, PoolUuid};
+use super::super::super::engine::BlockDev;
+use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::types::{DevUuid, PoolUuid};
+
+use super::super::engine::DevOwnership;
+use super::super::serde_structs::{BlockDevSave, Recordable};
 
 use super::blockdev::StratBlockDev;
 use super::cleanup::wipe_blockdevs;
 use super::device::{blkdev_size, resolve_devices};
-use super::engine::DevOwnership;
 use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};
-use super::serde_structs::{BlockDevSave, Recordable};
 use super::util::hw_lookup;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
@@ -78,6 +79,47 @@ impl Recordable<Vec<(Uuid, Sectors, Sectors)>> for Vec<BlkDevSegment> {
     }
 }
 
+/// Append the second list of BlkDevSegments to the first, or if the last
+/// segment of the first argument is adjacent to the first segment of the
+/// second argument, merge those two together.
+/// Postcondition: left.len() + right.len() - 1 <= result.len()
+/// Postcondition: result.len() <= left.len() + right.len()
+// FIXME: There is a method that duplicates this algorithm called
+// coalesce_segs. These methods should either be unified into a single method
+// OR one should go away entirely in solution to:
+// https://github.com/stratis-storage/stratisd/issues/762.
+pub fn coalesce_blkdevsegs(left: &[BlkDevSegment], right: &[BlkDevSegment]) -> Vec<BlkDevSegment> {
+    if left.is_empty() {
+        return right.to_vec();
+    }
+    if right.is_empty() {
+        return left.to_vec();
+    }
+
+    let mut segments = Vec::with_capacity(left.len() + right.len());
+    segments.extend_from_slice(left);
+
+    // Last existing and first new may be contiguous.
+    let coalesced = {
+        let right_first = right.first().expect("!right.is_empty()");
+        let left_last = segments.last_mut().expect("!left.is_empty()");
+        if left_last.uuid == right_first.uuid &&
+           (left_last.segment.start + left_last.segment.length == right_first.segment.start) {
+            left_last.segment.length += right_first.segment.length;
+            true
+        } else {
+            false
+        }
+    };
+
+    if coalesced {
+        segments.extend_from_slice(&right[1..]);
+    } else {
+        segments.extend_from_slice(right);
+    }
+    segments
+}
+
 /// Build a linear dev target table from BlkDevSegments. This is useful for
 /// calls to the devicemapper library.
 pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParams>> {
@@ -110,7 +152,7 @@ pub struct BlockDevMgr {
 }
 
 impl BlockDevMgr {
-    /// Create a new BlockDevMgr struct
+    /// Make a struct that represents an existing BlockDevMgr.
     pub fn new(pool_uuid: PoolUuid,
                block_devs: Vec<StratBlockDev>,
                last_update_time: Option<DateTime<Utc>>)
@@ -135,6 +177,11 @@ impl BlockDevMgr {
         Ok(BlockDevMgr::new(pool_uuid,
                             initialize(pool_uuid, devices, mda_size, force, &HashSet::new())?,
                             None))
+    }
+
+    /// Return the UUID of the pool
+    pub fn pool_uuid(&self) -> PoolUuid {
+        self.pool_uuid
     }
 
     /// Get a function that maps UUIDs to Devices.
@@ -436,10 +483,11 @@ mod tests {
 
     use devicemapper::SECTOR_SIZE;
 
-    use super::super::device::write_sectors;
+    use super::super::super::device::write_sectors;
+    use super::super::super::tests::{loopbacked, real};
+
     use super::super::metadata::{BDA_STATIC_HDR_SECTORS, MIN_MDA_SECTORS};
     use super::super::setup::{find_all, get_metadata};
-    use super::super::tests::{loopbacked, real};
 
     use super::*;
 

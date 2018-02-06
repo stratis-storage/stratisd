@@ -32,7 +32,7 @@ pub trait Recordable<T: Serialize> {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PoolSave {
     pub name: String,
-    pub block_devs: HashMap<DevUuid, BlockDevSave>,
+    pub backstore: BackstoreSave,
     pub flex_devs: FlexDevsSave,
     pub thinpool_dev: ThinPoolDevSave,
 }
@@ -57,10 +57,17 @@ pub struct FilesystemSave {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlexDevsSave {
-    pub meta_dev: Vec<(Uuid, Sectors, Sectors)>,
-    pub thin_meta_dev: Vec<(Uuid, Sectors, Sectors)>,
-    pub thin_data_dev: Vec<(Uuid, Sectors, Sectors)>,
-    pub thin_meta_dev_spare: Vec<(Uuid, Sectors, Sectors)>,
+    pub meta_dev: Vec<(Sectors, Sectors)>,
+    pub thin_meta_dev: Vec<(Sectors, Sectors)>,
+    pub thin_data_dev: Vec<(Sectors, Sectors)>,
+    pub thin_meta_dev_spare: Vec<(Sectors, Sectors)>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BackstoreSave {
+    pub segments: Vec<(Uuid, Sectors, Sectors)>,
+    pub block_devs: HashMap<DevUuid, BlockDevSave>,
+    pub next: Sectors,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

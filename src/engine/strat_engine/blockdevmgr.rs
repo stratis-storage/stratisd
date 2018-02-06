@@ -148,6 +148,9 @@ impl BlockDevMgr {
         Box::new(move |uuid: DevUuid| -> Option<Device> { uuid_map.get(&uuid).cloned() })
     }
 
+    /// Add paths to self.
+    /// Return the uuids of all blockdevs corresponding to paths that were
+    /// added.
     pub fn add(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
         let devices = resolve_devices(paths)?;
         let current_uuids = self.block_devs.keys().cloned().collect();

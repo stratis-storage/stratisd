@@ -1,0 +1,7 @@
+recursive-include src/stratisd_client_dbus *.py
+recursive-include tests *.py
+include check.py
+include tox.ini
+global-include requirements.txt
+include LICENSE README.rst
+include setup.py setup.cfg

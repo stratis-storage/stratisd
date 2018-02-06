@@ -1,0 +1,10 @@
+*.pyc
+*.egg-info
+
+# working directories
+.coverage
+.hypothesis
+.tox
+
+# coverage output
+htmlcov

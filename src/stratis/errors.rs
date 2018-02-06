@@ -4,10 +4,16 @@
 
 use std::{fmt, io};
 use std::error::Error;
+use std::str;
 
 #[cfg(feature="dbus_enabled")]
 use dbus;
 use libudev;
+use nix;
+use uuid;
+use serde_json;
+
+use devicemapper;
 
 use engine::EngineError;
 
@@ -18,6 +24,11 @@ pub enum StratisError {
     Error(String),
     Engine(EngineError),
     Io(io::Error),
+    Nix(nix::Error),
+    Uuid(uuid::ParseError),
+    Utf8(str::Utf8Error),
+    Serde(serde_json::error::Error),
+    DM(devicemapper::DmError),
 
     #[cfg(feature="dbus_enabled")]
     Dbus(dbus::Error),
@@ -32,6 +43,11 @@ impl fmt::Display for StratisError {
                 write!(f, "Engine error: {}", err.description().to_owned())
             }
             StratisError::Io(ref err) => write!(f, "IO error: {}", err),
+            StratisError::Nix(ref err) => write!(f, "Nix error: {}", err),
+            StratisError::Uuid(ref err) => write!(f, "Uuid error: {}", err),
+            StratisError::Utf8(ref err) => write!(f, "Utf8 error: {}", err),
+            StratisError::Serde(ref err) => write!(f, "Serde error: {}", err),
+            StratisError::DM(ref err) => write!(f, "DM error: {}", err),
 
             #[cfg(feature="dbus_enabled")]
             StratisError::Dbus(ref err) => {
@@ -48,6 +64,11 @@ impl Error for StratisError {
             StratisError::Error(ref s) => s,
             StratisError::Engine(ref err) => Error::description(err),
             StratisError::Io(ref err) => err.description(),
+            StratisError::Nix(ref err) => err.description(),
+            StratisError::Uuid(_) => "Uuid::ParseError",
+            StratisError::Utf8(ref err) => err.description(),
+            StratisError::Serde(ref err) => err.description(),
+            StratisError::DM(ref err) => err.description(),
 
             #[cfg(feature="dbus_enabled")]
             StratisError::Dbus(ref err) => err.message().unwrap_or("D-Bus Error"),
@@ -60,10 +81,22 @@ impl Error for StratisError {
             StratisError::Error(_) => None,
             StratisError::Engine(ref err) => Some(err),
             StratisError::Io(ref err) => Some(err),
+            StratisError::Nix(ref err) => Some(err),
+            StratisError::Uuid(ref err) => Some(err),
+            StratisError::Utf8(ref err) => Some(err),
+            StratisError::Serde(ref err) => Some(err),
+            StratisError::DM(ref err) => Some(err),
+
             #[cfg(feature="dbus_enabled")]
             StratisError::Dbus(ref err) => Some(err),
             StratisError::Udev(ref err) => Some(err),
         }
+    }
+}
+
+impl From<EngineError> for StratisError {
+    fn from(err: EngineError) -> StratisError {
+        StratisError::Engine(err)
     }
 }
 
@@ -73,16 +106,40 @@ impl From<io::Error> for StratisError {
     }
 }
 
+impl From<nix::Error> for StratisError {
+    fn from(err: nix::Error) -> StratisError {
+        StratisError::Nix(err)
+    }
+}
+
+impl From<uuid::ParseError> for StratisError {
+    fn from(err: uuid::ParseError) -> StratisError {
+        StratisError::Uuid(err)
+    }
+}
+
+impl From<str::Utf8Error> for StratisError {
+    fn from(err: str::Utf8Error) -> StratisError {
+        StratisError::Utf8(err)
+    }
+}
+
+impl From<serde_json::error::Error> for StratisError {
+    fn from(err: serde_json::error::Error) -> StratisError {
+        StratisError::Serde(err)
+    }
+}
+
+impl From<devicemapper::DmError> for StratisError {
+    fn from(err: devicemapper::DmError) -> StratisError {
+        StratisError::DM(err)
+    }
+}
+
 #[cfg(feature="dbus_enabled")]
 impl From<dbus::Error> for StratisError {
     fn from(err: dbus::Error) -> StratisError {
         StratisError::Dbus(err)
-    }
-}
-
-impl From<EngineError> for StratisError {
-    fn from(err: EngineError) -> StratisError {
-        StratisError::Engine(err)
     }
 }
 

@@ -105,12 +105,12 @@ impl DbusContext {
 #[derive(Default, Debug)]
 pub struct TData;
 impl DataType for TData {
+    type Tree = DbusContext;
     type ObjectPath = Option<OPContext>;
     type Property = ();
     type Interface = ();
     type Method = ();
     type Signal = ();
-    type Tree = DbusContext;
 }
 
 /// An action queue.

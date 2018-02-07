@@ -67,37 +67,6 @@ impl SimPool {
 }
 
 impl Pool for SimPool {
-    fn add_blockdevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<DevUuid>> {
-        let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
-        let device_pairs: Vec<_> = devices
-            .iter()
-            .map(|p| {
-                     let bd = SimDev::new(Rc::clone(&self.rdm), p);
-                     (bd.uuid(), bd)
-                 })
-            .collect();
-        let ret_uuids = device_pairs.iter().map(|&(uuid, _)| uuid).collect();
-        self.block_devs.extend(device_pairs);
-        Ok(ret_uuids)
-    }
-
-    fn destroy_filesystems<'a>(&'a mut self,
-                               fs_uuids: &[FilesystemUuid])
-                               -> EngineResult<Vec<FilesystemUuid>> {
-        let mut removed = Vec::new();
-        for &uuid in fs_uuids {
-            if self.filesystems.remove_by_uuid(uuid).is_some() {
-                removed.push(uuid);
-            }
-        }
-        Ok(removed)
-    }
-
-    fn destroy(self) -> EngineResult<()> {
-        // Nothing to do here.
-        Ok(())
-    }
-
     fn create_filesystems<'a, 'b>(&'a mut self,
                                   specs: &[(&'b str, Option<Sectors>)])
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
@@ -119,19 +88,35 @@ impl Pool for SimPool {
         Ok(result)
     }
 
-    fn snapshot_filesystem(&mut self,
-                           origin_uuid: FilesystemUuid,
-                           snapshot_name: &str)
-                           -> EngineResult<FilesystemUuid> {
-        let uuid = Uuid::new_v4();
-        let snapshot = match self.get_filesystem(origin_uuid) {
-            Some(_filesystem) => SimFilesystem::new(uuid, snapshot_name),
-            None => {
-                return Err(EngineError::Engine(ErrorEnum::NotFound, origin_uuid.to_string()));
+    fn add_blockdevs(&mut self, paths: &[&Path], _force: bool) -> EngineResult<Vec<DevUuid>> {
+        let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
+        let device_pairs: Vec<_> = devices
+            .iter()
+            .map(|p| {
+                     let bd = SimDev::new(Rc::clone(&self.rdm), p);
+                     (bd.uuid(), bd)
+                 })
+            .collect();
+        let ret_uuids = device_pairs.iter().map(|&(uuid, _)| uuid).collect();
+        self.block_devs.extend(device_pairs);
+        Ok(ret_uuids)
+    }
+
+    fn destroy(self) -> EngineResult<()> {
+        // Nothing to do here.
+        Ok(())
+    }
+
+    fn destroy_filesystems<'a>(&'a mut self,
+                               fs_uuids: &[FilesystemUuid])
+                               -> EngineResult<Vec<FilesystemUuid>> {
+        let mut removed = Vec::new();
+        for &uuid in fs_uuids {
+            if self.filesystems.remove_by_uuid(uuid).is_some() {
+                removed.push(uuid);
             }
-        };
-        self.filesystems.insert(snapshot);
-        Ok(uuid)
+        }
+        Ok(removed)
     }
 
     fn rename_filesystem(&mut self,
@@ -148,6 +133,21 @@ impl Pool for SimPool {
         filesystem.rename(new_name);
         self.filesystems.insert(filesystem);
         Ok(RenameAction::Renamed)
+    }
+
+    fn snapshot_filesystem(&mut self,
+                           origin_uuid: FilesystemUuid,
+                           snapshot_name: &str)
+                           -> EngineResult<FilesystemUuid> {
+        let uuid = Uuid::new_v4();
+        let snapshot = match self.get_filesystem(origin_uuid) {
+            Some(_filesystem) => SimFilesystem::new(uuid, snapshot_name),
+            None => {
+                return Err(EngineError::Engine(ErrorEnum::NotFound, origin_uuid.to_string()));
+            }
+        };
+        self.filesystems.insert(snapshot);
+        Ok(uuid)
     }
 
     fn rename(&mut self, name: &str) {

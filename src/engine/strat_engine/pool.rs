@@ -76,7 +76,10 @@ impl StratPool {
     }
 
     /// Setup a StratPool using its UUID and the list of devnodes it has.
-    pub fn setup(uuid: PoolUuid, devnodes: &HashMap<Device, PathBuf>) -> EngineResult<StratPool> {
+    pub fn setup(dm: &DM,
+                 uuid: PoolUuid,
+                 devnodes: &HashMap<Device, PathBuf>)
+                 -> EngineResult<StratPool> {
         let metadata = get_metadata(uuid, devnodes)?
             .ok_or_else(|| {
                             EngineError::Engine(ErrorEnum::NotFound,
@@ -84,7 +87,7 @@ impl StratPool {
                         })?;
         let bd_mgr = BlockDevMgr::new(uuid, get_blockdevs(uuid, &metadata, devnodes)?, None);
         let thinpool = ThinPool::setup(uuid,
-                                       &DM::new()?,
+                                       dm,
                                        metadata.thinpool_dev.data_block_size,
                                        DATA_LOWATER,
                                        &metadata.flex_devs,

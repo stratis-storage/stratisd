@@ -24,6 +24,17 @@ matrix:
           sudo: required
         - rust: nightly
           env: TASK=clippy
+        - language: python
+          install: pip3 install -r tests/client-dbus/requirements.txt
+          before_script:
+              - cd tests/client-dbus
+          env: TASK=lint
+          before_install:
+              - sudo apt-get -qq update
+              - sudo apt-get install -y libdbus-glib-1-dev
+          language: python
+          python: "3.4"
+          script: make -f Makefile $TASK
 
 branches:
     only: master

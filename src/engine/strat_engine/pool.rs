@@ -143,7 +143,7 @@ impl StratPool {
     pub fn record(&self, name: &str) -> PoolSave {
         PoolSave {
             name: name.to_owned(),
-            block_devs: self.store.record(),
+            store: self.store.record(),
             flex_devs: self.thin_pool.record(),
             thinpool_dev: self.thin_pool.record(),
         }
@@ -310,8 +310,8 @@ mod tests {
         assert_eq!(pool_save2, metadata2);
         let blockdevs1 = get_blockdevs(uuid1, &pool_save1, devnodes1).unwrap();
         let blockdevs2 = get_blockdevs(uuid2, &pool_save2, devnodes2).unwrap();
-        assert_eq!(blockdevs1.len(), pool_save1.block_devs.len());
-        assert_eq!(blockdevs2.len(), pool_save2.block_devs.len());
+        assert_eq!(blockdevs1.len(), pool_save1.store.block_devs.len());
+        assert_eq!(blockdevs2.len(), pool_save2.store.block_devs.len());
 
         for mut blockdev in blockdevs1 {
             let (amt, seg) = blockdev.request_space(Sectors(1));
@@ -337,8 +337,8 @@ mod tests {
         assert_eq!(pool_save2, metadata2);
         let blockdevs1 = get_blockdevs(uuid1, &pool_save1, devnodes1).unwrap();
         let blockdevs2 = get_blockdevs(uuid2, &pool_save2, devnodes2).unwrap();
-        assert_eq!(blockdevs1.len(), pool_save1.block_devs.len());
-        assert_eq!(blockdevs2.len(), pool_save2.block_devs.len());
+        assert_eq!(blockdevs1.len(), pool_save1.store.block_devs.len());
+        assert_eq!(blockdevs2.len(), pool_save2.store.block_devs.len());
 
         for mut blockdev in blockdevs1 {
             let (amt, seg) = blockdev.request_space(Sectors(1));

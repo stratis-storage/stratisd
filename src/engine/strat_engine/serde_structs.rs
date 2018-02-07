@@ -32,7 +32,7 @@ pub trait Recordable<T: Serialize> {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PoolSave {
     pub name: String,
-    pub block_devs: HashMap<DevUuid, BlockDevSave>,
+    pub store: StoreSave,
     pub flex_devs: FlexDevsSave,
     pub thinpool_dev: ThinPoolDevSave,
 }
@@ -61,6 +61,12 @@ pub struct FlexDevsSave {
     pub thin_meta_dev: Vec<(Uuid, Sectors, Sectors)>,
     pub thin_data_dev: Vec<(Uuid, Sectors, Sectors)>,
     pub thin_meta_dev_spare: Vec<(Uuid, Sectors, Sectors)>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StoreSave {
+    pub segments: Vec<(Uuid, Sectors, Sectors)>,
+    pub block_devs: HashMap<DevUuid, BlockDevSave>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

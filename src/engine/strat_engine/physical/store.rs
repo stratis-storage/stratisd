@@ -4,7 +4,6 @@
 
 // Code to handle the physical backing store of a pool.
 
-use std::collections::HashMap;
 use std::path::Path;
 
 use chrono::{DateTime, Utc};
@@ -16,7 +15,7 @@ use super::super::super::errors::EngineResult;
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::dmnames::{PhysicalRole, format_physical_name};
-use super::super::serde_structs::{Recordable, BlockDevSave};
+use super::super::serde_structs::{Recordable, StoreSave};
 
 use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, get_coalesced_segments, map_to_dm};
@@ -232,8 +231,11 @@ impl Store {
     }
 }
 
-impl Recordable<HashMap<DevUuid, BlockDevSave>> for Store {
-    fn record(&self) -> HashMap<DevUuid, BlockDevSave> {
-        self.data.block_mgr.record()
+impl Recordable<StoreSave> for Store {
+    fn record(&self) -> StoreSave {
+        StoreSave {
+            segments: self.data.segments.record(),
+            block_devs: self.data.block_mgr.record(),
+        }
     }
 }

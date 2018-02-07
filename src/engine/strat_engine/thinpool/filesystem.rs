@@ -54,9 +54,9 @@ impl StratFilesystem {
     /// Build a StratFilesystem that includes the ThinDev and related info.
     pub fn setup(fs_id: FilesystemUuid, name: &str, thin_dev: ThinDev) -> StratFilesystem {
         StratFilesystem {
-            fs_id: fs_id,
+            fs_id,
             name: name.to_owned(),
-            thin_dev: thin_dev,
+            thin_dev,
         }
     }
 

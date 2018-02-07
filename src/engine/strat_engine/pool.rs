@@ -64,9 +64,9 @@ impl StratPool {
 
         let mut pool = StratPool {
             name: name.to_owned(),
-            pool_uuid: pool_uuid,
+            pool_uuid,
             block_devs: block_mgr,
-            redundancy: redundancy,
+            redundancy,
             thin_pool: thinpool,
         };
 

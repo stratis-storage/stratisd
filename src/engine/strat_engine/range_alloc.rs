@@ -23,7 +23,7 @@ impl RangeAllocator {
                initial_used: &[(Sectors, Sectors)])
                -> EngineResult<RangeAllocator> {
         let mut allocator = RangeAllocator {
-            limit: limit,
+            limit,
             used: BTreeMap::new(),
         };
         allocator.insert_ranges(initial_used)?;

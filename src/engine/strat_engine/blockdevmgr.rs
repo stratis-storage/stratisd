@@ -48,9 +48,9 @@ impl Segment {
     /// Create a new Segment with given attributes
     pub fn new(device: Device, start: Sectors, length: Sectors) -> Segment {
         Segment {
-            device: device,
-            start: start,
-            length: length,
+            device,
+            start,
+            length,
         }
     }
 }
@@ -117,12 +117,12 @@ impl BlockDevMgr {
                last_update_time: Option<DateTime<Utc>>)
                -> BlockDevMgr {
         BlockDevMgr {
-            pool_uuid: pool_uuid,
+            pool_uuid,
             block_devs: block_devs
                 .into_iter()
                 .map(|bd| (bd.uuid(), bd))
                 .collect(),
-            last_update_time: last_update_time,
+            last_update_time,
         }
     }
 

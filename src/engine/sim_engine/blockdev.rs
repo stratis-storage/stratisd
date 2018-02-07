@@ -69,7 +69,7 @@ impl SimDev {
     pub fn new(rdm: Rc<RefCell<Randomizer>>, devnode: &Path) -> SimDev {
         SimDev {
             devnode: devnode.to_owned(),
-            rdm: rdm,
+            rdm,
             uuid: Uuid::new_v4(),
             user_info: None,
             hardware_info: None,

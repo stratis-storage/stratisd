@@ -52,7 +52,7 @@ impl SimPool {
             pool_uuid: Uuid::new_v4(),
             block_devs: HashMap::from_iter(device_pairs),
             filesystems: Table::default(),
-            redundancy: redundancy,
+            redundancy,
             rdm: Rc::clone(rdm),
         }
     }

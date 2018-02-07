@@ -16,7 +16,7 @@ pub struct SimFilesystem {
 impl SimFilesystem {
     pub fn new(fs_id: FilesystemUuid, name: &str) -> SimFilesystem {
         SimFilesystem {
-            fs_id: fs_id,
+            fs_id,
             name: name.to_owned(),
         }
     }

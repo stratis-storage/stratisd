@@ -17,7 +17,7 @@ use devicemapper::{device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBu
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::super::engine::Filesystem;
+use super::super::super::engine::{ApiProxy, Filesystem};
 use super::super::super::structures::Table;
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid, RenameAction};
 
@@ -354,10 +354,15 @@ impl ThinPool {
     /// Run status checks and take actions on the thinpool and its components.
     /// Returns a bool communicating if a configuration change requiring a
     /// metadata save has been made.
-    pub fn check(&mut self, backstore: &mut Backstore) -> StratisResult<bool> {
+    pub fn check(
+        &mut self,
+        backstore: &mut Backstore,
+        dbus_path: &Option<String>,
+        api_proxy: &ApiProxy,
+    ) -> StratisResult<bool> {
         #![allow(match_same_arms)]
         assert_eq!(backstore.device(), self.backstore_device);
-
+        debug!("dbus path = {:?}", dbus_path);
         let mut should_save: bool = false;
 
         let thinpool: dm::ThinPoolStatus = self.thin_pool.status(get_dm())?;
@@ -385,7 +390,10 @@ impl ThinPool {
                     let meta_extend_size = usage.total_meta;
                     match self.extend_thinpool_meta(meta_extend_size, backstore) {
                         #![allow(single_match)]
-                        Ok(_) => should_save = true,
+                        Ok(_) => {
+                            should_save = true;
+                            api_proxy.phys_used_changed(dbus_path, self.total_physical_used()?)?
+                        }
                         Err(_) => {} // TODO: Take pool offline?
                     }
                 }
@@ -403,7 +411,10 @@ impl ThinPool {
                         backstore,
                     ) {
                         #![allow(single_match)]
-                        Ok(_) => should_save = true,
+                        Ok(_) => {
+                            should_save = true;
+                            api_proxy.phys_used_changed(dbus_path, self.total_physical_used()?)?
+                        }
                         Err(_) => {} // TODO: Take pool offline?
                     }
                 }
@@ -871,11 +882,11 @@ fn attempt_thin_repair(
 
 #[cfg(test)]
 mod tests {
+
+    use nix::mount::{mount, umount, MsFlags};
     use std::fs::{File, OpenOptions};
     use std::io::{Read, Write};
     use std::path::Path;
-
-    use nix::mount::{mount, umount, MsFlags};
     use tempfile;
     use uuid::Uuid;
 
@@ -888,6 +899,7 @@ mod tests {
 
     use super::super::filesystem::{fs_usage, FILESYSTEM_LOWATER};
 
+    use super::super::super::super::engine::NullProxy;
     use super::*;
 
     const BYTES_PER_WRITE: usize = 2 * IEC::Ki as usize * SECTOR_SIZE as usize;
@@ -960,7 +972,7 @@ mod tests {
         backstore
             .add_blockdevs(&remaining_paths, BlockDevTier::Data, true)
             .unwrap();
-        pool.check(&mut backstore).unwrap();
+        pool.check(&mut backstore, &None, &NullProxy).unwrap();
         // Verify the pool is back in a Good state
         match pool.thin_pool.status(get_dm()).unwrap() {
             dm::ThinPoolStatus::Working(ref status) => {
@@ -1314,7 +1326,7 @@ mod tests {
         }
         // The meta device is smaller than META_LOWATER, so it should be expanded
         // in the thin_pool.check() call.
-        thin_pool.check(&mut backstore).unwrap();
+        thin_pool.check(&mut backstore, &None, &NullProxy).unwrap();
         match thin_pool.thin_pool.status(get_dm()).unwrap() {
             dm::ThinPoolStatus::Working(ref status) => {
                 let usage = &status.usage;

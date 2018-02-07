@@ -138,6 +138,10 @@ pub trait Pool: Debug {
         uuid: DevUuid,
         user_info: Option<&str>,
     ) -> StratisResult<bool>;
+    /// Allows the API layer (Dbus) to store path information it needs in the
+    /// pool, so that it can handle notifications from the engine via the
+    /// ApiProxy interface.
+    fn set_dbus_path(&mut self, path: &str) -> ();
 }
 
 pub trait Engine: Debug {
@@ -184,7 +188,7 @@ pub trait Engine: Debug {
     fn configure_simulator(&mut self, denominator: u32) -> StratisResult<()>;
 
     /// Get all pools belonging to this engine.
-    fn pools(&self) -> Vec<(Name, PoolUuid, &Pool)>;
+    fn pools(&mut self) -> Vec<(Name, PoolUuid, &mut Pool)>;
 
     /// If the engine would like to include an event in the message loop, it
     /// may return an Eventable from this method.
@@ -204,3 +208,34 @@ pub trait Eventable {
     /// Eventable to trigger.
     fn clear_event(&self) -> StratisResult<()>;
 }
+
+pub trait ApiProxy: Debug {
+    fn phys_used_changed(
+        &self,
+        _dbus_path: &Option<String>,
+        _new_value: Sectors,
+    ) -> StratisResult<()> {
+        Ok(())
+    }
+
+    fn thinpool_data_expand_failed(
+        &self,
+        _dbus_path: &Option<String>,
+        _new_value: Sectors,
+    ) -> StratisResult<()> {
+        Ok(())
+    }
+
+    fn thinpool_metadata_expand_failed(
+        &self,
+        _dbus_path: &Option<String>,
+        _new_value: Sectors,
+    ) -> StratisResult<()> {
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct NullProxy;
+
+impl ApiProxy for NullProxy {}

@@ -244,6 +244,7 @@ impl Pool for SimPool {
             |(_, b)| Ok(b.set_user_info(user_info)),
         )
     }
+    fn set_dbus_path(&mut self, _path: &str) -> () {}
 }
 
 #[cfg(test)]

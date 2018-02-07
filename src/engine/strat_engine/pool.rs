@@ -14,7 +14,7 @@ use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::engine::{BlockDev, Filesystem, Pool};
+use super::super::engine::{ApiProxy, BlockDev, Filesystem, Pool};
 use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
                           RenameAction};
 
@@ -53,6 +53,9 @@ pub struct StratPool {
     backstore: Backstore,
     redundancy: Redundancy,
     thin_pool: ThinPool,
+
+    #[cfg(feature = "dbus_enabled")]
+    dbus_path: Option<String>,
 }
 
 impl StratPool {
@@ -88,6 +91,8 @@ impl StratPool {
             backstore,
             redundancy,
             thin_pool: thinpool,
+
+            dbus_path: None,
         };
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
@@ -116,6 +121,8 @@ impl StratPool {
                 backstore,
                 redundancy: Redundancy::NONE,
                 thin_pool: thinpool,
+
+                dbus_path: None,
             },
         ))
     }
@@ -145,14 +152,21 @@ impl StratPool {
     /// Called when a DM device in this pool has generated an event.
     // TODO: Just check the device that evented. Currently checks
     // everything.
-    pub fn event_on(&mut self, pool_name: &Name, dm_name: &DmName) -> StratisResult<()> {
+    pub fn event_on(
+        &mut self,
+        pool_name: &Name,
+        dm_name: &DmName,
+        api_proxy: &ApiProxy,
+    ) -> StratisResult<()> {
         assert!(
             self.thin_pool
                 .get_eventing_dev_names()
                 .iter()
                 .any(|x| dm_name == &**x)
         );
-        if self.thin_pool.check(&mut self.backstore)? {
+        if self.thin_pool
+            .check(&mut self.backstore, &self.dbus_path, api_proxy)?
+        {
             self.write_metadata(pool_name)?;
         }
         Ok(())
@@ -300,6 +314,11 @@ impl Pool for StratPool {
         } else {
             Ok(false)
         }
+    }
+
+    fn set_dbus_path(&mut self, path: &str) -> () {
+        debug!("dbus path set for {:?} to {:?}", self, self.dbus_path);
+        self.dbus_path = Some(path.to_owned())
     }
 }
 

@@ -393,7 +393,7 @@ pub fn create_dbus_pool<'a>(
 
     let total_physical_used_property = f.property::<&str, _>("TotalPhysicalUsed", ())
         .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
+        .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_total_physical_used);
 
     let uuid_property = f.property::<&str, _>("Uuid", ())

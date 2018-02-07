@@ -116,7 +116,7 @@ impl Engine for StratEngine {
         }
 
         let dm = DM::new()?;
-        let pool = StratPool::initialize(name, &dm, blockdev_paths, redundancy, force)?;
+        let pool = StratPool::initialize(&dm, name, blockdev_paths, redundancy, force)?;
 
         let uuid = pool.uuid();
         devlinks::pool_added(pool.name())?;

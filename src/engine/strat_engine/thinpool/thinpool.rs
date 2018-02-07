@@ -165,8 +165,8 @@ impl ThinPool {
     /// If initial setup fails due to a thin_check failure, attempt to fix
     /// the problem by running thin_repair. If failure recurs, return an
     /// error.
-    pub fn setup(pool_uuid: PoolUuid,
-                 dm: &DM,
+    pub fn setup(dm: &DM,
+                 pool_uuid: PoolUuid,
                  data_block_size: Sectors,
                  low_water_mark: DataBlocks,
                  flex_devs: &FlexDevsSave,
@@ -842,8 +842,8 @@ mod tests {
         let flexdevs: FlexDevsSave = pool.record();
         pool.teardown(&dm).unwrap();
 
-        let pool = ThinPool::setup(pool_uuid,
-                                   &dm,
+        let pool = ThinPool::setup(&dm,
+                                   pool_uuid,
                                    DATA_BLOCK_SIZE,
                                    DATA_LOWATER,
                                    &flexdevs,
@@ -904,8 +904,8 @@ mod tests {
                     .unwrap();
         }
 
-        let new_pool = ThinPool::setup(pool_uuid,
-                                       &dm,
+        let new_pool = ThinPool::setup(&dm,
+                                       pool_uuid,
                                        DATA_BLOCK_SIZE,
                                        DATA_LOWATER,
                                        &pool.record(),
@@ -968,8 +968,8 @@ mod tests {
         // Check that destroyed fs is not present in MDV. If the record
         // had been left on the MDV that didn't match a thin_id in the
         // thinpool, ::setup() will fail.
-        let pool = ThinPool::setup(pool_uuid,
-                                   &dm,
+        let pool = ThinPool::setup(&dm,
+                                   pool_uuid,
                                    DATA_BLOCK_SIZE,
                                    DATA_LOWATER,
                                    &flexdevs,

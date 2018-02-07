@@ -38,8 +38,8 @@ impl StratPool {
     /// Initialize a Stratis Pool.
     /// 1. Initialize the block devices specified by paths.
     /// 2. Set up thinpool device to back filesystems.
-    pub fn initialize(name: &str,
-                      dm: &DM,
+    pub fn initialize(dm: &DM,
+                      name: &str,
                       paths: &[&Path],
                       redundancy: Redundancy,
                       force: bool)
@@ -86,8 +86,8 @@ impl StratPool {
                                                 format!("no metadata for pool {}", uuid))
                         })?;
         let bd_mgr = BlockDevMgr::new(uuid, get_blockdevs(uuid, &metadata, devnodes)?, None);
-        let thinpool = ThinPool::setup(uuid,
-                                       dm,
+        let thinpool = ThinPool::setup(dm,
+                                       uuid,
                                        metadata.thinpool_dev.data_block_size,
                                        DATA_LOWATER,
                                        &metadata.flex_devs,
@@ -312,12 +312,12 @@ mod tests {
         let dm = DM::new().unwrap();
 
         let name1 = "name1";
-        let pool1 = StratPool::initialize(&name1, &dm, paths1, Redundancy::NONE, false).unwrap();
+        let pool1 = StratPool::initialize(&dm, &name1, paths1, Redundancy::NONE, false).unwrap();
         let uuid1 = pool1.uuid();
         let metadata1 = pool1.record();
 
         let name2 = "name2";
-        let pool2 = StratPool::initialize(&name2, &dm, paths2, Redundancy::NONE, false).unwrap();
+        let pool2 = StratPool::initialize(&dm, &name2, paths2, Redundancy::NONE, false).unwrap();
         let uuid2 = pool2.uuid();
         let metadata2 = pool2.record();
 
@@ -364,8 +364,8 @@ mod tests {
     fn test_empty_pool(paths: &[&Path]) -> () {
         assert_eq!(paths.len(), 0);
         let dm = DM::new().unwrap();
-        assert!(match StratPool::initialize("stratis_test_pool",
-                                            &dm,
+        assert!(match StratPool::initialize(&dm,
+                                            "stratis_test_pool",
                                             paths,
                                             Redundancy::NONE,
                                             true)

@@ -35,7 +35,6 @@ struct DataLayer {
     next: Sectors,
 }
 
-#[allow(dead_code)]
 impl DataLayer {
     /// Setup a new DataLayer struct from the block_mgr.
     /// Note that this is a metadata changing event.
@@ -87,11 +86,13 @@ impl DataLayer {
     /// All the sectors available to this device
     // Note that this should always be equivalent to the sum of the length
     // fields of the segments in self.segments.
+    #[allow(dead_code)]
     pub fn capacity(&self) -> Sectors {
         self.dm_device.size()
     }
 
     /// Number of sectors unused
+    #[allow(dead_code)]
     pub fn available(&self) -> Sectors {
         self.capacity() - self.next
     }
@@ -99,6 +100,7 @@ impl DataLayer {
     /// Allocate requested chunks from device.
     /// Returns None if it is not possible to satisfy the request.
     // Simply serves up the space in the order in which it was requested.
+    #[allow(dead_code)]
     pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<(Sectors, Sectors)>>> {
         if self.available() < sizes.iter().cloned().sum() {
             return None;
@@ -111,13 +113,17 @@ impl DataLayer {
         }
         Some(chunks)
     }
+
+    /// Destroy the store. Teardown its DM devices and wipe its blockdevs.
+    pub fn destroy(self, dm: &DM) -> EngineResult<()> {
+        self.dm_device.teardown(dm)?;
+        self.block_mgr.destroy_all()
+    }
 }
 
 #[derive(Debug)]
 pub struct Store {
-    /// This block_mgr handles the data block devices; devices dedicated to
-    /// other things, like the cache, are handled separately.
-    block_mgr: BlockDevMgr,
+    data: DataLayer,
 }
 
 impl Store {
@@ -126,7 +132,12 @@ impl Store {
                block_devs: Vec<StratBlockDev>,
                last_update_time: Option<DateTime<Utc>>)
                -> Store {
-        Store { block_mgr: BlockDevMgr::new(pool_uuid, block_devs, last_update_time) }
+        let dm = DM::new().unwrap(); //FIXME
+        Store {
+            data: DataLayer::setup(&dm,
+                                   BlockDevMgr::new(pool_uuid, block_devs, last_update_time))
+                    .unwrap(),
+        }
     }
 
     /// Initialize a Store object, by initializing the specified devs.
@@ -135,23 +146,30 @@ impl Store {
                       mda_size: Sectors,
                       force: bool)
                       -> EngineResult<Store> {
-        Ok(Store { block_mgr: BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)? })
+        let dm = DM::new().unwrap(); //FIXME
+        Ok(Store {
+               data: DataLayer::setup(&dm,
+                                      BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?)?,
+           })
     }
 
     pub fn add(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
-        self.block_mgr.add(paths, force)
+        let dm = DM::new().unwrap(); //FIXME
+        self.data.add(&dm, paths, force)
     }
 
     // TODO: We will not be allocating BlkDevSegments any more, because
     // we will be allocating from the DM device.
-    pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<BlkDevSegment>>> {
-        self.block_mgr.alloc_space(sizes)
+    // The return type should be simplified to
+    // Option<Vec<Vec<(Sectors, Sectors)>>>
+    pub fn alloc_space(&mut self, _sizes: &[Sectors]) -> Option<Vec<Vec<BlkDevSegment>>> {
+        unimplemented!()
     }
 
     /// Return a reference to the blockdevs that form the base of the physical
     /// layer.
     pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
-        self.block_mgr.blockdevs()
+        self.data.block_mgr.blockdevs()
     }
 
     /// The current capacity of all the blockdevs that make up the physical
@@ -159,30 +177,41 @@ impl Store {
     /// does not include the sectors of the blockdevs that contain Stratis
     /// metadata.
     pub fn current_capacity(&self) -> Sectors {
-        self.block_mgr.current_capacity()
+        self.data.block_mgr.current_capacity()
     }
 
+    /// Destroy the entire store.
+    // TODO: Change name to destroy()
     pub fn destroy_all(self) -> EngineResult<()> {
-        self.block_mgr.destroy_all()
+        let dm = DM::new().unwrap(); //FIXME
+        self.data.destroy(&dm)
     }
+
+    /// Return the device that this tier is currently using.
+    /// Note that this may change if it switches between its cache and non-
+    /// cache incarnataions.
+    pub fn device(&self) -> Device {
+        self.data.dm_device.device()
+    }
+
 
     /// Lookup an immutable blockdev by its Stratis UUID.
     // Used for getting properties of a blockdev via the D-Bus.
     pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<&BlockDev> {
-        self.block_mgr.get_blockdev_by_uuid(uuid)
+        self.data.block_mgr.get_blockdev_by_uuid(uuid)
     }
 
     /// Lookup a mutable blockdev by its Stratis UUID.
     // Used for setting properties of a blockdev via the D-Bus.
     pub fn get_mut_blockdev_by_uuid(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
-        self.block_mgr.get_mut_blockdev_by_uuid(uuid)
+        self.data.block_mgr.get_mut_blockdev_by_uuid(uuid)
     }
 
     /// the number of sectors in the physical layer given up to Stratis
     /// metadata. current_capacity() - metadata_size() >= the size of the
     /// DM device.
     pub fn metadata_size(&self) -> Sectors {
-        self.block_mgr.metadata_size()
+        self.data.block_mgr.metadata_size()
     }
 
     /// Write the given data directly to the blockdevs that make up the
@@ -190,18 +219,21 @@ impl Store {
     /// in order to allow control over which blockdevs the metadata is written
     /// to.
     pub fn save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {
-        self.block_mgr.save_state(metadata)
+        self.data.block_mgr.save_state(metadata)
     }
 
     /// Map a Stratis blockdev uuid to a corresponding devnode.
     // Used during setup to construct devicemapper tables from Stratis metadata.
+    // Note: expected to be removed in final version, because the the devices
+    // in the flex layer will just contain metadata about how their blocks
+    // are allocated from the store, which is a unique device.
     pub fn uuid_to_devno(&self) -> Box<Fn(DevUuid) -> Option<Device>> {
-        self.block_mgr.uuid_to_devno()
+        self.data.block_mgr.uuid_to_devno()
     }
 }
 
 impl Recordable<HashMap<DevUuid, BlockDevSave>> for Store {
     fn record(&self) -> HashMap<DevUuid, BlockDevSave> {
-        self.block_mgr.record()
+        self.data.block_mgr.record()
     }
 }

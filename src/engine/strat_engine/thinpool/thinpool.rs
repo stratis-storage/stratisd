@@ -697,7 +697,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let mut mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut mgr = Store::initialize(&dm, pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(pool_uuid,
                                      &dm,
                                      &ThinPoolSizeParams::default(),
@@ -789,7 +789,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let mut mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut mgr = Store::initialize(&dm, pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(pool_uuid,
                                      &dm,
                                      &ThinPoolSizeParams::default(),
@@ -838,7 +838,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let mut mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut mgr = Store::initialize(&dm, pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(pool_uuid,
                                      &dm,
                                      &ThinPoolSizeParams::default(),
@@ -898,7 +898,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let mut mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut mgr = Store::initialize(&dm, pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(pool_uuid,
                                      &dm,
                                      &ThinPoolSizeParams::default(),
@@ -967,7 +967,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         let small_meta_size = MetaBlocks(16);
-        let mut mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut mgr = Store::initialize(&dm, pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         // Create a ThinPool with a very small meta device.
         let mut thin_pool = ThinPool::new(pool_uuid,
                                           &dm,
@@ -1020,7 +1020,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let mut mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut mgr = Store::initialize(&dm, pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(pool_uuid,
                                      &dm,
                                      &ThinPoolSizeParams::default(),
@@ -1077,7 +1077,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dm = DM::new().unwrap();
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let mut mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut mgr = Store::initialize(&dm, pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(pool_uuid,
                                      &dm,
                                      &ThinPoolSizeParams::default(),

@@ -127,34 +127,33 @@ pub struct Store {
 
 impl Store {
     /// Make a Store object from blockdevs that already belong to Stratis.
-    pub fn new(pool_uuid: PoolUuid,
+    pub fn new(dm: &DM,
+               pool_uuid: PoolUuid,
                block_devs: Vec<StratBlockDev>,
                last_update_time: Option<DateTime<Utc>>)
                -> Store {
-        let dm = DM::new().unwrap(); //FIXME
         Store {
-            data: DataLayer::setup(&dm,
+            data: DataLayer::setup(dm,
                                    BlockDevMgr::new(pool_uuid, block_devs, last_update_time))
                     .unwrap(),
         }
     }
 
     /// Initialize a Store object, by initializing the specified devs.
-    pub fn initialize(pool_uuid: PoolUuid,
+    pub fn initialize(dm: &DM,
+                      pool_uuid: PoolUuid,
                       paths: &[&Path],
                       mda_size: Sectors,
                       force: bool)
                       -> EngineResult<Store> {
-        let dm = DM::new().unwrap(); //FIXME
         Ok(Store {
-               data: DataLayer::setup(&dm,
+               data: DataLayer::setup(dm,
                                       BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?)?,
            })
     }
 
-    pub fn add(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
-        let dm = DM::new().unwrap(); //FIXME
-        self.data.add(&dm, paths, force)
+    pub fn add(&mut self, dm: &DM, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
+        self.data.add(dm, paths, force)
     }
 
     // TODO: We will not be allocating BlkDevSegments any more, because
@@ -180,10 +179,8 @@ impl Store {
     }
 
     /// Destroy the entire store.
-    // TODO: Change name to destroy()
-    pub fn destroy_all(self) -> EngineResult<()> {
-        let dm = DM::new().unwrap(); //FIXME
-        self.data.destroy(&dm)
+    pub fn destroy(self, dm: &DM) -> EngineResult<()> {
+        self.data.destroy(dm)
     }
 
     /// Return the device that this tier is currently using.

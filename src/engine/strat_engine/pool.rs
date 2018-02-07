@@ -41,7 +41,7 @@ impl StratPool {
                       -> EngineResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
-        let mut block_mgr = Store::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
+        let mut block_mgr = Store::initialize(dm, pool_uuid, paths, MIN_MDA_SECTORS, force)?;
 
         let thinpool = ThinPool::new(pool_uuid,
                                      dm,
@@ -52,7 +52,7 @@ impl StratPool {
         let thinpool = match thinpool {
             Ok(thinpool) => thinpool,
             Err(err) => {
-                let _ = block_mgr.destroy_all();
+                let _ = block_mgr.destroy(dm);
                 return Err(err);
             }
         };
@@ -78,7 +78,7 @@ impl StratPool {
                             EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no metadata for pool {}", uuid))
                         })?;
-        let store = Store::new(uuid, get_blockdevs(uuid, &metadata, devnodes)?, None);
+        let store = Store::new(dm, uuid, get_blockdevs(uuid, &metadata, devnodes)?, None);
         let thinpool = ThinPool::setup(dm,
                                        uuid,
                                        metadata.thinpool_dev.data_block_size,
@@ -181,14 +181,16 @@ impl Pool for StratPool {
                      paths: &[&Path],
                      force: bool)
                      -> EngineResult<Vec<DevUuid>> {
-        let bdev_info = self.store.add(paths, force)?;
+        let dm = DM::new()?;
+        let bdev_info = self.store.add(&dm, paths, force)?;
         self.write_metadata(pool_name)?;
         Ok(bdev_info)
     }
 
     fn destroy(self) -> EngineResult<()> {
-        self.thin_pool.teardown(&DM::new()?)?;
-        self.store.destroy_all()?;
+        let dm = DM::new()?;
+        self.thin_pool.teardown(&dm)?;
+        self.store.destroy(&dm)?;
         Ok(())
     }
 

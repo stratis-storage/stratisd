@@ -9,9 +9,6 @@ def local_file(name):
 
 README = local_file("README.rst")
 
-with open(local_file("src/stratisd_client_dbus/_version.py")) as o:
-        exec(o.read())
-
 setuptools.setup(
     name='stratisd-client-dbus',
     author='Anne Mulhern',

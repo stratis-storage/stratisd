@@ -16,7 +16,6 @@
 Miscellaneous methods to support testing.
 """
 
-import abc
 import os
 import string
 import subprocess
@@ -40,17 +39,16 @@ def _device_list(minimum):
        min_size=minimum
     )
 
-class ServiceABC(abc.ABC):
+class Service(object):
     """
-    Abstract base class of Service classes.
+    Handle starting and stopping the Rust service.
     """
 
-    @abc.abstractmethod
     def setUp(self):
         """
         Start the stratisd daemon with the simulator.
         """
-        raise NotImplementedError()
+        self._stratisd = subprocess.Popen([os.path.join(_STRATISD), '--sim'])
 
     def tearDown(self):
         """
@@ -59,15 +57,3 @@ class ServiceABC(abc.ABC):
         # pylint: disable=no-member
         self._stratisd.terminate()
         self._stratisd.wait()
-
-
-class ServiceR(ServiceABC):
-    """
-    Handle starting and stopping the Rust service.
-    """
-
-    def setUp(self):
-        self._stratisd = subprocess.Popen([os.path.join(_STRATISD), '--sim'])
-
-
-Service = ServiceR

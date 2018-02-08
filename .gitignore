@@ -11,3 +11,16 @@ target
 .settings
 .vscode
 tests/test_config.json
+
+# python files
+*.pyc
+*.egg-info
+
+# working directories
+.coverage
+.hypothesis
+.tox
+
+# coverage output
+htmlcov
+

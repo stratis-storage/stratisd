@@ -171,13 +171,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                      pool_save: &PoolSave,
                      devnodes: &HashMap<Device, PathBuf>)
                      -> EngineResult<Vec<StratBlockDev>> {
-    let flex_devs = &pool_save.flex_devs;
-    let segments = flex_devs
-        .meta_dev
-        .iter()
-        .chain(flex_devs.thin_meta_dev.iter())
-        .chain(flex_devs.thin_data_dev.iter())
-        .chain(flex_devs.thin_meta_dev_spare.iter());
+    let segments = &pool_save.store.segments;
 
     let mut segment_table = HashMap::new();
     for seg in segments {

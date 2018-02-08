@@ -57,10 +57,10 @@ pub struct FilesystemSave {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FlexDevsSave {
-    pub meta_dev: Vec<(Uuid, Sectors, Sectors)>,
-    pub thin_meta_dev: Vec<(Uuid, Sectors, Sectors)>,
-    pub thin_data_dev: Vec<(Uuid, Sectors, Sectors)>,
-    pub thin_meta_dev_spare: Vec<(Uuid, Sectors, Sectors)>,
+    pub meta_dev: Vec<(Sectors, Sectors)>,
+    pub thin_meta_dev: Vec<(Sectors, Sectors)>,
+    pub thin_data_dev: Vec<(Sectors, Sectors)>,
+    pub thin_meta_dev_spare: Vec<(Sectors, Sectors)>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

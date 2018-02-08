@@ -155,12 +155,9 @@ impl Store {
         self.data.add(dm, paths, force)
     }
 
-    // TODO: We will not be allocating BlkDevSegments any more, because
-    // we will be allocating from the DM device.
-    // The return type should be simplified to
-    // Option<Vec<Vec<(Sectors, Sectors)>>>
-    pub fn alloc_space(&mut self, _sizes: &[Sectors]) -> Option<Vec<Vec<BlkDevSegment>>> {
-        unimplemented!()
+    /// Allocate space from the underlying device.
+    pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<(Sectors, Sectors)>>> {
+        self.data.alloc_space(sizes)
     }
 
     /// Return a reference to the blockdevs that form the base of the physical
@@ -215,15 +212,6 @@ impl Store {
     /// to.
     pub fn save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {
         self.data.block_mgr.save_state(metadata)
-    }
-
-    /// Map a Stratis blockdev uuid to a corresponding devnode.
-    // Used during setup to construct devicemapper tables from Stratis metadata.
-    // Note: expected to be removed in final version, because the the devices
-    // in the flex layer will just contain metadata about how their blocks
-    // are allocated from the store, which is a unique device.
-    pub fn uuid_to_devno(&self) -> Box<Fn(DevUuid) -> Option<Device>> {
-        self.data.block_mgr.uuid_to_devno()
     }
 }
 

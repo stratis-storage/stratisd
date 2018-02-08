@@ -78,7 +78,10 @@ impl StratPool {
                             EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no metadata for pool {}", uuid))
                         })?;
-        let store = Store::setup(dm, uuid, get_blockdevs(uuid, &metadata, devnodes)?, None)?;
+        let store = Store::setup(dm,
+                                 uuid,
+                                 get_blockdevs(uuid, &metadata.store, devnodes)?,
+                                 None)?;
         let thinpool = ThinPool::setup(dm,
                                        uuid,
                                        metadata.thinpool_dev.data_block_size,
@@ -310,8 +313,8 @@ mod tests {
         let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
-        let blockdevs1 = get_blockdevs(uuid1, &pool_save1, devnodes1).unwrap();
-        let blockdevs2 = get_blockdevs(uuid2, &pool_save2, devnodes2).unwrap();
+        let blockdevs1 = get_blockdevs(uuid1, &pool_save1.store, devnodes1).unwrap();
+        let blockdevs2 = get_blockdevs(uuid2, &pool_save2.store, devnodes2).unwrap();
         assert_eq!(blockdevs1.len(), pool_save1.store.block_devs.len());
         assert_eq!(blockdevs2.len(), pool_save2.store.block_devs.len());
 
@@ -337,8 +340,8 @@ mod tests {
         let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
-        let blockdevs1 = get_blockdevs(uuid1, &pool_save1, devnodes1).unwrap();
-        let blockdevs2 = get_blockdevs(uuid2, &pool_save2, devnodes2).unwrap();
+        let blockdevs1 = get_blockdevs(uuid1, &pool_save1.store, devnodes1).unwrap();
+        let blockdevs2 = get_blockdevs(uuid2, &pool_save2.store, devnodes2).unwrap();
         assert_eq!(blockdevs1.len(), pool_save1.store.block_devs.len());
         assert_eq!(blockdevs2.len(), pool_save2.store.block_devs.len());
 

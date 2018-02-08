@@ -146,15 +146,15 @@ impl ThinPool {
                                             data_block_size,
                                             low_water_mark)?;
         Ok(ThinPool {
-               pool_uuid: pool_uuid,
+               pool_uuid,
                thin_pool: thinpool_dev,
-               meta_segments: meta_segments,
+               meta_segments,
                meta_spare_segments: spare_segments,
-               data_segments: data_segments,
-               mdv_segments: mdv_segments,
+               data_segments,
+               mdv_segments,
                id_gen: ThinDevIdPool::new_from_ids(&[]),
                filesystems: Table::default(),
-               mdv: mdv,
+               mdv,
            })
     }
 
@@ -262,15 +262,15 @@ impl ThinPool {
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
         Ok(ThinPool {
-               pool_uuid: pool_uuid,
+               pool_uuid,
                thin_pool: thinpool_dev,
-               meta_segments: meta_segments,
+               meta_segments,
                meta_spare_segments: spare_segments,
-               data_segments: data_segments,
-               mdv_segments: mdv_segments,
+               data_segments,
+               mdv_segments,
                id_gen: ThinDevIdPool::new_from_ids(&thin_ids),
                filesystems: fs_table,
-               mdv: mdv,
+               mdv,
            })
     }
 

@@ -65,10 +65,7 @@ impl BDA {
 
         let regions = mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, &mut f)?;
 
-        Ok(BDA {
-               header: header,
-               regions: regions,
-           })
+        Ok(BDA { header, regions })
     }
 
     /// Load a BDA on initial setup of a device.
@@ -83,10 +80,7 @@ impl BDA {
 
         let regions = mda::MDARegions::load(BDA_STATIC_HDR_SIZE, header.mda_size, f)?;
 
-        Ok(Some(BDA {
-                    header: header,
-                    regions: regions,
-                }))
+        Ok(Some(BDA { header, regions }))
     }
 
     /// Zero out Static Header on the blockdev. This causes it to no
@@ -179,13 +173,13 @@ impl StaticHeader {
            initialization_time: u64)
            -> StaticHeader {
         StaticHeader {
-            blkdev_size: blkdev_size,
-            pool_uuid: pool_uuid,
-            dev_uuid: dev_uuid,
-            mda_size: mda_size,
+            blkdev_size,
+            pool_uuid,
+            dev_uuid,
+            mda_size,
             reserved_size: MDA_RESERVED_SECTORS,
             flags: 0,
-            initialization_time: initialization_time,
+            initialization_time,
         }
     }
 
@@ -299,10 +293,10 @@ impl StaticHeader {
         mda::validate_mda_size(mda_size)?;
 
         Ok(Some(StaticHeader {
-                    pool_uuid: pool_uuid,
-                    dev_uuid: dev_uuid,
-                    blkdev_size: blkdev_size,
-                    mda_size: mda_size,
+                    pool_uuid,
+                    dev_uuid,
+                    blkdev_size,
+                    mda_size,
                     reserved_size: Sectors(LittleEndian::read_u64(&buf[104..112])),
                     flags: 0,
                     initialization_time: LittleEndian::read_u64(&buf[120..128]),
@@ -373,7 +367,7 @@ mod mda {
             f.flush()?;
 
             Ok(MDARegions {
-                   region_size: region_size,
+                   region_size,
                    mdas: [None, None],
                })
         }
@@ -410,7 +404,7 @@ mod mda {
             };
 
             Ok(MDARegions {
-                   region_size: region_size,
+                   region_size,
                    mdas: [get_mda(0)?, get_mda(1)?],
                })
         }
@@ -441,7 +435,7 @@ mod mda {
 
             let header = MDAHeader {
                 last_updated: *time,
-                used: used,
+                used,
                 data_crc: crc32::checksum_castagnoli(data),
             };
             let hdr_buf = header.to_buf();
@@ -573,7 +567,7 @@ mod mda {
 
                     let nsecs = LittleEndian::read_u32(&buf[24..28]);
                     Ok(Some(MDAHeader {
-                                used: used,
+                                used,
                                 last_updated: Utc.timestamp(secs as i64, nsecs),
                                 data_crc: LittleEndian::read_u32(&buf[4..8]),
                             }))

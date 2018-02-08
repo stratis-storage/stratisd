@@ -64,9 +64,9 @@ impl StratPool {
 
         let mut pool = StratPool {
             name: name.to_owned(),
-            pool_uuid: pool_uuid,
+            pool_uuid,
             block_devs: block_mgr,
-            redundancy: redundancy,
+            redundancy,
             thin_pool: thinpool,
         };
 
@@ -210,6 +210,15 @@ impl Pool for StratPool {
             .rename_filesystem(&self.name, uuid, new_name)
     }
 
+    fn snapshot_filesystem(&mut self,
+                           origin_uuid: FilesystemUuid,
+                           snapshot_name: &str)
+                           -> EngineResult<FilesystemUuid> {
+        let pool_name = self.name().to_owned();
+        self.thin_pool
+            .snapshot_filesystem(&DM::new()?, &pool_name, origin_uuid, snapshot_name)
+    }
+
     fn rename(&mut self, name: &str) {
         self.name = name.to_owned();
     }
@@ -226,15 +235,6 @@ impl Pool for StratPool {
 
     fn filesystems(&self) -> Vec<&Filesystem> {
         self.thin_pool.filesystems()
-    }
-
-    fn snapshot_filesystem(&mut self,
-                           origin_uuid: FilesystemUuid,
-                           snapshot_name: &str)
-                           -> EngineResult<FilesystemUuid> {
-        let pool_name = self.name().to_owned();
-        self.thin_pool
-            .snapshot_filesystem(&DM::new()?, &pool_name, origin_uuid, snapshot_name)
     }
 
     fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<&Filesystem> {

@@ -54,7 +54,7 @@ impl LoopTestDev {
         // Wipe 1 MiB at the beginning, as data sits around on the files.
         wipe_sectors(&ld.path().unwrap(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
 
-        LoopTestDev { ld: ld }
+        LoopTestDev { ld }
     }
 }
 

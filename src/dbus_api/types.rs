@@ -69,10 +69,7 @@ pub struct OPContext {
 
 impl OPContext {
     pub fn new(parent: Path<'static>, uuid: Uuid) -> OPContext {
-        OPContext {
-            parent: parent,
-            uuid: uuid,
-        }
+        OPContext { parent, uuid }
     }
 }
 
@@ -87,7 +84,7 @@ impl DbusContext {
     pub fn new(engine: Rc<RefCell<Engine>>) -> DbusContext {
         DbusContext {
             actions: Rc::new(RefCell::new(ActionQueue::default())),
-            engine: engine,
+            engine,
             next_index: Rc::new(Cell::new(0)),
         }
     }
@@ -105,12 +102,12 @@ impl DbusContext {
 #[derive(Default, Debug)]
 pub struct TData;
 impl DataType for TData {
+    type Tree = DbusContext;
     type ObjectPath = Option<OPContext>;
     type Property = ();
     type Interface = ();
     type Method = ();
     type Signal = ();
-    type Tree = DbusContext;
 }
 
 /// An action queue.

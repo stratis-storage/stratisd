@@ -48,7 +48,7 @@ impl<'a, T: HasName + HasUuid> IntoIterator for &'a Table<T> {
 }
 
 /// All operations are O(1).
-/// The implementation does not priviledge the name key over the UUID key
+/// The implementation does not privilege the name key over the UUID key
 /// in any way. They are both treated as constants once the item has been
 /// inserted. In order to rename a T item, it must be removed, renamed, and
 /// reinserted under the new name.

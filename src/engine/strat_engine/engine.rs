@@ -98,10 +98,6 @@ impl StratEngine {
 }
 
 impl Engine for StratEngine {
-    fn configure_simulator(&mut self, _denominator: u32) -> EngineResult<()> {
-        Ok(()) // we're not the simulator and not configurable, so just say ok
-    }
-
     fn create_pool(&mut self,
                    name: &str,
                    blockdev_paths: &[&Path],
@@ -169,6 +165,10 @@ impl Engine for StratEngine {
 
     fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<&mut Pool> {
         get_mut_pool!(self; uuid)
+    }
+
+    fn configure_simulator(&mut self, _denominator: u32) -> EngineResult<()> {
+        Ok(()) // we're not the simulator and not configurable, so just say ok
     }
 
     fn check(&mut self) -> () {

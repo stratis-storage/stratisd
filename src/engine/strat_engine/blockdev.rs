@@ -39,12 +39,12 @@ impl StratBlockDev {
                hardware_info: Option<String>)
                -> StratBlockDev {
         StratBlockDev {
-            dev: dev,
-            devnode: devnode,
-            bda: bda,
+            dev,
+            devnode,
+            bda,
             used: allocator,
-            user_info: user_info,
-            hardware_info: hardware_info,
+            user_info,
+            hardware_info,
         }
     }
 

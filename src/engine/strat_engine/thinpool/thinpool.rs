@@ -11,8 +11,9 @@ use std::process::Command;
 use uuid::Uuid;
 
 use devicemapper as dm;
-use devicemapper::{DM, DataBlocks, DmDevice, DmName, DmNameBuf, IEC, LinearDev, MetaBlocks,
-                   Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatusSummary, device_exists};
+use devicemapper::{DM, DataBlocks, Device, DmDevice, DmName, DmNameBuf, IEC, LinearDev,
+                   LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine,
+                   ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatusSummary, device_exists};
 
 use super::super::super::engine::Filesystem;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -40,6 +41,58 @@ const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
 pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
 const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
+
+/// Transform a list of segments belonging to a single device into a
+/// list of target lines for a linear device.
+fn segs_to_table(dev: Device,
+                 segments: &[(Sectors, Sectors)])
+                 -> Vec<TargetLine<LinearDevTargetParams>> {
+    let mut table = Vec::new();
+    let mut logical_start_offset = Sectors(0);
+
+    for &(start_offset, length) in segments {
+        let params = LinearTargetParams::new(dev, start_offset);
+        let line = TargetLine::new(logical_start_offset,
+                                   length,
+                                   LinearDevTargetParams::Linear(params));
+        table.push(line);
+        logical_start_offset += length;
+    }
+    table
+}
+
+fn coalesce_segs(left: &[(Sectors, Sectors)],
+                 right: &[(Sectors, Sectors)])
+                 -> Vec<(Sectors, Sectors)> {
+    if left.is_empty() {
+        return right.to_vec();
+    }
+    if right.is_empty() {
+        return left.to_vec();
+    }
+
+    let mut segments = Vec::with_capacity(left.len() + right.len());
+    segments.extend_from_slice(left);
+
+    // Combine first and last if they are contiguous.
+    let coalesced = {
+        let right_first = right.first().expect("!right.is_empty()");
+        let left_last = segments.last_mut().expect("!left.is_empty()");
+        if left_last.0 + left_last.1 == right_first.0 {
+            left_last.1 += right_first.1;
+            true
+        } else {
+            false
+        }
+    };
+
+    if coalesced {
+        segments.extend_from_slice(&left[1..]);
+    } else {
+        segments.extend_from_slice(left);
+    }
+    segments
+}
 
 
 pub struct ThinPoolSizeParams {

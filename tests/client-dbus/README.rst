@@ -1,4 +1,4 @@
-A set of tests for stratisd D-Bus layer 
+A set of tests for stratisd D-Bus layer
 ==============================================
 
 This code is not stable and is not intended for public use. Not only may
@@ -6,7 +6,7 @@ it change without notice, but it may also be entirely removed without notice.
 
 Testing
 -------
-The bulk of the tests designed to test the stratisd engine via the
+The bulk of the tests are designed to test the stratisd engine via the
 D-Bus API. They test basic functionality and behavior of the various D-Bus
 methods.
 

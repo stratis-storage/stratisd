@@ -4,7 +4,8 @@
 
 // Code to handle the physical backing store of a pool.
 
-use std::path::Path;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 
@@ -17,8 +18,8 @@ use super::super::super::types::{DevUuid, PoolUuid};
 use super::super::dmnames::{PhysicalRole, format_physical_name};
 use super::super::serde_structs::{Recordable, StoreSave};
 
-use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, get_coalesced_segments, map_to_dm};
+use super::setup::get_blockdevs;
 
 /// Handles the lowest level, base layer of this tier.
 /// The dm_device organizes all block devs into a single linear allocation pool.
@@ -129,12 +130,17 @@ impl Store {
     /// Make a Store object from blockdevs that already belong to Stratis.
     pub fn setup(dm: &DM,
                  pool_uuid: PoolUuid,
-                 block_devs: Vec<StratBlockDev>,
+                 store_save: &StoreSave,
+                 devnodes: &HashMap<Device, PathBuf>,
                  last_update_time: Option<DateTime<Utc>>)
                  -> EngineResult<Store> {
         Ok(Store {
                data: DataLayer::setup(dm,
-                                      BlockDevMgr::new(pool_uuid, block_devs, last_update_time))?,
+                                      BlockDevMgr::new(pool_uuid,
+                                                       get_blockdevs(pool_uuid,
+                                                                     store_save,
+                                                                     devnodes)?,
+                                                       last_update_time))?,
            })
     }
 

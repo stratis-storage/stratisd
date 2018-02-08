@@ -16,7 +16,7 @@ use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction};
 
-use super::physical::{MIN_MDA_SECTORS, Store, get_blockdevs, get_metadata};
+use super::physical::{MIN_MDA_SECTORS, Store, get_metadata};
 use super::serde_structs::{PoolSave, Recordable};
 use super::thinpool::{ThinPool, ThinPoolSizeParams};
 
@@ -78,10 +78,7 @@ impl StratPool {
                             EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no metadata for pool {}", uuid))
                         })?;
-        let store = Store::setup(dm,
-                                 uuid,
-                                 get_blockdevs(uuid, &metadata.store, devnodes)?,
-                                 None)?;
+        let store = Store::setup(dm, uuid, &metadata.store, devnodes, None)?;
         let thinpool = ThinPool::setup(dm,
                                        uuid,
                                        metadata.thinpool_dev.data_block_size,
@@ -313,22 +310,6 @@ mod tests {
         let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
-        let blockdevs1 = get_blockdevs(uuid1, &pool_save1.store, devnodes1).unwrap();
-        let blockdevs2 = get_blockdevs(uuid2, &pool_save2.store, devnodes2).unwrap();
-        assert_eq!(blockdevs1.len(), pool_save1.store.block_devs.len());
-        assert_eq!(blockdevs2.len(), pool_save2.store.block_devs.len());
-
-        for mut blockdev in blockdevs1 {
-            let (amt, seg) = blockdev.request_space(Sectors(1));
-            assert_eq!(amt, Sectors(1));
-            assert!(seg[0].0 >= blockdev.metadata_size());
-        }
-
-        for mut blockdev in blockdevs2 {
-            let (amt, seg) = blockdev.request_space(Sectors(1));
-            assert_eq!(amt, Sectors(1));
-            assert!(seg[0].0 >= blockdev.metadata_size());
-        }
 
         pool1.teardown().unwrap();
         pool2.teardown().unwrap();
@@ -340,22 +321,6 @@ mod tests {
         let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
-        let blockdevs1 = get_blockdevs(uuid1, &pool_save1.store, devnodes1).unwrap();
-        let blockdevs2 = get_blockdevs(uuid2, &pool_save2.store, devnodes2).unwrap();
-        assert_eq!(blockdevs1.len(), pool_save1.store.block_devs.len());
-        assert_eq!(blockdevs2.len(), pool_save2.store.block_devs.len());
-
-        for mut blockdev in blockdevs1 {
-            let (amt, seg) = blockdev.request_space(Sectors(1));
-            assert_eq!(amt, Sectors(1));
-            assert!(seg[0].0 >= blockdev.metadata_size());
-        }
-
-        for mut blockdev in blockdevs2 {
-            let (amt, seg) = blockdev.request_space(Sectors(1));
-            assert_eq!(amt, Sectors(1));
-            assert!(seg[0].0 >= blockdev.metadata_size());
-        }
     }
 
     #[test]

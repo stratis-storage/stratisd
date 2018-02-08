@@ -127,16 +127,15 @@ pub struct Store {
 
 impl Store {
     /// Make a Store object from blockdevs that already belong to Stratis.
-    pub fn new(dm: &DM,
-               pool_uuid: PoolUuid,
-               block_devs: Vec<StratBlockDev>,
-               last_update_time: Option<DateTime<Utc>>)
-               -> Store {
-        Store {
-            data: DataLayer::setup(dm,
-                                   BlockDevMgr::new(pool_uuid, block_devs, last_update_time))
-                    .unwrap(),
-        }
+    pub fn setup(dm: &DM,
+                 pool_uuid: PoolUuid,
+                 block_devs: Vec<StratBlockDev>,
+                 last_update_time: Option<DateTime<Utc>>)
+                 -> EngineResult<Store> {
+        Ok(Store {
+               data: DataLayer::setup(dm,
+                                      BlockDevMgr::new(pool_uuid, block_devs, last_update_time))?,
+           })
     }
 
     /// Initialize a Store object, by initializing the specified devs.

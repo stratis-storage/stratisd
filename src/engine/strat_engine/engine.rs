@@ -57,7 +57,8 @@ impl StratEngine {
     /// Returns an error if there was an error reading device nodes.
     /// Returns an error if there was an error setting up any of the pools.
     pub fn initialize() -> EngineResult<StratEngine> {
-        let minor_dm_version = DM::new()?.version()?.1;
+        let dm = DM::new()?;
+        let minor_dm_version = dm.version()?.1;
         if minor_dm_version < REQUIRED_DM_MINOR_VERSION {
             let err_msg = format!("Requires DM minor version {} but kernel only supports {}",
                                   REQUIRED_DM_MINOR_VERSION,
@@ -69,7 +70,7 @@ impl StratEngine {
 
         let mut table = Table::default();
         for (pool_uuid, devices) in &pools {
-            let evicted = table.insert(StratPool::setup(*pool_uuid, devices)?);
+            let evicted = table.insert(StratPool::setup(&dm, *pool_uuid, devices)?);
             if !evicted.is_empty() {
 
                 // TODO: update state machine on failure.
@@ -115,7 +116,7 @@ impl Engine for StratEngine {
         }
 
         let dm = DM::new()?;
-        let pool = StratPool::initialize(name, &dm, blockdev_paths, redundancy, force)?;
+        let pool = StratPool::initialize(&dm, name, blockdev_paths, redundancy, force)?;
 
         let uuid = pool.uuid();
         devlinks::pool_added(pool.name())?;

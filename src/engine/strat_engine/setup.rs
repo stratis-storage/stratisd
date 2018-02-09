@@ -26,6 +26,50 @@ use super::range_alloc::RangeAllocator;
 use super::serde_structs::PoolSave;
 
 
+/// Determine if devnode is a stratis device, if it is we will add  pool uuid and device
+/// information to pool_map and return pool uuid.
+pub fn is_stratis_device(devnode: &PathBuf) -> EngineResult<Option<PoolUuid>> {
+    match OpenOptions::new().read(true).open(&devnode) {
+        Ok(mut f) => {
+            if let DevOwnership::Ours(pool_uuid, _) = StaticHeader::determine_ownership(&mut f)? {
+                Ok(Some(pool_uuid))
+            } else {
+                Ok(None)
+            }
+        }
+        Err(err) => {
+            // There are some reasons for OpenOptions::open() to return an error
+            // which are not reasons for this method to return an error.
+            // Try to distinguish. Non-error conditions are:
+            //
+            // 1. ENXIO: The device does not exist anymore. This means that the device
+            // was volatile for some reason; in that case it can not belong to
+            // Stratis so it is safe to ignore it.
+            //
+            // 2. ENOMEDIUM: The device has no medium. An example of this case is an
+            // empty optical drive.
+            //
+            // Note that it is better to be conservative and return with an
+            // error in any case where failure to read the device could result
+            // in bad data for Stratis. Additional exceptions may be added,
+            // but only with a complete justification.
+            match err.kind() {
+                ErrorKind::NotFound => Ok(None),
+                _ => {
+                    if let Some(errno) = err.raw_os_error() {
+                        match Errno::from_i32(errno) {
+                            Errno::ENXIO | Errno::ENOMEDIUM => Ok(None),
+                            _ => Err(EngineError::Io(err)),
+                        }
+                    } else {
+                        Err(EngineError::Io(err))
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Find all Stratis devices.
 ///
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
@@ -37,64 +81,22 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
         let dir_e = dir_e?;
         let devnode = dir_e.path();
 
-        let devno = match devnode_to_devno(&devnode)? {
+        match devnode_to_devno(&devnode)? {
             None => continue,
             Some(devno) => {
-                // If this device has already been processed, continue.
                 if devno_set.insert(devno) {
-                    devno
+                    is_stratis_device(&devnode)?
+                        .and_then(|pool_uuid| {
+                                      pool_map
+                                          .entry(pool_uuid)
+                                          .or_insert_with(HashMap::new)
+                                          .insert(Device::from(devno), devnode)
+                                  });
                 } else {
                     continue;
                 }
             }
-        };
-
-        let f = OpenOptions::new().read(true).open(&devnode);
-
-        // There are some reasons for OpenOptions::open() to return an error
-        // which are not reasons for this method to return an error.
-        // Try to distinguish. Non-error conditions are:
-        //
-        // 1. ENXIO: The device does not exist anymore. This means that the device
-        // was volatile for some reason; in that case it can not belong to
-        // Stratis so it is safe to ignore it.
-        //
-        // 2. ENOMEDIUM: The device has no medium. An example of this case is an
-        // empty optical drive.
-        //
-        // Note that it is better to be conservative and return with an
-        // error in any case where failure to read the device could result
-        // in bad data for Stratis. Additional exceptions may be added,
-        // but only with a complete justification.
-        if f.is_err() {
-            let err = f.unwrap_err();
-            match err.kind() {
-                ErrorKind::NotFound => {
-                    continue;
-                }
-                _ => {
-                    if let Some(errno) = err.raw_os_error() {
-                        match Errno::from_i32(errno) {
-                            Errno::ENXIO | Errno::ENOMEDIUM => continue,
-                            _ => return Err(EngineError::Io(err)),
-                        };
-                    } else {
-                        return Err(EngineError::Io(err));
-                    }
-                }
-            }
         }
-
-        let mut f = f.expect("unreachable if f is err");
-        if let DevOwnership::Ours(pool_uuid, _) = StaticHeader::determine_ownership(&mut f)? {
-            // No value should ever be ejected, because duplicate device nodes
-            // are filtered out above. Therefore, the return value of insert()
-            // might as well be ignored.
-            let _ = pool_map
-                .entry(pool_uuid)
-                .or_insert_with(HashMap::new)
-                .insert(Device::from(devno), devnode);
-        };
     }
 
     Ok(pool_map)

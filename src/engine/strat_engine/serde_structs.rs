@@ -67,6 +67,7 @@ pub struct FlexDevsSave {
 pub struct StoreSave {
     pub segments: Vec<(Uuid, Sectors, Sectors)>,
     pub block_devs: HashMap<DevUuid, BlockDevSave>,
+    pub next: Sectors,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

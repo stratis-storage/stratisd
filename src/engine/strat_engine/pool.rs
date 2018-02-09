@@ -78,6 +78,25 @@ impl StratPool {
                             EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no metadata for pool {}", uuid))
                         })?;
+
+        // If the amount allocated from the cache tier is not the same as that
+        // used by the thinpool, consider the situation an error.
+        let flex_devs = &metadata.flex_devs;
+        let total_allocated = flex_devs
+            .meta_dev
+            .iter()
+            .chain(flex_devs.thin_meta_dev.iter())
+            .chain(flex_devs.thin_data_dev.iter())
+            .chain(flex_devs.thin_meta_dev_spare.iter())
+            .map(|x| x.1)
+            .sum::<Sectors>();
+        if total_allocated != metadata.store.next {
+            let err_msg = format!("{} used in thinpool, but {} given up by cache",
+                                  total_allocated,
+                                  metadata.store.next);
+            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
+        }
+
         let store = Store::setup(dm, uuid, &metadata.store, devnodes, None)?;
         let thinpool = ThinPool::setup(dm,
                                        uuid,

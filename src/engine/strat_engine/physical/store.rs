@@ -12,13 +12,13 @@ use chrono::{DateTime, Utc};
 use devicemapper::{Device, DM, DmDevice, LinearDev, Sectors};
 
 use super::super::super::engine::BlockDev;
-use super::super::super::errors::EngineResult;
+use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::dmnames::{PhysicalRole, format_physical_name};
 use super::super::serde_structs::{Recordable, StoreSave};
 
-use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, get_coalesced_segments, map_to_dm};
+use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment, get_coalesced_segments, map_to_dm};
 use super::setup::get_blockdevs;
 
 /// Handles the lowest level, base layer of this tier.
@@ -30,15 +30,60 @@ struct DataLayer {
     /// The device mapper device which aggregates all block_mgr's devices
     dm_device: LinearDev,
     /// The list of segments granted by block_mgr and used by dm_device
+    /// It is always the case that block_mgr.avail_space() == 0, i.e., all
+    /// available space in block_mgr is allocated to the dm_device.
     segments: Vec<BlkDevSegment>,
     /// The position from which requested space is allocated
     next: Sectors,
 }
 
 impl DataLayer {
+    /// Setup a previously existing data layer from the block_mgr and
+    /// previously allocated segments.
+    pub fn setup(dm: &DM,
+                 block_mgr: BlockDevMgr,
+                 segments: &[(DevUuid, Sectors, Sectors)],
+                 next: Sectors)
+                 -> EngineResult<DataLayer> {
+        if block_mgr.avail_space() != Sectors(0) {
+            let err_msg = format!("Blockdev avail space should be 0, is {}",
+                                  block_mgr.avail_space());
+            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+        }
+
+        let uuid_to_devno = block_mgr.uuid_to_devno();
+        let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> EngineResult<BlkDevSegment> {
+            let device = uuid_to_devno(triple.0)
+                .ok_or_else(|| {
+                                EngineError::Engine(ErrorEnum::NotFound,
+                                                    format!("missing device for UUUD {:?}",
+                                                            &triple.0))
+                            })?;
+            Ok(BlkDevSegment::new(triple.0, Segment::new(device, triple.1, triple.2)))
+        };
+        let segments = segments
+            .iter()
+            .map(&mapper)
+            .collect::<EngineResult<Vec<_>>>()?;
+
+        let ld = LinearDev::setup(dm,
+                                  &format_physical_name(block_mgr.pool_uuid(),
+                                                        PhysicalRole::Origin),
+                                  None,
+                                  map_to_dm(&segments))?;
+
+        Ok(DataLayer {
+               block_mgr,
+               dm_device: ld,
+               segments,
+               next,
+           })
+    }
+
+
     /// Setup a new DataLayer struct from the block_mgr.
     /// Note that this is a metadata changing event.
-    pub fn setup(dm: &DM, mut block_mgr: BlockDevMgr) -> EngineResult<DataLayer> {
+    pub fn new(dm: &DM, mut block_mgr: BlockDevMgr) -> EngineResult<DataLayer> {
         let avail_space = block_mgr.avail_space();
         let segments = block_mgr
             .alloc_space(&[avail_space])
@@ -134,14 +179,9 @@ impl Store {
                  devnodes: &HashMap<Device, PathBuf>,
                  last_update_time: Option<DateTime<Utc>>)
                  -> EngineResult<Store> {
-        Ok(Store {
-               data: DataLayer::setup(dm,
-                                      BlockDevMgr::new(pool_uuid,
-                                                       get_blockdevs(pool_uuid,
-                                                                     store_save,
-                                                                     devnodes)?,
-                                                       last_update_time))?,
-           })
+        let blockdevs = get_blockdevs(pool_uuid, store_save, devnodes)?;
+        let block_mgr = BlockDevMgr::new(pool_uuid, blockdevs, last_update_time);
+        Ok(Store { data: DataLayer::setup(dm, block_mgr, &store_save.segments, store_save.next)? })
     }
 
     /// Initialize a Store object, by initializing the specified devs.
@@ -152,8 +192,8 @@ impl Store {
                       force: bool)
                       -> EngineResult<Store> {
         Ok(Store {
-               data: DataLayer::setup(dm,
-                                      BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?)?,
+               data: DataLayer::new(dm,
+                                    BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?)?,
            })
     }
 
@@ -226,6 +266,7 @@ impl Recordable<StoreSave> for Store {
         StoreSave {
             segments: self.data.segments.record(),
             block_devs: self.data.block_mgr.record(),
+            next: self.data.next,
         }
     }
 }

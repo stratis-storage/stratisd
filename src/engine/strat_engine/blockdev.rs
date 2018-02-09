@@ -63,17 +63,6 @@ impl StratBlockDev {
         self.bda.save_state(time, metadata, &mut f)
     }
 
-    /// List the available-for-upper-layer-use range in this blockdev.
-    pub fn avail_range(&self) -> (Sectors, Sectors) {
-        let start = self.metadata_size();
-        let size = self.current_capacity();
-        // Blockdev size is at least MIN_DEV_SIZE, so this can fail only if
-        // size of metadata area exceeds 1 GiB. Initial metadata area size
-        // is 4 MiB.
-        assert!(start <= size);
-        (start, size - start)
-    }
-
     /// The device's UUID.
     pub fn uuid(&self) -> DevUuid {
         self.bda.dev_uuid()
@@ -159,7 +148,13 @@ impl BlockDev for StratBlockDev {
     }
 
     fn total_size(&self) -> Sectors {
-        self.avail_range().1
+        let start = self.metadata_size();
+        let size = self.current_capacity();
+        // Blockdev size is at least MIN_DEV_SIZE, so this can fail only if
+        // size of metadata area exceeds 1 GiB. Initial metadata area size
+        // is 4 MiB.
+        assert!(start <= size);
+        size - start
     }
 
     fn state(&self) -> BlockDevState {

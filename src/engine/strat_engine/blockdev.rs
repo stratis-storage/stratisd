@@ -31,21 +31,42 @@ pub struct StratBlockDev {
 }
 
 impl StratBlockDev {
+    /// Make a new BlockDev from the parameters.
+    /// Allocate space for the Stratis metadata on the device.
+    /// - dev: the device, identified by number
+    /// - devnode: the device node
+    /// - dev_size: the total size of the device
+    /// - bda: the device's BDA
+    /// - other_segments: segments claimed for non-Stratis metadata use
+    /// - user_info: user settable identifying information
+    /// - hardware_info: identifying information in the hardware
+    /// Returns an error if it is impossible to allocate all segments on the
+    /// device. This can happen even if upper_segments is empty,
+    /// if the device size is less than the size required for the Stratis
+    /// metadata.
     pub fn new(dev: Device,
                devnode: PathBuf,
+               dev_size: Sectors,
                bda: BDA,
-               allocator: RangeAllocator,
+               upper_segments: &[(Sectors, Sectors)],
                user_info: Option<String>,
                hardware_info: Option<String>)
-               -> StratBlockDev {
-        StratBlockDev {
-            dev,
-            devnode,
-            bda,
-            used: allocator,
-            user_info,
-            hardware_info,
-        }
+               -> EngineResult<StratBlockDev> {
+        let mut segments = vec![(Sectors(0), bda.size())];
+        segments.extend(upper_segments);
+        let allocator = RangeAllocator::new(dev_size, &segments)?;
+
+        assert!(bda.size() <= dev_size,
+                "Otherwise the segments for the metadata could not have been allocated");
+
+        Ok(StratBlockDev {
+               dev,
+               devnode,
+               bda,
+               used: allocator,
+               user_info,
+               hardware_info,
+           })
     }
 
     /// Returns the blockdev's Device
@@ -150,9 +171,6 @@ impl BlockDev for StratBlockDev {
     fn total_size(&self) -> Sectors {
         let start = self.metadata_size();
         let size = self.current_capacity();
-        // Blockdev size is at least MIN_DEV_SIZE, so this can fail only if
-        // size of metadata area exceeds 1 GiB. Initial metadata area size
-        // is 4 MiB.
         assert!(start <= size);
         size - start
     }

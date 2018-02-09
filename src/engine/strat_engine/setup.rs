@@ -22,7 +22,6 @@ use super::blockdev::StratBlockDev;
 use super::device::blkdev_size;
 use super::engine::DevOwnership;
 use super::metadata::{BDA, StaticHeader};
-use super::range_alloc::RangeAllocator;
 use super::serde_structs::PoolSave;
 
 
@@ -195,14 +194,6 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                 let actual_size = blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?
                     .sectors();
 
-                // If size of device has changed and is less, then it is
-                // possible that the segments previously allocated for this
-                // blockdev no longer exist. If that is the case,
-                // RangeAllocator::new() will return an error.
-                let allocator =
-                    RangeAllocator::new(actual_size,
-                                        segment_table.get(&bda.dev_uuid()).unwrap_or(&vec![]))?;
-
                 let bd_save = pool_save
                     .block_devs
                     .get(&bda.dev_uuid())
@@ -212,12 +203,18 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                                     EngineError::Engine(ErrorEnum::NotFound, err_msg)
                                 })?;
 
+                // If the size of the device has changed and is less,
+                // then it is possible that the segments previously allocated
+                // for this blockdev no longer exist. If that is the case,
+                // StratBlockDev::new will return an error.
+                let segments = segment_table.get(&bda.dev_uuid());
                 blockdevs.push(StratBlockDev::new(*device,
                                                   devnode.to_owned(),
+                                                  actual_size,
                                                   bda,
-                                                  allocator,
+                                                  segments.unwrap_or(&vec![]),
                                                   bd_save.user_info.clone(),
-                                                  bd_save.hardware_info.clone()));
+                                                  bd_save.hardware_info.clone())?);
             }
         }
     }

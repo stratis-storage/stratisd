@@ -356,15 +356,8 @@ mod tests {
     fn test_empty_pool(paths: &[&Path]) -> () {
         assert_eq!(paths.len(), 0);
         let dm = DM::new().unwrap();
-        assert!(match StratPool::initialize(&dm,
-                                            "stratis_test_pool",
-                                            paths,
-                                            Redundancy::NONE,
-                                            true)
-                              .unwrap_err() {
-                    EngineError::Engine(ErrorEnum::Invalid, _) => true,
-                    _ => false,
-                });
+        assert!(StratPool::initialize(&dm, "stratis_test_pool", paths, Redundancy::NONE, true)
+                    .is_err());
     }
 
     #[test]

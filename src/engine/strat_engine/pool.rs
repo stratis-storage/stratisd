@@ -334,6 +334,18 @@ mod tests {
         assert_eq!(blockdevs1.len(), pool_save1.block_devs.len());
         assert_eq!(blockdevs2.len(), pool_save2.block_devs.len());
 
+        for mut blockdev in blockdevs1 {
+            let (amt, seg) = blockdev.request_space(Sectors(1));
+            assert_eq!(amt, Sectors(1));
+            assert!(seg[0].0 >= blockdev.metadata_size());
+        }
+
+        for mut blockdev in blockdevs2 {
+            let (amt, seg) = blockdev.request_space(Sectors(1));
+            assert_eq!(amt, Sectors(1));
+            assert!(seg[0].0 >= blockdev.metadata_size());
+        }
+
         pool1.teardown().unwrap();
         pool2.teardown().unwrap();
         let pools = find_all().unwrap();
@@ -348,6 +360,18 @@ mod tests {
         let blockdevs2 = get_blockdevs(uuid2, &pool_save2, devnodes2).unwrap();
         assert_eq!(blockdevs1.len(), pool_save1.block_devs.len());
         assert_eq!(blockdevs2.len(), pool_save2.block_devs.len());
+
+        for mut blockdev in blockdevs1 {
+            let (amt, seg) = blockdev.request_space(Sectors(1));
+            assert_eq!(amt, Sectors(1));
+            assert!(seg[0].0 >= blockdev.metadata_size());
+        }
+
+        for mut blockdev in blockdevs2 {
+            let (amt, seg) = blockdev.request_space(Sectors(1));
+            assert_eq!(amt, Sectors(1));
+            assert!(seg[0].0 >= blockdev.metadata_size());
+        }
     }
 
     #[test]

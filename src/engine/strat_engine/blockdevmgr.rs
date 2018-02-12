@@ -24,7 +24,6 @@ use super::blockdev::StratBlockDev;
 use super::device::{blkdev_size, resolve_devices};
 use super::engine::DevOwnership;
 use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};
-use super::range_alloc::RangeAllocator;
 use super::serde_structs::{BlockDevSave, Recordable};
 use super::util::hw_lookup;
 
@@ -394,22 +393,27 @@ fn initialize(pool_uuid: PoolUuid,
 
     let mut bds: Vec<StratBlockDev> = Vec::new();
     for (dev, (devnode, dev_size, mut f)) in add_devs {
+        let dev_size = dev_size.sectors();
 
         let bda = BDA::initialize(&mut f,
                                   pool_uuid,
                                   Uuid::new_v4(),
                                   mda_size,
-                                  dev_size.sectors(),
+                                  dev_size,
                                   Utc::now().timestamp() as u64);
         if let Ok(bda) = bda {
-            let allocator = RangeAllocator::new(bda.dev_size(), &[(Sectors(0), bda.size())])
-                .expect("bda.size() < bda.dev_size() and single range");
-
             let hw_id = match hw_lookup(devnode) {
                 Ok(id) => id,
                 Err(_) => None,  // TODO: Log this failure so that it can be addressed.
             };
-            bds.push(StratBlockDev::new(dev, devnode.to_owned(), bda, allocator, None, hw_id));
+
+            // FIXME: The expect is only provisionally true.
+            // The dev_size is at least MIN_DEV_SIZE, but the size of the
+            // metadata is not really bounded from above.
+            let blockdev =
+                StratBlockDev::new(dev, devnode.to_owned(), dev_size, bda, &[], None, hw_id)
+                    .expect("bda.size() < dev_size and no user facing segments allocated");
+            bds.push(blockdev);
         } else {
             // TODO: check the return values and update state machine on failure
             let _ = BDA::wipe(&mut f);

@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use devicemapper::{DM, DmFlags, DmResult, DevId};
+use devicemapper::{DM, DevId, DmFlags, DmResult};
 
 use nix::mount::{MNT_DETACH, umount2};
 use mnt::get_submounts;

@@ -5,7 +5,7 @@
 // Manage the linear volume that stores metadata on pool levels 5-7.
 
 use std::convert::From;
-use std::fs::{create_dir, remove_dir, OpenOptions, read_dir, remove_file, rename};
+use std::fs::{OpenOptions, create_dir, read_dir, remove_dir, remove_file, rename};
 use std::io::ErrorKind;
 use std::io::prelude::*;
 use std::os::unix::io::AsRawFd;
@@ -16,7 +16,7 @@ use nix::mount::{MsFlags, mount, umount};
 use nix::unistd::fsync;
 use serde_json;
 
-use devicemapper::{DmDevice, DM, LinearDev};
+use devicemapper::{DM, DmDevice, LinearDev};
 
 use super::super::super::engine::HasUuid;
 use super::super::super::errors::EngineResult;

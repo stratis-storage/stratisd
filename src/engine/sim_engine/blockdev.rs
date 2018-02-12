@@ -9,7 +9,7 @@ use std::rc::Rc;
 use chrono::{DateTime, TimeZone, Utc};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Sectors, IEC};
+use devicemapper::{Bytes, IEC, Sectors};
 
 use super::super::engine::{BlockDev, HasUuid};
 use super::super::types::{BlockDevState, DevUuid};

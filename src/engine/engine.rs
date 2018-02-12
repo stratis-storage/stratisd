@@ -9,10 +9,10 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use devicemapper::{Sectors, Device};
+use devicemapper::{Device, Sectors};
 
 use super::errors::EngineResult;
-use super::types::{BlockDevState, FilesystemUuid, PoolUuid, DevUuid, RenameAction};
+use super::types::{BlockDevState, DevUuid, FilesystemUuid, PoolUuid, RenameAction};
 
 pub trait HasUuid: Debug {
     fn uuid(&self) -> Uuid;

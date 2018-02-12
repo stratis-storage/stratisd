@@ -17,9 +17,9 @@ use devicemapper::{DM, DataBlocks, DmDevice, DmName, DmNameBuf, IEC, LinearDev, 
 use super::super::super::engine::{Filesystem, HasName};
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::structures::Table;
-use super::super::super::types::{DevUuid, PoolUuid, FilesystemUuid, RenameAction};
+use super::super::super::types::{DevUuid, FilesystemUuid, PoolUuid, RenameAction};
 
-use super::super::blockdevmgr::{BlockDevMgr, BlkDevSegment, Segment, map_to_dm};
+use super::super::blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment, map_to_dm};
 use super::super::device::wipe_sectors;
 use super::super::devlinks;
 use super::super::serde_structs::{FilesystemSave, FlexDevsSave, Recordable, ThinPoolDevSave};

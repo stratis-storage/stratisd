@@ -10,11 +10,11 @@ use std::vec::Vec;
 use serde_json;
 use uuid::Uuid;
 
-use devicemapper::{Device, DM, DmName, DmNameBuf, Sectors};
+use devicemapper::{DM, Device, DmName, DmNameBuf, Sectors};
 
-use super::super::engine::{Filesystem, BlockDev, HasName, HasUuid, Pool};
+use super::super::engine::{BlockDev, Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, RenameAction, Redundancy};
+use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, Redundancy, RenameAction};
 
 use super::blockdevmgr::BlockDevMgr;
 use super::metadata::MIN_MDA_SECTORS;

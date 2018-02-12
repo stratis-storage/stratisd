@@ -34,7 +34,7 @@ use dbus::WatchEvent;
 use devicemapper::Device;
 
 use libstratis::engine::{Engine, SimEngine, StratEngine};
-use libstratis::stratis::{StratisResult, StratisError, VERSION};
+use libstratis::stratis::{StratisError, StratisResult, VERSION};
 
 /// If writing a program error to stderr fails, panic.
 fn print_err(err: StratisError) -> () {

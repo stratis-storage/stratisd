@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, IEC, SECTOR_SIZE, Sectors};
 
-use super::super::errors::{EngineResult, EngineError, ErrorEnum};
+use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{DevUuid, PoolUuid};
 
 use super::engine::DevOwnership;

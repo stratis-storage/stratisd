@@ -15,7 +15,7 @@ use serde_json;
 
 use devicemapper::{Device, devnode_to_devno};
 
-use super::super::errors::{EngineResult, EngineError, ErrorEnum};
+use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::PoolUuid;
 
 use super::blockdev::StratBlockDev;

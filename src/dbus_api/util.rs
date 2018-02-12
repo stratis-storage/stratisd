@@ -7,6 +7,9 @@ use std::error::Error;
 use dbus;
 use dbus::arg::{ArgType, Iter, IterAppend};
 use dbus::tree::{MethodErr, MTFn, PropInfo};
+use dbus::arg::Variant;
+use dbus::{Message, SignalArgs};
+use dbus::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
 
 use engine::{EngineError, ErrorEnum};
 
@@ -99,4 +102,15 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Resul
 
     i.append(data.parent.clone());
     Ok(())
+}
+
+/// Construct a signal that a property has changed.
+// Currently only handles returning string properties, since that's all that's
+// needed right now
+pub fn build_propchanged(prop_name: &str, new_value: &str, path: &dbus::Path) -> Message {
+    let mut prop_changed: PropertiesPropertiesChanged = Default::default();
+    prop_changed
+        .changed_properties
+        .insert(prop_name.into(), Variant(Box::new(new_value.to_owned())));
+    prop_changed.to_emit_message(path)
 }

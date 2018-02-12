@@ -24,6 +24,7 @@ use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
 use super::util::STRATIS_BASE_PATH;
 use super::util::STRATIS_BASE_SERVICE;
+use super::util::build_propchanged;
 use super::util::engine_to_dbus_err_tuple;
 use super::util::get_next_arg;
 use super::util::get_parent;
@@ -51,7 +52,7 @@ pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext,
 
     let name_property = f.property::<&str, _>("Name", ())
         .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
+        .emits_changed(EmitsChangedSignal::True)
         .on_get(get_filesystem_name);
 
     let pool_property = f.property::<&dbus::Path, _>("Pool", ())
@@ -106,25 +107,28 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let msg = match pool.rename_filesystem(filesystem_data.uuid, new_name) {
+    let msgs = match pool.rename_filesystem(filesystem_data.uuid, new_name) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("pool {} doesn't know about filesystem {}",
                                         pool_uuid,
                                         filesystem_data.uuid);
             let (rc, rs) = (u16::from(DbusErrorEnum::INTERNAL_ERROR), error_message);
-            return_message.append3(default_return, rc, rs)
+            vec![return_message.append3(default_return, rc, rs)]
         }
         Ok(RenameAction::Identity) => {
-            return_message.append3(default_return, msg_code_ok(), msg_string_ok())
+            vec![return_message.append3(default_return, msg_code_ok(), msg_string_ok())]
         }
-        Ok(RenameAction::Renamed) => return_message.append3(true, msg_code_ok(), msg_string_ok()),
+        Ok(RenameAction::Renamed) => {
+            vec![return_message.append3(true, msg_code_ok(), msg_string_ok()),
+                 build_propchanged("Name", new_name, object_path)]
+        }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
-            return_message.append3(default_return, rc, rs)
+            vec![return_message.append3(default_return, rc, rs)]
         }
     };
 
-    Ok(vec![msg])
+    Ok(msgs)
 }
 
 /// Get a filesystem property and place it on the D-Bus. The property is

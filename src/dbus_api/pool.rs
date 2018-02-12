@@ -8,16 +8,9 @@ use std::vec::Vec;
 
 use dbus;
 use dbus::Message;
-use dbus::arg::Array;
-use dbus::arg::IterAppend;
-use dbus::tree::Access;
-use dbus::tree::EmitsChangedSignal;
-use dbus::tree::Factory;
-use dbus::tree::MethodErr;
-use dbus::tree::MTFn;
-use dbus::tree::MethodResult;
-use dbus::tree::MethodInfo;
-use dbus::tree::PropInfo;
+use dbus::arg::{Array, IterAppend};
+use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult,
+                 PropInfo};
 
 use uuid::Uuid;
 

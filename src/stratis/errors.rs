@@ -3,8 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::error::Error;
-use std::fmt;
-use std::io;
+use std::{fmt, io};
 
 #[cfg(feature="dbus_enabled")]
 use dbus;

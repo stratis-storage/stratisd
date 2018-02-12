@@ -4,8 +4,7 @@
 
 use std::collections::HashMap;
 use std::iter::FromIterator;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::vec::Vec;
 
 use serde_json;

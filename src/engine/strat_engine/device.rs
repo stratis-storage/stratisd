@@ -5,9 +5,8 @@
 // Functions for dealing with devices.
 
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Seek, SeekFrom, Write};
-use std::fs::OpenOptions;
 use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
 

@@ -4,9 +4,7 @@
 
 use std::fmt;
 
-use rand::Rng;
-use rand::ThreadRng;
-use rand::thread_rng;
+use rand::{Rng, ThreadRng, thread_rng};
 
 pub struct Randomizer {
     rng: ThreadRng,

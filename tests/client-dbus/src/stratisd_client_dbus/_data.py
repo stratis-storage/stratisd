@@ -81,6 +81,13 @@ SPECS = {
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
 </method>
+<method name="SnapshotFilesystem">
+<arg name="origin" type="o" direction="in"/>
+<arg name="snapshot_name" type="s" direction="in"/>
+<arg name="result" type="o" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
 <property name="Name" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
 </property>

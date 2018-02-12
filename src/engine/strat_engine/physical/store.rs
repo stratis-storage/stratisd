@@ -39,18 +39,15 @@ struct DataLayer {
 
 impl DataLayer {
     /// Setup a previously existing data layer from the block_mgr and
-    /// previously allocated segments.
+    /// previously allocated segments. There is a possibility that the
+    /// size of the device has changed for the bigger since the last time
+    /// its metadata was recorded, so allocate any unallocated segments that
+    /// might have resulted from this.
     pub fn setup(dm: &DM,
-                 block_mgr: BlockDevMgr,
+                 mut block_mgr: BlockDevMgr,
                  segments: &[(DevUuid, Sectors, Sectors)],
                  next: Sectors)
                  -> EngineResult<DataLayer> {
-        if block_mgr.avail_space() != Sectors(0) {
-            let err_msg = format!("Blockdev avail space should be 0, is {}",
-                                  block_mgr.avail_space());
-            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
-        }
-
         let uuid_to_devno = block_mgr.uuid_to_devno();
         let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> EngineResult<BlkDevSegment> {
             let device = uuid_to_devno(triple.0)
@@ -61,16 +58,33 @@ impl DataLayer {
                             })?;
             Ok(BlkDevSegment::new(triple.0, Segment::new(device, triple.1, triple.2)))
         };
-        let segments = segments
+        let mut segments = segments
             .iter()
             .map(&mapper)
             .collect::<EngineResult<Vec<_>>>()?;
 
-        let ld = LinearDev::setup(dm,
-                                  &format_physical_name(block_mgr.pool_uuid(),
-                                                        PhysicalRole::Origin),
-                                  None,
-                                  map_to_dm(&segments))?;
+        let mut ld = LinearDev::setup(dm,
+                                      &format_physical_name(block_mgr.pool_uuid(),
+                                                            PhysicalRole::Origin),
+                                      None,
+                                      map_to_dm(&segments))?;
+
+        let avail_space = block_mgr.avail_space();
+        let additional_segments = block_mgr
+            .alloc_space(&[avail_space])
+            .expect("asked for exactly the space available, must get")
+            .iter()
+            .flat_map(|s| s.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+
+        // Add the new segments only after setting up the linear dev.
+        // Otherwise the new table will differ from the old and setup of the
+        // dev will fail.
+        if !additional_segments.is_empty() {
+            segments.extend(additional_segments);
+            ld.set_table(dm, map_to_dm(&segments))?;
+        }
 
         Ok(DataLayer {
                block_mgr,

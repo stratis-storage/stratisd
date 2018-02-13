@@ -6,8 +6,8 @@
 // Initial setup steps are steps that do not alter the environment.
 
 use std::collections::{HashMap, HashSet};
-use std::io::ErrorKind;
 use std::fs::{OpenOptions, read_dir};
+use std::io::ErrorKind;
 use std::path::PathBuf;
 
 use nix::Errno;

@@ -2,8 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::str::from_utf8;
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::str::from_utf8;
 
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Utc};

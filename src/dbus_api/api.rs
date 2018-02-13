@@ -2,10 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::path::Path;
-use std::vec::Vec;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::path::Path;
+use std::rc::Rc;
+use std::vec::Vec;
 
 use dbus;
 use dbus::{BusType, Connection, Message, NameFlag};
@@ -17,8 +17,8 @@ use uuid::Uuid;
 use engine::{Engine, Pool};
 use stratis::VERSION;
 
-use super::filesystem::create_dbus_filesystem;
 use super::blockdev::create_dbus_blockdev;
+use super::filesystem::create_dbus_filesystem;
 use super::pool::create_dbus_pool;
 use super::types::{ActionQueue, DbusContext, DbusErrorEnum, DeferredAction, TData};
 use super::util::{STRATIS_BASE_PATH, STRATIS_BASE_SERVICE, engine_to_dbus_err_tuple, get_next_arg,

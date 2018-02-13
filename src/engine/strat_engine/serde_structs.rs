@@ -15,8 +15,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use uuid::Uuid;
 use serde::Serialize;
+use uuid::Uuid;
 
 use devicemapper::{Sectors, ThinDevId};
 

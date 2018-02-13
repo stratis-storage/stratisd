@@ -8,9 +8,9 @@ use devicemapper::{Bytes, DM, DmDevice, DmName, IEC, SECTOR_SIZE, Sectors, ThinD
                    ThinPoolDev, ThinStatus};
 
 use mnt::{MountIter, MountParam};
+use nix::mount::{MsFlags, mount, umount};
 use nix::sys::statvfs::statvfs;
 use nix::sys::statvfs::vfs::Statvfs;
-use nix::mount::{MsFlags, mount, umount};
 use tempdir::TempDir;
 
 use super::super::super::engine::{Filesystem, HasName, HasUuid};

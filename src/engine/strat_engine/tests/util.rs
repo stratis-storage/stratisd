@@ -6,8 +6,8 @@ use std::path::PathBuf;
 
 use devicemapper::{DM, DevId, DmFlags, DmResult};
 
-use nix::mount::{MNT_DETACH, umount2};
 use mnt::get_submounts;
+use nix::mount::{MNT_DETACH, umount2};
 
 
 mod cleanup_errors {

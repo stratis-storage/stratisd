@@ -16,7 +16,7 @@ use devicemapper::Device;
 use super::super::engine::{Engine, Eventable, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
-use super::super::types::{PoolUuid, Name, Redundancy, RenameAction};
+use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
 use super::pool::SimPool;
 use super::randomization::Randomizer;

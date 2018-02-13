@@ -4,7 +4,7 @@
 
 // Code to handle cleanup after a failed operation.
 
-use super::super::errors::{EngineResult, EngineError, ErrorEnum};
+use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 
 use super::blockdev::StratBlockDev;

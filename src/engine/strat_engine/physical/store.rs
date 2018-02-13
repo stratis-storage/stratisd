@@ -145,13 +145,11 @@ impl DataLayer {
     /// All the sectors available to this device
     // Note that this should always be equivalent to the sum of the length
     // fields of the segments in self.segments.
-    #[allow(dead_code)]
     pub fn capacity(&self) -> Sectors {
         self.dm_device.size()
     }
 
     /// Number of sectors unused
-    #[allow(dead_code)]
     pub fn available(&self) -> Sectors {
         self.capacity() - self.next
     }
@@ -159,7 +157,6 @@ impl DataLayer {
     /// Allocate requested chunks from device.
     /// Returns None if it is not possible to satisfy the request.
     // Simply serves up the space in the order in which it was requested.
-    #[allow(dead_code)]
     pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<(Sectors, Sectors)>>> {
         if self.available() < sizes.iter().cloned().sum() {
             return None;

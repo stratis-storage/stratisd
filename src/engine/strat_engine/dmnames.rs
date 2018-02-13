@@ -58,10 +58,11 @@ impl Display for ThinPoolRole {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub enum PhysicalRole {
+    #[allow(dead_code)]
     Cache,
+    #[allow(dead_code)]
     Meta,
     Origin,
 }
@@ -107,7 +108,6 @@ pub fn format_thinpool_name(pool_uuid: PoolUuid, role: ThinPoolRole) -> DmNameBu
             .expect("FORMAT_VERSION display_length < 81")
 }
 
-#[allow(dead_code)]
 /// Format a name for the dm device that contains the physical layer.
 /// Prerequisite: len(format!("{}", FORMAT_VERSION) < 79
 pub fn format_physical_name(pool_uuid: PoolUuid, role: PhysicalRole) -> DmNameBuf {

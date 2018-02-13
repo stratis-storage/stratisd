@@ -112,9 +112,8 @@ class UdevAdd(unittest.TestCase):
         managed_objects = ObjectManager.Methods.GetManagedObjects(
             get_object(TOP_OBJECT), {})
 
-        if name:
-            return list(pools(managed_objects, {'Name': name}))
-        return list(pools(managed_objects, {}))
+        selector = {} if name is None else {'Name' : name}
+        return list(pools(managed_objects, selector))
 
     def _start_service(self):
         """

@@ -9,18 +9,18 @@ use std::fs::{File, OpenOptions};
 use std::path::Path;
 
 use chrono::{DateTime, Duration, Utc};
-use rand::{thread_rng, seq};
+use rand::{seq, thread_rng};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Device, IEC, Sectors, LinearDevTargetParams, LinearTargetParams,
+use devicemapper::{Bytes, Device, IEC, LinearDevTargetParams, LinearTargetParams, Sectors,
                    TargetLine};
 
 use super::super::engine::BlockDev;
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{DevUuid, PoolUuid};
 
-use super::cleanup::wipe_blockdevs;
 use super::blockdev::StratBlockDev;
+use super::cleanup::wipe_blockdevs;
 use super::device::{blkdev_size, resolve_devices};
 use super::engine::DevOwnership;
 use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};

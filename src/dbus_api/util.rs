@@ -6,7 +6,7 @@ use std::error::Error;
 
 use dbus;
 use dbus::arg::{ArgType, Iter, IterAppend};
-use dbus::tree::{MethodErr, MTFn, PropInfo};
+use dbus::tree::{MTFn, MethodErr, PropInfo};
 
 use engine::{EngineError, ErrorEnum};
 

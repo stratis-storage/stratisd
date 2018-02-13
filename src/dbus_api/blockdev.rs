@@ -5,14 +5,8 @@
 use dbus;
 use dbus::Message;
 use dbus::arg::IterAppend;
-use dbus::tree::Access;
-use dbus::tree::EmitsChangedSignal;
-use dbus::tree::Factory;
-use dbus::tree::MTFn;
-use dbus::tree::MethodErr;
-use dbus::tree::MethodInfo;
-use dbus::tree::MethodResult;
-use dbus::tree::PropInfo;
+use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult,
+                 PropInfo};
 
 use uuid::Uuid;
 
@@ -21,13 +15,8 @@ use super::super::engine::types::BlockDevState;
 
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
-use super::util::STRATIS_BASE_PATH;
-use super::util::STRATIS_BASE_SERVICE;
-use super::util::get_next_arg;
-use super::util::get_parent;
-use super::util::get_uuid;
-use super::util::msg_code_ok;
-use super::util::msg_string_ok;
+use super::util::{STRATIS_BASE_PATH, STRATIS_BASE_SERVICE, get_next_arg, get_parent, get_uuid,
+                  msg_code_ok, msg_string_ok};
 
 
 pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,

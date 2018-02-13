@@ -3,8 +3,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::cmp::min;
-use std::collections::Bound::{Included, Unbounded};
 use std::collections::BTreeMap;
+use std::collections::Bound::{Included, Unbounded};
 
 use devicemapper::Sectors;
 

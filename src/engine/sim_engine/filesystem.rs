@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use super::super::engine::{HasName, HasUuid, Filesystem};
+use super::super::engine::{Filesystem, HasName, HasUuid};
 use super::super::types::FilesystemUuid;
 
 #[derive(Debug)]

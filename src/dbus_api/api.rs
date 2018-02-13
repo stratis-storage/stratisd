@@ -2,44 +2,27 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::path::Path;
-use std::vec::Vec;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::path::Path;
+use std::rc::Rc;
+use std::vec::Vec;
 
 use dbus;
-use dbus::Connection;
-use dbus::BusType;
-use dbus::Message;
-use dbus::NameFlag;
-use dbus::arg::Array;
-use dbus::arg::IterAppend;
-use dbus::tree::Access;
-use dbus::tree::EmitsChangedSignal;
-use dbus::tree::Factory;
-use dbus::tree::MethodErr;
-use dbus::tree::MTFn;
-use dbus::tree::MethodResult;
-use dbus::tree::MethodInfo;
-use dbus::tree::PropInfo;
-use dbus::tree::Tree;
-use dbus::ConnectionItem;
+use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
+use dbus::arg::{Array, IterAppend};
+use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult,
+                 PropInfo, Tree};
 use uuid::Uuid;
 
 use engine::{Engine, Pool};
 use stratis::VERSION;
 
-use super::filesystem::create_dbus_filesystem;
 use super::blockdev::create_dbus_blockdev;
+use super::filesystem::create_dbus_filesystem;
 use super::pool::create_dbus_pool;
-use super::types::{ActionQueue, DeferredAction, DbusContext, DbusErrorEnum, TData};
-use super::util::STRATIS_BASE_PATH;
-use super::util::STRATIS_BASE_SERVICE;
-use super::util::engine_to_dbus_err_tuple;
-use super::util::get_next_arg;
-use super::util::msg_code_ok;
-use super::util::msg_string_ok;
-use super::util::tuple_to_option;
+use super::types::{ActionQueue, DbusContext, DbusErrorEnum, DeferredAction, TData};
+use super::util::{STRATIS_BASE_PATH, STRATIS_BASE_SERVICE, engine_to_dbus_err_tuple, get_next_arg,
+                  msg_code_ok, msg_string_ok, tuple_to_option};
 
 fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;

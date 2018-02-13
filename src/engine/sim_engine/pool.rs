@@ -14,10 +14,10 @@ use uuid::Uuid;
 
 use devicemapper::{IEC, Sectors};
 
-use super::super::engine::{Filesystem, BlockDev, HasName, HasUuid, Pool};
+use super::super::engine::{BlockDev, Filesystem, HasName, HasUuid, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
-use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, RenameAction, Redundancy};
+use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, Redundancy, RenameAction};
 
 use super::blockdev::SimDev;
 use super::filesystem::SimFilesystem;

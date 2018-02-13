@@ -8,16 +8,9 @@ use std::vec::Vec;
 
 use dbus;
 use dbus::Message;
-use dbus::arg::Array;
-use dbus::arg::IterAppend;
-use dbus::tree::Access;
-use dbus::tree::EmitsChangedSignal;
-use dbus::tree::Factory;
-use dbus::tree::MethodErr;
-use dbus::tree::MTFn;
-use dbus::tree::MethodResult;
-use dbus::tree::MethodInfo;
-use dbus::tree::PropInfo;
+use dbus::arg::{Array, IterAppend};
+use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult,
+                 PropInfo};
 
 use uuid::Uuid;
 
@@ -29,8 +22,8 @@ use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
-use super::util::{engine_to_dbus_err_tuple, get_next_arg, get_uuid, msg_code_ok, msg_string_ok,
-                  STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
+use super::util::{STRATIS_BASE_PATH, STRATIS_BASE_SERVICE, engine_to_dbus_err_tuple, get_next_arg,
+                  get_uuid, msg_code_ok, msg_string_ok};
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;

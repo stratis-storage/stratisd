@@ -4,9 +4,8 @@
 
 extern crate serde_json;
 
-use std::cmp;
+use std::{cmp, panic};
 use std::fs::OpenOptions;
-use std::panic;
 use std::path::{Path, PathBuf};
 
 use serde_json::{Value, from_reader};

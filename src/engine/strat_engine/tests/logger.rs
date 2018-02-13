@@ -4,7 +4,7 @@
 
 extern crate env_logger;
 
-use std::sync::{Once, ONCE_INIT};
+use std::sync::{ONCE_INIT, Once};
 
 static LOGGER_INIT: Once = ONCE_INIT;
 

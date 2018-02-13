@@ -5,15 +5,14 @@
 // Functions for dealing with devices.
 
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Seek, SeekFrom, Write};
-use std::fs::OpenOptions;
 use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
 
 use devicemapper::{Bytes, Device, IEC, SECTOR_SIZE, Sectors, devnode_to_devno};
 
-use super::super::errors::{EngineResult, EngineError, ErrorEnum};
+use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);
 

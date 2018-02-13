@@ -3,14 +3,13 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::cell::RefCell;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use chrono::{DateTime, TimeZone, Utc};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Sectors, IEC};
+use devicemapper::{Bytes, IEC, Sectors};
 
 use super::super::engine::{BlockDev, HasUuid};
 use super::super::types::{BlockDevState, DevUuid};

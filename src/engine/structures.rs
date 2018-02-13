@@ -323,7 +323,7 @@ mod tests {
         // t now contains the inserted thing.
         assert!(t.contains_name(&name));
         assert!(t.contains_uuid(uuid));
-        assert!(t.get_by_uuid(uuid).unwrap().1.stuff == thing_key);
+        assert_eq!(t.get_by_uuid(uuid).unwrap().1.stuff, thing_key);
 
         // Add another thing with the same keys.
         let thing2 = TestThing::new(&name, uuid);
@@ -334,14 +334,14 @@ mod tests {
         // It has displaced the old thing.
         assert!(displaced.is_some());
         let ref displaced_item = displaced.unwrap();
-        assert!(&*displaced_item.0 == name);
-        assert!(displaced_item.1 == uuid);
+        assert_eq!(&*displaced_item.0, name);
+        assert_eq!(displaced_item.1, uuid);
 
         // But it contains a thing with the same keys.
         assert!(t.contains_name(&name));
         assert!(t.contains_uuid(uuid));
-        assert!(t.get_by_uuid(uuid).unwrap().1.stuff == thing_key2);
-        assert!(t.len() == 1);
+        assert_eq!(t.get_by_uuid(uuid).unwrap().1.stuff, thing_key2);
+        assert_eq!(t.len(), 1);
     }
 
     #[test]
@@ -375,17 +375,17 @@ mod tests {
         // The items displaced consist exactly of the first item.
         assert!(displaced.is_some());
         let ref displaced_item = displaced.unwrap();
-        assert!(&*displaced_item.0 == name);
-        assert!(displaced_item.1 == uuid);
-        assert!(displaced_item.2.stuff == thing_key);
+        assert_eq!(&*displaced_item.0, name);
+        assert_eq!(displaced_item.1, uuid);
+        assert_eq!(displaced_item.2.stuff, thing_key);
 
         // The table contains the new item and has no memory of the old.
         assert!(t.contains_name(&name));
         assert!(t.contains_uuid(uuid2));
         assert!(!t.contains_uuid(uuid));
-        assert!(t.get_by_uuid(uuid2).unwrap().1.stuff == thing_key2);
-        assert!(t.get_by_name(&name).unwrap().1.stuff == thing_key2);
-        assert!(t.len() == 1);
+        assert_eq!(t.get_by_uuid(uuid2).unwrap().1.stuff, thing_key2);
+        assert_eq!(t.get_by_name(&name).unwrap().1.stuff, thing_key2);
+        assert_eq!(t.len(), 1);
     }
 
     #[test]
@@ -419,16 +419,16 @@ mod tests {
         // The items displaced consist exactly of the first item.
         assert!(displaced.is_some());
         let ref displaced_item = displaced.unwrap();
-        assert!(&*displaced_item.0 == name);
-        assert!(displaced_item.1 == uuid);
-        assert!(displaced_item.2.stuff == thing_key);
+        assert_eq!(&*displaced_item.0, name);
+        assert_eq!(displaced_item.1, uuid);
+        assert_eq!(displaced_item.2.stuff, thing_key);
 
         // The table contains the new item and has no memory of the old.
         assert!(t.contains_uuid(uuid));
         assert!(t.contains_name(name2));
         assert!(!t.contains_name(name));
-        assert!(t.get_by_uuid(uuid).unwrap().1.stuff == thing_key2);
-        assert!(t.get_by_name(&name2).unwrap().1.stuff == thing_key2);
-        assert!(t.len() == 1);
+        assert_eq!(t.get_by_uuid(uuid).unwrap().1.stuff, thing_key2);
+        assert_eq!(t.get_by_name(&name2).unwrap().1.stuff, thing_key2);
+        assert_eq!(t.len(), 1);
     }
 }

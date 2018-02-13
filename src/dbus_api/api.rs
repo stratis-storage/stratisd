@@ -8,10 +8,10 @@ use std::rc::Rc;
 use std::vec::Vec;
 
 use dbus;
-use dbus::{BusType, Connection, Message, NameFlag};
+use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
 use dbus::arg::{Array, IterAppend};
-use dbus::tree::{Access, ConnectionItem, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo,
-                 MethodResult, PropInfo, Tree};
+use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult,
+                 PropInfo, Tree};
 use uuid::Uuid;
 
 use engine::{Engine, Pool};

@@ -190,15 +190,9 @@ impl<T> Table<T> {
 
     /// Removes the item corresponding to the uuid if there is one.
     pub fn remove_by_uuid(&mut self, uuid: Uuid) -> Option<(Name, T)> {
-        if let Some(item) = self.items.remove(&uuid) {
-            let name = self.name_to_uuid
-                .iter()
-                .find(|&(_, item_uuid)| *item_uuid == uuid)
-                .expect("should be there")
-                .0
-                .to_owned();
-            self.name_to_uuid.remove(&*name);
-            Some(item)
+        if let Some((name, item)) = self.items.remove(&uuid) {
+            self.name_to_uuid.remove(&name);
+            Some((name, item))
         } else {
             None
         }

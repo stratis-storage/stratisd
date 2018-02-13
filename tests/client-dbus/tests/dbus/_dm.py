@@ -57,7 +57,7 @@ def remove_stratis_setup():
     # There is some dependency ordering with regards to dm tables, we will
     # simply iterate over the list attempting to remove them until they are
     # all gone or we give up trying.
-    while devices != [] and attempts <= max_loops:
+    while devices != [] and attempts < max_loops:
         attempts += 1
         for dev in devices:
             if _remove_device(dev):

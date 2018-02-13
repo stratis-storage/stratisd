@@ -165,7 +165,7 @@ class UdevAdd(unittest.TestCase):
         """
         # What is the best way to ensure we wait long enough for
         # the event to be done, this seems to work for now.
-        subprocess.run(['udevadm', 'settle'], check=True)
+        subprocess.check_call(['udevadm', 'settle'])
         time.sleep(1)
 
     # pylint: disable=too-many-locals

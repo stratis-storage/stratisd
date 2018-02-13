@@ -79,10 +79,7 @@ class UdevAdd(unittest.TestCase):
         :param tokens: Loop back device list
         :return: List of loop back devices
         """
-        rc = []
-        for t in tokens:
-            rc.append(self._lb_mgr.device_file(t))
-        return rc
+        return [self._lb_mgr.device_file(t) for t in tokens]
 
     def setUp(self):
         """
@@ -169,7 +166,6 @@ class UdevAdd(unittest.TestCase):
         """
         # What is the best way to ensure we wait long enough for
         # the event to be done, this seems to work for now.
-        # pylint: disable=no-member
         subprocess.run(['udevadm', 'settle'], check=True)
         time.sleep(1)
 

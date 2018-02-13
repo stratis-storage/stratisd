@@ -29,14 +29,9 @@ def _get_stratis_devices():
     Return a list of stratis DM devices
     :return: A list of stratis DM devices
     """
-    stratis_devices = []
     output = subprocess.check_output([_DM_BIN, 'ls'])
     decoded = output.decode("utf-8")
-    for l in decoded.split():
-        if l.startswith('stratis-'):
-            stratis_devices.append(l)
-
-    return stratis_devices
+    return [l for l in decoded.split() if l.startswith('stratis-')]
 
 
 def _remove_device(device):
@@ -62,9 +57,9 @@ def remove_stratis_setup():
     # There is some dependency ordering with regards to dm tables, we will
     # simply iterate over the list attempting to remove them until they are
     # all gone or we give up trying.
-    while devices and attempts <= max_loops:
+    while devices != [] and attempts <= max_loops:
         attempts += 1
-        for dev in list(devices):
+        for dev in devices:
             if _remove_device(dev):
                 devices.remove(dev)
 

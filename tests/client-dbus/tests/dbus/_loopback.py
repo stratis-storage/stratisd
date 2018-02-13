@@ -49,14 +49,13 @@ class LoopBackDevices(object):
         :return: opaque handle, done as device representing block device will
                  change.
         """
-        backing_file = self.dir + '/block_device_%d' % self.count
+        backing_file = os.path.join(self.dir, 'block_device_%d' % self.count)
         self.count += 1
 
         with open(backing_file, 'ab') as bd:
             # Sparse file, so go big (1 TiB)
             bd.truncate(1024**4)
 
-        # pylint: disable=no-member
         result = subprocess.check_output([_LOSETUP_BIN, '-f',
                                           '--show', backing_file])
         device = str.strip(result.decode("utf-8"))
@@ -72,7 +71,6 @@ class LoopBackDevices(object):
         """
         if token in self.devices:
             (device, backing_file) = self.devices[token]
-            # pylint: disable=no-member
             subprocess.check_call([_LOSETUP_BIN, '-d', device])
             self.devices[token] = (None, backing_file)
 
@@ -85,9 +83,10 @@ class LoopBackDevices(object):
         if token in self.devices:
             (device, _) = self.devices[token]
 
-            if device:
-                device_name = device.split('/')
-                with open("/sys/block/%s/uevent" % device_name[-1], "w") as e:
+            if device is not None:
+                device_name = os.path.split(device)[-1]
+                ufile = os.path.join("/sys/block", device_name, "uevent")
+                with open(ufile, "w") as e:
                     e.write("add")
 
     def hotplug(self, token):
@@ -99,7 +98,6 @@ class LoopBackDevices(object):
         if token in self.devices:
             (_, backing_file) = self.devices[token]
 
-            # pylint: disable=no-member
             result = subprocess.check_output([_LOSETUP_BIN, '-f', '--show',
                                     backing_file])
             device = str.strip(result.decode("utf-8"))
@@ -110,13 +108,11 @@ class LoopBackDevices(object):
 
     def device_file(self, token):
         """
-        Return the device block device full name for a loopback token
+        Return the block device full name for a loopback token
         :param token: Opaque representation of some loop back device
         :return: Full file path or None if not currently attached
         """
-        if token in self.devices:
-            return self.devices[token][0]
-        return None
+        return self.devices[token][0] if token in self.devices else None
 
     def destroy_devices(self):
         """
@@ -125,7 +121,6 @@ class LoopBackDevices(object):
         """
         for (device, backing_file) in self.devices.values():
             if device is not None:
-                # pylint: disable=no-member
                 subprocess.check_call([_LOSETUP_BIN, '-d', device])
             os.remove(backing_file)
 

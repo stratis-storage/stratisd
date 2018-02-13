@@ -25,7 +25,7 @@ use super::super::devlinks;
 use super::super::serde_structs::{FilesystemSave, FlexDevsSave, Recordable, ThinPoolDevSave};
 
 use super::dmdevice::{FlexRole, ThinDevIdPool, ThinPoolRole, ThinRole, format_flex_name,
-                      format_thinpool_name, format_thin_name};
+                      format_thin_name, format_thinpool_name};
 use super::filesystem::{FilesystemStatus, StratFilesystem};
 use super::mdv::MetadataVol;
 use super::util::execute_cmd;

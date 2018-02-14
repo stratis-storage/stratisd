@@ -59,7 +59,7 @@ def remove_stratis_setup():
     # all gone or we give up trying.
     while devices != [] and attempts < max_loops:
         attempts += 1
-        for dev in list(devices):
+        for dev in devices.copy():
             if _remove_device(dev):
                 devices.remove(dev)
 

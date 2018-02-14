@@ -121,7 +121,7 @@ class UdevAdd(unittest.TestCase):
         before we return.
         :return: None
         """
-        if not self._service:
+        if self._service is None:
             self._service = subprocess.Popen([os.path.join(_STRATISD),
                                               '--debug'])
 
@@ -191,11 +191,9 @@ class UdevAdd(unittest.TestCase):
         self._start_service()
 
         # Create the pools
-        for p in range(0, number_of_pools):
-            device_tokens = []
-
-            for i in range(0, dev_count_pool):
-                device_tokens.append(self._lb_mgr.create_device())
+        for _ in range(number_of_pools):
+            device_tokens = \
+               [self._lb_mgr.create_device() for _ in range(dev_count_pool)]
 
             pool_name = rs(5)
             UdevAdd._create_pool(pool_name, self._device_files(device_tokens))
@@ -221,14 +219,12 @@ class UdevAdd(unittest.TestCase):
 
         # Systematically add a device to each pool, checking that the pool
         # isn't assembled until complete
-        activation_sequence = []
-
         pool_names = pool_data.keys()
 
-        for i in range(0, dev_count_pool):
-            for p in pool_names:
-                activation_sequence.append(pool_data[p][i])
+        activation_sequence = \
+           [pool_data[p][i] for i in range(dev_count_pool) for p in pool_names]
 
+        # Add all but the last device for each pool
         for device_token in activation_sequence[:-number_of_pools]:
             self._lb_mgr.hotplug(device_token)
 
@@ -240,6 +236,7 @@ class UdevAdd(unittest.TestCase):
             result = UdevAdd._get_pools()
             self.assertEqual(len(result), 0)
 
+        # Add the last device that makes each pool complete
         for device_token in activation_sequence[-number_of_pools:]:
             self._lb_mgr.hotplug(device_token)
 
@@ -259,7 +256,7 @@ class UdevAdd(unittest.TestCase):
         Test combinations of pools and number of devices in each pool
         :return:
         """
-        for pools_num in range(0, 3):
+        for pools_num in range(3):
             for device_num in range(1, 4):
                 self._test_driver(pools_num, device_num)
 
@@ -283,10 +280,8 @@ class UdevAdd(unittest.TestCase):
         result = UdevAdd._get_pools()
         self.assertEqual(len(result), 0)
 
-        device_tokens = []
-
-        for _ in range(0, num_devices):
-            device_tokens.append(self._lb_mgr.create_device())
+        device_tokens = \
+           [self._lb_mgr.create_device() for _ in range(num_devices)]
 
         self.assertEqual(len(device_tokens), num_devices)
 
@@ -319,7 +314,7 @@ class UdevAdd(unittest.TestCase):
         self.assertEqual(len(UdevAdd._get_pools()), 1)
 
         # Generate unnecessary hot plug adds
-        for _ in range(0, num_hotplugs):
+        for _ in range(num_hotplugs):
             for d in device_tokens:
                 self._lb_mgr.generate_udev_add_event(d)
 
@@ -362,11 +357,8 @@ class UdevAdd(unittest.TestCase):
         self._start_service()
 
         # Create some pools with duplicate names
-        for i in range(0, num_pools):
-            this_pool = []
-
-            for _ in range(0, i + 1):
-                this_pool.append(self._lb_mgr.create_device())
+        for i in range(num_pools):
+            this_pool = [self._lb_mgr.create_device() for _ in range(i + 1)]
 
             pool_tokens.append(this_pool)
             UdevAdd._create_pool(pool_name, self._device_files(this_pool))
@@ -379,7 +371,7 @@ class UdevAdd(unittest.TestCase):
 
         # Hot plug activate each pool in sequence and force a duplicate name
         # error.
-        for i in range(0, num_pools):
+        for i in range(num_pools):
             for d in pool_tokens[i]:
                 self._lb_mgr.hotplug(d)
 
@@ -391,7 +383,7 @@ class UdevAdd(unittest.TestCase):
         # Lets dynamically rename the active pools and then hot-plug the other
         # pools so that they all come up.  This simulates what an end user
         # could do to fix this condition until we have CLI support to assist.
-        for _ in range(0, num_pools - 1):
+        for _ in range(num_pools - 1):
             current_pools = UdevAdd._get_pools()
 
             existing_pool_count = len(current_pools)
@@ -401,7 +393,7 @@ class UdevAdd(unittest.TestCase):
                 Pool.Methods.SetName(get_object(p[0]), {'name': rs(10)})
 
             # Generate synthetic add events
-            for add_index in range(0, num_pools):
+            for add_index in range(num_pools):
                 for d in pool_tokens[add_index]:
                     self._lb_mgr.generate_udev_add_event(d)
 

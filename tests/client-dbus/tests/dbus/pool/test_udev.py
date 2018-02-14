@@ -49,6 +49,8 @@ def rs(l):
         random.choice(string.ascii_uppercase) for _ in range(l)))
 
 
+@unittest.skipIf(os.getenv('STRATIS_DESTRUCTIVE_TEST') is None,
+                 "STRATIS_DESTRUCTIVE_TEST not set")
 class UdevAdd(unittest.TestCase):
     """
     Test udev add event support.

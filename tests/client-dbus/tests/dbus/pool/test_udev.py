@@ -123,7 +123,9 @@ class UdevAdd(unittest.TestCase):
         before we return.
         :return: None
         """
+
         if self._service is None:
+            dbus_interface_present = False
             self._service = subprocess.Popen([os.path.join(_STRATISD),
                                               '--debug'])
 
@@ -131,6 +133,7 @@ class UdevAdd(unittest.TestCase):
             while time.time() <= limit:
                 try:
                     get_object(TOP_OBJECT)
+                    dbus_interface_present = True
                     break
                 # pylint: disable=bare-except
                 except:
@@ -146,6 +149,10 @@ class UdevAdd(unittest.TestCase):
                 rc = self._service.returncode
                 self._service = None
                 raise Exception("Daemon unexpectedly exited with %s" % str(rc))
+
+            # Ensure we actually were able to communicate with dbus
+            if not dbus_interface_present:
+                raise Exception("stratisd: no dbus..., compiled out?")
 
     def _stop_service_remove_dm_tables(self):
         """

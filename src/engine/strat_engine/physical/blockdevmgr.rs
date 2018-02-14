@@ -141,7 +141,7 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParam
 #[derive(Debug)]
 pub struct BlockDevMgr {
     pool_uuid: PoolUuid,
-    block_devs: HashMap<DevUuid, StratBlockDev>,
+    block_devs: Vec<StratBlockDev>,
     last_update_time: Option<DateTime<Utc>>,
 }
 
@@ -153,10 +153,7 @@ impl BlockDevMgr {
                -> BlockDevMgr {
         BlockDevMgr {
             pool_uuid,
-            block_devs: block_devs
-                .into_iter()
-                .map(|bd| (bd.uuid(), bd))
-                .collect(),
+            block_devs,
             last_update_time,
         }
     }
@@ -182,7 +179,7 @@ impl BlockDevMgr {
     pub fn uuid_to_devno(&self) -> Box<Fn(DevUuid) -> Option<Device>> {
         let uuid_map: HashMap<DevUuid, Device> = self.block_devs
             .iter()
-            .map(|(uuid, bd)| (*uuid, *bd.device()))
+            .map(|bd| (bd.uuid(), *bd.device()))
             .collect();
 
         Box::new(move |uuid: DevUuid| -> Option<Device> { uuid_map.get(&uuid).cloned() })
@@ -193,24 +190,19 @@ impl BlockDevMgr {
     /// added.
     pub fn add(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
         let devices = resolve_devices(paths)?;
-        let current_uuids = self.block_devs.keys().cloned().collect();
+        let current_uuids = self.block_devs.iter().map(|bd| bd.uuid()).collect();
         let bds = initialize(self.pool_uuid,
                              devices,
                              MIN_MDA_SECTORS,
                              force,
                              &current_uuids)?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
-        self.block_devs
-            .extend(bds.into_iter().map(|bd| (bd.uuid(), bd)));
+        self.block_devs.extend(bds);
         Ok(bdev_uuids)
     }
 
-    pub fn destroy_all(mut self) -> EngineResult<()> {
-        let bds = self.block_devs
-            .drain()
-            .map(|(_, bd)| bd)
-            .collect::<Vec<_>>();
-        wipe_blockdevs(&bds)
+    pub fn destroy_all(self) -> EngineResult<()> {
+        wipe_blockdevs(&self.block_devs)
     }
 
     /// Allocate space according to sizes vector request.
@@ -235,7 +227,7 @@ impl BlockDevMgr {
             // In the context of this major inefficiency that ensues over time
             // the obvious but more minor inefficiency of this inner loop is
             // not worth worrying about.
-            for bd in self.block_devs.values_mut() {
+            for bd in &mut self.block_devs {
                 if alloc == needed {
                     break;
                 }
@@ -277,7 +269,7 @@ impl BlockDevMgr {
 
         let data_size = Bytes(metadata.len() as u64).sectors();
         let candidates = self.block_devs
-            .values_mut()
+            .iter_mut()
             .filter(|b| b.max_metadata_size() >= data_size);
 
         // TODO: consider making selection not entirely random, i.e, ensuring
@@ -301,17 +293,21 @@ impl BlockDevMgr {
     pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
         self.block_devs
             .iter()
-            .map(|(uuid, bd)| (*uuid, bd as &BlockDev))
+            .map(|bd| (bd.uuid(), bd as &BlockDev))
             .collect()
     }
 
     pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<&BlockDev> {
-        self.block_devs.get(&uuid).map(|bd| bd as &BlockDev)
+        self.block_devs
+            .iter()
+            .find(|bd| bd.uuid() == uuid)
+            .map(|bd| bd as &BlockDev)
     }
 
     pub fn get_mut_blockdev_by_uuid(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
         self.block_devs
-            .get_mut(&uuid)
+            .iter_mut()
+            .find(|bd| bd.uuid() == uuid)
             .map(|bd| bd as &mut BlockDev)
     }
 
@@ -319,7 +315,7 @@ impl BlockDevMgr {
 
     /// The number of sectors not allocated for any purpose.
     pub fn avail_space(&self) -> Sectors {
-        self.block_devs.values().map(|bd| bd.available()).sum()
+        self.block_devs.iter().map(|bd| bd.available()).sum()
     }
 
     /// The current capacity of all the blockdevs.
@@ -327,7 +323,7 @@ impl BlockDevMgr {
     /// are certainly allocated for Stratis metadata
     pub fn current_capacity(&self) -> Sectors {
         self.block_devs
-            .values()
+            .iter()
             .map(|b| b.current_capacity())
             .sum()
     }
@@ -336,18 +332,15 @@ impl BlockDevMgr {
     /// self.current_capacity() - self.metadata_size() >= self.avail_space()
     pub fn metadata_size(&self) -> Sectors {
         self.block_devs
-            .values()
+            .iter()
             .map(|bd| bd.metadata_size())
             .sum()
     }
 }
 
-impl Recordable<HashMap<DevUuid, BlockDevSave>> for BlockDevMgr {
-    fn record(&self) -> HashMap<Uuid, BlockDevSave> {
-        self.block_devs
-            .iter()
-            .map(|(uuid, bd)| (*uuid, bd.record()))
-            .collect()
+impl Recordable<Vec<BlockDevSave>> for BlockDevMgr {
+    fn record(&self) -> Vec<BlockDevSave> {
+        self.block_devs.iter().map(|bd| bd.record()).collect()
     }
 }
 

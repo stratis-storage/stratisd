@@ -12,7 +12,6 @@
 // can convert to or from them when saving our current state, or
 // restoring state from saved metadata.
 
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 use serde::Serialize;
@@ -39,6 +38,7 @@ pub struct PoolSave {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockDevSave {
+    pub uuid: DevUuid,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub devnode: Option<PathBuf>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -66,7 +66,7 @@ pub struct FlexDevsSave {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StoreSave {
     pub segments: Vec<(Uuid, Sectors, Sectors)>,
-    pub block_devs: HashMap<DevUuid, BlockDevSave>,
+    pub block_devs: Vec<BlockDevSave>,
     pub next: Sectors,
 }
 

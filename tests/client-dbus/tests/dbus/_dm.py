@@ -60,6 +60,8 @@ def remove_stratis_setup():
     while devices != [] and attempts < max_loops:
         attempts += 1
 
+        # Make a copy of the list as we are traversing a list we want to
+        # modify.
         for dev in devices.copy():
             if _remove_device(dev):
                 devices.remove(dev)

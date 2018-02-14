@@ -192,7 +192,8 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
 
                 let bd_save = backstore_save
                     .block_devs
-                    .get(&bda.dev_uuid())
+                    .iter()
+                    .find(|bds| bds.uuid == bda.dev_uuid())
                     .ok_or_else(|| {
                                     let err_msg = format!("Blockdev {} not found in metadata",
                                                           bda.dev_uuid());
@@ -217,7 +218,11 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
 
     // Verify that blockdevs found match blockdevs recorded.
     let current_uuids: HashSet<_> = blockdevs.iter().map(|b| b.uuid()).collect();
-    let recorded_uuids: HashSet<_> = backstore_save.block_devs.keys().cloned().collect();
+    let recorded_uuids: HashSet<_> = backstore_save
+        .block_devs
+        .iter()
+        .map(|bds| bds.uuid)
+        .collect();
 
     if current_uuids != recorded_uuids {
         let err_msg = "Recorded block dev UUIDs != discovered blockdev UUIDs";

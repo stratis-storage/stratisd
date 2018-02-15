@@ -203,44 +203,47 @@ impl<T> Table<T> {
     /// If two items are displaced, the one displaced by matching name is
     /// returned first.
     pub fn insert(&mut self, name: Name, uuid: Uuid, item: T) -> Option<Vec<(Name, Uuid, T)>> {
-        match self.name_to_uuid.insert(name.clone(), uuid) {
-            Some(old_uuid) => {
-                // (existing name, _)
-                match self.items.insert(uuid, (name.clone(), item)) {
-                    // (existing name, existing uuid)
-                    Some((old_name, old_item)) => {
-                        // double eviction
-                        if old_name != name {
-                            assert_ne!(old_uuid, uuid);
-                            let (_, item2) = self.items.remove(&old_uuid).expect("should be there");
-                            self.name_to_uuid
-                                .remove(&old_name)
-                                .expect("should be there");
-                            Some(vec![(old_name, uuid, old_item), (name, old_uuid, item2)])
-                        } else {
-                            Some(vec![(old_name, uuid, old_item)])
-                        }
-                    }
-                    // (existing name, new uuid)
-                    None => {
-                        let (old_name, old_item) =
-                            self.items.remove(&old_uuid).expect("should be there");
-                        Some(vec![(old_name, old_uuid, old_item)])
-                    }
-                }
+        let old_uuid = self.name_to_uuid.insert(name.clone(), uuid);
+        let old_pair = self.items.insert(uuid, (name.clone(), item));
+        match (old_uuid, old_pair) {
+            // Two possibilities: One entry with same name and uuid ejected OR
+            // two entries, one with same name and different uuid and one with
+            // same uuid and different name.
+            (Some(old_uuid), Some((old_name, old_item))) => {
+                Some(if old_uuid == uuid {
+                         assert_eq!(old_name, name);
+                         vec![(name, uuid, old_item)]
+                     } else {
+                         assert!(old_name != name);
+                         let other_uuid = self.name_to_uuid
+                             .remove(&old_name)
+                             .expect("invariant requires existence");
+                         let (other_name, other_item) = self.items
+                             .remove(&old_uuid)
+                             .expect("invariant requires existence");
+                         assert_eq!(other_name, name);
+                         assert_eq!(other_uuid, uuid);
+                         vec![(name, old_uuid, other_item), (old_name, uuid, old_item)]
+                     })
             }
-            None => {
-                // (new name, existing uuid)
-                if let Some((old_name, old_item)) = self.items.insert(uuid, (name, item)) {
-                    let old_uuid = self.name_to_uuid
-                        .remove(&old_name)
-                        .expect("should be there");
-                    Some(vec![(old_name, old_uuid, old_item)])
-                } else {
-                    // (new name, new uuid)
-                    None
-                }
+            // entry with same name but different uuid ejected
+            (Some(old_uuid), None) => {
+                let (other_name, other_item) = self.items
+                    .remove(&old_uuid)
+                    .expect("invariant requires existence");
+                assert_eq!(other_name, name);
+                Some(vec![(name, old_uuid, other_item)])
             }
+            // entry with same uuid but different name ejected
+            (None, Some((old_name, old_item))) => {
+                let other_uuid = self.name_to_uuid
+                    .remove(&old_name)
+                    .expect("invariant requires existence");
+                assert_eq!(other_uuid, uuid);
+                Some(vec![(old_name, uuid, old_item)])
+            }
+            // nothing ejected
+            (None, None) => None,
         }
     }
 }
@@ -267,6 +270,10 @@ mod tests {
     fn table_invariant<T>(table: &Table<T>) -> () {
         for (uuid, &(ref name, _)) in &table.items {
             assert_eq!(*uuid, *table.name_to_uuid.get(name).unwrap())
+        }
+
+        for (name, uuid) in &table.name_to_uuid {
+            assert_eq!(*name, table.items.get(uuid).unwrap().0);
         }
 
         // No extra garbage
@@ -473,8 +480,7 @@ mod tests {
         assert!(t.contains_name(&name1));
         assert!(t.contains_uuid(uuid1));
 
-        // Insert first item. There was nothing in the table before, so
-        // displaced is empty.
+        // Insert second item. No conflicts, so nothing is displaced.
         let displaced = t.insert(Name::new(name2.to_owned()), uuid2, thing2);
         table_invariant(&t);
         assert!(displaced.is_none());
@@ -498,12 +504,16 @@ mod tests {
         assert!(displaced.is_some());
         let ref displaced_items = displaced.unwrap();
         assert_eq!(displaced_items.len(), 2);
-        assert_eq!(&*displaced_items[0].0, name1);
-        assert_eq!(displaced_items[0].1, uuid1);
-        assert_eq!(displaced_items[0].2.stuff, thing_key1);
-        assert_eq!(&*displaced_items[1].0, name2);
-        assert_eq!(displaced_items[1].1, uuid2);
-        assert_eq!(displaced_items[1].2.stuff, thing_key2);
+
+        // The first displaced item has the name of the just inserted item.
+        assert_eq!(&*displaced_items[0].0, name3);
+        assert_eq!(displaced_items[0].1, uuid2);
+        assert_eq!(displaced_items[0].2.stuff, thing_key2);
+
+        // The second displaced items has the uuid of the just inserted item.
+        assert_eq!(&*displaced_items[1].0, name1);
+        assert_eq!(displaced_items[1].1, uuid3);
+        assert_eq!(displaced_items[1].2.stuff, thing_key1);
 
         // The table contains the new item and has no memory of the old.
         assert!(t.contains_uuid(uuid3));

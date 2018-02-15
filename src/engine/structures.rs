@@ -199,19 +199,33 @@ impl<T> Table<T> {
     }
 
     /// Inserts an item for given uuid and name.
-    /// Possibly returns the item displaced.
-    pub fn insert(&mut self, name: Name, uuid: Uuid, item: T) -> Option<(Name, Uuid, T)> {
+    /// Possibly returns the items displaced.
+    /// If two items are displaced, the one displaced by matching name is
+    /// returned first.
+    pub fn insert(&mut self, name: Name, uuid: Uuid, item: T) -> Option<Vec<(Name, Uuid, T)>> {
         match self.name_to_uuid.insert(name.clone(), uuid) {
             Some(old_uuid) => {
                 // (existing name, _)
-                match self.items.insert(uuid, (name, item)) {
+                match self.items.insert(uuid, (name.clone(), item)) {
                     // (existing name, existing uuid)
-                    Some((old_name, old_item)) => Some((old_name, uuid, old_item)),
+                    Some((old_name, old_item)) => {
+                        // double eviction
+                        if old_name != name {
+                            assert_ne!(old_uuid, uuid);
+                            let (_, item2) = self.items.remove(&old_uuid).expect("should be there");
+                            self.name_to_uuid
+                                .remove(&old_name)
+                                .expect("should be there");
+                            Some(vec![(old_name, uuid, old_item), (name, old_uuid, item2)])
+                        } else {
+                            Some(vec![(old_name, uuid, old_item)])
+                        }
+                    }
                     // (existing name, new uuid)
                     None => {
                         let (old_name, old_item) =
                             self.items.remove(&old_uuid).expect("should be there");
-                        Some((old_name, old_uuid, old_item))
+                        Some(vec![(old_name, old_uuid, old_item)])
                     }
                 }
             }
@@ -221,7 +235,7 @@ impl<T> Table<T> {
                     let old_uuid = self.name_to_uuid
                         .remove(&old_name)
                         .expect("should be there");
-                    Some((old_name, old_uuid, old_item))
+                    Some(vec![(old_name, old_uuid, old_item)])
                 } else {
                     // (new name, new uuid)
                     None
@@ -334,8 +348,8 @@ mod tests {
         // It has displaced the old thing.
         assert!(displaced.is_some());
         let ref displaced_item = displaced.unwrap();
-        assert_eq!(&*displaced_item.0, name);
-        assert_eq!(displaced_item.1, uuid);
+        assert_eq!(&*displaced_item[0].0, name);
+        assert_eq!(displaced_item[0].1, uuid);
 
         // But it contains a thing with the same keys.
         assert!(t.contains_name(&name));
@@ -375,9 +389,9 @@ mod tests {
         // The items displaced consist exactly of the first item.
         assert!(displaced.is_some());
         let ref displaced_item = displaced.unwrap();
-        assert_eq!(&*displaced_item.0, name);
-        assert_eq!(displaced_item.1, uuid);
-        assert_eq!(displaced_item.2.stuff, thing_key);
+        assert_eq!(&*displaced_item[0].0, name);
+        assert_eq!(displaced_item[0].1, uuid);
+        assert_eq!(displaced_item[0].2.stuff, thing_key);
 
         // The table contains the new item and has no memory of the old.
         assert!(t.contains_name(&name));
@@ -419,9 +433,9 @@ mod tests {
         // The items displaced consist exactly of the first item.
         assert!(displaced.is_some());
         let ref displaced_item = displaced.unwrap();
-        assert_eq!(&*displaced_item.0, name);
-        assert_eq!(displaced_item.1, uuid);
-        assert_eq!(displaced_item.2.stuff, thing_key);
+        assert_eq!(&*displaced_item[0].0, name);
+        assert_eq!(displaced_item[0].1, uuid);
+        assert_eq!(displaced_item[0].2.stuff, thing_key);
 
         // The table contains the new item and has no memory of the old.
         assert!(t.contains_uuid(uuid));
@@ -429,6 +443,73 @@ mod tests {
         assert!(!t.contains_name(name));
         assert_eq!(t.get_by_uuid(uuid).unwrap().1.stuff, thing_key2);
         assert_eq!(t.get_by_name(&name2).unwrap().1.stuff, thing_key2);
+        assert_eq!(t.len(), 1);
+    }
+
+    #[test]
+    /// Insert two things, then insert a thing that matches one name and one
+    /// uuid of each. Both existing things should be returned.
+    fn insert_same_uuid_and_same_name() {
+        let mut t: Table<TestThing> = Table::default();
+        table_invariant(&t);
+
+        let uuid1 = Uuid::new_v4();
+        let name1 = "name1";
+        let thing1 = TestThing::new(&name1, uuid1);
+        let thing_key1 = thing1.stuff;
+
+        let uuid2 = Uuid::new_v4();
+        let name2 = "name2";
+        let thing2 = TestThing::new(&name2, uuid2);
+        let thing_key2 = thing2.stuff;
+
+        // Insert first item. There was nothing in the table before, so
+        // displaced is empty.
+        let displaced = t.insert(Name::new(name1.to_owned()), uuid1, thing1);
+        table_invariant(&t);
+        assert!(displaced.is_none());
+
+        // t now contains thing1.
+        assert!(t.contains_name(&name1));
+        assert!(t.contains_uuid(uuid1));
+
+        // Insert first item. There was nothing in the table before, so
+        // displaced is empty.
+        let displaced = t.insert(Name::new(name2.to_owned()), uuid2, thing2);
+        table_invariant(&t);
+        assert!(displaced.is_none());
+
+        // t now also contains thing2.
+        assert!(t.contains_name(&name2));
+        assert!(t.contains_uuid(uuid2));
+
+        // Create a third thing with the uuid of one and the name of the
+        // other.
+        let uuid3 = uuid1;
+        let name3 = name2;
+        let thing3 = TestThing::new(&name3, uuid3);
+        let thing_key3 = thing3.stuff;
+
+        // Insert third item.
+        let displaced = t.insert(Name::new(name3.to_owned()), uuid3, thing3);
+        table_invariant(&t);
+
+        // The items displaced consist of two items.
+        assert!(displaced.is_some());
+        let ref displaced_items = displaced.unwrap();
+        assert_eq!(displaced_items.len(), 2);
+        assert_eq!(&*displaced_items[0].0, name1);
+        assert_eq!(displaced_items[0].1, uuid1);
+        assert_eq!(displaced_items[0].2.stuff, thing_key1);
+        assert_eq!(&*displaced_items[1].0, name2);
+        assert_eq!(displaced_items[1].1, uuid2);
+        assert_eq!(displaced_items[1].2.stuff, thing_key2);
+
+        // The table contains the new item and has no memory of the old.
+        assert!(t.contains_uuid(uuid3));
+        assert!(t.contains_name(name3));
+        assert_eq!(t.get_by_uuid(uuid3).unwrap().1.stuff, thing_key3);
+        assert_eq!(t.get_by_name(&name3).unwrap().1.stuff, thing_key3);
         assert_eq!(t.len(), 1);
     }
 }

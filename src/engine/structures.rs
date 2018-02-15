@@ -181,21 +181,19 @@ impl<T> Table<T> {
 
     /// Removes the item corresponding to name if there is one.
     pub fn remove_by_name(&mut self, name: &str) -> Option<(Uuid, T)> {
-        if let Some(uuid) = self.name_to_uuid.remove(name) {
-            self.items.remove(&uuid).map(|(_, item)| (uuid, item))
-        } else {
-            None
-        }
+        self.name_to_uuid
+            .remove(name)
+            .and_then(|uuid| self.items.remove(&uuid).map(|(_, item)| (uuid, item)))
     }
 
     /// Removes the item corresponding to the uuid if there is one.
     pub fn remove_by_uuid(&mut self, uuid: Uuid) -> Option<(Name, T)> {
-        if let Some((name, item)) = self.items.remove(&uuid) {
-            self.name_to_uuid.remove(&name);
-            Some((name, item))
-        } else {
-            None
-        }
+        self.items
+            .remove(&uuid)
+            .and_then(|(name, item)| {
+                          self.name_to_uuid.remove(&name);
+                          Some((name, item))
+                      })
     }
 
     /// Inserts an item for given uuid and name.

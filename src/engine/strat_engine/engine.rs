@@ -10,10 +10,10 @@ use std::path::{Path, PathBuf};
 
 use devicemapper::{DM, Device, DmNameBuf};
 
-use super::super::engine::{Engine, Eventable, HasName, HasUuid, Pool};
+use super::super::engine::{Engine, Eventable, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
-use super::super::types::{DevUuid, PoolUuid, Redundancy, RenameAction};
+use super::super::types::{DevUuid, Name, PoolUuid, Redundancy, RenameAction};
 
 use super::cleanup::teardown_pools;
 use super::devlinks;
@@ -83,11 +83,11 @@ impl StratEngine {
 
         for (pool_uuid, devices) in &pools {
             match StratPool::setup(&dm, *pool_uuid, devices) {
-                Ok(pool) => {
-                    let evicted = table.insert(pool);
-                    if !evicted.is_empty() {
+                Ok((pool_name, pool)) => {
+                    let evicted = table.insert(pool_name, *pool_uuid, pool);
+                    if evicted.is_some() {
                         // TODO: update state machine on failure.
-                        let _ = teardown_pools(table.empty());
+                        let _ = teardown_pools(table);
                         let err_msg = "found two pools with the same name";
                         return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
                     }
@@ -105,14 +105,14 @@ impl StratEngine {
             watched_dev_last_event_nrs: HashMap::new(),
         };
 
-        devlinks::setup_devlinks(engine.pools().into_iter())?;
+        devlinks::setup_devlinks(engine.pools().iter())?;
 
         Ok(engine)
     }
 
     /// Teardown Stratis, preparatory to a shutdown.
     pub fn teardown(self) -> EngineResult<()> {
-        teardown_pools(self.pools.empty())
+        teardown_pools(self.pools)
     }
 }
 
@@ -131,12 +131,11 @@ impl Engine for StratEngine {
         }
 
         let dm = DM::new()?;
-        let pool = StratPool::initialize(&dm, name, blockdev_paths, redundancy, force)?;
+        let (uuid, pool) = StratPool::initialize(&dm, name, blockdev_paths, redundancy, force)?;
 
-        let uuid = pool.uuid();
-        devlinks::pool_added(pool.name())?;
-        self.pools.insert(pool);
-
+        let name = Name::new(name.to_owned());
+        devlinks::pool_added(&name)?;
+        self.pools.insert(name, uuid, pool);
         Ok(uuid)
     }
 
@@ -166,15 +165,16 @@ impl Engine for StratEngine {
                     .expect("We just retrieved or created a HashMap");
                 devices.insert(device, dev_node);
 
-                let rc = if let Ok(pool) = StratPool::setup(&dm, pool_uuid, &devices) {
+                let rc = if let Ok((pool_name, pool)) =
+                    StratPool::setup(&dm, pool_uuid, &devices) {
                     // We know we have a unique uuid, but the pools table requires a unique name too
                     // so we will ensure unique before we insert as we don't want to change the
                     // existing state if we have a conflict.
                     //
                     // We will also _not_ exit the daemon as we do in initialize as we were
                     // previously up and running for some duration of time.
-                    if !self.pools.contains_name(pool.name()) {
-                        self.pools.insert(pool);
+                    if !self.pools.contains_name(&pool_name) {
+                        self.pools.insert(pool_name, pool_uuid, pool);
                         Some(pool_uuid)
                     } else {
                         let dev_paths = devices
@@ -187,7 +187,7 @@ impl Engine for StratEngine {
 
                         error!("udev add: duplicate pool name {:?} for uuid {:?}, \
                                 devices[{}], failing to setup complete pool!",
-                               pool.name(),
+                               pool_name,
                                pool_uuid,
                                dev_paths);
                         if let Err(e) = pool.teardown() {
@@ -208,7 +208,7 @@ impl Engine for StratEngine {
     }
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool> {
-        if let Some(pool) = self.pools.get_by_uuid(uuid) {
+        if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
             if pool.has_filesystems() {
                 return Err(EngineError::Engine(ErrorEnum::Busy,
                                                "filesystems remaining on pool".into()));
@@ -217,10 +217,11 @@ impl Engine for StratEngine {
             return Ok(false);
         }
 
-        let pool = self.pools
-            .remove_by_uuid(uuid)
-            .expect("Must succeed since self.pools.get_by_uuid() returned a value");
-        let pool_name = pool.name().to_owned();
+        let (pool_name, pool) =
+            self.pools
+                .remove_by_uuid(uuid)
+                .expect("Must succeed since self.pools.get_by_uuid() returned a value");
+
         pool.destroy()?;
         devlinks::pool_removed(&pool_name)?;
         Ok(true)
@@ -229,27 +230,27 @@ impl Engine for StratEngine {
     fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> EngineResult<RenameAction> {
         let old_name = rename_pool_pre!(self; uuid; new_name);
 
-        let mut pool = self.pools
-            .remove_by_uuid(uuid)
-            .expect("Must succeed since self.pools.get_by_uuid() returned a value");
-        pool.rename(new_name);
+        let (_, mut pool) =
+            self.pools
+                .remove_by_uuid(uuid)
+                .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
-        if let Err(err) = pool.write_metadata() {
-            pool.rename(&old_name);
-            self.pools.insert(pool);
+        let new_name = Name::new(new_name.to_owned());
+        if let Err(err) = pool.write_metadata(&new_name) {
+            self.pools.insert(old_name, uuid, pool);
             Err(err)
         } else {
-            self.pools.insert(pool);
-            devlinks::pool_renamed(&old_name, new_name)?;
+            self.pools.insert(new_name.clone(), uuid, pool);
+            devlinks::pool_renamed(&old_name, &new_name)?;
             Ok(RenameAction::Renamed)
         }
     }
 
-    fn get_pool(&self, uuid: PoolUuid) -> Option<&Pool> {
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &Pool)> {
         get_pool!(self; uuid)
     }
 
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<&mut Pool> {
+    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut Pool)> {
         get_mut_pool!(self; uuid)
     }
 
@@ -261,8 +262,11 @@ impl Engine for StratEngine {
         check_engine!(self);
     }
 
-    fn pools(&self) -> Vec<&Pool> {
-        self.pools.into_iter().map(|x| x as &Pool).collect()
+    fn pools(&self) -> Vec<(Name, PoolUuid, &Pool)> {
+        self.pools
+            .iter()
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &Pool))
+            .collect()
     }
 
     fn get_eventable(&mut self) -> EngineResult<Option<Box<Eventable>>> {
@@ -278,10 +282,10 @@ impl Engine for StratEngine {
                  })
             .collect();
 
-        for pool in &mut self.pools {
+        for (pool_name, _, pool) in &mut self.pools {
             for dm_name in pool.get_eventing_dev_names() {
                 if device_list.get(&dm_name) > self.watched_dev_last_event_nrs.get(&dm_name) {
-                    pool.event_on(&dm_name)?;
+                    pool.event_on(pool_name, &dm_name)?;
                 }
             }
         }
@@ -313,7 +317,7 @@ mod test {
         engine.teardown().unwrap();
 
         let engine = StratEngine::initialize().unwrap();
-        let pool_name: String = engine.get_pool(uuid1).unwrap().name().into();
+        let pool_name: String = engine.get_pool(uuid1).unwrap().0.to_owned();
         assert_eq!(pool_name, name2);
     }
 

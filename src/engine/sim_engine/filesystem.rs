@@ -2,45 +2,27 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use rand;
+
 use std::path::PathBuf;
 
-use super::super::engine::{Filesystem, HasName, HasUuid};
-use super::super::types::FilesystemUuid;
+use super::super::engine::Filesystem;
 
 #[derive(Debug)]
 pub struct SimFilesystem {
-    fs_id: FilesystemUuid,
-    name: String,
+    rand: u32,
 }
 
 impl SimFilesystem {
-    pub fn new(fs_id: FilesystemUuid, name: &str) -> SimFilesystem {
-        SimFilesystem {
-            fs_id,
-            name: name.to_owned(),
-        }
-    }
-
-    /// Set the name of this filesystem to name.
-    pub fn rename(&mut self, name: &str) {
-        self.name = name.to_owned();
+    pub fn new() -> SimFilesystem {
+        SimFilesystem { rand: rand::random::<u32>() }
     }
 }
 
 impl Filesystem for SimFilesystem {
     fn devnode(&self) -> PathBuf {
-        ["/dev/stratis", &self.name].into_iter().collect()
-    }
-}
-
-impl HasName for SimFilesystem {
-    fn name(&self) -> &str {
-        &self.name
-    }
-}
-
-impl HasUuid for SimFilesystem {
-    fn uuid(&self) -> FilesystemUuid {
-        self.fs_id
+        ["/dev/stratis", &format!("random-{}", self.rand)]
+            .into_iter()
+            .collect()
     }
 }

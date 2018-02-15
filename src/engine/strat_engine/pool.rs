@@ -12,9 +12,9 @@ use uuid::Uuid;
 
 use devicemapper::{DM, Device, DmName, DmNameBuf, Sectors};
 
-use super::super::engine::{BlockDev, Filesystem, HasName, HasUuid, Pool};
+use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::{DevUuid, FilesystemUuid, PoolUuid, Redundancy, RenameAction};
+use super::super::types::{DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction};
 
 use super::blockdevmgr::BlockDevMgr;
 use super::metadata::MIN_MDA_SECTORS;
@@ -26,8 +26,6 @@ pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
 
 #[derive(Debug)]
 pub struct StratPool {
-    name: String,
-    pool_uuid: PoolUuid,
     block_devs: BlockDevMgr,
     redundancy: Redundancy,
     thin_pool: ThinPool,
@@ -42,7 +40,7 @@ impl StratPool {
                       paths: &[&Path],
                       redundancy: Redundancy,
                       force: bool)
-                      -> EngineResult<StratPool> {
+                      -> EngineResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
         let mut block_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
@@ -62,23 +60,21 @@ impl StratPool {
         };
 
         let mut pool = StratPool {
-            name: name.to_owned(),
-            pool_uuid,
             block_devs: block_mgr,
             redundancy,
             thin_pool: thinpool,
         };
 
-        pool.write_metadata()?;
+        pool.write_metadata(&Name::new(name.to_owned()))?;
 
-        Ok(pool)
+        Ok((pool_uuid, pool))
     }
 
     /// Setup a StratPool using its UUID and the list of devnodes it has.
     pub fn setup(dm: &DM,
                  uuid: PoolUuid,
                  devnodes: &HashMap<Device, PathBuf>)
-                 -> EngineResult<StratPool> {
+                 -> EngineResult<(Name, StratPool)> {
         let metadata = get_metadata(uuid, devnodes)?
             .ok_or_else(|| {
                             EngineError::Engine(ErrorEnum::NotFound,
@@ -92,29 +88,28 @@ impl StratPool {
                                        &metadata.flex_devs,
                                        &bd_mgr)?;
 
-        Ok(StratPool {
-               name: metadata.name,
-               pool_uuid: uuid,
-               block_devs: bd_mgr,
-               redundancy: Redundancy::NONE,
-               thin_pool: thinpool,
-           })
+        Ok((Name::new(metadata.name),
+            StratPool {
+                block_devs: bd_mgr,
+                redundancy: Redundancy::NONE,
+                thin_pool: thinpool,
+            }))
     }
 
     /// Write current metadata to pool members.
-    pub fn write_metadata(&mut self) -> EngineResult<()> {
-        let data = serde_json::to_string(&self.record())?;
+    pub fn write_metadata(&mut self, name: &str) -> EngineResult<()> {
+        let data = serde_json::to_string(&self.record(name))?;
         self.block_devs.save_state(data.as_bytes())
     }
 
-    pub fn check(&mut self) -> EngineResult<()> {
+    pub fn check(&mut self, name: &Name) -> EngineResult<()> {
         // FIXME: The context should not be created here as this is not
         // a public method. Ideally the context should be created in the
         // invoking method, Engine::check(). However, since we hope that
         // method will go away entirely, we just fix half of the problem
         // with this method, and leave the rest alone.
         if self.thin_pool.check(&DM::new()?, &mut self.block_devs)? {
-            self.write_metadata()?;
+            self.write_metadata(name)?;
         }
         Ok(())
     }
@@ -136,20 +131,30 @@ impl StratPool {
     /// Called when a DM device in this pool has generated an event.
     // TODO: Just check the device that evented. Currently checks
     // everything.
-    pub fn event_on(&mut self, dm_name: &DmName) -> EngineResult<()> {
+    pub fn event_on(&mut self, pool_name: &Name, dm_name: &DmName) -> EngineResult<()> {
         assert!(self.thin_pool
                     .get_eventing_dev_names()
                     .iter()
                     .any(|x| dm_name == &**x));
         if self.thin_pool.check(&DM::new()?, &mut self.block_devs)? {
-            self.write_metadata()?;
+            self.write_metadata(pool_name)?;
         }
         Ok(())
+    }
+
+    pub fn record(&self, name: &str) -> PoolSave {
+        PoolSave {
+            name: name.to_owned(),
+            block_devs: self.block_devs.record(),
+            flex_devs: self.thin_pool.record(),
+            thinpool_dev: self.thin_pool.record(),
+        }
     }
 }
 
 impl Pool for StratPool {
     fn create_filesystems<'a, 'b>(&'a mut self,
+                                  pool_name: &str,
                                   specs: &[(&'b str, Option<Sectors>)])
                                   -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
         let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
@@ -163,20 +168,23 @@ impl Pool for StratPool {
 
         // TODO: Roll back on filesystem initialization failure.
         let dm = DM::new()?;
-        let pool_name = self.name().to_owned();
         let mut result = Vec::new();
         for (name, size) in names {
             let fs_uuid = self.thin_pool
-                .create_filesystem(&pool_name, name, &dm, size)?;
+                .create_filesystem(pool_name, name, &dm, size)?;
             result.push((name, fs_uuid));
         }
 
         Ok(result)
     }
 
-    fn add_blockdevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
+    fn add_blockdevs(&mut self,
+                     pool_name: &str,
+                     paths: &[&Path],
+                     force: bool)
+                     -> EngineResult<Vec<DevUuid>> {
         let bdev_info = self.block_devs.add(paths, force)?;
-        self.write_metadata()?;
+        self.write_metadata(pool_name)?;
         Ok(bdev_info)
     }
 
@@ -187,14 +195,14 @@ impl Pool for StratPool {
     }
 
     fn destroy_filesystems<'a>(&'a mut self,
+                               pool_name: &str,
                                fs_uuids: &[FilesystemUuid])
                                -> EngineResult<Vec<FilesystemUuid>> {
         let dm = DM::new()?;
 
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
-            self.thin_pool
-                .destroy_filesystem(&dm, &self.name, uuid)?;
+            self.thin_pool.destroy_filesystem(&dm, pool_name, uuid)?;
             removed.push(uuid);
         }
 
@@ -202,24 +210,21 @@ impl Pool for StratPool {
     }
 
     fn rename_filesystem(&mut self,
+                         pool_name: &str,
                          uuid: FilesystemUuid,
                          new_name: &str)
                          -> EngineResult<RenameAction> {
         self.thin_pool
-            .rename_filesystem(&self.name, uuid, new_name)
+            .rename_filesystem(pool_name, uuid, new_name)
     }
 
     fn snapshot_filesystem(&mut self,
+                           pool_name: &str,
                            origin_uuid: FilesystemUuid,
                            snapshot_name: &str)
                            -> EngineResult<FilesystemUuid> {
-        let pool_name = self.name().to_owned();
         self.thin_pool
-            .snapshot_filesystem(&DM::new()?, &pool_name, origin_uuid, snapshot_name)
-    }
-
-    fn rename(&mut self, name: &str) {
-        self.name = name.to_owned();
+            .snapshot_filesystem(&DM::new()?, pool_name, origin_uuid, snapshot_name)
     }
 
     fn total_physical_size(&self) -> Sectors {
@@ -232,23 +237,23 @@ impl Pool for StratPool {
             .and_then(|v| Ok(v + self.block_devs.metadata_size()))
     }
 
-    fn filesystems(&self) -> Vec<&Filesystem> {
+    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)> {
         self.thin_pool.filesystems()
     }
 
-    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<&Filesystem> {
+    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &Filesystem)> {
         self.thin_pool
             .get_filesystem_by_uuid(uuid)
-            .map(|fs| fs as &Filesystem)
+            .map(|(name, fs)| (name, fs as &Filesystem))
     }
 
-    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<&mut Filesystem> {
+    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<(Name, &mut Filesystem)> {
         self.thin_pool
             .get_mut_filesystem_by_uuid(uuid)
-            .map(|fs| fs as &mut Filesystem)
+            .map(|(name, fs)| (name, fs as &mut Filesystem))
     }
 
-    fn blockdevs(&self) -> Vec<&BlockDev> {
+    fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
         self.block_devs.blockdevs()
     }
 
@@ -260,31 +265,8 @@ impl Pool for StratPool {
         self.block_devs.get_mut_blockdev_by_uuid(uuid)
     }
 
-    fn save_state(&mut self) -> EngineResult<()> {
-        self.write_metadata()
-    }
-}
-
-impl HasUuid for StratPool {
-    fn uuid(&self) -> PoolUuid {
-        self.pool_uuid
-    }
-}
-
-impl HasName for StratPool {
-    fn name(&self) -> &str {
-        &self.name
-    }
-}
-
-impl Recordable<PoolSave> for StratPool {
-    fn record(&self) -> PoolSave {
-        PoolSave {
-            name: self.name.clone(),
-            block_devs: self.block_devs.record(),
-            flex_devs: self.thin_pool.record(),
-            thinpool_dev: self.thin_pool.record(),
-        }
+    fn save_state(&mut self, pool_name: &str) -> EngineResult<()> {
+        self.write_metadata(pool_name)
     }
 }
 
@@ -311,14 +293,14 @@ mod tests {
         let dm = DM::new().unwrap();
 
         let name1 = "name1";
-        let pool1 = StratPool::initialize(&dm, &name1, paths1, Redundancy::NONE, false).unwrap();
-        let uuid1 = pool1.uuid();
-        let metadata1 = pool1.record();
+        let (uuid1, pool1) = StratPool::initialize(&dm, &name1, paths1, Redundancy::NONE, false)
+            .unwrap();
+        let metadata1 = pool1.record(name1);
 
         let name2 = "name2";
-        let pool2 = StratPool::initialize(&dm, &name2, paths2, Redundancy::NONE, false).unwrap();
-        let uuid2 = pool2.uuid();
-        let metadata2 = pool2.record();
+        let (uuid2, pool2) = StratPool::initialize(&dm, &name2, paths2, Redundancy::NONE, false)
+            .unwrap();
+        let metadata2 = pool2.record(name2);
 
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 2);

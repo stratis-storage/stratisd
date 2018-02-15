@@ -16,13 +16,13 @@ macro_rules! calculate_redundancy {
 
 macro_rules! get_pool {
     ( $s:ident; $uuid:ident ) => {
-        $s.pools.get_by_uuid($uuid).map(|p| p as &Pool)
+        $s.pools.get_by_uuid($uuid).map(|(name, p)| (name.clone(), p as &Pool))
     }
 }
 
 macro_rules! get_mut_pool {
     ( $s:ident; $uuid:ident ) => {
-        $s.pools.get_mut_by_uuid($uuid).map(|p| p as &mut Pool)
+        $s.pools.get_mut_by_uuid($uuid).map(|(name, p)| (name.clone(), p as &mut Pool))
     }
 }
 
@@ -30,11 +30,11 @@ macro_rules! rename_filesystem_pre {
     ( $s:ident; $uuid:ident; $new_name:ident ) => {
         {
             let old_name = match $s.filesystems.get_by_uuid($uuid) {
-                Some(filesystem) => filesystem.name().to_owned(),
+                Some((name, _)) => name,
                 None => return Ok(RenameAction::NoSource),
             };
 
-            if old_name == $new_name {
+            if &*old_name == $new_name {
                 return Ok(RenameAction::Identity);
             }
 
@@ -50,11 +50,11 @@ macro_rules! rename_pool_pre {
     ( $s:ident; $uuid:ident; $new_name:ident ) => {
         {
             let old_name = match $s.pools.get_by_uuid($uuid) {
-                Some(pool) => pool.name().to_owned(),
+                Some((name, _)) => name,
                 None => return Ok(RenameAction::NoSource),
             };
 
-            if old_name == $new_name {
+            if &*old_name == $new_name {
                 return Ok(RenameAction::Identity);
             }
 
@@ -68,9 +68,9 @@ macro_rules! rename_pool_pre {
 
 macro_rules! check_engine {
     ( $s:ident ) => {
-        for pool in &mut $s.pools {
+        for (pool_name, _, pool) in &mut $s.pools {
             // FIXME: It is not really correct to ignore result of pool.check().
-            let _ = pool.check();
+            let _ = pool.check(pool_name);
         }
     }
 }

@@ -257,10 +257,10 @@ impl BlockDevMgr {
     }
 
     /// Get references to managed blockdevs.
-    pub fn blockdevs(&self) -> Vec<&BlockDev> {
+    pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
         self.block_devs
-            .values()
-            .map(|bd| bd as &BlockDev)
+            .iter()
+            .map(|(uuid, bd)| (*uuid, bd as &BlockDev))
             .collect()
     }
 

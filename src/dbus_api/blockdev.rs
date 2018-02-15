@@ -118,7 +118,7 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let id_changed = {
         let blockdev = pool.get_mut_blockdev(blockdev_data.uuid)
@@ -132,7 +132,7 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     // FIXME: engine should decide to save state, not this function
     if id_changed {
-        pool.save_state()
+        pool.save_state(&pool_name)
             .map_err(|err| {
                          MethodErr::failed(&format!("Could not save state for object path {}: {}",
                                                     object_path,
@@ -183,7 +183,7 @@ fn get_blockdev_property<F, R>(i: &mut IterAppend,
         .uuid;
 
     let engine = dbus_context.engine.borrow();
-    let pool =
+    let (_, pool) =
         engine
             .get_pool(pool_uuid)
             .ok_or_else(|| {

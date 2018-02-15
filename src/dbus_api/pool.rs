@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use devicemapper::Sectors;
 
-use engine::{Pool, RenameAction};
+use engine::{Name, Pool, RenameAction};
 
 use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;
@@ -43,10 +43,11 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let result =
-        pool.create_filesystems(&filesystems
+        pool.create_filesystems(&pool_name,
+                                &filesystems
                                      .map(|x| (x, None))
                                      .collect::<Vec<(&str, Option<Sectors>)>>());
 
@@ -87,7 +88,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let mut filesystem_map: HashMap<Uuid, dbus::Path<'static>> = HashMap::new();
     for op in filesystems {
@@ -97,7 +98,9 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     }
 
-    let result = pool.destroy_filesystems(&filesystem_map.keys().cloned().collect::<Vec<Uuid>>());
+    let result =
+        pool.destroy_filesystems(&pool_name,
+                                 &filesystem_map.keys().cloned().collect::<Vec<Uuid>>());
     let msg = match result {
         Ok(ref uuids) => {
             for uuid in uuids {
@@ -151,9 +154,9 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     };
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let msg = match pool.snapshot_filesystem(fs_uuid, snapshot_name) {
+    let msg = match pool.snapshot_filesystem(&pool_name, fs_uuid, snapshot_name) {
         Ok(uuid) => {
             let fs_object_path: dbus::Path =
                 create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
@@ -186,11 +189,11 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let pool = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
-    let result = pool.add_blockdevs(&blockdevs, force);
+    let result = pool.add_blockdevs(&*pool_name, &blockdevs, force);
     let msg = match result {
         Ok(uuids) => {
             let return_value = uuids
@@ -251,7 +254,7 @@ fn get_pool_property<F, R>(i: &mut IterAppend,
                            p: &PropInfo<MTFn<TData>, TData>,
                            getter: F)
                            -> Result<(), MethodErr>
-    where F: Fn(&Pool) -> Result<R, MethodErr>,
+    where F: Fn((Name, Uuid, &Pool)) -> Result<R, MethodErr>,
           R: dbus::arg::Append
 {
     let dbus_context = p.tree.get_data();
@@ -267,7 +270,7 @@ fn get_pool_property<F, R>(i: &mut IterAppend,
         .uuid;
 
     let engine = dbus_context.engine.borrow();
-    let pool =
+    let (pool_name, pool) =
         engine
             .get_pool(pool_uuid)
             .ok_or_else(|| {
@@ -275,21 +278,21 @@ fn get_pool_property<F, R>(i: &mut IterAppend,
                                                        &pool_uuid))
                         })?;
 
-    i.append(getter(pool)?);
+    i.append(getter((pool_name, pool_uuid, pool))?);
     Ok(())
 }
 
 fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |p| Ok(p.name().to_owned()))
+    get_pool_property(i, p, |(name, _, _)| Ok(name.to_owned()))
 }
 
 fn get_pool_total_physical_used(i: &mut IterAppend,
                                 p: &PropInfo<MTFn<TData>, TData>)
                                 -> Result<(), MethodErr> {
-    fn get_used(pool: &Pool) -> Result<String, MethodErr> {
+    fn get_used((_, uuid, pool): (Name, Uuid, &Pool)) -> Result<String, MethodErr> {
         let err_func = |_| {
             MethodErr::failed(&format!("no total physical size computed for pool with uuid {}",
-                                       pool.uuid()))
+                                       uuid))
         };
 
         pool.total_physical_used()
@@ -303,7 +306,9 @@ fn get_pool_total_physical_used(i: &mut IterAppend,
 fn get_pool_total_physical_size(i: &mut IterAppend,
                                 p: &PropInfo<MTFn<TData>, TData>)
                                 -> Result<(), MethodErr> {
-    get_pool_property(i, p, |p| Ok(format!("{}", *p.total_physical_size())))
+    get_pool_property(i,
+                      p,
+                      |(_, _, p)| Ok(format!("{}", *p.total_physical_size())))
 }
 
 pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,

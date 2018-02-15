@@ -57,7 +57,6 @@ pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>
     }
 
     for leftover in existing_dirs {
-        //pool_removed(str::from_utf8(leftover.as_bytes()).expect("is valid utf8"))?
         pool_removed(&Name::new(leftover))?
     }
 

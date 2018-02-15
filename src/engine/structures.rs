@@ -164,12 +164,12 @@ impl<T> Table<T> {
     /// Get mutable item by name.
     pub fn get_mut_by_name(&mut self, name: &str) -> Option<(Uuid, &mut T)> {
         let uuid = match self.name_to_uuid.get(name) {
-            Some(uuid) => *uuid,
+            Some(uuid) => uuid,
             None => return None,
         };
         self.items
-            .get_mut(&uuid)
-            .map(|&mut (_, ref mut item)| (uuid, item))
+            .get_mut(uuid)
+            .map(|&mut (_, ref mut item)| (*uuid, item))
     }
 
     /// Get mutable item by uuid.

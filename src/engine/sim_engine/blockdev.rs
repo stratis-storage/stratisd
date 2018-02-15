@@ -11,8 +11,8 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, IEC, Sectors};
 
-use super::super::engine::{BlockDev, HasUuid};
-use super::super::types::{BlockDevState, DevUuid};
+use super::super::engine::BlockDev;
+use super::super::types::BlockDevState;
 
 use super::randomization::Randomizer;
 
@@ -21,7 +21,6 @@ use super::randomization::Randomizer;
 pub struct SimDev {
     devnode: PathBuf,
     rdm: Rc<RefCell<Randomizer>>,
-    uuid: Uuid,
     user_info: Option<String>,
     hardware_info: Option<String>,
     initialization_time: u64,
@@ -57,22 +56,16 @@ impl BlockDev for SimDev {
     }
 }
 
-impl HasUuid for SimDev {
-    fn uuid(&self) -> DevUuid {
-        self.uuid
-    }
-}
-
 impl SimDev {
     /// Generates a new device from any devnode.
-    pub fn new(rdm: Rc<RefCell<Randomizer>>, devnode: &Path) -> SimDev {
-        SimDev {
-            devnode: devnode.to_owned(),
-            rdm,
-            uuid: Uuid::new_v4(),
-            user_info: None,
-            hardware_info: None,
-            initialization_time: Utc::now().timestamp() as u64,
-        }
+    pub fn new(rdm: Rc<RefCell<Randomizer>>, devnode: &Path) -> (Uuid, SimDev) {
+        (Uuid::new_v4(),
+         SimDev {
+             devnode: devnode.to_owned(),
+             rdm,
+             user_info: None,
+             hardware_info: None,
+             initialization_time: Utc::now().timestamp() as u64,
+         })
     }
 }

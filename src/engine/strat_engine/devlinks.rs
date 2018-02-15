@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use super::super::errors::EngineResult;
 
 use engine::Pool;
+use engine::types::{Name, PoolUuid};
 
 pub const DEV_PATH: &str = "/dev/stratis";
 
@@ -19,7 +20,9 @@ pub const DEV_PATH: &str = "/dev/stratis";
 /// or filesystem.
 // Don't just remove and recreate everything in case there are processes
 // (e.g. user shells) with the current working directory within the tree.
-pub fn setup_devlinks<'a, I: Iterator<Item = &'a Pool>>(pools: I) -> EngineResult<()> {
+pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>
+    (pools: I)
+     -> EngineResult<()> {
     if let Err(err) = fs::create_dir(DEV_PATH) {
         if err.kind() != ErrorKind::AlreadyExists {
             return Err(From::from(err));
@@ -30,12 +33,12 @@ pub fn setup_devlinks<'a, I: Iterator<Item = &'a Pool>>(pools: I) -> EngineResul
         .map(|dir_e| dir_e.and_then(|d| Ok(d.file_name().into_string().expect("Unix is utf-8"))))
         .collect::<Result<HashSet<_>, _>>()?;
 
-    for pool in pools {
-        if !existing_dirs.remove(pool.name()) {
-            pool_added(pool.name())?;
+    for &(ref pool_name, _, pool) in pools {
+        if !existing_dirs.remove(&pool_name.to_owned()) {
+            pool_added(pool_name)?;
         }
 
-        let pool_path: PathBuf = vec![DEV_PATH, pool.name()].iter().collect();
+        let pool_path: PathBuf = vec![DEV_PATH, pool_name].iter().collect();
 
         let mut existing_files = fs::read_dir(pool_path)?
             .map(|dir_e| {
@@ -43,18 +46,18 @@ pub fn setup_devlinks<'a, I: Iterator<Item = &'a Pool>>(pools: I) -> EngineResul
                  })
             .collect::<Result<HashSet<_>, _>>()?;
 
-        for fs in pool.filesystems() {
-            filesystem_added(pool.name(), fs.name(), &fs.devnode())?;
-            existing_files.remove(fs.name());
+        for (fs_name, _, fs) in pool.filesystems() {
+            filesystem_added(pool_name, &fs_name, &fs.devnode())?;
+            existing_files.remove(&fs_name.to_owned());
         }
 
         for leftover in existing_files {
-            filesystem_removed(pool.name(), &leftover)?;
+            filesystem_removed(pool_name, &leftover)?;
         }
     }
 
     for leftover in existing_dirs {
-        pool_removed(str::from_utf8(leftover.as_bytes()).expect("is valid utf8"))?
+        pool_removed(&Name::new(leftover))?
     }
 
     Ok(())

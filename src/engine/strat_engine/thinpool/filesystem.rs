@@ -13,11 +13,11 @@ use nix::sys::statvfs::statvfs;
 use nix::sys::statvfs::vfs::Statvfs;
 use tempdir::TempDir;
 
-use super::super::super::engine::{Filesystem, HasName, HasUuid};
+use super::super::super::engine::Filesystem;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::super::types::FilesystemUuid;
+use super::super::super::types::{FilesystemUuid, Name};
 
-use super::super::serde_structs::{FilesystemSave, Recordable};
+use super::super::serde_structs::FilesystemSave;
 
 use super::util::{create_fs, set_uuid, xfs_growfs};
 
@@ -27,8 +27,6 @@ pub const FILESYSTEM_LOWATER: Sectors = Sectors(256 * IEC::Mi / (SECTOR_SIZE as 
 
 #[derive(Debug)]
 pub struct StratFilesystem {
-    fs_id: FilesystemUuid,
-    name: String,
     thin_dev: ThinDev,
 }
 
@@ -41,23 +39,16 @@ pub enum FilesystemStatus {
 
 impl StratFilesystem {
     /// Create a StratFilesystem on top of the given ThinDev.
-    pub fn initialize(fs_id: FilesystemUuid,
-                      name: &str,
-                      thin_dev: ThinDev)
-                      -> EngineResult<StratFilesystem> {
-        let fs = StratFilesystem::setup(fs_id, name, thin_dev);
+    pub fn initialize(fs_id: FilesystemUuid, thin_dev: ThinDev) -> EngineResult<StratFilesystem> {
+        let fs = StratFilesystem::setup(thin_dev);
 
         create_fs(&fs.devnode(), fs_id)?;
         Ok(fs)
     }
 
     /// Build a StratFilesystem that includes the ThinDev and related info.
-    pub fn setup(fs_id: FilesystemUuid, name: &str, thin_dev: ThinDev) -> StratFilesystem {
-        StratFilesystem {
-            fs_id,
-            name: name.to_owned(),
-            thin_dev,
-        }
+    pub fn setup(thin_dev: ThinDev) -> StratFilesystem {
+        StratFilesystem { thin_dev }
     }
 
     /// Create a snapshot of the filesystem. Return the resulting filesystem/ThinDev
@@ -66,11 +57,13 @@ impl StratFilesystem {
     /// Mounting a filesystem with a duplicate UUID would require special handling,
     /// so snapshot_fs_uuid is used to update the new snapshot filesystem so it has
     /// a unique UUID.
+    #[allow(too_many_arguments)]
     pub fn snapshot(&self,
                     dm: &DM,
                     thin_pool: &ThinPoolDev,
                     snapshot_name: &str,
                     snapshot_dmname: &DmName,
+                    snapshot_fs_name: &Name,
                     snapshot_fs_uuid: FilesystemUuid,
                     snapshot_thin_id: ThinDevId)
                     -> EngineResult<StratFilesystem> {
@@ -99,13 +92,13 @@ impl StratFilesystem {
                     umount(tmp_dir.path())?;
                 }
                 set_uuid(&thin_dev.devnode(), snapshot_fs_uuid)?;
-                Ok(StratFilesystem::setup(snapshot_fs_uuid, snapshot_name, thin_dev))
+                Ok(StratFilesystem::setup(thin_dev))
             }
             Err(e) => {
                 Err(EngineError::Engine(ErrorEnum::Error,
                                         format!("failed to create {} snapshot for {} - {}",
                                                 snapshot_name,
-                                                self.name,
+                                                snapshot_fs_name,
                                                 e)))
             }
         }
@@ -187,44 +180,25 @@ impl StratFilesystem {
         Ok(())
     }
 
-    /// Set the name of this filesystem to name.
-    pub fn rename(&mut self, name: &str) {
-        self.name = name.to_owned();
-    }
-
     /// Destroy the filesystem.
     pub fn destroy(self, dm: &DM, thin_pool: &ThinPoolDev) -> EngineResult<()> {
         self.thin_dev.destroy(dm, thin_pool)?;
         Ok(())
     }
-}
 
-impl HasName for StratFilesystem {
-    fn name(&self) -> &str {
-        &self.name
-    }
-}
-
-impl HasUuid for StratFilesystem {
-    fn uuid(&self) -> FilesystemUuid {
-        self.fs_id
+    pub fn record(&self, name: &Name, uuid: FilesystemUuid) -> FilesystemSave {
+        FilesystemSave {
+            name: name.to_owned(),
+            uuid: uuid,
+            thin_id: self.thin_dev.id(),
+            size: self.thin_dev.size(),
+        }
     }
 }
 
 impl Filesystem for StratFilesystem {
     fn devnode(&self) -> PathBuf {
         self.thin_dev.devnode()
-    }
-}
-
-impl Recordable<FilesystemSave> for StratFilesystem {
-    fn record(&self) -> FilesystemSave {
-        FilesystemSave {
-            name: self.name.clone(),
-            uuid: self.fs_id,
-            thin_id: self.thin_dev.id(),
-            size: self.thin_dev.size(),
-        }
     }
 }
 

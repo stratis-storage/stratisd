@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// Code to handle the physical backing store of a pool.
+// Code to handle the backing store of a pool.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -15,7 +15,7 @@ use super::super::super::engine::BlockDev;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::types::{DevUuid, PoolUuid};
 
-use super::super::dmnames::{CacheRole, format_physical_name};
+use super::super::dmnames::{CacheRole, format_backstore_name};
 use super::super::serde_structs::{Recordable, BackstoreSave};
 
 use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment, coalesce_blkdevsegs, map_to_dm};
@@ -64,8 +64,8 @@ impl DataTier {
             .collect::<EngineResult<Vec<_>>>()?;
 
         let mut ld = LinearDev::setup(dm,
-                                      &format_physical_name(block_mgr.pool_uuid(),
-                                                            CacheRole::Origin),
+                                      &format_backstore_name(block_mgr.pool_uuid(),
+                                                             CacheRole::Origin),
                                       None,
                                       map_to_dm(&segments))?;
 
@@ -107,7 +107,8 @@ impl DataTier {
             .cloned()
             .collect::<Vec<_>>();
         let ld = LinearDev::setup(dm,
-                                  &format_physical_name(block_mgr.pool_uuid(), CacheRole::Origin),
+                                  &format_backstore_name(block_mgr.pool_uuid(),
+                                                         CacheRole::Origin),
                                   None,
                                   map_to_dm(&segments))?;
         Ok(DataTier {
@@ -238,14 +239,13 @@ impl Backstore {
         self.data_tier.alloc_space(sizes)
     }
 
-    /// Return a reference to the blockdevs that form the base of the physical
-    /// layer.
+    /// Return a reference to the blockdevs that form the basis of the
+    /// backstore.
     pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
         self.data_tier.block_mgr.blockdevs()
     }
 
-    /// The current capacity of all the blockdevs that make up the physical
-    /// layer.
+    /// The current capacity of all the blockdevs that make up the backstore.
     pub fn current_capacity(&self) -> Sectors {
         self.data_tier.current_capacity()
     }
@@ -275,7 +275,7 @@ impl Backstore {
         self.data_tier.block_mgr.get_mut_blockdev_by_uuid(uuid)
     }
 
-    /// the number of sectors in the physical layer given up to Stratis
+    /// the number of sectors in the backstore given up to Stratis
     /// metadata. current_capacity() - metadata_size() >= the size of the
     /// DM device.
     pub fn metadata_size(&self) -> Sectors {
@@ -283,7 +283,7 @@ impl Backstore {
     }
 
     /// Write the given data directly to the blockdevs that make up the
-    /// physical layer. This action bypasses the DM device entirely,
+    /// backstore. This action bypasses the DM device entirely,
     /// in order to allow control over which blockdevs the metadata is written
     /// to.
     pub fn save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {

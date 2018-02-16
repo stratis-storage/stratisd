@@ -20,11 +20,11 @@ use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::structures::Table;
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid, RenameAction};
 
+use super::super::backstore::Backstore;
 use super::super::devlinks;
 use super::super::device::wipe_sectors;
 use super::super::dmnames::{FlexRole, ThinPoolRole, ThinRole, format_flex_name,
                             format_thinpool_name, format_thin_name};
-use super::super::physical::Backstore;
 use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
 use super::filesystem::{FilesystemStatus, StratFilesystem};
@@ -733,7 +733,7 @@ mod tests {
 
     use devicemapper::{Bytes, SECTOR_SIZE};
 
-    use super::super::super::physical::MIN_MDA_SECTORS;
+    use super::super::super::backstore::MIN_MDA_SECTORS;
     use super::super::super::tests::{loopbacked, real};
     use super::super::super::tests::tempdir::TempDir;
 

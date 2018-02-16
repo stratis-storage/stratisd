@@ -108,9 +108,9 @@ pub fn format_thinpool_name(pool_uuid: PoolUuid, role: ThinPoolRole) -> DmNameBu
             .expect("FORMAT_VERSION display_length < 81")
 }
 
-/// Format a name for the dm device that contains the physical layer.
+/// Format a name for dm devices in the backstore.
 /// Prerequisite: len(format!("{}", FORMAT_VERSION) < 79
-pub fn format_physical_name(pool_uuid: PoolUuid, role: CacheRole) -> DmNameBuf {
+pub fn format_backstore_name(pool_uuid: PoolUuid, role: CacheRole) -> DmNameBuf {
     DmNameBuf::new(format!("stratis-{}-{}-physical-{}",
                            FORMAT_VERSION,
                            pool_uuid.simple().to_string(),

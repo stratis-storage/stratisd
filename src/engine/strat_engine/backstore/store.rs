@@ -156,13 +156,18 @@ impl DataTier {
     /// The total size of all the blockdevs combined
     pub fn current_capacity(&self) -> Sectors {
         let size = self.block_mgr.current_capacity();
-        assert!(size > self.capacity());
+        assert_eq!(size - self.metadata_size(), self.capacity());
         size
     }
 
     /// Number of sectors unused
     pub fn available(&self) -> Sectors {
         self.capacity() - self.next
+    }
+
+    /// The number of sectors used for metadata by all the blockdevs
+    pub fn metadata_size(&self) -> Sectors {
+        self.block_mgr.metadata_size()
     }
 
     /// Allocate requested chunks from device.
@@ -275,11 +280,10 @@ impl Backstore {
         self.data_tier.block_mgr.get_mut_blockdev_by_uuid(uuid)
     }
 
-    /// the number of sectors in the backstore given up to Stratis
-    /// metadata. current_capacity() - metadata_size() >= the size of the
-    /// DM device.
+    /// The number of sectors in the backstore given up to Stratis
+    /// metadata.
     pub fn metadata_size(&self) -> Sectors {
-        self.data_tier.block_mgr.metadata_size()
+        self.data_tier.metadata_size()
     }
 
     /// Write the given data directly to the blockdevs that make up the

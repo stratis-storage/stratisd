@@ -159,7 +159,10 @@ impl DataLayer {
 
     /// Allocate requested chunks from device.
     /// Returns None if it is not possible to satisfy the request.
-    // Simply serves up the space in the order in which it was requested.
+    /// Each segment allocated is contiguous with its neighbors in the return
+    /// vector.
+    /// WARNING: All this must change when it becomes possible to return
+    /// sectors to the store.
     pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<(Sectors, Sectors)>>> {
         if self.available() < sizes.iter().cloned().sum() {
             return None;

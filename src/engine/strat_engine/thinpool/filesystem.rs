@@ -10,7 +10,6 @@ use devicemapper::{Bytes, DM, DmDevice, DmName, IEC, SECTOR_SIZE, Sectors, ThinD
 use mnt::{MountIter, MountParam};
 use nix::mount::{MsFlags, mount, umount};
 use nix::sys::statvfs::statvfs;
-use nix::sys::statvfs::vfs::Statvfs;
 use tempdir::TempDir;
 
 use super::super::super::engine::Filesystem;
@@ -204,11 +203,10 @@ impl Filesystem for StratFilesystem {
 
 /// Return total bytes allocated to the filesystem, total bytes used by data/metadata
 pub fn fs_usage(mount_point: &Path) -> EngineResult<(Bytes, Bytes)> {
-    let mut stat = Statvfs::default();
-    statvfs(mount_point, &mut stat)?;
+    let stat = statvfs(mount_point)?;
 
     // stat.f_bsize is type c_ulong, which is 32 bits on some archs. Upcast.
-    let f_bsize = stat.f_bsize as u64;
+    let f_bsize = stat.block_size() as u64;
 
-    Ok((Bytes(f_bsize * stat.f_blocks), Bytes(f_bsize * (stat.f_blocks - stat.f_bfree))))
+    Ok((Bytes(f_bsize * stat.blocks()), Bytes(f_bsize * (stat.blocks() - stat.blocks_free()))))
 }

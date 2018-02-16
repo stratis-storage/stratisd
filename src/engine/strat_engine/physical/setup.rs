@@ -19,7 +19,7 @@ use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::types::PoolUuid;
 
 use super::super::engine::DevOwnership;
-use super::super::serde_structs::{PoolSave, StoreSave};
+use super::super::serde_structs::{BackstoreSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
 use super::device::blkdev_size;
@@ -169,10 +169,10 @@ pub fn get_metadata(pool_uuid: PoolUuid,
 /// Returns an error if the blockdevs obtained do not match the metadata.
 #[allow(implicit_hasher)]
 pub fn get_blockdevs(pool_uuid: PoolUuid,
-                     store_save: &StoreSave,
+                     backstore_save: &BackstoreSave,
                      devnodes: &HashMap<Device, PathBuf>)
                      -> EngineResult<Vec<StratBlockDev>> {
-    let segments = &store_save.segments;
+    let segments = &backstore_save.segments;
 
     let mut segment_table = HashMap::new();
     for seg in segments {
@@ -190,7 +190,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                 let actual_size = blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?
                     .sectors();
 
-                let bd_save = store_save
+                let bd_save = backstore_save
                     .block_devs
                     .iter()
                     .find(|bds| bds.uuid == bda.dev_uuid())
@@ -218,7 +218,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
 
     // Verify that blockdevs found match blockdevs recorded.
     let current_uuids: HashSet<_> = blockdevs.iter().map(|b| b.uuid()).collect();
-    let recorded_uuids: HashSet<_> = store_save
+    let recorded_uuids: HashSet<_> = backstore_save
         .block_devs
         .iter()
         .map(|bds| bds.uuid)

@@ -16,7 +16,7 @@ use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::dmnames::{CacheRole, format_physical_name};
-use super::super::serde_structs::{Recordable, StoreSave};
+use super::super::serde_structs::{Recordable, BackstoreSave};
 
 use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment, coalesce_blkdevsegs, map_to_dm};
 use super::setup::get_blockdevs;
@@ -191,33 +191,36 @@ impl DataTier {
 }
 
 #[derive(Debug)]
-pub struct Store {
+pub struct Backstore {
     data_tier: DataTier,
 }
 
-impl Store {
-    /// Make a Store object from blockdevs that already belong to Stratis.
+impl Backstore {
+    /// Make a Backstore object from blockdevs that already belong to Stratis.
     pub fn setup(dm: &DM,
                  pool_uuid: PoolUuid,
-                 store_save: &StoreSave,
+                 backstore_save: &BackstoreSave,
                  devnodes: &HashMap<Device, PathBuf>,
                  last_update_time: Option<DateTime<Utc>>)
-                 -> EngineResult<Store> {
-        let blockdevs = get_blockdevs(pool_uuid, store_save, devnodes)?;
+                 -> EngineResult<Backstore> {
+        let blockdevs = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
         let block_mgr = BlockDevMgr::new(pool_uuid, blockdevs, last_update_time);
-        Ok(Store {
-               data_tier: DataTier::setup(dm, block_mgr, &store_save.segments, store_save.next)?,
+        Ok(Backstore {
+               data_tier: DataTier::setup(dm,
+                                          block_mgr,
+                                          &backstore_save.segments,
+                                          backstore_save.next)?,
            })
     }
 
-    /// Initialize a Store object, by initializing the specified devs.
+    /// Initialize a Backstore object, by initializing the specified devs.
     pub fn initialize(dm: &DM,
                       pool_uuid: PoolUuid,
                       paths: &[&Path],
                       mda_size: Sectors,
                       force: bool)
-                      -> EngineResult<Store> {
-        Ok(Store {
+                      -> EngineResult<Backstore> {
+        Ok(Backstore {
                data_tier: DataTier::new(dm,
                                         BlockDevMgr::initialize(pool_uuid,
                                                                 paths,
@@ -288,9 +291,9 @@ impl Store {
     }
 }
 
-impl Recordable<StoreSave> for Store {
-    fn record(&self) -> StoreSave {
-        StoreSave {
+impl Recordable<BackstoreSave> for Backstore {
+    fn record(&self) -> BackstoreSave {
+        BackstoreSave {
             segments: self.data_tier.segments.record(),
             block_devs: self.data_tier.block_mgr.record(),
             next: self.data_tier.next,

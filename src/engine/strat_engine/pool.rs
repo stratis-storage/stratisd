@@ -16,7 +16,7 @@ use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction};
 
-use super::physical::{MIN_MDA_SECTORS, Store, get_metadata};
+use super::physical::{Backstore, MIN_MDA_SECTORS, get_metadata};
 use super::serde_structs::{PoolSave, Recordable};
 use super::thinpool::{ThinPool, ThinPoolSizeParams};
 
@@ -24,7 +24,7 @@ pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
 
 #[derive(Debug)]
 pub struct StratPool {
-    store: Store,
+    backstore: Backstore,
     redundancy: Redundancy,
     thin_pool: ThinPool,
 }
@@ -41,24 +41,24 @@ impl StratPool {
                       -> EngineResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
-        let mut block_mgr = Store::initialize(dm, pool_uuid, paths, MIN_MDA_SECTORS, force)?;
+        let mut backstore = Backstore::initialize(dm, pool_uuid, paths, MIN_MDA_SECTORS, force)?;
 
         let thinpool = ThinPool::new(pool_uuid,
                                      dm,
                                      &ThinPoolSizeParams::default(),
                                      DATA_BLOCK_SIZE,
                                      DATA_LOWATER,
-                                     &mut block_mgr);
+                                     &mut backstore);
         let thinpool = match thinpool {
             Ok(thinpool) => thinpool,
             Err(err) => {
-                let _ = block_mgr.destroy(dm);
+                let _ = backstore.destroy(dm);
                 return Err(err);
             }
         };
 
         let mut pool = StratPool {
-            store: block_mgr,
+            backstore,
             redundancy,
             thin_pool: thinpool,
         };
@@ -90,24 +90,24 @@ impl StratPool {
             .chain(flex_devs.thin_meta_dev_spare.iter())
             .map(|x| x.1)
             .sum::<Sectors>();
-        if total_allocated != metadata.store.next {
+        if total_allocated != metadata.backstore.next {
             let err_msg = format!("{} used in thinpool, but {} given up by cache",
                                   total_allocated,
-                                  metadata.store.next);
+                                  metadata.backstore.next);
             return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
         }
 
-        let store = Store::setup(dm, uuid, &metadata.store, devnodes, None)?;
+        let backstore = Backstore::setup(dm, uuid, &metadata.backstore, devnodes, None)?;
         let thinpool = ThinPool::setup(dm,
                                        uuid,
                                        metadata.thinpool_dev.data_block_size,
                                        DATA_LOWATER,
                                        &metadata.flex_devs,
-                                       &store)?;
+                                       &backstore)?;
 
         Ok((Name::new(metadata.name),
             StratPool {
-                store: store,
+                backstore,
                 redundancy: Redundancy::NONE,
                 thin_pool: thinpool,
             }))
@@ -116,7 +116,7 @@ impl StratPool {
     /// Write current metadata to pool members.
     pub fn write_metadata(&mut self, name: &str) -> EngineResult<()> {
         let data = serde_json::to_string(&self.record(name))?;
-        self.store.save_state(data.as_bytes())
+        self.backstore.save_state(data.as_bytes())
     }
 
     pub fn check(&mut self, name: &Name) -> EngineResult<()> {
@@ -125,7 +125,7 @@ impl StratPool {
         // invoking method, Engine::check(). However, since we hope that
         // method will go away entirely, we just fix half of the problem
         // with this method, and leave the rest alone.
-        if self.thin_pool.check(&DM::new()?, &mut self.store)? {
+        if self.thin_pool.check(&DM::new()?, &mut self.backstore)? {
             self.write_metadata(name)?;
         }
         Ok(())
@@ -153,7 +153,7 @@ impl StratPool {
                     .get_eventing_dev_names()
                     .iter()
                     .any(|x| dm_name == &**x));
-        if self.thin_pool.check(&DM::new()?, &mut self.store)? {
+        if self.thin_pool.check(&DM::new()?, &mut self.backstore)? {
             self.write_metadata(pool_name)?;
         }
         Ok(())
@@ -162,7 +162,7 @@ impl StratPool {
     pub fn record(&self, name: &str) -> PoolSave {
         PoolSave {
             name: name.to_owned(),
-            store: self.store.record(),
+            backstore: self.backstore.record(),
             flex_devs: self.thin_pool.record(),
             thinpool_dev: self.thin_pool.record(),
         }
@@ -201,7 +201,7 @@ impl Pool for StratPool {
                      force: bool)
                      -> EngineResult<Vec<DevUuid>> {
         let dm = DM::new()?;
-        let bdev_info = self.store.add(&dm, paths, force)?;
+        let bdev_info = self.backstore.add(&dm, paths, force)?;
         self.write_metadata(pool_name)?;
         Ok(bdev_info)
     }
@@ -209,7 +209,7 @@ impl Pool for StratPool {
     fn destroy(self) -> EngineResult<()> {
         let dm = DM::new()?;
         self.thin_pool.teardown(&dm)?;
-        self.store.destroy(&dm)?;
+        self.backstore.destroy(&dm)?;
         Ok(())
     }
 
@@ -247,13 +247,13 @@ impl Pool for StratPool {
     }
 
     fn total_physical_size(&self) -> Sectors {
-        self.store.current_capacity()
+        self.backstore.current_capacity()
     }
 
     fn total_physical_used(&self) -> EngineResult<Sectors> {
         self.thin_pool
             .total_physical_used()
-            .and_then(|v| Ok(v + self.store.metadata_size()))
+            .and_then(|v| Ok(v + self.backstore.metadata_size()))
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)> {
@@ -273,15 +273,15 @@ impl Pool for StratPool {
     }
 
     fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
-        self.store.blockdevs()
+        self.backstore.blockdevs()
     }
 
     fn get_blockdev(&self, uuid: DevUuid) -> Option<&BlockDev> {
-        self.store.get_blockdev_by_uuid(uuid)
+        self.backstore.get_blockdev_by_uuid(uuid)
     }
 
     fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
-        self.store.get_mut_blockdev_by_uuid(uuid)
+        self.backstore.get_mut_blockdev_by_uuid(uuid)
     }
 
     fn save_state(&mut self, pool_name: &str) -> EngineResult<()> {

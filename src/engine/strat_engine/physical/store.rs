@@ -96,7 +96,7 @@ impl DataLayer {
 
 
     /// Setup a new DataLayer struct from the block_mgr.
-    /// Note that this is a metadata changing event.
+    /// WARNING: metadata changing event
     pub fn new(dm: &DM, mut block_mgr: BlockDevMgr) -> EngineResult<DataLayer> {
         let avail_space = block_mgr.avail_space();
         let segments = block_mgr
@@ -120,7 +120,7 @@ impl DataLayer {
 
     /// Add the given paths to self. Return UUIDs of the new blockdevs
     /// corresponding to the specified paths.
-    /// Note that this is a metadata changing event.
+    /// WARNING: metadata changing event
     pub fn add(&mut self, dm: &DM, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
         let uuids = self.block_mgr.add(paths, force)?;
 
@@ -240,8 +240,8 @@ impl Store {
     }
 
     /// Return the device that this tier is currently using.
-    /// Note that this may change if it switches between its cache and non-
-    /// cache incarnataions.
+    /// WARNING: This may change it the backstore switches between its
+    /// cache and its non-cache incarnations, among other reasons.
     pub fn device(&self) -> Device {
         self.data.dm_device.device()
     }

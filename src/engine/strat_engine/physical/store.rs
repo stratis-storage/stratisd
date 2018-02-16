@@ -142,10 +142,14 @@ impl DataLayer {
     }
 
     /// All the sectors available to this device
-    // Note that this should always be equivalent to the sum of the length
-    // fields of the segments in self.segments.
     pub fn capacity(&self) -> Sectors {
-        self.dm_device.size()
+        let size = self.dm_device.size();
+        assert_eq!(self.segments
+                       .iter()
+                       .map(|x| x.segment.length)
+                       .sum::<Sectors>(),
+                   size);
+        size
     }
 
     /// Number of sectors unused

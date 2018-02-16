@@ -152,6 +152,13 @@ impl DataLayer {
         size
     }
 
+    /// The total size of all the blockdevs combined
+    pub fn current_capacity(&self) -> Sectors {
+        let size = self.block_mgr.current_capacity();
+        assert!(size > self.capacity());
+        size
+    }
+
     /// Number of sectors unused
     pub fn available(&self) -> Sectors {
         self.capacity() - self.next
@@ -230,11 +237,9 @@ impl Store {
     }
 
     /// The current capacity of all the blockdevs that make up the physical
-    /// layer. This should be greater than the size of the dm device, which
-    /// does not include the sectors of the blockdevs that contain Stratis
-    /// metadata.
+    /// layer.
     pub fn current_capacity(&self) -> Sectors {
-        self.data.block_mgr.current_capacity()
+        self.data.current_capacity()
     }
 
     /// Destroy the entire store.

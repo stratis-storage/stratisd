@@ -79,10 +79,16 @@ impl Recordable<Vec<(Uuid, Sectors, Sectors)>> for Vec<BlkDevSegment> {
     }
 }
 
-/// Coalesce existing BlkDevSegment values with newly allocated segments.
-pub fn get_coalesced_segments(left: &[BlkDevSegment],
-                              right: &[BlkDevSegment])
-                              -> Vec<BlkDevSegment> {
+/// Append the second list of BlkDevSegments to the first, or if the last
+/// segment of the first argument is adjacent to the first segment of the
+/// second argument, merge those two together.
+/// Postcondition: left.len() + right.len() - 1 <= result.len()
+/// Postcondition: result.len() <= left.len() + right.len()
+// FIXME: There is a method that duplicates this algorithm called
+// coalesce_segs. These methods should either be unified into a single method
+// OR one should go away entirely in solution to:
+// https://github.com/stratis-storage/stratisd/issues/762.
+pub fn coalesce_blkdevsegs(left: &[BlkDevSegment], right: &[BlkDevSegment]) -> Vec<BlkDevSegment> {
     if left.is_empty() {
         return right.to_vec();
     }

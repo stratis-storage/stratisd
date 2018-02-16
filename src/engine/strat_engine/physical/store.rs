@@ -18,7 +18,7 @@ use super::super::super::types::{DevUuid, PoolUuid};
 use super::super::dmnames::{CacheRole, format_physical_name};
 use super::super::serde_structs::{Recordable, StoreSave};
 
-use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment, get_coalesced_segments, map_to_dm};
+use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment, coalesce_blkdevsegs, map_to_dm};
 use super::setup::get_blockdevs;
 
 /// Handles the lowest level, base layer of this tier.
@@ -107,8 +107,7 @@ impl DataLayer {
             .cloned()
             .collect::<Vec<_>>();
         let ld = LinearDev::setup(dm,
-                                  &format_physical_name(block_mgr.pool_uuid(),
-                                                        CacheRole::Origin),
+                                  &format_physical_name(block_mgr.pool_uuid(), CacheRole::Origin),
                                   None,
                                   map_to_dm(&segments))?;
         Ok(DataLayer {
@@ -133,7 +132,7 @@ impl DataLayer {
             .flat_map(|s| s.iter())
             .cloned()
             .collect::<Vec<_>>();
-        let coalesced = get_coalesced_segments(&self.segments, &segments);
+        let coalesced = coalesce_blkdevsegs(&self.segments, &segments);
 
         self.dm_device.set_table(dm, map_to_dm(&coalesced))?;
 

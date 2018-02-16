@@ -61,6 +61,16 @@ fn segs_to_table(dev: Device,
     table
 }
 
+
+/// Append the second list of segments to the first, or if the last
+/// segment of the first argument is adjacent to the first segment of the
+/// second argument, merge those two together.
+/// Postcondition: left.len() + right.len() - 1 <= result.len()
+/// Postcondition: result.len() <= left.len() + right.len()
+// FIXME: There is a method that duplicates this algorithm called
+// coalesce_blkdevsegs. These methods should either be unified into a single
+// method OR one should go away entirely in solution to:
+// https://github.com/stratis-storage/stratisd/issues/762.
 fn coalesce_segs(left: &[(Sectors, Sectors)],
                  right: &[(Sectors, Sectors)])
                  -> Vec<(Sectors, Sectors)> {

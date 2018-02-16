@@ -59,7 +59,7 @@ impl Display for ThinPoolRole {
 }
 
 #[derive(Clone, Copy)]
-pub enum PhysicalRole {
+pub enum CacheRole {
     #[allow(dead_code)]
     Cache,
     #[allow(dead_code)]
@@ -67,12 +67,12 @@ pub enum PhysicalRole {
     Origin,
 }
 
-impl Display for PhysicalRole {
+impl Display for CacheRole {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            PhysicalRole::Cache => write!(f, "cache"),
-            PhysicalRole::Meta => write!(f, "meta"),
-            PhysicalRole::Origin => write!(f, "origin"),
+            CacheRole::Cache => write!(f, "cache"),
+            CacheRole::Meta => write!(f, "meta"),
+            CacheRole::Origin => write!(f, "origin"),
         }
     }
 }
@@ -110,7 +110,7 @@ pub fn format_thinpool_name(pool_uuid: PoolUuid, role: ThinPoolRole) -> DmNameBu
 
 /// Format a name for the dm device that contains the physical layer.
 /// Prerequisite: len(format!("{}", FORMAT_VERSION) < 79
-pub fn format_physical_name(pool_uuid: PoolUuid, role: PhysicalRole) -> DmNameBuf {
+pub fn format_physical_name(pool_uuid: PoolUuid, role: CacheRole) -> DmNameBuf {
     DmNameBuf::new(format!("stratis-{}-{}-physical-{}",
                            FORMAT_VERSION,
                            pool_uuid.simple().to_string(),

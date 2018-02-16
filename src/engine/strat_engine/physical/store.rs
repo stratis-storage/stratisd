@@ -15,7 +15,7 @@ use super::super::super::engine::BlockDev;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::types::{DevUuid, PoolUuid};
 
-use super::super::dmnames::{PhysicalRole, format_physical_name};
+use super::super::dmnames::{CacheRole, format_physical_name};
 use super::super::serde_structs::{Recordable, StoreSave};
 
 use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment, get_coalesced_segments, map_to_dm};
@@ -65,7 +65,7 @@ impl DataLayer {
 
         let mut ld = LinearDev::setup(dm,
                                       &format_physical_name(block_mgr.pool_uuid(),
-                                                            PhysicalRole::Origin),
+                                                            CacheRole::Origin),
                                       None,
                                       map_to_dm(&segments))?;
 
@@ -108,7 +108,7 @@ impl DataLayer {
             .collect::<Vec<_>>();
         let ld = LinearDev::setup(dm,
                                   &format_physical_name(block_mgr.pool_uuid(),
-                                                        PhysicalRole::Origin),
+                                                        CacheRole::Origin),
                                   None,
                                   map_to_dm(&segments))?;
         Ok(DataLayer {

@@ -5,6 +5,8 @@
 extern crate libc;
 
 use std::collections::HashMap;
+use std::fs;
+use std::io::ErrorKind;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::{Path, PathBuf};
 
@@ -57,15 +59,17 @@ impl Eventable for DM {
 
 impl StratEngine {
     /// Setup a StratEngine.
-    /// 1. Verify the existence of Stratis /dev directory.
-    /// 2. Setup all the pools belonging to the engine.
+    /// 1. Verify dm version meets minimum requirements.
+    /// 2. Verify the existence of Stratis /dev directory.
+    /// 3. Setup all the pools belonging to the engine.
     ///    a. Places any devices which belong to a pool, but are not complete
     ///       in the incomplete pools data structure.
     ///
     /// Returns an error if the kernel doesn't support required DM features.
-    /// Returns an error if there was an error reading device nodes.
+    /// Returns an error if we are unable to create /dev/stratis directory.
     /// Returns an error and tears down all the pools if we find a pool with a
     /// duplicate name found.
+    /// Returns an error if we are unable to setup device symbolic links.
     pub fn initialize() -> EngineResult<StratEngine> {
         let dm = DM::new()?;
         let minor_dm_version = dm.version()?.1;
@@ -74,6 +78,12 @@ impl StratEngine {
                                   REQUIRED_DM_MINOR_VERSION,
                                   minor_dm_version);
             return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+        }
+
+        if let Err(err) = fs::create_dir(devlinks::DEV_PATH) {
+            if err.kind() != ErrorKind::AlreadyExists {
+                return Err(From::from(err));
+            }
         }
 
         let pools = find_all()?;

@@ -23,6 +23,10 @@ use super::setup::get_blockdevs;
 
 /// Handles the lowest level, base layer of this tier.
 /// The dm_device organizes all block devs into a single linear allocation pool.
+/// All available space on the blockdevs is allocated to dm_device.
+/// This structure can allocate additional space to the upper layer, but it
+/// cannot accept returned space. When it is extended to be able to accept
+/// returned space the allocation algorithm will have to be revised.
 #[derive(Debug)]
 struct DataTier {
     /// Manages the individual block devices
@@ -40,9 +44,10 @@ struct DataTier {
 impl DataTier {
     /// Setup a previously existing data layer from the block_mgr and
     /// previously allocated segments. There is a possibility that the
-    /// size of the device has changed for the bigger since the last time
+    /// size of some blockdev has changed for the bigger since the last time
     /// its metadata was recorded, so allocate any unallocated segments that
     /// might have resulted from this.
+    /// WARNING: metadata changing event
     pub fn setup(dm: &DM,
                  mut block_mgr: BlockDevMgr,
                  segments: &[(DevUuid, Sectors, Sectors)],
@@ -176,6 +181,7 @@ impl DataTier {
     /// vector.
     /// WARNING: All this must change when it becomes possible to return
     /// sectors to the store.
+    /// WARNING: metadata changing event
     pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<(Sectors, Sectors)>>> {
         if self.available() < sizes.iter().cloned().sum() {
             return None;
@@ -203,6 +209,7 @@ pub struct Backstore {
 
 impl Backstore {
     /// Make a Backstore object from blockdevs that already belong to Stratis.
+    /// WARNING: metadata changing event
     pub fn setup(dm: &DM,
                  pool_uuid: PoolUuid,
                  backstore_save: &BackstoreSave,
@@ -220,6 +227,7 @@ impl Backstore {
     }
 
     /// Initialize a Backstore object, by initializing the specified devs.
+    /// WARNING: metadata changing event
     pub fn initialize(dm: &DM,
                       pool_uuid: PoolUuid,
                       paths: &[&Path],
@@ -235,11 +243,15 @@ impl Backstore {
            })
     }
 
+    /// Add the given paths to self. Return UUIDs of the new blockdevs
+    /// corresponding to the specified paths.
+    /// WARNING: metadata changing event
     pub fn add(&mut self, dm: &DM, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
         self.data_tier.add(dm, paths, force)
     }
 
     /// Allocate space from the underlying device.
+    /// WARNING: metadata changing event
     pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<(Sectors, Sectors)>>> {
         self.data_tier.alloc_space(sizes)
     }
@@ -269,13 +281,11 @@ impl Backstore {
 
 
     /// Lookup an immutable blockdev by its Stratis UUID.
-    // Used for getting properties of a blockdev via the D-Bus.
     pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<&BlockDev> {
         self.data_tier.block_mgr.get_blockdev_by_uuid(uuid)
     }
 
     /// Lookup a mutable blockdev by its Stratis UUID.
-    // Used for setting properties of a blockdev via the D-Bus.
     pub fn get_mut_blockdev_by_uuid(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
         self.data_tier.block_mgr.get_mut_blockdev_by_uuid(uuid)
     }

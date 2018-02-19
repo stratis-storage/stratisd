@@ -9,14 +9,14 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 
-use devicemapper::{Device, DM, DmDevice, LinearDev, Sectors};
+use devicemapper::{DM, Device, DmDevice, LinearDev, Sectors};
 
 use super::super::super::engine::BlockDev;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::dmnames::{CacheRole, format_backstore_name};
-use super::super::serde_structs::{Recordable, BackstoreSave};
+use super::super::serde_structs::{BackstoreSave, Recordable};
 
 use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment, coalesce_blkdevsegs, map_to_dm};
 use super::setup::get_blockdevs;

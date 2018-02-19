@@ -22,6 +22,7 @@ import unittest
 import subprocess
 import time
 import random
+import shutil
 import string
 import os
 
@@ -410,3 +411,24 @@ class UdevAdd(unittest.TestCase):
             self.assertEqual(len(UdevAdd._get_pools()), existing_pool_count + 1)
 
         self.assertEqual(len(UdevAdd._get_pools()), num_pools)
+
+    def test_daemon_clean_start(self):
+        """
+        Test to make sure we bring up a an existing pool when we have a
+        clean state, like when we boot a system and /dev is empty!
+        :return: None
+        """
+        pool_name = rs(12)
+
+        self._start_service()
+
+        block_token = self._lb_mgr.create_device()
+        UdevAdd._create_pool(pool_name, self._device_files([block_token]))
+        self.assertEqual(len(UdevAdd._get_pools()), 1)
+
+        self._stop_service_remove_dm_tables()
+
+        shutil.rmtree("/dev/stratis")
+
+        self._start_service()
+        self.assertEqual(len(UdevAdd._get_pools()), 1)

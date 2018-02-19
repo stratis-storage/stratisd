@@ -5,6 +5,8 @@
 extern crate libc;
 
 use std::collections::HashMap;
+use std::fs;
+use std::io::ErrorKind;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::{Path, PathBuf};
 
@@ -57,15 +59,17 @@ impl Eventable for DM {
 
 impl StratEngine {
     /// Setup a StratEngine.
-    /// 1. Verify the existence of Stratis /dev directory.
-    /// 2. Setup all the pools belonging to the engine.
+    /// 1. Verify dm version meets minimum requirements.
+    /// 2. Verify the existence of Stratis /dev directory.
+    /// 3. Setup all the pools belonging to the engine.
     ///    a. Places any devices which belong to a pool, but are not complete
     ///       in the incomplete pools data structure.
     ///
     /// Returns an error if the kernel doesn't support required DM features.
-    /// Returns an error if there was an error reading device nodes.
+    /// Returns an error if we are unable to create /dev/stratis directory.
     /// Returns an error and tears down all the pools if we find a pool with a
     /// duplicate name found.
+    /// Returns an error if we are unable to setup device symbolic links.
     pub fn initialize() -> EngineResult<StratEngine> {
         let dm = DM::new()?;
         let minor_dm_version = dm.version()?.1;
@@ -74,6 +78,12 @@ impl StratEngine {
                                   REQUIRED_DM_MINOR_VERSION,
                                   minor_dm_version);
             return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+        }
+
+        if let Err(err) = fs::create_dir(devlinks::DEV_PATH) {
+            if err.kind() != ErrorKind::AlreadyExists {
+                return Err(From::from(err));
+            }
         }
 
         let pools = find_all()?;
@@ -92,7 +102,10 @@ impl StratEngine {
                         return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
                     }
                 }
-                Err(_) => {
+                Err(e) => {
+                    // TODO: Add ability to distinguish expected vs. unexpected errors
+                    // (expected error would be caused by missing block device(s).
+                    warn!("Pool {} failed to setup, reason ({:?}", pool_uuid, e);
                     // Unable to setup pool, it might become complete later.
                     incomplete_pools.insert(*pool_uuid, devices.clone());
                 }
@@ -165,40 +178,45 @@ impl Engine for StratEngine {
                     .expect("We just retrieved or created a HashMap");
                 devices.insert(device, dev_node);
 
-                let rc = if let Ok((pool_name, pool)) =
-                    StratPool::setup(&dm, pool_uuid, &devices) {
-                    // We know we have a unique uuid, but the pools table requires a unique name too
-                    // so we will ensure unique before we insert as we don't want to change the
-                    // existing state if we have a conflict.
-                    //
-                    // We will also _not_ exit the daemon as we do in initialize as we were
-                    // previously up and running for some duration of time.
-                    if !self.pools.contains_name(&pool_name) {
-                        self.pools.insert(pool_name, pool_uuid, pool);
-                        Some(pool_uuid)
-                    } else {
-                        let dev_paths = devices
-                            .values()
-                            .map(|p| p.to_str().expect("Expecting valid device path!"))
-                            .collect::<Vec<&str>>()
-                            .join(", ");
+                let rc = match StratPool::setup(&dm, pool_uuid, &devices) {
+                    Ok((pool_name, pool)) => {
+                        // We know we have a unique uuid, but the pools table requires a unique
+                        // name too so we will ensure unique before we insert as we don't want to
+                        // change the existing state if we have a conflict.
+                        //
+                        // We will also _not_ exit the daemon as we do in initialize as we were
+                        // previously up and running for some duration of time.
+                        if !self.pools.contains_name(&pool_name) {
+                            self.pools.insert(pool_name, pool_uuid, pool);
+                            Some(pool_uuid)
+                        } else {
+                            let dev_paths = devices
+                                .values()
+                                .map(|p| p.to_str().expect("Expecting valid device path!"))
+                                .collect::<Vec<&str>>()
+                                .join(", ");
 
-                        self.incomplete_pools.insert(pool_uuid, devices);
+                            self.incomplete_pools.insert(pool_uuid, devices);
 
-                        error!("udev add: duplicate pool name {:?} for uuid {:?}, \
+                            error!("udev add: duplicate pool name {:?} for uuid {:?}, \
                                 devices[{}], failing to setup complete pool!",
-                               pool_name,
-                               pool_uuid,
-                               dev_paths);
-                        if let Err(e) = pool.teardown() {
-                            error!("Error while tearing down pool with duplicate name! {:?}!",
-                                   e);
+                                   pool_name,
+                                   pool_uuid,
+                                   dev_paths);
+                            if let Err(e) = pool.teardown() {
+                                error!("Error while tearing down pool with duplicate name! {:?}!",
+                                       e);
+                            }
+                            None
                         }
+                    }
+                    Err(e) => {
+                        warn!("udev add: pool {} failed to setup, reason ({:?}",
+                              pool_uuid,
+                              e);
+                        self.incomplete_pools.insert(pool_uuid, devices);
                         None
                     }
-                } else {
-                    self.incomplete_pools.insert(pool_uuid, devices);
-                    None
                 };
                 Ok(rc)
             }

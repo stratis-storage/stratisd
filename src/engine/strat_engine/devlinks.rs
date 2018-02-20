@@ -8,12 +8,11 @@ use std::io::ErrorKind;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
+use super::super::engine::Pool;
 use super::super::errors::EngineResult;
+use super::super::types::{Name, PoolUuid};
 
-use engine::Pool;
-use engine::types::{Name, PoolUuid};
-
-pub const DEV_PATH: &str = "/dev/stratis";
+use super::engine::DEV_PATH;
 
 /// Set up directories and symlinks under /dev/stratis based on current
 /// config. Clear out any directory or file that doesn't correspond to a pool

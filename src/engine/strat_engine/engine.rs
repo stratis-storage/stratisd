@@ -20,6 +20,8 @@ use super::cleanup::teardown_pools;
 use super::devlinks;
 use super::pool::StratPool;
 
+
+pub const DEV_PATH: &str = "/dev/stratis";
 const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 
 #[derive(Debug, PartialEq, Eq)]

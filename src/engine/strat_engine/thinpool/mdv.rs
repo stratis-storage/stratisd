@@ -21,7 +21,7 @@ use devicemapper::{DM, DmDevice, LinearDev};
 use super::super::super::errors::EngineResult;
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid};
 
-use super::super::devlinks::DEV_PATH;
+use super::super::engine::DEV_PATH;
 use super::super::serde_structs::FilesystemSave;
 
 use super::util::create_fs;

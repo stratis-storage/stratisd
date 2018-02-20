@@ -20,6 +20,8 @@ use super::devlinks;
 use super::pool::StratPool;
 use super::setup::{find_all, is_stratis_device};
 
+
+pub const DEV_PATH: &str = "/dev/stratis";
 const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 
 #[derive(Debug, PartialEq, Eq)]

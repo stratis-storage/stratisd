@@ -12,7 +12,7 @@ use super::super::engine::Pool;
 use super::super::errors::EngineResult;
 use super::super::types::{Name, PoolUuid};
 
-pub const DEV_PATH: &str = "/dev/stratis";
+use super::engine::DEV_PATH;
 
 /// Set up directories and symlinks under /dev/stratis based on current
 /// config. Clear out any directory or file that doesn't correspond to a pool

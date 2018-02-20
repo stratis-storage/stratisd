@@ -8,10 +8,9 @@ use std::io::ErrorKind;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
+use super::super::engine::Pool;
 use super::super::errors::EngineResult;
-
-use engine::Pool;
-use engine::types::{Name, PoolUuid};
+use super::super::types::{Name, PoolUuid};
 
 pub const DEV_PATH: &str = "/dev/stratis";
 

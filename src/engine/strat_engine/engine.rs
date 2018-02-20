@@ -302,6 +302,8 @@ impl Engine for StratEngine {
 
 #[cfg(test)]
 mod test {
+    use std::fs::remove_dir_all;
+
     use super::super::tests::{loopbacked, real};
 
     use super::*;
@@ -339,9 +341,11 @@ mod test {
     /// 1. Create two pools.
     /// 2. Verify that both exist.
     /// 3. Teardown the engine.
-    /// 4. Verify that pools are gone.
-    /// 5. Initialize the engine.
-    /// 6. Verify that pools can be found again.
+    /// 4. Initialize the engine.
+    /// 5. Verify that pools can be found again.
+    /// 6. Teardown the engine and remove "/dev/stratis".
+    /// 7. Initialize the engine one more time.
+    /// 8. Verify that both pools are found and that there are no incomplete pools.
     fn test_setup(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
@@ -364,6 +368,17 @@ mod test {
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());
+
+        engine.teardown().unwrap();
+        remove_dir_all(DEV_PATH).unwrap();
+
+        let engine = StratEngine::initialize().unwrap();
+        assert_eq!(engine.incomplete_pools, HashMap::new());
+
+        assert!(engine.get_pool(uuid1).is_some());
+        assert!(engine.get_pool(uuid2).is_some());
+
+        engine.teardown().unwrap();
     }
 
     #[test]

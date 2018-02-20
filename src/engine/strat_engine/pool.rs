@@ -16,17 +16,15 @@ use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction};
 
-use super::blockdevmgr::BlockDevMgr;
-use super::metadata::MIN_MDA_SECTORS;
+use super::backstore::{Backstore, MIN_MDA_SECTORS, get_metadata};
 use super::serde_structs::{PoolSave, Recordable};
-use super::setup::{get_blockdevs, get_metadata};
 use super::thinpool::{ThinPool, ThinPoolSizeParams};
 
 pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
 
 #[derive(Debug)]
 pub struct StratPool {
-    block_devs: BlockDevMgr,
+    backstore: Backstore,
     redundancy: Redundancy,
     thin_pool: ThinPool,
 }
@@ -43,24 +41,24 @@ impl StratPool {
                       -> EngineResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
-        let mut block_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
+        let mut backstore = Backstore::initialize(dm, pool_uuid, paths, MIN_MDA_SECTORS, force)?;
 
         let thinpool = ThinPool::new(pool_uuid,
                                      dm,
                                      &ThinPoolSizeParams::default(),
                                      DATA_BLOCK_SIZE,
                                      DATA_LOWATER,
-                                     &mut block_mgr);
+                                     &mut backstore);
         let thinpool = match thinpool {
             Ok(thinpool) => thinpool,
             Err(err) => {
-                let _ = block_mgr.destroy_all();
+                let _ = backstore.destroy(dm);
                 return Err(err);
             }
         };
 
         let mut pool = StratPool {
-            block_devs: block_mgr,
+            backstore,
             redundancy,
             thin_pool: thinpool,
         };
@@ -80,17 +78,36 @@ impl StratPool {
                             EngineError::Engine(ErrorEnum::NotFound,
                                                 format!("no metadata for pool {}", uuid))
                         })?;
-        let bd_mgr = BlockDevMgr::new(uuid, get_blockdevs(uuid, &metadata, devnodes)?, None);
+
+        // If the amount allocated from the cache tier is not the same as that
+        // used by the thinpool, consider the situation an error.
+        let flex_devs = &metadata.flex_devs;
+        let total_allocated = flex_devs
+            .meta_dev
+            .iter()
+            .chain(flex_devs.thin_meta_dev.iter())
+            .chain(flex_devs.thin_data_dev.iter())
+            .chain(flex_devs.thin_meta_dev_spare.iter())
+            .map(|x| x.1)
+            .sum::<Sectors>();
+        if total_allocated != metadata.backstore.next {
+            let err_msg = format!("{} used in thinpool, but {} given up by cache",
+                                  total_allocated,
+                                  metadata.backstore.next);
+            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
+        }
+
+        let backstore = Backstore::setup(dm, uuid, &metadata.backstore, devnodes, None)?;
         let thinpool = ThinPool::setup(dm,
                                        uuid,
                                        metadata.thinpool_dev.data_block_size,
                                        DATA_LOWATER,
                                        &metadata.flex_devs,
-                                       &bd_mgr)?;
+                                       &backstore)?;
 
         Ok((Name::new(metadata.name),
             StratPool {
-                block_devs: bd_mgr,
+                backstore,
                 redundancy: Redundancy::NONE,
                 thin_pool: thinpool,
             }))
@@ -99,7 +116,7 @@ impl StratPool {
     /// Write current metadata to pool members.
     pub fn write_metadata(&mut self, name: &str) -> EngineResult<()> {
         let data = serde_json::to_string(&self.record(name))?;
-        self.block_devs.save_state(data.as_bytes())
+        self.backstore.save_state(data.as_bytes())
     }
 
     pub fn check(&mut self, name: &Name) -> EngineResult<()> {
@@ -108,7 +125,7 @@ impl StratPool {
         // invoking method, Engine::check(). However, since we hope that
         // method will go away entirely, we just fix half of the problem
         // with this method, and leave the rest alone.
-        if self.thin_pool.check(&DM::new()?, &mut self.block_devs)? {
+        if self.thin_pool.check(&DM::new()?, &mut self.backstore)? {
             self.write_metadata(name)?;
         }
         Ok(())
@@ -136,7 +153,7 @@ impl StratPool {
                     .get_eventing_dev_names()
                     .iter()
                     .any(|x| dm_name == &**x));
-        if self.thin_pool.check(&DM::new()?, &mut self.block_devs)? {
+        if self.thin_pool.check(&DM::new()?, &mut self.backstore)? {
             self.write_metadata(pool_name)?;
         }
         Ok(())
@@ -145,7 +162,7 @@ impl StratPool {
     pub fn record(&self, name: &str) -> PoolSave {
         PoolSave {
             name: name.to_owned(),
-            block_devs: self.block_devs.record(),
+            backstore: self.backstore.record(),
             flex_devs: self.thin_pool.record(),
             thinpool_dev: self.thin_pool.record(),
         }
@@ -183,14 +200,16 @@ impl Pool for StratPool {
                      paths: &[&Path],
                      force: bool)
                      -> EngineResult<Vec<DevUuid>> {
-        let bdev_info = self.block_devs.add(paths, force)?;
+        let dm = DM::new()?;
+        let bdev_info = self.backstore.add(&dm, paths, force)?;
         self.write_metadata(pool_name)?;
         Ok(bdev_info)
     }
 
     fn destroy(self) -> EngineResult<()> {
-        self.thin_pool.teardown(&DM::new()?)?;
-        self.block_devs.destroy_all()?;
+        let dm = DM::new()?;
+        self.thin_pool.teardown(&dm)?;
+        self.backstore.destroy(&dm)?;
         Ok(())
     }
 
@@ -228,13 +247,13 @@ impl Pool for StratPool {
     }
 
     fn total_physical_size(&self) -> Sectors {
-        self.block_devs.current_capacity()
+        self.backstore.current_capacity()
     }
 
     fn total_physical_used(&self) -> EngineResult<Sectors> {
         self.thin_pool
             .total_physical_used()
-            .and_then(|v| Ok(v + self.block_devs.metadata_size()))
+            .and_then(|v| Ok(v + self.backstore.metadata_size()))
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)> {
@@ -254,15 +273,15 @@ impl Pool for StratPool {
     }
 
     fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
-        self.block_devs.blockdevs()
+        self.backstore.blockdevs()
     }
 
     fn get_blockdev(&self, uuid: DevUuid) -> Option<&BlockDev> {
-        self.block_devs.get_blockdev_by_uuid(uuid)
+        self.backstore.get_blockdev_by_uuid(uuid)
     }
 
     fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
-        self.block_devs.get_mut_blockdev_by_uuid(uuid)
+        self.backstore.get_mut_blockdev_by_uuid(uuid)
     }
 
     fn save_state(&mut self, pool_name: &str) -> EngineResult<()> {
@@ -274,7 +293,7 @@ impl Pool for StratPool {
 mod tests {
     use super::super::super::types::Redundancy;
 
-    use super::super::setup::find_all;
+    use super::super::backstore::find_all;
     use super::super::tests::{loopbacked, real};
 
     use super::*;
@@ -310,22 +329,6 @@ mod tests {
         let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
-        let blockdevs1 = get_blockdevs(uuid1, &pool_save1, devnodes1).unwrap();
-        let blockdevs2 = get_blockdevs(uuid2, &pool_save2, devnodes2).unwrap();
-        assert_eq!(blockdevs1.len(), pool_save1.block_devs.len());
-        assert_eq!(blockdevs2.len(), pool_save2.block_devs.len());
-
-        for mut blockdev in blockdevs1 {
-            let (amt, seg) = blockdev.request_space(Sectors(1));
-            assert_eq!(amt, Sectors(1));
-            assert!(seg[0].0 >= blockdev.metadata_size());
-        }
-
-        for mut blockdev in blockdevs2 {
-            let (amt, seg) = blockdev.request_space(Sectors(1));
-            assert_eq!(amt, Sectors(1));
-            assert!(seg[0].0 >= blockdev.metadata_size());
-        }
 
         pool1.teardown().unwrap();
         pool2.teardown().unwrap();
@@ -337,22 +340,6 @@ mod tests {
         let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
-        let blockdevs1 = get_blockdevs(uuid1, &pool_save1, devnodes1).unwrap();
-        let blockdevs2 = get_blockdevs(uuid2, &pool_save2, devnodes2).unwrap();
-        assert_eq!(blockdevs1.len(), pool_save1.block_devs.len());
-        assert_eq!(blockdevs2.len(), pool_save2.block_devs.len());
-
-        for mut blockdev in blockdevs1 {
-            let (amt, seg) = blockdev.request_space(Sectors(1));
-            assert_eq!(amt, Sectors(1));
-            assert!(seg[0].0 >= blockdev.metadata_size());
-        }
-
-        for mut blockdev in blockdevs2 {
-            let (amt, seg) = blockdev.request_space(Sectors(1));
-            assert_eq!(amt, Sectors(1));
-            assert!(seg[0].0 >= blockdev.metadata_size());
-        }
     }
 
     #[test]
@@ -369,15 +356,8 @@ mod tests {
     fn test_empty_pool(paths: &[&Path]) -> () {
         assert_eq!(paths.len(), 0);
         let dm = DM::new().unwrap();
-        assert!(match StratPool::initialize(&dm,
-                                            "stratis_test_pool",
-                                            paths,
-                                            Redundancy::NONE,
-                                            true)
-                              .unwrap_err() {
-                    EngineError::Engine(ErrorEnum::Invalid, _) => true,
-                    _ => false,
-                });
+        assert!(StratPool::initialize(&dm, "stratis_test_pool", paths, Redundancy::NONE, true)
+                    .is_err());
     }
 
     #[test]

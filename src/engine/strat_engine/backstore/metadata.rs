@@ -12,10 +12,10 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, IEC, SECTOR_SIZE, Sectors};
 
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::{DevUuid, PoolUuid};
+use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::types::{DevUuid, PoolUuid};
 
-use super::engine::DevOwnership;
+use super::super::engine::DevOwnership;
 
 pub use self::mda::{MIN_MDA_SECTORS, validate_mda_size};
 
@@ -315,7 +315,7 @@ mod mda {
 
     use devicemapper::{Bytes, Sectors};
 
-    use super::super::super::errors::{EngineResult, EngineError, ErrorEnum};
+    use super::super::super::super::errors::{EngineResult, EngineError, ErrorEnum};
 
     const _MDA_REGION_HDR_SIZE: usize = 32;
     const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
@@ -758,7 +758,8 @@ mod tests {
     use quickcheck::{QuickCheck, TestResult};
     use uuid::Uuid;
 
-    use super::super::engine::DevOwnership;
+    use super::super::super::engine::DevOwnership;
+
     use super::*;
 
     /// Return a static header with random block device and MDA size.

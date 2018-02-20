@@ -2,16 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// Functions for dealing with device mapper devices.
+// Functions for dealing with device mapper names.
 
 use std::fmt;
 use std::fmt::Display;
 
-use devicemapper::{DmNameBuf, ThinDevId};
+use devicemapper::DmNameBuf;
 
-use super::super::super::errors::EngineResult;
-
-use super::super::super::super::engine::{FilesystemUuid, PoolUuid};
+use super::super::super::engine::{FilesystemUuid, PoolUuid};
 
 const FORMAT_VERSION: u16 = 1;
 
@@ -60,6 +58,25 @@ impl Display for ThinPoolRole {
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum CacheRole {
+    #[allow(dead_code)]
+    Cache,
+    #[allow(dead_code)]
+    Meta,
+    Origin,
+}
+
+impl Display for CacheRole {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            CacheRole::Cache => write!(f, "cache"),
+            CacheRole::Meta => write!(f, "meta"),
+            CacheRole::Origin => write!(f, "origin"),
+        }
+    }
+}
+
 /// Format a name for the flex layer.
 /// Prerequisite: len(format!("{}", FORMAT_VERSION)) < 72
 pub fn format_flex_name(pool_uuid: PoolUuid, role: FlexRole) -> DmNameBuf {
@@ -91,28 +108,12 @@ pub fn format_thinpool_name(pool_uuid: PoolUuid, role: ThinPoolRole) -> DmNameBu
             .expect("FORMAT_VERSION display_length < 81")
 }
 
-
-#[derive(Debug)]
-/// A pool of thindev ids, all unique.
-pub struct ThinDevIdPool {
-    next_id: u32,
-}
-
-impl ThinDevIdPool {
-    /// Make a new pool from a possibly empty Vec of ids.
-    /// Does not verify the absence of duplicate ids.
-    pub fn new_from_ids(ids: &[ThinDevId]) -> ThinDevIdPool {
-        let max_id: Option<u32> = ids.into_iter().map(|x| (*x).into()).max();
-        ThinDevIdPool { next_id: max_id.map(|x| x + 1).unwrap_or(0) }
-    }
-
-    /// Get a new id for a thindev.
-    /// Returns an error if no thindev id can be constructed.
-    // TODO: Improve this so that it is guaranteed only to fail if every 24 bit
-    // number has been used.
-    pub fn new_id(&mut self) -> EngineResult<ThinDevId> {
-        let next_id = ThinDevId::new_u64(u64::from(self.next_id))?;
-        self.next_id += 1;
-        Ok(next_id)
-    }
+/// Format a name for dm devices in the backstore.
+/// Prerequisite: len(format!("{}", FORMAT_VERSION) < 79
+pub fn format_backstore_name(pool_uuid: PoolUuid, role: CacheRole) -> DmNameBuf {
+    DmNameBuf::new(format!("stratis-{}-{}-physical-{}",
+                           FORMAT_VERSION,
+                           pool_uuid.simple().to_string(),
+                           role))
+            .expect("FORMAT_VERSION display_length < 78")
 }

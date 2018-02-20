@@ -243,8 +243,9 @@ impl Backstore {
         self.data_tier.alloc_space(sizes)
     }
 
-    /// Return a reference to the blockdevs that form the basis of the
-    /// backstore.
+    /// Return a reference to all the devs that this pool has ownership of.
+    /// This includes blockdevs, cachedevs, any device about which information
+    /// may be placed on the D-Bus.
     pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
         self.data_tier.block_mgr.blockdevs()
     }

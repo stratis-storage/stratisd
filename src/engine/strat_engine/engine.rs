@@ -15,10 +15,10 @@ use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{DevUuid, Name, PoolUuid, Redundancy, RenameAction};
 
+use super::backstore::{find_all, is_stratis_device};
 use super::cleanup::teardown_pools;
 use super::devlinks;
 use super::pool::StratPool;
-use super::setup::{find_all, is_stratis_device};
 
 const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 

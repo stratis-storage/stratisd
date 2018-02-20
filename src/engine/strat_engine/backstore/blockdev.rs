@@ -11,13 +11,14 @@ use chrono::{DateTime, TimeZone, Utc};
 
 use devicemapper::{Device, Sectors};
 
-use super::super::engine::BlockDev;
-use super::super::errors::EngineResult;
-use super::super::types::{BlockDevState, DevUuid, PoolUuid};
+use super::super::super::engine::BlockDev;
+use super::super::super::errors::EngineResult;
+use super::super::super::types::{BlockDevState, DevUuid, PoolUuid};
+
+use super::super::serde_structs::{BlockDevSave, Recordable};
 
 use super::metadata::BDA;
 use super::range_alloc::RangeAllocator;
-use super::serde_structs::{BlockDevSave, Recordable};
 
 
 #[derive(Debug)]
@@ -178,6 +179,7 @@ impl BlockDev for StratBlockDev {
 impl Recordable<BlockDevSave> for StratBlockDev {
     fn record(&self) -> BlockDevSave {
         BlockDevSave {
+            uuid: self.uuid(),
             devnode: Some(self.devnode.clone()),
             user_info: self.user_info.clone(),
             hardware_info: self.hardware_info.clone(),

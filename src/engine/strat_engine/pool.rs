@@ -117,7 +117,7 @@ impl StratPool {
     /// Write current metadata to pool members.
     pub fn write_metadata(&mut self, name: &str) -> EngineResult<()> {
         let data = serde_json::to_string(&self.record(name))?;
-        self.backstore.save_state(data.as_bytes())
+        self.backstore.datadev_save_state(data.as_bytes())
     }
 
     pub fn check(&mut self, name: &Name) -> EngineResult<()> {
@@ -254,13 +254,13 @@ impl Pool for StratPool {
     }
 
     fn total_physical_size(&self) -> Sectors {
-        self.backstore.current_capacity()
+        self.backstore.datadev_current_capacity()
     }
 
     fn total_physical_used(&self) -> EngineResult<Sectors> {
         self.thin_pool
             .total_physical_used()
-            .and_then(|v| Ok(v + self.backstore.metadata_size()))
+            .and_then(|v| Ok(v + self.backstore.datadev_metadata_size()))
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)> {

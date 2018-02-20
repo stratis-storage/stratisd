@@ -181,6 +181,12 @@ impl DataTier {
         self.dm_device.teardown(dm)?;
         self.block_mgr.destroy_all()
     }
+
+    /// Save the given state to the devices. This action bypasses the DM
+    /// device entirely.
+    pub fn save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {
+        self.block_mgr.save_state(metadata)
+    }
 }
 
 #[derive(Debug)]
@@ -243,8 +249,8 @@ impl Backstore {
         self.data_tier.block_mgr.blockdevs()
     }
 
-    /// The current capacity of all the blockdevs that make up the backstore.
-    pub fn current_capacity(&self) -> Sectors {
+    /// The current capacity of all the blockdevs in the data tier.
+    pub fn datadev_current_capacity(&self) -> Sectors {
         self.data_tier.current_capacity()
     }
 
@@ -285,17 +291,14 @@ impl Backstore {
     }
 
     /// The number of sectors in the backstore given up to Stratis
-    /// metadata.
-    pub fn metadata_size(&self) -> Sectors {
+    /// metadata on devices in the data tier.
+    pub fn datadev_metadata_size(&self) -> Sectors {
         self.data_tier.metadata_size()
     }
 
-    /// Write the given data directly to the blockdevs that make up the
-    /// backstore. This action bypasses the DM device entirely,
-    /// in order to allow control over which blockdevs the metadata is written
-    /// to.
-    pub fn save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {
-        self.data_tier.block_mgr.save_state(metadata)
+    /// Write the given data to the data tier's devices.
+    pub fn datadev_save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {
+        self.data_tier.save_state(metadata)
     }
 }
 

@@ -23,8 +23,8 @@ use super::super::super::types::{FilesystemUuid, Name, PoolUuid, RenameAction};
 use super::super::backstore::Backstore;
 use super::super::device::wipe_sectors;
 use super::super::devlinks;
-use super::super::dmnames::{FlexRole, ThinPoolRole, ThinRole, format_flex_name,
-                            format_thinpool_name, format_thin_name};
+use super::super::dmnames::{FlexRole, ThinPoolRole, ThinRole, format_flex_name, format_thin_name,
+                            format_thinpool_name};
 use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
 use super::filesystem::{FilesystemStatus, StratFilesystem};

@@ -78,6 +78,8 @@ impl StratEngine {
             return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
         }
 
+        devlinks::setup_dev_path()?;
+
         let pools = find_all()?;
 
         let mut table = Table::default();

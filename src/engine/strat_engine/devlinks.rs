@@ -14,6 +14,18 @@ use super::super::types::{Name, PoolUuid};
 
 use super::engine::DEV_PATH;
 
+/// Set up the root Stratis directory, where dev links as well as temporary
+/// MDV mounts will be created. This must occur before any pools are setup.
+pub fn setup_dev_path() -> EngineResult<()> {
+    if let Err(err) = fs::create_dir(DEV_PATH) {
+        if err.kind() != ErrorKind::AlreadyExists {
+            return Err(From::from(err));
+        }
+    }
+
+    Ok(())
+}
+
 /// Set up directories and symlinks under /dev/stratis based on current
 /// config. Clear out any directory or file that doesn't correspond to a pool
 /// or filesystem.
@@ -22,12 +34,6 @@ use super::engine::DEV_PATH;
 pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>
     (pools: I)
      -> EngineResult<()> {
-    if let Err(err) = fs::create_dir(DEV_PATH) {
-        if err.kind() != ErrorKind::AlreadyExists {
-            return Err(From::from(err));
-        }
-    }
-
     let mut existing_dirs = fs::read_dir(DEV_PATH)?
         .map(|dir_e| dir_e.and_then(|d| Ok(d.file_name().into_string().expect("Unix is utf-8"))))
         .collect::<Result<HashSet<_>, _>>()?;

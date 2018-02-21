@@ -27,30 +27,30 @@ use super::setup::get_blockdevs;
 /// but it cannot accept returned space. When it is extended to be able to
 /// accept returned space the allocation algorithm will have to be revised.
 /// All available sectors on blockdevs in the manager are allocated to
-/// dm_device.
+/// the DM device.
 #[derive(Debug)]
 struct DataTier {
     /// Manages the individual block devices
     /// it is always the case block_mgr.avail_space() == 0.
     block_mgr: BlockDevMgr,
-    /// The device mapper device which aggregates block_mgr's devices
-    dm_device: LinearDev,
     /// The list of segments granted by block_mgr and used by dm_device
+    /// It is always the case that block_mgr.avail_space() == 0, i.e., all
+    /// available space in block_mgr is allocated to the DM device.
     segments: Vec<BlkDevSegment>,
-    /// The position from which requested space is allocated
-    next: Sectors,
 }
 
 impl DataTier {
     /// Setup a previously existing data layer from the block_mgr and
     /// previously allocated segments.
     ///
+    /// Returns the DataTier and the linear DM device that was created during
+    /// setup.
+    ///
     /// WARNING: metadata changing event
     pub fn setup(dm: &DM,
                  block_mgr: BlockDevMgr,
-                 segments: &[(DevUuid, Sectors, Sectors)],
-                 next: Sectors)
-                 -> EngineResult<DataTier> {
+                 segments: &[(DevUuid, Sectors, Sectors)])
+                 -> EngineResult<(DataTier, LinearDev)> {
         if block_mgr.avail_space() != Sectors(0) {
             let err_msg = format!("{} unallocated to device; probable metadata corruption",
                                   block_mgr.avail_space());
@@ -75,18 +75,20 @@ impl DataTier {
         let (dm_name, dm_uuid) = format_backstore_ids(block_mgr.pool_uuid(), CacheRole::OriginSub);
         let ld = LinearDev::setup(dm, &dm_name, Some(&dm_uuid), map_to_dm(&segments))?;
 
-        Ok(DataTier {
-               block_mgr,
-               dm_device: ld,
-               segments,
-               next,
-           })
+        Ok((DataTier {
+                block_mgr,
+                segments,
+            },
+            ld))
     }
 
 
     /// Setup a new DataTier struct from the block_mgr.
+    ///
+    /// Returns the DataTier and the linear device that was created.
+    ///
     /// WARNING: metadata changing event
-    pub fn new(dm: &DM, mut block_mgr: BlockDevMgr) -> EngineResult<DataTier> {
+    pub fn new(dm: &DM, mut block_mgr: BlockDevMgr) -> EngineResult<(DataTier, LinearDev)> {
         let avail_space = block_mgr.avail_space();
         let segments = block_mgr
             .alloc_space(&[avail_space])
@@ -97,18 +99,22 @@ impl DataTier {
             .collect::<Vec<_>>();
         let (dm_name, dm_uuid) = format_backstore_ids(block_mgr.pool_uuid(), CacheRole::OriginSub);
         let ld = LinearDev::setup(dm, &dm_name, Some(&dm_uuid), map_to_dm(&segments))?;
-        Ok(DataTier {
-               block_mgr,
-               dm_device: ld,
-               segments,
-               next: Sectors(0),
-           })
+        Ok((DataTier {
+                block_mgr,
+                segments,
+            },
+            ld))
     }
 
     /// Add the given paths to self. Return UUIDs of the new blockdevs
     /// corresponding to the specified paths.
     /// WARNING: metadata changing event
-    pub fn add(&mut self, dm: &DM, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
+    pub fn add(&mut self,
+               dm: &DM,
+               ld: &mut LinearDev,
+               paths: &[&Path],
+               force: bool)
+               -> EngineResult<Vec<DevUuid>> {
         let uuids = self.block_mgr.add(paths, force)?;
 
         let avail_space = self.block_mgr.avail_space();
@@ -121,7 +127,7 @@ impl DataTier {
             .collect::<Vec<_>>();
         let coalesced = coalesce_blkdevsegs(&self.segments, &segments);
 
-        self.dm_device.set_table(dm, map_to_dm(&coalesced))?;
+        ld.set_table(dm, map_to_dm(&coalesced))?;
 
         self.segments = coalesced;
 
@@ -130,13 +136,10 @@ impl DataTier {
 
     /// All the sectors available to this device
     pub fn capacity(&self) -> Sectors {
-        let size = self.dm_device.size();
-        assert_eq!(self.segments
-                       .iter()
-                       .map(|x| x.segment.length)
-                       .sum::<Sectors>(),
-                   size);
-        size
+        self.segments
+            .iter()
+            .map(|x| x.segment.length)
+            .sum::<Sectors>()
     }
 
     /// The total size of all the blockdevs combined
@@ -146,14 +149,93 @@ impl DataTier {
         size
     }
 
-    /// Number of sectors unused
-    pub fn available(&self) -> Sectors {
-        self.capacity() - self.next
-    }
-
     /// The number of sectors used for metadata by all the blockdevs
     pub fn metadata_size(&self) -> Sectors {
         self.block_mgr.metadata_size()
+    }
+
+    /// Destroy the store. Wipe its blockdevs.
+    pub fn destroy(self) -> EngineResult<()> {
+        self.block_mgr.destroy_all()
+    }
+
+    /// Save the given state to the devices. This action bypasses the DM
+    /// device entirely.
+    pub fn save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {
+        self.block_mgr.save_state(metadata)
+    }
+
+    /// Lookup an immutable blockdev by its Stratis UUID.
+    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<&BlockDev> {
+        self.block_mgr.get_blockdev_by_uuid(uuid)
+    }
+
+    /// Lookup a mutable blockdev by its Stratis UUID.
+    pub fn get_mut_blockdev_by_uuid(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
+        self.block_mgr.get_mut_blockdev_by_uuid(uuid)
+    }
+
+    /// Get the blockdevs belonging to this tier
+    pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
+        self.block_mgr.blockdevs()
+    }
+}
+
+/// This structure can allocate additional space to the upper layer, but it
+/// cannot accept returned space. When it is extended to be able to accept
+/// returned space the allocation algorithm will have to be revised.
+#[derive(Debug)]
+pub struct Backstore {
+    /// Coordinates handling of the blockdevs that form the base.
+    data_tier: DataTier,
+    /// A DM device.
+    dm_device: LinearDev,
+    /// Index for managing allocation from dm_device.
+    next: Sectors,
+}
+
+impl Backstore {
+    /// Make a Backstore object from blockdevs that already belong to Stratis.
+    /// WARNING: metadata changing event
+    pub fn setup(dm: &DM,
+                 pool_uuid: PoolUuid,
+                 backstore_save: &BackstoreSave,
+                 devnodes: &HashMap<Device, PathBuf>,
+                 last_update_time: Option<DateTime<Utc>>)
+                 -> EngineResult<Backstore> {
+        let blockdevs = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
+        let block_mgr = BlockDevMgr::new(pool_uuid, blockdevs, last_update_time);
+        let (data_tier, dm_device) = DataTier::setup(dm, block_mgr, &backstore_save.segments)?;
+        Ok(Backstore {
+               data_tier,
+               dm_device,
+               next: backstore_save.next,
+           })
+    }
+
+    /// Initialize a Backstore object, by initializing the specified devs.
+    /// WARNING: metadata changing event
+    pub fn initialize(dm: &DM,
+                      pool_uuid: PoolUuid,
+                      paths: &[&Path],
+                      mda_size: Sectors,
+                      force: bool)
+                      -> EngineResult<Backstore> {
+        let (data_tier, dm_device) =
+            DataTier::new(dm,
+                          BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?)?;
+        Ok(Backstore {
+               data_tier,
+               dm_device,
+               next: Sectors(0),
+           })
+    }
+
+    /// Add the given paths to self. Return UUIDs of the new blockdevs
+    /// corresponding to the specified paths.
+    /// WARNING: metadata changing event
+    pub fn add(&mut self, dm: &DM, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
+        self.data_tier.add(dm, &mut self.dm_device, paths, force)
     }
 
     /// Allocate requested chunks from device.
@@ -176,78 +258,11 @@ impl DataTier {
         Some(chunks)
     }
 
-    /// Destroy the store. Teardown its DM devices and wipe its blockdevs.
-    pub fn destroy(self, dm: &DM) -> EngineResult<()> {
-        self.dm_device.teardown(dm)?;
-        self.block_mgr.destroy_all()
-    }
-
-    /// Save the given state to the devices. This action bypasses the DM
-    /// device entirely.
-    pub fn save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {
-        self.block_mgr.save_state(metadata)
-    }
-}
-
-#[derive(Debug)]
-pub struct Backstore {
-    data_tier: DataTier,
-}
-
-impl Backstore {
-    /// Make a Backstore object from blockdevs that already belong to Stratis.
-    /// WARNING: metadata changing event
-    pub fn setup(dm: &DM,
-                 pool_uuid: PoolUuid,
-                 backstore_save: &BackstoreSave,
-                 devnodes: &HashMap<Device, PathBuf>,
-                 last_update_time: Option<DateTime<Utc>>)
-                 -> EngineResult<Backstore> {
-        let blockdevs = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
-        let block_mgr = BlockDevMgr::new(pool_uuid, blockdevs, last_update_time);
-        Ok(Backstore {
-               data_tier: DataTier::setup(dm,
-                                          block_mgr,
-                                          &backstore_save.segments,
-                                          backstore_save.next)?,
-           })
-    }
-
-    /// Initialize a Backstore object, by initializing the specified devs.
-    /// WARNING: metadata changing event
-    pub fn initialize(dm: &DM,
-                      pool_uuid: PoolUuid,
-                      paths: &[&Path],
-                      mda_size: Sectors,
-                      force: bool)
-                      -> EngineResult<Backstore> {
-        Ok(Backstore {
-               data_tier: DataTier::new(dm,
-                                        BlockDevMgr::initialize(pool_uuid,
-                                                                paths,
-                                                                mda_size,
-                                                                force)?)?,
-           })
-    }
-
-    /// Add the given paths to self. Return UUIDs of the new blockdevs
-    /// corresponding to the specified paths.
-    /// WARNING: metadata changing event
-    pub fn add(&mut self, dm: &DM, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
-        self.data_tier.add(dm, paths, force)
-    }
-
-    /// Allocate space from the underlying device.
-    /// WARNING: metadata changing event
-    pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<(Sectors, Sectors)>>> {
-        self.data_tier.alloc_space(sizes)
-    }
-
     /// Return a reference to all the devs that this pool has ownership of.
     /// This includes blockdevs, cachedevs, any device about which information
     /// may be placed on the D-Bus.
     pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
-        self.data_tier.block_mgr.blockdevs()
+        self.data_tier.blockdevs()
     }
 
     /// The current capacity of all the blockdevs in the data tier.
@@ -257,38 +272,35 @@ impl Backstore {
 
     /// The available number of Sectors.
     pub fn available(&self) -> Sectors {
-        self.data_tier.available()
+        self.data_tier.capacity() - self.next
     }
 
     /// Destroy the entire store.
     pub fn destroy(self, dm: &DM) -> EngineResult<()> {
-        self.data_tier.destroy(dm)
+        self.dm_device.teardown(dm)?;
+        self.data_tier.destroy()
     }
 
     /// Teardown the store, i.e., the DM devices.
     pub fn teardown(self, dm: &DM) -> EngineResult<()> {
-        self.data_tier
-            .dm_device
-            .teardown(dm)
-            .map_err(|e| e.into())
+        self.dm_device.teardown(dm).map_err(|e| e.into())
     }
 
     /// Return the device that this tier is currently using.
     /// WARNING: This may change it the backstore switches between its
     /// cache and its non-cache incarnations, among other reasons.
     pub fn device(&self) -> Device {
-        self.data_tier.dm_device.device()
+        self.dm_device.device()
     }
-
 
     /// Lookup an immutable blockdev by its Stratis UUID.
     pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<&BlockDev> {
-        self.data_tier.block_mgr.get_blockdev_by_uuid(uuid)
+        self.data_tier.get_blockdev_by_uuid(uuid)
     }
 
     /// Lookup a mutable blockdev by its Stratis UUID.
     pub fn get_mut_blockdev_by_uuid(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
-        self.data_tier.block_mgr.get_mut_blockdev_by_uuid(uuid)
+        self.data_tier.get_mut_blockdev_by_uuid(uuid)
     }
 
     /// The number of sectors in the backstore given up to Stratis
@@ -308,7 +320,7 @@ impl Recordable<BackstoreSave> for Backstore {
         BackstoreSave {
             segments: self.data_tier.segments.record(),
             block_devs: self.data_tier.block_mgr.record(),
-            next: self.data_tier.next,
+            next: self.next,
         }
     }
 }

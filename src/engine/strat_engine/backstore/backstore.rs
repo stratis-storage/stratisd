@@ -8,8 +8,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
+use either::{Either, Left, Right};
 
-use devicemapper::{DM, Device, DmDevice, LinearDev, Sectors};
+use devicemapper::{CacheDev, DM, Device, DmDevice, LinearDev, Sectors};
 
 use super::super::super::engine::BlockDev;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -111,7 +112,7 @@ impl DataTier {
     /// WARNING: metadata changing event
     pub fn add(&mut self,
                dm: &DM,
-               ld: &mut LinearDev,
+               dm_device: &mut TopDmDevice,
                paths: &[&Path],
                force: bool)
                -> EngineResult<Vec<DevUuid>> {
@@ -126,8 +127,12 @@ impl DataTier {
             .cloned()
             .collect::<Vec<_>>();
         let coalesced = coalesce_blkdevsegs(&self.segments, &segments);
+        let table = map_to_dm(&coalesced);
 
-        ld.set_table(dm, map_to_dm(&coalesced))?;
+        match *dm_device {
+            Left(ref mut lineardev) => lineardev.set_table(dm, table),
+            Right(ref mut cachedev) => cachedev.set_origin_table(dm, table),
+        }?;
 
         self.segments = coalesced;
 
@@ -200,6 +205,61 @@ struct CacheTier {
     cache_segments: Vec<BlkDevSegment>,
 }
 
+impl CacheTier {
+    /// Destroy the tier. Wipe its blockdevs.
+    pub fn destroy(self) -> EngineResult<()> {
+        self.block_mgr.destroy_all()
+    }
+
+    /// Lookup an immutable blockdev by its Stratis UUID.
+    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
+        self.block_mgr
+            .get_blockdev_by_uuid(uuid)
+            .and_then(|bd| Some((BlockDevTier::Cache, bd)))
+    }
+
+    /// Lookup a mutable blockdev by its Stratis UUID.
+    pub fn get_mut_blockdev_by_uuid(&mut self,
+                                    uuid: DevUuid)
+                                    -> Option<(BlockDevTier, &mut BlockDev)> {
+        self.block_mgr
+            .get_mut_blockdev_by_uuid(uuid)
+            .and_then(|bd| Some((BlockDevTier::Cache, bd)))
+    }
+
+    /// Add the given paths to self. Return UUIDs of the new blockdevs
+    /// corresponding to the specified paths.
+    /// Adds all additional space to cache sub-device.
+    /// WARNING: metadata changing event
+    pub fn add(&mut self,
+               _dm: &DM,
+               _cache_device: &mut CacheDev,
+               paths: &[&Path],
+               force: bool)
+               -> EngineResult<Vec<DevUuid>> {
+        let uuids = self.block_mgr.add(paths, force)?;
+
+        let avail_space = self.block_mgr.avail_space();
+        let segments = self.block_mgr
+            .alloc_space(&[avail_space])
+            .expect("asked for exactly the space available, must get")
+            .iter()
+            .flat_map(|s| s.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        let coalesced = coalesce_blkdevsegs(&self.cache_segments, &segments);
+        let _table = map_to_dm(&coalesced);
+
+        // FIXME: Set the cache table.
+
+        self.cache_segments = coalesced;
+
+        Ok(uuids)
+    }
+}
+
+type TopDmDevice = Either<LinearDev, CacheDev>;
+
 /// This structure can allocate additional space to the upper layer, but it
 /// cannot accept returned space. When it is extended to be able to accept
 /// returned space the allocation algorithm will have to be revised.
@@ -211,7 +271,7 @@ pub struct Backstore {
     /// this structure can operate without a cache.
     cache_tier: Option<CacheTier>,
     /// A DM device.
-    dm_device: LinearDev,
+    dm_device: TopDmDevice,
     /// Index for managing allocation from dm_device.
     next: Sectors,
 }
@@ -231,7 +291,7 @@ impl Backstore {
         Ok(Backstore {
                data_tier,
                cache_tier: None,
-               dm_device,
+               dm_device: Left(dm_device),
                next: backstore_save.next,
            })
     }
@@ -250,7 +310,7 @@ impl Backstore {
         Ok(Backstore {
                data_tier,
                cache_tier: None,
-               dm_device,
+               dm_device: Left(dm_device),
                next: Sectors(0),
            })
     }
@@ -267,7 +327,14 @@ impl Backstore {
         match tier {
             BlockDevTier::Cache => {
                 match self.cache_tier {
-                    Some(ref _cache_tier) => panic!("not ready"),
+                    Some(ref mut cache_tier) => {
+                        let cache_device =
+                            self.dm_device
+                                .as_mut()
+                                .right()
+                                .expect("cache_tier.is_some() <=> type of dm_device is CacheDev");
+                        cache_tier.add(dm, cache_device, paths, force)
+                    }
                     None => panic!("not ready"),
                 }
             }
@@ -314,7 +381,15 @@ impl Backstore {
 
     /// Destroy the entire store.
     pub fn destroy(self, dm: &DM) -> EngineResult<()> {
-        self.dm_device.teardown(dm)?;
+        match self.dm_device {
+            Left(lineardev) => lineardev.teardown(dm)?,
+            Right(cachedev) => {
+                cachedev.teardown(dm)?;
+                self.cache_tier
+                    .expect("if dm_device is cache, cache tier exists")
+                    .destroy()?
+            }
+        };
         self.data_tier.destroy()
     }
 
@@ -327,19 +402,34 @@ impl Backstore {
     /// WARNING: This may change it the backstore switches between its
     /// cache and its non-cache incarnations, among other reasons.
     pub fn device(&self) -> Device {
-        self.dm_device.device()
+        self.dm_device
+            .as_ref()
+            .either(|d| d.device(), |d| d.device())
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.
     pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
-        self.data_tier.get_blockdev_by_uuid(uuid)
+        self.data_tier
+            .get_blockdev_by_uuid(uuid)
+            .or_else(|| {
+                         self.cache_tier
+                             .as_ref()
+                             .and_then(|c| c.get_blockdev_by_uuid(uuid))
+                     })
     }
 
     /// Lookup a mutable blockdev by its Stratis UUID.
     pub fn get_mut_blockdev_by_uuid(&mut self,
                                     uuid: DevUuid)
                                     -> Option<(BlockDevTier, &mut BlockDev)> {
-        self.data_tier.get_mut_blockdev_by_uuid(uuid)
+        let cache_tier = &mut self.cache_tier;
+        self.data_tier
+            .get_mut_blockdev_by_uuid(uuid)
+            .or_else(move || {
+                         cache_tier
+                             .as_mut()
+                             .and_then(|c| c.get_mut_blockdev_by_uuid(uuid))
+                     })
     }
 
     /// The number of sectors in the backstore given up to Stratis

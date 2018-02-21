@@ -70,7 +70,7 @@ impl DataTier {
 
         let mut ld = LinearDev::setup(dm,
                                       &format_backstore_name(block_mgr.pool_uuid(),
-                                                             CacheRole::Origin),
+                                                             CacheRole::OriginSub),
                                       None,
                                       map_to_dm(&segments))?;
 
@@ -113,7 +113,7 @@ impl DataTier {
             .collect::<Vec<_>>();
         let ld = LinearDev::setup(dm,
                                   &format_backstore_name(block_mgr.pool_uuid(),
-                                                         CacheRole::Origin),
+                                                         CacheRole::OriginSub),
                                   None,
                                   map_to_dm(&segments))?;
         Ok(DataTier {

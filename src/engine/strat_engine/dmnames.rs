@@ -58,21 +58,29 @@ impl Display for ThinPoolRole {
     }
 }
 
+/// The various roles taken on by DM devices in the cache tier.
 #[derive(Clone, Copy)]
 pub enum CacheRole {
+    /// The DM cache device, contains the other three devices.
     #[allow(dead_code)]
     Cache,
+    /// The cache sub-device of the DM cache device.
     #[allow(dead_code)]
-    Meta,
-    Origin,
+    CacheSub,
+    /// The meta sub-device of the DM cache device.
+    #[allow(dead_code)]
+    MetaSub,
+    /// The origin sub-device of the DM cache device, holds the actual data.
+    OriginSub,
 }
 
 impl Display for CacheRole {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             CacheRole::Cache => write!(f, "cache"),
-            CacheRole::Meta => write!(f, "meta"),
-            CacheRole::Origin => write!(f, "origin"),
+            CacheRole::CacheSub => write!(f, "cachesub"),
+            CacheRole::MetaSub => write!(f, "metasub"),
+            CacheRole::OriginSub => write!(f, "originsub"),
         }
     }
 }
@@ -109,7 +117,7 @@ pub fn format_thinpool_name(pool_uuid: PoolUuid, role: ThinPoolRole) -> DmNameBu
 }
 
 /// Format a name for dm devices in the backstore.
-/// Prerequisite: len(format!("{}", FORMAT_VERSION) < 79
+/// Prerequisite: len(format!("{}", FORMAT_VERSION) < 76
 pub fn format_backstore_name(pool_uuid: PoolUuid, role: CacheRole) -> DmNameBuf {
     DmNameBuf::new(format!("stratis-{}-{}-physical-{}",
                            FORMAT_VERSION,

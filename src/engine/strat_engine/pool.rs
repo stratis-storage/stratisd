@@ -203,12 +203,8 @@ impl Pool for StratPool {
                      tier: BlockDevTier,
                      force: bool)
                      -> EngineResult<Vec<DevUuid>> {
-        if tier == BlockDevTier::Cache {
-            return Err(EngineError::Engine(ErrorEnum::Invalid, "UNIMPLEMENTED".into()));
-        }
-
         let dm = DM::new()?;
-        let bdev_info = self.backstore.add(&dm, paths, force)?;
+        let bdev_info = self.backstore.add_blockdevs(&dm, paths, tier, force)?;
         self.write_metadata(pool_name)?;
         Ok(bdev_info)
     }

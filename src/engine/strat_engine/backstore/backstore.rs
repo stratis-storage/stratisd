@@ -258,8 +258,21 @@ impl Backstore {
     /// Add the given paths to self. Return UUIDs of the new blockdevs
     /// corresponding to the specified paths.
     /// WARNING: metadata changing event
-    pub fn add(&mut self, dm: &DM, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
-        self.data_tier.add(dm, &mut self.dm_device, paths, force)
+    pub fn add_blockdevs(&mut self,
+                         dm: &DM,
+                         paths: &[&Path],
+                         tier: BlockDevTier,
+                         force: bool)
+                         -> EngineResult<Vec<DevUuid>> {
+        match tier {
+            BlockDevTier::Cache => {
+                match self.cache_tier {
+                    Some(ref _cache_tier) => panic!("not ready"),
+                    None => panic!("not ready"),
+                }
+            }
+            BlockDevTier::Data => self.data_tier.add(dm, &mut self.dm_device, paths, force),
+        }
     }
 
     /// Allocate requested chunks from device.

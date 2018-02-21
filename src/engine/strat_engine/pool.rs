@@ -284,15 +284,11 @@ impl Pool for StratPool {
     }
 
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
-        self.backstore
-            .get_blockdev_by_uuid(uuid)
-            .and_then(|bd| Some((BlockDevTier::Data, bd)))
+        self.backstore.get_blockdev_by_uuid(uuid)
     }
 
     fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)> {
-        self.backstore
-            .get_mut_blockdev_by_uuid(uuid)
-            .and_then(|bd| Some((BlockDevTier::Data, bd)))
+        self.backstore.get_mut_blockdev_by_uuid(uuid)
     }
 
     fn save_state(&mut self, pool_name: &str) -> EngineResult<()> {

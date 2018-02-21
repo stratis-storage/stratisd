@@ -166,13 +166,19 @@ impl DataTier {
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.
-    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<&BlockDev> {
-        self.block_mgr.get_blockdev_by_uuid(uuid)
+    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
+        self.block_mgr
+            .get_blockdev_by_uuid(uuid)
+            .and_then(|bd| Some((BlockDevTier::Data, bd)))
     }
 
     /// Lookup a mutable blockdev by its Stratis UUID.
-    pub fn get_mut_blockdev_by_uuid(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
-        self.block_mgr.get_mut_blockdev_by_uuid(uuid)
+    pub fn get_mut_blockdev_by_uuid(&mut self,
+                                    uuid: DevUuid)
+                                    -> Option<(BlockDevTier, &mut BlockDev)> {
+        self.block_mgr
+            .get_mut_blockdev_by_uuid(uuid)
+            .and_then(|bd| Some((BlockDevTier::Data, bd)))
     }
 
     /// Get the blockdevs belonging to this tier
@@ -294,12 +300,14 @@ impl Backstore {
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.
-    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<&BlockDev> {
+    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
         self.data_tier.get_blockdev_by_uuid(uuid)
     }
 
     /// Lookup a mutable blockdev by its Stratis UUID.
-    pub fn get_mut_blockdev_by_uuid(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
+    pub fn get_mut_blockdev_by_uuid(&mut self,
+                                    uuid: DevUuid)
+                                    -> Option<(BlockDevTier, &mut BlockDev)> {
         self.data_tier.get_mut_blockdev_by_uuid(uuid)
     }
 

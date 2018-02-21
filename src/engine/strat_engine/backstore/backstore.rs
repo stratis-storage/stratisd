@@ -13,7 +13,7 @@ use devicemapper::{DM, Device, DmDevice, LinearDev, Sectors};
 
 use super::super::super::engine::BlockDev;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::super::types::{DevUuid, PoolUuid};
+use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
 use super::super::dmnames::{CacheRole, format_backstore_ids};
 use super::super::serde_structs::{BackstoreSave, Recordable};
@@ -187,6 +187,19 @@ impl DataTier {
     }
 }
 
+/// Handles the cache devices.
+#[derive(Debug)]
+struct CacheTier {
+    /// Manages the individual block devices
+    block_mgr: BlockDevMgr,
+    /// The list of segments granted by block_mgr and used by the metadata
+    /// device.
+    meta_segments: Vec<BlkDevSegment>,
+    /// The list of segments granted by block_mgr and used by the cache
+    /// device.
+    cache_segments: Vec<BlkDevSegment>,
+}
+
 /// This structure can allocate additional space to the upper layer, but it
 /// cannot accept returned space. When it is extended to be able to accept
 /// returned space the allocation algorithm will have to be revised.
@@ -194,6 +207,9 @@ impl DataTier {
 pub struct Backstore {
     /// Coordinates handling of the blockdevs that form the base.
     data_tier: DataTier,
+    /// Coordinate handling of blockdevs that back the cache. Optional, since
+    /// this structure can operate without a cache.
+    cache_tier: Option<CacheTier>,
     /// A DM device.
     dm_device: LinearDev,
     /// Index for managing allocation from dm_device.
@@ -214,6 +230,7 @@ impl Backstore {
         let (data_tier, dm_device) = DataTier::setup(dm, block_mgr, &backstore_save.segments)?;
         Ok(Backstore {
                data_tier,
+               cache_tier: None,
                dm_device,
                next: backstore_save.next,
            })
@@ -232,6 +249,7 @@ impl Backstore {
                           BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?)?;
         Ok(Backstore {
                data_tier,
+               cache_tier: None,
                dm_device,
                next: Sectors(0),
            })

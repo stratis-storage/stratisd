@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc};
 use either::{Either, Left, Right};
 
-use devicemapper::{CacheDev, DM, Device, DmDevice, LinearDev, Sectors};
+use devicemapper::{CacheDev, DM, Device, DmDevice, IEC, LinearDev, MIN_CACHE_BLOCK_SIZE, Sectors};
 
 use super::super::super::engine::BlockDev;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -255,6 +255,58 @@ impl CacheTier {
         self.cache_segments = coalesced;
 
         Ok(uuids)
+    }
+
+    /// Setup a new CacheTier struct from the block_mgr.
+    ///
+    /// Returns the CacheTier and the cache device that was created.
+    ///
+    /// WARNING: metadata changing event
+    #[allow(dead_code)]
+    pub fn new(dm: &DM,
+               mut block_mgr: BlockDevMgr,
+               origin: LinearDev)
+               -> EngineResult<(CacheTier, CacheDev)> {
+        let avail_space = block_mgr.avail_space();
+        // TODO: check whether this should be increased
+        let meta_space = Sectors(4 * IEC::Ki);
+
+        assert!(meta_space < avail_space,
+                "every block device must be at least one GiB");
+
+        let mut segments = block_mgr
+            .alloc_space(&[meta_space, avail_space - meta_space])
+            .expect("asked for exactly the space available, must get");
+
+        let cache_segments = segments.pop().expect("segments.len() == 2");
+        let meta_segments = segments.pop().expect("segments.len() == 1");
+
+        let meta = LinearDev::setup(dm,
+                                    &format_backstore_name(block_mgr.pool_uuid(),
+                                                           CacheRole::MetaSub),
+                                    None,
+                                    map_to_dm(&meta_segments))?;
+
+        let cache = LinearDev::setup(dm,
+                                     &format_backstore_name(block_mgr.pool_uuid(),
+                                                            CacheRole::CacheSub),
+                                     None,
+                                     map_to_dm(&cache_segments))?;
+
+        let cd = CacheDev::new(dm,
+                               &format_backstore_name(block_mgr.pool_uuid(), CacheRole::Cache),
+                               None,
+                               meta,
+                               cache,
+                               origin,
+                               MIN_CACHE_BLOCK_SIZE)?;
+
+        Ok((CacheTier {
+                block_mgr,
+                meta_segments,
+                cache_segments,
+            },
+            cd))
     }
 }
 

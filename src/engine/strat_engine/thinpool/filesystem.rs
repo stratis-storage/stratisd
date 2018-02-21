@@ -205,8 +205,10 @@ impl Filesystem for StratFilesystem {
 pub fn fs_usage(mount_point: &Path) -> EngineResult<(Bytes, Bytes)> {
     let stat = statvfs(mount_point)?;
 
-    // stat.f_bsize is type c_ulong, which is 32 bits on some archs. Upcast.
+    // stat.block_size() is type c_ulong, which is 32 bits on some archs.
+    // Upcast to u64.
     let f_bsize = stat.block_size() as u64;
 
-    Ok((Bytes(f_bsize * stat.blocks()), Bytes(f_bsize * (stat.blocks() - stat.blocks_free()))))
+    let blocks = stat.blocks();
+    Ok((Bytes(f_bsize * blocks), Bytes(f_bsize * (blocks - stat.blocks_free()))))
 }

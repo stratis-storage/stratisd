@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use devicemapper::{DM, DevId, DmFlags, DmResult};
 
 use mnt::get_submounts;
-use nix::mount::{MNT_DETACH, umount2};
+use nix::mount::{MntFlags, umount2};
 
 
 mod cleanup_errors {
@@ -75,7 +75,7 @@ fn stratis_filesystems_unmount() -> Result<()> {
         for m in mounts
                 .iter()
                 .filter(|m| m.file.to_str().map_or(false, |s| s.contains("stratis"))) {
-            umount2(&m.file, MNT_DETACH)?;
+            umount2(&m.file, MntFlags::MNT_DETACH)?;
         }
         Ok(())
     }()

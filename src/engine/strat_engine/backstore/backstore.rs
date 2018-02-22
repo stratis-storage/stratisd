@@ -8,7 +8,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
-use either::{Either, Left, Right};
 
 use devicemapper::{CacheDev, DM, Device, DmDevice, IEC, LinearDev, MIN_CACHE_BLOCK_SIZE, Sectors};
 
@@ -112,10 +111,19 @@ impl DataTier {
     /// WARNING: metadata changing event
     pub fn add(&mut self,
                dm: &DM,
-               dm_device: &mut TopDmDevice,
+               cache: Option<&mut CacheDev>,
+               linear: Option<&mut LinearDev>,
                paths: &[&Path],
                force: bool)
                -> EngineResult<Vec<DevUuid>> {
+        // These are here so that if invariant is false, the method fails
+        // before allocating the segments from the block_mgr.
+        // These two statements combined are equivalent to
+        // cache.is_some() XOR linear.is_some(), but they may be clearer and
+        // Rust does not seem to have a boolean XOR operator, anyway.
+        assert!(!(cache.is_some() && linear.is_some()));
+        assert!(!(cache.is_none() && linear.is_none()));
+
         let uuids = self.block_mgr.add(paths, force)?;
 
         let avail_space = self.block_mgr.avail_space();
@@ -129,9 +137,10 @@ impl DataTier {
         let coalesced = coalesce_blkdevsegs(&self.segments, &segments);
         let table = map_to_dm(&coalesced);
 
-        match *dm_device {
-            Left(ref mut lineardev) => lineardev.set_table(dm, table),
-            Right(ref mut cachedev) => cachedev.set_origin_table(dm, table),
+        match (cache, linear) {
+            (Some(cache), None) => cache.set_origin_table(dm, table),
+            (None, Some(linear)) => linear.set_table(dm, table),
+            _ => panic!("see assertions at top of method"),
         }?;
 
         self.segments = coalesced;
@@ -281,21 +290,16 @@ impl CacheTier {
         let cache_segments = segments.pop().expect("segments.len() == 2");
         let meta_segments = segments.pop().expect("segments.len() == 1");
 
-        let meta = LinearDev::setup(dm,
-                                    &format_backstore_name(block_mgr.pool_uuid(),
-                                                           CacheRole::MetaSub),
-                                    None,
-                                    map_to_dm(&meta_segments))?;
+        let (dm_name, dm_uuid) = format_backstore_ids(block_mgr.pool_uuid(), CacheRole::MetaSub);
+        let meta = LinearDev::setup(dm, &dm_name, Some(&dm_uuid), map_to_dm(&meta_segments))?;
 
-        let cache = LinearDev::setup(dm,
-                                     &format_backstore_name(block_mgr.pool_uuid(),
-                                                            CacheRole::CacheSub),
-                                     None,
-                                     map_to_dm(&cache_segments))?;
+        let (dm_name, dm_uuid) = format_backstore_ids(block_mgr.pool_uuid(), CacheRole::CacheSub);
+        let cache = LinearDev::setup(dm, &dm_name, Some(&dm_uuid), map_to_dm(&cache_segments))?;
 
+        let (dm_name, dm_uuid) = format_backstore_ids(block_mgr.pool_uuid(), CacheRole::Cache);
         let cd = CacheDev::new(dm,
-                               &format_backstore_name(block_mgr.pool_uuid(), CacheRole::Cache),
-                               None,
+                               &dm_name,
+                               Some(&dm_uuid),
                                meta,
                                cache,
                                origin,
@@ -310,11 +314,13 @@ impl CacheTier {
     }
 }
 
-type TopDmDevice = Either<LinearDev, CacheDev>;
 
 /// This structure can allocate additional space to the upper layer, but it
 /// cannot accept returned space. When it is extended to be able to accept
 /// returned space the allocation algorithm will have to be revised.
+///
+/// self.linear.is_some() XOR self.cache.is_some()
+/// self.cache.is_some() <=> self.cache_tier.is_some()
 #[derive(Debug)]
 pub struct Backstore {
     /// Coordinates handling of the blockdevs that form the base.
@@ -322,8 +328,10 @@ pub struct Backstore {
     /// Coordinate handling of blockdevs that back the cache. Optional, since
     /// this structure can operate without a cache.
     cache_tier: Option<CacheTier>,
-    /// A DM device.
-    dm_device: TopDmDevice,
+    /// A linear DM device.
+    linear: Option<LinearDev>,
+    /// A cache DM Device.
+    cache: Option<CacheDev>,
     /// Index for managing allocation from dm_device.
     next: Sectors,
 }
@@ -343,7 +351,8 @@ impl Backstore {
         Ok(Backstore {
                data_tier,
                cache_tier: None,
-               dm_device: Left(dm_device),
+               linear: Some(dm_device),
+               cache: None,
                next: backstore_save.next,
            })
     }
@@ -362,7 +371,8 @@ impl Backstore {
         Ok(Backstore {
                data_tier,
                cache_tier: None,
-               dm_device: Left(dm_device),
+               linear: Some(dm_device),
+               cache: None,
                next: Sectors(0),
            })
     }
@@ -380,17 +390,19 @@ impl Backstore {
             BlockDevTier::Cache => {
                 match self.cache_tier {
                     Some(ref mut cache_tier) => {
-                        let cache_device =
-                            self.dm_device
+                        let mut cache_device =
+                            self.cache
                                 .as_mut()
-                                .right()
-                                .expect("cache_tier.is_some() <=> type of dm_device is CacheDev");
-                        cache_tier.add(dm, cache_device, paths, force)
+                                .expect("cache_tier.is_some() <=> self.cache.is_some()");
+                        cache_tier.add(dm, &mut cache_device, paths, force)
                     }
                     None => panic!("not ready"),
                 }
             }
-            BlockDevTier::Data => self.data_tier.add(dm, &mut self.dm_device, paths, force),
+            BlockDevTier::Data => {
+                self.data_tier
+                    .add(dm, self.cache.as_mut(), self.linear.as_mut(), paths, force)
+            }
         }
     }
 
@@ -433,13 +445,17 @@ impl Backstore {
 
     /// Destroy the entire store.
     pub fn destroy(self, dm: &DM) -> EngineResult<()> {
-        match self.dm_device {
-            Left(lineardev) => lineardev.teardown(dm)?,
-            Right(cachedev) => {
-                cachedev.teardown(dm)?;
+        match self.cache {
+            Some(cache) => {
+                cache.teardown(dm)?;
                 self.cache_tier
                     .expect("if dm_device is cache, cache tier exists")
-                    .destroy()?
+                    .destroy()?;
+            }
+            None => {
+                self.linear
+                    .expect("self.cache.is_none()")
+                    .teardown(dm)?;
             }
         };
         self.data_tier.destroy()
@@ -454,9 +470,11 @@ impl Backstore {
     /// WARNING: This may change it the backstore switches between its
     /// cache and its non-cache incarnations, among other reasons.
     pub fn device(&self) -> Device {
-        self.dm_device
+        self.cache
             .as_ref()
-            .either(|d| d.device(), |d| d.device())
+            .map(|d| d.device())
+            .or_else(|| self.linear.as_ref().map(|d| d.device()))
+            .expect("must be one or the other")
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.

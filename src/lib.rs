@@ -25,7 +25,6 @@ extern crate serde_json;
 #[macro_use]
 extern crate log;
 extern crate libudev;
-extern crate either;
 
 #[cfg(test)]
 #[macro_use]

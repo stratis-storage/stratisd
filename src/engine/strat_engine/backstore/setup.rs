@@ -10,7 +10,7 @@ use std::fs::{OpenOptions, read_dir};
 use std::io::ErrorKind;
 use std::path::PathBuf;
 
-use nix::Errno;
+use nix::errno::Errno;
 use serde_json;
 
 use devicemapper::{Device, devnode_to_devno};

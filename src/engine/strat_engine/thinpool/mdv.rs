@@ -60,7 +60,7 @@ impl<'a> MountedMDV<'a> {
                     Some("xfs"),
                     MsFlags::empty(),
                     None as Option<&str>) {
-            Err(nix::Error::Sys(nix::Errno::EBUSY)) => {
+            Err(nix::Error::Sys(nix::errno::Errno::EBUSY)) => {
                 // The device is already mounted at the specified mount point
                 Ok(())
             }

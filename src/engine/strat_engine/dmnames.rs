@@ -7,7 +7,7 @@
 use std::fmt;
 use std::fmt::Display;
 
-use devicemapper::DmNameBuf;
+use devicemapper::{DmNameBuf, DmUuidBuf};
 
 use super::super::super::engine::{FilesystemUuid, PoolUuid};
 
@@ -85,43 +85,63 @@ impl Display for CacheRole {
     }
 }
 
-/// Format a name for the flex layer.
+/// Format a name & uuid for the flex layer.
 /// Prerequisite: len(format!("{}", FORMAT_VERSION)) < 72
-pub fn format_flex_name(pool_uuid: PoolUuid, role: FlexRole) -> DmNameBuf {
-    DmNameBuf::new(format!("stratis-{}-{}-flex-{}",
-                           FORMAT_VERSION,
-                           pool_uuid.simple().to_string(),
-                           role))
-            .expect("FORMAT_VERSION display length < 72")
+pub fn format_flex_ids(pool_uuid: PoolUuid, role: FlexRole) -> (DmNameBuf, DmUuidBuf) {
+    (DmNameBuf::new(format!("stratis-{}-{}-flex-{}",
+                            FORMAT_VERSION,
+                            pool_uuid.simple().to_string(),
+                            role))
+             .expect("FORMAT_VERSION display length < 72"),
+     DmUuidBuf::new(format!("stratis-{}-{}-flex-{}",
+                            FORMAT_VERSION,
+                            pool_uuid.simple().to_string(),
+                            role))
+             .expect("FORMAT_VERSION display length < 72"))
 
 }
 
-/// Format a name for the thin layer.
+/// Format a name & uuid for the thin layer.
 /// Prerequisite: len(format!("{}", FORMAT_VERSION)) < 50
-pub fn format_thin_name(pool_uuid: PoolUuid, role: ThinRole) -> DmNameBuf {
-    DmNameBuf::new(format!("stratis-{}-{}-thin-{}",
-                           FORMAT_VERSION,
-                           pool_uuid.simple().to_string(),
-                           role))
-            .expect("FORMAT_VERSION display length < 50")
+pub fn format_thin_ids(pool_uuid: PoolUuid, role: ThinRole) -> (DmNameBuf, DmUuidBuf) {
+    (DmNameBuf::new(format!("stratis-{}-{}-thin-{}",
+                            FORMAT_VERSION,
+                            pool_uuid.simple().to_string(),
+                            role))
+             .expect("FORMAT_VERSION display length < 50"),
+     DmUuidBuf::new(format!("stratis-{}-{}-thin-{}",
+                            FORMAT_VERSION,
+                            pool_uuid.simple().to_string(),
+                            role))
+             .expect("FORMAT_VERSION display length < 50"))
 }
 
-/// Format a name for the thin pool layer.
+/// Format a name & uuid for the thin pool layer.
 /// Prerequisite: len(format!("{}", FORMAT_VERSION)) < 81
-pub fn format_thinpool_name(pool_uuid: PoolUuid, role: ThinPoolRole) -> DmNameBuf {
-    DmNameBuf::new(format!("stratis-{}-{}-thinpool-{}",
-                           FORMAT_VERSION,
-                           pool_uuid.simple().to_string(),
-                           role))
-            .expect("FORMAT_VERSION display_length < 81")
+pub fn format_thinpool_ids(pool_uuid: PoolUuid, role: ThinPoolRole) -> (DmNameBuf, DmUuidBuf) {
+    (DmNameBuf::new(format!("stratis-{}-{}-thinpool-{}",
+                            FORMAT_VERSION,
+                            pool_uuid.simple().to_string(),
+                            role))
+             .expect("FORMAT_VERSION display_length < 81"),
+     DmUuidBuf::new(format!("stratis-{}-{}-thinpool-{}",
+                            FORMAT_VERSION,
+                            pool_uuid.simple().to_string(),
+                            role))
+             .expect("FORMAT_VERSION display_length < 81"))
 }
 
-/// Format a name for dm devices in the backstore.
+/// Format a name & uuid for dm devices in the backstore.
 /// Prerequisite: len(format!("{}", FORMAT_VERSION) < 76
-pub fn format_backstore_name(pool_uuid: PoolUuid, role: CacheRole) -> DmNameBuf {
-    DmNameBuf::new(format!("stratis-{}-{}-physical-{}",
-                           FORMAT_VERSION,
-                           pool_uuid.simple().to_string(),
-                           role))
-            .expect("FORMAT_VERSION display_length < 78")
+pub fn format_backstore_ids(pool_uuid: PoolUuid, role: CacheRole) -> (DmNameBuf, DmUuidBuf) {
+    (DmNameBuf::new(format!("stratis-{}-{}-physical-{}",
+                            FORMAT_VERSION,
+                            pool_uuid.simple().to_string(),
+                            role))
+             .expect("FORMAT_VERSION display_length < 76"),
+     DmUuidBuf::new(format!("stratis-{}-{}-physical-{}",
+                            FORMAT_VERSION,
+                            pool_uuid.simple().to_string(),
+                            role))
+             .expect("FORMAT_VERSION display_length < 76"))
 }

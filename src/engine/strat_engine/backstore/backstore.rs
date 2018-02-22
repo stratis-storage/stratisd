@@ -15,7 +15,7 @@ use super::super::super::engine::BlockDev;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::types::{DevUuid, PoolUuid};
 
-use super::super::dmnames::{CacheRole, format_backstore_name};
+use super::super::dmnames::{CacheRole, format_backstore_ids};
 use super::super::serde_structs::{BackstoreSave, Recordable};
 
 use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment, coalesce_blkdevsegs, map_to_dm};
@@ -68,11 +68,8 @@ impl DataTier {
             .map(&mapper)
             .collect::<EngineResult<Vec<_>>>()?;
 
-        let mut ld = LinearDev::setup(dm,
-                                      &format_backstore_name(block_mgr.pool_uuid(),
-                                                             CacheRole::OriginSub),
-                                      None,
-                                      map_to_dm(&segments))?;
+        let (dm_name, dm_uuid) = format_backstore_ids(block_mgr.pool_uuid(), CacheRole::OriginSub);
+        let mut ld = LinearDev::setup(dm, &dm_name, Some(&dm_uuid), map_to_dm(&segments))?;
 
         let avail_space = block_mgr.avail_space();
         let additional_segments = block_mgr
@@ -111,11 +108,8 @@ impl DataTier {
             .flat_map(|s| s.iter())
             .cloned()
             .collect::<Vec<_>>();
-        let ld = LinearDev::setup(dm,
-                                  &format_backstore_name(block_mgr.pool_uuid(),
-                                                         CacheRole::OriginSub),
-                                  None,
-                                  map_to_dm(&segments))?;
+        let (dm_name, dm_uuid) = format_backstore_ids(block_mgr.pool_uuid(), CacheRole::OriginSub);
+        let ld = LinearDev::setup(dm, &dm_name, Some(&dm_uuid), map_to_dm(&segments))?;
         Ok(DataTier {
                block_mgr,
                dm_device: ld,

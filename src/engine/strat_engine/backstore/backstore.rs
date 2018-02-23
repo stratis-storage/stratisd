@@ -22,20 +22,20 @@ use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment, coalesce_blkdevseg
 use super::setup::get_blockdevs;
 
 /// Handles the lowest level, base layer of this tier.
-/// The dm_device organizes all block devs into a single linear allocation pool.
-/// All available space on the blockdevs is allocated to dm_device.
-/// This structure can allocate additional space to the upper layer, but it
-/// cannot accept returned space. When it is extended to be able to accept
-/// returned space the allocation algorithm will have to be revised.
+/// The dm_device organizes all block devs into a single linear allocation
+/// pool. This structure can allocate additional space to the upper layer,
+/// but it cannot accept returned space. When it is extended to be able to
+/// accept returned space the allocation algorithm will have to be revised.
+/// All available sectors on blockdevs in the manager are allocated to
+/// dm_device.
 #[derive(Debug)]
 struct DataTier {
     /// Manages the individual block devices
+    /// it is always the case block_mgr.avail_space() == 0.
     block_mgr: BlockDevMgr,
-    /// The device mapper device which aggregates all block_mgr's devices
+    /// The device mapper device which aggregates block_mgr's devices
     dm_device: LinearDev,
     /// The list of segments granted by block_mgr and used by dm_device
-    /// It is always the case that block_mgr.avail_space() == 0, i.e., all
-    /// available space in block_mgr is allocated to the dm_device.
     segments: Vec<BlkDevSegment>,
     /// The position from which requested space is allocated
     next: Sectors,
@@ -49,10 +49,16 @@ impl DataTier {
     /// might have resulted from this.
     /// WARNING: metadata changing event
     pub fn setup(dm: &DM,
-                 mut block_mgr: BlockDevMgr,
+                 block_mgr: BlockDevMgr,
                  segments: &[(DevUuid, Sectors, Sectors)],
                  next: Sectors)
                  -> EngineResult<DataTier> {
+        if block_mgr.avail_space() != Sectors(0) {
+            let err_msg = format!("{} unallocated to device; probable metadata corruption",
+                                  block_mgr.avail_space());
+            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+        }
+
         let uuid_to_devno = block_mgr.uuid_to_devno();
         let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> EngineResult<BlkDevSegment> {
             let device = uuid_to_devno(triple.0)
@@ -63,33 +69,16 @@ impl DataTier {
                             })?;
             Ok(BlkDevSegment::new(triple.0, Segment::new(device, triple.1, triple.2)))
         };
-        let mut segments = segments
+        let segments = segments
             .iter()
             .map(&mapper)
             .collect::<EngineResult<Vec<_>>>()?;
 
-        let mut ld = LinearDev::setup(dm,
-                                      &format_backstore_name(block_mgr.pool_uuid(),
-                                                             CacheRole::OriginSub),
-                                      None,
-                                      map_to_dm(&segments))?;
-
-        let avail_space = block_mgr.avail_space();
-        let additional_segments = block_mgr
-            .alloc_space(&[avail_space])
-            .expect("asked for exactly the space available, must get")
-            .iter()
-            .flat_map(|s| s.iter())
-            .cloned()
-            .collect::<Vec<_>>();
-
-        // Add the new segments only after setting up the linear dev.
-        // Otherwise the new table will differ from the old and setup of the
-        // dev will fail.
-        if !additional_segments.is_empty() {
-            segments.extend(additional_segments);
-            ld.set_table(dm, map_to_dm(&segments))?;
-        }
+        let ld = LinearDev::setup(dm,
+                                  &format_backstore_name(block_mgr.pool_uuid(),
+                                                         CacheRole::OriginSub),
+                                  None,
+                                  map_to_dm(&segments))?;
 
         Ok(DataTier {
                block_mgr,

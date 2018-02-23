@@ -433,13 +433,11 @@ fn initialize(pool_uuid: PoolUuid,
 
     let mut bds: Vec<StratBlockDev> = Vec::new();
     for (dev, (devnode, dev_size, mut f)) in add_devs {
-        let dev_size = dev_size.sectors();
-
         let bda = BDA::initialize(&mut f,
                                   pool_uuid,
                                   Uuid::new_v4(),
                                   mda_size,
-                                  dev_size,
+                                  dev_size.sectors(),
                                   Utc::now().timestamp() as u64);
         if let Ok(bda) = bda {
             let hw_id = match hw_lookup(devnode) {
@@ -451,8 +449,8 @@ fn initialize(pool_uuid: PoolUuid,
             // The dev_size is at least MIN_DEV_SIZE, but the size of the
             // metadata is not really bounded from above.
             let blockdev =
-                StratBlockDev::new(dev, devnode.to_owned(), dev_size, bda, &[], None, hw_id)
-                    .expect("bda.size() < dev_size and no user facing segments allocated");
+                StratBlockDev::new(dev, devnode.to_owned(), bda, &[], None, hw_id)
+                    .expect("bda.size() == dev_size; only allocating space for metadata");
             bds.push(blockdev);
         } else {
             // TODO: check the return values and update state machine on failure

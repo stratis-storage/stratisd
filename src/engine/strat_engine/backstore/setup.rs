@@ -204,6 +204,10 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                 // then it is possible that the segments previously allocated
                 // for this blockdev no longer exist. If that is the case,
                 // StratBlockDev::new will return an error.
+                // NOTE: Currently, all blockdevs have all their space
+                // allocated to the DM device in the data tier. As long as
+                // that is the case, this block will always return an error
+                // if the blockdev size has decreased.
                 let segments = segment_table.get(&bda.dev_uuid());
                 blockdevs.push(StratBlockDev::new(*device,
                                                   devnode.to_owned(),

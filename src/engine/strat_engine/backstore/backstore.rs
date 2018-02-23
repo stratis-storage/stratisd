@@ -272,7 +272,6 @@ impl CacheTier {
     /// Returns the CacheTier and the cache device that was created.
     ///
     /// WARNING: metadata changing event
-    #[allow(dead_code)]
     pub fn new(dm: &DM,
                mut block_mgr: BlockDevMgr,
                origin: LinearDev)

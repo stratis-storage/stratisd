@@ -188,7 +188,7 @@ impl Engine for StratEngine {
                         } else {
                             let dev_paths = devices
                                 .values()
-                                .map(|p| p.to_str().expect("Expecting valid device path!"))
+                                .map(|p| p.to_str().expect("Unix is utf-8"))
                                 .collect::<Vec<&str>>()
                                 .join(", ");
 

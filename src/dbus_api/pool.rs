@@ -206,7 +206,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> MethodRes
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
-    let result = pool.add_blockdevs(&*pool_name, pool_uuid, &blockdevs, tier, force);
+    let result = pool.add_blockdevs(&*pool_name, &blockdevs, tier, force);
     let msg = match result {
         Ok(uuids) => {
             let return_value = uuids

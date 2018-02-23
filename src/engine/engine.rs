@@ -61,7 +61,6 @@ pub trait Pool: Debug {
     /// or there was an error while reading or writing a blockdev.
     fn add_blockdevs(&mut self,
                      pool_name: &str,
-                     pool_uuid: PoolUuid,
                      paths: &[&Path],
                      tier: BlockDevTier,
                      force: bool)

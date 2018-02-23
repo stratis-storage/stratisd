@@ -383,7 +383,6 @@ impl Backstore {
     /// WARNING: metadata changing event
     pub fn add_blockdevs(&mut self,
                          dm: &DM,
-                         pool_uuid: PoolUuid,
                          paths: &[&Path],
                          tier: BlockDevTier,
                          force: bool)
@@ -399,6 +398,12 @@ impl Backstore {
                         cache_tier.add(dm, &mut cache_device, paths, force)
                     }
                     None => {
+                        // FIXME: This is obviously a bad idea, but it means
+                        // that is unnecessary to add a pool UUID parameter to
+                        // this method. That course of action would require
+                        // various changes in the calling code which have not
+                        // been agreed upon.
+                        let pool_uuid = self.data_tier.block_mgr.pool_uuid();
                         let bdm =
                             BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
                         let linear = self.linear

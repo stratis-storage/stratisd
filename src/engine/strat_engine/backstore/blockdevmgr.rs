@@ -451,7 +451,7 @@ fn initialize(pool_uuid: PoolUuid,
             // The dev_size is at least MIN_DEV_SIZE, but the size of the
             // metadata is not really bounded from above.
             let blockdev =
-                StratBlockDev::new(dev, devnode.to_owned(), dev_size, bda, &[], None, hw_id)
+                StratBlockDev::new(dev, devnode.to_owned(), bda, &[], None, hw_id)
                     .expect("bda.size() < dev_size and no user facing segments allocated");
             bds.push(blockdev);
         } else {

@@ -190,6 +190,14 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                 let actual_size = blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?
                     .sectors();
 
+                if actual_size < bda.dev_size() {
+                    let err_msg = format!("actual blockdev size ({}) < recorded size ({})",
+                                          actual_size,
+                                          bda.dev_size());
+
+                    return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+                }
+
                 let bd_save = backstore_save
                     .block_devs
                     .iter()
@@ -200,14 +208,13 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                                     EngineError::Engine(ErrorEnum::NotFound, err_msg)
                                 })?;
 
-                // If the size of the device has changed and is less,
-                // then it is possible that the segments previously allocated
-                // for this blockdev no longer exist. If that is the case,
-                // StratBlockDev::new will return an error.
+                // This should always succeed since the actual size is at
+                // least the recorded size, so all segments should be
+                // available to be allocated. If this fails, the most likely
+                // conclusion is metadata corruption.
                 let segments = segment_table.get(&bda.dev_uuid());
                 blockdevs.push(StratBlockDev::new(*device,
                                                   devnode.to_owned(),
-                                                  actual_size,
                                                   bda,
                                                   segments.unwrap_or(&vec![]),
                                                   bd_save.user_info.clone(),

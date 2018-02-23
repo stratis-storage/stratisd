@@ -199,12 +199,14 @@ impl Pool for StratPool {
 
     fn add_blockdevs(&mut self,
                      pool_name: &str,
+                     pool_uuid: PoolUuid,
                      paths: &[&Path],
                      tier: BlockDevTier,
                      force: bool)
                      -> EngineResult<Vec<DevUuid>> {
         let dm = DM::new()?;
-        let bdev_info = self.backstore.add_blockdevs(&dm, paths, tier, force)?;
+        let bdev_info = self.backstore
+            .add_blockdevs(&dm, pool_uuid, paths, tier, force)?;
         self.write_metadata(pool_name)?;
         Ok(bdev_info)
     }

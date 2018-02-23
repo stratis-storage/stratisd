@@ -86,6 +86,7 @@ impl Pool for SimPool {
 
     fn add_blockdevs(&mut self,
                      _pool_name: &str,
+                     _pool_uuid: PoolUuid,
                      paths: &[&Path],
                      tier: BlockDevTier,
                      _force: bool)
@@ -402,7 +403,7 @@ mod tests {
             .unwrap();
         let (pool_name, pool) = engine.get_mut_pool(uuid).unwrap();
         let devices = [Path::new("/s/a"), Path::new("/s/b")];
-        assert!(match pool.add_blockdevs(&*pool_name, &devices, BlockDevTier::Data, false) {
+        assert!(match pool.add_blockdevs(&*pool_name, uuid, &devices, BlockDevTier::Data, false) {
                     Ok(devs) => devs.len() == devices.len(),
                     _ => false,
                 });

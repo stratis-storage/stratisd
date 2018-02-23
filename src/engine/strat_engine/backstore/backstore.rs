@@ -19,6 +19,7 @@ use super::super::dmnames::{CacheRole, format_backstore_ids};
 use super::super::serde_structs::{BackstoreSave, Recordable};
 
 use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment, coalesce_blkdevsegs, map_to_dm};
+use super::metadata::MIN_MDA_SECTORS;
 use super::setup::get_blockdevs;
 
 /// Handles the lowest level, base layer of this tier.
@@ -382,6 +383,7 @@ impl Backstore {
     /// WARNING: metadata changing event
     pub fn add_blockdevs(&mut self,
                          dm: &DM,
+                         pool_uuid: PoolUuid,
                          paths: &[&Path],
                          tier: BlockDevTier,
                          force: bool)
@@ -396,7 +398,18 @@ impl Backstore {
                                 .expect("cache_tier.is_some() <=> self.cache.is_some()");
                         cache_tier.add(dm, &mut cache_device, paths, force)
                     }
-                    None => panic!("not ready"),
+                    None => {
+                        let bdm =
+                            BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
+                        let linear = self.linear
+                            .take()
+                            .expect("cache_tier.is_none() <=> self.linear.is_some()");
+                        let (mut cache_tier, mut cache) = CacheTier::new(dm, bdm, linear)?;
+                        let uuids = cache_tier.add(dm, &mut cache, paths, force)?;
+                        self.cache = Some(cache);
+                        self.cache_tier = Some(cache_tier);
+                        Ok(uuids)
+                    }
                 }
             }
             BlockDevTier::Data => {

@@ -36,18 +36,19 @@ impl StratBlockDev {
     /// Allocate space for the Stratis metadata on the device.
     /// - dev: the device, identified by number
     /// - devnode: the device node
-    /// - dev_size: the total size of the device
     /// - bda: the device's BDA
     /// - other_segments: segments claimed for non-Stratis metadata use
     /// - user_info: user settable identifying information
     /// - hardware_info: identifying information in the hardware
     /// Returns an error if it is impossible to allocate all segments on the
-    /// device. This can happen even if upper_segments is empty,
-    /// if the device size is less than the size required for the Stratis
-    /// metadata.
+    /// device.
+    /// NOTE: It is possible that the actual device size is greater than
+    /// the recorded device size. In that case, the additional space available
+    /// on the device is simply invisible to the blockdev. Consequently, it
+    /// is invisible to the engine, and is not part of the total size value
+    /// reported on the D-Bus.
     pub fn new(dev: Device,
                devnode: PathBuf,
-               dev_size: Sectors,
                bda: BDA,
                upper_segments: &[(Sectors, Sectors)],
                user_info: Option<String>,
@@ -55,10 +56,7 @@ impl StratBlockDev {
                -> EngineResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.size())];
         segments.extend(upper_segments);
-        let allocator = RangeAllocator::new(dev_size, &segments)?;
-
-        assert!(bda.size() <= dev_size,
-                "Otherwise the segments for the metadata could not have been allocated");
+        let allocator = RangeAllocator::new(bda.dev_size(), &segments)?;
 
         Ok(StratBlockDev {
                dev,
@@ -110,16 +108,11 @@ impl StratBlockDev {
     }
 
     // ALL SIZE METHODS
-
-    /// The size of the device as recorded in the metadata.
-    #[allow(dead_code)]
-    pub fn recorded_size(&self) -> Sectors {
-        self.bda.dev_size()
-    }
-
     /// The actual size of the device now.
     pub fn current_capacity(&self) -> Sectors {
-        self.used.capacity()
+        let size = self.used.capacity();
+        assert_eq!(self.bda.dev_size(), size);
+        size
     }
 
     /// The number of Sectors on this device used by Stratis for metadata

@@ -215,7 +215,6 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                 let segments = segment_table.get(&bda.dev_uuid());
                 blockdevs.push(StratBlockDev::new(*device,
                                                   devnode.to_owned(),
-                                                  actual_size,
                                                   bda,
                                                   segments.unwrap_or(&vec![]),
                                                   bd_save.user_info.clone(),

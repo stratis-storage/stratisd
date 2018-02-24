@@ -566,8 +566,8 @@ impl ThinPool {
                                snapshot_name: &str)
                                -> EngineResult<FilesystemUuid> {
         let snapshot_fs_uuid = Uuid::new_v4();
-        let (snapshot_dm_name, _) = format_thin_ids(self.pool_uuid,
-                                                    ThinRole::Filesystem(snapshot_fs_uuid));
+        let (snapshot_dm_name, snapshot_dm_uuid) =
+            format_thin_ids(self.pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));
         let snapshot_id = self.id_gen.new_id()?;
         let new_filesystem = match self.get_filesystem_by_uuid(origin_uuid) {
             Some((fs_name, filesystem)) => {
@@ -576,6 +576,7 @@ impl ThinPool {
                               &self.thin_pool,
                               snapshot_name,
                               &snapshot_dm_name,
+                              Some(&snapshot_dm_uuid),
                               &fs_name,
                               snapshot_fs_uuid,
                               snapshot_id)?

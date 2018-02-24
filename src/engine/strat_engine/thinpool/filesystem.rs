@@ -4,8 +4,8 @@
 
 use std::path::{Path, PathBuf};
 
-use devicemapper::{Bytes, DM, DmDevice, DmName, IEC, SECTOR_SIZE, Sectors, ThinDev, ThinDevId,
-                   ThinPoolDev, ThinStatus};
+use devicemapper::{Bytes, DM, DmDevice, DmName, DmUuid, IEC, SECTOR_SIZE, Sectors, ThinDev,
+                   ThinDevId, ThinPoolDev, ThinStatus};
 
 use mnt::{MountIter, MountParam};
 use nix::mount::{MsFlags, mount, umount};
@@ -61,14 +61,19 @@ impl StratFilesystem {
                     dm: &DM,
                     thin_pool: &ThinPoolDev,
                     snapshot_name: &str,
-                    snapshot_dmname: &DmName,
+                    snapshot_dm_name: &DmName,
+                    snapshot_dm_uuid: Option<&DmUuid>,
                     snapshot_fs_name: &Name,
                     snapshot_fs_uuid: FilesystemUuid,
                     snapshot_thin_id: ThinDevId)
                     -> EngineResult<StratFilesystem> {
 
         match self.thin_dev
-                  .snapshot(dm, snapshot_dmname, None, thin_pool, snapshot_thin_id) {
+                  .snapshot(dm,
+                            snapshot_dm_name,
+                            snapshot_dm_uuid,
+                            thin_pool,
+                            snapshot_thin_id) {
             Ok(thin_dev) => {
                 // If the source is mounted, XFS puts a dummy record in the
                 // log to enforce replay of the snapshot to deal with any

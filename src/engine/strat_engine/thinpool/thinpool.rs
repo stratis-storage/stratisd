@@ -23,8 +23,8 @@ use super::super::super::types::{FilesystemUuid, Name, PoolUuid, RenameAction};
 use super::super::backstore::Backstore;
 use super::super::device::wipe_sectors;
 use super::super::devlinks;
-use super::super::dmnames::{FlexRole, ThinPoolRole, ThinRole, format_flex_name, format_thin_name,
-                            format_thinpool_name};
+use super::super::dmnames::{FlexRole, ThinPoolRole, ThinRole, format_flex_ids, format_thin_ids,
+                            format_thinpool_ids};
 use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
 use super::filesystem::{FilesystemStatus, StratFilesystem};
@@ -186,28 +186,30 @@ impl ThinPool {
         // superblock DM issue error messages because it triggers code paths
         // that are trying to re-adopt the device with the attributes that
         // have been passed.
+        let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinMeta);
         let meta_dev = LinearDev::setup(dm,
-                                        &format_flex_name(pool_uuid, FlexRole::ThinMeta),
-                                        None,
+                                        &dm_name,
+                                        Some(&dm_uuid),
                                         segs_to_table(backstore.device(), &meta_segments))?;
         wipe_sectors(&meta_dev.devnode(), Sectors(0), thin_pool_size.meta_size())?;
 
+        let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinData);
         let data_dev = LinearDev::setup(dm,
-                                        &format_flex_name(pool_uuid, FlexRole::ThinData),
-                                        None,
+                                        &dm_name,
+                                        Some(&dm_uuid),
                                         segs_to_table(backstore.device(), &data_segments))?;
 
-        let mdv_name = format_flex_name(pool_uuid, FlexRole::MetadataVolume);
+        let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);
         let mdv_dev = LinearDev::setup(dm,
-                                       &mdv_name,
-                                       None,
+                                       &dm_name,
+                                       Some(&dm_uuid),
                                        segs_to_table(backstore.device(), &mdv_segments))?;
         let mdv = MetadataVol::initialize(pool_uuid, mdv_dev)?;
 
-        let name = format_thinpool_name(pool_uuid, ThinPoolRole::Pool);
+        let (dm_name, dm_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
         let thinpool_dev = ThinPoolDev::new(dm,
-                                            &name,
-                                            None,
+                                            &dm_name,
+                                            Some(&dm_uuid),
                                             meta_dev,
                                             data_dev,
                                             data_block_size,
@@ -244,7 +246,7 @@ impl ThinPool {
         let data_segments = flex_devs.thin_data_dev.to_vec();
         let spare_segments = flex_devs.thin_meta_dev_spare.to_vec();
 
-        let thinpool_name = format_thinpool_name(pool_uuid, ThinPoolRole::Pool);
+        let (thinpool_name, thinpool_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
         let (meta_dev, meta_segments, spare_segments) = setup_metadev(dm,
                                                                       pool_uuid,
                                                                       &thinpool_name,
@@ -252,22 +254,24 @@ impl ThinPool {
                                                                       meta_segments,
                                                                       spare_segments)?;
 
+        let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinData);
         let data_dev = LinearDev::setup(dm,
-                                        &format_flex_name(pool_uuid, FlexRole::ThinData),
-                                        None,
+                                        &dm_name,
+                                        Some(&dm_uuid),
                                         segs_to_table(backstore.device(), &data_segments))?;
 
         let thinpool_dev = ThinPoolDev::setup(dm,
                                               &thinpool_name,
-                                              None,
+                                              Some(&thinpool_uuid),
                                               meta_dev,
                                               data_dev,
                                               data_block_size,
                                               low_water_mark)?;
 
+        let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);
         let mdv_dev = LinearDev::setup(dm,
-                                       &format_flex_name(pool_uuid, FlexRole::MetadataVolume),
-                                       None,
+                                       &dm_name,
+                                       Some(&dm_uuid),
                                        segs_to_table(backstore.device(), &mdv_segments))?;
         let mdv = MetadataVol::setup(pool_uuid, mdv_dev)?;
         let filesystem_metadatas = mdv.filesystems()?;
@@ -276,10 +280,11 @@ impl ThinPool {
         let filesystems = filesystem_metadatas
             .iter()
             .map(|fssave| {
-                let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fssave.uuid));
+                let (dm_name, dm_uuid) = format_thin_ids(pool_uuid,
+                                                         ThinRole::Filesystem(fssave.uuid));
                 let thin_dev = ThinDev::setup(dm,
-                                              &device_name,
-                                              None,
+                                              &dm_name,
+                                              Some(&dm_uuid),
                                               fssave.size,
                                               &thinpool_dev,
                                               fssave.thin_id)?;
@@ -535,10 +540,10 @@ impl ThinPool {
                              size: Option<Sectors>)
                              -> EngineResult<FilesystemUuid> {
         let fs_uuid = Uuid::new_v4();
-        let device_name = format_thin_name(self.pool_uuid, ThinRole::Filesystem(fs_uuid));
+        let (dm_name, dm_uuid) = format_thin_ids(self.pool_uuid, ThinRole::Filesystem(fs_uuid));
         let thin_dev = ThinDev::new(dm,
-                                    &device_name,
-                                    None,
+                                    &dm_name,
+                                    Some(&dm_uuid),
                                     size.unwrap_or(DEFAULT_THIN_DEV_SIZE),
                                     &self.thin_pool,
                                     self.id_gen.new_id()?)?;
@@ -561,8 +566,8 @@ impl ThinPool {
                                snapshot_name: &str)
                                -> EngineResult<FilesystemUuid> {
         let snapshot_fs_uuid = Uuid::new_v4();
-        let snapshot_dmname = format_thin_name(self.pool_uuid,
-                                               ThinRole::Filesystem(snapshot_fs_uuid));
+        let (snapshot_dm_name, snapshot_dm_uuid) =
+            format_thin_ids(self.pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));
         let snapshot_id = self.id_gen.new_id()?;
         let new_filesystem = match self.get_filesystem_by_uuid(origin_uuid) {
             Some((fs_name, filesystem)) => {
@@ -570,7 +575,8 @@ impl ThinPool {
                     .snapshot(dm,
                               &self.thin_pool,
                               snapshot_name,
-                              &snapshot_dmname,
+                              &snapshot_dm_name,
+                              Some(&snapshot_dm_uuid),
                               &fs_name,
                               snapshot_fs_uuid,
                               snapshot_id)?
@@ -632,10 +638,10 @@ impl ThinPool {
 
     /// The names of DM devices belonging to this pool that may generate events
     pub fn get_eventing_dev_names(&self) -> Vec<DmNameBuf> {
-        vec![format_flex_name(self.pool_uuid, FlexRole::ThinMeta),
-             format_flex_name(self.pool_uuid, FlexRole::ThinData),
-             format_flex_name(self.pool_uuid, FlexRole::MetadataVolume),
-             format_thinpool_name(self.pool_uuid, ThinPoolRole::Pool)]
+        vec![format_flex_ids(self.pool_uuid, FlexRole::ThinMeta).0,
+             format_flex_ids(self.pool_uuid, FlexRole::ThinData).0,
+             format_flex_ids(self.pool_uuid, FlexRole::MetadataVolume).0,
+             format_thinpool_ids(self.pool_uuid, ThinPoolRole::Pool).0]
 
     }
 }
@@ -672,9 +678,10 @@ fn setup_metadev(dm: &DM,
                  spare_segments: Vec<(Sectors, Sectors)>)
                  -> EngineResult<(LinearDev, Vec<(Sectors, Sectors)>, Vec<(Sectors, Sectors)>)> {
     #![allow(collapsible_if)]
+    let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinMeta);
     let mut meta_dev = LinearDev::setup(dm,
-                                        &format_flex_name(pool_uuid, FlexRole::ThinMeta),
-                                        None,
+                                        &dm_name,
+                                        Some(&dm_uuid),
                                         segs_to_table(device, &meta_segments))?;
 
     if !device_exists(dm, thinpool_name)? {
@@ -703,9 +710,10 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
                        device: Device,
                        spare_segments: &[(Sectors, Sectors)])
                        -> EngineResult<LinearDev> {
+    let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinMetaSpare);
     let mut new_meta_dev = LinearDev::setup(dm,
-                                            &format_flex_name(pool_uuid, FlexRole::ThinMetaSpare),
-                                            None,
+                                            &dm_name,
+                                            Some(&dm_uuid),
                                             segs_to_table(device, spare_segments))?;
 
     execute_cmd(Command::new("thin_repair")
@@ -968,10 +976,10 @@ mod tests {
             .unwrap()
             .1
             .thin_id();
-        let device_name = format_thin_name(pool_uuid, ThinRole::Filesystem(fs_uuid));
+        let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
         let thindev = ThinDev::setup(&dm,
-                                     &device_name,
-                                     None,
+                                     &dm_name,
+                                     Some(&dm_uuid),
                                      DEFAULT_THIN_DEV_SIZE,
                                      &pool.thin_pool,
                                      thin_id);
@@ -979,7 +987,7 @@ mod tests {
         pool.destroy_filesystem(&dm, pool_name, fs_uuid).unwrap();
 
         let thindev = ThinDev::setup(&dm,
-                                     &device_name,
+                                     &dm_name,
                                      None,
                                      DEFAULT_THIN_DEV_SIZE,
                                      &pool.thin_pool,

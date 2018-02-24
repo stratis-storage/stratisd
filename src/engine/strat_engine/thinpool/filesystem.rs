@@ -68,7 +68,7 @@ impl StratFilesystem {
                     -> EngineResult<StratFilesystem> {
 
         match self.thin_dev
-                  .snapshot(dm, thin_pool, snapshot_dmname, snapshot_thin_id) {
+                  .snapshot(dm, snapshot_dmname, None, thin_pool, snapshot_thin_id) {
             Ok(thin_dev) => {
                 // If the source is mounted, XFS puts a dummy record in the
                 // log to enforce replay of the snapshot to deal with any

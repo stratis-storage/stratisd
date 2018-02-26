@@ -405,13 +405,22 @@ impl Backstore {
                         let pool_uuid = self.data_tier.block_mgr.pool_uuid();
                         let bdm =
                             BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
+
                         let linear = self.linear
                             .take()
                             .expect("cache_tier.is_none() <=> self.linear.is_some()");
                         let (mut cache_tier, mut cache) = CacheTier::new(dm, bdm, linear)?;
-                        let uuids = cache_tier.add(dm, &mut cache, paths, force)?;
                         self.cache = Some(cache);
+
+                        let uuids = cache_tier
+                            .block_mgr
+                            .blockdevs()
+                            .iter()
+                            .map(|&(uuid, _)| uuid)
+                            .collect::<Vec<_>>();
+
                         self.cache_tier = Some(cache_tier);
+
                         Ok(uuids)
                     }
                 }

@@ -43,10 +43,8 @@ struct DataTier {
 
 impl DataTier {
     /// Setup a previously existing data layer from the block_mgr and
-    /// previously allocated segments. There is a possibility that the
-    /// size of some blockdev has changed for the bigger since the last time
-    /// its metadata was recorded, so allocate any unallocated segments that
-    /// might have resulted from this.
+    /// previously allocated segments.
+    ///
     /// WARNING: metadata changing event
     pub fn setup(dm: &DM,
                  block_mgr: BlockDevMgr,

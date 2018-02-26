@@ -543,8 +543,14 @@ impl Backstore {
 impl Recordable<BackstoreSave> for Backstore {
     fn record(&self) -> BackstoreSave {
         BackstoreSave {
-            data_segments: self.data_tier.segments.record(),
             block_devs: self.data_tier.block_mgr.record(),
+            cache_segments: self.cache_tier
+                .as_ref()
+                .map(|c| c.cache_segments.record()),
+            data_segments: self.data_tier.segments.record(),
+            meta_segments: self.cache_tier
+                .as_ref()
+                .map(|c| c.meta_segments.record()),
             next: self.next,
         }
     }

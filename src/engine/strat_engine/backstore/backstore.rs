@@ -242,8 +242,8 @@ impl CacheTier {
     /// Adds all additional space to cache sub-device.
     /// WARNING: metadata changing event
     pub fn add(&mut self,
-               _dm: &DM,
-               _cache_device: &mut CacheDev,
+               dm: &DM,
+               cache_device: &mut CacheDev,
                paths: &[&Path],
                force: bool)
                -> EngineResult<Vec<DevUuid>> {
@@ -258,9 +258,9 @@ impl CacheTier {
             .cloned()
             .collect::<Vec<_>>();
         let coalesced = coalesce_blkdevsegs(&self.cache_segments, &segments);
-        let _table = map_to_dm(&coalesced);
+        let table = map_to_dm(&coalesced);
 
-        // FIXME: Set the cache table.
+        cache_device.set_cache_table(dm, table)?;
 
         self.cache_segments = coalesced;
 

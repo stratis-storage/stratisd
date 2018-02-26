@@ -172,7 +172,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                      backstore_save: &BackstoreSave,
                      devnodes: &HashMap<Device, PathBuf>)
                      -> EngineResult<Vec<StratBlockDev>> {
-    let segments = &backstore_save.segments;
+    let segments = &backstore_save.data_segments;
 
     let mut segment_table = HashMap::new();
     for seg in segments {

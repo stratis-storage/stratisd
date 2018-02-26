@@ -65,7 +65,7 @@ pub struct FlexDevsSave {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BackstoreSave {
-    pub segments: Vec<(Uuid, Sectors, Sectors)>,
+    pub data_segments: Vec<(Uuid, Sectors, Sectors)>,
     pub block_devs: Vec<BlockDevSave>,
     pub next: Sectors,
 }

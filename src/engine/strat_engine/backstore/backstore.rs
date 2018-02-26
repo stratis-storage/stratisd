@@ -347,7 +347,7 @@ impl Backstore {
                  -> EngineResult<Backstore> {
         let blockdevs = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
         let block_mgr = BlockDevMgr::new(pool_uuid, blockdevs, last_update_time);
-        let (data_tier, dm_device) = DataTier::setup(dm, block_mgr, &backstore_save.segments)?;
+        let (data_tier, dm_device) = DataTier::setup(dm, block_mgr, &backstore_save.data_segments)?;
         Ok(Backstore {
                data_tier,
                cache_tier: None,
@@ -543,7 +543,7 @@ impl Backstore {
 impl Recordable<BackstoreSave> for Backstore {
     fn record(&self) -> BackstoreSave {
         BackstoreSave {
-            segments: self.data_tier.segments.record(),
+            data_segments: self.data_tier.segments.record(),
             block_devs: self.data_tier.block_mgr.record(),
             next: self.next,
         }

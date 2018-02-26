@@ -132,8 +132,8 @@ impl StratPool {
     }
 
     /// Teardown a pool.
-    pub fn teardown(self) -> EngineResult<()> {
-        self.thin_pool.teardown(&DM::new()?)
+    pub fn teardown(self, dm: &DM) -> EngineResult<()> {
+        self.thin_pool.teardown(dm)
     }
 
     pub fn has_filesystems(&self) -> bool {
@@ -330,8 +330,8 @@ mod tests {
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
 
-        pool1.teardown().unwrap();
-        pool2.teardown().unwrap();
+        pool1.teardown(&dm).unwrap();
+        pool2.teardown(&dm).unwrap();
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 2);
         let devnodes1 = pools.get(&uuid1).unwrap();

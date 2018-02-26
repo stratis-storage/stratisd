@@ -409,7 +409,7 @@ impl Backstore {
                         let linear = self.linear
                             .take()
                             .expect("cache_tier.is_none() <=> self.linear.is_some()");
-                        let (mut cache_tier, mut cache) = CacheTier::new(dm, bdm, linear)?;
+                        let (cache_tier, cache) = CacheTier::new(dm, bdm, linear)?;
                         self.cache = Some(cache);
 
                         let uuids = cache_tier

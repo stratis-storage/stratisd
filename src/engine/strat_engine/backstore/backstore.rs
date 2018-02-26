@@ -216,6 +216,67 @@ struct CacheTier {
 }
 
 impl CacheTier {
+    /// Setup a previously existing cache layer from the block_mgr and
+    /// previously allocated segments.
+    ///
+    /// Returns the CacheTier and the cache DM device that was created during
+    /// setup.
+    ///
+    /// WARNING: metadata changing event
+    pub fn setup(dm: &DM,
+                 block_mgr: BlockDevMgr,
+                 origin: LinearDev,
+                 cache_segments: &[(DevUuid, Sectors, Sectors)],
+                 meta_segments: &[(DevUuid, Sectors, Sectors)])
+                 -> EngineResult<(CacheTier, CacheDev)> {
+        if block_mgr.avail_space() != Sectors(0) {
+            let err_msg = format!("{} unallocated to device; probable metadata corruption",
+                                  block_mgr.avail_space());
+            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+        }
+
+        let uuid_to_devno = block_mgr.uuid_to_devno();
+        let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> EngineResult<BlkDevSegment> {
+            let device = uuid_to_devno(triple.0)
+                .ok_or_else(|| {
+                                EngineError::Engine(ErrorEnum::NotFound,
+                                                    format!("missing device for UUUD {:?}",
+                                                            &triple.0))
+                            })?;
+            Ok(BlkDevSegment::new(triple.0, Segment::new(device, triple.1, triple.2)))
+        };
+
+        let meta_segments = meta_segments
+            .iter()
+            .map(&mapper)
+            .collect::<EngineResult<Vec<_>>>()?;
+        let (dm_name, dm_uuid) = format_backstore_ids(block_mgr.pool_uuid(), CacheRole::MetaSub);
+        let meta = LinearDev::setup(dm, &dm_name, Some(&dm_uuid), map_to_dm(&meta_segments))?;
+
+        let cache_segments = cache_segments
+            .iter()
+            .map(&mapper)
+            .collect::<EngineResult<Vec<_>>>()?;
+        let (dm_name, dm_uuid) = format_backstore_ids(block_mgr.pool_uuid(), CacheRole::CacheSub);
+        let cache = LinearDev::setup(dm, &dm_name, Some(&dm_uuid), map_to_dm(&cache_segments))?;
+
+        let (dm_name, dm_uuid) = format_backstore_ids(block_mgr.pool_uuid(), CacheRole::Cache);
+        let cd = CacheDev::setup(dm,
+                                 &dm_name,
+                                 Some(&dm_uuid),
+                                 meta,
+                                 cache,
+                                 origin,
+                                 MIN_CACHE_BLOCK_SIZE)?;
+
+        Ok((CacheTier {
+                block_mgr,
+                meta_segments,
+                cache_segments,
+            },
+            cd))
+    }
+
     /// Destroy the tier. Wipe its blockdevs.
     pub fn destroy(self) -> EngineResult<()> {
         self.block_mgr.destroy_all()
@@ -345,14 +406,33 @@ impl Backstore {
                  devnodes: &HashMap<Device, PathBuf>,
                  last_update_time: Option<DateTime<Utc>>)
                  -> EngineResult<Backstore> {
-        let (datadevs, _) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
+        let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
         let block_mgr = BlockDevMgr::new(pool_uuid, datadevs, last_update_time);
         let (data_tier, dm_device) = DataTier::setup(dm, block_mgr, &backstore_save.data_segments)?;
+
+        let (cache_tier, cache, linear) = if !cachedevs.is_empty() {
+            let block_mgr = BlockDevMgr::new(pool_uuid, cachedevs, last_update_time);
+            match (&backstore_save.cache_segments, &backstore_save.meta_segments) {
+                (&Some(ref cache_segments), &Some(ref meta_segments)) => {
+                    let (cache_tier, cache_device) =
+                        CacheTier::setup(dm, block_mgr, dm_device, cache_segments, meta_segments)?;
+                    (Some(cache_tier), Some(cache_device), None)
+
+                }
+                _ => {
+                    let err_msg = "Cachedevs exist, but meta or cache segments are not allocated";
+                    return Err(EngineError::Engine(ErrorEnum::Error, err_msg.into()));
+                }
+            }
+        } else {
+            (None, None, Some(dm_device))
+        };
+
         Ok(Backstore {
                data_tier,
-               cache_tier: None,
-               linear: Some(dm_device),
-               cache: None,
+               cache_tier,
+               linear,
+               cache,
                next: backstore_save.next,
            })
     }
@@ -487,9 +567,13 @@ impl Backstore {
         self.data_tier.destroy()
     }
 
-    /// Teardown the store, i.e., the DM devices.
+    /// Teardown the DM devices in the backstore.
     pub fn teardown(self, dm: &DM) -> EngineResult<()> {
-        self.dm_device.teardown(dm).map_err(|e| e.into())
+        match self.cache {
+                Some(cache) => cache.teardown(dm),
+                None => self.linear.expect("cache.is_none()").teardown(dm),
+            }
+            .map_err(|e| e.into())
     }
 
     /// Return the device that this tier is currently using.

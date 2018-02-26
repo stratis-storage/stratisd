@@ -193,7 +193,7 @@ impl StratFilesystem {
     pub fn record(&self, name: &Name, uuid: FilesystemUuid) -> FilesystemSave {
         FilesystemSave {
             name: name.to_owned(),
-            uuid: uuid,
+            uuid,
             thin_id: self.thin_dev.id(),
             size: self.thin_dev.size(),
         }

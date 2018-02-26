@@ -345,8 +345,8 @@ impl Backstore {
                  devnodes: &HashMap<Device, PathBuf>,
                  last_update_time: Option<DateTime<Utc>>)
                  -> EngineResult<Backstore> {
-        let blockdevs = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
-        let block_mgr = BlockDevMgr::new(pool_uuid, blockdevs, last_update_time);
+        let (datadevs, _) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
+        let block_mgr = BlockDevMgr::new(pool_uuid, datadevs, last_update_time);
         let (data_tier, dm_device) = DataTier::setup(dm, block_mgr, &backstore_save.data_segments)?;
         Ok(Backstore {
                data_tier,

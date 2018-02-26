@@ -196,7 +196,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
         }
     }
 
-    let mut blockdevs = vec![];
+    let mut datadevs = vec![];
     for (device, devnode) in devnodes {
         let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
         if let Some(bda) = bda {
@@ -213,7 +213,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                 }
 
                 let bd_save = backstore_save
-                    .block_devs
+                    .data_devs
                     .iter()
                     .find(|bds| bds.uuid == bda.dev_uuid())
                     .ok_or_else(|| {
@@ -227,20 +227,20 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                 // available to be allocated. If this fails, the most likely
                 // conclusion is metadata corruption.
                 let segments = segment_table.get(&bda.dev_uuid());
-                blockdevs.push(StratBlockDev::new(*device,
-                                                  devnode.to_owned(),
-                                                  bda,
-                                                  segments.unwrap_or(&vec![]),
-                                                  bd_save.user_info.clone(),
-                                                  bd_save.hardware_info.clone())?);
+                datadevs.push(StratBlockDev::new(*device,
+                                                 devnode.to_owned(),
+                                                 bda,
+                                                 segments.unwrap_or(&vec![]),
+                                                 bd_save.user_info.clone(),
+                                                 bd_save.hardware_info.clone())?);
             }
         }
     }
 
     // Verify that blockdevs found match blockdevs recorded.
-    let current_uuids: HashSet<_> = blockdevs.iter().map(|b| b.uuid()).collect();
+    let current_uuids: HashSet<_> = datadevs.iter().map(|b| b.uuid()).collect();
     let recorded_uuids: HashSet<_> = backstore_save
-        .block_devs
+        .data_devs
         .iter()
         .map(|bds| bds.uuid)
         .collect();
@@ -250,10 +250,10 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
         return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
     }
 
-    if blockdevs.len() != current_uuids.len() {
+    if datadevs.len() != current_uuids.len() {
         let err_msg = "Duplicate block devices found in environment";
         return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
     }
 
-    Ok(blockdevs)
+    Ok(datadevs)
 }

@@ -133,7 +133,8 @@ impl StratPool {
 
     /// Teardown a pool.
     pub fn teardown(self, dm: &DM) -> EngineResult<()> {
-        self.thin_pool.teardown(dm)
+        self.thin_pool.teardown(dm)?;
+        self.backstore.teardown(dm)
     }
 
     pub fn has_filesystems(&self) -> bool {

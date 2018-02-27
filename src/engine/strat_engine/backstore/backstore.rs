@@ -644,6 +644,8 @@ impl Recordable<BackstoreSave> for Backstore {
 #[cfg(test)]
 mod tests {
 
+    use devicemapper::{CacheDevStatus, DataBlocks};
+
     use uuid::Uuid;
 
     use super::super::super::tests::{loopbacked, real};
@@ -667,41 +669,85 @@ mod tests {
 
     /// Test adding cachedevs to the backstore.
     /// When cachedevs are added, cache tier, etc. must exist.
+    /// Nonetheless, because nothing is written or read, cache usage ought
+    /// to be 0. Adding some more cachedevs exercises different code path
+    /// from adding initial cachedevs.
     fn test_add_cache_devs(paths: &[&Path]) -> () {
-        assert!(paths.len() > 1);
+        assert!(paths.len() > 2);
 
-        let (paths1, paths2) = paths.split_at(paths.len() / 2);
+        let (initcachepaths, paths) = paths.split_at(1);
+        let (cachedevpaths, datadevpaths) = paths.split_at(1);
 
         let dm = DM::new().unwrap();
         let mut backstore =
-            Backstore::initialize(&dm, Uuid::new_v4(), paths1, MIN_MDA_SECTORS, false).unwrap();
+            Backstore::initialize(&dm, Uuid::new_v4(), datadevpaths, MIN_MDA_SECTORS, false)
+                .unwrap();
 
         invariant(&backstore);
 
         let cache_uuids = backstore
-            .add_blockdevs(&dm, paths2, BlockDevTier::Cache, false)
+            .add_blockdevs(&dm, initcachepaths, BlockDevTier::Cache, false)
             .unwrap();
 
         invariant(&backstore);
 
-        assert_eq!(cache_uuids.len(), paths2.len());
+        assert_eq!(cache_uuids.len(), initcachepaths.len());
         assert!(backstore.linear.is_none());
+
+        let cache_status = backstore
+            .cache
+            .as_ref()
+            .map(|c| c.status(&dm).unwrap())
+            .unwrap();
+
+        match cache_status {
+            CacheDevStatus::Working(status) => {
+                let usage = &status.usage;
+                assert_eq!(usage.used_cache, DataBlocks(0));
+                assert_eq!(usage.total_meta, Sectors(4 * IEC::Ki).metablocks());
+                assert!(usage.total_cache > DataBlocks(0));
+            }
+            CacheDevStatus::Fail => panic!("cache status should succeed"),
+        }
+
+        let cache_uuids = backstore
+            .add_blockdevs(&dm, cachedevpaths, BlockDevTier::Cache, false)
+            .unwrap();
+        invariant(&backstore);
+        assert_eq!(cache_uuids.len(), cachedevpaths.len());
+
+        let cache_status = backstore
+            .cache
+            .as_ref()
+            .map(|c| c.status(&dm).unwrap())
+            .unwrap();
+
+        match cache_status {
+            CacheDevStatus::Working(status) => {
+                let usage = &status.usage;
+                assert_eq!(usage.used_cache, DataBlocks(0));
+                assert_eq!(usage.total_meta, Sectors(4 * IEC::Ki).metablocks());
+                assert!(usage.total_cache > DataBlocks(0));
+            }
+            CacheDevStatus::Fail => panic!("cache status should succeed"),
+        }
+
         backstore.destroy(&dm).unwrap();
     }
 
     #[test]
     pub fn loop_test_add_cache_devs() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_add_cache_devs);
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(3, 4), test_add_cache_devs);
     }
 
     #[test]
     pub fn real_test_add_cache_devs() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_add_cache_devs);
+        real::test_with_spec(real::DeviceLimits::AtLeast(3), test_add_cache_devs);
     }
 
     #[test]
     pub fn travis_test_add_cache_devs() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_add_cache_devs);
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(3, 4), test_add_cache_devs);
     }
 
     /// Create a backstore with a cache.

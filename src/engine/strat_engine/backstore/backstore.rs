@@ -648,6 +648,8 @@ mod tests {
 
     use super::super::super::tests::{loopbacked, real};
 
+    use super::super::setup::find_all;
+
     use super::*;
 
     /// Assert some invariants of the backstore
@@ -700,5 +702,59 @@ mod tests {
     #[test]
     pub fn travis_test_add_cache_devs() {
         loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_add_cache_devs);
+    }
+
+    /// Create a backstore with a cache.
+    /// Setup the same backstore, should succeed.
+    /// Tear down the backstore.
+    /// Setup the same backstore again.
+    /// Destroy all.
+    fn test_setup(paths: &[&Path]) -> () {
+        assert!(paths.len() > 1);
+
+        let (paths1, paths2) = paths.split_at(paths.len() / 2);
+
+        let dm = DM::new().unwrap();
+        let pool_uuid = Uuid::new_v4();
+
+        let mut backstore = Backstore::initialize(&dm, pool_uuid, paths1, MIN_MDA_SECTORS, false)
+            .unwrap();
+        invariant(&backstore);
+
+        backstore
+            .add_blockdevs(&dm, paths2, BlockDevTier::Cache, false)
+            .unwrap();
+        invariant(&backstore);
+
+        let backstore_save = backstore.record();
+
+        let map = find_all().unwrap();
+        let map = map.get(&pool_uuid).unwrap();
+        let backstore = Backstore::setup(&dm, pool_uuid, &backstore_save, &map, None).unwrap();
+        invariant(&backstore);
+
+        backstore.teardown(&dm).unwrap();
+
+        let map = find_all().unwrap();
+        let map = map.get(&pool_uuid).unwrap();
+        let backstore = Backstore::setup(&dm, pool_uuid, &backstore_save, &map, None).unwrap();
+        invariant(&backstore);
+
+        backstore.destroy(&dm).unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_setup() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_setup);
+    }
+
+    #[test]
+    pub fn real_test_setup() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_setup);
+    }
+
+    #[test]
+    pub fn travis_test_setup() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_setup);
     }
 }

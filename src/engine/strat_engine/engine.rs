@@ -91,7 +91,7 @@ impl StratEngine {
                     let evicted = table.insert(pool_name, *pool_uuid, pool);
                     if evicted.is_some() {
                         // TODO: update state machine on failure.
-                        let _ = teardown_pools(table);
+                        let _ = teardown_pools(&dm, table);
                         let err_msg = "found two pools with the same name";
                         return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
                     }
@@ -115,8 +115,9 @@ impl StratEngine {
     }
 
     /// Teardown Stratis, preparatory to a shutdown.
+    #[cfg(test)]
     pub fn teardown(self) -> EngineResult<()> {
-        teardown_pools(self.pools)
+        teardown_pools(&DM::new()?, self.pools)
     }
 }
 
@@ -194,7 +195,7 @@ impl Engine for StratEngine {
                                pool_name,
                                pool_uuid,
                                dev_paths);
-                        if let Err(e) = pool.teardown() {
+                        if let Err(e) = pool.teardown(&dm) {
                             error!("Error while tearing down pool with duplicate name! {:?}!",
                                    e);
                         }

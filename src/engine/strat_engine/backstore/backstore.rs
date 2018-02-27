@@ -253,6 +253,14 @@ impl Backstore {
         self.data_tier.destroy(dm)
     }
 
+    /// Teardown the store, i.e., the DM devices.
+    pub fn teardown(self, dm: &DM) -> EngineResult<()> {
+        self.data_tier
+            .dm_device
+            .teardown(dm)
+            .map_err(|e| e.into())
+    }
+
     /// Return the device that this tier is currently using.
     /// WARNING: This may change it the backstore switches between its
     /// cache and its non-cache incarnations, among other reasons.

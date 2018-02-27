@@ -4,6 +4,8 @@
 
 // Code to handle cleanup after a failed operation.
 
+use devicemapper::DM;
+
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 
@@ -11,10 +13,10 @@ use super::pool::StratPool;
 
 
 /// Teardown pools.
-pub fn teardown_pools(pools: Table<StratPool>) -> EngineResult<()> {
+pub fn teardown_pools(dm: &DM, pools: Table<StratPool>) -> EngineResult<()> {
     let mut untorndown_pools = Vec::new();
     for (_, uuid, pool) in pools {
-        pool.teardown()
+        pool.teardown(dm)
             .unwrap_or_else(|_| untorndown_pools.push(uuid));
     }
     if untorndown_pools.is_empty() {

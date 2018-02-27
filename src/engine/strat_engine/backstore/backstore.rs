@@ -577,8 +577,8 @@ impl Backstore {
     }
 
     /// Return the device that this tier is currently using.
-    /// WARNING: This may change it the backstore switches between its
-    /// cache and its non-cache incarnations, among other reasons.
+    /// This changes, depending on whether the backstore is supporting a cache
+    /// or not.
     pub fn device(&self) -> Device {
         self.cache
             .as_ref()

@@ -358,9 +358,14 @@ impl ThinPool {
 
                 if usage.used_data > cmp::max(usage.total_data, DATA_LOWATER) - DATA_LOWATER {
                     // Request expansion of physical space allocated to the pool
-                    // TODO: we just request that the space be doubled here.
+                    // TODO: we request that the space be doubled or use the remaining space by
+                    // requesting the minimum total_data vs. available space.
                     // A more sophisticated approach might be in order.
-                    match self.extend_thinpool(dm, usage.total_data, backstore) {
+                    match self.extend_thinpool(dm,
+                                               DataBlocks(cmp::min(*usage.total_data,
+                                                                   backstore.available() /
+                                                                   DATA_BLOCK_SIZE)),
+                                               backstore) {
                         #![allow(single_match)]
                         Ok(_) => should_save = true,
                         Err(_) => {} // TODO: Take pool offline?

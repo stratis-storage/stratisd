@@ -248,6 +248,11 @@ impl Backstore {
         self.data_tier.current_capacity()
     }
 
+    /// The available number of Sectors.
+    pub fn available(&self) -> Sectors {
+        self.data_tier.available()
+    }
+
     /// Destroy the entire store.
     pub fn destroy(self, dm: &DM) -> EngineResult<()> {
         self.data_tier.destroy(dm)

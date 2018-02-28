@@ -22,7 +22,7 @@ pub fn write_sectors<P: AsRef<Path>>(path: P,
     let mut f = BufWriter::with_capacity(IEC::Mi as usize,
                                          OpenOptions::new().write(true).open(path)?);
 
-    f.seek(SeekFrom::Start(*offset))?;
+    f.seek(SeekFrom::Start(*offset.bytes()))?;
     for _ in 0..*length {
         f.write_all(buf)?;
     }

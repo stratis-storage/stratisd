@@ -35,7 +35,11 @@ test-travis:
 test:
 	RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 cargo test -- --skip real_ --skip loop_ --skip travis_
 
-docs: stratisd.8
+docs: stratisd.8 docs-rust
+
+docs-travis: docs-rust
+
+docs-rust:
 	cargo doc --no-deps
 
 stratisd.8: docs/stratisd.txt
@@ -48,9 +52,13 @@ clippy:
 	build
 	clippy
 	docs
+	docs-rust
+	docs-travis
 	fmt
 	outdated
 	test
-	test-real
 	test-loop
+	test-real
+	test-travis
+	travis_fmt
 	tree

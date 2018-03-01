@@ -16,7 +16,7 @@ outdated: ${HOME}/.cargo/bin/cargo-outdated
 fmt: ${HOME}/.cargo/bin/cargo-fmt
 	PATH=${HOME}/.cargo/bin:${PATH} cargo fmt
 
-travis_fmt:
+fmt-travis:
 	rustup run stable cargo install rustfmt --vers 0.8.3 --force
 	cargo fmt -- --write-mode=diff
 
@@ -55,10 +55,10 @@ clippy:
 	docs-rust
 	docs-travis
 	fmt
+	fmt-travis
 	outdated
 	test
 	test-loop
 	test-real
 	test-travis
-	travis_fmt
 	tree

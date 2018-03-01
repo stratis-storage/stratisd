@@ -35,8 +35,11 @@ test-travis:
 test:
 	RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 cargo test -- --skip real_ --skip loop_ --skip travis_
 
-docs:
+docs: stratisd.8
 	cargo doc --no-deps
+
+stratisd.8: docs/stratisd.txt
+	a2x -f manpage docs/stratisd.txt
 
 clippy:
 	RUSTFLAGS='-D warnings' cargo build --features "clippy"

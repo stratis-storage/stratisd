@@ -7,6 +7,8 @@ addons:
           - libdbus-1-dev
           - libudev-dev
           - libdbus-glib-1-dev
+          - asciidoc
+          - libxml2-utils
 
 language: rust
 

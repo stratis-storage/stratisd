@@ -15,6 +15,7 @@ use super::super::super::engine::BlockDev;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
+use super::super::device::wipe_sectors;
 use super::super::dmnames::{CacheRole, format_backstore_ids};
 use super::super::serde_structs::{BackstoreSave, Recordable};
 
@@ -353,6 +354,10 @@ impl CacheTier {
 
         let (dm_name, dm_uuid) = format_backstore_ids(block_mgr.pool_uuid(), CacheRole::MetaSub);
         let meta = LinearDev::setup(dm, &dm_name, Some(&dm_uuid), map_to_dm(&meta_segments))?;
+
+        // See comment in ThinPool::new() method
+        wipe_sectors(&meta.devnode(), Sectors(0), meta.size())?;
+
 
         let (dm_name, dm_uuid) = format_backstore_ids(block_mgr.pool_uuid(), CacheRole::CacheSub);
         let cache = LinearDev::setup(dm, &dm_name, Some(&dm_uuid), map_to_dm(&cache_segments))?;

@@ -7,8 +7,6 @@ addons:
           - libdbus-1-dev
           - libudev-dev
           - libdbus-glib-1-dev
-          - asciidoc
-          - libxml2-utils
 
 language: rust
 
@@ -19,7 +17,7 @@ matrix:
         - rust: stable
           env: TASK=build
         - rust: stable
-          env: TASK=docs
+          env: TASK=docs-travis
         - rust: stable
           env: TASK=test
         - rust: stable

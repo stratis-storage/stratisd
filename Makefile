@@ -16,7 +16,7 @@ outdated: ${HOME}/.cargo/bin/cargo-outdated
 fmt: ${HOME}/.cargo/bin/cargo-fmt
 	PATH=${HOME}/.cargo/bin:${PATH} cargo fmt
 
-travis_fmt:
+fmt-travis:
 	rustup run stable cargo install rustfmt --vers 0.8.3 --force
 	cargo fmt -- --write-mode=diff
 
@@ -35,8 +35,15 @@ test-travis:
 test:
 	RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 cargo test -- --skip real_ --skip loop_ --skip travis_
 
-docs:
+docs: stratisd.8 docs-rust
+
+docs-travis: docs-rust
+
+docs-rust:
 	cargo doc --no-deps
+
+stratisd.8: docs/stratisd.txt
+	a2x -f manpage docs/stratisd.txt
 
 clippy:
 	RUSTFLAGS='-D warnings' cargo build --features "clippy"
@@ -45,9 +52,13 @@ clippy:
 	build
 	clippy
 	docs
+	docs-rust
+	docs-travis
 	fmt
+	fmt-travis
 	outdated
 	test
-	test-real
 	test-loop
+	test-real
+	test-travis
 	tree

@@ -323,6 +323,7 @@ impl CacheTier {
         let table = map_to_dm(&coalesced);
 
         cache_device.set_cache_table(dm, table)?;
+        cache_device.resume(dm)?;
 
         self.cache_segments = coalesced;
 

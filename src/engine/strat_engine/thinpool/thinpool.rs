@@ -11,9 +11,10 @@ use std::process::Command;
 use uuid::Uuid;
 
 use devicemapper as dm;
-use devicemapper::{DM, DataBlocks, Device, DmDevice, DmName, DmNameBuf, IEC, LinearDev,
-                   LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine,
-                   ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatusSummary, device_exists};
+use devicemapper::{DM, DataBlocks, Device, DmDevice, DmName, DmNameBuf, IEC, FlakeyTargetParams,
+                   LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors,
+                   TargetLine, ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatusSummary,
+                   device_exists};
 
 use super::super::super::engine::Filesystem;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -685,6 +686,66 @@ impl ThinPool {
         }
         self.thin_pool.resume(dm)?;
         Ok(())
+    }
+
+    /// Set the device on all DM devices
+    pub fn set_device(&mut self, dm: &DM, backstore_device: Device) -> EngineResult<bool> {
+        if backstore_device == self.backstore_device {
+            return Ok(false);
+        }
+
+        let xform_target_line =
+            |line: &TargetLine<LinearDevTargetParams>| -> TargetLine<LinearDevTargetParams> {
+                let new_params = match line.params {
+                    LinearDevTargetParams::Linear(ref params) => {
+                    LinearDevTargetParams::Linear(LinearTargetParams::new(backstore_device,
+                                                                          params.start_offset))
+                }
+                    LinearDevTargetParams::Flakey(ref params) => {
+                        let feature_args = params.feature_args.iter().cloned().collect::<Vec<_>>();
+                        LinearDevTargetParams::Flakey(FlakeyTargetParams::new(backstore_device,
+                                                                         params.start_offset,
+                                                                         params.up_interval,
+                                                                         params.down_interval,
+                                                                         feature_args))
+                    }
+                };
+
+                TargetLine::new(line.start, line.length, new_params)
+            };
+
+        let meta_table = self.thin_pool
+            .meta_dev()
+            .table()
+            .table
+            .clone()
+            .iter()
+            .map(&xform_target_line)
+            .collect::<Vec<_>>();
+
+        let data_table = self.thin_pool
+            .data_dev()
+            .table()
+            .table
+            .clone()
+            .iter()
+            .map(&xform_target_line)
+            .collect::<Vec<_>>();
+
+        let mdv_table = self.mdv
+            .device()
+            .table()
+            .table
+            .clone()
+            .iter()
+            .map(&xform_target_line)
+            .collect::<Vec<_>>();
+
+        self.thin_pool.set_meta_table(dm, meta_table)?;
+        self.thin_pool.set_data_table(dm, data_table)?;
+        self.mdv.set_table(dm, mdv_table)?;
+
+        return Ok(true);
     }
 }
 

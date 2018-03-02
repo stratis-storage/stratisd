@@ -13,11 +13,11 @@ language: rust
 matrix:
     include:
         - rust: stable
-          env: TASK=travis_fmt
+          env: TASK=fmt-travis
         - rust: stable
           env: TASK=build
         - rust: stable
-          env: TASK=docs
+          env: TASK=docs-travis
         - rust: stable
           env: TASK=test
         - rust: stable

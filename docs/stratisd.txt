@@ -1,0 +1,51 @@
+stratisd(8)
+==========
+
+NAME
+----
+stratisd - Daemon to create and monitor storage pools
+
+SYNOPSIS
+--------
+  stratisd [GLOBAL OPTIONS]
+
+DESCRIPTION
+-----------
+*stratisd* creates, manages, and monitors local storage pools. It is
+controlled by the user with the *stratis* command-line tool, or using D-Bus.
+
+Stratis *pools* created from one or more block devices (*blockdevs*),
+and then enables multiple *filesystems* to be created from the pool.
+
+Typically, Stratisd is not invoked by the user, but runs as a system service.
+
+GLOBAL OPTIONS
+--------------
+--debug::
+	Output additional diagnostic information when running.
+--sim::
+	Run with a simulated engine that does not actually perform storage
+	configuration, instead of the default engine.
+--help, -h::
+	Show help.
+
+
+SEE ALSO
+--------
+stratis(8)
+
+REPORTING BUGS & DEVELOPMENT
+-----------------------------
+GitHub for issues and development::
+       https://github.com/stratis-storage, against either 'stratis-cli' or
+'stratisd' projects, based on likelihood of issue being with the command-line
+tool or the service daemon.
+Mailing list::
+	stratis-devel@lists.fedorahosted.org for general development
+	discussion
+
+LICENSE
+-------
+stratisd is licensed under the *Mozilla Public License, Version 2.0*. Software
+distributed under this license is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied.

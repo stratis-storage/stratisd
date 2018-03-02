@@ -11,6 +11,8 @@ target
 .settings
 .vscode
 tests/test_config.json
+# man pages
+*.8
 
 # python files
 *.pyc

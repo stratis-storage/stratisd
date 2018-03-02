@@ -283,6 +283,11 @@ impl CacheTier {
         self.block_mgr.destroy_all()
     }
 
+    /// Get all the blockdevs belonging to this tier.
+    pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
+        self.block_mgr.blockdevs()
+    }
+
     /// Lookup an immutable blockdev by its Stratis UUID.
     pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
         self.block_mgr
@@ -542,7 +547,17 @@ impl Backstore {
     /// This includes blockdevs, cachedevs, any device about which information
     /// may be placed on the D-Bus.
     pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
-        self.data_tier.blockdevs()
+        match self.cache_tier {
+            Some(ref cache) => {
+                cache
+                    .blockdevs()
+                    .iter()
+                    .chain(self.data_tier.blockdevs().iter())
+                    .map(|&x| x)
+                    .collect()
+            }
+            None => self.data_tier.blockdevs(),
+        }
     }
 
     /// The current capacity of all the blockdevs in the data tier.

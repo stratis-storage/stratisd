@@ -150,6 +150,10 @@ pub struct ThinPool {
     id_gen: ThinDevIdPool,
     filesystems: Table<StratFilesystem>,
     mdv: MetadataVol,
+    /// The single DM device that the backstore presents as its upper-most
+    /// layer. All DM components obtain their storage from this layer.
+    /// The device will change if the backstore adds or removes a cache.
+    backstore_device: Device,
 }
 
 impl ThinPool {
@@ -178,6 +182,8 @@ impl ThinPool {
         let spare_segments = segments_list.pop().expect("len(segments_list) == 2");
         let meta_segments = segments_list.pop().expect("len(segments_list) == 1");
 
+        let backstore_device = backstore.device();
+
         // When constructing a thin-pool, Stratis reserves the first N
         // sectors on a block device by creating a linear device with a
         // starting offset. DM writes the super block in the first block.
@@ -190,20 +196,20 @@ impl ThinPool {
         let meta_dev = LinearDev::setup(dm,
                                         &dm_name,
                                         Some(&dm_uuid),
-                                        segs_to_table(backstore.device(), &meta_segments))?;
+                                        segs_to_table(backstore_device, &meta_segments))?;
         wipe_sectors(&meta_dev.devnode(), Sectors(0), thin_pool_size.meta_size())?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinData);
         let data_dev = LinearDev::setup(dm,
                                         &dm_name,
                                         Some(&dm_uuid),
-                                        segs_to_table(backstore.device(), &data_segments))?;
+                                        segs_to_table(backstore_device, &data_segments))?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);
         let mdv_dev = LinearDev::setup(dm,
                                        &dm_name,
                                        Some(&dm_uuid),
-                                       segs_to_table(backstore.device(), &mdv_segments))?;
+                                       segs_to_table(backstore_device, &mdv_segments))?;
         let mdv = MetadataVol::initialize(pool_uuid, mdv_dev)?;
 
         let (dm_name, dm_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
@@ -224,6 +230,7 @@ impl ThinPool {
                id_gen: ThinDevIdPool::new_from_ids(&[]),
                filesystems: Table::default(),
                mdv,
+               backstore_device,
            })
     }
 
@@ -246,11 +253,13 @@ impl ThinPool {
         let data_segments = flex_devs.thin_data_dev.to_vec();
         let spare_segments = flex_devs.thin_meta_dev_spare.to_vec();
 
+        let backstore_device = backstore.device();
+
         let (thinpool_name, thinpool_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
         let (meta_dev, meta_segments, spare_segments) = setup_metadev(dm,
                                                                       pool_uuid,
                                                                       &thinpool_name,
-                                                                      backstore.device(),
+                                                                      backstore_device,
                                                                       meta_segments,
                                                                       spare_segments)?;
 
@@ -258,7 +267,7 @@ impl ThinPool {
         let data_dev = LinearDev::setup(dm,
                                         &dm_name,
                                         Some(&dm_uuid),
-                                        segs_to_table(backstore.device(), &data_segments))?;
+                                        segs_to_table(backstore_device, &data_segments))?;
 
         let thinpool_dev = ThinPoolDev::setup(dm,
                                               &thinpool_name,
@@ -272,7 +281,7 @@ impl ThinPool {
         let mdv_dev = LinearDev::setup(dm,
                                        &dm_name,
                                        Some(&dm_uuid),
-                                       segs_to_table(backstore.device(), &mdv_segments))?;
+                                       segs_to_table(backstore_device, &mdv_segments))?;
         let mdv = MetadataVol::setup(pool_uuid, mdv_dev)?;
         let filesystem_metadatas = mdv.filesystems()?;
 
@@ -314,6 +323,7 @@ impl ThinPool {
                id_gen: ThinDevIdPool::new_from_ids(&thin_ids),
                filesystems: fs_table,
                mdv,
+               backstore_device,
            })
     }
 
@@ -323,6 +333,7 @@ impl ThinPool {
     /// metadata save has been made.
     pub fn check(&mut self, dm: &DM, backstore: &mut Backstore) -> EngineResult<bool> {
         #![allow(match_same_arms)]
+        assert_eq!(backstore.device(), self.backstore_device);
 
         let mut should_save: bool = false;
 
@@ -417,9 +428,11 @@ impl ThinPool {
                        extend_size: DataBlocks,
                        backstore: &mut Backstore)
                        -> EngineResult<DataBlocks> {
+        let backstore_device = self.backstore_device;
+        assert_eq!(backstore.device(), backstore_device);
         if let Some(new_data_regions) = backstore.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
             self.extend_data(dm,
-                             backstore.device(),
+                             backstore_device,
                              new_data_regions
                                  .first()
                                  .expect("len(new_data_regions) == 1"))?;
@@ -438,9 +451,11 @@ impl ThinPool {
                             extend_size: MetaBlocks,
                             backstore: &mut Backstore)
                             -> EngineResult<MetaBlocks> {
+        let backstore_device = self.backstore_device;
+        assert_eq!(backstore.device(), backstore_device);
         if let Some(new_meta_regions) = backstore.alloc_space(&[extend_size.sectors()]) {
             self.extend_meta(dm,
-                             backstore.device(),
+                             backstore_device,
                              new_meta_regions
                                  .first()
                                  .expect("len(new_meta_regions) == 1"))?;

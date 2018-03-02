@@ -36,6 +36,11 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return: Vec<(dbus::Path, &str)> = Vec::new();
 
+    if filesystems.nth(1).is_some() {
+        let err_msg = "only 1 filesystem per request allowed";
+        let (rc, rs) = (u16::from(DbusErrorEnum::ERROR), err_msg);
+        return Ok(vec![return_message.append3(default_return, rc, rs)]);
+    }
 
     let pool_path = m.tree
         .get(object_path)

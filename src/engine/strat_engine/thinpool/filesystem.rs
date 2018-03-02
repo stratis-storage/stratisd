@@ -198,6 +198,16 @@ impl StratFilesystem {
             size: self.thin_dev.size(),
         }
     }
+
+    pub fn suspend(&mut self, dm: &DM) -> EngineResult<()> {
+        self.thin_dev.suspend(dm)?;
+        Ok(())
+    }
+
+    pub fn resume(&mut self, dm: &DM) -> EngineResult<()> {
+        self.thin_dev.resume(dm)?;
+        Ok(())
+    }
 }
 
 impl Filesystem for StratFilesystem {

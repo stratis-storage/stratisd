@@ -666,6 +666,26 @@ impl ThinPool {
              format_thinpool_ids(self.pool_uuid, ThinPoolRole::Pool).0]
 
     }
+
+    /// Suspend the thinpool
+    pub fn suspend(&mut self, dm: &DM) -> EngineResult<()> {
+        for (_, _, fs) in &mut self.filesystems {
+            fs.suspend(dm)?;
+        }
+        self.thin_pool.suspend(dm)?;
+        self.mdv.suspend(dm)?;
+        Ok(())
+    }
+
+    /// Resume the thinpool
+    pub fn resume(&mut self, dm: &DM) -> EngineResult<()> {
+        self.mdv.resume(dm)?;
+        for (_, _, fs) in &mut self.filesystems {
+            fs.resume(dm)?;
+        }
+        self.thin_pool.resume(dm)?;
+        Ok(())
+    }
 }
 
 impl Recordable<FlexDevsSave> for ThinPool {

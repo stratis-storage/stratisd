@@ -201,6 +201,18 @@ impl MetadataVol {
 
         Ok(())
     }
+
+    /// Suspend the metadata volume DM devices
+    pub fn suspend(&mut self, dm: &DM) -> EngineResult<()> {
+        self.dev.suspend(dm)?;
+        Ok(())
+    }
+
+    /// Resume the metadata volume DM devices
+    pub fn resume(&mut self, dm: &DM) -> EngineResult<()> {
+        self.dev.resume(dm)?;
+        Ok(())
+    }
 }
 
 /// Remove temp files from the designated directory.

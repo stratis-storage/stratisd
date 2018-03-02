@@ -204,7 +204,9 @@ impl Pool for StratPool {
                      force: bool)
                      -> EngineResult<Vec<DevUuid>> {
         let dm = DM::new()?;
+        self.thin_pool.suspend(&dm)?;
         let bdev_info = self.backstore.add_blockdevs(&dm, paths, tier, force)?;
+        self.thin_pool.resume(&dm)?;
         self.write_metadata(pool_name)?;
         Ok(bdev_info)
     }

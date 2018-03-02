@@ -1,0 +1,17 @@
+[Unit]
+Description=A daemon that manages a pool of block devices to create flexible file systems
+Documentation=man:stratisd(8)
+Before=local-fs-pre.target
+DefaultDependencies=no
+
+[Service]
+Type=dbus
+BusName=org.storage.stratis1
+ExecStart=/usr/libexec/stratisd --debug
+KillSignal=SIGINT
+Restart=on-abort
+StandardOutput=syslog
+StandardError=syslog
+
+[Install]
+WantedBy=sysinit.target

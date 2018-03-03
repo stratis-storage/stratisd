@@ -20,9 +20,12 @@ import time
 import unittest
 
 from stratisd_client_dbus import Manager
+from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import Pool
 from stratisd_client_dbus import StratisdErrors
+from stratisd_client_dbus import blockdevs
 from stratisd_client_dbus import get_object
+from stratisd_client_dbus import pools
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
@@ -69,6 +72,13 @@ class AddDevsTestCase(unittest.TestCase):
         """
         Adding an empty list of devs should leave the pool empty.
         """
+        managed_objects = \
+           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        (pool, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
+
+        blockdevs1 = blockdevs(managed_objects, {'Pool': pool})
+        self.assertEqual(list(blockdevs1), [])
+
         (result, rc, _) = Pool.Methods.AddDevs(
            self._pool_object,
            {
@@ -77,14 +87,29 @@ class AddDevsTestCase(unittest.TestCase):
            }
         )
 
-        self.assertEqual(len(result), 0)
+        self.assertEqual(result, [])
         self.assertEqual(rc, StratisdErrors.OK)
+
+        managed_objects = \
+           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        blockdevs2 = blockdevs(managed_objects, {'Pool': pool})
+        self.assertEqual(list(blockdevs2), [])
+
+        blockdevs3 = blockdevs(managed_objects, {})
+        self.assertEqual(list(blockdevs3), [])
 
     def testSomeDevs(self):
         """
         Adding a non-empty list of devs should increase the number of devs
         in the pool.
         """
+        managed_objects = \
+           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        (pool, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
+
+        blockdevs1 = blockdevs(managed_objects, {'Pool': pool})
+        self.assertEqual(list(blockdevs1), [])
+
         (result, rc, _) = Pool.Methods.AddDevs(
            self._pool_object,
            {
@@ -94,7 +119,24 @@ class AddDevsTestCase(unittest.TestCase):
         )
 
         num_devices_added = len(result)
+        managed_objects = \
+           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+
         if rc == StratisdErrors.OK:
             self.assertGreater(num_devices_added, 0)
         else:
             self.assertEqual(num_devices_added, 0)
+
+        blockdev_object_paths = frozenset(result)
+
+        # blockdevs exported on the D-Bus are exactly those added
+        blockdevs2 = list(blockdevs(managed_objects, {'Pool': pool}))
+        blockdevs2_object_paths = frozenset([op for (op, _) in blockdevs2])
+        self.assertEqual(blockdevs2_object_paths, blockdev_object_paths)
+
+        # no duplicates in the object paths
+        self.assertEqual(len(blockdevs2), num_devices_added)
+
+        # There are no blockdevs but for those in this pool
+        blockdevs3 = blockdevs(managed_objects, {})
+        self.assertEqual(len(list(blockdevs3)), num_devices_added)

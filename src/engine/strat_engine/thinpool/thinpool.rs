@@ -197,7 +197,7 @@ impl ThinPool {
                                         &dm_name,
                                         Some(&dm_uuid),
                                         segs_to_table(backstore_device, &meta_segments))?;
-        wipe_sectors(&meta_dev.devnode(), Sectors(0), thin_pool_size.meta_size())?;
+        wipe_sectors(&meta_dev.devnode(), Sectors(0), meta_dev.size())?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinData);
         let data_dev = LinearDev::setup(dm,

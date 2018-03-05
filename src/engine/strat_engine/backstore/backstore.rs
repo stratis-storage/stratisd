@@ -47,8 +47,6 @@ impl DataTier {
     ///
     /// Returns the DataTier and the linear DM device that was created during
     /// setup.
-    ///
-    /// WARNING: metadata changing event
     pub fn setup(dm: &DM,
                  block_mgr: BlockDevMgr,
                  segments: &[(DevUuid, Sectors, Sectors)])
@@ -222,8 +220,6 @@ impl CacheTier {
     ///
     /// Returns the CacheTier and the cache DM device that was created during
     /// setup.
-    ///
-    /// WARNING: metadata changing event
     pub fn setup(dm: &DM,
                  block_mgr: BlockDevMgr,
                  origin: LinearDev,
@@ -410,7 +406,6 @@ pub struct Backstore {
 
 impl Backstore {
     /// Make a Backstore object from blockdevs that already belong to Stratis.
-    /// WARNING: metadata changing event
     pub fn setup(dm: &DM,
                  pool_uuid: PoolUuid,
                  backstore_save: &BackstoreSave,

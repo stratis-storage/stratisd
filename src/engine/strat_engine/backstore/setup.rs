@@ -167,22 +167,49 @@ pub fn get_metadata(pool_uuid: PoolUuid,
 /// the given devices. Return them in the order in which they were written
 /// in the metadata.
 /// Returns an error if the blockdevs obtained do not match the metadata.
+/// Returns a tuple, of which the first are the data devs, and the second
+/// are the devs that support the cache tier.
 #[allow(implicit_hasher)]
 pub fn get_blockdevs(pool_uuid: PoolUuid,
                      backstore_save: &BackstoreSave,
                      devnodes: &HashMap<Device, PathBuf>)
-                     -> EngineResult<Vec<StratBlockDev>> {
-    let segments = &backstore_save.segments;
+                     -> EngineResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
+    let recorded_data_map: HashMap<_, _> = backstore_save
+        .data_devs
+        .iter()
+        .map(|bds| (bds.uuid, bds))
+        .collect();
+
+    let recorded_cache_map: HashMap<_, _> = match backstore_save.cache_devs {
+        Some(ref cache_devs) => cache_devs.iter().map(|bds| (bds.uuid, bds)).collect(),
+        None => HashMap::new(),
+    };
 
     let mut segment_table = HashMap::new();
-    for seg in segments {
+    for seg in &backstore_save.data_segments {
         segment_table
             .entry(seg.0)
             .or_insert_with(Vec::default)
             .push((seg.1, seg.2))
     }
+    if let Some(ref segs) = backstore_save.cache_segments {
+        for seg in segs {
+            segment_table
+                .entry(seg.0)
+                .or_insert_with(Vec::default)
+                .push((seg.1, seg.2))
+        }
+    }
+    if let Some(ref segs) = backstore_save.meta_segments {
+        for seg in segs {
+            segment_table
+                .entry(seg.0)
+                .or_insert_with(Vec::default)
+                .push((seg.1, seg.2))
+        }
+    }
 
-    let mut blockdevs = vec![];
+    let (mut datadevs, mut cachedevs) = (vec![], vec![]);
     for (device, devnode) in devnodes {
         let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
         if let Some(bda) = bda {
@@ -198,48 +225,62 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                     return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
                 }
 
-                let bd_save = backstore_save
-                    .block_devs
-                    .iter()
-                    .find(|bds| bds.uuid == bda.dev_uuid())
-                    .ok_or_else(|| {
-                                    let err_msg = format!("Blockdev {} not found in metadata",
-                                                          bda.dev_uuid());
-                                    EngineError::Engine(ErrorEnum::NotFound, err_msg)
-                                })?;
+                let dev_uuid = bda.dev_uuid();
+
+                let (dev_vec, bd_save) = match recorded_data_map.get(&dev_uuid) {
+                    Some(bd_save) => (&mut datadevs, bd_save),
+                    None => {
+                        match recorded_cache_map.get(&dev_uuid) {
+                            Some(bd_save) => (&mut cachedevs, bd_save),
+                            None => {
+                                let err_msg = format!("Blockdev {} not found in metadata",
+                                                      bda.dev_uuid());
+                                return Err(EngineError::Engine(ErrorEnum::NotFound, err_msg));
+                            }
+                        }
+                    }
+                };
 
                 // This should always succeed since the actual size is at
                 // least the recorded size, so all segments should be
                 // available to be allocated. If this fails, the most likely
                 // conclusion is metadata corruption.
-                let segments = segment_table.get(&bda.dev_uuid());
-                blockdevs.push(StratBlockDev::new(*device,
-                                                  devnode.to_owned(),
-                                                  bda,
-                                                  segments.unwrap_or(&vec![]),
-                                                  bd_save.user_info.clone(),
-                                                  bd_save.hardware_info.clone())?);
+                let segments = segment_table.get(&dev_uuid);
+                dev_vec.push(StratBlockDev::new(*device,
+                                                devnode.to_owned(),
+                                                bda,
+                                                segments.unwrap_or(&vec![]),
+                                                bd_save.user_info.clone(),
+                                                bd_save.hardware_info.clone())?);
             }
         }
     }
 
-    // Verify that blockdevs found match blockdevs recorded.
-    let current_uuids: HashSet<_> = blockdevs.iter().map(|b| b.uuid()).collect();
-    let recorded_uuids: HashSet<_> = backstore_save
-        .block_devs
-        .iter()
-        .map(|bds| bds.uuid)
-        .collect();
-
-    if current_uuids != recorded_uuids {
-        let err_msg = "Recorded block dev UUIDs != discovered blockdev UUIDs";
+    // Verify that datadevs found match datadevs recorded.
+    let current_data_uuids: HashSet<_> = datadevs.iter().map(|b| b.uuid()).collect();
+    let recorded_data_uuids: HashSet<_> = recorded_data_map.keys().cloned().collect();
+    if current_data_uuids != recorded_data_uuids {
+        let err_msg = "Recorded data dev UUIDs != discovered datadev UUIDs";
         return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
     }
 
-    if blockdevs.len() != current_uuids.len() {
-        let err_msg = "Duplicate block devices found in environment";
+    if datadevs.len() != current_data_uuids.len() {
+        let err_msg = "Duplicate data devices found in environment";
         return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
     }
 
-    Ok(blockdevs)
+    // Verify that cachedevs found match cachedevs recorded.
+    let current_cache_uuids: HashSet<_> = cachedevs.iter().map(|b| b.uuid()).collect();
+    let recorded_cache_uuids: HashSet<_> = recorded_cache_map.keys().cloned().collect();
+    if current_cache_uuids != recorded_cache_uuids {
+        let err_msg = "Recorded cache dev UUIDs != discovered cachedev UUIDs";
+        return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+    }
+
+    if cachedevs.len() != current_cache_uuids.len() {
+        let err_msg = "Duplicate cache devices found in environment";
+        return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+    }
+
+    Ok((datadevs, cachedevs))
 }

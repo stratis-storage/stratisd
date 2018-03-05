@@ -56,10 +56,17 @@ SPECS = {
 "org.storage.stratis1.pool" :
 """
 <interface name="org.storage.stratis1.pool">
-<method name="AddDevs">
+<method name="AddCacheDevs">
 <arg name="force" type="b" direction="in"/>
 <arg name="devices" type="as" direction="in"/>
-<arg name="results" type="as" direction="out"/>
+<arg name="results" type="ao" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="AddDataDevs">
+<arg name="force" type="b" direction="in"/>
+<arg name="devices" type="as" direction="in"/>
+<arg name="results" type="ao" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
 </method>

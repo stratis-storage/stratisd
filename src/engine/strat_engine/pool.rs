@@ -14,7 +14,8 @@ use devicemapper::{DM, Device, DmName, DmNameBuf, Sectors};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::{DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction};
+use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
+                          RenameAction};
 
 use super::backstore::{Backstore, MIN_MDA_SECTORS, get_metadata};
 use super::serde_structs::{PoolSave, Recordable};
@@ -116,7 +117,7 @@ impl StratPool {
     /// Write current metadata to pool members.
     pub fn write_metadata(&mut self, name: &str) -> EngineResult<()> {
         let data = serde_json::to_string(&self.record(name))?;
-        self.backstore.save_state(data.as_bytes())
+        self.backstore.datadev_save_state(data.as_bytes())
     }
 
     pub fn check(&mut self, name: &Name) -> EngineResult<()> {
@@ -199,10 +200,14 @@ impl Pool for StratPool {
     fn add_blockdevs(&mut self,
                      pool_name: &str,
                      paths: &[&Path],
+                     tier: BlockDevTier,
                      force: bool)
                      -> EngineResult<Vec<DevUuid>> {
         let dm = DM::new()?;
-        let bdev_info = self.backstore.add(&dm, paths, force)?;
+        self.thin_pool.suspend(&dm)?;
+        let bdev_info = self.backstore.add_blockdevs(&dm, paths, tier, force)?;
+        self.thin_pool.set_device(&dm, self.backstore.device())?;
+        self.thin_pool.resume(&dm)?;
         self.write_metadata(pool_name)?;
         Ok(bdev_info)
     }
@@ -248,13 +253,13 @@ impl Pool for StratPool {
     }
 
     fn total_physical_size(&self) -> Sectors {
-        self.backstore.current_capacity()
+        self.backstore.datadev_current_capacity()
     }
 
     fn total_physical_used(&self) -> EngineResult<Sectors> {
         self.thin_pool
             .total_physical_used()
-            .and_then(|v| Ok(v + self.backstore.metadata_size()))
+            .and_then(|v| Ok(v + self.backstore.datadev_metadata_size()))
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)> {
@@ -277,11 +282,11 @@ impl Pool for StratPool {
         self.backstore.blockdevs()
     }
 
-    fn get_blockdev(&self, uuid: DevUuid) -> Option<&BlockDev> {
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
         self.backstore.get_blockdev_by_uuid(uuid)
     }
 
-    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)> {
         self.backstore.get_mut_blockdev_by_uuid(uuid)
     }
 

@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use devicemapper::Sectors;
 
-use engine::{Name, Pool, RenameAction};
+use engine::{BlockDevTier, Name, Pool, RenameAction};
 
 use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;
@@ -176,7 +176,15 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    add_devs(m, BlockDevTier::Data)
+}
+
+fn add_cachedevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    add_devs(m, BlockDevTier::Cache)
+}
+
+fn add_devs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -198,7 +206,7 @@ fn add_devs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
-    let result = pool.add_blockdevs(&*pool_name, &blockdevs, force);
+    let result = pool.add_blockdevs(&*pool_name, &blockdevs, tier, force);
     let msg = match result {
         Ok(uuids) => {
             let return_value = uuids
@@ -335,7 +343,14 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let add_devs_method = f.method("AddDevs", (), add_devs)
+    let add_blockdevs_method = f.method("AddDataDevs", (), add_blockdevs)
+        .in_arg(("force", "b"))
+        .in_arg(("devices", "as"))
+        .out_arg(("results", "ao"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
+
+    let add_cachedevs_method = f.method("AddCacheDevs", (), add_cachedevs)
         .in_arg(("force", "b"))
         .in_arg(("devices", "as"))
         .out_arg(("results", "ao"))
@@ -387,7 +402,8 @@ pub fn create_dbus_pool<'a>(dbus_context: &DbusContext,
                  .add_m(create_filesystems_method)
                  .add_m(destroy_filesystems_method)
                  .add_m(snapshot_method)
-                 .add_m(add_devs_method)
+                 .add_m(add_blockdevs_method)
+                 .add_m(add_cachedevs_method)
                  .add_m(rename_method)
                  .add_p(name_property)
                  .add_p(total_physical_size_property)

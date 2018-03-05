@@ -17,7 +17,8 @@ use devicemapper::{IEC, Sectors};
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
-use super::super::types::{DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction};
+use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
+                          RenameAction};
 
 use super::blockdev::SimDev;
 use super::filesystem::SimFilesystem;
@@ -26,6 +27,7 @@ use super::randomization::Randomizer;
 #[derive(Debug)]
 pub struct SimPool {
     pub block_devs: HashMap<DevUuid, SimDev>,
+    pub cache_devs: HashMap<DevUuid, SimDev>,
     pub filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
@@ -42,6 +44,7 @@ impl SimPool {
         (Uuid::new_v4(),
          SimPool {
              block_devs: HashMap::from_iter(device_pairs),
+             cache_devs: HashMap::new(),
              filesystems: Table::default(),
              redundancy,
              rdm: Rc::clone(rdm),
@@ -84,6 +87,7 @@ impl Pool for SimPool {
     fn add_blockdevs(&mut self,
                      _pool_name: &str,
                      paths: &[&Path],
+                     tier: BlockDevTier,
                      _force: bool)
                      -> EngineResult<Vec<DevUuid>> {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
@@ -92,7 +96,13 @@ impl Pool for SimPool {
             .map(|p| SimDev::new(Rc::clone(&self.rdm), p))
             .collect();
         let ret_uuids = device_pairs.iter().map(|&(uuid, _)| uuid).collect();
-        self.block_devs.extend(device_pairs);
+
+        let the_vec = match tier {
+            BlockDevTier::Cache => &mut self.cache_devs,
+            BlockDevTier::Data => &mut self.block_devs,
+        };
+
+        the_vec.extend(device_pairs);
         Ok(ret_uuids)
     }
 
@@ -181,18 +191,32 @@ impl Pool for SimPool {
     fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
         self.block_devs
             .iter()
+            .chain(self.cache_devs.iter())
             .map(|(uuid, bd)| (*uuid, bd as &BlockDev))
             .collect()
     }
 
-    fn get_blockdev(&self, uuid: DevUuid) -> Option<&BlockDev> {
-        self.block_devs.get(&uuid).map(|p| p as &BlockDev)
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
+        self.block_devs
+            .get(&uuid)
+            .and_then(|bd| Some((BlockDevTier::Data, bd as &BlockDev)))
+            .or_else(move || {
+                         self.cache_devs
+                             .get(&uuid)
+                             .and_then(|bd| Some((BlockDevTier::Cache, bd as &BlockDev)))
+                     })
     }
 
-    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)> {
+        let cache_devs = &mut self.cache_devs;
         self.block_devs
             .get_mut(&uuid)
-            .map(|p| p as &mut BlockDev)
+            .and_then(|bd| Some((BlockDevTier::Data, bd as &mut BlockDev)))
+            .or_else(move || {
+                         cache_devs
+                             .get_mut(&uuid)
+                             .and_then(|bd| Some((BlockDevTier::Cache, bd as &mut BlockDev)))
+                     })
     }
 
     fn save_state(&mut self, _pool_name: &str) -> EngineResult<()> {
@@ -208,11 +232,10 @@ mod tests {
     use uuid::Uuid;
 
     use engine::Engine;
-    use engine::ErrorEnum;
-    use engine::EngineError;
-    use engine::RenameAction;
 
     use super::super::SimEngine;
+
+    use super::*;
 
     #[test]
     /// Renaming a filesystem on an empty pool always works
@@ -379,7 +402,7 @@ mod tests {
             .unwrap();
         let (pool_name, pool) = engine.get_mut_pool(uuid).unwrap();
         let devices = [Path::new("/s/a"), Path::new("/s/b")];
-        assert!(match pool.add_blockdevs(&*pool_name, &devices, false) {
+        assert!(match pool.add_blockdevs(&*pool_name, &devices, BlockDevTier::Data, false) {
                     Ok(devs) => devs.len() == devices.len(),
                     _ => false,
                 });

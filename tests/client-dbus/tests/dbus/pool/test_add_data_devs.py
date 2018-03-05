@@ -35,7 +35,7 @@ from .._misc import Service
 _DEVICE_STRATEGY = _device_list(1)
 
 
-class AddDevsTestCase(unittest.TestCase):
+class AddDataDevsTestCase(unittest.TestCase):
     """
     Test adding devices to a pool which is initially empty.
     """
@@ -79,7 +79,7 @@ class AddDevsTestCase(unittest.TestCase):
         blockdevs1 = blockdevs(managed_objects, {'Pool': pool})
         self.assertEqual(list(blockdevs1), [])
 
-        (result, rc, _) = Pool.Methods.AddDevs(
+        (result, rc, _) = Pool.Methods.AddDataDevs(
            self._pool_object,
            {
               'force': False,
@@ -110,7 +110,7 @@ class AddDevsTestCase(unittest.TestCase):
         blockdevs1 = blockdevs(managed_objects, {'Pool': pool})
         self.assertEqual(list(blockdevs1), [])
 
-        (result, rc, _) = Pool.Methods.AddDevs(
+        (result, rc, _) = Pool.Methods.AddDataDevs(
            self._pool_object,
            {
               'force': False,

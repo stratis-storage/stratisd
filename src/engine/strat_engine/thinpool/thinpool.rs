@@ -11,9 +11,10 @@ use std::process::Command;
 use uuid::Uuid;
 
 use devicemapper as dm;
-use devicemapper::{DM, DataBlocks, Device, DmDevice, DmName, DmNameBuf, IEC, LinearDev,
-                   LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine,
-                   ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatusSummary, device_exists};
+use devicemapper::{DM, DataBlocks, Device, DmDevice, DmName, DmNameBuf, IEC, FlakeyTargetParams,
+                   LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors,
+                   TargetLine, ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatusSummary,
+                   device_exists};
 
 use super::super::super::engine::Filesystem;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -477,6 +478,7 @@ impl ThinPool {
         let segments = coalesce_segs(&self.data_segments, &new_segs.to_vec());
         self.thin_pool
             .set_data_table(dm, segs_to_table(device, &segments))?;
+        self.thin_pool.resume(dm)?;
         self.data_segments = segments;
 
         Ok(())
@@ -491,6 +493,7 @@ impl ThinPool {
         let segments = coalesce_segs(&self.meta_segments, &new_segs.to_vec());
         self.thin_pool
             .set_meta_table(dm, segs_to_table(device, &segments))?;
+        self.thin_pool.resume(dm)?;
         self.meta_segments = segments;
 
         Ok(())
@@ -663,6 +666,86 @@ impl ThinPool {
              format_flex_ids(self.pool_uuid, FlexRole::MetadataVolume).0,
              format_thinpool_ids(self.pool_uuid, ThinPoolRole::Pool).0]
 
+    }
+
+    /// Suspend the thinpool
+    pub fn suspend(&mut self, dm: &DM) -> EngineResult<()> {
+        for (_, _, fs) in &mut self.filesystems {
+            fs.suspend(dm)?;
+        }
+        self.thin_pool.suspend(dm)?;
+        self.mdv.suspend(dm)?;
+        Ok(())
+    }
+
+    /// Resume the thinpool
+    pub fn resume(&mut self, dm: &DM) -> EngineResult<()> {
+        self.mdv.resume(dm)?;
+        for (_, _, fs) in &mut self.filesystems {
+            fs.resume(dm)?;
+        }
+        self.thin_pool.resume(dm)?;
+        Ok(())
+    }
+
+    /// Set the device on all DM devices
+    pub fn set_device(&mut self, dm: &DM, backstore_device: Device) -> EngineResult<bool> {
+        if backstore_device == self.backstore_device {
+            return Ok(false);
+        }
+
+        let xform_target_line =
+            |line: &TargetLine<LinearDevTargetParams>| -> TargetLine<LinearDevTargetParams> {
+                let new_params = match line.params {
+                    LinearDevTargetParams::Linear(ref params) => {
+                    LinearDevTargetParams::Linear(LinearTargetParams::new(backstore_device,
+                                                                          params.start_offset))
+                }
+                    LinearDevTargetParams::Flakey(ref params) => {
+                        let feature_args = params.feature_args.iter().cloned().collect::<Vec<_>>();
+                        LinearDevTargetParams::Flakey(FlakeyTargetParams::new(backstore_device,
+                                                                         params.start_offset,
+                                                                         params.up_interval,
+                                                                         params.down_interval,
+                                                                         feature_args))
+                    }
+                };
+
+                TargetLine::new(line.start, line.length, new_params)
+            };
+
+        let meta_table = self.thin_pool
+            .meta_dev()
+            .table()
+            .table
+            .clone()
+            .iter()
+            .map(&xform_target_line)
+            .collect::<Vec<_>>();
+
+        let data_table = self.thin_pool
+            .data_dev()
+            .table()
+            .table
+            .clone()
+            .iter()
+            .map(&xform_target_line)
+            .collect::<Vec<_>>();
+
+        let mdv_table = self.mdv
+            .device()
+            .table()
+            .table
+            .clone()
+            .iter()
+            .map(&xform_target_line)
+            .collect::<Vec<_>>();
+
+        self.thin_pool.set_meta_table(dm, meta_table)?;
+        self.thin_pool.set_data_table(dm, data_table)?;
+        self.mdv.set_table(dm, mdv_table)?;
+
+        return Ok(true);
     }
 }
 

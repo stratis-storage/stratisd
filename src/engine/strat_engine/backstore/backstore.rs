@@ -274,32 +274,6 @@ impl CacheTier {
             cd))
     }
 
-    /// Destroy the tier. Wipe its blockdevs.
-    pub fn destroy(self) -> EngineResult<()> {
-        self.block_mgr.destroy_all()
-    }
-
-    /// Get all the blockdevs belonging to this tier.
-    pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
-        self.block_mgr.blockdevs()
-    }
-
-    /// Lookup an immutable blockdev by its Stratis UUID.
-    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
-        self.block_mgr
-            .get_blockdev_by_uuid(uuid)
-            .and_then(|bd| Some((BlockDevTier::Cache, bd)))
-    }
-
-    /// Lookup a mutable blockdev by its Stratis UUID.
-    pub fn get_mut_blockdev_by_uuid(&mut self,
-                                    uuid: DevUuid)
-                                    -> Option<(BlockDevTier, &mut BlockDev)> {
-        self.block_mgr
-            .get_mut_blockdev_by_uuid(uuid)
-            .and_then(|bd| Some((BlockDevTier::Cache, bd)))
-    }
-
     /// Add the given paths to self. Return UUIDs of the new blockdevs
     /// corresponding to the specified paths.
     /// Adds all additional space to cache sub-device.
@@ -379,6 +353,32 @@ impl CacheTier {
                 cache_segments,
             },
             cd))
+    }
+
+    /// Destroy the tier. Wipe its blockdevs.
+    pub fn destroy(self) -> EngineResult<()> {
+        self.block_mgr.destroy_all()
+    }
+
+    /// Get all the blockdevs belonging to this tier.
+    pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
+        self.block_mgr.blockdevs()
+    }
+
+    /// Lookup an immutable blockdev by its Stratis UUID.
+    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
+        self.block_mgr
+            .get_blockdev_by_uuid(uuid)
+            .and_then(|bd| Some((BlockDevTier::Cache, bd)))
+    }
+
+    /// Lookup a mutable blockdev by its Stratis UUID.
+    pub fn get_mut_blockdev_by_uuid(&mut self,
+                                    uuid: DevUuid)
+                                    -> Option<(BlockDevTier, &mut BlockDev)> {
+        self.block_mgr
+            .get_mut_blockdev_by_uuid(uuid)
+            .and_then(|bd| Some((BlockDevTier::Cache, bd)))
     }
 }
 

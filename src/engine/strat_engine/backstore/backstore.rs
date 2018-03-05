@@ -463,6 +463,53 @@ impl Backstore {
            })
     }
 
+    /// Add cachedevs to the backstore.
+    ///
+    /// If the cache tier does not already exist, create it.
+    ///
+    // Postcondition: self.cache.is_some() && self.linear.is_none()
+    fn add_cachedevs(&mut self,
+                     dm: &DM,
+                     paths: &[&Path],
+                     force: bool)
+                     -> EngineResult<Vec<DevUuid>> {
+        match self.cache_tier {
+            Some(ref mut cache_tier) => {
+                let mut cache_device = self.cache
+                    .as_mut()
+                    .expect("cache_tier.is_some() <=> self.cache.is_some()");
+                cache_tier.add(dm, &mut cache_device, paths, force)
+            }
+            None => {
+                // FIXME: This is obviously a bad idea, but unless the UUID
+                // is obtained from block_mgr then it is necessary to
+                // add a pool UUID parameter to this method. That course of
+                // action would require various changes in the calling code
+                // which have not been agreed upon. See GitHub PR:
+                // https://github.com/stratis-storage/stratisd/pull/784
+                let pool_uuid = self.data_tier.block_mgr.pool_uuid();
+                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
+
+                let linear = self.linear
+                    .take()
+                    .expect("cache_tier.is_none() <=> self.linear.is_some()");
+                let (cache_tier, cache) = CacheTier::new(dm, bdm, linear)?;
+                self.cache = Some(cache);
+
+                let uuids = cache_tier
+                    .block_mgr
+                    .blockdevs()
+                    .iter()
+                    .map(|&(uuid, _)| uuid)
+                    .collect::<Vec<_>>();
+
+                self.cache_tier = Some(cache_tier);
+
+                Ok(uuids)
+            }
+        }
+    }
+
     /// Add the given paths to self. Return UUIDs of the new blockdevs
     /// corresponding to the specified paths.
     /// WARNING: metadata changing event
@@ -473,45 +520,7 @@ impl Backstore {
                          force: bool)
                          -> EngineResult<Vec<DevUuid>> {
         match tier {
-            BlockDevTier::Cache => {
-                match self.cache_tier {
-                    Some(ref mut cache_tier) => {
-                        let mut cache_device =
-                            self.cache
-                                .as_mut()
-                                .expect("cache_tier.is_some() <=> self.cache.is_some()");
-                        cache_tier.add(dm, &mut cache_device, paths, force)
-                    }
-                    None => {
-                        // FIXME: This is obviously a bad idea, but it means
-                        // that is necessary to add a pool UUID parameter to
-                        // this method. That course of action would require
-                        // various changes in the calling code which have not
-                        // been agreed upon. See GitHub PR:
-                        // https://github.com/stratis-storage/stratisd/pull/784
-                        let pool_uuid = self.data_tier.block_mgr.pool_uuid();
-                        let bdm =
-                            BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
-
-                        let linear = self.linear
-                            .take()
-                            .expect("cache_tier.is_none() <=> self.linear.is_some()");
-                        let (cache_tier, cache) = CacheTier::new(dm, bdm, linear)?;
-                        self.cache = Some(cache);
-
-                        let uuids = cache_tier
-                            .block_mgr
-                            .blockdevs()
-                            .iter()
-                            .map(|&(uuid, _)| uuid)
-                            .collect::<Vec<_>>();
-
-                        self.cache_tier = Some(cache_tier);
-
-                        Ok(uuids)
-                    }
-                }
-            }
+            BlockDevTier::Cache => self.add_cachedevs(dm, paths, force),
             BlockDevTier::Data => {
                 self.data_tier
                     .add(dm, self.cache.as_mut(), self.linear.as_mut(), paths, force)

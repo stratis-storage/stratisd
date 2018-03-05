@@ -278,6 +278,10 @@ impl CacheTier {
     /// corresponding to the specified paths.
     /// Adds all additional space to cache sub-device.
     /// WARNING: metadata changing event
+    // FIXME: That all segments on the newly added device are added to the
+    // cache sub-device and none to the meta sub-device could lead to failure.
+    // Presumably, the size required for the meta sub-device varies directly
+    // with the size of cache sub-device.
     pub fn add(&mut self,
                dm: &DM,
                cache_device: &mut CacheDev,

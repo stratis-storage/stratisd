@@ -117,7 +117,7 @@ impl StratPool {
     /// Write current metadata to pool members.
     pub fn write_metadata(&mut self, name: &str) -> EngineResult<()> {
         let data = serde_json::to_string(&self.record(name))?;
-        self.backstore.save_state(data.as_bytes())
+        self.backstore.datadev_save_state(data.as_bytes())
     }
 
     pub fn check(&mut self, name: &Name) -> EngineResult<()> {
@@ -203,12 +203,11 @@ impl Pool for StratPool {
                      tier: BlockDevTier,
                      force: bool)
                      -> EngineResult<Vec<DevUuid>> {
-        if tier == BlockDevTier::Cache {
-            return Err(EngineError::Engine(ErrorEnum::Invalid, "UNIMPLEMENTED".into()));
-        }
-
         let dm = DM::new()?;
-        let bdev_info = self.backstore.add(&dm, paths, force)?;
+        self.thin_pool.suspend(&dm)?;
+        let bdev_info = self.backstore.add_blockdevs(&dm, paths, tier, force)?;
+        self.thin_pool.set_device(&dm, self.backstore.device())?;
+        self.thin_pool.resume(&dm)?;
         self.write_metadata(pool_name)?;
         Ok(bdev_info)
     }
@@ -254,13 +253,13 @@ impl Pool for StratPool {
     }
 
     fn total_physical_size(&self) -> Sectors {
-        self.backstore.current_capacity()
+        self.backstore.datadev_current_capacity()
     }
 
     fn total_physical_used(&self) -> EngineResult<Sectors> {
         self.thin_pool
             .total_physical_used()
-            .and_then(|v| Ok(v + self.backstore.metadata_size()))
+            .and_then(|v| Ok(v + self.backstore.datadev_metadata_size()))
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)> {
@@ -284,15 +283,11 @@ impl Pool for StratPool {
     }
 
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
-        self.backstore
-            .get_blockdev_by_uuid(uuid)
-            .and_then(|bd| Some((BlockDevTier::Data, bd)))
+        self.backstore.get_blockdev_by_uuid(uuid)
     }
 
     fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)> {
-        self.backstore
-            .get_mut_blockdev_by_uuid(uuid)
-            .and_then(|bd| Some((BlockDevTier::Data, bd)))
+        self.backstore.get_mut_blockdev_by_uuid(uuid)
     }
 
     fn save_state(&mut self, pool_name: &str) -> EngineResult<()> {

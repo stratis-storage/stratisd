@@ -65,8 +65,14 @@ pub struct FlexDevsSave {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BackstoreSave {
-    pub segments: Vec<(Uuid, Sectors, Sectors)>,
-    pub block_devs: Vec<BlockDevSave>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_devs: Option<Vec<BlockDevSave>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_segments: Option<Vec<(Uuid, Sectors, Sectors)>>,
+    pub data_devs: Vec<BlockDevSave>,
+    pub data_segments: Vec<(Uuid, Sectors, Sectors)>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meta_segments: Option<Vec<(Uuid, Sectors, Sectors)>>,
     pub next: Sectors,
 }
 

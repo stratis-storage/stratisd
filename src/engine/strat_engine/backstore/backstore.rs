@@ -645,7 +645,7 @@ impl Backstore {
     }
 
     /// Write the given data to the data tier's devices.
-    pub fn datadev_save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {
+    pub fn save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {
         self.data_tier.save_state(metadata)
     }
 }

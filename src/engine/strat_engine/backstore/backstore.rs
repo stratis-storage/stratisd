@@ -315,8 +315,9 @@ impl CacheTier {
                origin: LinearDev)
                -> EngineResult<(CacheTier, CacheDev)> {
         let avail_space = block_mgr.avail_space();
-        // TODO: check whether this should be increased
-        let meta_space = Sectors(4 * IEC::Ki);
+
+        // FIXME: Come up with a better way to choose metadata device size
+        let meta_space = Sectors(IEC::Mi);
 
         assert!(meta_space < avail_space,
                 "every block device must be at least one GiB");
@@ -701,6 +702,8 @@ mod tests {
     fn test_add_cache_devs(paths: &[&Path]) -> () {
         assert!(paths.len() > 2);
 
+        let meta_size = Sectors(IEC::Mi);
+
         let (initcachepaths, paths) = paths.split_at(1);
         let (cachedevpaths, datadevpaths) = paths.split_at(1);
 
@@ -730,7 +733,7 @@ mod tests {
             CacheDevStatus::Working(status) => {
                 let usage = &status.usage;
                 assert_eq!(usage.used_cache, DataBlocks(0));
-                assert_eq!(usage.total_meta, Sectors(4 * IEC::Ki).metablocks());
+                assert_eq!(usage.total_meta, meta_size.metablocks());
                 assert!(usage.total_cache > DataBlocks(0));
             }
             CacheDevStatus::Fail => panic!("cache status should succeed"),
@@ -752,7 +755,7 @@ mod tests {
             CacheDevStatus::Working(status) => {
                 let usage = &status.usage;
                 assert_eq!(usage.used_cache, DataBlocks(0));
-                assert_eq!(usage.total_meta, Sectors(4 * IEC::Ki).metablocks());
+                assert_eq!(usage.total_meta, meta_size.metablocks());
                 assert!(usage.total_cache > DataBlocks(0));
             }
             CacheDevStatus::Fail => panic!("cache status should succeed"),

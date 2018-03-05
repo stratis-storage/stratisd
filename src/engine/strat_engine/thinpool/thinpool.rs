@@ -1309,4 +1309,42 @@ mod tests {
     pub fn real_test_xfs_expand() {
         real::test_with_spec(real::DeviceLimits::AtLeast(1), test_xfs_expand);
     }
+
+    /// Just suspend and resume the device and make sure it doesn't crash.
+    /// Suspend twice in succession and then resume twice in succession
+    /// to check idempotency.
+    fn test_suspend_resume(paths: &[&Path]) {
+        let pool_uuid = Uuid::new_v4();
+        let dm = DM::new().unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        let mut backstore = Backstore::initialize(&dm, pool_uuid, paths, MIN_MDA_SECTORS, false)
+            .unwrap();
+        let mut pool = ThinPool::new(pool_uuid,
+                                     &dm,
+                                     &ThinPoolSizeParams::default(),
+                                     DATA_BLOCK_SIZE,
+                                     DATA_LOWATER,
+                                     &mut backstore)
+                .unwrap();
+
+        let pool_name = "stratis_test_pool";
+        devlinks::pool_added(&pool_name).unwrap();
+        pool.create_filesystem(pool_name, "stratis_test_filesystem", &dm, None)
+            .unwrap();
+
+        pool.suspend(&dm).unwrap();
+        pool.suspend(&dm).unwrap();
+        pool.resume(&dm).unwrap();
+        pool.resume(&dm).unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_suspend_resume() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_suspend_resume);
+    }
+
+    #[test]
+    pub fn real_test_suspend_resume() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_suspend_resume);
+    }
 }

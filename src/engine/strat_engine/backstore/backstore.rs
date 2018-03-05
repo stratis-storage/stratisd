@@ -548,9 +548,9 @@ impl Backstore {
         Some(chunks)
     }
 
-    /// Return a reference to all the devs that this pool has ownership of.
-    /// This includes blockdevs, cachedevs, any device about which information
-    /// may be placed on the D-Bus.
+    /// Return a reference to all the blockdevs that this pool has ownership
+    /// of. The blockdevs may be returned in any order. It is unsafe to assume
+    /// that they are grouped by tier or any other organization.
     pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
         match self.cache_tier {
             Some(ref cache) => {

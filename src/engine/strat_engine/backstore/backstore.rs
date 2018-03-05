@@ -566,7 +566,7 @@ impl Backstore {
     }
 
     /// The current capacity of all the blockdevs in the data tier.
-    pub fn datadev_current_capacity(&self) -> Sectors {
+    pub fn datatier_current_capacity(&self) -> Sectors {
         self.data_tier.current_capacity()
     }
 
@@ -640,7 +640,7 @@ impl Backstore {
 
     /// The number of sectors in the backstore given up to Stratis
     /// metadata on devices in the data tier.
-    pub fn datadev_metadata_size(&self) -> Sectors {
+    pub fn datatier_metadata_size(&self) -> Sectors {
         self.data_tier.metadata_size()
     }
 

@@ -1379,6 +1379,7 @@ mod tests {
 
         let tmp_dir = TempDir::new("stratis_testing").unwrap();
         let new_file = tmp_dir.path().join("stratis_test.txt");
+        let bytestring = b"some bytes";
         {
             let (_, fs) = pool.get_filesystem_by_uuid(fs_uuid).unwrap();
             mount(Some(&fs.devnode()),
@@ -1392,9 +1393,16 @@ mod tests {
                 .write(true)
                 .open(&new_file)
                 .unwrap()
-                .write(b"some bytes")
+                .write(bytestring)
                 .unwrap();
         }
+        let filesystem_saves = pool.mdv.filesystems().unwrap();
+        assert_eq!(filesystem_saves.len(), 1);
+        assert_eq!(filesystem_saves
+                       .first()
+                       .expect("filesystem_saves().len == 1")
+                       .uuid,
+                   fs_uuid);
 
         pool.suspend(&dm).unwrap();
         let old_device = backstore.device();
@@ -1415,7 +1423,15 @@ mod tests {
                 .read(&mut buf)
                 .unwrap();
         }
-        assert_eq!(&buf, b"some bytes");
+        assert_eq!(&buf, bytestring);
+
+        let filesystem_saves = pool.mdv.filesystems().unwrap();
+        assert_eq!(filesystem_saves.len(), 1);
+        assert_eq!(filesystem_saves
+                       .first()
+                       .expect("filesystem_saves().len == 1")
+                       .uuid,
+                   fs_uuid);
     }
 
     #[test]

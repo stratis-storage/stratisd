@@ -846,6 +846,8 @@ mod tests {
 
     use devicemapper::{Bytes, SECTOR_SIZE};
 
+    use super::super::super::super::types::BlockDevTier;
+
     use super::super::super::backstore::MIN_MDA_SECTORS;
     use super::super::super::tests::{loopbacked, real};
     use super::super::super::tests::tempdir::TempDir;
@@ -1346,5 +1348,83 @@ mod tests {
     #[test]
     pub fn real_test_suspend_resume() {
         real::test_with_spec(real::DeviceLimits::AtLeast(1), test_suspend_resume);
+    }
+
+    /// Set up thinpool and backstore. Set up filesystem and write to it.
+    /// Add cachedev to backstore, causing cache to be built.
+    /// Update device on self. Read written bits from filesystem
+    /// presented on cache device.
+    fn test_set_device(paths: &[&Path]) {
+        assert!(paths.len() > 1);
+
+        let (paths1, paths2) = paths.split_at(paths.len() / 2);
+
+        let pool_uuid = Uuid::new_v4();
+        let dm = DM::new().unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        let mut backstore = Backstore::initialize(&dm, pool_uuid, paths2, MIN_MDA_SECTORS, false)
+            .unwrap();
+        let mut pool = ThinPool::new(pool_uuid,
+                                     &dm,
+                                     &ThinPoolSizeParams::default(),
+                                     DATA_BLOCK_SIZE,
+                                     DATA_LOWATER,
+                                     &mut backstore)
+                .unwrap();
+
+        let pool_name = "stratis_test_pool";
+        devlinks::pool_added(&pool_name).unwrap();
+        let fs_uuid = pool.create_filesystem(pool_name, "stratis_test_filesystem", &dm, None)
+            .unwrap();
+
+        let tmp_dir = TempDir::new("stratis_testing").unwrap();
+        let new_file = tmp_dir.path().join("stratis_test.txt");
+        {
+            let (_, fs) = pool.get_filesystem_by_uuid(fs_uuid).unwrap();
+            mount(Some(&fs.devnode()),
+                  tmp_dir.path(),
+                  Some("xfs"),
+                  MsFlags::empty(),
+                  None as Option<&str>)
+                    .unwrap();
+            OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&new_file)
+                .unwrap()
+                .write(b"some bytes")
+                .unwrap();
+        }
+
+        pool.suspend(&dm).unwrap();
+        let old_device = backstore.device();
+        backstore
+            .add_blockdevs(&dm, paths1, BlockDevTier::Cache, false)
+            .unwrap();
+        let new_device = backstore.device();
+        assert!(old_device != new_device);
+        pool.set_device(&dm, new_device).unwrap();
+        pool.resume(&dm).unwrap();
+
+        let mut buf = [0u8; 10];
+        {
+            OpenOptions::new()
+                .read(true)
+                .open(&new_file)
+                .unwrap()
+                .read(&mut buf)
+                .unwrap();
+        }
+        assert_eq!(&buf, b"some bytes");
+    }
+
+    #[test]
+    pub fn loop_test_set_device() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_set_device);
+    }
+
+    #[test]
+    pub fn real_test_set_device() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_set_device);
     }
 }

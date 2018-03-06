@@ -19,10 +19,10 @@ tests/test_config.json
 *.egg-info
 
 # working directories
+.cache
 .coverage
 .hypothesis
 .tox
 
 # coverage output
 htmlcov
-

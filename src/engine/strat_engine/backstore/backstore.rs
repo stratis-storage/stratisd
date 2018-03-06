@@ -799,11 +799,14 @@ mod tests {
         let mut backstore = Backstore::initialize(&dm, pool_uuid, paths1, MIN_MDA_SECTORS, false)
             .unwrap();
         invariant(&backstore);
+        let old_device = backstore.device();
 
         backstore
             .add_blockdevs(&dm, paths2, BlockDevTier::Cache, false)
             .unwrap();
         invariant(&backstore);
+
+        assert!(backstore.device() != old_device);
 
         let backstore_save = backstore.record();
 

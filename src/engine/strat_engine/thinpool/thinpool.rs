@@ -681,10 +681,10 @@ impl ThinPool {
     /// Resume the thinpool
     pub fn resume(&mut self, dm: &DM) -> EngineResult<()> {
         self.mdv.resume(dm)?;
+        self.thin_pool.resume(dm)?;
         for (_, _, fs) in &mut self.filesystems {
             fs.resume(dm)?;
         }
-        self.thin_pool.resume(dm)?;
         Ok(())
     }
 

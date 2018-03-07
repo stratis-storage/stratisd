@@ -122,6 +122,7 @@ impl DataTier {
         let coalesced = coalesce_blkdevsegs(&self.segments, &segments);
 
         self.dm_device.set_table(dm, map_to_dm(&coalesced))?;
+        self.dm_device.resume(dm)?;
 
         self.segments = coalesced;
 

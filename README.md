@@ -2,6 +2,10 @@
 
 A daemon that manages a pool of block devices to create flexible filesystems.
 
+## Status
+
+March 8 2018: Stratis 0.5 released. See [release notes](docs/RELNOTES-0.5.md) for details.
+
 ## Background
 
 Stratis (which includes [stratisd](https://github.com/stratis-storage/stratisd)
@@ -20,11 +24,6 @@ the [D-Bus API Reference manual](https://stratis-storage.github.io/DBusAPIRefere
 and [some coding style guidelines](https://stratis-storage.github.io/StratisStyleGuidelines.pdf).
 
 ## Getting involved
-
-### Status
-
-Stratis is currently in early stages of development and is a few months away from being
-ready for initial testing by users.
 
 ### Communication channels
 

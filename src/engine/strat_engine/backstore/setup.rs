@@ -8,18 +8,19 @@
 use std::collections::{HashMap, HashSet};
 use std::fs::{OpenOptions, read_dir};
 use std::io::ErrorKind;
+use std::ops::Sub;
 use std::path::PathBuf;
 
 use nix::errno::Errno;
 use serde_json;
 
-use devicemapper::{Device, devnode_to_devno};
+use devicemapper::{Device, Sectors, devnode_to_devno};
 
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::super::types::PoolUuid;
+use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::engine::DevOwnership;
-use super::super::serde_structs::{BackstoreSave, PoolSave};
+use super::super::serde_structs::{BackstoreSave, BlockDevSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
 use super::device::blkdev_size;
@@ -163,6 +164,62 @@ pub fn get_metadata(pool_uuid: PoolUuid,
     Err(EngineError::Engine(ErrorEnum::NotFound, err_str.into()))
 }
 
+/// Synthesize information obtained from the metadata and records of the
+/// actual devnodes left on the device into a list of StratBlockDevs
+/// sorted according to their order in the metadata.
+/// Returns an error if a dev's UUID can not be found in the metadata.
+fn get_blockdevs_internal(pool_uuid: PoolUuid,
+                          blockdev_map: &HashMap<DevUuid, (usize, &BlockDevSave)>,
+                          segment_table: &HashMap<DevUuid, Vec<(Sectors, Sectors)>>,
+                          devnodes: &HashMap<Device, PathBuf>)
+                          -> EngineResult<Vec<StratBlockDev>> {
+    let mut blockdevs = vec![];
+    for (device, devnode) in devnodes {
+        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
+        if let Some(bda) = bda {
+            if bda.pool_uuid() == pool_uuid {
+                let actual_size = blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?
+                    .sectors();
+
+                if actual_size < bda.dev_size() {
+                    let err_msg = format!("actual blockdev size ({}) < recorded size ({})",
+                                          actual_size,
+                                          bda.dev_size());
+
+                    return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+                }
+
+                let dev_uuid = bda.dev_uuid();
+                let &(index, bd_save) = blockdev_map
+                    .get(&dev_uuid)
+                    .ok_or_else(|| {
+                                    let err_msg = format!("Blockdev {} not found in metadata",
+                                                          dev_uuid);
+                                    EngineError::Engine(ErrorEnum::NotFound, err_msg)
+                                })?;
+
+                // This should always succeed since the actual size is at
+                // least the recorded size, so all segments should be
+                // available to be allocated. If this fails, the most likely
+                // conclusion is metadata corruption.
+                let segments = segment_table.get(&bda.dev_uuid());
+                blockdevs.push((index,
+                                StratBlockDev::new(*device,
+                                                   devnode.to_owned(),
+                                                   bda,
+                                                   segments.unwrap_or(&vec![]),
+                                                   bd_save.user_info.clone(),
+                                                   bd_save.hardware_info.clone())?));
+            }
+        }
+    }
+    blockdevs.sort_by_key(|&(index, _)| index);
+    Ok(blockdevs
+           .into_iter()
+           .map(|(_, bd)| bd)
+           .collect::<Vec<_>>())
+}
+
 /// Get all the blockdevs corresponding to this pool that can be obtained from
 /// the given devices. Return them in the order in which they were written
 /// in the metadata.
@@ -192,68 +249,34 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
             .push((seg.1, seg.2))
     }
 
-    let mut blockdevs = vec![];
-    for (device, devnode) in devnodes {
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
-        if let Some(bda) = bda {
-            if bda.pool_uuid() == pool_uuid {
-                let actual_size = blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?
-                    .sectors();
+    // Get sorted blockdevs
+    let blockdevs = get_blockdevs_internal(pool_uuid, &recorded_data_map, &segment_table, devnodes)?;
 
-                if actual_size < bda.dev_size() {
-                    let err_msg = format!("actual blockdev size ({}) < recorded size ({})",
-                                          actual_size,
-                                          bda.dev_size());
+    // Verify that blockdevs found match blockdevs recorded.
+    let mut current_uuids = HashSet::new();
+    for blockdev in &blockdevs {
+        if !current_uuids.insert(blockdev.uuid()) {
+            let err_msg = format!("Two devices w/ same UUID ({}) found in environment",
+                                  blockdev.uuid());
 
-                    return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
-                }
-
-                let dev_uuid = bda.dev_uuid();
-                let &(index, bd_save) = recorded_data_map
-                    .get(&dev_uuid)
-                    .ok_or_else(|| {
-                                    let err_msg = format!("Blockdev {} not found in metadata",
-                                                          dev_uuid);
-                                    EngineError::Engine(ErrorEnum::NotFound, err_msg)
-                                })?;
-
-                // This should always succeed since the actual size is at
-                // least the recorded size, so all segments should be
-                // available to be allocated. If this fails, the most likely
-                // conclusion is metadata corruption.
-                let segments = segment_table.get(&bda.dev_uuid());
-                blockdevs.push((index,
-                                StratBlockDev::new(*device,
-                                                   devnode.to_owned(),
-                                                   bda,
-                                                   segments.unwrap_or(&vec![]),
-                                                   bd_save.user_info.clone(),
-                                                   bd_save.hardware_info.clone())?));
-            }
+            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
         }
     }
 
-    // Verify that blockdevs found match blockdevs recorded.
-    let current_uuids: HashSet<_> = blockdevs.iter().map(|&(_, ref b)| b.uuid()).collect();
-    let recorded_uuids: HashSet<_> = backstore_save
-        .block_devs
-        .iter()
-        .map(|bds| bds.uuid)
-        .collect();
+    let recorded_uuids: HashSet<_> = recorded_data_map.keys().cloned().collect();
 
     if current_uuids != recorded_uuids {
-        let err_msg = "Recorded block dev UUIDs != discovered blockdev UUIDs";
-        return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+        assert!(current_uuids.len() < recorded_uuids.len(),
+                "Returned with error if device UUID could not be found");
+        let missing_uuids = recorded_uuids.sub(&current_uuids);
+        let err_msg = format!("Blockdev UUIDs recorded in the metadata but not found: {}",
+                              missing_uuids
+                                  .iter()
+                                  .map(|u| u.to_string())
+                                  .collect::<Vec<_>>()
+                                  .join(", "));
+        return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
     }
 
-    if blockdevs.len() != current_uuids.len() {
-        let err_msg = "Duplicate block devices found in environment";
-        return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
-    }
-
-    blockdevs.sort_by_key(|&(index, _)| index);
-    Ok(blockdevs
-           .into_iter()
-           .map(|(_, bd)| bd)
-           .collect::<Vec<_>>())
+    Ok(blockdevs)
 }

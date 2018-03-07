@@ -84,17 +84,18 @@ impl StratFilesystem {
                 //
                 // If the source is unmounted the XFS log will be clean so
                 // we can skip the mount/unmount.
-                if self.get_mount_point()?.is_some() {
-                    let tmp_dir = TempDir::new("stratis_mp_")?;
-                    // Mount the snapshot with the "nouuid" option. mount
-                    // will fail due to duplicate UUID otherwise.
-                    mount(Some(&thin_dev.devnode()),
-                          tmp_dir.path(),
-                          Some("xfs"),
-                          MsFlags::empty(),
-                          Some("nouuid"))?;
-                    umount(tmp_dir.path())?;
-                }
+
+                // FIXME: get_mount_point doesn't work so assume we need to mount/unmount
+                let tmp_dir = TempDir::new("stratis_mp_")?;
+                // Mount the snapshot with the "nouuid" option. mount
+                // will fail due to duplicate UUID otherwise.
+                mount(Some(&thin_dev.devnode()),
+                      tmp_dir.path(),
+                      Some("xfs"),
+                      MsFlags::empty(),
+                      Some("nouuid"))?;
+                umount(tmp_dir.path())?;
+
                 set_uuid(&thin_dev.devnode(), snapshot_fs_uuid)?;
                 Ok(StratFilesystem::setup(thin_dev))
             }

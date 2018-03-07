@@ -477,6 +477,7 @@ impl ThinPool {
         let segments = coalesce_segs(&self.data_segments, &new_segs.to_vec());
         self.thin_pool
             .set_data_table(dm, segs_to_table(device, &segments))?;
+        self.thin_pool.resume(dm)?;
         self.data_segments = segments;
 
         Ok(())
@@ -491,6 +492,7 @@ impl ThinPool {
         let segments = coalesce_segs(&self.meta_segments, &new_segs.to_vec());
         self.thin_pool
             .set_meta_table(dm, segs_to_table(device, &segments))?;
+        self.thin_pool.resume(dm)?;
         self.meta_segments = segments;
 
         Ok(())

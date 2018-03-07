@@ -172,8 +172,18 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                      backstore_save: &BackstoreSave,
                      devnodes: &HashMap<Device, PathBuf>)
                      -> EngineResult<Vec<StratBlockDev>> {
-    let segments = &backstore_save.segments;
+    // Map blockdev UUIDs to pair of their position within
+    // backstore_save.block_devs and their metadata.
+    let recorded_data_map: HashMap<_, _> = backstore_save
+        .block_devs
+        .iter()
+        .enumerate()
+        .map(|(index, bds)| (bds.uuid, (index, bds)))
+        .collect();
 
+    // Sort the segments by the UUID to which they refer, i.e., group by
+    // blockdev.
+    let segments = &backstore_save.segments;
     let mut segment_table = HashMap::new();
     for seg in segments {
         segment_table
@@ -198,13 +208,12 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                     return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
                 }
 
-                let bd_save = backstore_save
-                    .block_devs
-                    .iter()
-                    .find(|bds| bds.uuid == bda.dev_uuid())
+                let dev_uuid = bda.dev_uuid();
+                let &(index, bd_save) = recorded_data_map
+                    .get(&dev_uuid)
                     .ok_or_else(|| {
                                     let err_msg = format!("Blockdev {} not found in metadata",
-                                                          bda.dev_uuid());
+                                                          dev_uuid);
                                     EngineError::Engine(ErrorEnum::NotFound, err_msg)
                                 })?;
 
@@ -213,18 +222,19 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                 // available to be allocated. If this fails, the most likely
                 // conclusion is metadata corruption.
                 let segments = segment_table.get(&bda.dev_uuid());
-                blockdevs.push(StratBlockDev::new(*device,
-                                                  devnode.to_owned(),
-                                                  bda,
-                                                  segments.unwrap_or(&vec![]),
-                                                  bd_save.user_info.clone(),
-                                                  bd_save.hardware_info.clone())?);
+                blockdevs.push((index,
+                                StratBlockDev::new(*device,
+                                                   devnode.to_owned(),
+                                                   bda,
+                                                   segments.unwrap_or(&vec![]),
+                                                   bd_save.user_info.clone(),
+                                                   bd_save.hardware_info.clone())?));
             }
         }
     }
 
     // Verify that blockdevs found match blockdevs recorded.
-    let current_uuids: HashSet<_> = blockdevs.iter().map(|b| b.uuid()).collect();
+    let current_uuids: HashSet<_> = blockdevs.iter().map(|&(_, ref b)| b.uuid()).collect();
     let recorded_uuids: HashSet<_> = backstore_save
         .block_devs
         .iter()
@@ -241,5 +251,9 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
         return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
     }
 
-    Ok(blockdevs)
+    blockdevs.sort_by_key(|&(index, _)| index);
+    Ok(blockdevs
+           .into_iter()
+           .map(|(_, bd)| bd)
+           .collect::<Vec<_>>())
 }

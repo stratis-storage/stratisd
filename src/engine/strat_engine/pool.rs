@@ -14,7 +14,8 @@ use devicemapper::{DM, Device, DmName, DmNameBuf, Sectors};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::types::{DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction};
+use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
+                          RenameAction};
 
 use super::backstore::{Backstore, MIN_MDA_SECTORS, get_metadata};
 use super::serde_structs::{PoolSave, Recordable};
@@ -199,10 +200,14 @@ impl Pool for StratPool {
     fn add_blockdevs(&mut self,
                      pool_name: &str,
                      paths: &[&Path],
+                     tier: BlockDevTier,
                      force: bool)
                      -> EngineResult<Vec<DevUuid>> {
         let dm = DM::new()?;
-        let bdev_info = self.backstore.add(&dm, paths, force)?;
+        self.thin_pool.suspend(&dm)?;
+        let bdev_info = self.backstore.add_blockdevs(&dm, paths, tier, force)?;
+        self.thin_pool.set_device(&dm, self.backstore.device())?;
+        self.thin_pool.resume(&dm)?;
         self.write_metadata(pool_name)?;
         Ok(bdev_info)
     }
@@ -248,13 +253,13 @@ impl Pool for StratPool {
     }
 
     fn total_physical_size(&self) -> Sectors {
-        self.backstore.current_capacity()
+        self.backstore.datatier_current_capacity()
     }
 
     fn total_physical_used(&self) -> EngineResult<Sectors> {
         self.thin_pool
             .total_physical_used()
-            .and_then(|v| Ok(v + self.backstore.metadata_size()))
+            .and_then(|v| Ok(v + self.backstore.datatier_metadata_size()))
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)> {
@@ -277,11 +282,11 @@ impl Pool for StratPool {
         self.backstore.blockdevs()
     }
 
-    fn get_blockdev(&self, uuid: DevUuid) -> Option<&BlockDev> {
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
         self.backstore.get_blockdev_by_uuid(uuid)
     }
 
-    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)> {
         self.backstore.get_mut_blockdev_by_uuid(uuid)
     }
 
@@ -292,10 +297,18 @@ impl Pool for StratPool {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+    use std::fs::OpenOptions;
+    use std::io::{Read, Write};
+
+    use nix::mount::{MsFlags, mount, umount};
+
     use super::super::super::types::Redundancy;
 
     use super::super::backstore::find_all;
+    use super::super::devlinks;
     use super::super::tests::{loopbacked, real};
+    use super::super::tests::tempdir::TempDir;
 
     use super::*;
 
@@ -352,6 +365,7 @@ mod tests {
     pub fn real_test_basic_metadata() {
         real::test_with_spec(real::DeviceLimits::AtLeast(2), test_basic_metadata);
     }
+
     /// Verify that a pool with no devices does not have the minimum amount of
     /// space required.
     fn test_empty_pool(paths: &[&Path]) -> () {
@@ -369,5 +383,140 @@ mod tests {
     #[test]
     pub fn real_test_empty_pool() {
         real::test_with_spec(real::DeviceLimits::Exactly(0), test_empty_pool);
+    }
+
+    /// Test that adding a cachedev causes metadata to be updated.
+    /// Verify that teardown and setup of pool allows reading from filesystem
+    /// written before cache was added. Check some basic facts about the
+    /// metadata.
+    fn test_add_cachedevs(paths: &[&Path]) {
+        assert!(paths.len() > 1);
+
+        let (paths1, paths2) = paths.split_at(paths.len() / 2);
+        let dm = DM::new().unwrap();
+
+        let name = "stratis-test-pool";
+        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        let (uuid, mut pool) = StratPool::initialize(&dm, &name, paths2, Redundancy::NONE, false)
+            .unwrap();
+        devlinks::pool_added(&name).unwrap();
+
+        let metadata1 = pool.record(name);
+        assert!(metadata1.backstore.cache_devs.is_none());
+        assert!(metadata1.backstore.cache_segments.is_none());
+        assert!(metadata1.backstore.meta_segments.is_none());
+
+        let (_, fs_uuid) = pool.create_filesystems(&name, &[("stratis-filesystem", None)])
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let tmp_dir = TempDir::new("stratis_testing").unwrap();
+        let new_file = tmp_dir.path().join("stratis_test.txt");
+        let bytestring = b"some bytes";
+        {
+            let (_, fs) = pool.get_filesystem(fs_uuid).unwrap();
+            mount(Some(&fs.devnode()),
+                  tmp_dir.path(),
+                  Some("xfs"),
+                  MsFlags::empty(),
+                  None as Option<&str>)
+                    .unwrap();
+            OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&new_file)
+                .unwrap()
+                .write(bytestring)
+                .unwrap();
+        }
+
+        pool.add_blockdevs(&name, paths1, BlockDevTier::Cache, false)
+            .unwrap();
+
+        let metadata2 = pool.record(name);
+        assert!(metadata2.backstore.cache_devs.is_some());
+        assert!(metadata2.backstore.cache_segments.is_some());
+        assert!(metadata2.backstore.meta_segments.is_some());
+
+        let mut buf = [0u8; 10];
+        {
+            OpenOptions::new()
+                .read(true)
+                .open(&new_file)
+                .unwrap()
+                .read(&mut buf)
+                .unwrap();
+        }
+        assert_eq!(&buf, bytestring);
+
+        umount(tmp_dir.path()).unwrap();
+
+        pool.teardown(&dm).unwrap();
+
+        let pools = find_all().unwrap();
+        assert_eq!(pools.len(), 1);
+        let (name, pool) = StratPool::setup(&dm, uuid, pools.get(&uuid).unwrap()).unwrap();
+
+        let metadata3 = pool.record(&name);
+
+        // FIXME: A simple test of equality between metadata2 and metadata3
+        // should be all that is required once blockdevs maintain a consistent
+        // order across teardown/setup operations.
+        assert!(metadata3.backstore.cache_devs.is_some());
+        assert!(metadata3.backstore.cache_segments.is_some());
+        assert!(metadata3.backstore.meta_segments.is_some());
+
+        assert_eq!(metadata3
+                       .backstore
+                       .cache_devs
+                       .as_ref()
+                       .map(|bds| bds.iter().map(|bd| bd.uuid).collect::<HashSet<_>>()),
+                   metadata2
+                       .backstore
+                       .cache_devs
+                       .as_ref()
+                       .map(|bds| bds.iter().map(|bd| bd.uuid).collect::<HashSet<_>>()));
+        assert_eq!(metadata3
+                       .backstore
+                       .data_devs
+                       .iter()
+                       .map(|bd| bd.uuid)
+                       .collect::<HashSet<_>>(),
+                   metadata2
+                       .backstore
+                       .data_devs
+                       .iter()
+                       .map(|bd| bd.uuid)
+                       .collect::<HashSet<_>>());
+
+        let mut buf = [0u8; 10];
+        {
+            let (_, fs) = pool.get_filesystem(fs_uuid).unwrap();
+            mount(Some(&fs.devnode()),
+                  tmp_dir.path(),
+                  Some("xfs"),
+                  MsFlags::empty(),
+                  None as Option<&str>)
+                    .unwrap();
+            OpenOptions::new()
+                .read(true)
+                .open(&new_file)
+                .unwrap()
+                .read(&mut buf)
+                .unwrap();
+        }
+        assert_eq!(&buf, bytestring);
+        umount(tmp_dir.path()).unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_add_cachedevs() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_add_cachedevs);
+    }
+
+    #[test]
+    pub fn real_test_add_cachedevs() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_add_cachedevs);
     }
 }

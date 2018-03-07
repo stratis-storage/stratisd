@@ -12,7 +12,8 @@ use uuid::Uuid;
 use devicemapper::{Device, Sectors};
 
 use super::errors::EngineResult;
-use super::types::{BlockDevState, DevUuid, FilesystemUuid, Name, PoolUuid, RenameAction};
+use super::types::{BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid,
+                   RenameAction};
 
 pub trait Filesystem: Debug {
     /// path of the device node
@@ -61,6 +62,7 @@ pub trait Pool: Debug {
     fn add_blockdevs(&mut self,
                      pool_name: &str,
                      paths: &[&Path],
+                     tier: BlockDevTier,
                      force: bool)
                      -> EngineResult<Vec<DevUuid>>;
 
@@ -124,10 +126,10 @@ pub trait Pool: Debug {
     fn blockdevs(&self) -> Vec<(Uuid, &BlockDev)>;
 
     /// Get the blockdev in this pool with this UUID.
-    fn get_blockdev(&self, uuid: DevUuid) -> Option<&BlockDev>;
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)>;
 
     /// Get the mutable filesystem in this pool with this UUID.
-    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<&mut BlockDev>;
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)>;
 
     /// Save the state of the pool. FIXME, see #614.
     fn save_state(&mut self, pool_name: &str) -> EngineResult<()>;

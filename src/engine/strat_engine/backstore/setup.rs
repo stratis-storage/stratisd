@@ -164,8 +164,7 @@ pub fn get_metadata(pool_uuid: PoolUuid,
 }
 
 /// Get all the blockdevs corresponding to this pool that can be obtained from
-/// the given devices. Return them in the order in which they were written
-/// in the metadata.
+/// the given devices.
 /// Returns an error if the blockdevs obtained do not match the metadata.
 #[allow(implicit_hasher)]
 pub fn get_blockdevs(pool_uuid: PoolUuid,

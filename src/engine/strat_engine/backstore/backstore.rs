@@ -716,16 +716,17 @@ mod tests {
     /// to be 0. Adding some more cachedevs exercises different code path
     /// from adding initial cachedevs.
     fn test_add_cache_devs(paths: &[&Path]) -> () {
-        assert!(paths.len() > 2);
+        assert!(paths.len() > 3);
 
         let meta_size = Sectors(IEC::Mi);
 
         let (initcachepaths, paths) = paths.split_at(1);
-        let (cachedevpaths, datadevpaths) = paths.split_at(1);
+        let (cachedevpaths, paths) = paths.split_at(1);
+        let (datadevpaths, initdatapaths) = paths.split_at(1);
 
         let dm = DM::new().unwrap();
         let mut backstore =
-            Backstore::initialize(&dm, Uuid::new_v4(), datadevpaths, MIN_MDA_SECTORS, false)
+            Backstore::initialize(&dm, Uuid::new_v4(), initdatapaths, MIN_MDA_SECTORS, false)
                 .unwrap();
 
         invariant(&backstore);
@@ -755,6 +756,12 @@ mod tests {
             CacheDevStatus::Fail => panic!("cache status should succeed"),
         }
 
+        let data_uuids = backstore
+            .add_blockdevs(&dm, datadevpaths, BlockDevTier::Data, false)
+            .unwrap();
+        invariant(&backstore);
+        assert_eq!(data_uuids.len(), datadevpaths.len());
+
         let cache_uuids = backstore
             .add_blockdevs(&dm, cachedevpaths, BlockDevTier::Cache, false)
             .unwrap();
@@ -782,17 +789,17 @@ mod tests {
 
     #[test]
     pub fn loop_test_add_cache_devs() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(3, 4), test_add_cache_devs);
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(4, 5), test_add_cache_devs);
     }
 
     #[test]
     pub fn real_test_add_cache_devs() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(3), test_add_cache_devs);
+        real::test_with_spec(real::DeviceLimits::AtLeast(4), test_add_cache_devs);
     }
 
     #[test]
     pub fn travis_test_add_cache_devs() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(3, 4), test_add_cache_devs);
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(4, 5), test_add_cache_devs);
     }
 
     /// Create a backstore with a cache.

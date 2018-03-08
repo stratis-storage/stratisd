@@ -55,12 +55,12 @@ impl BDA {
 
         // Write 8K header. Static_Header copies go in sectors 1 and 9.
         f.seek(SeekFrom::Start(0))?;
-        f.write_all(&zeroed[..SECTOR_SIZE])?;               // Zero 1 unused sector
+        f.write_all(&zeroed[..SECTOR_SIZE])?; // Zero 1 unused sector
         f.write_all(&hdr_buf)?;
-        f.write_all(&zeroed[..SECTOR_SIZE * 7])?;           // Zero 7 unused sectors
+        f.write_all(&zeroed[..SECTOR_SIZE * 7])?; // Zero 7 unused sectors
         f.flush()?;
         f.write_all(&hdr_buf)?;
-        f.write_all(&zeroed[..SECTOR_SIZE * 6])?;           // Zero 6 unused sectors
+        f.write_all(&zeroed[..SECTOR_SIZE * 6])?; // Zero 6 unused sectors
         f.flush()?;
 
         let regions = mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, &mut f)?;

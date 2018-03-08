@@ -11,9 +11,10 @@ use std::process::Command;
 use uuid::Uuid;
 
 use devicemapper as dm;
-use devicemapper::{DM, DataBlocks, Device, DmDevice, DmName, DmNameBuf, IEC, LinearDev,
-                   LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine,
-                   ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatusSummary, device_exists};
+use devicemapper::{DM, DataBlocks, Device, DmDevice, DmName, DmNameBuf, IEC, FlakeyTargetParams,
+                   LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors,
+                   TargetLine, ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatusSummary,
+                   device_exists};
 
 use super::super::super::engine::Filesystem;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -666,6 +667,88 @@ impl ThinPool {
              format_thinpool_ids(self.pool_uuid, ThinPoolRole::Pool).0]
 
     }
+
+    /// Suspend the thinpool
+    pub fn suspend(&mut self, dm: &DM) -> EngineResult<()> {
+        for (_, _, fs) in &mut self.filesystems {
+            fs.suspend(dm)?;
+        }
+        self.thin_pool.suspend(dm)?;
+        self.mdv.suspend(dm)?;
+        Ok(())
+    }
+
+    /// Resume the thinpool
+    pub fn resume(&mut self, dm: &DM) -> EngineResult<()> {
+        self.mdv.resume(dm)?;
+        self.thin_pool.resume(dm)?;
+        for (_, _, fs) in &mut self.filesystems {
+            fs.resume(dm)?;
+        }
+        Ok(())
+    }
+
+    /// Set the device on all DM devices
+    pub fn set_device(&mut self, dm: &DM, backstore_device: Device) -> EngineResult<bool> {
+        if backstore_device == self.backstore_device {
+            return Ok(false);
+        }
+
+        let xform_target_line =
+            |line: &TargetLine<LinearDevTargetParams>| -> TargetLine<LinearDevTargetParams> {
+                let new_params = match line.params {
+                    LinearDevTargetParams::Linear(ref params) => {
+                    LinearDevTargetParams::Linear(LinearTargetParams::new(backstore_device,
+                                                                          params.start_offset))
+                }
+                    LinearDevTargetParams::Flakey(ref params) => {
+                        let feature_args = params.feature_args.iter().cloned().collect::<Vec<_>>();
+                        LinearDevTargetParams::Flakey(FlakeyTargetParams::new(backstore_device,
+                                                                         params.start_offset,
+                                                                         params.up_interval,
+                                                                         params.down_interval,
+                                                                         feature_args))
+                    }
+                };
+
+                TargetLine::new(line.start, line.length, new_params)
+            };
+
+        let meta_table = self.thin_pool
+            .meta_dev()
+            .table()
+            .table
+            .clone()
+            .iter()
+            .map(&xform_target_line)
+            .collect::<Vec<_>>();
+
+        let data_table = self.thin_pool
+            .data_dev()
+            .table()
+            .table
+            .clone()
+            .iter()
+            .map(&xform_target_line)
+            .collect::<Vec<_>>();
+
+        let mdv_table = self.mdv
+            .device()
+            .table()
+            .table
+            .clone()
+            .iter()
+            .map(&xform_target_line)
+            .collect::<Vec<_>>();
+
+        self.thin_pool.set_meta_table(dm, meta_table)?;
+        self.thin_pool.set_data_table(dm, data_table)?;
+        self.mdv.set_table(dm, mdv_table)?;
+
+        self.backstore_device = backstore_device;
+
+        Ok(true)
+    }
 }
 
 impl Recordable<FlexDevsSave> for ThinPool {
@@ -762,6 +845,8 @@ mod tests {
     use uuid::Uuid;
 
     use devicemapper::{Bytes, SECTOR_SIZE};
+
+    use super::super::super::super::types::BlockDevTier;
 
     use super::super::super::backstore::MIN_MDA_SECTORS;
     use super::super::super::tests::{loopbacked, real};
@@ -1225,5 +1310,137 @@ mod tests {
     #[test]
     pub fn real_test_xfs_expand() {
         real::test_with_spec(real::DeviceLimits::AtLeast(1), test_xfs_expand);
+    }
+
+    /// Just suspend and resume the device and make sure it doesn't crash.
+    /// Suspend twice in succession and then resume twice in succession
+    /// to check idempotency.
+    fn test_suspend_resume(paths: &[&Path]) {
+        let pool_uuid = Uuid::new_v4();
+        let dm = DM::new().unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        let mut backstore = Backstore::initialize(&dm, pool_uuid, paths, MIN_MDA_SECTORS, false)
+            .unwrap();
+        let mut pool = ThinPool::new(pool_uuid,
+                                     &dm,
+                                     &ThinPoolSizeParams::default(),
+                                     DATA_BLOCK_SIZE,
+                                     DATA_LOWATER,
+                                     &mut backstore)
+                .unwrap();
+
+        let pool_name = "stratis_test_pool";
+        devlinks::pool_added(&pool_name).unwrap();
+        pool.create_filesystem(pool_name, "stratis_test_filesystem", &dm, None)
+            .unwrap();
+
+        pool.suspend(&dm).unwrap();
+        pool.suspend(&dm).unwrap();
+        pool.resume(&dm).unwrap();
+        pool.resume(&dm).unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_suspend_resume() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_suspend_resume);
+    }
+
+    #[test]
+    pub fn real_test_suspend_resume() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_suspend_resume);
+    }
+
+    /// Set up thinpool and backstore. Set up filesystem and write to it.
+    /// Add cachedev to backstore, causing cache to be built.
+    /// Update device on self. Read written bits from filesystem
+    /// presented on cache device.
+    fn test_set_device(paths: &[&Path]) {
+        assert!(paths.len() > 1);
+
+        let (paths1, paths2) = paths.split_at(paths.len() / 2);
+
+        let pool_uuid = Uuid::new_v4();
+        let dm = DM::new().unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        let mut backstore = Backstore::initialize(&dm, pool_uuid, paths2, MIN_MDA_SECTORS, false)
+            .unwrap();
+        let mut pool = ThinPool::new(pool_uuid,
+                                     &dm,
+                                     &ThinPoolSizeParams::default(),
+                                     DATA_BLOCK_SIZE,
+                                     DATA_LOWATER,
+                                     &mut backstore)
+                .unwrap();
+
+        let pool_name = "stratis_test_pool";
+        devlinks::pool_added(&pool_name).unwrap();
+        let fs_uuid = pool.create_filesystem(pool_name, "stratis_test_filesystem", &dm, None)
+            .unwrap();
+
+        let tmp_dir = TempDir::new("stratis_testing").unwrap();
+        let new_file = tmp_dir.path().join("stratis_test.txt");
+        let bytestring = b"some bytes";
+        {
+            let (_, fs) = pool.get_filesystem_by_uuid(fs_uuid).unwrap();
+            mount(Some(&fs.devnode()),
+                  tmp_dir.path(),
+                  Some("xfs"),
+                  MsFlags::empty(),
+                  None as Option<&str>)
+                    .unwrap();
+            OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(&new_file)
+                .unwrap()
+                .write(bytestring)
+                .unwrap();
+        }
+        let filesystem_saves = pool.mdv.filesystems().unwrap();
+        assert_eq!(filesystem_saves.len(), 1);
+        assert_eq!(filesystem_saves
+                       .first()
+                       .expect("filesystem_saves().len == 1")
+                       .uuid,
+                   fs_uuid);
+
+        pool.suspend(&dm).unwrap();
+        let old_device = backstore.device();
+        backstore
+            .add_blockdevs(&dm, paths1, BlockDevTier::Cache, false)
+            .unwrap();
+        let new_device = backstore.device();
+        assert!(old_device != new_device);
+        pool.set_device(&dm, new_device).unwrap();
+        pool.resume(&dm).unwrap();
+
+        let mut buf = [0u8; 10];
+        {
+            OpenOptions::new()
+                .read(true)
+                .open(&new_file)
+                .unwrap()
+                .read(&mut buf)
+                .unwrap();
+        }
+        assert_eq!(&buf, bytestring);
+
+        let filesystem_saves = pool.mdv.filesystems().unwrap();
+        assert_eq!(filesystem_saves.len(), 1);
+        assert_eq!(filesystem_saves
+                       .first()
+                       .expect("filesystem_saves().len == 1")
+                       .uuid,
+                   fs_uuid);
+    }
+
+    #[test]
+    pub fn loop_test_set_device() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_set_device);
+    }
+
+    #[test]
+    pub fn real_test_set_device() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_set_device);
     }
 }

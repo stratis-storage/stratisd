@@ -702,6 +702,12 @@ mod tests {
                 (backstore.cache_tier.is_some() && backstore.cache.is_some() &&
                  backstore.linear.is_none()));
         assert_eq!(backstore.data_tier.block_mgr.avail_space(), Sectors(0));
+        assert_eq!(backstore.data_tier.capacity(),
+                   match (&backstore.linear, &backstore.cache) {
+                       (&None, &Some(ref cache)) => cache.size(),
+                       (&Some(ref linear), &None) => linear.size(),
+                       _ => panic!("impossible; see first assertion"),
+                   })
     }
 
     /// Test adding cachedevs to the backstore.

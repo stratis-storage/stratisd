@@ -70,16 +70,14 @@ fn dm_stratis_devices_remove() -> Result<()> {
 /// Try and un-mount any filesystems that have the name stratis in the mount point, returning
 /// immediately on the first one we are unable to unmount.
 fn stratis_filesystems_unmount() -> Result<()> {
-    || -> Result<()> {
-        let mounts = get_submounts(&PathBuf::from("/"))?;
-        for m in mounts
-                .iter()
-                .filter(|m| m.file.to_str().map_or(false, |s| s.contains("stratis"))) {
-            umount2(&m.file, MntFlags::MNT_DETACH)?;
-        }
-        Ok(())
-    }()
-            .map_err(|e| Error::with_chain(e, "unable to unmount all stratis filesystems"))
+    for m in get_submounts(&PathBuf::from("/"))?
+            .iter()
+            .filter(|m| m.file.to_str().map_or(false, |s| s.contains("stratis"))) {
+        umount2(&m.file, MntFlags::MNT_DETACH)
+            .map_err(|e| Error::with_chain(e, "unable to unmount all Stratis filesystems"))?;
+    }
+
+    Ok(())
 }
 
 /// When a unit test panics we can leave the system in an inconsistent state.  This function

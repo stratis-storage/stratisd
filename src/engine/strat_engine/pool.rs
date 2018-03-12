@@ -138,12 +138,12 @@ impl StratPool {
     /// Called when a DM device in this pool has generated an event.
     // TODO: Just check the device that evented. Currently checks
     // everything.
-    pub fn event_on(&mut self, pool_name: &Name, dm_name: &DmName) -> EngineResult<()> {
+    pub fn event_on(&mut self, dm: &DM, pool_name: &Name, dm_name: &DmName) -> EngineResult<()> {
         assert!(self.thin_pool
                     .get_eventing_dev_names()
                     .iter()
                     .any(|x| dm_name == &**x));
-        if self.thin_pool.check(&DM::new()?, &mut self.backstore)? {
+        if self.thin_pool.check(dm, &mut self.backstore)? {
             self.write_metadata(pool_name)?;
         }
         Ok(())
@@ -246,7 +246,7 @@ impl Pool for StratPool {
 
     fn total_physical_used(&self) -> EngineResult<Sectors> {
         self.thin_pool
-            .total_physical_used()
+            .total_physical_used(&DM::new()?)
             .and_then(|v| Ok(v + self.backstore.datatier_metadata_size()))
     }
 

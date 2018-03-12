@@ -284,8 +284,8 @@ impl Engine for StratEngine {
     }
 
     fn evented(&mut self) -> EngineResult<()> {
-        let device_list: HashMap<_, _> = DM::new()?
-            .list_devices()?
+        let dm = DM::new()?;
+        let device_list: HashMap<_, _> = dm.list_devices()?
             .into_iter()
             .map(|(dm_name, _, event_nr)| {
                      (dm_name, event_nr.expect("Supported DM versions always provide a value"))
@@ -295,7 +295,7 @@ impl Engine for StratEngine {
         for (pool_name, _, pool) in &mut self.pools {
             for dm_name in pool.get_eventing_dev_names() {
                 if device_list.get(&dm_name) > self.watched_dev_last_event_nrs.get(&dm_name) {
-                    pool.event_on(pool_name, &dm_name)?;
+                    pool.event_on(&dm, pool_name, &dm_name)?;
                 }
             }
         }

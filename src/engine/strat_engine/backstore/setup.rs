@@ -16,9 +16,11 @@ use serde_json;
 use devicemapper::{Device, devnode_to_devno};
 
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
-use super::super::super::types::PoolUuid;
+use super::super::super::structures::Table;
+use super::super::super::types::{Name, PoolUuid};
 
 use super::super::engine::DevOwnership;
+use super::super::pool::{StratPool, check_metadata};
 use super::super::serde_structs::{BackstoreSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
@@ -26,8 +28,8 @@ use super::device::blkdev_size;
 use super::metadata::{BDA, StaticHeader};
 
 
-/// Determine if devnode is a stratis device, if it is we will add  pool uuid and device
-/// information to pool_map and return pool uuid.
+/// Determine if devnode is a Stratis device. Return the device's Stratis
+/// pool UUID if it belongs to Stratis.
 pub fn is_stratis_device(devnode: &PathBuf) -> EngineResult<Option<PoolUuid>> {
     match OpenOptions::new().read(true).open(&devnode) {
         Ok(mut f) => {
@@ -68,6 +70,29 @@ pub fn is_stratis_device(devnode: &PathBuf) -> EngineResult<Option<PoolUuid>> {
             }
         }
     }
+}
+
+
+/// Setup a pool from constituent devices in the context of some already
+/// setup pools. Return an error on anything that prevents the pool
+/// being set up.
+pub fn setup_pool(pool_uuid: PoolUuid,
+                  devices: &HashMap<Device, PathBuf>,
+                  pools: &Table<StratPool>)
+                  -> EngineResult<(Name, StratPool)> {
+    let metadata = get_metadata(pool_uuid, devices)?
+        .ok_or_else(|| {
+                        EngineError::Engine(ErrorEnum::NotFound,
+                                            format!("no metadata for pool UUID \"{}\"", pool_uuid))
+                    })?;
+    if pools.contains_name(&metadata.name) {
+        let err_msg = format!("duplicate pool name \"{}\" for pool UUID \"{}\"",
+                              &metadata.name,
+                              pool_uuid);
+        return Err(EngineError::Engine(ErrorEnum::AlreadyExists, err_msg));
+    }
+
+    check_metadata(&metadata).and_then(|_| StratPool::setup(pool_uuid, devices, &metadata))
 }
 
 /// Find all Stratis devices.

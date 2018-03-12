@@ -15,7 +15,8 @@ use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{DevUuid, Name, PoolUuid, Redundancy, RenameAction};
 
-use super::backstore::{find_all, is_stratis_device};
+use super::backstore::{find_all, is_stratis_device, setup_pool};
+#[cfg(test)]
 use super::cleanup::teardown_pools;
 use super::devlinks;
 use super::dm::get_dm;
@@ -44,6 +45,7 @@ pub struct StratEngine {
     // we've handled for each
     watched_dev_last_event_nrs: HashMap<DmNameBuf, u32>,
 }
+
 
 
 impl StratEngine {
@@ -80,23 +82,14 @@ impl StratEngine {
         let mut table = Table::default();
         let mut incomplete_pools = HashMap::new();
 
-        for (pool_uuid, devices) in &pools {
-            match StratPool::setup(*pool_uuid, devices) {
+        for (pool_uuid, devices) in pools {
+            match setup_pool(pool_uuid, &devices, &table) {
                 Ok((pool_name, pool)) => {
-                    let evicted = table.insert(pool_name, *pool_uuid, pool);
-                    if evicted.is_some() {
-                        // TODO: update state machine on failure.
-                        let _ = teardown_pools(table);
-                        let err_msg = "found two pools with the same name";
-                        return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
-                    }
+                    table.insert(pool_name, pool_uuid, pool);
                 }
-                Err(e) => {
-                    // TODO: Add ability to distinguish expected vs. unexpected errors,
-                    // expected error would be caused by missing block device(s).
-                    warn!("Pool {} failed to setup, reason {:?}.", pool_uuid, e);
-                    // Unable to setup pool, it might become complete later.
-                    incomplete_pools.insert(*pool_uuid, devices.clone());
+                Err(err) => {
+                    warn!("pool failed to setup, reason {:?}", err);
+                    incomplete_pools.insert(pool_uuid, devices);
                 }
             }
         }
@@ -146,72 +139,43 @@ impl Engine for StratEngine {
     /// up and running, it will get setup and the pool uuid will be returned.
     ///
     /// Returns an error if the status of the block device can not be evaluated.
+    /// Logs a warning if the block devices appears to be a Stratis block
+    /// device and no pool is set up.
     fn block_evaluate(&mut self,
                       dev_node: PathBuf,
                       device: Device)
                       -> EngineResult<Option<PoolUuid>> {
-        if let Some(pool_uuid) = is_stratis_device(&dev_node)? {
+        let pool_uuid = if let Some(pool_uuid) = is_stratis_device(&dev_node)? {
             if self.pools.contains_uuid(pool_uuid) {
                 // TODO: Handle the case where we have found a device for an already active pool
                 // ref. https://github.com/stratis-storage/stratisd/issues/748
                 warn!("udev add: pool {} is already known, ignoring device {:?}!",
                       pool_uuid,
                       dev_node);
-                Ok(None)
+                None
             } else {
-
                 let mut devices = self.incomplete_pools
                     .remove(&pool_uuid)
                     .or_else(|| Some(HashMap::new()))
                     .expect("We just retrieved or created a HashMap");
                 devices.insert(device, dev_node);
 
-
-                let rc = match StratPool::setup(pool_uuid, &devices) {
+                match setup_pool(pool_uuid, &devices, &self.pools) {
                     Ok((pool_name, pool)) => {
-                        // We know we have a unique uuid, but the pools table requires a unique
-                        // name too so we will ensure unique before we insert as we don't want to
-                        // change the existing state if we have a conflict.
-                        //
-                        // We will also _not_ exit the daemon as we do in initialize as we were
-                        // previously up and running for some duration of time.
-                        if !self.pools.contains_name(&pool_name) {
-                            self.pools.insert(pool_name, pool_uuid, pool);
-                            Some(pool_uuid)
-                        } else {
-                            let dev_paths = devices
-                                .values()
-                                .map(|p| p.to_str().expect("Unix is utf-8"))
-                                .collect::<Vec<&str>>()
-                                .join(", ");
-
-                            self.incomplete_pools.insert(pool_uuid, devices);
-
-                            error!("udev add: duplicate pool name {:?} for uuid {:?}, \
-                                devices[{}], failing to setup complete pool.",
-                                   pool_name,
-                                   pool_uuid,
-                                   dev_paths);
-                            if let Err(e) = pool.teardown() {
-                                error!("Error while tearing down pool with duplicate name {:?}.",
-                                       e);
-                            }
-                            None
-                        }
+                        self.pools.insert(pool_name, pool_uuid, pool);
+                        Some(pool_uuid)
                     }
-                    Err(e) => {
-                        warn!("udev add: pool {} failed to setup, reason {:?}.",
-                              pool_uuid,
-                              e);
+                    Err(err) => {
+                        warn!("udev add: pool failed to setup, reason {:?}", err);
                         self.incomplete_pools.insert(pool_uuid, devices);
                         None
                     }
-                };
-                Ok(rc)
+                }
             }
         } else {
-            Ok(None)
-        }
+            None
+        };
+        Ok(pool_uuid)
     }
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool> {

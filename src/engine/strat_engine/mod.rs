@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 mod backstore;
+#[cfg(test)]
 mod cleanup;
 mod device;
 mod devlinks;

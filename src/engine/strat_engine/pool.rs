@@ -120,18 +120,6 @@ impl StratPool {
         self.backstore.save_state(data.as_bytes())
     }
 
-    pub fn check(&mut self, name: &Name) -> EngineResult<()> {
-        // FIXME: The context should not be created here as this is not
-        // a public method. Ideally the context should be created in the
-        // invoking method, Engine::check(). However, since we hope that
-        // method will go away entirely, we just fix half of the problem
-        // with this method, and leave the rest alone.
-        if self.thin_pool.check(&DM::new()?, &mut self.backstore)? {
-            self.write_metadata(name)?;
-        }
-        Ok(())
-    }
-
     /// Teardown a pool.
     pub fn teardown(self, dm: &DM) -> EngineResult<()> {
         self.thin_pool.teardown(dm)?;

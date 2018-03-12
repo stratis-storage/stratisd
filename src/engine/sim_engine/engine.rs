@@ -114,10 +114,6 @@ impl Engine for SimEngine {
         Ok(())
     }
 
-    fn check(&mut self) -> () {
-        check_engine!(self)
-    }
-
     fn pools(&self) -> Vec<(Name, PoolUuid, &Pool)> {
         self.pools
             .iter()

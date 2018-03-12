@@ -66,15 +66,6 @@ macro_rules! rename_pool_pre {
     }
 }
 
-macro_rules! check_engine {
-    ( $s:ident ) => {
-        for (pool_name, _, pool) in &mut $s.pools {
-            // FIXME: It is not really correct to ignore result of pool.check().
-            let _ = pool.check(pool_name);
-        }
-    }
-}
-
 macro_rules! set_blockdev_user_info {
     ( $s:ident; $info:ident ) => {
         if $s.user_info.as_ref().map(|x| &**x) != $info {

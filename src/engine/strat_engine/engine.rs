@@ -272,10 +272,6 @@ impl Engine for StratEngine {
         Ok(()) // we're not the simulator and not configurable, so just say ok
     }
 
-    fn check(&mut self) -> () {
-        check_engine!(self);
-    }
-
     fn pools(&self) -> Vec<(Name, PoolUuid, &Pool)> {
         self.pools
             .iter()

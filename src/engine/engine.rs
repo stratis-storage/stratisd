@@ -176,9 +176,6 @@ pub trait Engine: Debug {
     /// denominator: the probably of failure is 1/denominator.
     fn configure_simulator(&mut self, denominator: u32) -> EngineResult<()>;
 
-    /// Check pools' current state and take appropriate actions
-    fn check(&mut self) -> ();
-
     /// Get all pools belonging to this engine.
     fn pools(&self) -> Vec<(Name, PoolUuid, &Pool)>;
 

@@ -13,6 +13,7 @@ target
 tests/test_config.json
 # man pages
 *.8
+*.8.gz
 
 # python files
 *.pyc

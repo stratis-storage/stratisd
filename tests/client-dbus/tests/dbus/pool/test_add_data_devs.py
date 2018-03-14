@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Test adding blockdevs to a pool.
 """
@@ -51,14 +50,12 @@ class AddDataDevsTestCase(unittest.TestCase):
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 0),
-              'force': False,
-              'devices': []
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': []
+            })
         self._pool_object = get_object(poolpath)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
@@ -79,13 +76,10 @@ class AddDataDevsTestCase(unittest.TestCase):
         blockdevs1 = blockdevs(managed_objects, {'Pool': pool})
         self.assertEqual(list(blockdevs1), [])
 
-        (result, rc, _) = Pool.Methods.AddDataDevs(
-           self._pool_object,
-           {
-              'force': False,
-              'devices': []
-           }
-        )
+        (result, rc, _) = Pool.Methods.AddDataDevs(self._pool_object, {
+            'force': False,
+            'devices': []
+        })
 
         self.assertEqual(result, [])
         self.assertEqual(rc, StratisdErrors.OK)
@@ -110,13 +104,11 @@ class AddDataDevsTestCase(unittest.TestCase):
         blockdevs1 = blockdevs(managed_objects, {'Pool': pool})
         self.assertEqual(list(blockdevs1), [])
 
-        (result, rc, _) = Pool.Methods.AddDataDevs(
-           self._pool_object,
-           {
-              'force': False,
-              'devices': _DEVICE_STRATEGY.example()
-           }
-        )
+        (result, rc,
+         _) = Pool.Methods.AddDataDevs(self._pool_object, {
+             'force': False,
+             'devices': _DEVICE_STRATEGY.example()
+         })
 
         num_devices_added = len(result)
         managed_objects = \
@@ -142,5 +134,5 @@ class AddDataDevsTestCase(unittest.TestCase):
         self.assertEqual(len(list(blockdevs3)), num_devices_added)
 
         # There are no cachedevs belonging to this pool
-        blockdevs4 = blockdevs(managed_objects, {'Pool': pool, 'Tier':  1})
+        blockdevs4 = blockdevs(managed_objects, {'Pool': pool, 'Tier': 1})
         self.assertEqual(list(blockdevs4), [])

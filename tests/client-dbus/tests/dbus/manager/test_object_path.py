@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Test object path methods.
 """
@@ -22,7 +21,6 @@ from stratisd_client_dbus import get_object
 
 from .._misc import _device_list
 from .._misc import Service
-
 
 _DEVICE_STRATEGY = _device_list(0)
 
@@ -38,7 +36,7 @@ class GetObjectTestCase(unittest.TestCase):
         """
         self._service = Service()
         self._service.setUp()
-        time.sleep(1) # wait until the service is available
+        time.sleep(1)  # wait until the service is available
 
     def tearDown(self):
         """

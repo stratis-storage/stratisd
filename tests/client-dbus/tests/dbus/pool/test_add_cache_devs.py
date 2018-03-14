@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Test adding blockdevs to a pool.
 """
@@ -51,14 +50,12 @@ class AddCacheDevsTestCase1(unittest.TestCase):
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 0),
-              'force': False,
-              'devices': []
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': []
+            })
         self._pool_object = get_object(poolpath)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
@@ -76,13 +73,10 @@ class AddCacheDevsTestCase1(unittest.TestCase):
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (pool, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
 
-        (result, rc, _) = Pool.Methods.AddCacheDevs(
-           self._pool_object,
-           {
-              'force': False,
-              'devices': []
-           }
-        )
+        (result, rc, _) = Pool.Methods.AddCacheDevs(self._pool_object, {
+            'force': False,
+            'devices': []
+        })
 
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
@@ -103,13 +97,11 @@ class AddCacheDevsTestCase1(unittest.TestCase):
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (pool, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
 
-        (result, rc, _) = Pool.Methods.AddCacheDevs(
-           self._pool_object,
-           {
-              'force': False,
-              'devices': _DEVICE_STRATEGY.example()
-           }
-        )
+        (result, rc,
+         _) = Pool.Methods.AddCacheDevs(self._pool_object, {
+             'force': False,
+             'devices': _DEVICE_STRATEGY.example()
+         })
 
         num_devices_added = len(result)
         managed_objects = \
@@ -135,7 +127,7 @@ class AddCacheDevsTestCase1(unittest.TestCase):
         self.assertEqual(len(list(blockdevs3)), num_devices_added)
 
         # There are no datadevs belonging to this pool
-        blockdevs4 = blockdevs(managed_objects, {'Pool': pool, 'Tier':  0})
+        blockdevs4 = blockdevs(managed_objects, {'Pool': pool, 'Tier': 0})
         self.assertEqual(list(blockdevs4), [])
 
 
@@ -155,14 +147,12 @@ class AddCacheDevsTestCase2(unittest.TestCase):
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         ((poolpath, devpaths), _, _) = Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 0),
-              'force': False,
-              'devices': _DEVICE_STRATEGY.example()
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': _DEVICE_STRATEGY.example()
+            })
         self._pool_object = get_object(poolpath)
         self._devpaths = frozenset(devpaths)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
@@ -182,17 +172,15 @@ class AddCacheDevsTestCase2(unittest.TestCase):
         (pool, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
 
         blockdevs1 = blockdevs(managed_objects, {'Pool': pool, 'Tier': 0})
-        self.assertEqual(self._devpaths, frozenset(op for (op, _) in blockdevs1))
+        self.assertEqual(self._devpaths, frozenset(
+            op for (op, _) in blockdevs1))
         blockdevs2 = blockdevs(managed_objects, {'Pool': pool, 'Tier': 1})
         self.assertEqual(list(blockdevs2), [])
 
-        (result, rc, _) = Pool.Methods.AddCacheDevs(
-           self._pool_object,
-           {
-              'force': False,
-              'devices': []
-           }
-        )
+        (result, rc, _) = Pool.Methods.AddCacheDevs(self._pool_object, {
+            'force': False,
+            'devices': []
+        })
 
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
@@ -200,7 +188,8 @@ class AddCacheDevsTestCase2(unittest.TestCase):
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         blockdevs3 = blockdevs(managed_objects, {'Pool': pool})
-        self.assertEqual(frozenset(op for (op, _) in blockdevs3), self._devpaths)
+        self.assertEqual(
+            frozenset(op for (op, _) in blockdevs3), self._devpaths)
 
     def testSomeDevs(self):
         """
@@ -211,14 +200,13 @@ class AddCacheDevsTestCase2(unittest.TestCase):
         (pool, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
 
         blockdevs1 = blockdevs(managed_objects, {'Pool': pool, 'Tier': 0})
-        self.assertEqual(self._devpaths, frozenset(op for (op, _) in blockdevs1))
-        (result, rc, _) = Pool.Methods.AddCacheDevs(
-           self._pool_object,
-           {
-              'force': False,
-              'devices': _DEVICE_STRATEGY.example()
-           }
-        )
+        self.assertEqual(self._devpaths, frozenset(
+            op for (op, _) in blockdevs1))
+        (result, rc,
+         _) = Pool.Methods.AddCacheDevs(self._pool_object, {
+             'force': False,
+             'devices': _DEVICE_STRATEGY.example()
+         })
 
         num_devices_added = len(result)
         managed_objects = \
@@ -232,11 +220,13 @@ class AddCacheDevsTestCase2(unittest.TestCase):
         blockdev_object_paths = frozenset(result)
 
         # cache blockdevs exported on the D-Bus are exactly those added
-        blockdevs2 = list(blockdevs(managed_objects, {'Pool': pool, 'Tier': 1}))
+        blockdevs2 = list(
+            blockdevs(managed_objects, {
+                'Pool': pool,
+                'Tier': 1
+            }))
         self.assertEqual(
-           frozenset(op for (op, _) in blockdevs2),
-           blockdev_object_paths
-        )
+            frozenset(op for (op, _) in blockdevs2), blockdev_object_paths)
 
         # no duplicates in the object paths
         self.assertEqual(len(blockdevs2), num_devices_added)
@@ -248,4 +238,5 @@ class AddCacheDevsTestCase2(unittest.TestCase):
 
         # The number of datadevs has remained the same
         blockdevs5 = blockdevs(managed_objects, {'Pool': pool, 'Tier': 0})
-        self.assertEqual(frozenset(op for (op, _) in blockdevs5), self._devpaths)
+        self.assertEqual(
+            frozenset(op for (op, _) in blockdevs5), self._devpaths)

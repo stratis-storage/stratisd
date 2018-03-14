@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Test renaming a pool.
 """
@@ -50,14 +49,12 @@ class SetNameTestCase(unittest.TestCase):
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         ((self._pool_object_path, _), _, _) = Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 0),
-              'force': False,
-              'devices': _DEVICE_STRATEGY.example()
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': _DEVICE_STRATEGY.example()
+            })
         self._pool_object = get_object(self._pool_object_path)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
@@ -71,10 +68,8 @@ class SetNameTestCase(unittest.TestCase):
         """
         Test rename to same name.
         """
-        (result, rc, _) = Pool.Methods.SetName(
-           self._pool_object,
-           {'name': self._POOLNAME}
-        )
+        (result, rc, _) = Pool.Methods.SetName(self._pool_object,
+                                               {'name': self._POOLNAME})
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertFalse(result)
@@ -92,10 +87,8 @@ class SetNameTestCase(unittest.TestCase):
         """
         new_name = "new"
 
-        (result, rc, _) = Pool.Methods.SetName(
-           self._pool_object,
-           {'name': new_name}
-        )
+        (result, rc, _) = Pool.Methods.SetName(self._pool_object,
+                                               {'name': new_name})
 
         self.assertTrue(result)
         self.assertEqual(rc, StratisdErrors.OK)
@@ -103,8 +96,7 @@ class SetNameTestCase(unittest.TestCase):
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         self.assertIsNone(
-           next(pools(managed_objects, {'Name': self._POOLNAME}), None)
-        )
+            next(pools(managed_objects, {'Name': self._POOLNAME}), None))
         result = next(pools(managed_objects, {'Name': new_name}), None)
         self.assertIsNotNone(result)
         (pool, _) = result

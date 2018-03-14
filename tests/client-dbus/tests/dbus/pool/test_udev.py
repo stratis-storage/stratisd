@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 """
 Used to test udev "add" event in stratisd
 """
@@ -49,8 +47,9 @@ def rs(l):
         random.choice(string.ascii_uppercase) for _ in range(l)))
 
 
-@unittest.skipIf(os.getenv('STRATIS_DESTRUCTIVE_TEST') is None,
-                 "STRATIS_DESTRUCTIVE_TEST not set")
+@unittest.skipIf(
+    os.getenv('STRATIS_DESTRUCTIVE_TEST') is None,
+    "STRATIS_DESTRUCTIVE_TEST not set")
 class UdevAdd(unittest.TestCase):
     """
     Test udev add event support.
@@ -65,14 +64,12 @@ class UdevAdd(unittest.TestCase):
         :return: Dbus proxy object representing pool.
         """
         ((pool_object_path, _), _, _) = Manager.Methods.CreatePool(
-            get_object(TOP_OBJECT),
-            {
+            get_object(TOP_OBJECT), {
                 'name': name,
                 'redundancy': (True, 0),
                 'force': False,
                 'devices': devices
-            }
-        )
+            })
         return get_object(pool_object_path)
 
     def _device_files(self, tokens):
@@ -114,7 +111,7 @@ class UdevAdd(unittest.TestCase):
         managed_objects = ObjectManager.Methods.GetManagedObjects(
             get_object(TOP_OBJECT), {})
 
-        selector = {} if name is None else {'Name' : name}
+        selector = {} if name is None else {'Name': name}
         return list(pools(managed_objects, selector))
 
     def _start_service(self):
@@ -126,8 +123,8 @@ class UdevAdd(unittest.TestCase):
 
         if self._service is None:
             dbus_interface_present = False
-            self._service = subprocess.Popen([os.path.join(_STRATISD),
-                                              '--debug'])
+            self._service = subprocess.Popen(
+                [os.path.join(_STRATISD), '--debug'])
 
             limit = time.time() + 10.0
             while time.time() <= limit:
@@ -178,7 +175,9 @@ class UdevAdd(unittest.TestCase):
         time.sleep(1)
 
     # pylint: disable=too-many-locals
-    def _test_driver(self, number_of_pools, dev_count_pool,
+    def _test_driver(self,
+                     number_of_pools,
+                     dev_count_pool,
                      some_existing=False):
         """
         We want to test 1..N number of devices in the following scenarios:
@@ -407,6 +406,7 @@ class UdevAdd(unittest.TestCase):
                     self._lb_mgr.generate_udev_add_event(d)
 
             self._settle()
-            self.assertEqual(len(UdevAdd._get_pools()), existing_pool_count + 1)
+            self.assertEqual(
+                len(UdevAdd._get_pools()), existing_pool_count + 1)
 
         self.assertEqual(len(UdevAdd._get_pools()), num_pools)

@@ -11,15 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 """
 Functionality pertaining to device mapper
 """
 
 import os
 import subprocess
-
 
 _DM_BIN = os.getenv('STRATIS_DMSETUP_BIN', "/usr/sbin/dmsetup")
 
@@ -40,8 +37,8 @@ def _remove_device(device):
     :param device: The device to remove
     :return: True if device was removed, else False
     """
-    return_code = subprocess.call([_DM_BIN, 'remove', device],
-                                  stderr=subprocess.PIPE)
+    return_code = subprocess.call(
+        [_DM_BIN, 'remove', device], stderr=subprocess.PIPE)
     return return_code == 0
 
 

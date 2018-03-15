@@ -98,7 +98,7 @@ impl StratPool {
             return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
         }
 
-        let backstore = Backstore::setup(dm, uuid, &metadata.backstore, devnodes, None)?;
+        let backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, None)?;
         let thinpool = ThinPool::setup(dm,
                                        uuid,
                                        metadata.thinpool_dev.data_block_size,

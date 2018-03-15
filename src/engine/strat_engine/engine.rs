@@ -7,6 +7,7 @@ extern crate libc;
 use std::collections::HashMap;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::{Path, PathBuf};
+use std::panic::catch_unwind;
 
 use devicemapper::{DM, Device, DmNameBuf};
 
@@ -18,6 +19,7 @@ use super::super::types::{DevUuid, Name, PoolUuid, Redundancy, RenameAction};
 use super::backstore::{find_all, is_stratis_device};
 use super::cleanup::teardown_pools;
 use super::devlinks;
+use super::dm::get_dm_context;
 use super::pool::StratPool;
 
 
@@ -68,7 +70,13 @@ impl StratEngine {
     /// Returns an error and tears down all the pools if we find a pool with a
     /// duplicate name found.
     pub fn initialize() -> EngineResult<StratEngine> {
-        let dm = DM::new()?;
+        let dm = match catch_unwind(get_dm_context) {
+            Ok(dm) => dm,
+            Err(_) => {
+                let err_msg = "failed to instantiate DM context";
+                return Err(EngineError::Engine(ErrorEnum::Error, err_msg.into()));
+            }
+        };
         let minor_dm_version = dm.version()?.1;
         if minor_dm_version < REQUIRED_DM_MINOR_VERSION {
             let err_msg = format!("Requires DM minor version {} but kernel only supports {}",
@@ -85,12 +93,12 @@ impl StratEngine {
         let mut incomplete_pools = HashMap::new();
 
         for (pool_uuid, devices) in &pools {
-            match StratPool::setup(&dm, *pool_uuid, devices) {
+            match StratPool::setup(*pool_uuid, devices) {
                 Ok((pool_name, pool)) => {
                     let evicted = table.insert(pool_name, *pool_uuid, pool);
                     if evicted.is_some() {
                         // TODO: update state machine on failure.
-                        let _ = teardown_pools(&dm, table);
+                        let _ = teardown_pools(table);
                         let err_msg = "found two pools with the same name";
                         return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
                     }
@@ -119,7 +127,7 @@ impl StratEngine {
     /// Teardown Stratis, preparatory to a shutdown.
     #[cfg(test)]
     pub fn teardown(self) -> EngineResult<()> {
-        teardown_pools(&DM::new()?, self.pools)
+        teardown_pools(self.pools)
     }
 }
 
@@ -137,8 +145,7 @@ impl Engine for StratEngine {
             return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
-        let dm = DM::new()?;
-        let (uuid, pool) = StratPool::initialize(&dm, name, blockdev_paths, redundancy, force)?;
+        let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy, force)?;
 
         let name = Name::new(name.to_owned());
         devlinks::pool_added(&name)?;
@@ -155,7 +162,6 @@ impl Engine for StratEngine {
                       dev_node: PathBuf,
                       device: Device)
                       -> EngineResult<Option<PoolUuid>> {
-        let dm = DM::new()?;
         if let Some(pool_uuid) = is_stratis_device(&dev_node)? {
             if self.pools.contains_uuid(pool_uuid) {
                 // TODO: Handle the case where we have found a device for an already active pool
@@ -173,7 +179,7 @@ impl Engine for StratEngine {
                 devices.insert(device, dev_node);
 
 
-                let rc = match StratPool::setup(&dm, pool_uuid, &devices) {
+                let rc = match StratPool::setup(pool_uuid, &devices) {
                     Ok((pool_name, pool)) => {
                         // We know we have a unique uuid, but the pools table requires a unique
                         // name too so we will ensure unique before we insert as we don't want to
@@ -198,7 +204,7 @@ impl Engine for StratEngine {
                                    pool_name,
                                    pool_uuid,
                                    dev_paths);
-                            if let Err(e) = pool.teardown(&dm) {
+                            if let Err(e) = pool.teardown() {
                                 error!("Error while tearing down pool with duplicate name {:?}.",
                                        e);
                             }
@@ -283,7 +289,7 @@ impl Engine for StratEngine {
     }
 
     fn evented(&mut self) -> EngineResult<()> {
-        let device_list: HashMap<_, _> = DM::new()?
+        let device_list: HashMap<_, _> = get_dm_context()
             .list_devices()?
             .into_iter()
             .map(|(dm_name, _, event_nr)| {

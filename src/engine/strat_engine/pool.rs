@@ -10,7 +10,7 @@ use std::vec::Vec;
 use serde_json;
 use uuid::Uuid;
 
-use devicemapper::{DM, Device, DmName, DmNameBuf, Sectors};
+use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -34,18 +34,16 @@ impl StratPool {
     /// Initialize a Stratis Pool.
     /// 1. Initialize the block devices specified by paths.
     /// 2. Set up thinpool device to back filesystems.
-    pub fn initialize(dm: &DM,
-                      name: &str,
+    pub fn initialize(name: &str,
                       paths: &[&Path],
                       redundancy: Redundancy,
                       force: bool)
                       -> EngineResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
-        let mut backstore = Backstore::initialize(dm, pool_uuid, paths, MIN_MDA_SECTORS, force)?;
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
 
         let thinpool = ThinPool::new(pool_uuid,
-                                     dm,
                                      &ThinPoolSizeParams::default(),
                                      DATA_BLOCK_SIZE,
                                      DATA_LOWATER,
@@ -53,7 +51,7 @@ impl StratPool {
         let thinpool = match thinpool {
             Ok(thinpool) => thinpool,
             Err(err) => {
-                let _ = backstore.destroy(dm);
+                let _ = backstore.destroy();
                 return Err(err);
             }
         };
@@ -70,8 +68,7 @@ impl StratPool {
     }
 
     /// Setup a StratPool using its UUID and the list of devnodes it has.
-    pub fn setup(dm: &DM,
-                 uuid: PoolUuid,
+    pub fn setup(uuid: PoolUuid,
                  devnodes: &HashMap<Device, PathBuf>)
                  -> EngineResult<(Name, StratPool)> {
         let metadata = get_metadata(uuid, devnodes)?
@@ -98,9 +95,8 @@ impl StratPool {
             return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
         }
 
-        let backstore = Backstore::setup(dm, uuid, &metadata.backstore, devnodes, None)?;
-        let thinpool = ThinPool::setup(dm,
-                                       uuid,
+        let backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, None)?;
+        let thinpool = ThinPool::setup(uuid,
                                        metadata.thinpool_dev.data_block_size,
                                        DATA_LOWATER,
                                        &metadata.flex_devs,
@@ -121,9 +117,9 @@ impl StratPool {
     }
 
     /// Teardown a pool.
-    pub fn teardown(self, dm: &DM) -> EngineResult<()> {
-        self.thin_pool.teardown(dm)?;
-        self.backstore.teardown(dm)
+    pub fn teardown(self) -> EngineResult<()> {
+        self.thin_pool.teardown()?;
+        self.backstore.teardown()
     }
 
     pub fn has_filesystems(&self) -> bool {
@@ -143,7 +139,7 @@ impl StratPool {
                     .get_eventing_dev_names()
                     .iter()
                     .any(|x| dm_name == &**x));
-        if self.thin_pool.check(&DM::new()?, &mut self.backstore)? {
+        if self.thin_pool.check(&mut self.backstore)? {
             self.write_metadata(pool_name)?;
         }
         Ok(())
@@ -174,11 +170,9 @@ impl Pool for StratPool {
         }
 
         // TODO: Roll back on filesystem initialization failure.
-        let dm = DM::new()?;
         let mut result = Vec::new();
         for (name, size) in names {
-            let fs_uuid = self.thin_pool
-                .create_filesystem(pool_name, name, &dm, size)?;
+            let fs_uuid = self.thin_pool.create_filesystem(pool_name, name, size)?;
             result.push((name, fs_uuid));
         }
 
@@ -191,19 +185,17 @@ impl Pool for StratPool {
                      tier: BlockDevTier,
                      force: bool)
                      -> EngineResult<Vec<DevUuid>> {
-        let dm = DM::new()?;
-        self.thin_pool.suspend(&dm)?;
-        let bdev_info = self.backstore.add_blockdevs(&dm, paths, tier, force)?;
-        self.thin_pool.set_device(&dm, self.backstore.device())?;
-        self.thin_pool.resume(&dm)?;
+        self.thin_pool.suspend()?;
+        let bdev_info = self.backstore.add_blockdevs(paths, tier, force)?;
+        self.thin_pool.set_device(self.backstore.device())?;
+        self.thin_pool.resume()?;
         self.write_metadata(pool_name)?;
         Ok(bdev_info)
     }
 
     fn destroy(self) -> EngineResult<()> {
-        let dm = DM::new()?;
-        self.thin_pool.teardown(&dm)?;
-        self.backstore.destroy(&dm)?;
+        self.thin_pool.teardown()?;
+        self.backstore.destroy()?;
         Ok(())
     }
 
@@ -211,11 +203,9 @@ impl Pool for StratPool {
                                pool_name: &str,
                                fs_uuids: &[FilesystemUuid])
                                -> EngineResult<Vec<FilesystemUuid>> {
-        let dm = DM::new()?;
-
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
-            self.thin_pool.destroy_filesystem(&dm, pool_name, uuid)?;
+            self.thin_pool.destroy_filesystem(pool_name, uuid)?;
             removed.push(uuid);
         }
 
@@ -237,7 +227,7 @@ impl Pool for StratPool {
                            snapshot_name: &str)
                            -> EngineResult<FilesystemUuid> {
         self.thin_pool
-            .snapshot_filesystem(&DM::new()?, pool_name, origin_uuid, snapshot_name)
+            .snapshot_filesystem(pool_name, origin_uuid, snapshot_name)
     }
 
     fn total_physical_size(&self) -> Sectors {
@@ -311,15 +301,14 @@ mod tests {
         assert!(paths.len() > 1);
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
-        let dm = DM::new().unwrap();
 
         let name1 = "name1";
-        let (uuid1, pool1) = StratPool::initialize(&dm, &name1, paths1, Redundancy::NONE, false)
+        let (uuid1, pool1) = StratPool::initialize(&name1, paths1, Redundancy::NONE, false)
             .unwrap();
         let metadata1 = pool1.record(name1);
 
         let name2 = "name2";
-        let (uuid2, pool2) = StratPool::initialize(&dm, &name2, paths2, Redundancy::NONE, false)
+        let (uuid2, pool2) = StratPool::initialize(&name2, paths2, Redundancy::NONE, false)
             .unwrap();
         let metadata2 = pool2.record(name2);
 
@@ -332,8 +321,8 @@ mod tests {
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
 
-        pool1.teardown(&dm).unwrap();
-        pool2.teardown(&dm).unwrap();
+        pool1.teardown().unwrap();
+        pool2.teardown().unwrap();
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 2);
         let devnodes1 = pools.get(&uuid1).unwrap();
@@ -358,9 +347,7 @@ mod tests {
     /// space required.
     fn test_empty_pool(paths: &[&Path]) -> () {
         assert_eq!(paths.len(), 0);
-        let dm = DM::new().unwrap();
-        assert!(StratPool::initialize(&dm, "stratis_test_pool", paths, Redundancy::NONE, true)
-                    .is_err());
+        assert!(StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE, true).is_err());
     }
 
     #[test]
@@ -381,11 +368,10 @@ mod tests {
         assert!(paths.len() > 1);
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
-        let dm = DM::new().unwrap();
 
         let name = "stratis-test-pool";
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let (uuid, mut pool) = StratPool::initialize(&dm, &name, paths2, Redundancy::NONE, false)
+        let (uuid, mut pool) = StratPool::initialize(&name, paths2, Redundancy::NONE, false)
             .unwrap();
         devlinks::pool_added(&name).unwrap();
 
@@ -440,11 +426,11 @@ mod tests {
 
         umount(tmp_dir.path()).unwrap();
 
-        pool.teardown(&dm).unwrap();
+        pool.teardown().unwrap();
 
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 1);
-        let (name, pool) = StratPool::setup(&dm, uuid, pools.get(&uuid).unwrap()).unwrap();
+        let (name, pool) = StratPool::setup(uuid, pools.get(&uuid).unwrap()).unwrap();
 
         let metadata3 = pool.record(&name);
 

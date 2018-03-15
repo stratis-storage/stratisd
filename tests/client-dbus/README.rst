@@ -27,3 +27,7 @@ Contributing
 ------------
 Issues suggesting tests or pull requests that extend the existing test suite
 are welcome.
+
+The code style standard is PEP8.  Travis CI runs a compliance test on
+all pull requests via yapf.  Please auto format code before opening a pull 
+request via "make fmt".

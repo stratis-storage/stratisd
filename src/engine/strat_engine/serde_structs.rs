@@ -12,8 +12,6 @@
 // can convert to or from them when saving our current state, or
 // restoring state from saved metadata.
 
-use std::path::PathBuf;
-
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -39,8 +37,6 @@ pub struct PoolSave {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockDevSave {
     pub uuid: DevUuid,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub devnode: Option<PathBuf>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_info: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

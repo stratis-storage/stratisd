@@ -8,14 +8,12 @@ arg_map = {
    "src/stratisd_client_dbus" : [
       "--reports=no",
       "--disable=I",
-      "--disable=bad-continuation",
       "--disable=invalid-name",
       "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'"
    ],
    "tests" : [
       "--reports=no",
       "--disable=I",
-      "--disable=bad-continuation",
       "--disable=duplicate-code",
       "--disable=invalid-name",
       "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'"

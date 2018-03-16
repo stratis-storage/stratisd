@@ -8,6 +8,7 @@ use std::error::Error;
 #[cfg(feature="dbus_enabled")]
 use dbus;
 use libudev;
+use nix;
 
 use engine::EngineError;
 
@@ -22,6 +23,7 @@ pub enum StratisError {
     #[cfg(feature="dbus_enabled")]
     Dbus(dbus::Error),
     Udev(libudev::Error),
+    Nix(nix::Error),
 }
 
 impl fmt::Display for StratisError {
@@ -38,6 +40,7 @@ impl fmt::Display for StratisError {
                 write!(f, "Dbus error: {}", err.message().unwrap_or("Unknown"))
             }
             StratisError::Udev(ref err) => write!(f, "Udev error: {}", err),
+            StratisError::Nix(ref err) => write!(f, "Nix error: {}", err),
         }
     }
 }
@@ -52,6 +55,7 @@ impl Error for StratisError {
             #[cfg(feature="dbus_enabled")]
             StratisError::Dbus(ref err) => err.message().unwrap_or("D-Bus Error"),
             StratisError::Udev(ref err) => Error::description(err),
+            StratisError::Nix(ref err) => Error::description(err),
         }
     }
 
@@ -63,6 +67,7 @@ impl Error for StratisError {
             #[cfg(feature="dbus_enabled")]
             StratisError::Dbus(ref err) => Some(err),
             StratisError::Udev(ref err) => Some(err),
+            StratisError::Nix(ref err) => Some(err),
         }
     }
 }
@@ -89,5 +94,11 @@ impl From<EngineError> for StratisError {
 impl From<libudev::Error> for StratisError {
     fn from(err: libudev::Error) -> StratisError {
         StratisError::Udev(err)
+    }
+}
+
+impl From<nix::Error> for StratisError {
+    fn from(err: nix::Error) -> StratisError {
+        StratisError::Nix(err)
     }
 }

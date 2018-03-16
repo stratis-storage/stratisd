@@ -12,6 +12,7 @@ extern crate clap;
 extern crate dbus;
 extern crate libc;
 extern crate libudev;
+extern crate nix;
 
 #[cfg(test)]
 extern crate quickcheck;
@@ -19,6 +20,8 @@ extern crate quickcheck;
 use std::cell::RefCell;
 use std::env;
 use std::error::Error;
+use std::fs::{File, OpenOptions};
+use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use std::process::exit;
@@ -26,7 +29,10 @@ use std::rc::Rc;
 
 use clap::{App, Arg};
 use env_logger::LogBuilder;
+use libc::pid_t;
 use log::{LogLevelFilter, SetLoggerError};
+use nix::fcntl::{flock, FlockArg};
+use nix::unistd::getpid;
 
 #[cfg(feature="dbus_enabled")]
 use dbus::WatchEvent;
@@ -35,6 +41,8 @@ use devicemapper::Device;
 
 use libstratis::engine::{Engine, SimEngine, StratEngine};
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
+
+const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
 
 /// If writing a program error to stderr fails, panic.
 fn print_err(err: StratisError) -> () {
@@ -78,7 +86,38 @@ fn handle_udev_add(event: &libudev::Event) -> Option<(PathBuf, Device)> {
     None
 }
 
+/// To ensure only one instance of stratisd runs at a time, acquire an
+/// exclusive lock. Return an error if lock attempt fails.
+fn create_pid_file() -> StratisResult<File> {
+    let mut f = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(STRATISD_PID_PATH)?;
+    match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
+        Ok(_) => {
+            f.write(format!("{}\n", getpid()).as_bytes())?;
+            Ok(f)
+        }
+        Err(_) => {
+            let mut buf = String::new();
+            f.read_to_string(&mut buf)?;
+            // pidfile is supposed to contain pid of holder. But you never
+            // know so be paranoid.
+            let pid_str = buf.split_whitespace()
+                .next()
+                .and_then(|s| s.parse::<pid_t>().ok())
+                .map(|pid| format!("{}", pid))
+                .unwrap_or_else(|| "<unknown>".into());
+            Err(StratisError::Error(format!("Daemon already running with pid: {}", pid_str)))
+        }
+    }
+}
+
 fn run() -> StratisResult<()> {
+
+    // Exit immediately if stratisd is already running
+    let _ = create_pid_file()?;
 
     let matches = App::new("stratis")
         .version(VERSION)

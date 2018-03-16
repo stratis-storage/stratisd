@@ -15,6 +15,7 @@ pub type StratisResult<T> = Result<T, StratisError>;
 
 #[derive(Debug)]
 pub enum StratisError {
+    Error(String),
     Engine(EngineError),
     StderrNotFound,
     Io(io::Error),
@@ -27,6 +28,7 @@ pub enum StratisError {
 impl fmt::Display for StratisError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            StratisError::Error(ref s) => write!(f, "Error: {}", s),
             StratisError::Engine(ref err) => {
                 write!(f, "Engine error: {}", err.description().to_owned())
             }
@@ -45,6 +47,7 @@ impl fmt::Display for StratisError {
 impl Error for StratisError {
     fn description(&self) -> &str {
         match *self {
+            StratisError::Error(ref s) => s,
             StratisError::Engine(ref err) => Error::description(err),
             StratisError::StderrNotFound => "stderr not found",
             StratisError::Io(ref err) => err.description(),
@@ -57,6 +60,7 @@ impl Error for StratisError {
 
     fn cause(&self) -> Option<&Error> {
         match *self {
+            StratisError::Error(_) => None,
             StratisError::Engine(ref err) => Some(err),
             StratisError::StderrNotFound => None,
             StratisError::Io(ref err) => Some(err),

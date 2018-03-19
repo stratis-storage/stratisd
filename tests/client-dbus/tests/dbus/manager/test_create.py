@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Test 'CreatePool'.
 """
@@ -64,14 +63,12 @@ class Create2TestCase(unittest.TestCase):
         """
         devs = _DEVICE_STRATEGY.example()
         ((poolpath, devnodes), rc, _) = Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 0),
-              'force': False,
-              'devices': devs
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': devs
+            })
 
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
@@ -88,8 +85,7 @@ class Create2TestCase(unittest.TestCase):
             pool_info = MOPool(table)
             self.assertLessEqual(
                 int(pool_info.TotalPhysicalUsed()),
-                int(pool_info.TotalPhysicalSize())
-            )
+                int(pool_info.TotalPhysicalSize()))
         else:
             self.assertIsNone(result)
             self.assertEqual(len(all_pools), 0)
@@ -100,15 +96,14 @@ class Create2TestCase(unittest.TestCase):
         """
         devs = _DEVICE_STRATEGY.example()
         (_, rc, _) = Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 1),
-              'force': False,
-              'devices': devs
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 1),
+                'force': False,
+                'devices': devs
+            })
         self.assertEqual(rc, StratisdErrors.ERROR)
+
 
 class Create3TestCase(unittest.TestCase):
     """
@@ -125,14 +120,12 @@ class Create3TestCase(unittest.TestCase):
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 0),
-              'force': False,
-              'devices': _DEVICE_STRATEGY.example()
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': _DEVICE_STRATEGY.example()
+            })
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
@@ -145,17 +138,16 @@ class Create3TestCase(unittest.TestCase):
         """
         Create should fail trying to create new pool with same name as previous.
         """
-        pools1 = pools(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        pools1 = pools(
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
 
         (_, rc, _) = Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 0),
-              'force': False,
-              'devices': _DEVICE_STRATEGY.example()
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': _DEVICE_STRATEGY.example()
+            })
         expected_rc = StratisdErrors.ALREADY_EXISTS
         self.assertEqual(rc, expected_rc)
 
@@ -166,6 +158,5 @@ class Create3TestCase(unittest.TestCase):
 
         self.assertIsNotNone(pool)
         self.assertEqual(
-           frozenset(x for (x, y) in pools1),
-           frozenset(x for (x, y) in pools2)
-        )
+            frozenset(x for (x, y) in pools1), frozenset(
+                x for (x, y) in pools2))

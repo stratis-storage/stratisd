@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Class to handle loop back devices.
 """
@@ -56,8 +55,8 @@ class LoopBackDevices(object):
             # Sparse file, so go big (1 TiB)
             bd.truncate(1024**4)
 
-        result = subprocess.check_output([_LOSETUP_BIN, '-f',
-                                          '--show', backing_file])
+        result = subprocess.check_output(
+            [_LOSETUP_BIN, '-f', '--show', backing_file])
         device = str.strip(result.decode("utf-8"))
         token = uuid.uuid4()
         self.devices[token] = (device, backing_file)
@@ -98,8 +97,8 @@ class LoopBackDevices(object):
         if token in self.devices:
             (_, backing_file) = self.devices[token]
 
-            result = subprocess.check_output([_LOSETUP_BIN, '-f', '--show',
-                                    backing_file])
+            result = subprocess.check_output(
+                [_LOSETUP_BIN, '-f', '--show', backing_file])
             device = str.strip(result.decode("utf-8"))
             self.devices[token] = (device, backing_file)
 

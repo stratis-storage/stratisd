@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Test renaming a filesystem.
 """
@@ -52,19 +51,15 @@ class SetNameTestCase(unittest.TestCase):
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         ((self._pool_object_path, _), _, _) = Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 0),
-              'force': False,
-              'devices': _DEVICE_STRATEGY.example()
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': _DEVICE_STRATEGY.example()
+            })
         self._pool_object = get_object(self._pool_object_path)
         (created, _, _) = Pool.Methods.CreateFilesystems(
-           self._pool_object,
-           {'specs': [self._fs_name]}
-        )
+            self._pool_object, {'specs': [self._fs_name]})
         self._filesystem_object_path = created[0][0]
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
@@ -79,10 +74,8 @@ class SetNameTestCase(unittest.TestCase):
         Test rename to same name.
         """
         filesystem = get_object(self._filesystem_object_path)
-        (result, rc, _) = Filesystem.Methods.SetName(
-           filesystem,
-           {'name': self._fs_name}
-        )
+        (result, rc, _) = Filesystem.Methods.SetName(filesystem,
+                                                     {'name': self._fs_name})
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertFalse(result)
@@ -92,17 +85,16 @@ class SetNameTestCase(unittest.TestCase):
         Test rename to new name.
         """
         filesystem = get_object(self._filesystem_object_path)
-        (result, rc, _) = Filesystem.Methods.SetName(
-           filesystem,
-           {'name': "new"}
-        )
+        (result, rc, _) = Filesystem.Methods.SetName(filesystem,
+                                                     {'name': "new"})
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertTrue(result)
 
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (fs_object_path, _) = next(filesystems(managed_objects, {'Name': 'new'}))
+        (fs_object_path, _) = next(
+            filesystems(managed_objects, {'Name': 'new'}))
         self.assertEqual(self._filesystem_object_path, fs_object_path)
 
         fs_object_path = \

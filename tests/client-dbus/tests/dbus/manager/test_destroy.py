@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Test DestroyPool.
 """
@@ -33,8 +32,8 @@ from stratisd_client_dbus._constants import TOP_OBJECT
 from .._misc import _device_list
 from .._misc import Service
 
-
 _DEVICE_STRATEGY = _device_list(0)
+
 
 class Destroy1TestCase(unittest.TestCase):
     """
@@ -94,14 +93,12 @@ class Destroy2TestCase(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         self._devices = _DEVICE_STRATEGY.example()
         Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 0),
-              'force': False,
-              'devices': self._devices
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': self._devices
+            })
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
@@ -119,9 +116,8 @@ class Destroy2TestCase(unittest.TestCase):
         (pool1, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
         blockdevs1 = blockdevs(managed_objects, {'Pool': pool1})
         self.assertEqual(
-           frozenset(MOBlockDev(b).Devnode() for (_, b) in blockdevs1),
-           frozenset(d for d in self._devices)
-        )
+            frozenset(MOBlockDev(b).Devnode() for (_, b) in blockdevs1),
+            frozenset(d for d in self._devices))
 
         (result, rc, _) = \
                 Manager.Methods.DestroyPool(self._proxy, {'pool': pool1})
@@ -155,18 +151,14 @@ class Destroy3TestCase(unittest.TestCase):
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 0),
-              'force': False,
-              'devices': _DEVICE_STRATEGY.example()
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': _DEVICE_STRATEGY.example()
+            })
         Pool.Methods.CreateFilesystems(
-           get_object(poolpath),
-           {'specs': [self._VOLNAME]}
-        )
+            get_object(poolpath), {'specs': [self._VOLNAME]})
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
@@ -209,14 +201,12 @@ class Destroy4TestCase(unittest.TestCase):
         time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 0),
-              'force': False,
-              'devices': []
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': []
+            })
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
@@ -243,5 +233,4 @@ class Destroy4TestCase(unittest.TestCase):
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         self.assertIsNone(
-           next(pools(managed_objects, {'Name': self._POOLNAME}), None)
-        )
+            next(pools(managed_objects, {'Name': self._POOLNAME}), None))

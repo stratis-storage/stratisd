@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Test 'stratisd'.
 """
@@ -60,6 +59,7 @@ class StratisTestCase(unittest.TestCase):
         version = Manager.Properties.Version.Get(get_object(TOP_OBJECT))
         (major, _, _) = version.split(".")
         self.assertEqual(major, "0")
+
 
 class StratisTestCase2(unittest.TestCase):
     """

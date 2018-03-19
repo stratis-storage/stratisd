@@ -11,14 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Test creating a filesystem in a pool.
 """
 
 import time
 import unittest
-
 
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import ObjectManager
@@ -52,14 +50,12 @@ class CreateFSTestCase(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY.example()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 0),
-              'force': False,
-              'devices': self._devs
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': self._devs
+            })
         self._pool_object = get_object(poolpath)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
@@ -76,9 +72,7 @@ class CreateFSTestCase(unittest.TestCase):
         number of volumes.
         """
         (result, rc, _) = Pool.Methods.CreateFilesystems(
-           self._pool_object,
-           {'specs': []}
-        )
+            self._pool_object, {'specs': []})
 
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
@@ -95,9 +89,7 @@ class CreateFSTestCase(unittest.TestCase):
         new_name = "name"
 
         (result, rc, _) = Pool.Methods.CreateFilesystems(
-           self._pool_object,
-           {'specs': [new_name, new_name]}
-        )
+            self._pool_object, {'specs': [new_name, new_name]})
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertEqual(len(result), 1)
@@ -128,19 +120,15 @@ class CreateFSTestCase1(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY.example()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 0),
-              'force': False,
-              'devices': self._devs
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': self._devs
+            })
         self._pool_object = get_object(poolpath)
-        Pool.Methods.CreateFilesystems(
-           self._pool_object,
-           {'specs': [self._VOLNAME]}
-        )
+        Pool.Methods.CreateFilesystems(self._pool_object,
+                                       {'specs': [self._VOLNAME]})
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
@@ -156,9 +144,7 @@ class CreateFSTestCase1(unittest.TestCase):
         fail, and no additional volume should be created.
         """
         (result, rc, _) = Pool.Methods.CreateFilesystems(
-           self._pool_object,
-           {'specs': [self._VOLNAME]}
-        )
+            self._pool_object, {'specs': [self._VOLNAME]})
 
         self.assertEqual(rc, StratisdErrors.ALREADY_EXISTS)
         self.assertEqual(len(result), 0)
@@ -175,9 +161,7 @@ class CreateFSTestCase1(unittest.TestCase):
         new_name = "newname"
 
         (result, rc, _) = Pool.Methods.CreateFilesystems(
-           self._pool_object,
-           {'specs': [new_name]}
-        )
+            self._pool_object, {'specs': [new_name]})
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertEqual(len(result), 1)
@@ -197,9 +181,7 @@ class CreateFSTestCase1(unittest.TestCase):
         fail, and no additional volume should be created.
         """
         (result, rc, _) = Pool.Methods.CreateFilesystems(
-           self._pool_object,
-           {'specs': [self._VOLNAME, "newname"]}
-        )
+            self._pool_object, {'specs': [self._VOLNAME, "newname"]})
 
         self.assertEqual(rc, StratisdErrors.ALREADY_EXISTS)
         self.assertEqual(len(result), 0)
@@ -215,9 +197,7 @@ class CreateFSTestCase1(unittest.TestCase):
         multiple volume support is added back - this test should be removed.
         """
         (result, rc, _) = Pool.Methods.CreateFilesystems(
-           self._pool_object,
-           {'specs': ["a", "b"]}
-        )
+            self._pool_object, {'specs': ["a", "b"]})
 
         self.assertEqual(rc, StratisdErrors.ERROR)
         self.assertEqual(len(result), 0)

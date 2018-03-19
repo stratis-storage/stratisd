@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Test destroying a filesystem in a pool.
 """
@@ -51,14 +50,12 @@ class DestroyFSTestCase(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY.example()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 0),
-              'force': False,
-              'devices': self._devs
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': self._devs
+            })
         self._pool_object = get_object(poolpath)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
@@ -75,9 +72,7 @@ class DestroyFSTestCase(unittest.TestCase):
         number of volumes.
         """
         (result, rc, _) = Pool.Methods.DestroyFilesystems(
-           self._pool_object,
-           {'filesystems': []}
-        )
+            self._pool_object, {'filesystems': []})
 
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
@@ -92,9 +87,7 @@ class DestroyFSTestCase(unittest.TestCase):
         because at the end the filesystem is not there.
         """
         (result, rc, _) = Pool.Methods.DestroyFilesystems(
-           self._pool_object,
-           {'filesystems': ['/']}
-        )
+            self._pool_object, {'filesystems': ['/']})
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertEqual(len(result), 0)
 
@@ -121,19 +114,15 @@ class DestroyFSTestCase1(unittest.TestCase):
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY.example()
         ((self._poolpath, _), _, _) = Manager.Methods.CreatePool(
-           self._proxy,
-           {
-              'name': self._POOLNAME,
-              'redundancy': (True, 0),
-              'force': False,
-              'devices': self._devs
-           }
-        )
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': self._devs
+            })
         self._pool_object = get_object(self._poolpath)
         (self._filesystems, _, _) = Pool.Methods.CreateFilesystems(
-           self._pool_object,
-           {'specs': [(self._VOLNAME, '', None)]}
-        )
+            self._pool_object, {'specs': [(self._VOLNAME, '', None)]})
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):
@@ -149,9 +138,7 @@ class DestroyFSTestCase1(unittest.TestCase):
         """
         fs_object_path = self._filesystems[0][0]
         (result, rc, _) = Pool.Methods.DestroyFilesystems(
-           self._pool_object,
-           {'filesystems': [fs_object_path]}
-        )
+            self._pool_object, {'filesystems': [fs_object_path]})
 
         self.assertEqual(len(result), 1)
         self.assertEqual(rc, StratisdErrors.OK)
@@ -168,9 +155,7 @@ class DestroyFSTestCase1(unittest.TestCase):
         """
         fs_object_path = self._filesystems[0][0]
         (result, rc, _) = Pool.Methods.DestroyFilesystems(
-           self._pool_object,
-           {'filesystems': [fs_object_path, "/"]}
-        )
+            self._pool_object, {'filesystems': [fs_object_path, "/"]})
 
         self.assertEqual(len(result), 1)
         self.assertEqual(rc, StratisdErrors.OK)

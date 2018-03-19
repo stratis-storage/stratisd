@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Miscellaneous methods to support testing.
 """
@@ -32,12 +31,9 @@ def _device_list(minimum):
     :param int minimum: the minimum number of devices, must be at least 0
     """
     return strategies.lists(
-       strategies.text(
-          alphabet=string.ascii_letters + "/",
-          min_size=1
-       ),
-       min_size=minimum
-    )
+        strategies.text(alphabet=string.ascii_letters + "/", min_size=1),
+        min_size=minimum)
+
 
 class Service(object):
     """

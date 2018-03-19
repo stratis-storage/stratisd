@@ -19,7 +19,6 @@ extern crate quickcheck;
 
 use std::cell::RefCell;
 use std::env;
-use std::error::Error;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
@@ -46,7 +45,7 @@ const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
 
 /// If writing a program error to stderr fails, panic.
 fn print_err(err: StratisError) -> () {
-    eprintln!("{}", err.description());
+    eprintln!("{}", err);
 }
 
 /// Configure and initialize the logger.

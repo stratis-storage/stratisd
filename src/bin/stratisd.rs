@@ -109,8 +109,7 @@ fn create_pid_file() -> StratisResult<File> {
                 .and_then(|s| s.parse::<pid_t>().ok())
                 .map(|pid| format!("{}", pid))
                 .unwrap_or_else(|| "<unknown>".into());
-            eprintln!("Stratisd is already running with pid {}", pid_str);
-            exit(1);
+            Err(StratisError::Error(format!("Daemon already running with pid: {}", pid_str)))
         }
     }
 }

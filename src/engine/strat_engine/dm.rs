@@ -13,7 +13,7 @@ static mut DM_CONTEXT: Option<DM> = None;
 
 pub fn get_dm_context() -> &'static DM {
     unsafe {
-        INIT.call_once(|| DM_CONTEXT = Some(DM::new().unwrap()));
+        INIT.call_once(|| DM_CONTEXT = Some(Err("error").unwrap()));
         match DM_CONTEXT {
             Some(ref context) => context,
             _ => panic!("DM_CONTEXT.is_some()"),

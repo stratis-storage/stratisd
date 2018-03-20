@@ -9,8 +9,8 @@ dbus-tests:
 
 .PHONY: fmt
 fmt:
-	yapf --style pep8 --recursive --in-place . check.py setup.py src tests
+	yapf --style pep8 --recursive --in-place check.py setup.py src tests
 
 .PHONY: fmt-travis
 fmt-travis:
-	yapf --style pep8 --recursive --diff . check.py setup.py src tests
+	yapf --style pep8 --recursive --diff check.py setup.py src tests

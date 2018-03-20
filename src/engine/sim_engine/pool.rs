@@ -227,7 +227,7 @@ mod tests {
 
     use uuid::Uuid;
 
-    use engine::Engine;
+    use super::super::super::engine::Engine;
 
     use super::super::SimEngine;
 

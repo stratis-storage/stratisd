@@ -504,8 +504,8 @@ impl ThinPool {
     // This includes all the sectors being held as spares for the meta device,
     // all the sectors allocated to the meta data device, and all the sectors
     // in use on the data device.
-    pub fn total_physical_used(&self) -> EngineResult<Sectors> {
-        let data_dev_used = match self.thin_pool.status(&DM::new()?)? {
+    pub fn total_physical_used(&self, dm: &DM) -> EngineResult<Sectors> {
+        let data_dev_used = match self.thin_pool.status(dm)? {
             dm::ThinPoolStatus::Working(ref status) => *status.usage.used_data * DATA_BLOCK_SIZE,
             _ => {
                 let err_msg = "thin pool failed, could not obtain usage";

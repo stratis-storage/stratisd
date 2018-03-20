@@ -7,8 +7,9 @@ extern crate libc;
 use std::collections::HashMap;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::{Path, PathBuf};
+use std::panic::catch_unwind;
 
-use devicemapper::{DM, Device, DmNameBuf};
+use devicemapper::{DM, Device, DmNameBuf, get_dm_context};
 
 use super::super::engine::{Engine, Eventable, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -69,7 +70,13 @@ impl StratEngine {
     /// Returns an error and tears down all the pools if we find a pool with a
     /// duplicate name found.
     pub fn initialize() -> EngineResult<StratEngine> {
-        let dm = DM::new()?;
+        let dm = match catch_unwind(get_dm_context) {
+            Ok(dm) => dm,
+            Err(_) => {
+                let err_msg = "failed to instantiate DM context";
+                return Err(EngineError::Engine(ErrorEnum::Error, err_msg.into()));
+            }
+        };
         let minor_dm_version = dm.version()?.1;
         if minor_dm_version < REQUIRED_DM_MINOR_VERSION {
             let err_msg = format!("Requires DM minor version {} but kernel only supports {}",

@@ -173,7 +173,7 @@ dependencies = [
 [[package]]
 name = "devicemapper"
 version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/mulkieran/devicemapper-rs?branch=master-context#740d1e13780060997b9a2a37262e5245c2a3b37f"
 dependencies = [
  "bitflags 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "error-chain 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -329,7 +329,7 @@ dependencies = [
  "clippy 0.0.189 (registry+https://github.com/rust-lang/crates.io-index)",
  "crc 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "dbus 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "devicemapper 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "devicemapper 0.19.0 (git+https://github.com/mulkieran/devicemapper-rs?branch=master-context)",
  "env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "error-chain 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -831,7 +831,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum crc 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bc1914fae6f18ae347320f0ba5e4fc270e17c037ea621fe41ec7e8adf67d11b0"
 "checksum dbghelp-sys 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "97590ba53bcb8ac28279161ca943a924d1fd4a8fb3fa63302591647c4fc5b850"
 "checksum dbus 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)" = "5b2c58aab20dd6637871e6e03cb6122f00b496a91eb65b688639c940012d8710"
-"checksum devicemapper 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e0587d7a4546f0ae61959761503e693f02f36d2b18194bcd28538f7d9981b62e"
+"checksum devicemapper 0.19.0 (git+https://github.com/mulkieran/devicemapper-rs?branch=master-context)" = "<none>"
 "checksum dtoa 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "80c8b71fd71146990a9742fc06dcbbde19161a267e0ad4e572c35162f4578c90"
 "checksum either 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "18785c1ba806c258137c937e44ada9ee7e69a37e3c72077542cd2f069d78562a"
 "checksum env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "3ddf21e73e016298f5cb37d6ef8e8da8e39f91f9ec8b0df44b7deb16a9f8cd5b"

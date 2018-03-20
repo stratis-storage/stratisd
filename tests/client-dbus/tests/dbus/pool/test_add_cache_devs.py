@@ -15,7 +15,6 @@
 Test adding blockdevs to a pool.
 """
 
-import time
 import unittest
 
 from stratisd_client_dbus import Manager
@@ -47,7 +46,6 @@ class AddCacheDevsTestCase1(unittest.TestCase):
         """
         self._service = Service()
         self._service.setUp()
-        time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
             self._proxy, {
@@ -144,7 +142,6 @@ class AddCacheDevsTestCase2(unittest.TestCase):
         """
         self._service = Service()
         self._service.setUp()
-        time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         ((poolpath, devpaths), _, _) = Manager.Methods.CreatePool(
             self._proxy, {

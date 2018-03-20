@@ -15,7 +15,6 @@
 Test destroying a filesystem in a pool.
 """
 
-import time
 import unittest
 
 from stratisd_client_dbus import Manager
@@ -46,7 +45,6 @@ class DestroyFSTestCase(unittest.TestCase):
         """
         self._service = Service()
         self._service.setUp()
-        time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY.example()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
@@ -110,7 +108,6 @@ class DestroyFSTestCase1(unittest.TestCase):
         """
         self._service = Service()
         self._service.setUp()
-        time.sleep(2)
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY.example()
         ((self._poolpath, _), _, _) = Manager.Methods.CreatePool(

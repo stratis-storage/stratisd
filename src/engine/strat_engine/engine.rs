@@ -46,13 +46,12 @@ pub struct StratEngine {
 
 impl Eventable for DM {
     /// Get file we'd like to have monitored for activity
-    fn get_pollable_fd(&mut self) -> RawFd {
+    fn get_pollable_fd(&self) -> RawFd {
         self.file().as_raw_fd()
     }
 
-    fn clear_event(&mut self) -> EngineResult<()> {
+    fn clear_event(&self) -> EngineResult<()> {
         self.arm_poll()?;
-
         Ok(())
     }
 }
@@ -279,7 +278,7 @@ impl Engine for StratEngine {
             .collect()
     }
 
-    fn get_eventable(&mut self) -> EngineResult<Option<Box<Eventable>>> {
+    fn get_eventable(&self) -> EngineResult<Option<Box<Eventable>>> {
         Ok(Some(Box::new(DM::new()?)))
     }
 

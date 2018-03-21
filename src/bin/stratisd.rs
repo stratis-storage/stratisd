@@ -135,12 +135,12 @@ fn run() -> StratisResult<()> {
                  events: libc::POLLIN,
              });
 
-    let mut eventable = engine.borrow_mut().get_eventable()?;
+    let eventable = engine.borrow().get_eventable()?;
 
     // The variable _dbus_client_index_start is only used when dbus support is compiled in, thus
     // we denote the value as not needed to compile when dbus support is not included.
     let (engine_eventable, poll_timeout, _dbus_client_index_start) = match eventable {
-        Some(ref mut evt) => {
+        Some(ref evt) => {
             fds.push(libc::pollfd {
                          fd: evt.get_pollable_fd(),
                          revents: 0,
@@ -201,7 +201,7 @@ fn run() -> StratisResult<()> {
                 fds[FD_INDEX_ENGINE].revents = 0;
 
                 eventable
-                    .as_mut()
+                    .as_ref()
                     .expect("eventable.is_some()")
                     .clear_event()?;
 

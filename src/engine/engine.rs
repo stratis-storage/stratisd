@@ -181,7 +181,7 @@ pub trait Engine: Debug {
 
     /// If the engine would like to include an event in the message loop, it
     /// may return an Eventable from this method.
-    fn get_eventable(&mut self) -> EngineResult<Option<Box<Eventable>>>;
+    fn get_eventable(&self) -> EngineResult<Option<Box<Eventable>>>;
 
     /// Notify the engine that an event has occurred on the Eventable.
     fn evented(&mut self) -> EngineResult<()>;
@@ -191,9 +191,9 @@ pub trait Engine: Debug {
 /// Engine::get_eventable() and Engine::evented().
 pub trait Eventable {
     /// Get fd the engine would like to monitor for activity
-    fn get_pollable_fd(&mut self) -> RawFd;
+    fn get_pollable_fd(&self) -> RawFd;
 
     /// Assuming level-triggered semantics, clear the event that caused the
     /// Eventable to trigger.
-    fn clear_event(&mut self) -> EngineResult<()>;
+    fn clear_event(&self) -> EngineResult<()>;
 }

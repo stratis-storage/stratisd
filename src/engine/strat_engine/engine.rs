@@ -284,8 +284,8 @@ impl Engine for StratEngine {
             .collect()
     }
 
-    fn get_eventable(&self) -> EngineResult<Option<Box<Eventable>>> {
-        Ok(Some(Box::new(DM::new()?)))
+    fn get_eventable(&self) -> Option<&'static Eventable> {
+        Some(get_dm())
     }
 
     fn evented(&mut self) -> EngineResult<()> {

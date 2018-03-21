@@ -5,11 +5,10 @@
 extern crate libc;
 
 use std::collections::HashMap;
-use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::{Path, PathBuf};
 use std::panic::catch_unwind;
 
-use devicemapper::{DM, Device, DmNameBuf};
+use devicemapper::{Device, DmNameBuf};
 
 use super::super::engine::{Engine, Eventable, Pool};
 use super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -46,17 +45,6 @@ pub struct StratEngine {
     watched_dev_last_event_nrs: HashMap<DmNameBuf, u32>,
 }
 
-impl Eventable for DM {
-    /// Get file we'd like to have monitored for activity
-    fn get_pollable_fd(&self) -> RawFd {
-        self.file().as_raw_fd()
-    }
-
-    fn clear_event(&self) -> EngineResult<()> {
-        self.arm_poll()?;
-        Ok(())
-    }
-}
 
 impl StratEngine {
     /// Setup a StratEngine.

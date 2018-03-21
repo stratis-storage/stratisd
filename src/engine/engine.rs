@@ -181,7 +181,7 @@ pub trait Engine: Debug {
 
     /// If the engine would like to include an event in the message loop, it
     /// may return an Eventable from this method.
-    fn get_eventable(&self) -> EngineResult<Option<Box<Eventable>>>;
+    fn get_eventable(&self) -> EngineResult<Option<&'static Eventable>>;
 
     /// Notify the engine that an event has occurred on the Eventable.
     fn evented(&mut self) -> EngineResult<()>;

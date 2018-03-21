@@ -428,10 +428,12 @@ impl ThinPool {
         let backstore_device = self.backstore_device;
         assert_eq!(backstore.device(), backstore_device);
         if let Some(new_data_regions) = backstore.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
+            self.suspend()?;
             self.extend_data(backstore_device,
                              new_data_regions
                                  .first()
                                  .expect("len(new_data_regions) == 1"))?;
+            self.resume()?;
         } else {
             let err_msg = format!("Insufficient space to accommodate request for {}",
                                   extend_size);
@@ -449,10 +451,12 @@ impl ThinPool {
         let backstore_device = self.backstore_device;
         assert_eq!(backstore.device(), backstore_device);
         if let Some(new_meta_regions) = backstore.alloc_space(&[extend_size.sectors()]) {
+            self.suspend()?;
             self.extend_meta(backstore_device,
                              new_meta_regions
                                  .first()
                                  .expect("len(new_meta_regions) == 1"))?;
+            self.resume()?;
         } else {
             let err_msg = format!("Insufficient space to accommodate request for {}",
                                   extend_size);
@@ -652,7 +656,7 @@ impl ThinPool {
     /// Suspend the thinpool
     pub fn suspend(&mut self) -> EngineResult<()> {
         for (_, _, fs) in &mut self.filesystems {
-            fs.suspend()?;
+            fs.suspend(false)?;
         }
         self.thin_pool.suspend(get_dm(), true)?;
         self.mdv.suspend()?;

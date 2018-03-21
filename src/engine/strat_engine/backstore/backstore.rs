@@ -857,11 +857,6 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_setup() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_setup);
-    }
-
-    #[test]
     pub fn travis_test_setup() {
         loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_setup);
     }

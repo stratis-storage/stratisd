@@ -419,6 +419,27 @@ impl ThinPool {
 
         Ok(())
     }
+    /// Suspend all the thindevs in the pool
+    pub fn suspend_pool(&mut self, dm: &DM) -> EngineResult<()> {
+
+        for (_, _, fs) in self.filesystems.borrow_mut() {
+            fs.suspend_noflush(dm)?;
+        }
+        self.thin_pool.suspend(dm)?;
+
+        Ok(())
+    }
+
+    /// Resume all the thindevs in the pool
+    pub fn resume_pool(&mut self, dm: &DM) -> EngineResult<()> {
+
+        self.thin_pool.resume(dm)?;
+        for (_, _, fs) in self.filesystems.borrow_mut() {
+            fs.resume(dm)?;
+        }
+
+        Ok(())
+    }
 
     /// Expand the physical space allocated to a pool by extend_size.
     /// Return the number of DataBlocks added.
@@ -432,11 +453,13 @@ impl ThinPool {
         let backstore_device = self.backstore_device;
         assert_eq!(backstore.device(), backstore_device);
         if let Some(new_data_regions) = backstore.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
+            self.suspend_pool(dm)?;
             self.extend_data(dm,
                              backstore_device,
                              new_data_regions
                                  .first()
                                  .expect("len(new_data_regions) == 1"))?;
+            self.resume_pool(dm)?;
         } else {
             let err_msg = format!("Insufficient space to accommodate request for {}",
                                   extend_size);
@@ -478,7 +501,6 @@ impl ThinPool {
         let segments = coalesce_segs(&self.data_segments, &new_segs.to_vec());
         self.thin_pool
             .set_data_table(dm, segs_to_table(device, &segments))?;
-        self.thin_pool.resume(dm)?;
         self.data_segments = segments;
 
         Ok(())
@@ -740,10 +762,11 @@ impl ThinPool {
             .iter()
             .map(&xform_target_line)
             .collect::<Vec<_>>();
-
+        self.suspend_pool(dm)?;
         self.thin_pool.set_meta_table(dm, meta_table)?;
         self.thin_pool.set_data_table(dm, data_table)?;
         self.mdv.set_table(dm, mdv_table)?;
+        self.resume_pool(dm)?;
 
         self.backstore_device = backstore_device;
 

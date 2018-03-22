@@ -6,6 +6,7 @@ mod backstore;
 mod cleanup;
 mod device;
 mod devlinks;
+mod dm;
 mod dmnames;
 mod engine;
 mod pool;

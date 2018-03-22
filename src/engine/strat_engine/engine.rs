@@ -7,7 +7,7 @@ extern crate libc;
 use std::collections::HashMap;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::{Path, PathBuf};
-use std::panic::catch_unwind;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use devicemapper::{DM, Device, DmNameBuf};
 
@@ -70,7 +70,7 @@ impl StratEngine {
     /// Returns an error and tears down all the pools if we find a pool with a
     /// duplicate name found.
     pub fn initialize() -> EngineResult<StratEngine> {
-        let dm = match catch_unwind(get_dm_context) {
+        let dm = match catch_unwind(AssertUnwindSafe(get_dm_context)) {
             Ok(dm) => dm,
             Err(_) => {
                 let err_msg = "failed to instantiate DM context";

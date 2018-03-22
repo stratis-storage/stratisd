@@ -121,7 +121,7 @@ impl Engine for SimEngine {
             .collect()
     }
 
-    fn get_eventable(&self) -> EngineResult<Option<Box<Eventable>>> {
+    fn get_eventable(&self) -> EngineResult<Option<&'static Eventable>> {
         Ok(None)
     }
 

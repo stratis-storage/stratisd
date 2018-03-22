@@ -115,6 +115,9 @@ fn create_pid_file() -> StratisResult<File> {
 
 fn run() -> StratisResult<()> {
 
+    // Exit immediately if stratisd is already running
+    let _ = create_pid_file()?;
+
     let matches = App::new("stratis")
         .version(VERSION)
         .about("Stratis storage management")
@@ -128,8 +131,6 @@ fn run() -> StratisResult<()> {
 
     initialize_log(matches.is_present("debug"))
         .expect("This is the first and only invocation of this method; it must succeed.");
-
-    let _pidfile = create_pid_file()?;
 
     // We must setup a udev listener before we initialize the
     // engine. It is possible that a device may appear after the engine has read the

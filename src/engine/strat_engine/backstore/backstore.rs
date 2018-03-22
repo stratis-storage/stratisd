@@ -605,6 +605,7 @@ impl Backstore {
     }
 
     /// Teardown the DM devices in the backstore.
+    #[cfg(test)]
     pub fn teardown(self) -> EngineResult<()> {
         match self.cache {
                 Some(cache) => cache.teardown(get_dm()),

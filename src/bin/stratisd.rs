@@ -86,7 +86,7 @@ fn handle_udev_add(event: &libudev::Event) -> Option<(PathBuf, Device)> {
 }
 
 /// To ensure only one instance of stratisd runs at a time, acquire an
-/// exclusive lock. Exit if lock attempt fails.
+/// exclusive lock. Return an error if lock attempt fails.
 fn create_pid_file() -> StratisResult<File> {
     let mut f = OpenOptions::new()
         .read(true)

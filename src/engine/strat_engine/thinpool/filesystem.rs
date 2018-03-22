@@ -200,6 +200,11 @@ impl StratFilesystem {
         }
     }
 
+    pub fn suspend_noflush(&mut self, dm: &DM) -> EngineResult<()> {
+        self.thin_dev.suspend_noflush(dm)?;
+        Ok(())
+    }
+
     pub fn suspend(&mut self, dm: &DM) -> EngineResult<()> {
         self.thin_dev.suspend(dm)?;
         Ok(())

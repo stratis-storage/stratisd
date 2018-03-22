@@ -173,7 +173,7 @@ fn run() -> StratisResult<()> {
                  events: libc::POLLIN,
              });
 
-    let eventable = engine.borrow().get_eventable()?;
+    let eventable = engine.borrow().get_eventable();
 
     // The variable _dbus_client_index_start is only used when dbus support is compiled in, thus
     // we denote the value as not needed to compile when dbus support is not included.

@@ -16,11 +16,12 @@ use nix::mount::{MsFlags, mount, umount};
 use nix::unistd::fsync;
 use serde_json;
 
-use devicemapper::{DM, DmDevice, LinearDev, LinearDevTargetParams, TargetLine};
+use devicemapper::{DmDevice, LinearDev, LinearDevTargetParams, TargetLine};
 
 use super::super::super::errors::EngineResult;
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid};
 
+use super::super::dm::get_dm;
 use super::super::engine::DEV_PATH;
 use super::super::serde_structs::FilesystemSave;
 
@@ -196,21 +197,21 @@ impl MetadataVol {
     }
 
     /// Tear down a Metadata Volume.
-    pub fn teardown(self, dm: &DM) -> EngineResult<()> {
-        self.dev.teardown(dm)?;
+    pub fn teardown(self) -> EngineResult<()> {
+        self.dev.teardown(get_dm())?;
 
         Ok(())
     }
 
     /// Suspend the metadata volume DM devices
-    pub fn suspend(&mut self, dm: &DM) -> EngineResult<()> {
-        self.dev.suspend(dm)?;
+    pub fn suspend(&mut self) -> EngineResult<()> {
+        self.dev.suspend(get_dm())?;
         Ok(())
     }
 
     /// Resume the metadata volume DM devices
-    pub fn resume(&mut self, dm: &DM) -> EngineResult<()> {
-        self.dev.resume(dm)?;
+    pub fn resume(&mut self) -> EngineResult<()> {
+        self.dev.resume(get_dm())?;
         Ok(())
     }
 
@@ -220,11 +221,8 @@ impl MetadataVol {
     }
 
     /// Set the table of the backing device
-    pub fn set_table(&mut self,
-                     dm: &DM,
-                     table: Vec<TargetLine<LinearDevTargetParams>>)
-                     -> EngineResult<()> {
-        self.dev.set_table(dm, table)?;
+    pub fn set_table(&mut self, table: Vec<TargetLine<LinearDevTargetParams>>) -> EngineResult<()> {
+        self.dev.set_table(get_dm(), table)?;
         Ok(())
     }
 }

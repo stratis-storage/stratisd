@@ -2,12 +2,15 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::panic::catch_unwind;
 use std::path::PathBuf;
-
-use devicemapper::{DM, DevId, DmFlags, DmResult};
 
 use mnt::get_submounts;
 use nix::mount::{MntFlags, umount2};
+
+use devicemapper::{DevId, DmFlags, DmResult};
+
+use super::super::dm::get_dm;
 
 
 mod cleanup_errors {
@@ -22,7 +25,7 @@ mod cleanup_errors {
     }
 }
 
-use self::cleanup_errors::{Error, Result, ResultExt};
+use self::cleanup_errors::{Error, Result};
 
 
 /// Attempt to remove all device mapper devices which match the stratis naming convention.
@@ -30,15 +33,16 @@ use self::cleanup_errors::{Error, Result, ResultExt};
 fn dm_stratis_devices_remove() -> Result<()> {
 
     /// One iteration of removing devicemapper devices
-    fn one_iteration(dm: &DM) -> DmResult<(bool, Vec<String>)> {
+    fn one_iteration() -> DmResult<(bool, Vec<String>)> {
         let mut progress_made = false;
         let mut remain = Vec::new();
 
-        for d in dm.list_devices()?
+        for d in get_dm()
+                .list_devices()?
                 .iter()
                 .filter(|d| format!("{}", d.0.as_ref()).starts_with("stratis-1")) {
 
-            match dm.device_remove(&DevId::Name(&d.0), DmFlags::empty()) {
+            match get_dm().device_remove(&DevId::Name(&d.0), DmFlags::empty()) {
                 Ok(_) => progress_made = true,
                 Err(_) => remain.push(format!("{}", d.0.as_ref())),
             }
@@ -46,10 +50,12 @@ fn dm_stratis_devices_remove() -> Result<()> {
         Ok((progress_made, remain))
     }
 
-    let dm = DM::new().chain_err(|| "Unable to initialize DM")?;
+    if catch_unwind(get_dm).is_err() {
+        return Err("Unable to initialize DM".into());
+    }
 
     loop {
-        let (progress_made, remain) = one_iteration(&dm)
+        let (progress_made, remain) = one_iteration()
             .map_err(|e| {
                 Error::with_chain(e,
                                   "Error while attempting to remove stratis device mapper devices")}

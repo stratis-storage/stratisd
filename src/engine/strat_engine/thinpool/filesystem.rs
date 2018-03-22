@@ -4,8 +4,8 @@
 
 use std::path::{Path, PathBuf};
 
-use devicemapper::{Bytes, DM, DmDevice, DmName, DmUuid, IEC, SECTOR_SIZE, Sectors, ThinDev,
-                   ThinDevId, ThinPoolDev, ThinStatus};
+use devicemapper::{Bytes, DmDevice, DmName, DmUuid, IEC, SECTOR_SIZE, Sectors, ThinDev, ThinDevId,
+                   ThinPoolDev, ThinStatus};
 
 use mnt::{MountIter, MountParam};
 use nix::mount::{MsFlags, mount, umount};
@@ -16,6 +16,7 @@ use super::super::super::engine::Filesystem;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::types::{FilesystemUuid, Name};
 
+use super::super::dm::get_dm;
 use super::super::serde_structs::FilesystemSave;
 
 use super::util::{create_fs, set_uuid, xfs_growfs};
@@ -58,7 +59,6 @@ impl StratFilesystem {
     /// a unique UUID.
     #[allow(too_many_arguments)]
     pub fn snapshot(&self,
-                    dm: &DM,
                     thin_pool: &ThinPoolDev,
                     snapshot_name: &str,
                     snapshot_dm_name: &DmName,
@@ -69,7 +69,7 @@ impl StratFilesystem {
                     -> EngineResult<StratFilesystem> {
 
         match self.thin_dev
-                  .snapshot(dm,
+                  .snapshot(get_dm(),
                             snapshot_dm_name,
                             snapshot_dm_uuid,
                             thin_pool,
@@ -111,15 +111,15 @@ impl StratFilesystem {
 
     /// check if filesystem is getting full and needs to be extended
     /// TODO: deal with the thindev in a Fail state.
-    pub fn check(&mut self, dm: &DM) -> EngineResult<FilesystemStatus> {
-        match self.thin_dev.status(dm)? {
+    pub fn check(&mut self) -> EngineResult<FilesystemStatus> {
+        match self.thin_dev.status(get_dm())? {
             ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.get_mount_point()? {
                     let (fs_total_bytes, fs_total_used_bytes) = fs_usage(&mount_point)?;
                     let free_bytes = fs_total_bytes - fs_total_used_bytes;
                     if free_bytes.sectors() < FILESYSTEM_LOWATER {
                         let extend_size = self.extend_size(self.thin_dev.size());
-                        if self.thin_dev.extend(dm, extend_size).is_err() {
+                        if self.thin_dev.extend(get_dm(), extend_size).is_err() {
                             return Ok(FilesystemStatus::ThinDevExtendFailed);
                         }
                         if xfs_growfs(&mount_point).is_err() {
@@ -180,14 +180,14 @@ impl StratFilesystem {
     }
 
     /// Tear down the filesystem.
-    pub fn teardown(self, dm: &DM) -> EngineResult<()> {
-        self.thin_dev.teardown(dm)?;
+    pub fn teardown(self) -> EngineResult<()> {
+        self.thin_dev.teardown(get_dm())?;
         Ok(())
     }
 
     /// Destroy the filesystem.
-    pub fn destroy(self, dm: &DM, thin_pool: &ThinPoolDev) -> EngineResult<()> {
-        self.thin_dev.destroy(dm, thin_pool)?;
+    pub fn destroy(self, thin_pool: &ThinPoolDev) -> EngineResult<()> {
+        self.thin_dev.destroy(get_dm(), thin_pool)?;
         Ok(())
     }
 
@@ -200,13 +200,13 @@ impl StratFilesystem {
         }
     }
 
-    pub fn suspend(&mut self, dm: &DM) -> EngineResult<()> {
-        self.thin_dev.suspend(dm)?;
+    pub fn suspend(&mut self) -> EngineResult<()> {
+        self.thin_dev.suspend(get_dm())?;
         Ok(())
     }
 
-    pub fn resume(&mut self, dm: &DM) -> EngineResult<()> {
-        self.thin_dev.resume(dm)?;
+    pub fn resume(&mut self) -> EngineResult<()> {
+        self.thin_dev.resume(get_dm())?;
         Ok(())
     }
 }

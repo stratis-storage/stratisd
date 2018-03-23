@@ -80,7 +80,8 @@ impl BDA {
     where
         F: Read + Seek,
     {
-        let header = match StaticHeader::setup(f)? {
+        let (buf, num_bytes) = StaticHeader::get_buf(f)?;
+        let header = match StaticHeader::setup_from_buf(&buf, num_bytes)? {
             Some(header) => header,
             None => return Ok(None),
         };
@@ -195,37 +196,46 @@ impl StaticHeader {
         }
     }
 
-    /// Try to find a valid StaticHeader on a device.
-    /// If there is no StaticHeader on the device, return None.
-    /// If there is a problem reading a header, return an error.
-    fn setup<F>(f: &mut F) -> StratisResult<Option<StaticHeader>>
+    /// Get the buffer that contains the static headers
+    fn get_buf<F>(f: &mut F) -> StratisResult<([u8; _BDA_STATIC_HDR_SIZE], usize)>
     where
         F: Read + Seek,
     {
-        #![allow(unused_io_amount)]
         f.seek(SeekFrom::Start(0))?;
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
 
-        // FIXME: See https://github.com/stratis-storage/stratisd/pull/476
-        f.read(&mut buf)?;
+        let num_bytes = f.read(&mut buf)?;
 
-        // TODO: repair static header if one incorrect?
-        // Note: this would require some adjustment or some revision to
-        // setup_from_buf().
-        StaticHeader::setup_from_buf(&buf)
+        Ok((buf, num_bytes))
     }
 
-    /// Try to find a valid StaticHeader in a buffer.
+    /// Try to find a valid StaticHeader in a buffer with num_bytes_read in it.
+    ///
     /// If there is an error in reading the first, try the next. If there is
     /// no error in reading the first, assume it is correct, i.e., do not
     /// verify that it matches the next.
-    /// Return None if the static header's magic number is wrong.
-    fn setup_from_buf(buf: &[u8; _BDA_STATIC_HDR_SIZE]) -> StratisResult<Option<StaticHeader>> {
-        let sigblock_spots = [
-            &buf[SECTOR_SIZE..2 * SECTOR_SIZE],
-            &buf[9 * SECTOR_SIZE..10 * SECTOR_SIZE],
-        ];
+    ///
+    /// Return None if the static header's magic number is not Stratis's.
+    fn setup_from_buf(
+        buf: &[u8; _BDA_STATIC_HDR_SIZE],
+        num_bytes_read: usize,
+    ) -> StratisResult<Option<StaticHeader>> {
+        let first_region_end = 2 * SECTOR_SIZE;
+        let second_region_end = 10 * SECTOR_SIZE;
 
+        let sigblock_spots = if num_bytes_read < first_region_end {
+            vec![]
+        } else if num_bytes_read < second_region_end {
+            vec![&buf[first_region_end - SECTOR_SIZE..first_region_end]]
+        } else {
+            vec![
+                &buf[first_region_end - SECTOR_SIZE..first_region_end],
+                &buf[second_region_end - SECTOR_SIZE..second_region_end],
+            ]
+        };
+
+        // TODO: Consider patching up the first sigblock region if it is
+        // incorrect, but there is a second one which is not.
         for buf in &sigblock_spots {
             match StaticHeader::sigblock_from_buf(buf) {
                 Ok(val) => return Ok(val),
@@ -233,7 +243,7 @@ impl StaticHeader {
             }
         }
 
-        let err_str = "Appeared to be a Stratis device, but no valid sigblock found";
+        let err_str = "No valid sigblock found";
         Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
     }
 
@@ -243,19 +253,9 @@ impl StaticHeader {
     where
         F: Read + Seek,
     {
-        #![allow(unused_io_amount)]
+        let (buf, num_bytes) = StaticHeader::get_buf(f)?;
 
-        f.seek(SeekFrom::Start(0))?;
-        let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
-
-        // FIXME: See https://github.com/stratis-storage/stratisd/pull/476
-        f.read(&mut buf)?;
-
-        // Using setup() as a test of ownership sets a high bar. It is
-        // not sufficient to have STRAT_MAGIC to be considered "Ours",
-        // it must also have correct CRC, no weird stuff in fields,
-        // etc!
-        match StaticHeader::setup_from_buf(&buf) {
+        match StaticHeader::setup_from_buf(&buf, num_bytes) {
             Ok(Some(sh)) => Ok(DevOwnership::Ours(sh.pool_uuid, sh.dev_uuid)),
             Ok(None) => {
                 if buf.iter().any(|x| *x != 0) {

@@ -4,6 +4,7 @@
 
 use std::{error, fmt, io, str};
 
+use blkid;
 use libudev;
 use nix;
 use uuid;
@@ -31,6 +32,7 @@ pub enum EngineError {
     Serde(serde_json::error::Error),
     DM(devicemapper::DmError),
     Udev(libudev::Error),
+    BlkidError(blkid::BlkidError),
 }
 
 impl fmt::Display for EngineError {
@@ -44,6 +46,7 @@ impl fmt::Display for EngineError {
             EngineError::Serde(ref err) => write!(f, "Serde error: {}", err),
             EngineError::DM(ref err) => write!(f, "DM error: {}", err),
             EngineError::Udev(ref err) => write!(f, "udev error: {}", err),
+            EngineError::BlkidError(ref err) => write!(f, "Blkid error: {}", err),
         }
     }
 }
@@ -59,6 +62,7 @@ impl error::Error for EngineError {
             EngineError::Serde(ref err) => err.description(),
             EngineError::DM(ref err) => err.description(),
             EngineError::Udev(ref err) => err.description(),
+            EngineError::BlkidError(ref err) => err.description(),
         }
     }
 }
@@ -104,5 +108,11 @@ impl From<devicemapper::DmError> for EngineError {
 impl From<libudev::Error> for EngineError {
     fn from(err: libudev::Error) -> EngineError {
         EngineError::Udev(err)
+    }
+}
+
+impl From<blkid::BlkidError> for EngineError {
+    fn from(err: blkid::BlkidError) -> EngineError {
+        EngineError::BlkidError(err)
     }
 }

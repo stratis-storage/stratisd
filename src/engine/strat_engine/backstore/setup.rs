@@ -31,7 +31,8 @@ use super::metadata::{BDA, StaticHeader};
 pub fn is_stratis_device(devnode: &PathBuf) -> EngineResult<Option<PoolUuid>> {
     match OpenOptions::new().read(true).open(&devnode) {
         Ok(mut f) => {
-            if let DevOwnership::Ours(pool_uuid, _) = StaticHeader::determine_ownership(&mut f)? {
+            if let DevOwnership::Ours(pool_uuid, _) =
+                StaticHeader::determine_ownership(&mut f, Some(&devnode))? {
                 Ok(Some(pool_uuid))
             } else {
                 Ok(None)

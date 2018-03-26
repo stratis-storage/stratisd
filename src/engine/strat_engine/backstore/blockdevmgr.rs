@@ -370,7 +370,7 @@ fn initialize(pool_uuid: PoolUuid,
             .write(true)
             .open(&devnode)?;
         let dev_size = blkdev_size(&f)?;
-        let ownership = StaticHeader::determine_ownership(&mut f)?;
+        let ownership = StaticHeader::determine_ownership(&mut f, Some(&devnode))?;
 
         Ok((devnode, dev_size, ownership, f))
     }
@@ -397,10 +397,12 @@ fn initialize(pool_uuid: PoolUuid,
             };
             match ownership {
                 DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, f))),
-                DevOwnership::Theirs => {
+                DevOwnership::Theirs(signature) => {
                     if !force {
-                        let err_str = format!("Device {} appears to belong to another application",
-                                              devnode.display());
+                        let err_str = format!("Device {} appears to belong to another \
+                                               application ({})",
+                                              devnode.display(),
+                                              signature);
                         return Err(EngineError::Engine(ErrorEnum::Invalid, err_str));
                     } else {
                         add_devs.push((dev, (devnode, dev_size, f)))
@@ -471,13 +473,11 @@ mod tests {
     use rand;
     use uuid::Uuid;
 
-
-    use devicemapper::SECTOR_SIZE;
-
-    use super::super::super::device::write_sectors;
+    use super::super::super::engine::NON_ZEROED_DISK_MSG;
     use super::super::super::tests::{loopbacked, real};
+    use super::super::super::thinpool::create_fs;
 
-    use super::super::metadata::{BDA_STATIC_HDR_SECTORS, MIN_MDA_SECTORS};
+    use super::super::metadata::MIN_MDA_SECTORS;
     use super::super::setup::{find_all, get_metadata};
 
     use super::*;
@@ -514,7 +514,8 @@ mod tests {
     }
 
     /// Verify that it is impossible to initialize a set of disks of which
-    /// even one is dirty, i.e, has some data written within BDA_STATIC_HDR_SECTORS
+    /// even one has a signature i.e, has some data written within
+    /// BDA_STATIC_HDR_SECTORS
     /// of start of disk. Choose the dirty disk randomly. This means that even
     /// if our code is broken with respect to this property, this test might
     /// sometimes succeed.
@@ -524,11 +525,9 @@ mod tests {
     fn test_force_flag_dirty(paths: &[&Path]) -> () {
 
         let index = rand::random::<u8>() as usize % paths.len();
-        write_sectors(paths[index],
-                      Sectors(index as u64 % *BDA_STATIC_HDR_SECTORS),
-                      Sectors(1),
-                      &[1u8; SECTOR_SIZE])
-                .unwrap();
+
+        // Write a valid XFS signature to the randomly selected disk
+        create_fs(&paths[index], Uuid::new_v4()).unwrap();
 
         let pool_uuid = Uuid::new_v4();
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).is_err());
@@ -539,10 +538,11 @@ mod tests {
             StaticHeader::determine_ownership(&mut OpenOptions::new()
                                                        .read(true)
                                                        .open(path)
-                                                       .unwrap())
+                                                       .unwrap(),
+                                              None)
                     .unwrap() ==
             if i == index {
-                DevOwnership::Theirs
+                DevOwnership::Theirs(String::from(NON_ZEROED_DISK_MSG))
             } else {
                 DevOwnership::Unowned
             }
@@ -555,7 +555,8 @@ mod tests {
             match StaticHeader::determine_ownership(&mut OpenOptions::new()
                                                              .read(true)
                                                              .open(path)
-                                                             .unwrap())
+                                                             .unwrap(),
+                                                    None)
                           .unwrap() {
                 DevOwnership::Ours(uuid, _) => pool_uuid == uuid,
                 _ => false,
@@ -693,7 +694,8 @@ mod tests {
             match StaticHeader::determine_ownership(&mut OpenOptions::new()
                                                              .read(true)
                                                              .open(path)
-                                                             .unwrap())
+                                                             .unwrap(),
+                                                    None)
                           .unwrap() {
                 DevOwnership::Ours(uuid, _) => uuid == pool_uuid,
                 _ => false,
@@ -706,7 +708,8 @@ mod tests {
                              StaticHeader::determine_ownership(&mut OpenOptions::new()
                                                                         .read(true)
                                                                         .open(path)
-                                                                        .unwrap())
+                                                                        .unwrap(),
+                                                               None)
                                      .unwrap() == DevOwnership::Unowned
                          }));
     }

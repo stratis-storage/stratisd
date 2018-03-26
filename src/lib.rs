@@ -43,3 +43,6 @@ pub mod stratis;
 
 #[macro_use]
 extern crate macro_attr;
+
+extern crate blkid;
+extern crate blkid_sys;

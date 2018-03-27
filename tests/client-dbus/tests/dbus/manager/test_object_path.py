@@ -14,7 +14,6 @@
 """
 Test object path methods.
 """
-import time
 import unittest
 
 from stratisd_client_dbus import get_object
@@ -36,7 +35,6 @@ class GetObjectTestCase(unittest.TestCase):
         """
         self._service = Service()
         self._service.setUp()
-        time.sleep(1)  # wait until the service is available
 
     def tearDown(self):
         """

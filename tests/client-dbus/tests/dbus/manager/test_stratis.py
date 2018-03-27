@@ -15,7 +15,6 @@
 Test 'stratisd'.
 """
 
-import time
 import unittest
 
 from dbus_python_client_gen import DPClientInvalidArgError
@@ -40,7 +39,6 @@ class StratisTestCase(unittest.TestCase):
         """
         self._service = Service()
         self._service.setUp()
-        time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
@@ -72,7 +70,6 @@ class StratisTestCase2(unittest.TestCase):
         """
         self._service = Service()
         self._service.setUp()
-        time.sleep(1)
         self._proxy = get_object(TOP_OBJECT)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 

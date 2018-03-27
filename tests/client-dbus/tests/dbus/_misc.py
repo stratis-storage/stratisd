@@ -18,6 +18,7 @@ Miscellaneous methods to support testing.
 import os
 import string
 import subprocess
+import time
 
 from hypothesis import strategies
 
@@ -45,6 +46,7 @@ class Service(object):
         Start the stratisd daemon with the simulator.
         """
         self._stratisd = subprocess.Popen([os.path.join(_STRATISD), '--sim'])
+        time.sleep(1)
 
     def tearDown(self):
         """

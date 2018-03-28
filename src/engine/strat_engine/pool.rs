@@ -17,11 +17,35 @@ use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
                           RenameAction};
 
-use super::backstore::{Backstore, MIN_MDA_SECTORS, get_metadata};
+use super::backstore::{Backstore, MIN_MDA_SECTORS};
 use super::serde_structs::{PoolSave, Recordable};
 use super::thinpool::{ThinPool, ThinPoolSizeParams};
 
 pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
+
+
+/// Check the metadata of an individual pool for consistency.
+pub fn check_metadata(metadata: &PoolSave) -> EngineResult<()> {
+    // If the amount allocated from the cache tier is not the same as that
+    // used by the thinpool, consider the situation an error.
+    let flex_devs = &metadata.flex_devs;
+    let total_allocated = flex_devs
+        .meta_dev
+        .iter()
+        .chain(flex_devs.thin_meta_dev.iter())
+        .chain(flex_devs.thin_data_dev.iter())
+        .chain(flex_devs.thin_meta_dev_spare.iter())
+        .map(|x| x.1)
+        .sum::<Sectors>();
+    if total_allocated != metadata.backstore.next {
+        let err_msg = format!("{} used in thinpool, but {} given up by cache",
+                              total_allocated,
+                              metadata.backstore.next);
+        Err(EngineError::Engine(ErrorEnum::Invalid, err_msg))
+    } else {
+        Ok(())
+    }
+}
 
 #[derive(Debug)]
 pub struct StratPool {
@@ -69,32 +93,9 @@ impl StratPool {
 
     /// Setup a StratPool using its UUID and the list of devnodes it has.
     pub fn setup(uuid: PoolUuid,
-                 devnodes: &HashMap<Device, PathBuf>)
+                 devnodes: &HashMap<Device, PathBuf>,
+                 metadata: &PoolSave)
                  -> EngineResult<(Name, StratPool)> {
-        let metadata = get_metadata(uuid, devnodes)?
-            .ok_or_else(|| {
-                            EngineError::Engine(ErrorEnum::NotFound,
-                                                format!("no metadata for pool {}", uuid))
-                        })?;
-
-        // If the amount allocated from the cache tier is not the same as that
-        // used by the thinpool, consider the situation an error.
-        let flex_devs = &metadata.flex_devs;
-        let total_allocated = flex_devs
-            .meta_dev
-            .iter()
-            .chain(flex_devs.thin_meta_dev.iter())
-            .chain(flex_devs.thin_data_dev.iter())
-            .chain(flex_devs.thin_meta_dev_spare.iter())
-            .map(|x| x.1)
-            .sum::<Sectors>();
-        if total_allocated != metadata.backstore.next {
-            let err_msg = format!("{} used in thinpool, but {} given up by cache",
-                                  total_allocated,
-                                  metadata.backstore.next);
-            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
-        }
-
         let backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, None)?;
         let thinpool = ThinPool::setup(uuid,
                                        metadata.thinpool_dev.data_block_size,
@@ -102,7 +103,7 @@ impl StratPool {
                                        &metadata.flex_devs,
                                        &backstore)?;
 
-        Ok((Name::new(metadata.name),
+        Ok((Name::new(metadata.name.to_owned()),
             StratPool {
                 backstore,
                 redundancy: Redundancy::NONE,
@@ -117,6 +118,7 @@ impl StratPool {
     }
 
     /// Teardown a pool.
+    #[cfg(test)]
     pub fn teardown(self) -> EngineResult<()> {
         self.thin_pool.teardown()?;
         self.backstore.teardown()
@@ -283,12 +285,16 @@ mod tests {
 
     use super::super::super::types::Redundancy;
 
-    use super::super::backstore::find_all;
+    use super::super::backstore::{find_all, get_metadata};
     use super::super::devlinks;
     use super::super::tests::{loopbacked, real};
     use super::super::tests::tempdir::TempDir;
 
     use super::*;
+
+    fn invariant(pool: &StratPool, pool_name: &str) -> () {
+        check_metadata(&pool.record(&Name::new(pool_name.into()))).unwrap();
+    }
 
     /// Verify that metadata can be read from pools.
     /// 1. Split paths into two separate sets.
@@ -305,11 +311,15 @@ mod tests {
         let name1 = "name1";
         let (uuid1, pool1) = StratPool::initialize(&name1, paths1, Redundancy::NONE, false)
             .unwrap();
+        invariant(&pool1, &name1);
+
         let metadata1 = pool1.record(name1);
 
         let name2 = "name2";
         let (uuid2, pool2) = StratPool::initialize(&name2, paths2, Redundancy::NONE, false)
             .unwrap();
+        invariant(&pool2, &name2);
+
         let metadata2 = pool2.record(name2);
 
         let pools = find_all().unwrap();
@@ -374,6 +384,7 @@ mod tests {
         let (uuid, mut pool) = StratPool::initialize(&name, paths2, Redundancy::NONE, false)
             .unwrap();
         devlinks::pool_added(&name).unwrap();
+        invariant(&pool, &name);
 
         let metadata1 = pool.record(name);
         assert!(metadata1.backstore.cache_devs.is_none());
@@ -384,6 +395,7 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
+        invariant(&pool, &name);
 
         let tmp_dir = TempDir::new("stratis_testing").unwrap();
         let new_file = tmp_dir.path().join("stratis_test.txt");
@@ -407,6 +419,7 @@ mod tests {
 
         pool.add_blockdevs(&name, paths1, BlockDevTier::Cache, false)
             .unwrap();
+        invariant(&pool, &name);
 
         let metadata2 = pool.record(name);
         assert!(metadata2.backstore.cache_devs.is_some());
@@ -430,7 +443,12 @@ mod tests {
 
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 1);
-        let (name, pool) = StratPool::setup(uuid, pools.get(&uuid).unwrap()).unwrap();
+        let devices = pools.get(&uuid).unwrap();
+        let (name, pool) = StratPool::setup(uuid,
+                                            &devices,
+                                            &get_metadata(uuid, &devices).unwrap().unwrap())
+                .unwrap();
+        invariant(&pool, &name);
 
         let metadata3 = pool.record(&name);
 

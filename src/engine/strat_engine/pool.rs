@@ -292,6 +292,10 @@ mod tests {
 
     use super::*;
 
+    fn invariant(pool: &StratPool, pool_name: &str) -> () {
+        check_metadata(&pool.record(&Name::new(pool_name.into()))).unwrap();
+    }
+
     /// Verify that metadata can be read from pools.
     /// 1. Split paths into two separate sets.
     /// 2. Create pools from the two sets.
@@ -307,11 +311,15 @@ mod tests {
         let name1 = "name1";
         let (uuid1, pool1) = StratPool::initialize(&name1, paths1, Redundancy::NONE, false)
             .unwrap();
+        invariant(&pool1, &name1);
+
         let metadata1 = pool1.record(name1);
 
         let name2 = "name2";
         let (uuid2, pool2) = StratPool::initialize(&name2, paths2, Redundancy::NONE, false)
             .unwrap();
+        invariant(&pool2, &name2);
+
         let metadata2 = pool2.record(name2);
 
         let pools = find_all().unwrap();
@@ -376,6 +384,7 @@ mod tests {
         let (uuid, mut pool) = StratPool::initialize(&name, paths2, Redundancy::NONE, false)
             .unwrap();
         devlinks::pool_added(&name).unwrap();
+        invariant(&pool, &name);
 
         let metadata1 = pool.record(name);
         assert!(metadata1.backstore.cache_devs.is_none());
@@ -386,6 +395,7 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
+        invariant(&pool, &name);
 
         let tmp_dir = TempDir::new("stratis_testing").unwrap();
         let new_file = tmp_dir.path().join("stratis_test.txt");
@@ -409,6 +419,7 @@ mod tests {
 
         pool.add_blockdevs(&name, paths1, BlockDevTier::Cache, false)
             .unwrap();
+        invariant(&pool, &name);
 
         let metadata2 = pool.record(name);
         assert!(metadata2.backstore.cache_devs.is_some());
@@ -437,6 +448,7 @@ mod tests {
                                             &devices,
                                             &get_metadata(uuid, &devices).unwrap().unwrap())
                 .unwrap();
+        invariant(&pool, &name);
 
         let metadata3 = pool.record(&name);
 

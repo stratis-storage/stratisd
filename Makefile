@@ -7,6 +7,9 @@ ${HOME}/.cargo/bin/cargo-tree:
 ${HOME}/.cargo/bin/cargo-outdated:
 	cargo install cargo-outdated
 
+${HOME}/.cargo/bin/cargo-script:
+	cargo install cargo-script
+
 tree: ${HOME}/.cargo/bin/cargo-tree
 	PATH=${HOME}/.cargo/bin:${PATH} cargo tree
 
@@ -51,6 +54,9 @@ stratisd.8.gz: stratisd.8
 clippy:
 	RUSTFLAGS='-D warnings' cargo build --features "clippy"
 
+uml-graphs: ${HOME}/.cargo/bin/cargo-script
+	PATH=${HOME}/.cargo/bin:${PATH} cargo script scripts/uml_graphs.rs
+
 .PHONY:
 	build
 	clippy
@@ -65,3 +71,4 @@ clippy:
 	test-real
 	test-travis
 	tree
+	uml-graphs

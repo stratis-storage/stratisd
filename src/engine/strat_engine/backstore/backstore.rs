@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 
-use devicemapper::{CacheDev, Device, DmDevice, IEC, LinearDev, MIN_CACHE_BLOCK_SIZE, Sectors};
+use devicemapper::{CacheDev, Device, DmDevice, IEC, LinearDev, Sectors};
 
 use super::super::super::engine::BlockDev;
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
@@ -23,6 +23,10 @@ use super::super::serde_structs::{BackstoreSave, Recordable};
 use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment, coalesce_blkdevsegs, map_to_dm};
 use super::metadata::MIN_MDA_SECTORS;
 use super::setup::get_blockdevs;
+
+/// Use a cache block size that the kernel docs indicate is the largest
+/// typical size.
+const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
 
 /// Handles the lowest level, base layer of this tier.
 /// The dm_device organizes all block devs into a single linear allocation
@@ -274,7 +278,7 @@ impl CacheTier {
                                  meta,
                                  cache,
                                  origin,
-                                 MIN_CACHE_BLOCK_SIZE)?;
+                                 CACHE_BLOCK_SIZE)?;
 
         Ok((CacheTier {
                 block_mgr,
@@ -364,7 +368,7 @@ impl CacheTier {
                                meta,
                                cache,
                                origin,
-                               MIN_CACHE_BLOCK_SIZE)?;
+                               CACHE_BLOCK_SIZE)?;
 
         Ok((CacheTier {
                 block_mgr,

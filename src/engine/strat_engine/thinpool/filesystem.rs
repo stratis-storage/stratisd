@@ -202,8 +202,8 @@ impl StratFilesystem {
         }
     }
 
-    pub fn suspend(&mut self) -> EngineResult<()> {
-        self.thin_dev.suspend(get_dm(), true)?;
+    pub fn suspend(&mut self, flush: bool) -> EngineResult<()> {
+        self.thin_dev.suspend(get_dm(), flush)?;
         Ok(())
     }
 

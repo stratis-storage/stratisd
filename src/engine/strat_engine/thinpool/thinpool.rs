@@ -654,7 +654,7 @@ impl ThinPool {
         for (_, _, fs) in &mut self.filesystems {
             fs.suspend()?;
         }
-        self.thin_pool.suspend(get_dm())?;
+        self.thin_pool.suspend(get_dm(), true)?;
         self.mdv.suspend()?;
         Ok(())
     }

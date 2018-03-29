@@ -205,7 +205,7 @@ impl MetadataVol {
 
     /// Suspend the metadata volume DM devices
     pub fn suspend(&mut self) -> EngineResult<()> {
-        self.dev.suspend(get_dm())?;
+        self.dev.suspend(get_dm(), true)?;
         Ok(())
     }
 

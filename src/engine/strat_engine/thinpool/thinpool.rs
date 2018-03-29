@@ -16,8 +16,9 @@ use devicemapper::{DataBlocks, Device, DmDevice, DmName, DmNameBuf, IEC, FlakeyT
                    TargetLine, ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatusSummary,
                    device_exists};
 
+use stratis::{ErrorEnum, StratisError, StratisResult};
+
 use super::super::super::engine::Filesystem;
-use super::super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::super::structures::Table;
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid, RenameAction};
 
@@ -467,7 +468,10 @@ impl ThinPool {
 
 
     /// Extend the thinpool with new data regions.
-    fn extend_data(&mut self, device: Device, new_segs: &[(Sectors, Sectors)]) -> StratisResult<()> {
+    fn extend_data(&mut self,
+                   device: Device,
+                   new_segs: &[(Sectors, Sectors)])
+                   -> StratisResult<()> {
         let segments = coalesce_segs(&self.data_segments, &new_segs.to_vec());
         self.thin_pool
             .set_data_table(get_dm(), segs_to_table(device, &segments))?;
@@ -478,7 +482,10 @@ impl ThinPool {
     }
 
     /// Extend the thinpool meta device with additional segments.
-    fn extend_meta(&mut self, device: Device, new_segs: &[(Sectors, Sectors)]) -> StratisResult<()> {
+    fn extend_meta(&mut self,
+                   device: Device,
+                   new_segs: &[(Sectors, Sectors)])
+                   -> StratisResult<()> {
         let segments = coalesce_segs(&self.meta_segments, &new_segs.to_vec());
         self.thin_pool
             .set_meta_table(get_dm(), segs_to_table(device, &segments))?;
@@ -592,8 +599,8 @@ impl ThinPool {
             }
             None => {
                 return Err(StratisError::Engine(ErrorEnum::Error,
-                                               "snapshot_filesystem failed, filesystem not found"
-                                                   .into()));
+                                                "snapshot_filesystem failed, filesystem not found"
+                                                    .into()));
             }
         };
         let new_fs_name = Name::new(snapshot_name.to_owned());
@@ -760,12 +767,13 @@ impl Recordable<ThinPoolDevSave> for ThinPool {
 /// dev. Return the metadata device, the metadata segments, and the
 /// spare segments.
 #[allow(type_complexity)]
-fn setup_metadev(pool_uuid: PoolUuid,
-                 thinpool_name: &DmName,
-                 device: Device,
-                 meta_segments: Vec<(Sectors, Sectors)>,
-                 spare_segments: Vec<(Sectors, Sectors)>)
-                 -> StratisResult<(LinearDev, Vec<(Sectors, Sectors)>, Vec<(Sectors, Sectors)>)> {
+fn setup_metadev
+    (pool_uuid: PoolUuid,
+     thinpool_name: &DmName,
+     device: Device,
+     meta_segments: Vec<(Sectors, Sectors)>,
+     spare_segments: Vec<(Sectors, Sectors)>)
+     -> StratisResult<(LinearDev, Vec<(Sectors, Sectors)>, Vec<(Sectors, Sectors)>)> {
     #![allow(collapsible_if)]
     let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinMeta);
     let mut meta_dev = LinearDev::setup(get_dm(),

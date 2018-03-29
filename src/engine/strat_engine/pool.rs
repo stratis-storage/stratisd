@@ -12,8 +12,9 @@ use uuid::Uuid;
 
 use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
+use stratis::{ErrorEnum, StratisError, StratisResult};
+
 use super::super::engine::{BlockDev, Filesystem, Pool};
-use super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
                           RenameAction};
 

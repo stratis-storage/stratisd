@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use devicemapper::{Device, Sectors};
 
-use super::errors::StratisResult;
+use stratis::StratisResult;
 use super::types::{BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid,
                    RenameAction};
 

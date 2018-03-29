@@ -9,10 +9,6 @@ pub use self::engine::Engine;
 pub use self::engine::Filesystem;
 pub use self::engine::Pool;
 
-pub use self::errors::StratisError;
-pub use self::errors::StratisResult;
-pub use self::errors::ErrorEnum;
-
 pub use self::sim_engine::SimEngine;
 pub use self::strat_engine::StratEngine;
 
@@ -33,7 +29,6 @@ pub mod strat_engine;
 
 #[allow(module_inception)]
 pub mod engine;
-mod errors;
 mod sim_engine;
 mod structures;
 pub mod types;

@@ -12,8 +12,9 @@ use nix::mount::{MsFlags, mount, umount};
 use nix::sys::statvfs::statvfs;
 use tempdir::TempDir;
 
+use stratis::{ErrorEnum, StratisError, StratisResult};
+
 use super::super::super::engine::Filesystem;
-use super::super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::super::types::{FilesystemUuid, Name};
 
 use super::super::dm::get_dm;

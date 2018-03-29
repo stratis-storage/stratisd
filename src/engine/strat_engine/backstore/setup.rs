@@ -15,7 +15,8 @@ use serde_json;
 
 use devicemapper::{Device, devnode_to_devno};
 
-use super::super::super::errors::{StratisError, StratisResult, ErrorEnum};
+use stratis::{ErrorEnum, StratisError, StratisResult};
+
 use super::super::super::structures::Table;
 use super::super::super::types::{Name, PoolUuid};
 

@@ -10,8 +10,9 @@ use std::path::{Path, PathBuf};
 
 use devicemapper::{Device, DmNameBuf};
 
+use stratis::{ErrorEnum, StratisError, StratisResult};
+
 use super::super::engine::{Engine, Eventable, Pool};
-use super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{DevUuid, Name, PoolUuid, Redundancy, RenameAction};
 

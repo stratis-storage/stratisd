@@ -4,7 +4,7 @@
 
 // Code to handle cleanup after a failed operation.
 
-use super::super::super::errors::{StratisError, StratisResult, ErrorEnum};
+use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::blockdev::StratBlockDev;
 

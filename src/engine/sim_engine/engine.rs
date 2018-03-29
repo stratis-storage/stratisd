@@ -13,8 +13,9 @@ use std::rc::Rc;
 
 use devicemapper::Device;
 
+use stratis::{ErrorEnum, StratisError, StratisResult};
+
 use super::super::engine::{Engine, Eventable, Pool};
-use super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
@@ -140,11 +141,11 @@ mod tests {
 
     use quickcheck::QuickCheck;
 
+    use stratis::{ErrorEnum, StratisError};
+
     use super::SimEngine;
 
     use engine::Engine;
-    use engine::StratisError;
-    use engine::ErrorEnum;
     use engine::RenameAction;
 
     #[test]

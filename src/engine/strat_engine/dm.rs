@@ -10,8 +10,9 @@ use std::sync::{Once, ONCE_INIT};
 
 use devicemapper::DM;
 
+use stratis::StratisResult;
+
 use super::super::engine::Eventable;
-use super::super::errors::StratisResult;
 
 static INIT: Once = ONCE_INIT;
 static mut DM_CONTEXT: Option<DM> = None;

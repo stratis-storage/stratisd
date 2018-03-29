@@ -11,8 +11,9 @@ use chrono::{DateTime, Utc};
 
 use devicemapper::{CacheDev, Device, DmDevice, IEC, LinearDev, Sectors};
 
+use stratis::{ErrorEnum, StratisError, StratisResult};
+
 use super::super::super::engine::BlockDev;
-use super::super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
 use super::super::device::wipe_sectors;
@@ -66,8 +67,8 @@ impl DataTier {
             let device = uuid_to_devno(triple.0)
                 .ok_or_else(|| {
                                 StratisError::Engine(ErrorEnum::NotFound,
-                                                    format!("missing device for UUUD {:?}",
-                                                            &triple.0))
+                                                     format!("missing device for UUUD {:?}",
+                                                             &triple.0))
                             })?;
             Ok(BlkDevSegment::new(triple.0, Segment::new(device, triple.1, triple.2)))
         };
@@ -245,8 +246,8 @@ impl CacheTier {
             let device = uuid_to_devno(triple.0)
                 .ok_or_else(|| {
                                 StratisError::Engine(ErrorEnum::NotFound,
-                                                    format!("missing device for UUUD {:?}",
-                                                            &triple.0))
+                                                     format!("missing device for UUUD {:?}",
+                                                             &triple.0))
                             })?;
             Ok(BlkDevSegment::new(triple.0, Segment::new(device, triple.1, triple.2)))
         };

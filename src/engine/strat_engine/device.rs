@@ -10,8 +10,7 @@ use std::path::Path;
 
 use devicemapper::{IEC, SECTOR_SIZE, Sectors};
 
-use super::super::errors::StratisResult;
-
+use stratis::StratisResult;
 
 /// Write buf at offset length times.
 pub fn write_sectors<P: AsRef<Path>>(path: P,
@@ -32,6 +31,9 @@ pub fn write_sectors<P: AsRef<Path>>(path: P,
 }
 
 /// Zero sectors at the given offset for length sectors.
-pub fn wipe_sectors<P: AsRef<Path>>(path: P, offset: Sectors, length: Sectors) -> StratisResult<()> {
+pub fn wipe_sectors<P: AsRef<Path>>(path: P,
+                                    offset: Sectors,
+                                    length: Sectors)
+                                    -> StratisResult<()> {
     write_sectors(path, offset, length, &[0u8; SECTOR_SIZE])
 }

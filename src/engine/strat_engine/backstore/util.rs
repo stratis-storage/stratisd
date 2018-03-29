@@ -8,7 +8,7 @@ use std::path::Path;
 
 use libudev;
 
-use super::super::super::errors::{StratisError, StratisResult, ErrorEnum};
+use stratis::{ErrorEnum, StratisError, StratisResult};
 
 /// Lookup the WWN from the udev db using the device node eg. /dev/sda
 pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<String>> {

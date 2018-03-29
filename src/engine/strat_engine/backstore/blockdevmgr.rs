@@ -15,8 +15,9 @@ use uuid::Uuid;
 use devicemapper::{Bytes, Device, IEC, LinearDevTargetParams, LinearTargetParams, Sectors,
                    TargetLine};
 
+use stratis::{ErrorEnum, StratisError, StratisResult};
+
 use super::super::super::engine::BlockDev;
-use super::super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::engine::DevOwnership;

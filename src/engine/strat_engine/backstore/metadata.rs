@@ -12,7 +12,8 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, IEC, SECTOR_SIZE, Sectors};
 
-use super::super::super::errors::{StratisError, StratisResult, ErrorEnum};
+use stratis::{ErrorEnum, StratisError, StratisResult};
+
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::engine::DevOwnership;
@@ -315,7 +316,7 @@ mod mda {
 
     use devicemapper::{Bytes, Sectors};
 
-    use super::super::super::super::errors::{StratisResult, StratisError, ErrorEnum};
+    use stratis::{ErrorEnum, StratisError, StratisResult};
 
     const _MDA_REGION_HDR_SIZE: usize = 32;
     const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
@@ -426,7 +427,7 @@ mod mda {
         {
             if self.last_update_time() >= Some(time) {
                 return Err(StratisError::Engine(ErrorEnum::Invalid,
-                                               "Overwriting newer data".into()));
+                                                "Overwriting newer data".into()));
             }
 
             let region_size = self.region_size.bytes();
@@ -552,7 +553,8 @@ mod mda {
                     region_size: Bytes)
                     -> StratisResult<Option<MDAHeader>> {
             if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_castagnoli(&buf[4..]) {
-                return Err(StratisError::Engine(ErrorEnum::Invalid, "MDA region header CRC".into()));
+                return Err(StratisError::Engine(ErrorEnum::Invalid,
+                                                "MDA region header CRC".into()));
             }
 
             match LittleEndian::read_u64(&buf[16..24]) {
@@ -624,10 +626,10 @@ mod mda {
     fn check_mda_region_size(used: Bytes, available: Bytes) -> StratisResult<()> {
         if MDA_REGION_HDR_SIZE + used > available {
             return Err(StratisError::Engine(ErrorEnum::Invalid,
-                                           format!("metadata length {} exceeds region available {}",
-                                                   used,
-                                                   // available region > header size
-                                                   available - MDA_REGION_HDR_SIZE)));
+                                            format!("metadata length {} exceeds region available {}",
+                                                    used,
+                                                    // available region > header size
+                                                    available - MDA_REGION_HDR_SIZE)));
         };
         Ok(())
     }
@@ -636,17 +638,17 @@ mod mda {
     pub fn validate_mda_size(size: Sectors) -> StratisResult<()> {
         if size % NUM_MDA_REGIONS != Sectors(0) {
             return Err(StratisError::Engine(ErrorEnum::Invalid,
-                                           format!("MDA size {} is not divisible by number of \
+                                            format!("MDA size {} is not divisible by number of \
                                                     copies required {}",
-                                                   size,
-                                                   NUM_MDA_REGIONS)));
+                                                    size,
+                                                    NUM_MDA_REGIONS)));
         };
 
         if size < MIN_MDA_SECTORS {
             return Err(StratisError::Engine(ErrorEnum::Invalid,
-                                           format!("MDA size {} is less than minimum ({})",
-                                                   size,
-                                                   MIN_MDA_SECTORS)));
+                                            format!("MDA size {} is less than minimum ({})",
+                                                    size,
+                                                    MIN_MDA_SECTORS)));
         };
         Ok(())
     }

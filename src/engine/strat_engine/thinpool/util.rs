@@ -9,7 +9,7 @@ use std::process::Command;
 
 use uuid::Uuid;
 
-use super::super::super::errors::{StratisError, StratisResult, ErrorEnum};
+use stratis::{ErrorEnum, StratisError, StratisResult};
 
 /// Common function to call a command line utility, returning an Result with an error message which
 /// also includes stdout & stderr if it fails.

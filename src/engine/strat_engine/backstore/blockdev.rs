@@ -11,8 +11,9 @@ use chrono::{DateTime, TimeZone, Utc};
 
 use devicemapper::{Device, Sectors};
 
+use stratis::StratisResult;
+
 use super::super::super::engine::BlockDev;
-use super::super::super::errors::StratisResult;
 use super::super::super::types::{BlockDevState, DevUuid, PoolUuid};
 
 use super::super::serde_structs::{BlockDevSave, Recordable};

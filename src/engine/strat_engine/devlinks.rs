@@ -8,8 +8,9 @@ use std::io::ErrorKind;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
+use stratis::StratisResult;
+
 use super::super::engine::Pool;
-use super::super::errors::StratisResult;
 use super::super::types::{Name, PoolUuid};
 
 use super::engine::DEV_PATH;

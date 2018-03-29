@@ -7,8 +7,7 @@
 
 use devicemapper::ThinDevId;
 
-use super::super::super::errors::StratisResult;
-
+use stratis::StratisResult;
 
 #[derive(Debug)]
 /// A pool of thindev ids, all unique.

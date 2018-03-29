@@ -18,7 +18,8 @@ use serde_json;
 
 use devicemapper::{DmDevice, LinearDev, LinearDevTargetParams, TargetLine};
 
-use super::super::super::errors::StratisResult;
+use stratis::StratisResult;
+
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid};
 
 use super::super::dm::get_dm;

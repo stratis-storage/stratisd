@@ -11,7 +11,7 @@ use std::path::Path;
 
 use devicemapper::{Bytes, Device, devnode_to_devno};
 
-use super::super::super::errors::{StratisError, StratisResult, ErrorEnum};
+use stratis::{ErrorEnum, StratisError, StratisResult};
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);
 

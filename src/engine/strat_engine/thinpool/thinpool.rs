@@ -99,9 +99,9 @@ fn coalesce_segs(left: &[(Sectors, Sectors)],
     };
 
     if coalesced {
-        segments.extend_from_slice(&left[1..]);
+        segments.extend_from_slice(&right[1..]);
     } else {
-        segments.extend_from_slice(left);
+        segments.extend_from_slice(right);
     }
     segments
 }

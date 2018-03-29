@@ -118,8 +118,10 @@ impl StratFilesystem {
                     let (fs_total_bytes, fs_total_used_bytes) = fs_usage(&mount_point)?;
                     let free_bytes = fs_total_bytes - fs_total_used_bytes;
                     if free_bytes.sectors() < FILESYSTEM_LOWATER {
-                        let extend_size = self.extend_size(self.thin_dev.size());
-                        if self.thin_dev.extend(get_dm(), extend_size).is_err() {
+                        let mut table = self.thin_dev.table().table.clone();
+                        table.length = self.thin_dev.size() +
+                                       self.extend_size(self.thin_dev.size());
+                        if self.thin_dev.set_table(get_dm(), table).is_err() {
                             return Ok(FilesystemStatus::ThinDevExtendFailed);
                         }
                         if xfs_growfs(&mount_point).is_err() {
@@ -201,7 +203,7 @@ impl StratFilesystem {
     }
 
     pub fn suspend(&mut self) -> EngineResult<()> {
-        self.thin_dev.suspend(get_dm())?;
+        self.thin_dev.suspend(get_dm(), true)?;
         Ok(())
     }
 

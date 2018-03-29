@@ -15,7 +15,7 @@ use serde_json;
 
 use devicemapper::{Device, devnode_to_devno};
 
-use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::super::structures::Table;
 use super::super::super::types::{Name, PoolUuid};
 
@@ -30,7 +30,7 @@ use super::metadata::{BDA, StaticHeader};
 
 /// Determine if devnode is a Stratis device. Return the device's Stratis
 /// pool UUID if it belongs to Stratis.
-pub fn is_stratis_device(devnode: &PathBuf) -> EngineResult<Option<PoolUuid>> {
+pub fn is_stratis_device(devnode: &PathBuf) -> StratisResult<Option<PoolUuid>> {
     match OpenOptions::new().read(true).open(&devnode) {
         Ok(mut f) => {
             if let DevOwnership::Ours(pool_uuid, _) = StaticHeader::determine_ownership(&mut f)? {
@@ -79,7 +79,7 @@ pub fn is_stratis_device(devnode: &PathBuf) -> EngineResult<Option<PoolUuid>> {
 pub fn setup_pool(pool_uuid: PoolUuid,
                   devices: &HashMap<Device, PathBuf>,
                   pools: &Table<StratPool>)
-                  -> EngineResult<(Name, StratPool)> {
+                  -> StratisResult<(Name, StratPool)> {
     // FIXME: In this method, various errors are assembled from various
     // sources and combined into strings, so that they
     // can be printed as log messages if necessary. Instead, some kind of
@@ -129,7 +129,7 @@ pub fn setup_pool(pool_uuid: PoolUuid,
 /// Find all Stratis devices.
 ///
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
-pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
+pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
 
     let mut pool_map = HashMap::new();
     let mut devno_set = HashSet::new();
@@ -163,7 +163,7 @@ pub fn find_all() -> EngineResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
 #[allow(implicit_hasher)]
 pub fn get_metadata(pool_uuid: PoolUuid,
                     devnodes: &HashMap<Device, PathBuf>)
-                    -> EngineResult<Option<PoolSave>> {
+                    -> StratisResult<Option<PoolSave>> {
 
     // Get pairs of device nodes and matching BDAs
     // If no BDA, or BDA UUID does not match pool UUID, skip.
@@ -228,7 +228,7 @@ pub fn get_metadata(pool_uuid: PoolUuid,
 pub fn get_blockdevs(pool_uuid: PoolUuid,
                      backstore_save: &BackstoreSave,
                      devnodes: &HashMap<Device, PathBuf>)
-                     -> EngineResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
+                     -> StratisResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
     let recorded_data_map: HashMap<_, _> = backstore_save
         .data_devs
         .iter()

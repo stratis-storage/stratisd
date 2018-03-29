@@ -14,7 +14,7 @@ use std::rc::Rc;
 use devicemapper::Device;
 
 use super::super::engine::{Engine, Eventable, Pool};
-use super::super::errors::{StratisError, EngineResult, ErrorEnum};
+use super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
@@ -36,7 +36,7 @@ impl Engine for SimEngine {
                    blockdev_paths: &[&Path],
                    redundancy: Option<u16>,
                    _force: bool)
-                   -> EngineResult<PoolUuid> {
+                   -> StratisResult<PoolUuid> {
 
         let redundancy = calculate_redundancy!(redundancy);
 
@@ -65,17 +65,17 @@ impl Engine for SimEngine {
     fn block_evaluate(&mut self,
                       device: Device,
                       dev_node: PathBuf)
-                      -> EngineResult<Option<PoolUuid>> {
+                      -> StratisResult<Option<PoolUuid>> {
         assert_ne!(dev_node, PathBuf::from("/"));
         assert_ne!(libc::dev_t::from(device), 0);
         Ok(None)
     }
 
-    fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool> {
+    fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<bool> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
             if pool.has_filesystems() {
                 return Err(StratisError::Engine(ErrorEnum::Busy,
-                                               "filesystems remaining on pool".into()));
+                                                "filesystems remaining on pool".into()));
             };
         } else {
             return Ok(false);
@@ -88,7 +88,7 @@ impl Engine for SimEngine {
         Ok(true)
     }
 
-    fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> EngineResult<RenameAction> {
+    fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction> {
         rename_pool_pre!(self; uuid; new_name);
 
         let (_, pool) = self.pools
@@ -109,7 +109,7 @@ impl Engine for SimEngine {
     }
 
     /// Set properties of the simulator
-    fn configure_simulator(&mut self, denominator: u32) -> EngineResult<()> {
+    fn configure_simulator(&mut self, denominator: u32) -> StratisResult<()> {
         self.rdm.borrow_mut().set_probability(denominator);
         Ok(())
     }
@@ -125,7 +125,7 @@ impl Engine for SimEngine {
         None
     }
 
-    fn evented(&mut self) -> EngineResult<()> {
+    fn evented(&mut self) -> StratisResult<()> {
         Ok(())
     }
 }

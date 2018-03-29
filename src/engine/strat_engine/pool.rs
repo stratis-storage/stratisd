@@ -13,7 +13,7 @@ use uuid::Uuid;
 use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
-use super::super::errors::{StratisError, EngineResult, ErrorEnum};
+use super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
                           RenameAction};
 
@@ -25,7 +25,7 @@ pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
 
 
 /// Check the metadata of an individual pool for consistency.
-pub fn check_metadata(metadata: &PoolSave) -> EngineResult<()> {
+pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
     // If the amount allocated from the cache tier is not the same as that
     // used by the thinpool, consider the situation an error.
     let flex_devs = &metadata.flex_devs;
@@ -62,7 +62,7 @@ impl StratPool {
                       paths: &[&Path],
                       redundancy: Redundancy,
                       force: bool)
-                      -> EngineResult<(PoolUuid, StratPool)> {
+                      -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
@@ -95,7 +95,7 @@ impl StratPool {
     pub fn setup(uuid: PoolUuid,
                  devnodes: &HashMap<Device, PathBuf>,
                  metadata: &PoolSave)
-                 -> EngineResult<(Name, StratPool)> {
+                 -> StratisResult<(Name, StratPool)> {
         let backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, None)?;
         let thinpool = ThinPool::setup(uuid,
                                        metadata.thinpool_dev.data_block_size,
@@ -112,14 +112,14 @@ impl StratPool {
     }
 
     /// Write current metadata to pool members.
-    pub fn write_metadata(&mut self, name: &str) -> EngineResult<()> {
+    pub fn write_metadata(&mut self, name: &str) -> StratisResult<()> {
         let data = serde_json::to_string(&self.record(name))?;
         self.backstore.save_state(data.as_bytes())
     }
 
     /// Teardown a pool.
     #[cfg(test)]
-    pub fn teardown(self) -> EngineResult<()> {
+    pub fn teardown(self) -> StratisResult<()> {
         self.thin_pool.teardown()?;
         self.backstore.teardown()
     }
@@ -136,7 +136,7 @@ impl StratPool {
     /// Called when a DM device in this pool has generated an event.
     // TODO: Just check the device that evented. Currently checks
     // everything.
-    pub fn event_on(&mut self, pool_name: &Name, dm_name: &DmName) -> EngineResult<()> {
+    pub fn event_on(&mut self, pool_name: &Name, dm_name: &DmName) -> StratisResult<()> {
         assert!(self.thin_pool
                     .get_eventing_dev_names()
                     .iter()
@@ -161,7 +161,7 @@ impl Pool for StratPool {
     fn create_filesystems<'a, 'b>(&'a mut self,
                                   pool_name: &str,
                                   specs: &[(&'b str, Option<Sectors>)])
-                                  -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
+                                  -> StratisResult<Vec<(&'b str, FilesystemUuid)>> {
         let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
         for name in names.keys() {
             if self.thin_pool
@@ -186,7 +186,7 @@ impl Pool for StratPool {
                      paths: &[&Path],
                      tier: BlockDevTier,
                      force: bool)
-                     -> EngineResult<Vec<DevUuid>> {
+                     -> StratisResult<Vec<DevUuid>> {
         self.thin_pool.suspend()?;
         let bdev_info = self.backstore.add_blockdevs(paths, tier, force)?;
         self.thin_pool.set_device(self.backstore.device())?;
@@ -195,7 +195,7 @@ impl Pool for StratPool {
         Ok(bdev_info)
     }
 
-    fn destroy(self) -> EngineResult<()> {
+    fn destroy(self) -> StratisResult<()> {
         self.thin_pool.teardown()?;
         self.backstore.destroy()?;
         Ok(())
@@ -204,7 +204,7 @@ impl Pool for StratPool {
     fn destroy_filesystems<'a>(&'a mut self,
                                pool_name: &str,
                                fs_uuids: &[FilesystemUuid])
-                               -> EngineResult<Vec<FilesystemUuid>> {
+                               -> StratisResult<Vec<FilesystemUuid>> {
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
             self.thin_pool.destroy_filesystem(pool_name, uuid)?;
@@ -218,7 +218,7 @@ impl Pool for StratPool {
                          pool_name: &str,
                          uuid: FilesystemUuid,
                          new_name: &str)
-                         -> EngineResult<RenameAction> {
+                         -> StratisResult<RenameAction> {
         self.thin_pool
             .rename_filesystem(pool_name, uuid, new_name)
     }
@@ -227,7 +227,7 @@ impl Pool for StratPool {
                            pool_name: &str,
                            origin_uuid: FilesystemUuid,
                            snapshot_name: &str)
-                           -> EngineResult<FilesystemUuid> {
+                           -> StratisResult<FilesystemUuid> {
         self.thin_pool
             .snapshot_filesystem(pool_name, origin_uuid, snapshot_name)
     }
@@ -236,7 +236,7 @@ impl Pool for StratPool {
         self.backstore.datatier_current_capacity()
     }
 
-    fn total_physical_used(&self) -> EngineResult<Sectors> {
+    fn total_physical_used(&self) -> StratisResult<Sectors> {
         self.thin_pool
             .total_physical_used()
             .and_then(|v| Ok(v + self.backstore.datatier_metadata_size()))
@@ -270,7 +270,7 @@ impl Pool for StratPool {
         self.backstore.get_mut_blockdev_by_uuid(uuid)
     }
 
-    fn save_state(&mut self, pool_name: &str) -> EngineResult<()> {
+    fn save_state(&mut self, pool_name: &str) -> StratisResult<()> {
         self.write_metadata(pool_name)
     }
 }

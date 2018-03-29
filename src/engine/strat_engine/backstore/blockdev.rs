@@ -12,7 +12,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use devicemapper::{Device, Sectors};
 
 use super::super::super::engine::BlockDev;
-use super::super::super::errors::EngineResult;
+use super::super::super::errors::StratisResult;
 use super::super::super::types::{BlockDevState, DevUuid, PoolUuid};
 
 use super::super::serde_structs::{BlockDevSave, Recordable};
@@ -53,7 +53,7 @@ impl StratBlockDev {
                upper_segments: &[(Sectors, Sectors)],
                user_info: Option<String>,
                hardware_info: Option<String>)
-               -> EngineResult<StratBlockDev> {
+               -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.size())];
         segments.extend(upper_segments);
         let allocator = RangeAllocator::new(bda.dev_size(), &segments)?;
@@ -73,12 +73,12 @@ impl StratBlockDev {
         &self.dev
     }
 
-    pub fn wipe_metadata(&self) -> EngineResult<()> {
+    pub fn wipe_metadata(&self) -> StratisResult<()> {
         let mut f = OpenOptions::new().write(true).open(&self.devnode)?;
         BDA::wipe(&mut f)
     }
 
-    pub fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> EngineResult<()> {
+    pub fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> StratisResult<()> {
         let mut f = OpenOptions::new().write(true).open(&self.devnode)?;
         self.bda.save_state(time, metadata, &mut f)
     }

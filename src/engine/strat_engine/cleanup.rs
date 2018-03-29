@@ -4,14 +4,14 @@
 
 // Code to handle cleanup after a failed operation.
 
-use super::super::errors::{StratisError, EngineResult, ErrorEnum};
+use super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::structures::Table;
 
 use super::pool::StratPool;
 
 
 /// Teardown pools.
-pub fn teardown_pools(pools: Table<StratPool>) -> EngineResult<()> {
+pub fn teardown_pools(pools: Table<StratPool>) -> StratisResult<()> {
     let mut untorndown_pools = Vec::new();
     for (_, uuid, pool) in pools {
         pool.teardown()

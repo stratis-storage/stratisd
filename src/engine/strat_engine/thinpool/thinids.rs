@@ -7,7 +7,7 @@
 
 use devicemapper::ThinDevId;
 
-use super::super::super::errors::EngineResult;
+use super::super::super::errors::StratisResult;
 
 
 #[derive(Debug)]
@@ -28,7 +28,7 @@ impl ThinDevIdPool {
     /// Returns an error if no thindev id can be constructed.
     // TODO: Improve this so that it is guaranteed only to fail if every 24 bit
     // number has been used.
-    pub fn new_id(&mut self) -> EngineResult<ThinDevId> {
+    pub fn new_id(&mut self) -> StratisResult<ThinDevId> {
         let next_id = ThinDevId::new_u64(u64::from(self.next_id))?;
         self.next_id += 1;
         Ok(next_id)

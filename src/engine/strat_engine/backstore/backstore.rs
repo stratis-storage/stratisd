@@ -12,7 +12,7 @@ use chrono::{DateTime, Utc};
 use devicemapper::{CacheDev, Device, DmDevice, IEC, LinearDev, Sectors};
 
 use super::super::super::engine::BlockDev;
-use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
 use super::super::device::wipe_sectors;
@@ -54,7 +54,7 @@ impl DataTier {
     /// setup.
     pub fn setup(block_mgr: BlockDevMgr,
                  segments: &[(DevUuid, Sectors, Sectors)])
-                 -> EngineResult<(DataTier, LinearDev)> {
+                 -> StratisResult<(DataTier, LinearDev)> {
         if block_mgr.avail_space() != Sectors(0) {
             let err_msg = format!("{} unallocated to device; probable metadata corruption",
                                   block_mgr.avail_space());
@@ -62,7 +62,7 @@ impl DataTier {
         }
 
         let uuid_to_devno = block_mgr.uuid_to_devno();
-        let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> EngineResult<BlkDevSegment> {
+        let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> StratisResult<BlkDevSegment> {
             let device = uuid_to_devno(triple.0)
                 .ok_or_else(|| {
                                 StratisError::Engine(ErrorEnum::NotFound,
@@ -74,7 +74,7 @@ impl DataTier {
         let segments = segments
             .iter()
             .map(&mapper)
-            .collect::<EngineResult<Vec<_>>>()?;
+            .collect::<StratisResult<Vec<_>>>()?;
 
         let (dm_name, dm_uuid) = format_backstore_ids(block_mgr.pool_uuid(), CacheRole::OriginSub);
         let ld = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), map_to_dm(&segments))?;
@@ -92,7 +92,7 @@ impl DataTier {
     /// Returns the DataTier and the linear device that was created.
     ///
     /// WARNING: metadata changing event
-    pub fn new(mut block_mgr: BlockDevMgr) -> EngineResult<(DataTier, LinearDev)> {
+    pub fn new(mut block_mgr: BlockDevMgr) -> StratisResult<(DataTier, LinearDev)> {
         let avail_space = block_mgr.avail_space();
         let segments = block_mgr
             .alloc_space(&[avail_space])
@@ -118,7 +118,7 @@ impl DataTier {
                linear: Option<&mut LinearDev>,
                paths: &[&Path],
                force: bool)
-               -> EngineResult<Vec<DevUuid>> {
+               -> StratisResult<Vec<DevUuid>> {
         // These are here so that if invariant is false, the method fails
         // before allocating the segments from the block_mgr.
         // These two statements combined are equivalent to
@@ -178,13 +178,13 @@ impl DataTier {
     }
 
     /// Destroy the store. Wipe its blockdevs.
-    pub fn destroy(self) -> EngineResult<()> {
+    pub fn destroy(self) -> StratisResult<()> {
         self.block_mgr.destroy_all()
     }
 
     /// Save the given state to the devices. This action bypasses the DM
     /// device entirely.
-    pub fn save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {
+    pub fn save_state(&mut self, metadata: &[u8]) -> StratisResult<()> {
         self.block_mgr.save_state(metadata)
     }
 
@@ -233,7 +233,7 @@ impl CacheTier {
                  origin: LinearDev,
                  cache_segments: &[(DevUuid, Sectors, Sectors)],
                  meta_segments: &[(DevUuid, Sectors, Sectors)])
-                 -> EngineResult<(CacheTier, CacheDev)> {
+                 -> StratisResult<(CacheTier, CacheDev)> {
         if block_mgr.avail_space() != Sectors(0) {
             let err_msg = format!("{} unallocated to device; probable metadata corruption",
                                   block_mgr.avail_space());
@@ -241,7 +241,7 @@ impl CacheTier {
         }
 
         let uuid_to_devno = block_mgr.uuid_to_devno();
-        let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> EngineResult<BlkDevSegment> {
+        let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> StratisResult<BlkDevSegment> {
             let device = uuid_to_devno(triple.0)
                 .ok_or_else(|| {
                                 StratisError::Engine(ErrorEnum::NotFound,
@@ -254,7 +254,7 @@ impl CacheTier {
         let meta_segments = meta_segments
             .iter()
             .map(&mapper)
-            .collect::<EngineResult<Vec<_>>>()?;
+            .collect::<StratisResult<Vec<_>>>()?;
         let (dm_name, dm_uuid) = format_backstore_ids(block_mgr.pool_uuid(), CacheRole::MetaSub);
         let meta = LinearDev::setup(get_dm(),
                                     &dm_name,
@@ -264,7 +264,7 @@ impl CacheTier {
         let cache_segments = cache_segments
             .iter()
             .map(&mapper)
-            .collect::<EngineResult<Vec<_>>>()?;
+            .collect::<StratisResult<Vec<_>>>()?;
         let (dm_name, dm_uuid) = format_backstore_ids(block_mgr.pool_uuid(), CacheRole::CacheSub);
         let cache = LinearDev::setup(get_dm(),
                                      &dm_name,
@@ -300,7 +300,7 @@ impl CacheTier {
                cache_device: &mut CacheDev,
                paths: &[&Path],
                force: bool)
-               -> EngineResult<Vec<DevUuid>> {
+               -> StratisResult<Vec<DevUuid>> {
         let uuids = self.block_mgr.add(paths, force)?;
 
         let avail_space = self.block_mgr.avail_space();
@@ -329,7 +329,7 @@ impl CacheTier {
     /// WARNING: metadata changing event
     pub fn new(mut block_mgr: BlockDevMgr,
                origin: LinearDev)
-               -> EngineResult<(CacheTier, CacheDev)> {
+               -> StratisResult<(CacheTier, CacheDev)> {
         let avail_space = block_mgr.avail_space();
 
         // FIXME: Come up with a better way to choose metadata device size
@@ -379,7 +379,7 @@ impl CacheTier {
     }
 
     /// Destroy the tier. Wipe its blockdevs.
-    pub fn destroy(self) -> EngineResult<()> {
+    pub fn destroy(self) -> StratisResult<()> {
         self.block_mgr.destroy_all()
     }
 
@@ -433,7 +433,7 @@ impl Backstore {
                  backstore_save: &BackstoreSave,
                  devnodes: &HashMap<Device, PathBuf>,
                  last_update_time: Option<DateTime<Utc>>)
-                 -> EngineResult<Backstore> {
+                 -> StratisResult<Backstore> {
         let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
         let block_mgr = BlockDevMgr::new(pool_uuid, datadevs, last_update_time);
         let (data_tier, dm_device) = DataTier::setup(block_mgr, &backstore_save.data_segments)?;
@@ -471,7 +471,7 @@ impl Backstore {
                       paths: &[&Path],
                       mda_size: Sectors,
                       force: bool)
-                      -> EngineResult<Backstore> {
+                      -> StratisResult<Backstore> {
         let (data_tier, dm_device) =
             DataTier::new(BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?)?;
         Ok(Backstore {
@@ -488,7 +488,7 @@ impl Backstore {
     /// If the cache tier does not already exist, create it.
     ///
     // Postcondition: self.cache.is_some() && self.linear.is_none()
-    fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
+    fn add_cachedevs(&mut self, paths: &[&Path], force: bool) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(ref mut cache_tier) => {
                 let mut cache_device = self.cache
@@ -533,7 +533,7 @@ impl Backstore {
                          paths: &[&Path],
                          tier: BlockDevTier,
                          force: bool)
-                         -> EngineResult<Vec<DevUuid>> {
+                         -> StratisResult<Vec<DevUuid>> {
         match tier {
             BlockDevTier::Cache => self.add_cachedevs(paths, force),
             BlockDevTier::Data => {
@@ -591,7 +591,7 @@ impl Backstore {
     }
 
     /// Destroy the entire store.
-    pub fn destroy(self) -> EngineResult<()> {
+    pub fn destroy(self) -> StratisResult<()> {
         match self.cache {
             Some(cache) => {
                 cache.teardown(get_dm())?;
@@ -610,7 +610,7 @@ impl Backstore {
 
     /// Teardown the DM devices in the backstore.
     #[cfg(test)]
-    pub fn teardown(self) -> EngineResult<()> {
+    pub fn teardown(self) -> StratisResult<()> {
         match self.cache {
                 Some(cache) => cache.teardown(get_dm()),
                 None => {
@@ -665,7 +665,7 @@ impl Backstore {
     }
 
     /// Write the given data to the data tier's devices.
-    pub fn save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {
+    pub fn save_state(&mut self, metadata: &[u8]) -> StratisResult<()> {
         self.data_tier.save_state(metadata)
     }
 }

@@ -10,7 +10,7 @@ pub use self::engine::Filesystem;
 pub use self::engine::Pool;
 
 pub use self::errors::StratisError;
-pub use self::errors::EngineResult;
+pub use self::errors::StratisResult;
 pub use self::errors::ErrorEnum;
 
 pub use self::sim_engine::SimEngine;

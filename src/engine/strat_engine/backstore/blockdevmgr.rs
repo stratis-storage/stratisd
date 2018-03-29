@@ -16,7 +16,7 @@ use devicemapper::{Bytes, Device, IEC, LinearDevTargetParams, LinearTargetParams
                    TargetLine};
 
 use super::super::super::engine::BlockDev;
-use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::engine::DevOwnership;
@@ -169,7 +169,7 @@ impl BlockDevMgr {
                       paths: &[&Path],
                       mda_size: Sectors,
                       force: bool)
-                      -> EngineResult<BlockDevMgr> {
+                      -> StratisResult<BlockDevMgr> {
         let devices = resolve_devices(paths)?;
         Ok(BlockDevMgr::new(pool_uuid,
                             initialize(pool_uuid, devices, mda_size, force, &HashSet::new())?,
@@ -194,7 +194,7 @@ impl BlockDevMgr {
     /// Add paths to self.
     /// Return the uuids of all blockdevs corresponding to paths that were
     /// added.
-    pub fn add(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
+    pub fn add(&mut self, paths: &[&Path], force: bool) -> StratisResult<Vec<DevUuid>> {
         let devices = resolve_devices(paths)?;
         let current_uuids = self.block_devs.iter().map(|bd| bd.uuid()).collect();
         let bds = initialize(self.pool_uuid,
@@ -207,7 +207,7 @@ impl BlockDevMgr {
         Ok(bdev_uuids)
     }
 
-    pub fn destroy_all(self) -> EngineResult<()> {
+    pub fn destroy_all(self) -> StratisResult<()> {
         wipe_blockdevs(&self.block_devs)
     }
 
@@ -262,7 +262,7 @@ impl BlockDevMgr {
     /// time, use a time that is one nanosecond greater than that previously
     /// written. Randomly select no more than MAX_NUM_TO_WRITE blockdevs to
     /// write to.
-    pub fn save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {
+    pub fn save_state(&mut self, metadata: &[u8]) -> StratisResult<()> {
         let current_time = Utc::now();
         let stamp_time = if Some(current_time) <= self.last_update_time {
             self.last_update_time
@@ -357,14 +357,14 @@ fn initialize(pool_uuid: PoolUuid,
               mda_size: Sectors,
               force: bool,
               owned_devs: &HashSet<DevUuid>)
-              -> EngineResult<Vec<StratBlockDev>> {
+              -> StratisResult<Vec<StratBlockDev>> {
 
     /// Get device information, returns an error if problem with obtaining
     /// that information.
     /// Returns a tuple with the device's path, its size in bytes,
     /// its ownership as determined by calling determine_ownership(),
     /// and an open File handle, all of which are needed later.
-    fn dev_info(devnode: &Path) -> EngineResult<(&Path, Bytes, DevOwnership, File)> {
+    fn dev_info(devnode: &Path) -> StratisResult<(&Path, Bytes, DevOwnership, File)> {
         let mut f = OpenOptions::new()
             .read(true)
             .write(true)
@@ -383,8 +383,8 @@ fn initialize(pool_uuid: PoolUuid,
                           pool_uuid: PoolUuid,
                           force: bool,
                           owned_devs: &HashSet<DevUuid>)
-                          -> EngineResult<Vec<(Device, (&'a Path, Bytes, File))>>
-        where I: Iterator<Item = (Device, EngineResult<(&'a Path, Bytes, DevOwnership, File)>)>
+                          -> StratisResult<Vec<(Device, (&'a Path, Bytes, File))>>
+        where I: Iterator<Item = (Device, StratisResult<(&'a Path, Bytes, DevOwnership, File)>)>
     {
         let mut add_devs = Vec::new();
         for (dev, dev_result) in dev_infos {

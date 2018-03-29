@@ -15,7 +15,7 @@ use uuid::Uuid;
 use devicemapper::{IEC, Sectors};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
-use super::super::errors::{StratisError, EngineResult, ErrorEnum};
+use super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
                           RenameAction};
@@ -60,7 +60,7 @@ impl Pool for SimPool {
     fn create_filesystems<'a, 'b>(&'a mut self,
                                   _pool_name: &str,
                                   specs: &[(&'b str, Option<Sectors>)])
-                                  -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
+                                  -> StratisResult<Vec<(&'b str, FilesystemUuid)>> {
         let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
         for name in names.keys() {
             if self.filesystems.contains_name(name) {
@@ -85,7 +85,7 @@ impl Pool for SimPool {
                      paths: &[&Path],
                      tier: BlockDevTier,
                      _force: bool)
-                     -> EngineResult<Vec<DevUuid>> {
+                     -> StratisResult<Vec<DevUuid>> {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs: Vec<_> = devices
             .iter()
@@ -102,7 +102,7 @@ impl Pool for SimPool {
         Ok(ret_uuids)
     }
 
-    fn destroy(self) -> EngineResult<()> {
+    fn destroy(self) -> StratisResult<()> {
         // Nothing to do here.
         Ok(())
     }
@@ -110,7 +110,7 @@ impl Pool for SimPool {
     fn destroy_filesystems<'a>(&'a mut self,
                                _pool_name: &str,
                                fs_uuids: &[FilesystemUuid])
-                               -> EngineResult<Vec<FilesystemUuid>> {
+                               -> StratisResult<Vec<FilesystemUuid>> {
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
             if self.filesystems.remove_by_uuid(uuid).is_some() {
@@ -124,7 +124,7 @@ impl Pool for SimPool {
                          _pool_name: &str,
                          uuid: FilesystemUuid,
                          new_name: &str)
-                         -> EngineResult<RenameAction> {
+                         -> StratisResult<RenameAction> {
         rename_filesystem_pre!(self; uuid; new_name);
 
         let (_, filesystem) =
@@ -142,7 +142,7 @@ impl Pool for SimPool {
                            _pool_name: &str,
                            origin_uuid: FilesystemUuid,
                            snapshot_name: &str)
-                           -> EngineResult<FilesystemUuid> {
+                           -> StratisResult<FilesystemUuid> {
         let uuid = Uuid::new_v4();
         let snapshot = match self.get_filesystem(origin_uuid) {
             Some(_filesystem) => SimFilesystem::new(),
@@ -161,7 +161,7 @@ impl Pool for SimPool {
         Sectors(IEC::Ei)
     }
 
-    fn total_physical_used(&self) -> EngineResult<Sectors> {
+    fn total_physical_used(&self) -> StratisResult<Sectors> {
         Ok(Sectors(0))
     }
 
@@ -215,7 +215,7 @@ impl Pool for SimPool {
                      })
     }
 
-    fn save_state(&mut self, _pool_name: &str) -> EngineResult<()> {
+    fn save_state(&mut self, _pool_name: &str) -> StratisResult<()> {
         Ok(())
     }
 }

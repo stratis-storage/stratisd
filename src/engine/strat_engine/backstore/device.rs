@@ -11,11 +11,11 @@ use std::path::Path;
 
 use devicemapper::{Bytes, Device, devnode_to_devno};
 
-use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, StratisResult, ErrorEnum};
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);
 
-pub fn blkdev_size(file: &File) -> EngineResult<Bytes> {
+pub fn blkdev_size(file: &File) -> StratisResult<Bytes> {
     let mut val: u64 = 0;
 
     match unsafe { blkgetsize64(file.as_raw_fd(), &mut val) } {
@@ -29,7 +29,7 @@ pub fn blkdev_size(file: &File) -> EngineResult<Bytes> {
 /// Return an IOError if there was a problem resolving any particular device.
 /// The set of devices maps each device to one of the paths passed.
 /// Returns an error if any path does not correspond to a block device.
-pub fn resolve_devices<'a>(paths: &'a [&Path]) -> EngineResult<HashMap<Device, &'a Path>> {
+pub fn resolve_devices<'a>(paths: &'a [&Path]) -> StratisResult<HashMap<Device, &'a Path>> {
     let mut map = HashMap::new();
     for path in paths {
         match devnode_to_devno(path)? {

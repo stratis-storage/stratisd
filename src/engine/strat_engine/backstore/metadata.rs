@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, IEC, SECTOR_SIZE, Sectors};
 
-use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::engine::DevOwnership;
@@ -42,7 +42,7 @@ impl BDA {
                          mda_size: Sectors,
                          blkdev_size: Sectors,
                          initialization_time: u64)
-                         -> EngineResult<BDA>
+                         -> StratisResult<BDA>
         where F: Seek + Write
     {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
@@ -70,7 +70,7 @@ impl BDA {
 
     /// Load a BDA on initial setup of a device.
     /// Returns None if no BDA appears to exist.
-    pub fn load<F>(f: &mut F) -> EngineResult<Option<BDA>>
+    pub fn load<F>(f: &mut F) -> StratisResult<Option<BDA>>
         where F: Read + Seek
     {
         let header = match StaticHeader::setup(f)? {
@@ -85,7 +85,7 @@ impl BDA {
 
     /// Zero out Static Header on the blockdev. This causes it to no
     /// longer be seen as a Stratis blockdev.
-    pub fn wipe<F>(f: &mut F) -> EngineResult<()>
+    pub fn wipe<F>(f: &mut F) -> StratisResult<()>
         where F: Seek + Write
     {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
@@ -102,7 +102,7 @@ impl BDA {
                          time: &DateTime<Utc>,
                          metadata: &[u8],
                          mut f: &mut F)
-                         -> EngineResult<()>
+                         -> StratisResult<()>
         where F: Seek + Write
     {
         self.regions
@@ -110,7 +110,7 @@ impl BDA {
     }
 
     /// Read latest metadata from the disk
-    pub fn load_state<F>(&self, mut f: &mut F) -> EngineResult<Option<Vec<u8>>>
+    pub fn load_state<F>(&self, mut f: &mut F) -> StratisResult<Option<Vec<u8>>>
         where F: Read + Seek
     {
         self.regions.load_state(BDA_STATIC_HDR_SIZE, &mut f)
@@ -186,7 +186,7 @@ impl StaticHeader {
     /// Try to find a valid StaticHeader on a device.
     /// If there is no StaticHeader on the device, return None.
     /// If there is a problem reading a header, return an error.
-    fn setup<F>(f: &mut F) -> EngineResult<Option<StaticHeader>>
+    fn setup<F>(f: &mut F) -> StratisResult<Option<StaticHeader>>
         where F: Read + Seek
     {
         #![allow(unused_io_amount)]
@@ -207,7 +207,7 @@ impl StaticHeader {
     /// no error in reading the first, assume it is correct, i.e., do not
     /// verify that it matches the next.
     /// Return None if the static header's magic number is wrong.
-    fn setup_from_buf(buf: &[u8; _BDA_STATIC_HDR_SIZE]) -> EngineResult<Option<StaticHeader>> {
+    fn setup_from_buf(buf: &[u8; _BDA_STATIC_HDR_SIZE]) -> StratisResult<Option<StaticHeader>> {
         let sigblock_spots = [&buf[SECTOR_SIZE..2 * SECTOR_SIZE],
                               &buf[9 * SECTOR_SIZE..10 * SECTOR_SIZE]];
 
@@ -224,7 +224,7 @@ impl StaticHeader {
 
     /// Determine the ownership of a device.
     /// If the device is owned by Stratis, return its device UUID.
-    pub fn determine_ownership<F>(f: &mut F) -> EngineResult<DevOwnership>
+    pub fn determine_ownership<F>(f: &mut F) -> StratisResult<DevOwnership>
         where F: Read + Seek
     {
         #![allow(unused_io_amount)]
@@ -270,7 +270,7 @@ impl StaticHeader {
 
     /// Build a StaticHeader from a SECTOR_SIZE buf that was read from
     /// a blockdev.
-    fn sigblock_from_buf(buf: &[u8]) -> EngineResult<Option<StaticHeader>> {
+    fn sigblock_from_buf(buf: &[u8]) -> StratisResult<Option<StaticHeader>> {
 
         assert_eq!(buf.len(), SECTOR_SIZE);
 
@@ -315,7 +315,7 @@ mod mda {
 
     use devicemapper::{Bytes, Sectors};
 
-    use super::super::super::super::errors::{EngineResult, StratisError, ErrorEnum};
+    use super::super::super::super::errors::{StratisResult, StratisError, ErrorEnum};
 
     const _MDA_REGION_HDR_SIZE: usize = 32;
     const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
@@ -350,7 +350,7 @@ mod mda {
         pub fn initialize<F>(header_size: Bytes,
                              size: Sectors,
                              f: &mut F)
-                             -> EngineResult<MDARegions>
+                             -> StratisResult<MDARegions>
             where F: Seek + Write
         {
             let hdr_buf = MDAHeader::default().to_buf();
@@ -377,7 +377,7 @@ mod mda {
         /// StaticHeader has already been read. Therefore, it
         /// constitutes an error if it is not possible to discover two
         /// well-formed MDAHeaders for this device.
-        pub fn load<F>(header_size: Bytes, size: Sectors, f: &mut F) -> EngineResult<MDARegions>
+        pub fn load<F>(header_size: Bytes, size: Sectors, f: &mut F) -> StratisResult<MDARegions>
             where F: Read + Seek
         {
             let region_size = size / NUM_MDA_REGIONS;
@@ -387,7 +387,7 @@ mod mda {
             // If it appears that no metadata has been written at the location
             // return None. If it appears that there is metadata, but it has
             // been corrupted, return an error.
-            let mut load_a_region = |index: usize| -> EngineResult<Option<MDAHeader>> {
+            let mut load_a_region = |index: usize| -> StratisResult<Option<MDAHeader>> {
                 let mut hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
                 f.seek(SeekFrom::Start(MDARegions::mda_offset(header_size,
                                                                  index,
@@ -399,7 +399,7 @@ mod mda {
             // Get an MDAHeader for the given index.
             // If there is a failure reading the first, fall back on the
             // second. If there is a failure reading both, return an error.
-            let mut get_mda = |index: usize| -> EngineResult<Option<MDAHeader>> {
+            let mut get_mda = |index: usize| -> StratisResult<Option<MDAHeader>> {
                 load_a_region(index).or_else(|_| load_a_region(index + 2))
             };
 
@@ -421,7 +421,7 @@ mod mda {
                              time: &DateTime<Utc>,
                              data: &[u8],
                              f: &mut F)
-                             -> EngineResult<()>
+                             -> StratisResult<()>
             where F: Seek + Write
         {
             if self.last_update_time() >= Some(time) {
@@ -441,7 +441,7 @@ mod mda {
             let hdr_buf = header.to_buf();
 
             // Write data to a region specified by index.
-            let mut save_region = |index: usize| -> EngineResult<()> {
+            let mut save_region = |index: usize| -> StratisResult<()> {
                 f.seek(SeekFrom::Start(MDARegions::mda_offset(header_size, index, region_size)))?;
                 f.write_all(&hdr_buf)?;
                 f.write_all(data)?;
@@ -465,7 +465,7 @@ mod mda {
         /// In case there is no record of metadata in regions, return None.
         /// If there is a record of metadata, and there is a failure to read
         /// the metadata, return an error.
-        pub fn load_state<F>(&self, header_size: Bytes, f: &mut F) -> EngineResult<Option<Vec<u8>>>
+        pub fn load_state<F>(&self, header_size: Bytes, f: &mut F) -> StratisResult<Option<Vec<u8>>>
             where F: Read + Seek
         {
             let newer_region = self.newer();
@@ -477,7 +477,7 @@ mod mda {
 
             // Load the metadata region specified by index.
             // It is an error if the metadata can not be found.
-            let mut load_region = |index: usize| -> EngineResult<Vec<u8>> {
+            let mut load_region = |index: usize| -> StratisResult<Vec<u8>> {
                 let offset = MDARegions::mda_offset(header_size, index, region_size) +
                              _MDA_REGION_HDR_SIZE as u64;
                 f.seek(SeekFrom::Start(offset))?;
@@ -550,7 +550,7 @@ mod mda {
         /// timestamp region in the buffer is 0.
         fn from_buf(buf: &[u8; _MDA_REGION_HDR_SIZE],
                     region_size: Bytes)
-                    -> EngineResult<Option<MDAHeader>> {
+                    -> StratisResult<Option<MDAHeader>> {
             if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_castagnoli(&buf[4..]) {
                 return Err(StratisError::Engine(ErrorEnum::Invalid, "MDA region header CRC".into()));
             }
@@ -596,7 +596,7 @@ mod mda {
         /// Return an error if the data can not be read, since the existence
         /// of the MDAHeader implies that the data must be available.
         // MDAHeader cannot seek because it doesn't know which region it's in
-        fn load_region<F>(&self, f: &mut F) -> EngineResult<Vec<u8>>
+        fn load_region<F>(&self, f: &mut F) -> StratisResult<Vec<u8>>
             where F: Read
         {
             // This cast could fail if running on a 32-bit machine and
@@ -621,7 +621,7 @@ mod mda {
 
     /// Check that data size does not exceed region available.
     /// Note that used is the amount used for metadata only.
-    fn check_mda_region_size(used: Bytes, available: Bytes) -> EngineResult<()> {
+    fn check_mda_region_size(used: Bytes, available: Bytes) -> StratisResult<()> {
         if MDA_REGION_HDR_SIZE + used > available {
             return Err(StratisError::Engine(ErrorEnum::Invalid,
                                            format!("metadata length {} exceeds region available {}",
@@ -633,7 +633,7 @@ mod mda {
     }
 
     /// Validate MDA size
-    pub fn validate_mda_size(size: Sectors) -> EngineResult<()> {
+    pub fn validate_mda_size(size: Sectors) -> StratisResult<()> {
         if size % NUM_MDA_REGIONS != Sectors(0) {
             return Err(StratisError::Engine(ErrorEnum::Invalid,
                                            format!("MDA size {} is not divisible by number of \

@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use devicemapper::{Device, DmNameBuf};
 
 use super::super::engine::{Engine, Eventable, Pool};
-use super::super::errors::{StratisError, EngineResult, ErrorEnum};
+use super::super::errors::{StratisError, StratisResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{DevUuid, Name, PoolUuid, Redundancy, RenameAction};
 
@@ -57,7 +57,7 @@ impl StratEngine {
     ///
     /// Returns an error if the kernel doesn't support required DM features.
     /// Returns an error if there was an error reading device nodes.
-    pub fn initialize() -> EngineResult<StratEngine> {
+    pub fn initialize() -> StratisResult<StratEngine> {
         let dm = match catch_unwind(get_dm) {
             Ok(dm) => dm,
             Err(_) => {
@@ -104,7 +104,7 @@ impl StratEngine {
 
     /// Teardown Stratis, preparatory to a shutdown.
     #[cfg(test)]
-    pub fn teardown(self) -> EngineResult<()> {
+    pub fn teardown(self) -> StratisResult<()> {
         teardown_pools(self.pools)
     }
 }
@@ -115,7 +115,7 @@ impl Engine for StratEngine {
                    blockdev_paths: &[&Path],
                    redundancy: Option<u16>,
                    force: bool)
-                   -> EngineResult<PoolUuid> {
+                   -> StratisResult<PoolUuid> {
 
         let redundancy = calculate_redundancy!(redundancy);
 
@@ -141,7 +141,7 @@ impl Engine for StratEngine {
     fn block_evaluate(&mut self,
                       device: Device,
                       dev_node: PathBuf)
-                      -> EngineResult<Option<PoolUuid>> {
+                      -> StratisResult<Option<PoolUuid>> {
         let pool_uuid = if let Some(pool_uuid) = is_stratis_device(&dev_node)? {
             if self.pools.contains_uuid(pool_uuid) {
                 // TODO: Handle the case where we have found a device for an already active pool
@@ -174,11 +174,11 @@ impl Engine for StratEngine {
         Ok(pool_uuid)
     }
 
-    fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool> {
+    fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<bool> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
             if pool.has_filesystems() {
                 return Err(StratisError::Engine(ErrorEnum::Busy,
-                                               "filesystems remaining on pool".into()));
+                                                "filesystems remaining on pool".into()));
             };
         } else {
             return Ok(false);
@@ -194,7 +194,7 @@ impl Engine for StratEngine {
         Ok(true)
     }
 
-    fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> EngineResult<RenameAction> {
+    fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction> {
         let old_name = rename_pool_pre!(self; uuid; new_name);
 
         let (_, mut pool) =
@@ -221,7 +221,7 @@ impl Engine for StratEngine {
         get_mut_pool!(self; uuid)
     }
 
-    fn configure_simulator(&mut self, _denominator: u32) -> EngineResult<()> {
+    fn configure_simulator(&mut self, _denominator: u32) -> StratisResult<()> {
         Ok(()) // we're not the simulator and not configurable, so just say ok
     }
 
@@ -236,7 +236,7 @@ impl Engine for StratEngine {
         Some(get_dm())
     }
 
-    fn evented(&mut self) -> EngineResult<()> {
+    fn evented(&mut self) -> StratisResult<()> {
         let device_list: HashMap<_, _> = get_dm()
             .list_devices()?
             .into_iter()

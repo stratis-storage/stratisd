@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use devicemapper::{Device, Sectors};
 
-use super::errors::EngineResult;
+use super::errors::StratisResult;
 use super::types::{BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid,
                    RenameAction};
 
@@ -53,7 +53,7 @@ pub trait Pool: Debug {
     fn create_filesystems<'a, 'b>(&'a mut self,
                                   pool_name: &str,
                                   specs: &[(&'b str, Option<Sectors>)])
-                                  -> EngineResult<Vec<(&'b str, FilesystemUuid)>>;
+                                  -> StratisResult<Vec<(&'b str, FilesystemUuid)>>;
 
     /// Adds blockdevs specified by paths to pool.
     /// Returns a list of uuids corresponding to devices actually added.
@@ -64,12 +64,12 @@ pub trait Pool: Debug {
                      paths: &[&Path],
                      tier: BlockDevTier,
                      force: bool)
-                     -> EngineResult<Vec<DevUuid>>;
+                     -> StratisResult<Vec<DevUuid>>;
 
     /// Destroy the pool.
     /// Precondition: All filesystems belonging to this pool must be
     /// unmounted.
-    fn destroy(self) -> EngineResult<()>;
+    fn destroy(self) -> StratisResult<()>;
 
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
@@ -78,7 +78,7 @@ pub trait Pool: Debug {
     fn destroy_filesystems<'a>(&'a mut self,
                                pool_name: &str,
                                fs_uuids: &[FilesystemUuid])
-                               -> EngineResult<Vec<FilesystemUuid>>;
+                               -> StratisResult<Vec<FilesystemUuid>>;
 
     /// Rename filesystem
     /// Rename pool with uuid to new_name.
@@ -89,7 +89,7 @@ pub trait Pool: Debug {
                          pool_name: &str,
                          uuid: FilesystemUuid,
                          new_name: &str)
-                         -> EngineResult<RenameAction>;
+                         -> StratisResult<RenameAction>;
 
     /// Snapshot filesystem
     /// Create a CoW snapshot of the origin
@@ -97,7 +97,7 @@ pub trait Pool: Debug {
                            pool_name: &str,
                            origin_uuid: FilesystemUuid,
                            snapshot_name: &str)
-                           -> EngineResult<FilesystemUuid>;
+                           -> StratisResult<FilesystemUuid>;
 
     /// The total number of Sectors belonging to this pool.
     /// There are no exclusions, so this number includes overhead sectors
@@ -110,7 +110,7 @@ pub trait Pool: Debug {
     /// The number of Sectors in this pool that are currently in use by the
     /// pool for some purpose, be it to store metadata, to store user data,
     /// or to reserve for some other purpose.
-    fn total_physical_used(&self) -> EngineResult<Sectors>;
+    fn total_physical_used(&self) -> StratisResult<Sectors>;
 
     /// Get all the filesystems belonging to this pool.
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)>;
@@ -132,7 +132,7 @@ pub trait Pool: Debug {
     fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)>;
 
     /// Save the state of the pool. FIXME, see #614.
-    fn save_state(&mut self, pool_name: &str) -> EngineResult<()>;
+    fn save_state(&mut self, pool_name: &str) -> StratisResult<()>;
 }
 
 pub trait Engine: Debug {
@@ -145,7 +145,7 @@ pub trait Engine: Debug {
                    blockdev_paths: &[&Path],
                    redundancy: Option<u16>,
                    force: bool)
-                   -> EngineResult<PoolUuid>;
+                   -> StratisResult<PoolUuid>;
 
     /// Evaluate a device node & devicemapper::Device to see if it's a valid
     /// stratis device.  If all the devices are present in the pool and the pool isn't already
@@ -153,18 +153,18 @@ pub trait Engine: Debug {
     fn block_evaluate(&mut self,
                       device: Device,
                       dev_node: PathBuf)
-                      -> EngineResult<Option<PoolUuid>>;
+                      -> StratisResult<Option<PoolUuid>>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.
     /// Returns true if some action was necessary, otherwise false.
-    fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool>;
+    fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<bool>;
 
     /// Rename pool with uuid to new_name.
     /// Raises an error if the mapping can't be applied because
     /// new_name is already in use.
     /// Returns true if it was necessary to perform an action, false if not.
-    fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> EngineResult<RenameAction>;
+    fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction>;
 
     /// Find the pool designated by uuid.
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &Pool)>;
@@ -174,7 +174,7 @@ pub trait Engine: Debug {
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.
-    fn configure_simulator(&mut self, denominator: u32) -> EngineResult<()>;
+    fn configure_simulator(&mut self, denominator: u32) -> StratisResult<()>;
 
     /// Get all pools belonging to this engine.
     fn pools(&self) -> Vec<(Name, PoolUuid, &Pool)>;
@@ -184,7 +184,7 @@ pub trait Engine: Debug {
     fn get_eventable(&self) -> Option<&'static Eventable>;
 
     /// Notify the engine that an event has occurred on the Eventable.
-    fn evented(&mut self) -> EngineResult<()>;
+    fn evented(&mut self) -> StratisResult<()>;
 }
 
 /// Allows an Engine to include a fd in the event loop. See
@@ -195,5 +195,5 @@ pub trait Eventable {
 
     /// Assuming level-triggered semantics, clear the event that caused the
     /// Eventable to trigger.
-    fn clear_event(&self) -> EngineResult<()>;
+    fn clear_event(&self) -> StratisResult<()>;
 }

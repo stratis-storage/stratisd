@@ -15,14 +15,22 @@ use serde_json;
 
 use devicemapper;
 
-use engine::EngineError;
-
 pub type StratisResult<T> = Result<T, StratisError>;
+
+#[derive(Debug, Clone)]
+pub enum ErrorEnum {
+    Error,
+
+    AlreadyExists,
+    Busy,
+    Invalid,
+    NotFound,
+}
 
 #[derive(Debug)]
 pub enum StratisError {
     Error(String),
-    Engine(EngineError),
+    Engine(ErrorEnum, String),
     Io(io::Error),
     Nix(nix::Error),
     Uuid(uuid::ParseError),
@@ -39,9 +47,7 @@ impl fmt::Display for StratisError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             StratisError::Error(ref s) => write!(f, "Error: {}", s),
-            StratisError::Engine(ref err) => {
-                write!(f, "Engine error: {}", err.description().to_owned())
-            }
+            StratisError::Engine(_, ref msg) => write!(f, "Engine error: {}", msg),
             StratisError::Io(ref err) => write!(f, "IO error: {}", err),
             StratisError::Nix(ref err) => write!(f, "Nix error: {}", err),
             StratisError::Uuid(ref err) => write!(f, "Uuid error: {}", err),
@@ -62,7 +68,7 @@ impl Error for StratisError {
     fn description(&self) -> &str {
         match *self {
             StratisError::Error(ref s) => s,
-            StratisError::Engine(ref err) => Error::description(err),
+            StratisError::Engine(_, ref msg) => msg,
             StratisError::Io(ref err) => err.description(),
             StratisError::Nix(ref err) => err.description(),
             StratisError::Uuid(_) => "Uuid::ParseError",
@@ -79,7 +85,7 @@ impl Error for StratisError {
     fn cause(&self) -> Option<&Error> {
         match *self {
             StratisError::Error(_) => None,
-            StratisError::Engine(ref err) => Some(err),
+            StratisError::Engine(_, _) => None,
             StratisError::Io(ref err) => Some(err),
             StratisError::Nix(ref err) => Some(err),
             StratisError::Uuid(ref err) => Some(err),
@@ -91,12 +97,6 @@ impl Error for StratisError {
             StratisError::Dbus(ref err) => Some(err),
             StratisError::Udev(ref err) => Some(err),
         }
-    }
-}
-
-impl From<EngineError> for StratisError {
-    fn from(err: EngineError) -> StratisError {
-        StratisError::Engine(err)
     }
 }
 

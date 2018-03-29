@@ -5,6 +5,6 @@
 pub use self::stratis::VERSION;
 pub use self::errors::{StratisError, StratisResult};
 
-mod errors;
+pub mod errors;
 #[allow(module_inception)]
 mod stratis;

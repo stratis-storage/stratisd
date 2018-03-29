@@ -13,7 +13,7 @@ use nix::sys::statvfs::statvfs;
 use tempdir::TempDir;
 
 use super::super::super::engine::Filesystem;
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
 use super::super::super::types::{FilesystemUuid, Name};
 
 use super::super::dm::get_dm;
@@ -100,7 +100,7 @@ impl StratFilesystem {
                 Ok(StratFilesystem::setup(thin_dev))
             }
             Err(e) => {
-                Err(EngineError::Engine(ErrorEnum::Error,
+                Err(StratisError::Engine(ErrorEnum::Error,
                                         format!("failed to create {} snapshot for {} - {}",
                                                 snapshot_name,
                                                 snapshot_fs_name,
@@ -155,12 +155,12 @@ impl StratFilesystem {
     /// node, while ignoring parse errors as long as at least one mount point is found.
     pub fn get_mount_point(&self) -> EngineResult<Option<PathBuf>> {
         let device_node = self.devnode();
-        let search = device_node.to_str().ok_or_else(|| EngineError::Engine(ErrorEnum::Error,
+        let search = device_node.to_str().ok_or_else(|| StratisError::Engine(ErrorEnum::Error,
                                     format!("Unable to represent devnode as string {:?}", *self)))?;
 
         let m_iter = MountIter::new_from_proc()
             .map_err(|e| {
-                         EngineError::Engine(ErrorEnum::Error,
+                         StratisError::Engine(ErrorEnum::Error,
                                              format!("Error reading /proc/mounts {:?}", e))
                      })?;
 
@@ -178,7 +178,7 @@ impl StratFilesystem {
             }
         }
 
-        last_error.map_or(Ok(None), |e| Err(EngineError::Engine(ErrorEnum::Error, e)))
+        last_error.map_or(Ok(None), |e| Err(StratisError::Engine(ErrorEnum::Error, e)))
     }
 
     /// Tear down the filesystem.

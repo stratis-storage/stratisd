@@ -4,7 +4,7 @@
 
 // Code to handle cleanup after a failed operation.
 
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
 
 use super::blockdev::StratBlockDev;
 
@@ -25,6 +25,6 @@ pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> EngineResult<()> {
     } else {
         let err_msg = format!("Failed to wipe already initialized devnodes: {:?}",
                               unerased_devnodes);
-        Err(EngineError::Engine(ErrorEnum::Error, err_msg))
+        Err(StratisError::Engine(ErrorEnum::Error, err_msg))
     }
 }

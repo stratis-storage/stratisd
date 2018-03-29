@@ -8,7 +8,7 @@ use std::path::Path;
 
 use libudev;
 
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
 
 /// Lookup the WWN from the udev db using the device node eg. /dev/sda
 pub fn hw_lookup(dev_node_search: &Path) -> EngineResult<Option<String>> {
@@ -26,7 +26,7 @@ pub fn hw_lookup(dev_node_search: &Path) -> EngineResult<Option<String>> {
                 .map_or(Ok(None), |i| {
                     i.to_str()
                         .ok_or_else(|| {
-                                        EngineError::Engine(ErrorEnum::Error,
+                                        StratisError::Engine(ErrorEnum::Error,
                                                             format!("Unable to convert {:?} to str",
                                                                     i))
                                     })

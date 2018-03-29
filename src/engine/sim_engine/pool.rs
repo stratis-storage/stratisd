@@ -15,7 +15,7 @@ use uuid::Uuid;
 use devicemapper::{IEC, Sectors};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::errors::{StratisError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
                           RenameAction};
@@ -64,7 +64,7 @@ impl Pool for SimPool {
         let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
         for name in names.keys() {
             if self.filesystems.contains_name(name) {
-                return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
+                return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
             }
         }
 
@@ -147,7 +147,7 @@ impl Pool for SimPool {
         let snapshot = match self.get_filesystem(origin_uuid) {
             Some(_filesystem) => SimFilesystem::new(),
             None => {
-                return Err(EngineError::Engine(ErrorEnum::NotFound, origin_uuid.to_string()));
+                return Err(StratisError::Engine(ErrorEnum::NotFound, origin_uuid.to_string()));
             }
         };
         self.filesystems
@@ -274,7 +274,7 @@ mod tests {
             .unwrap();
         let old_uuid = results.iter().find(|x| x.0 == old_name).unwrap().1;
         assert!(match pool.rename_filesystem(pool_name, old_uuid, new_name) {
-                    Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
+                    Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
                     _ => false,
                 });
     }
@@ -370,7 +370,7 @@ mod tests {
         pool.create_filesystems(pool_name, &[(fs_name, None)])
             .unwrap();
         assert!(match pool.create_filesystems(pool_name, &[(fs_name, None)]) {
-                    Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
+                    Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
                     _ => false,
                 });
     }

@@ -15,7 +15,7 @@ use serde_json;
 
 use devicemapper::{Device, devnode_to_devno};
 
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
 use super::super::super::structures::Table;
 use super::super::super::types::{Name, PoolUuid};
 
@@ -61,10 +61,10 @@ pub fn is_stratis_device(devnode: &PathBuf) -> EngineResult<Option<PoolUuid>> {
                     if let Some(errno) = err.raw_os_error() {
                         match Errno::from_i32(errno) {
                             Errno::ENXIO | Errno::ENOMEDIUM => Ok(None),
-                            _ => Err(EngineError::Io(err)),
+                            _ => Err(StratisError::Io(err)),
                         }
                     } else {
-                        Err(EngineError::Io(err))
+                        Err(StratisError::Io(err))
                     }
                 }
             }
@@ -98,14 +98,14 @@ pub fn setup_pool(pool_uuid: PoolUuid,
     let metadata = get_metadata(pool_uuid, devices)?
         .ok_or_else(|| {
                         let err_msg = format!("no metadata found for {}", info_string());
-                        EngineError::Engine(ErrorEnum::NotFound, err_msg)
+                        StratisError::Engine(ErrorEnum::NotFound, err_msg)
                     })?;
 
     if pools.contains_name(&metadata.name) {
         let err_msg = format!("pool with name \"{}\" set up; metadata specifies same name for {}",
                               &metadata.name,
                               info_string());
-        return Err(EngineError::Engine(ErrorEnum::AlreadyExists, err_msg));
+        return Err(StratisError::Engine(ErrorEnum::AlreadyExists, err_msg));
     }
 
     check_metadata(&metadata)
@@ -113,7 +113,7 @@ pub fn setup_pool(pool_uuid: PoolUuid,
                      let err_msg = format!("inconsistent metadata for {}: reason: {:?}",
                                            info_string(),
                                            e);
-                     Err(EngineError::Engine(ErrorEnum::Error, err_msg))
+                     Err(StratisError::Engine(ErrorEnum::Error, err_msg))
                  })
         .and_then(|_| {
             StratPool::setup(pool_uuid, devices, &metadata)
@@ -121,7 +121,7 @@ pub fn setup_pool(pool_uuid: PoolUuid,
                      let err_msg = format!("failed to set up pool for {}: reason: {:?}",
                                            info_string(),
                                            e);
-                     Err(EngineError::Engine(ErrorEnum::Error, err_msg))
+                     Err(StratisError::Engine(ErrorEnum::Error, err_msg))
                  })
         })
 }
@@ -216,7 +216,7 @@ pub fn get_metadata(pool_uuid: PoolUuid,
     // some metadata, because we have a most recent time, but we failed to
     // get any.
     let err_str = "timestamp indicates data was written, but no data successfully read";
-    Err(EngineError::Engine(ErrorEnum::NotFound, err_str.into()))
+    Err(StratisError::Engine(ErrorEnum::NotFound, err_str.into()))
 }
 
 /// Get all the blockdevs corresponding to this pool that can be obtained from
@@ -277,7 +277,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                                           actual_size,
                                           bda.dev_size());
 
-                    return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+                    return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
                 }
 
                 let dev_uuid = bda.dev_uuid();
@@ -290,7 +290,7 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                             None => {
                                 let err_msg = format!("Blockdev {} not found in metadata",
                                                       bda.dev_uuid());
-                                return Err(EngineError::Engine(ErrorEnum::NotFound, err_msg));
+                                return Err(StratisError::Engine(ErrorEnum::NotFound, err_msg));
                             }
                         }
                     }
@@ -316,12 +316,12 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
     let recorded_data_uuids: HashSet<_> = recorded_data_map.keys().cloned().collect();
     if current_data_uuids != recorded_data_uuids {
         let err_msg = "Recorded data dev UUIDs != discovered datadev UUIDs";
-        return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
     }
 
     if datadevs.len() != current_data_uuids.len() {
         let err_msg = "Duplicate data devices found in environment";
-        return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
     }
 
     // Verify that cachedevs found match cachedevs recorded.
@@ -329,12 +329,12 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
     let recorded_cache_uuids: HashSet<_> = recorded_cache_map.keys().cloned().collect();
     if current_cache_uuids != recorded_cache_uuids {
         let err_msg = "Recorded cache dev UUIDs != discovered cachedev UUIDs";
-        return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
     }
 
     if cachedevs.len() != current_cache_uuids.len() {
         let err_msg = "Duplicate cache devices found in environment";
-        return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
     }
 
     Ok((datadevs, cachedevs))

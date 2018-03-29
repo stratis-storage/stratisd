@@ -17,7 +17,7 @@ use devicemapper::{DataBlocks, Device, DmDevice, DmName, DmNameBuf, IEC, FlakeyT
                    device_exists};
 
 use super::super::super::engine::Filesystem;
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
 use super::super::super::structures::Table;
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid, RenameAction};
 
@@ -174,7 +174,7 @@ impl ThinPool {
                 Some(sl) => sl,
                 None => {
                     let err_msg = "Could not allocate sufficient space for thinpool devices.";
-                    return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+                    return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
                 }
             };
 
@@ -307,7 +307,7 @@ impl ThinPool {
             let evicted = fs_table.insert(name, uuid, fs);
             if evicted.is_some() {
                 let err_msg = "filesystems with duplicate UUID or name specified in metadata";
-                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
             }
         }
 
@@ -437,7 +437,7 @@ impl ThinPool {
         } else {
             let err_msg = format!("Insufficient space to accommodate request for {}",
                                   extend_size);
-            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
         }
         Ok(extend_size)
     }
@@ -460,7 +460,7 @@ impl ThinPool {
         } else {
             let err_msg = format!("Insufficient space to accommodate request for {}",
                                   extend_size);
-            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
         }
         Ok(extend_size)
     }
@@ -498,7 +498,7 @@ impl ThinPool {
             dm::ThinPoolStatus::Working(ref status) => *status.usage.used_data * DATA_BLOCK_SIZE,
             _ => {
                 let err_msg = "thin pool failed, could not obtain usage";
-                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
             }
         };
 
@@ -591,7 +591,7 @@ impl ThinPool {
                               snapshot_id)?
             }
             None => {
-                return Err(EngineError::Engine(ErrorEnum::Error,
+                return Err(StratisError::Engine(ErrorEnum::Error,
                                                "snapshot_filesystem failed, filesystem not found"
                                                    .into()));
             }

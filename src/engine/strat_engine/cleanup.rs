@@ -4,7 +4,7 @@
 
 // Code to handle cleanup after a failed operation.
 
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::errors::{StratisError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 
 use super::pool::StratPool;
@@ -22,6 +22,6 @@ pub fn teardown_pools(pools: Table<StratPool>) -> EngineResult<()> {
     } else {
         let err_msg = format!("Failed to teardown already set up pools: {:?}",
                               untorndown_pools);
-        Err(EngineError::Engine(ErrorEnum::Error, err_msg))
+        Err(StratisError::Engine(ErrorEnum::Error, err_msg))
     }
 }

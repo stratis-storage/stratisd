@@ -9,7 +9,7 @@ pub use self::engine::Engine;
 pub use self::engine::Filesystem;
 pub use self::engine::Pool;
 
-pub use self::errors::EngineError;
+pub use self::errors::StratisError;
 pub use self::errors::EngineResult;
 pub use self::errors::ErrorEnum;
 

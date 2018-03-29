@@ -4,6 +4,6 @@
 
 pub use super::super::stratis::errors::ErrorEnum;
 
-pub use super::super::stratis::errors::StratisError as EngineError;
+pub use super::super::stratis::errors::StratisError;
 
-pub type EngineResult<T> = Result<T, EngineError>;
+pub type EngineResult<T> = Result<T, StratisError>;

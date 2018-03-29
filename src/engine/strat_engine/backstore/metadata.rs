@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, IEC, SECTOR_SIZE, Sectors};
 
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::engine::DevOwnership;
@@ -219,7 +219,7 @@ impl StaticHeader {
         }
 
         let err_str = "Appeared to be a Stratis device, but no valid sigblock found";
-        Err(EngineError::Engine(ErrorEnum::Invalid, err_str.into()))
+        Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
     }
 
     /// Determine the ownership of a device.
@@ -280,7 +280,7 @@ impl StaticHeader {
 
         let crc = crc32::checksum_castagnoli(&buf[4..SECTOR_SIZE]);
         if crc != LittleEndian::read_u32(&buf[..4]) {
-            return Err(EngineError::Engine(ErrorEnum::Invalid, "header CRC invalid".into()));
+            return Err(StratisError::Engine(ErrorEnum::Invalid, "header CRC invalid".into()));
         }
 
         let blkdev_size = Sectors(LittleEndian::read_u64(&buf[20..28]));
@@ -315,7 +315,7 @@ mod mda {
 
     use devicemapper::{Bytes, Sectors};
 
-    use super::super::super::super::errors::{EngineResult, EngineError, ErrorEnum};
+    use super::super::super::super::errors::{EngineResult, StratisError, ErrorEnum};
 
     const _MDA_REGION_HDR_SIZE: usize = 32;
     const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
@@ -425,7 +425,7 @@ mod mda {
             where F: Seek + Write
         {
             if self.last_update_time() >= Some(time) {
-                return Err(EngineError::Engine(ErrorEnum::Invalid,
+                return Err(StratisError::Engine(ErrorEnum::Invalid,
                                                "Overwriting newer data".into()));
             }
 
@@ -552,7 +552,7 @@ mod mda {
                     region_size: Bytes)
                     -> EngineResult<Option<MDAHeader>> {
             if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_castagnoli(&buf[4..]) {
-                return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region header CRC".into()));
+                return Err(StratisError::Engine(ErrorEnum::Invalid, "MDA region header CRC".into()));
             }
 
             match LittleEndian::read_u64(&buf[16..24]) {
@@ -613,7 +613,7 @@ mod mda {
             f.read_exact(&mut data_buf)?;
 
             if self.data_crc != crc32::checksum_castagnoli(&data_buf) {
-                return Err(EngineError::Engine(ErrorEnum::Invalid, "MDA region data CRC".into()));
+                return Err(StratisError::Engine(ErrorEnum::Invalid, "MDA region data CRC".into()));
             }
             Ok(data_buf)
         }
@@ -623,7 +623,7 @@ mod mda {
     /// Note that used is the amount used for metadata only.
     fn check_mda_region_size(used: Bytes, available: Bytes) -> EngineResult<()> {
         if MDA_REGION_HDR_SIZE + used > available {
-            return Err(EngineError::Engine(ErrorEnum::Invalid,
+            return Err(StratisError::Engine(ErrorEnum::Invalid,
                                            format!("metadata length {} exceeds region available {}",
                                                    used,
                                                    // available region > header size
@@ -635,7 +635,7 @@ mod mda {
     /// Validate MDA size
     pub fn validate_mda_size(size: Sectors) -> EngineResult<()> {
         if size % NUM_MDA_REGIONS != Sectors(0) {
-            return Err(EngineError::Engine(ErrorEnum::Invalid,
+            return Err(StratisError::Engine(ErrorEnum::Invalid,
                                            format!("MDA size {} is not divisible by number of \
                                                     copies required {}",
                                                    size,
@@ -643,7 +643,7 @@ mod mda {
         };
 
         if size < MIN_MDA_SECTORS {
-            return Err(EngineError::Engine(ErrorEnum::Invalid,
+            return Err(StratisError::Engine(ErrorEnum::Invalid,
                                            format!("MDA size {} is less than minimum ({})",
                                                    size,
                                                    MIN_MDA_SECTORS)));

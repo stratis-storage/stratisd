@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use devicemapper::{Device, DmNameBuf};
 
 use super::super::engine::{Engine, Eventable, Pool};
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::errors::{StratisError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{DevUuid, Name, PoolUuid, Redundancy, RenameAction};
 
@@ -62,7 +62,7 @@ impl StratEngine {
             Ok(dm) => dm,
             Err(_) => {
                 let err_msg = "failed to instantiate DM context";
-                return Err(EngineError::Engine(ErrorEnum::Error, err_msg.into()));
+                return Err(StratisError::Engine(ErrorEnum::Error, err_msg.into()));
             }
         };
         let minor_dm_version = dm.version()?.1;
@@ -70,7 +70,7 @@ impl StratEngine {
             let err_msg = format!("Requires DM minor version {} but kernel only supports {}",
                                   REQUIRED_DM_MINOR_VERSION,
                                   minor_dm_version);
-            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
         }
 
         devlinks::setup_dev_path()?;
@@ -120,7 +120,7 @@ impl Engine for StratEngine {
         let redundancy = calculate_redundancy!(redundancy);
 
         if self.pools.contains_name(name) {
-            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.into()));
+            return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
         let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy, force)?;
@@ -177,7 +177,7 @@ impl Engine for StratEngine {
     fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
             if pool.has_filesystems() {
-                return Err(EngineError::Engine(ErrorEnum::Busy,
+                return Err(StratisError::Engine(ErrorEnum::Busy,
                                                "filesystems remaining on pool".into()));
             };
         } else {

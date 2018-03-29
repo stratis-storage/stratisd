@@ -16,7 +16,7 @@ use devicemapper::{Bytes, Device, IEC, LinearDevTargetParams, LinearTargetParams
                    TargetLine};
 
 use super::super::super::engine::BlockDev;
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::engine::DevOwnership;
@@ -291,7 +291,7 @@ impl BlockDevMgr {
             Ok(())
         } else {
             let err_msg = "Failed to save metadata to even one device in pool";
-            Err(EngineError::Engine(ErrorEnum::Error, err_msg.into()))
+            Err(StratisError::Engine(ErrorEnum::Error, err_msg.into()))
         }
     }
 
@@ -393,7 +393,7 @@ fn initialize(pool_uuid: PoolUuid,
                 let error_message = format!("{} too small, minimum {} bytes",
                                             devnode.display(),
                                             MIN_DEV_SIZE);
-                return Err(EngineError::Engine(ErrorEnum::Invalid, error_message));
+                return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
             };
             match ownership {
                 DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, f))),
@@ -401,7 +401,7 @@ fn initialize(pool_uuid: PoolUuid,
                     if !force {
                         let err_str = format!("Device {} appears to belong to another application",
                                               devnode.display());
-                        return Err(EngineError::Engine(ErrorEnum::Invalid, err_str));
+                        return Err(StratisError::Engine(ErrorEnum::Invalid, err_str));
                     } else {
                         add_devs.push((dev, (devnode, dev_size, f)))
                     }
@@ -411,13 +411,13 @@ fn initialize(pool_uuid: PoolUuid,
                         if !owned_devs.contains(&dev_uuid) {
                             let error_str = format!("Device {} with pool UUID is unknown to pool",
                                                     devnode.display());
-                            return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
+                            return Err(StratisError::Engine(ErrorEnum::Invalid, error_str));
                         }
                     } else {
                         let error_str = format!("Device {} already belongs to Stratis pool {}",
                                                 devnode.display(),
                                                 uuid);
-                        return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
+                        return Err(StratisError::Engine(ErrorEnum::Invalid, error_str));
                     }
                 }
             }

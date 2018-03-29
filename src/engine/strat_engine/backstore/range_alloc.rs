@@ -8,7 +8,7 @@ use std::collections::Bound::{Included, Unbounded};
 
 use devicemapper::Sectors;
 
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
 
 #[derive(Debug)]
 pub struct RangeAllocator {
@@ -42,13 +42,13 @@ impl RangeAllocator {
                                       off,
                                       len,
                                       self.limit);
-                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
+                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
             }
         } else {
             let err_msg = format!("elements in range ({}, {}) inexpressible in this format",
                                   off,
                                   len);
-            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
+            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
         }
         Ok(())
     }
@@ -77,7 +77,7 @@ impl RangeAllocator {
                                           off,
                                           prev_off,
                                           prev_len);
-                    return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
+                    return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
                 }
                 if prev_off + prev_len == off {
                     contig_prev = Some((prev_off, prev_len))
@@ -94,7 +94,7 @@ impl RangeAllocator {
                                           off,
                                           len,
                                           next_off);
-                    return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
+                    return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
                 }
                 if off + len == next_off {
                     contig_next = Some((next_off, next_len))

@@ -11,7 +11,7 @@ use std::path::Path;
 
 use devicemapper::{Bytes, Device, devnode_to_devno};
 
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);
 
@@ -19,7 +19,7 @@ pub fn blkdev_size(file: &File) -> EngineResult<Bytes> {
     let mut val: u64 = 0;
 
     match unsafe { blkgetsize64(file.as_raw_fd(), &mut val) } {
-        Err(x) => Err(EngineError::Nix(x)),
+        Err(x) => Err(StratisError::Nix(x)),
         Ok(_) => Ok(Bytes(val)),
     }
 }
@@ -38,7 +38,7 @@ pub fn resolve_devices<'a>(paths: &'a [&Path]) -> EngineResult<HashMap<Device, &
             }
             None => {
                 let err_msg = format!("path {} does not refer to a block device", path.display());
-                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
+                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
             }
         }
     }

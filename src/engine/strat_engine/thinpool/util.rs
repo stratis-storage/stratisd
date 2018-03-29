@@ -9,7 +9,7 @@ use std::process::Command;
 
 use uuid::Uuid;
 
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
 
 /// Common function to call a command line utility, returning an Result with an error message which
 /// also includes stdout & stderr if it fails.
@@ -24,7 +24,7 @@ pub fn execute_cmd(cmd: &mut Command, error_msg: &str) -> EngineResult<()> {
                               error_msg,
                               std_out_txt,
                               std_err_txt);
-        Err(EngineError::Engine(ErrorEnum::Error, err_msg))
+        Err(StratisError::Engine(ErrorEnum::Error, err_msg))
     }
 }
 

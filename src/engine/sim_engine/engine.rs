@@ -14,7 +14,7 @@ use std::rc::Rc;
 use devicemapper::Device;
 
 use super::super::engine::{Engine, Eventable, Pool};
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::errors::{StratisError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
@@ -41,7 +41,7 @@ impl Engine for SimEngine {
         let redundancy = calculate_redundancy!(redundancy);
 
         if self.pools.contains_name(name) {
-            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.into()));
+            return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
         let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
@@ -53,7 +53,7 @@ impl Engine for SimEngine {
         let (pool_uuid, pool) = SimPool::new(&Rc::clone(&self.rdm), &devices, redundancy);
 
         if self.rdm.borrow_mut().throw_die() {
-            return Err(EngineError::Engine(ErrorEnum::Error, "X".into()));
+            return Err(StratisError::Engine(ErrorEnum::Error, "X".into()));
         }
 
         self.pools
@@ -74,7 +74,7 @@ impl Engine for SimEngine {
     fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
             if pool.has_filesystems() {
-                return Err(EngineError::Engine(ErrorEnum::Busy,
+                return Err(StratisError::Engine(ErrorEnum::Busy,
                                                "filesystems remaining on pool".into()));
             };
         } else {
@@ -143,7 +143,7 @@ mod tests {
     use super::SimEngine;
 
     use engine::Engine;
-    use engine::EngineError;
+    use engine::StratisError;
     use engine::ErrorEnum;
     use engine::RenameAction;
 
@@ -237,7 +237,7 @@ mod tests {
             .create_pool(name, &[Path::new("/s/d")], None, false)
             .unwrap();
         assert!(match engine.create_pool(name, &[], None, false) {
-                    Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
+                    Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
                     _ => false,
                 });
     }
@@ -304,7 +304,7 @@ mod tests {
         let uuid = engine.create_pool("old_name", &[], None, false).unwrap();
         engine.create_pool(new_name, &[], None, false).unwrap();
         assert!(match engine.rename_pool(uuid, new_name) {
-                    Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
+                    Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
                     _ => false,
                 });
     }

@@ -12,7 +12,7 @@ use chrono::{DateTime, Utc};
 use devicemapper::{CacheDev, Device, DmDevice, IEC, LinearDev, Sectors};
 
 use super::super::super::engine::BlockDev;
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::super::errors::{StratisError, EngineResult, ErrorEnum};
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
 use super::super::device::wipe_sectors;
@@ -58,14 +58,14 @@ impl DataTier {
         if block_mgr.avail_space() != Sectors(0) {
             let err_msg = format!("{} unallocated to device; probable metadata corruption",
                                   block_mgr.avail_space());
-            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
         }
 
         let uuid_to_devno = block_mgr.uuid_to_devno();
         let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> EngineResult<BlkDevSegment> {
             let device = uuid_to_devno(triple.0)
                 .ok_or_else(|| {
-                                EngineError::Engine(ErrorEnum::NotFound,
+                                StratisError::Engine(ErrorEnum::NotFound,
                                                     format!("missing device for UUUD {:?}",
                                                             &triple.0))
                             })?;
@@ -237,14 +237,14 @@ impl CacheTier {
         if block_mgr.avail_space() != Sectors(0) {
             let err_msg = format!("{} unallocated to device; probable metadata corruption",
                                   block_mgr.avail_space());
-            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
         }
 
         let uuid_to_devno = block_mgr.uuid_to_devno();
         let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> EngineResult<BlkDevSegment> {
             let device = uuid_to_devno(triple.0)
                 .ok_or_else(|| {
-                                EngineError::Engine(ErrorEnum::NotFound,
+                                StratisError::Engine(ErrorEnum::NotFound,
                                                     format!("missing device for UUUD {:?}",
                                                             &triple.0))
                             })?;
@@ -449,7 +449,7 @@ impl Backstore {
                 }
                 _ => {
                     let err_msg = "Cachedevs exist, but meta or cache segments are not allocated";
-                    return Err(EngineError::Engine(ErrorEnum::Error, err_msg.into()));
+                    return Err(StratisError::Engine(ErrorEnum::Error, err_msg.into()));
                 }
             }
         } else {

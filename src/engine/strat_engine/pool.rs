@@ -13,7 +13,7 @@ use uuid::Uuid;
 use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use super::super::errors::{StratisError, EngineResult, ErrorEnum};
 use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
                           RenameAction};
 
@@ -41,7 +41,7 @@ pub fn check_metadata(metadata: &PoolSave) -> EngineResult<()> {
         let err_msg = format!("{} used in thinpool, but {} given up by cache",
                               total_allocated,
                               metadata.backstore.next);
-        Err(EngineError::Engine(ErrorEnum::Invalid, err_msg))
+        Err(StratisError::Engine(ErrorEnum::Invalid, err_msg))
     } else {
         Ok(())
     }
@@ -167,7 +167,7 @@ impl Pool for StratPool {
             if self.thin_pool
                    .get_mut_filesystem_by_name(*name)
                    .is_some() {
-                return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
+                return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
             }
         }
 

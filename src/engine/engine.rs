@@ -151,8 +151,8 @@ pub trait Engine: Debug {
     /// stratis device.  If all the devices are present in the pool and the pool isn't already
     /// up and running, it will get setup and the pool uuid will be returned.
     fn block_evaluate(&mut self,
-                      dev_node: PathBuf,
-                      device: Device)
+                      device: Device,
+                      dev_node: PathBuf)
                       -> EngineResult<Option<PoolUuid>>;
 
     /// Destroy a pool.

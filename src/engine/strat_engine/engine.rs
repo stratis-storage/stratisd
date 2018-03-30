@@ -139,8 +139,8 @@ impl Engine for StratEngine {
     /// Logs a warning if the block devices appears to be a Stratis block
     /// device and no pool is set up.
     fn block_evaluate(&mut self,
-                      dev_node: PathBuf,
-                      device: Device)
+                      device: Device,
+                      dev_node: PathBuf)
                       -> EngineResult<Option<PoolUuid>> {
         let pool_uuid = if let Some(pool_uuid) = is_stratis_device(&dev_node)? {
             if self.pools.contains_uuid(pool_uuid) {

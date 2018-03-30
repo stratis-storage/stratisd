@@ -68,7 +68,7 @@ fn initialize_log(debug: bool) -> Result<(), SetLoggerError> {
 
 /// Given a udev event check to see if it's an add and if it is return the device node and
 /// devicemapper::Device.
-fn handle_udev_add(event: &libudev::Event) -> Option<(PathBuf, Device)> {
+fn handle_udev_add(event: &libudev::Event) -> Option<(Device, PathBuf)> {
     if event.event_type() == libudev::EventType::Add {
         let device = event.device();
         return device
@@ -77,8 +77,8 @@ fn handle_udev_add(event: &libudev::Event) -> Option<(PathBuf, Device)> {
                                  device
                                      .devnum()
                                      .and_then(|devnum| {
-                                                   Some((PathBuf::from(devnode),
-                                                         Device::from(devnum)))
+                                                   Some((Device::from(devnum),
+                                                         PathBuf::from(devnode)))
                                                })
                              });
     }
@@ -203,13 +203,13 @@ fn run() -> StratisResult<()> {
             loop {
                 match udev.receive_event() {
                     Some(event) => {
-                        if let Some((devnode, device)) = handle_udev_add(&event) {
+                        if let Some((device, devnode)) = handle_udev_add(&event) {
 
                             // If block evaluate returns an error we are going to ignore it as
                             // there is nothing we can do for a device we are getting errors with.
                             let pool_uuid = engine
                                 .borrow_mut()
-                                .block_evaluate(devnode, device)
+                                .block_evaluate(device, devnode)
                                 .unwrap_or(None);
 
                             // We need to pretend that we aren't using the variable _pool_uuid so

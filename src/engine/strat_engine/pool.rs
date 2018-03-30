@@ -18,7 +18,7 @@ use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
                           RenameAction};
 
-use super::backstore::{Backstore, MIN_MDA_SECTORS};
+use super::backstore::{BDA, Backstore, MIN_MDA_SECTORS};
 use super::serde_structs::{PoolSave, Recordable};
 use super::thinpool::{ThinPool, ThinPoolSizeParams};
 
@@ -94,7 +94,7 @@ impl StratPool {
 
     /// Setup a StratPool using its UUID and the list of devnodes it has.
     pub fn setup(uuid: PoolUuid,
-                 devnodes: &HashMap<Device, PathBuf>,
+                 devnodes: &HashMap<Device, (PathBuf, StratisResult<BDA>)>,
                  metadata: &PoolSave)
                  -> StratisResult<(Name, StratPool)> {
         let backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, None)?;

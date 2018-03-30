@@ -5,6 +5,7 @@
 extern crate libc;
 
 use std::collections::HashMap;
+use std::fs::OpenOptions;
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 
@@ -16,7 +17,7 @@ use super::super::engine::{Engine, Eventable, Pool};
 use super::super::structures::Table;
 use super::super::types::{DevUuid, Name, PoolUuid, Redundancy, RenameAction};
 
-use super::backstore::{find_all, is_stratis_device, setup_pool};
+use super::backstore::{BDA, find_all, is_stratis_device, setup_pool};
 #[cfg(test)]
 use super::cleanup::teardown_pools;
 use super::devlinks;
@@ -40,7 +41,7 @@ pub struct StratEngine {
 
     // Map of stratis devices that have been found but one or more stratis block devices are missing
     // which prevents the associated pools from being setup.
-    incomplete_pools: HashMap<PoolUuid, HashMap<Device, PathBuf>>,
+    incomplete_pools: HashMap<PoolUuid, HashMap<Device, (PathBuf, StratisResult<BDA>)>>,
 
     // Maps name of DM devices we are watching to the most recent event number
     // we've handled for each
@@ -156,7 +157,19 @@ impl Engine for StratEngine {
                     .remove(&pool_uuid)
                     .or_else(|| Some(HashMap::new()))
                     .expect("We just retrieved or created a HashMap");
-                devices.insert(device, dev_node);
+                let bda = match OpenOptions::new()
+                          .read(true)
+                          .open(&dev_node)
+                          .map_err(|e| e.into())
+                          .and_then(|mut f| BDA::load(&mut f)) {
+                    Ok(None) => {
+                        let err_msg = format!("Stratis device {:?} has no BDA", dev_node);
+                        Err(StratisError::Engine(ErrorEnum::NotFound, err_msg))
+                    }
+                    Ok(Some(bda)) => Ok(bda),
+                    Err(err) => Err(err),
+                };
+                devices.insert(device, (dev_node, bda));
                 match setup_pool(pool_uuid, &devices, &self.pools) {
                     Ok((pool_name, pool)) => {
                         self.pools.insert(pool_name, pool_uuid, pool);
@@ -333,7 +346,7 @@ mod test {
         remove_dir_all(DEV_PATH).unwrap();
 
         let engine = StratEngine::initialize().unwrap();
-        assert_eq!(engine.incomplete_pools, HashMap::new());
+        assert!(engine.incomplete_pools.is_empty());
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());

@@ -22,7 +22,7 @@ use super::super::dmnames::{CacheRole, format_backstore_ids};
 use super::super::serde_structs::{BackstoreSave, Recordable};
 
 use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment, coalesce_blkdevsegs, map_to_dm};
-use super::metadata::MIN_MDA_SECTORS;
+use super::metadata::{BDA, MIN_MDA_SECTORS};
 use super::setup::get_blockdevs;
 
 /// Use a cache block size that the kernel docs indicate is the largest
@@ -432,7 +432,7 @@ impl Backstore {
     /// Make a Backstore object from blockdevs that already belong to Stratis.
     pub fn setup(pool_uuid: PoolUuid,
                  backstore_save: &BackstoreSave,
-                 devnodes: &HashMap<Device, PathBuf>,
+                 devnodes: &HashMap<Device, (PathBuf, StratisResult<BDA>)>,
                  last_update_time: Option<DateTime<Utc>>)
                  -> StratisResult<Backstore> {
         let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;

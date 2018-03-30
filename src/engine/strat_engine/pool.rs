@@ -327,8 +327,8 @@ mod tests {
         assert_eq!(pools.len(), 2);
         let devnodes1 = pools.get(&uuid1).unwrap();
         let devnodes2 = pools.get(&uuid2).unwrap();
-        let pool_save1 = get_metadata(uuid1, devnodes1).unwrap().unwrap();
-        let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
+        let pool_save1 = get_metadata(devnodes1).unwrap().unwrap();
+        let pool_save2 = get_metadata(devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
 
@@ -338,8 +338,8 @@ mod tests {
         assert_eq!(pools.len(), 2);
         let devnodes1 = pools.get(&uuid1).unwrap();
         let devnodes2 = pools.get(&uuid2).unwrap();
-        let pool_save1 = get_metadata(uuid1, devnodes1).unwrap().unwrap();
-        let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
+        let pool_save1 = get_metadata(devnodes1).unwrap().unwrap();
+        let pool_save2 = get_metadata(devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
     }
@@ -445,10 +445,8 @@ mod tests {
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 1);
         let devices = pools.get(&uuid).unwrap();
-        let (name, pool) = StratPool::setup(uuid,
-                                            &devices,
-                                            &get_metadata(uuid, &devices).unwrap().unwrap())
-                .unwrap();
+        let (name, pool) =
+            StratPool::setup(uuid, &devices, &get_metadata(&devices).unwrap().unwrap()).unwrap();
         invariant(&pool, &name);
 
         let metadata3 = pool.record(&name);

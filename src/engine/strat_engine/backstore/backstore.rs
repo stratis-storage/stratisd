@@ -435,7 +435,7 @@ impl Backstore {
                  devnodes: &HashMap<Device, (PathBuf, StratisResult<BDA>)>,
                  last_update_time: Option<DateTime<Utc>>)
                  -> StratisResult<Backstore> {
-        let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
+        let (datadevs, cachedevs) = get_blockdevs(backstore_save, devnodes)?;
         let block_mgr = BlockDevMgr::new(pool_uuid, datadevs, last_update_time);
         let (data_tier, dm_device) = DataTier::setup(block_mgr, &backstore_save.data_segments)?;
 

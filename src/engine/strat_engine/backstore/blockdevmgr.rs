@@ -663,7 +663,7 @@ mod tests {
 
         assert!(pools
                     .iter()
-                    .map(|(uuid, devs)| get_metadata(*uuid, devs))
+                    .map(|(_, devs)| get_metadata(devs))
                     .all(|x| x.unwrap().is_none()));
     }
 

@@ -30,7 +30,6 @@ const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)
 
 const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
-
 /// The SyncAll trait unifies the File type with other types that do
 /// not implement sync_all(). The purpose is to allow testing of methods
 /// that sync to a File using other structs that also implement Write, but
@@ -57,7 +56,7 @@ impl<T> SyncAll for Cursor<T>
 }
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BDA {
     header: StaticHeader,
     regions: mda::MDARegions,
@@ -182,7 +181,7 @@ impl BDA {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StaticHeader {
     blkdev_size: Sectors,
     pool_uuid: PoolUuid,
@@ -358,7 +357,7 @@ mod mda {
     pub const MIN_MDA_SECTORS: Sectors = Sectors(2032);
 
 
-    #[derive(Debug)]
+    #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct MDARegions {
         // Spec defines 4 regions, but regions 2 & 3 are duplicates of 0 and 1 respectively
         region_size: Sectors,
@@ -552,7 +551,7 @@ mod mda {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct MDAHeader {
         last_updated: DateTime<Utc>,
 

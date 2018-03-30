@@ -80,7 +80,7 @@ impl StratEngine {
         let mut table = Table::default();
         let mut incomplete_pools = HashMap::new();
         for (pool_uuid, devices) in pools {
-            match setup_pool(pool_uuid, &devices, &table) {
+            match setup_pool(pool_uuid, devices.clone(), &table) {
                 Ok((pool_name, pool)) => {
                     table.insert(pool_name, pool_uuid, pool);
                 }
@@ -156,7 +156,7 @@ impl Engine for StratEngine {
                     .or_else(|| Some(HashMap::new()))
                     .expect("We just retrieved or created a HashMap");
                 devices.insert(device, dev_node);
-                match setup_pool(pool_uuid, &devices, &self.pools) {
+                match setup_pool(pool_uuid, devices.clone(), &self.pools) {
                     Ok((pool_name, pool)) => {
                         self.pools.insert(pool_name, pool_uuid, pool);
                         Some(pool_uuid)

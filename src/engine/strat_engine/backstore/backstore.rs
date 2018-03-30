@@ -431,7 +431,7 @@ impl Backstore {
     /// Make a Backstore object from blockdevs that already belong to Stratis.
     pub fn setup(pool_uuid: PoolUuid,
                  backstore_save: &BackstoreSave,
-                 devnodes: &HashMap<Device, PathBuf>,
+                 devnodes: HashMap<Device, PathBuf>,
                  last_update_time: Option<DateTime<Utc>>)
                  -> EngineResult<Backstore> {
         let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
@@ -836,14 +836,14 @@ mod tests {
 
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
-        let backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
+        let backstore = Backstore::setup(pool_uuid, &backstore_save, map.clone(), None).unwrap();
         invariant(&backstore);
 
         backstore.teardown().unwrap();
 
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
-        let backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
+        let backstore = Backstore::setup(pool_uuid, &backstore_save, map.clone(), None).unwrap();
         invariant(&backstore);
 
         backstore.destroy().unwrap();

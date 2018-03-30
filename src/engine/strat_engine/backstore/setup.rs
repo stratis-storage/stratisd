@@ -77,7 +77,7 @@ pub fn is_stratis_device(devnode: &PathBuf) -> EngineResult<Option<PoolUuid>> {
 /// setup pools. Return an error on anything that prevents the pool
 /// being set up.
 pub fn setup_pool(pool_uuid: PoolUuid,
-                  devices: &HashMap<Device, PathBuf>,
+                  devices: HashMap<Device, PathBuf>,
                   pools: &Table<StratPool>)
                   -> EngineResult<(Name, StratPool)> {
     // FIXME: In this method, various errors are assembled from various
@@ -86,7 +86,7 @@ pub fn setup_pool(pool_uuid: PoolUuid,
     // error-chaining should be used here and if it is necessary
     // to log the error, the log code should be able to reduce the error
     // chain to something that can be sensibly logged.
-    let info_string = || {
+    let info_string = {
         let dev_paths = devices
             .values()
             .map(|p| p.to_str().expect("Unix is utf-8"))
@@ -95,31 +95,30 @@ pub fn setup_pool(pool_uuid: PoolUuid,
         format!("(pool UUID: {}, devnodes: {})", pool_uuid, dev_paths)
     };
 
-    let metadata = get_metadata(pool_uuid, devices)?
+    let metadata = get_metadata(pool_uuid, &devices)?
         .ok_or_else(|| {
-                        let err_msg = format!("no metadata found for {}", info_string());
+                        let err_msg = format!("no metadata found for {}", info_string);
                         EngineError::Engine(ErrorEnum::NotFound, err_msg)
                     })?;
 
     if pools.contains_name(&metadata.name) {
         let err_msg = format!("pool with name \"{}\" set up; metadata specifies same name for {}",
                               &metadata.name,
-                              info_string());
+                              info_string);
         return Err(EngineError::Engine(ErrorEnum::AlreadyExists, err_msg));
     }
 
     check_metadata(&metadata)
         .or_else(|e| {
-                     let err_msg = format!("inconsistent metadata for {}: reason: {:?}",
-                                           info_string(),
-                                           e);
+                     let err_msg =
+                         format!("inconsistent metadata for {}: reason: {:?}", info_string, e);
                      Err(EngineError::Engine(ErrorEnum::Error, err_msg))
                  })
         .and_then(|_| {
             StratPool::setup(pool_uuid, devices, &metadata)
         .or_else(|e| {
                      let err_msg = format!("failed to set up pool for {}: reason: {:?}",
-                                           info_string(),
+                                           info_string,
                                            e);
                      Err(EngineError::Engine(ErrorEnum::Error, err_msg))
                  })
@@ -227,7 +226,7 @@ pub fn get_metadata(pool_uuid: PoolUuid,
 #[allow(implicit_hasher)]
 pub fn get_blockdevs(pool_uuid: PoolUuid,
                      backstore_save: &BackstoreSave,
-                     devnodes: &HashMap<Device, PathBuf>)
+                     devnodes: HashMap<Device, PathBuf>)
                      -> EngineResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
     let recorded_data_map: HashMap<_, _> = backstore_save
         .data_devs
@@ -266,10 +265,10 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
 
     let (mut datadevs, mut cachedevs) = (vec![], vec![]);
     for (device, devnode) in devnodes {
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
+        let bda = BDA::load(&mut OpenOptions::new().read(true).open(&devnode)?)?;
         if let Some(bda) = bda {
             if bda.pool_uuid() == pool_uuid {
-                let actual_size = blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?
+                let actual_size = blkdev_size(&OpenOptions::new().read(true).open(&devnode)?)?
                     .sectors();
 
                 if actual_size < bda.dev_size() {
@@ -301,8 +300,8 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                 // available to be allocated. If this fails, the most likely
                 // conclusion is metadata corruption.
                 let segments = segment_table.get(&dev_uuid);
-                dev_vec.push(StratBlockDev::new(*device,
-                                                devnode.to_owned(),
+                dev_vec.push(StratBlockDev::new(device,
+                                                devnode,
                                                 bda,
                                                 segments.unwrap_or(&vec![]),
                                                 bd_save.user_info.clone(),

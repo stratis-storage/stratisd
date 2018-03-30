@@ -93,7 +93,7 @@ impl StratPool {
 
     /// Setup a StratPool using its UUID and the list of devnodes it has.
     pub fn setup(uuid: PoolUuid,
-                 devnodes: &HashMap<Device, PathBuf>,
+                 devnodes: HashMap<Device, PathBuf>,
                  metadata: &PoolSave)
                  -> EngineResult<(Name, StratPool)> {
         let backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, None)?;
@@ -445,7 +445,7 @@ mod tests {
         assert_eq!(pools.len(), 1);
         let devices = pools.get(&uuid).unwrap();
         let (name, pool) = StratPool::setup(uuid,
-                                            &devices,
+                                            devices.clone(),
                                             &get_metadata(uuid, &devices).unwrap().unwrap())
                 .unwrap();
         invariant(&pool, &name);

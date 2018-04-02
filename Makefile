@@ -1,3 +1,5 @@
+TARGET ?= "x86_64-unknown-linux-gnu"
+
 ${HOME}/.cargo/bin/cargo-fmt:
 	cargo install rustfmt --vers 0.8.3
 
@@ -21,7 +23,9 @@ fmt-travis:
 	cargo fmt -- --write-mode=diff
 
 build:
-	RUSTFLAGS='-D warnings' cargo build --features "dbus_enabled"
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS='-D warnings' \
+	cargo build --features "dbus_enabled" --target $(TARGET)
 
 test-loop:
 	sudo env "PATH=${PATH}" RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test loop_

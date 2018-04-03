@@ -63,8 +63,8 @@ impl Engine for SimEngine {
     }
 
     fn block_evaluate(&mut self,
-                      dev_node: PathBuf,
-                      device: Device)
+                      device: Device,
+                      dev_node: PathBuf)
                       -> EngineResult<Option<PoolUuid>> {
         assert_ne!(dev_node, PathBuf::from("/"));
         assert_ne!(libc::dev_t::from(device), 0);

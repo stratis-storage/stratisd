@@ -30,8 +30,10 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 pub enum DevOwnership {
     Ours(PoolUuid, DevUuid),
     Unowned,
-    Theirs,
+    Theirs(String),
 }
+
+pub const NON_ZEROED_DISK_MSG: &str = "First 8K is not zero";
 
 #[derive(Debug)]
 pub struct StratEngine {

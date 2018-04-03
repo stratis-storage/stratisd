@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::io::{Read, Seek, SeekFrom, Write};
+use std::path::Path;
 use std::str::from_utf8;
 
 use byteorder::{ByteOrder, LittleEndian};
@@ -15,7 +16,9 @@ use devicemapper::{Bytes, IEC, SECTOR_SIZE, Sectors};
 use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::types::{DevUuid, PoolUuid};
 
-use super::super::engine::DevOwnership;
+use super::super::engine::{DevOwnership, NON_ZEROED_DISK_MSG};
+
+use super::util::device_signature;
 
 pub use self::mda::{MIN_MDA_SECTORS, validate_mda_size};
 
@@ -222,9 +225,10 @@ impl StaticHeader {
         Err(EngineError::Engine(ErrorEnum::Invalid, err_str.into()))
     }
 
-    /// Determine the ownership of a device.
+    /// Determine the ownership of a device by checking for the Stratis signature in the buffer or
+    /// by checking the device signature by using blkid if the path parameter is supplied.
     /// If the device is owned by Stratis, return its device UUID.
-    pub fn determine_ownership<F>(f: &mut F) -> EngineResult<DevOwnership>
+    pub fn determine_ownership<F>(f: &mut F, path: Option<&Path>) -> EngineResult<DevOwnership>
         where F: Read + Seek
     {
         #![allow(unused_io_amount)]
@@ -242,10 +246,20 @@ impl StaticHeader {
         match StaticHeader::setup_from_buf(&buf) {
             Ok(Some(sh)) => Ok(DevOwnership::Ours(sh.pool_uuid, sh.dev_uuid)),
             Ok(None) => {
-                if buf.iter().any(|x| *x != 0) {
-                    Ok(DevOwnership::Theirs)
+                if let Some(devnode) = path {
+                    let signature = device_signature(devnode)?;
+                    if signature.is_none() {
+                        Ok(DevOwnership::Unowned)
+                    } else {
+                        Ok(DevOwnership::Theirs(signature
+                                            .unwrap_or(String::from("Inspect device with blkid"))))
+                    }
                 } else {
-                    Ok(DevOwnership::Unowned)
+                    if buf.iter().any(|x| *x != 0) {
+                        Ok(DevOwnership::Theirs(String::from(NON_ZEROED_DISK_MSG)))
+                    } else {
+                        Ok(DevOwnership::Unowned)
+                    }
                 }
             }
             Err(err) => Err(err),
@@ -785,7 +799,7 @@ mod tests {
                 return TestResult::discard();
             }
             let mut buf = Cursor::new(vec![0; _BDA_STATIC_HDR_SIZE]);
-            match StaticHeader::determine_ownership(&mut buf).unwrap() {
+            match StaticHeader::determine_ownership(&mut buf, None).unwrap() {
                 DevOwnership::Unowned => {}
                 _ => return TestResult::failed(),
             }
@@ -793,8 +807,8 @@ mod tests {
             let data = vec![value; length as usize];
             buf.seek(SeekFrom::Start(offset as u64)).unwrap();
             buf.write(&data).unwrap();
-            match StaticHeader::determine_ownership(&mut buf).unwrap() {
-                DevOwnership::Theirs => {}
+            match StaticHeader::determine_ownership(&mut buf, None).unwrap() {
+                DevOwnership::Theirs(_) => {}
                 _ => return TestResult::failed(),
             }
             TestResult::passed()
@@ -816,7 +830,7 @@ mod tests {
         fn test_ownership(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
             let sh = random_static_header(blkdev_size, mda_size_factor);
             let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
-            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
+            let ownership = StaticHeader::determine_ownership(&mut buf, None).unwrap();
             match ownership {
                 DevOwnership::Unowned => {}
                 _ => return TestResult::failed(),
@@ -829,7 +843,7 @@ mod tests {
                             sh.blkdev_size,
                             Utc::now().timestamp() as u64)
                     .unwrap();
-            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
+            let ownership = StaticHeader::determine_ownership(&mut buf, None).unwrap();
             match ownership {
                 DevOwnership::Ours(pool_uuid, dev_uuid) => {
                     if sh.pool_uuid != pool_uuid || sh.dev_uuid != dev_uuid {
@@ -840,7 +854,7 @@ mod tests {
             }
 
             BDA::wipe(&mut buf).unwrap();
-            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
+            let ownership = StaticHeader::determine_ownership(&mut buf, None).unwrap();
             match ownership {
                 DevOwnership::Unowned => {}
                 _ => return TestResult::failed(),

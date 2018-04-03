@@ -84,7 +84,7 @@ impl Error for StratisError {
 
     fn cause(&self) -> Option<&Error> {
         match *self {
-            StratisError::Error(_) => None,
+            StratisError::Error(_) |
             StratisError::Engine(_, _) => None,
             StratisError::Io(ref err) => Some(err),
             StratisError::Nix(ref err) => Some(err),

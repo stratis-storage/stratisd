@@ -15,8 +15,9 @@ use uuid::Uuid;
 use devicemapper::{Bytes, Device, IEC, LinearDevTargetParams, LinearTargetParams, Sectors,
                    TargetLine};
 
+use stratis::{ErrorEnum, StratisError, StratisResult};
+
 use super::super::super::engine::BlockDev;
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::engine::DevOwnership;
@@ -169,7 +170,7 @@ impl BlockDevMgr {
                       paths: &[&Path],
                       mda_size: Sectors,
                       force: bool)
-                      -> EngineResult<BlockDevMgr> {
+                      -> StratisResult<BlockDevMgr> {
         let devices = resolve_devices(paths)?;
         Ok(BlockDevMgr::new(pool_uuid,
                             initialize(pool_uuid, devices, mda_size, force, &HashSet::new())?,
@@ -194,7 +195,7 @@ impl BlockDevMgr {
     /// Add paths to self.
     /// Return the uuids of all blockdevs corresponding to paths that were
     /// added.
-    pub fn add(&mut self, paths: &[&Path], force: bool) -> EngineResult<Vec<DevUuid>> {
+    pub fn add(&mut self, paths: &[&Path], force: bool) -> StratisResult<Vec<DevUuid>> {
         let devices = resolve_devices(paths)?;
         let current_uuids = self.block_devs.iter().map(|bd| bd.uuid()).collect();
         let bds = initialize(self.pool_uuid,
@@ -207,7 +208,7 @@ impl BlockDevMgr {
         Ok(bdev_uuids)
     }
 
-    pub fn destroy_all(self) -> EngineResult<()> {
+    pub fn destroy_all(self) -> StratisResult<()> {
         wipe_blockdevs(&self.block_devs)
     }
 
@@ -262,7 +263,7 @@ impl BlockDevMgr {
     /// time, use a time that is one nanosecond greater than that previously
     /// written. Randomly select no more than MAX_NUM_TO_WRITE blockdevs to
     /// write to.
-    pub fn save_state(&mut self, metadata: &[u8]) -> EngineResult<()> {
+    pub fn save_state(&mut self, metadata: &[u8]) -> StratisResult<()> {
         let current_time = Utc::now();
         let stamp_time = if Some(current_time) <= self.last_update_time {
             self.last_update_time
@@ -291,7 +292,7 @@ impl BlockDevMgr {
             Ok(())
         } else {
             let err_msg = "Failed to save metadata to even one device in pool";
-            Err(EngineError::Engine(ErrorEnum::Error, err_msg.into()))
+            Err(StratisError::Engine(ErrorEnum::Error, err_msg.into()))
         }
     }
 
@@ -357,14 +358,14 @@ fn initialize(pool_uuid: PoolUuid,
               mda_size: Sectors,
               force: bool,
               owned_devs: &HashSet<DevUuid>)
-              -> EngineResult<Vec<StratBlockDev>> {
+              -> StratisResult<Vec<StratBlockDev>> {
 
     /// Get device information, returns an error if problem with obtaining
     /// that information.
     /// Returns a tuple with the device's path, its size in bytes,
     /// its ownership as determined by calling determine_ownership(),
     /// and an open File handle, all of which are needed later.
-    fn dev_info(devnode: &Path) -> EngineResult<(&Path, Bytes, DevOwnership, File)> {
+    fn dev_info(devnode: &Path) -> StratisResult<(&Path, Bytes, DevOwnership, File)> {
         let mut f = OpenOptions::new()
             .read(true)
             .write(true)
@@ -383,8 +384,8 @@ fn initialize(pool_uuid: PoolUuid,
                           pool_uuid: PoolUuid,
                           force: bool,
                           owned_devs: &HashSet<DevUuid>)
-                          -> EngineResult<Vec<(Device, (&'a Path, Bytes, File))>>
-        where I: Iterator<Item = (Device, EngineResult<(&'a Path, Bytes, DevOwnership, File)>)>
+                          -> StratisResult<Vec<(Device, (&'a Path, Bytes, File))>>
+        where I: Iterator<Item = (Device, StratisResult<(&'a Path, Bytes, DevOwnership, File)>)>
     {
         let mut add_devs = Vec::new();
         for (dev, dev_result) in dev_infos {
@@ -393,7 +394,7 @@ fn initialize(pool_uuid: PoolUuid,
                 let error_message = format!("{} too small, minimum {} bytes",
                                             devnode.display(),
                                             MIN_DEV_SIZE);
-                return Err(EngineError::Engine(ErrorEnum::Invalid, error_message));
+                return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
             };
             match ownership {
                 DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, f))),
@@ -401,7 +402,7 @@ fn initialize(pool_uuid: PoolUuid,
                     if !force {
                         let err_str = format!("Device {} appears to belong to another application",
                                               devnode.display());
-                        return Err(EngineError::Engine(ErrorEnum::Invalid, err_str));
+                        return Err(StratisError::Engine(ErrorEnum::Invalid, err_str));
                     } else {
                         add_devs.push((dev, (devnode, dev_size, f)))
                     }
@@ -411,13 +412,13 @@ fn initialize(pool_uuid: PoolUuid,
                         if !owned_devs.contains(&dev_uuid) {
                             let error_str = format!("Device {} with pool UUID is unknown to pool",
                                                     devnode.display());
-                            return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
+                            return Err(StratisError::Engine(ErrorEnum::Invalid, error_str));
                         }
                     } else {
                         let error_str = format!("Device {} already belongs to Stratis pool {}",
                                                 devnode.display(),
                                                 uuid);
-                        return Err(EngineError::Engine(ErrorEnum::Invalid, error_str));
+                        return Err(StratisError::Engine(ErrorEnum::Invalid, error_str));
                     }
                 }
             }

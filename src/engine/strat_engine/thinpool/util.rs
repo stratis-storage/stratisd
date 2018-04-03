@@ -9,11 +9,11 @@ use std::process::Command;
 
 use uuid::Uuid;
 
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use stratis::{ErrorEnum, StratisError, StratisResult};
 
 /// Common function to call a command line utility, returning an Result with an error message which
 /// also includes stdout & stderr if it fails.
-pub fn execute_cmd(cmd: &mut Command, error_msg: &str) -> EngineResult<()> {
+pub fn execute_cmd(cmd: &mut Command, error_msg: &str) -> StratisResult<()> {
     let result = cmd.output()?;
     if result.status.success() {
         Ok(())
@@ -24,12 +24,12 @@ pub fn execute_cmd(cmd: &mut Command, error_msg: &str) -> EngineResult<()> {
                               error_msg,
                               std_out_txt,
                               std_err_txt);
-        Err(EngineError::Engine(ErrorEnum::Error, err_msg))
+        Err(StratisError::Engine(ErrorEnum::Error, err_msg))
     }
 }
 
 /// Create a filesystem on devnode.
-pub fn create_fs(devnode: &Path, uuid: Uuid) -> EngineResult<()> {
+pub fn create_fs(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
     execute_cmd(Command::new("mkfs.xfs")
                     .arg("-f")
                     .arg("-q")
@@ -41,13 +41,13 @@ pub fn create_fs(devnode: &Path, uuid: Uuid) -> EngineResult<()> {
 
 /// Use the xfs_growfs command to expand a filesystem mounted at the given
 /// mount point.
-pub fn xfs_growfs(mount_point: &Path) -> EngineResult<()> {
+pub fn xfs_growfs(mount_point: &Path) -> StratisResult<()> {
     execute_cmd(Command::new("xfs_growfs").arg(mount_point).arg("-d"),
                 &format!("Failed to expand filesystem {:?}", mount_point))
 }
 
 /// Set a new UUID for filesystem on the devnode.
-pub fn set_uuid(devnode: &Path, uuid: Uuid) -> EngineResult<()> {
+pub fn set_uuid(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
     execute_cmd(Command::new("xfs_admin")
                     .arg("-U")
                     .arg(format!("{}", uuid))

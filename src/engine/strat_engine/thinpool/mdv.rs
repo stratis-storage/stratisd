@@ -18,7 +18,8 @@ use serde_json;
 
 use devicemapper::{DmDevice, LinearDev, LinearDevTargetParams, TargetLine};
 
-use super::super::super::errors::EngineResult;
+use stratis::StratisResult;
+
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid};
 
 use super::super::dm::get_dm;
@@ -49,7 +50,7 @@ struct MountedMDV<'a> {
 
 impl<'a> MountedMDV<'a> {
     /// Borrow the MDV and ensure it's mounted.
-    fn mount(mdv: &MetadataVol) -> EngineResult<MountedMDV> {
+    fn mount(mdv: &MetadataVol) -> StratisResult<MountedMDV> {
         if let Err(err) = create_dir(&mdv.mount_pt) {
             if err.kind() != ErrorKind::AlreadyExists {
                 return Err(From::from(err));
@@ -89,13 +90,13 @@ impl<'a> Drop for MountedMDV<'a> {
 
 impl MetadataVol {
     /// Initialize a new Metadata Volume.
-    pub fn initialize(pool_uuid: PoolUuid, dev: LinearDev) -> EngineResult<MetadataVol> {
+    pub fn initialize(pool_uuid: PoolUuid, dev: LinearDev) -> StratisResult<MetadataVol> {
         create_fs(&dev.devnode(), pool_uuid)?;
         MetadataVol::setup(pool_uuid, dev)
     }
 
     /// Set up an existing Metadata Volume.
-    pub fn setup(pool_uuid: PoolUuid, dev: LinearDev) -> EngineResult<MetadataVol> {
+    pub fn setup(pool_uuid: PoolUuid, dev: LinearDev) -> StratisResult<MetadataVol> {
         let filename = format!(".mdv-{}", pool_uuid.simple());
         let mount_pt: PathBuf = vec![DEV_PATH, &filename].iter().collect();
 
@@ -126,7 +127,7 @@ impl MetadataVol {
                    name: &Name,
                    uuid: FilesystemUuid,
                    fs: &StratFilesystem)
-                   -> EngineResult<()> {
+                   -> StratisResult<()> {
         let data = serde_json::to_string(&fs.record(name, uuid))?;
         let path = self.mount_pt
             .join(FILESYSTEM_DIR)
@@ -156,7 +157,7 @@ impl MetadataVol {
     }
 
     /// Remove info on a filesystem from persistent storage.
-    pub fn rm_fs(&self, fs_uuid: FilesystemUuid) -> EngineResult<()> {
+    pub fn rm_fs(&self, fs_uuid: FilesystemUuid) -> StratisResult<()> {
         let fs_path = self.mount_pt
             .join(FILESYSTEM_DIR)
             .join(fs_uuid.simple().to_string())
@@ -174,7 +175,7 @@ impl MetadataVol {
     }
 
     /// Get list of filesystems stored on the MDV.
-    pub fn filesystems(&self) -> EngineResult<Vec<FilesystemSave>> {
+    pub fn filesystems(&self) -> StratisResult<Vec<FilesystemSave>> {
         let mut filesystems = Vec::new();
 
         let mount = MountedMDV::mount(self)?;
@@ -197,20 +198,20 @@ impl MetadataVol {
     }
 
     /// Tear down a Metadata Volume.
-    pub fn teardown(self) -> EngineResult<()> {
+    pub fn teardown(self) -> StratisResult<()> {
         self.dev.teardown(get_dm())?;
 
         Ok(())
     }
 
     /// Suspend the metadata volume DM devices
-    pub fn suspend(&mut self) -> EngineResult<()> {
+    pub fn suspend(&mut self) -> StratisResult<()> {
         self.dev.suspend(get_dm(), true)?;
         Ok(())
     }
 
     /// Resume the metadata volume DM devices
-    pub fn resume(&mut self) -> EngineResult<()> {
+    pub fn resume(&mut self) -> StratisResult<()> {
         self.dev.resume(get_dm())?;
         Ok(())
     }
@@ -221,7 +222,9 @@ impl MetadataVol {
     }
 
     /// Set the table of the backing device
-    pub fn set_table(&mut self, table: Vec<TargetLine<LinearDevTargetParams>>) -> EngineResult<()> {
+    pub fn set_table(&mut self,
+                     table: Vec<TargetLine<LinearDevTargetParams>>)
+                     -> StratisResult<()> {
         self.dev.set_table(get_dm(), table)?;
         Ok(())
     }
@@ -234,7 +237,7 @@ impl MetadataVol {
 /// Returns the following summary values:
 ///  * the number of temp files found
 ///  * paths of those unremoved, if any
-fn remove_temp_files(dir: &Path) -> EngineResult<(u64, Vec<PathBuf>)> {
+fn remove_temp_files(dir: &Path) -> StratisResult<(u64, Vec<PathBuf>)> {
     let mut found = 0;
     let mut failed = Vec::new();
     for path in read_dir(dir)?

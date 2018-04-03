@@ -8,7 +8,7 @@ macro_rules! calculate_redundancy {
             None | Some(0) => Redundancy::NONE,
             Some(n) => {
                 let message = format!("code {} does not correspond to any redundancy", n);
-                return Err(EngineError::Engine(ErrorEnum::Error, message));
+                return Err(StratisError::Engine(ErrorEnum::Error, message));
             }
         }
     }
@@ -39,7 +39,7 @@ macro_rules! rename_filesystem_pre {
             }
 
             if $s.filesystems.contains_name($new_name) {
-                return Err(EngineError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
+                return Err(StratisError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
             }
             old_name
         }
@@ -59,7 +59,7 @@ macro_rules! rename_pool_pre {
             }
 
             if $s.pools.contains_name($new_name) {
-                return Err(EngineError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
+                return Err(StratisError::Engine(ErrorEnum::AlreadyExists, $new_name.into()));
             }
             old_name
         }

@@ -12,8 +12,9 @@ use nix::mount::{MsFlags, mount, umount};
 use nix::sys::statvfs::statvfs;
 use tempdir::TempDir;
 
+use stratis::{ErrorEnum, StratisError, StratisResult};
+
 use super::super::super::engine::Filesystem;
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::types::{FilesystemUuid, Name};
 
 use super::super::dm::get_dm;
@@ -39,7 +40,7 @@ pub enum FilesystemStatus {
 
 impl StratFilesystem {
     /// Create a StratFilesystem on top of the given ThinDev.
-    pub fn initialize(fs_id: FilesystemUuid, thin_dev: ThinDev) -> EngineResult<StratFilesystem> {
+    pub fn initialize(fs_id: FilesystemUuid, thin_dev: ThinDev) -> StratisResult<StratFilesystem> {
         let fs = StratFilesystem::setup(thin_dev);
 
         create_fs(&fs.devnode(), fs_id)?;
@@ -66,7 +67,7 @@ impl StratFilesystem {
                     snapshot_fs_name: &Name,
                     snapshot_fs_uuid: FilesystemUuid,
                     snapshot_thin_id: ThinDevId)
-                    -> EngineResult<StratFilesystem> {
+                    -> StratisResult<StratFilesystem> {
 
         match self.thin_dev
                   .snapshot(get_dm(),
@@ -100,18 +101,18 @@ impl StratFilesystem {
                 Ok(StratFilesystem::setup(thin_dev))
             }
             Err(e) => {
-                Err(EngineError::Engine(ErrorEnum::Error,
-                                        format!("failed to create {} snapshot for {} - {}",
-                                                snapshot_name,
-                                                snapshot_fs_name,
-                                                e)))
+                Err(StratisError::Engine(ErrorEnum::Error,
+                                         format!("failed to create {} snapshot for {} - {}",
+                                                 snapshot_name,
+                                                 snapshot_fs_name,
+                                                 e)))
             }
         }
     }
 
     /// check if filesystem is getting full and needs to be extended
     /// TODO: deal with the thindev in a Fail state.
-    pub fn check(&mut self) -> EngineResult<FilesystemStatus> {
+    pub fn check(&mut self) -> StratisResult<FilesystemStatus> {
         match self.thin_dev.status(get_dm())? {
             ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.get_mount_point()? {
@@ -153,15 +154,15 @@ impl StratFilesystem {
     /// Get one (non-deterministic in the presence of errors) of the mount_point(s) for the file
     /// system that is contained on the block device referred to as self.devnode(), i.e. the device
     /// node, while ignoring parse errors as long as at least one mount point is found.
-    pub fn get_mount_point(&self) -> EngineResult<Option<PathBuf>> {
+    pub fn get_mount_point(&self) -> StratisResult<Option<PathBuf>> {
         let device_node = self.devnode();
-        let search = device_node.to_str().ok_or_else(|| EngineError::Engine(ErrorEnum::Error,
+        let search = device_node.to_str().ok_or_else(|| StratisError::Engine(ErrorEnum::Error,
                                     format!("Unable to represent devnode as string {:?}", *self)))?;
 
         let m_iter = MountIter::new_from_proc()
             .map_err(|e| {
-                         EngineError::Engine(ErrorEnum::Error,
-                                             format!("Error reading /proc/mounts {:?}", e))
+                         StratisError::Engine(ErrorEnum::Error,
+                                              format!("Error reading /proc/mounts {:?}", e))
                      })?;
 
         let mut last_error: Option<String> = None;
@@ -178,17 +179,17 @@ impl StratFilesystem {
             }
         }
 
-        last_error.map_or(Ok(None), |e| Err(EngineError::Engine(ErrorEnum::Error, e)))
+        last_error.map_or(Ok(None), |e| Err(StratisError::Engine(ErrorEnum::Error, e)))
     }
 
     /// Tear down the filesystem.
-    pub fn teardown(self) -> EngineResult<()> {
+    pub fn teardown(self) -> StratisResult<()> {
         self.thin_dev.teardown(get_dm())?;
         Ok(())
     }
 
     /// Destroy the filesystem.
-    pub fn destroy(self, thin_pool: &ThinPoolDev) -> EngineResult<()> {
+    pub fn destroy(self, thin_pool: &ThinPoolDev) -> StratisResult<()> {
         self.thin_dev.destroy(get_dm(), thin_pool)?;
         Ok(())
     }
@@ -202,12 +203,12 @@ impl StratFilesystem {
         }
     }
 
-    pub fn suspend(&mut self, flush: bool) -> EngineResult<()> {
+    pub fn suspend(&mut self, flush: bool) -> StratisResult<()> {
         self.thin_dev.suspend(get_dm(), flush)?;
         Ok(())
     }
 
-    pub fn resume(&mut self) -> EngineResult<()> {
+    pub fn resume(&mut self) -> StratisResult<()> {
         self.thin_dev.resume(get_dm())?;
         Ok(())
     }
@@ -220,7 +221,7 @@ impl Filesystem for StratFilesystem {
 }
 
 /// Return total bytes allocated to the filesystem, total bytes used by data/metadata
-pub fn fs_usage(mount_point: &Path) -> EngineResult<(Bytes, Bytes)> {
+pub fn fs_usage(mount_point: &Path) -> StratisResult<(Bytes, Bytes)> {
     let stat = statvfs(mount_point)?;
 
     // Upcast all arch-dependent variable width values to u64

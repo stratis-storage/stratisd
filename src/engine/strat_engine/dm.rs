@@ -10,8 +10,9 @@ use std::sync::{Once, ONCE_INIT};
 
 use devicemapper::DM;
 
+use stratis::StratisResult;
+
 use super::super::engine::Eventable;
-use super::super::errors::EngineResult;
 
 static INIT: Once = ONCE_INIT;
 static mut DM_CONTEXT: Option<DM> = None;
@@ -33,7 +34,7 @@ impl Eventable for DM {
         self.file().as_raw_fd()
     }
 
-    fn clear_event(&self) -> EngineResult<()> {
+    fn clear_event(&self) -> StratisResult<()> {
         self.arm_poll()?;
         Ok(())
     }

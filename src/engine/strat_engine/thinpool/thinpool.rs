@@ -16,8 +16,9 @@ use devicemapper::{DataBlocks, Device, DmDevice, DmName, DmNameBuf, IEC, FlakeyT
                    TargetLine, ThinDev, ThinDevId, ThinPoolDev, ThinPoolStatusSummary,
                    device_exists};
 
+use stratis::{ErrorEnum, StratisError, StratisResult};
+
 use super::super::super::engine::Filesystem;
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::super::structures::Table;
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid, RenameAction};
 
@@ -165,7 +166,7 @@ impl ThinPool {
                data_block_size: Sectors,
                low_water_mark: DataBlocks,
                backstore: &mut Backstore)
-               -> EngineResult<ThinPool> {
+               -> StratisResult<ThinPool> {
         let mut segments_list =
             match backstore.alloc_space(&[thin_pool_size.meta_size(),
                                           thin_pool_size.meta_size(),
@@ -174,7 +175,7 @@ impl ThinPool {
                 Some(sl) => sl,
                 None => {
                     let err_msg = "Could not allocate sufficient space for thinpool devices.";
-                    return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+                    return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
                 }
             };
 
@@ -247,7 +248,7 @@ impl ThinPool {
                  low_water_mark: DataBlocks,
                  flex_devs: &FlexDevsSave,
                  backstore: &Backstore)
-                 -> EngineResult<ThinPool> {
+                 -> StratisResult<ThinPool> {
         let mdv_segments = flex_devs.meta_dev.to_vec();
         let meta_segments = flex_devs.thin_meta_dev.to_vec();
         let data_segments = flex_devs.thin_data_dev.to_vec();
@@ -300,14 +301,14 @@ impl ThinPool {
                     fssave.uuid,
                     StratFilesystem::setup(thin_dev)))
             })
-            .collect::<EngineResult<Vec<_>>>()?;
+            .collect::<StratisResult<Vec<_>>>()?;
 
         let mut fs_table = Table::default();
         for (name, uuid, fs) in filesystems {
             let evicted = fs_table.insert(name, uuid, fs);
             if evicted.is_some() {
                 let err_msg = "filesystems with duplicate UUID or name specified in metadata";
-                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
             }
         }
 
@@ -330,7 +331,7 @@ impl ThinPool {
     /// Run status checks and take actions on the thinpool and its components.
     /// Returns a bool communicating if a configuration change requiring a
     /// metadata save has been made.
-    pub fn check(&mut self, backstore: &mut Backstore) -> EngineResult<bool> {
+    pub fn check(&mut self, backstore: &mut Backstore) -> StratisResult<bool> {
         #![allow(match_same_arms)]
         assert_eq!(backstore.device(), self.backstore_device);
 
@@ -391,7 +392,7 @@ impl ThinPool {
             .borrow_mut()
             .iter_mut()
             .map(|(_, _, fs)| fs.check())
-            .collect::<EngineResult<Vec<_>>>()?;
+            .collect::<StratisResult<Vec<_>>>()?;
 
         for fs_status in filesystems {
             if let FilesystemStatus::Failed = fs_status {
@@ -403,7 +404,7 @@ impl ThinPool {
 
     /// Tear down the components managed here: filesystems, the MDV,
     /// and the actual thinpool device itself.
-    pub fn teardown(self) -> EngineResult<()> {
+    pub fn teardown(self) -> StratisResult<()> {
         // Must succeed in tearing down all filesystems before the
         // thinpool..
         for (_, _, fs) in self.filesystems {
@@ -424,7 +425,7 @@ impl ThinPool {
     fn extend_thinpool(&mut self,
                        extend_size: DataBlocks,
                        backstore: &mut Backstore)
-                       -> EngineResult<DataBlocks> {
+                       -> StratisResult<DataBlocks> {
         let backstore_device = self.backstore_device;
         assert_eq!(backstore.device(), backstore_device);
         if let Some(new_data_regions) = backstore.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
@@ -437,7 +438,7 @@ impl ThinPool {
         } else {
             let err_msg = format!("Insufficient space to accommodate request for {}",
                                   extend_size);
-            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
         }
         Ok(extend_size)
     }
@@ -447,7 +448,7 @@ impl ThinPool {
     fn extend_thinpool_meta(&mut self,
                             extend_size: MetaBlocks,
                             backstore: &mut Backstore)
-                            -> EngineResult<MetaBlocks> {
+                            -> StratisResult<MetaBlocks> {
         let backstore_device = self.backstore_device;
         assert_eq!(backstore.device(), backstore_device);
         if let Some(new_meta_regions) = backstore.alloc_space(&[extend_size.sectors()]) {
@@ -460,14 +461,17 @@ impl ThinPool {
         } else {
             let err_msg = format!("Insufficient space to accommodate request for {}",
                                   extend_size);
-            return Err(EngineError::Engine(ErrorEnum::Error, err_msg));
+            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
         }
         Ok(extend_size)
     }
 
 
     /// Extend the thinpool with new data regions.
-    fn extend_data(&mut self, device: Device, new_segs: &[(Sectors, Sectors)]) -> EngineResult<()> {
+    fn extend_data(&mut self,
+                   device: Device,
+                   new_segs: &[(Sectors, Sectors)])
+                   -> StratisResult<()> {
         let segments = coalesce_segs(&self.data_segments, &new_segs.to_vec());
         self.thin_pool
             .set_data_table(get_dm(), segs_to_table(device, &segments))?;
@@ -478,7 +482,10 @@ impl ThinPool {
     }
 
     /// Extend the thinpool meta device with additional segments.
-    fn extend_meta(&mut self, device: Device, new_segs: &[(Sectors, Sectors)]) -> EngineResult<()> {
+    fn extend_meta(&mut self,
+                   device: Device,
+                   new_segs: &[(Sectors, Sectors)])
+                   -> StratisResult<()> {
         let segments = coalesce_segs(&self.meta_segments, &new_segs.to_vec());
         self.thin_pool
             .set_meta_table(get_dm(), segs_to_table(device, &segments))?;
@@ -493,12 +500,12 @@ impl ThinPool {
     // This includes all the sectors being held as spares for the meta device,
     // all the sectors allocated to the meta data device, and all the sectors
     // in use on the data device.
-    pub fn total_physical_used(&self) -> EngineResult<Sectors> {
+    pub fn total_physical_used(&self) -> StratisResult<Sectors> {
         let data_dev_used = match self.thin_pool.status(get_dm())? {
             dm::ThinPoolStatus::Working(ref status) => *status.usage.used_data * DATA_BLOCK_SIZE,
             _ => {
                 let err_msg = "thin pool failed, could not obtain usage";
-                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg.into()));
+                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
             }
         };
 
@@ -549,7 +556,7 @@ impl ThinPool {
                              pool_name: &str,
                              name: &str,
                              size: Option<Sectors>)
-                             -> EngineResult<FilesystemUuid> {
+                             -> StratisResult<FilesystemUuid> {
         let fs_uuid = Uuid::new_v4();
         let (dm_name, dm_uuid) = format_thin_ids(self.pool_uuid, ThinRole::Filesystem(fs_uuid));
         let thin_dev = ThinDev::new(get_dm(),
@@ -574,7 +581,7 @@ impl ThinPool {
                                pool_name: &str,
                                origin_uuid: FilesystemUuid,
                                snapshot_name: &str)
-                               -> EngineResult<FilesystemUuid> {
+                               -> StratisResult<FilesystemUuid> {
         let snapshot_fs_uuid = Uuid::new_v4();
         let (snapshot_dm_name, snapshot_dm_uuid) =
             format_thin_ids(self.pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));
@@ -591,9 +598,9 @@ impl ThinPool {
                               snapshot_id)?
             }
             None => {
-                return Err(EngineError::Engine(ErrorEnum::Error,
-                                               "snapshot_filesystem failed, filesystem not found"
-                                                   .into()));
+                return Err(StratisError::Engine(ErrorEnum::Error,
+                                                "snapshot_filesystem failed, filesystem not found"
+                                                    .into()));
             }
         };
         let new_fs_name = Name::new(snapshot_name.to_owned());
@@ -609,7 +616,7 @@ impl ThinPool {
     pub fn destroy_filesystem(&mut self,
                               pool_name: &str,
                               uuid: FilesystemUuid)
-                              -> EngineResult<()> {
+                              -> StratisResult<()> {
         if let Some((fs_name, fs)) = self.filesystems.remove_by_uuid(uuid) {
             fs.destroy(&self.thin_pool)?;
             self.mdv.rm_fs(uuid)?;
@@ -623,7 +630,7 @@ impl ThinPool {
                              pool_name: &str,
                              uuid: FilesystemUuid,
                              new_name: &str)
-                             -> EngineResult<RenameAction> {
+                             -> StratisResult<RenameAction> {
 
         let old_name = rename_filesystem_pre!(self; uuid; new_name);
         let new_name = Name::new(new_name.to_owned());
@@ -654,7 +661,7 @@ impl ThinPool {
     }
 
     /// Suspend the thinpool
-    pub fn suspend(&mut self) -> EngineResult<()> {
+    pub fn suspend(&mut self) -> StratisResult<()> {
         for (_, _, fs) in &mut self.filesystems {
             fs.suspend(false)?;
         }
@@ -664,7 +671,7 @@ impl ThinPool {
     }
 
     /// Resume the thinpool
-    pub fn resume(&mut self) -> EngineResult<()> {
+    pub fn resume(&mut self) -> StratisResult<()> {
         self.mdv.resume()?;
         self.thin_pool.resume(get_dm())?;
         for (_, _, fs) in &mut self.filesystems {
@@ -674,7 +681,7 @@ impl ThinPool {
     }
 
     /// Set the device on all DM devices
-    pub fn set_device(&mut self, backstore_device: Device) -> EngineResult<bool> {
+    pub fn set_device(&mut self, backstore_device: Device) -> StratisResult<bool> {
         if backstore_device == self.backstore_device {
             return Ok(false);
         }
@@ -760,12 +767,13 @@ impl Recordable<ThinPoolDevSave> for ThinPool {
 /// dev. Return the metadata device, the metadata segments, and the
 /// spare segments.
 #[allow(type_complexity)]
-fn setup_metadev(pool_uuid: PoolUuid,
-                 thinpool_name: &DmName,
-                 device: Device,
-                 meta_segments: Vec<(Sectors, Sectors)>,
-                 spare_segments: Vec<(Sectors, Sectors)>)
-                 -> EngineResult<(LinearDev, Vec<(Sectors, Sectors)>, Vec<(Sectors, Sectors)>)> {
+fn setup_metadev
+    (pool_uuid: PoolUuid,
+     thinpool_name: &DmName,
+     device: Device,
+     meta_segments: Vec<(Sectors, Sectors)>,
+     spare_segments: Vec<(Sectors, Sectors)>)
+     -> StratisResult<(LinearDev, Vec<(Sectors, Sectors)>, Vec<(Sectors, Sectors)>)> {
     #![allow(collapsible_if)]
     let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinMeta);
     let mut meta_dev = LinearDev::setup(get_dm(),
@@ -797,7 +805,7 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
                        meta_dev: LinearDev,
                        device: Device,
                        spare_segments: &[(Sectors, Sectors)])
-                       -> EngineResult<LinearDev> {
+                       -> StratisResult<LinearDev> {
     let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinMetaSpare);
     let mut new_meta_dev = LinearDev::setup(get_dm(),
                                             &dm_name,

@@ -4,14 +4,14 @@
 
 // Code to handle cleanup after a failed operation.
 
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::blockdev::StratBlockDev;
 
 /// Wipe some blockdevs of their identifying headers.
 /// Return an error if any of the blockdevs could not be wiped.
 /// If an error occurs while wiping a blockdev, attempt to wipe all remaining.
-pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> EngineResult<()> {
+pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
     let mut unerased_devnodes = Vec::new();
 
     for bd in blockdevs {
@@ -25,6 +25,6 @@ pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> EngineResult<()> {
     } else {
         let err_msg = format!("Failed to wipe already initialized devnodes: {:?}",
                               unerased_devnodes);
-        Err(EngineError::Engine(ErrorEnum::Error, err_msg))
+        Err(StratisError::Engine(ErrorEnum::Error, err_msg))
     }
 }

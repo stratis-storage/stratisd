@@ -13,8 +13,9 @@ use std::rc::Rc;
 
 use devicemapper::Device;
 
+use stratis::{ErrorEnum, StratisError, StratisResult};
+
 use super::super::engine::{Engine, Eventable, Pool};
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
@@ -36,12 +37,12 @@ impl Engine for SimEngine {
                    blockdev_paths: &[&Path],
                    redundancy: Option<u16>,
                    _force: bool)
-                   -> EngineResult<PoolUuid> {
+                   -> StratisResult<PoolUuid> {
 
         let redundancy = calculate_redundancy!(redundancy);
 
         if self.pools.contains_name(name) {
-            return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.into()));
+            return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
         let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
@@ -53,7 +54,7 @@ impl Engine for SimEngine {
         let (pool_uuid, pool) = SimPool::new(&Rc::clone(&self.rdm), &devices, redundancy);
 
         if self.rdm.borrow_mut().throw_die() {
-            return Err(EngineError::Engine(ErrorEnum::Error, "X".into()));
+            return Err(StratisError::Engine(ErrorEnum::Error, "X".into()));
         }
 
         self.pools
@@ -65,17 +66,17 @@ impl Engine for SimEngine {
     fn block_evaluate(&mut self,
                       device: Device,
                       dev_node: PathBuf)
-                      -> EngineResult<Option<PoolUuid>> {
+                      -> StratisResult<Option<PoolUuid>> {
         assert_ne!(dev_node, PathBuf::from("/"));
         assert_ne!(libc::dev_t::from(device), 0);
         Ok(None)
     }
 
-    fn destroy_pool(&mut self, uuid: PoolUuid) -> EngineResult<bool> {
+    fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<bool> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
             if pool.has_filesystems() {
-                return Err(EngineError::Engine(ErrorEnum::Busy,
-                                               "filesystems remaining on pool".into()));
+                return Err(StratisError::Engine(ErrorEnum::Busy,
+                                                "filesystems remaining on pool".into()));
             };
         } else {
             return Ok(false);
@@ -88,7 +89,7 @@ impl Engine for SimEngine {
         Ok(true)
     }
 
-    fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> EngineResult<RenameAction> {
+    fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction> {
         rename_pool_pre!(self; uuid; new_name);
 
         let (_, pool) = self.pools
@@ -109,7 +110,7 @@ impl Engine for SimEngine {
     }
 
     /// Set properties of the simulator
-    fn configure_simulator(&mut self, denominator: u32) -> EngineResult<()> {
+    fn configure_simulator(&mut self, denominator: u32) -> StratisResult<()> {
         self.rdm.borrow_mut().set_probability(denominator);
         Ok(())
     }
@@ -125,7 +126,7 @@ impl Engine for SimEngine {
         None
     }
 
-    fn evented(&mut self) -> EngineResult<()> {
+    fn evented(&mut self) -> StratisResult<()> {
         Ok(())
     }
 }
@@ -140,11 +141,11 @@ mod tests {
 
     use quickcheck::QuickCheck;
 
+    use stratis::{ErrorEnum, StratisError};
+
     use super::SimEngine;
 
     use engine::Engine;
-    use engine::EngineError;
-    use engine::ErrorEnum;
     use engine::RenameAction;
 
     #[test]
@@ -237,7 +238,7 @@ mod tests {
             .create_pool(name, &[Path::new("/s/d")], None, false)
             .unwrap();
         assert!(match engine.create_pool(name, &[], None, false) {
-                    Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
+                    Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
                     _ => false,
                 });
     }
@@ -304,7 +305,7 @@ mod tests {
         let uuid = engine.create_pool("old_name", &[], None, false).unwrap();
         engine.create_pool(new_name, &[], None, false).unwrap();
         assert!(match engine.rename_pool(uuid, new_name) {
-                    Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
+                    Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
                     _ => false,
                 });
     }

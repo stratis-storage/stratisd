@@ -8,7 +8,7 @@ use dbus;
 use dbus::arg::{ArgType, Iter, IterAppend};
 use dbus::tree::{MTFn, MethodErr, PropInfo};
 
-use engine::{EngineError, ErrorEnum};
+use stratis::{ErrorEnum, StratisError};
 
 use super::types::{DbusErrorEnum, TData};
 
@@ -35,10 +35,11 @@ pub fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr
 
 /// Translates an engine error to the (errorcode, string) tuple that Stratis
 /// D-Bus methods return.
-pub fn engine_to_dbus_err_tuple(err: &EngineError) -> (u16, String) {
+pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
     #![allow(match_same_arms)]
     let error = match *err {
-        EngineError::Engine(ref e, _) => {
+        StratisError::Error(_) => DbusErrorEnum::INTERNAL_ERROR,
+        StratisError::Engine(ref e, _) => {
             match *e {
                 ErrorEnum::Error => DbusErrorEnum::ERROR,
                 ErrorEnum::AlreadyExists => DbusErrorEnum::ALREADY_EXISTS,
@@ -47,13 +48,14 @@ pub fn engine_to_dbus_err_tuple(err: &EngineError) -> (u16, String) {
                 ErrorEnum::NotFound => DbusErrorEnum::NOTFOUND,
             }
         }
-        EngineError::Io(_) => DbusErrorEnum::IO_ERROR,
-        EngineError::Nix(_) => DbusErrorEnum::NIX_ERROR,
-        EngineError::Uuid(_) => DbusErrorEnum::INTERNAL_ERROR,
-        EngineError::Utf8(_) => DbusErrorEnum::INTERNAL_ERROR,
-        EngineError::Serde(_) => DbusErrorEnum::INTERNAL_ERROR,
-        EngineError::DM(_) => DbusErrorEnum::INTERNAL_ERROR,
-        EngineError::Udev(_) => DbusErrorEnum::INTERNAL_ERROR,
+        StratisError::Io(_) => DbusErrorEnum::IO_ERROR,
+        StratisError::Nix(_) => DbusErrorEnum::NIX_ERROR,
+        StratisError::Uuid(_) => DbusErrorEnum::INTERNAL_ERROR,
+        StratisError::Utf8(_) => DbusErrorEnum::INTERNAL_ERROR,
+        StratisError::Serde(_) => DbusErrorEnum::INTERNAL_ERROR,
+        StratisError::DM(_) => DbusErrorEnum::INTERNAL_ERROR,
+        StratisError::Dbus(_) => DbusErrorEnum::INTERNAL_ERROR,
+        StratisError::Udev(_) => DbusErrorEnum::INTERNAL_ERROR,
     };
     (error.into(), err.description().to_owned())
 }

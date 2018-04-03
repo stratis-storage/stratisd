@@ -14,8 +14,9 @@ use uuid::Uuid;
 
 use devicemapper::{IEC, Sectors};
 
+use stratis::{ErrorEnum, StratisError, StratisResult};
+
 use super::super::engine::{BlockDev, Filesystem, Pool};
-use super::super::errors::{EngineError, EngineResult, ErrorEnum};
 use super::super::structures::Table;
 use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
                           RenameAction};
@@ -60,11 +61,11 @@ impl Pool for SimPool {
     fn create_filesystems<'a, 'b>(&'a mut self,
                                   _pool_name: &str,
                                   specs: &[(&'b str, Option<Sectors>)])
-                                  -> EngineResult<Vec<(&'b str, FilesystemUuid)>> {
+                                  -> StratisResult<Vec<(&'b str, FilesystemUuid)>> {
         let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
         for name in names.keys() {
             if self.filesystems.contains_name(name) {
-                return Err(EngineError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
+                return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
             }
         }
 
@@ -85,7 +86,7 @@ impl Pool for SimPool {
                      paths: &[&Path],
                      tier: BlockDevTier,
                      _force: bool)
-                     -> EngineResult<Vec<DevUuid>> {
+                     -> StratisResult<Vec<DevUuid>> {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs: Vec<_> = devices
             .iter()
@@ -102,7 +103,7 @@ impl Pool for SimPool {
         Ok(ret_uuids)
     }
 
-    fn destroy(self) -> EngineResult<()> {
+    fn destroy(self) -> StratisResult<()> {
         // Nothing to do here.
         Ok(())
     }
@@ -110,7 +111,7 @@ impl Pool for SimPool {
     fn destroy_filesystems<'a>(&'a mut self,
                                _pool_name: &str,
                                fs_uuids: &[FilesystemUuid])
-                               -> EngineResult<Vec<FilesystemUuid>> {
+                               -> StratisResult<Vec<FilesystemUuid>> {
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
             if self.filesystems.remove_by_uuid(uuid).is_some() {
@@ -124,7 +125,7 @@ impl Pool for SimPool {
                          _pool_name: &str,
                          uuid: FilesystemUuid,
                          new_name: &str)
-                         -> EngineResult<RenameAction> {
+                         -> StratisResult<RenameAction> {
         rename_filesystem_pre!(self; uuid; new_name);
 
         let (_, filesystem) =
@@ -142,12 +143,12 @@ impl Pool for SimPool {
                            _pool_name: &str,
                            origin_uuid: FilesystemUuid,
                            snapshot_name: &str)
-                           -> EngineResult<FilesystemUuid> {
+                           -> StratisResult<FilesystemUuid> {
         let uuid = Uuid::new_v4();
         let snapshot = match self.get_filesystem(origin_uuid) {
             Some(_filesystem) => SimFilesystem::new(),
             None => {
-                return Err(EngineError::Engine(ErrorEnum::NotFound, origin_uuid.to_string()));
+                return Err(StratisError::Engine(ErrorEnum::NotFound, origin_uuid.to_string()));
             }
         };
         self.filesystems
@@ -161,7 +162,7 @@ impl Pool for SimPool {
         Sectors(IEC::Ei)
     }
 
-    fn total_physical_used(&self) -> EngineResult<Sectors> {
+    fn total_physical_used(&self) -> StratisResult<Sectors> {
         Ok(Sectors(0))
     }
 
@@ -215,7 +216,7 @@ impl Pool for SimPool {
                      })
     }
 
-    fn save_state(&mut self, _pool_name: &str) -> EngineResult<()> {
+    fn save_state(&mut self, _pool_name: &str) -> StratisResult<()> {
         Ok(())
     }
 }
@@ -274,7 +275,7 @@ mod tests {
             .unwrap();
         let old_uuid = results.iter().find(|x| x.0 == old_name).unwrap().1;
         assert!(match pool.rename_filesystem(pool_name, old_uuid, new_name) {
-                    Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
+                    Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
                     _ => false,
                 });
     }
@@ -370,7 +371,7 @@ mod tests {
         pool.create_filesystems(pool_name, &[(fs_name, None)])
             .unwrap();
         assert!(match pool.create_filesystems(pool_name, &[(fs_name, None)]) {
-                    Err(EngineError::Engine(ErrorEnum::AlreadyExists, _)) => true,
+                    Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
                     _ => false,
                 });
     }

@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 pub use self::stratis::VERSION;
-pub use self::errors::{StratisError, StratisResult};
+pub use self::errors::{ErrorEnum, StratisError, StratisResult};
 
 mod errors;
 #[allow(module_inception)]

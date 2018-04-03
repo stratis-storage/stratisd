@@ -8,7 +8,7 @@ use std::collections::Bound::{Included, Unbounded};
 
 use devicemapper::Sectors;
 
-use super::super::super::errors::{EngineError, EngineResult, ErrorEnum};
+use stratis::{ErrorEnum, StratisError, StratisResult};
 
 #[derive(Debug)]
 pub struct RangeAllocator {
@@ -21,7 +21,7 @@ impl RangeAllocator {
     /// ranges marked as used.
     pub fn new(limit: Sectors,
                initial_used: &[(Sectors, Sectors)])
-               -> EngineResult<RangeAllocator> {
+               -> StratisResult<RangeAllocator> {
         let mut allocator = RangeAllocator {
             limit,
             used: BTreeMap::new(),
@@ -35,20 +35,20 @@ impl RangeAllocator {
         self.limit
     }
 
-    fn check_for_overflow(&self, off: Sectors, len: Sectors) -> EngineResult<()> {
+    fn check_for_overflow(&self, off: Sectors, len: Sectors) -> StratisResult<()> {
         if let Some(sum) = off.checked_add(len) {
             if sum > self.limit {
                 let err_msg = format!("elements in range ({}, {}) exceed limit {}",
                                       off,
                                       len,
                                       self.limit);
-                return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
+                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
             }
         } else {
             let err_msg = format!("elements in range ({}, {}) inexpressible in this format",
                                   off,
                                   len);
-            return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
+            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
         }
         Ok(())
     }
@@ -60,7 +60,7 @@ impl RangeAllocator {
     /// TODO: Consider using a different algorithmic that first sorts ranges
     /// and then merges used and ranges by traversing them in parallel, for
     /// efficiency.
-    fn insert_ranges(&mut self, ranges: &[(Sectors, Sectors)]) -> EngineResult<()> {
+    fn insert_ranges(&mut self, ranges: &[(Sectors, Sectors)]) -> StratisResult<()> {
         for &(off, len) in ranges {
             self.check_for_overflow(off, len)?;
 
@@ -77,7 +77,7 @@ impl RangeAllocator {
                                           off,
                                           prev_off,
                                           prev_len);
-                    return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
+                    return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
                 }
                 if prev_off + prev_len == off {
                     contig_prev = Some((prev_off, prev_len))
@@ -94,7 +94,7 @@ impl RangeAllocator {
                                           off,
                                           len,
                                           next_off);
-                    return Err(EngineError::Engine(ErrorEnum::Invalid, err_msg));
+                    return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
                 }
                 if off + len == next_off {
                     contig_next = Some((next_off, next_len))
@@ -135,7 +135,7 @@ impl RangeAllocator {
     fn remove_ranges(&mut self, to_free: &[(Sectors, Sectors)]) -> () {
         for &(off, len) in to_free {
             // TODO: when this method goes into use, fix it so that it returns
-            // an EngineResult, make this a try!.
+            // an StratisResult, make this a try!.
             self.check_for_overflow(off, len).unwrap();
 
             let maybe_prev = self.used

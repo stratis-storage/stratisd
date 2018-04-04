@@ -11,6 +11,9 @@ addons:
 language: rust
 
 matrix:
+    allow_failures:
+        - rust: stable
+          env: TASK=fmt-travis
     include:
         - rust: stable
           env: TASK=fmt-travis

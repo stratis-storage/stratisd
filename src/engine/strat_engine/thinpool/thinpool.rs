@@ -145,7 +145,6 @@ impl Default for ThinPoolSizeParams {
 /// metadata associated with it.
 #[derive(Debug)]
 pub struct ThinPool {
-    pool_uuid: PoolUuid,
     thin_pool: ThinPoolDev,
     meta_segments: Vec<(Sectors, Sectors)>,
     meta_spare_segments: Vec<(Sectors, Sectors)>,
@@ -234,7 +233,6 @@ impl ThinPool {
             low_water_mark,
         )?;
         Ok(ThinPool {
-            pool_uuid,
             thin_pool: thinpool_dev,
             meta_segments,
             meta_spare_segments: spare_segments,
@@ -338,7 +336,6 @@ impl ThinPool {
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
         Ok(ThinPool {
-            pool_uuid,
             thin_pool: thinpool_dev,
             meta_segments,
             meta_spare_segments: spare_segments,
@@ -593,12 +590,13 @@ impl ThinPool {
     /// already be in use.
     pub fn create_filesystem(
         &mut self,
+        pool_uuid: PoolUuid,
         pool_name: &str,
         name: &str,
         size: Option<Sectors>,
     ) -> StratisResult<FilesystemUuid> {
         let fs_uuid = Uuid::new_v4();
-        let (dm_name, dm_uuid) = format_thin_ids(self.pool_uuid, ThinRole::Filesystem(fs_uuid));
+        let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
         let thin_dev = ThinDev::new(
             get_dm(),
             &dm_name,
@@ -621,13 +619,14 @@ impl ThinPool {
     /// must exist.  Returns the Uuid of the new filesystem.
     pub fn snapshot_filesystem(
         &mut self,
+        pool_uuid: PoolUuid,
         pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
     ) -> StratisResult<FilesystemUuid> {
         let snapshot_fs_uuid = Uuid::new_v4();
         let (snapshot_dm_name, snapshot_dm_uuid) =
-            format_thin_ids(self.pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));
+            format_thin_ids(pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));
         let snapshot_id = self.id_gen.new_id()?;
         let new_filesystem = match self.get_filesystem_by_uuid(origin_uuid) {
             Some((fs_name, filesystem)) => filesystem.snapshot(
@@ -695,12 +694,12 @@ impl ThinPool {
     }
 
     /// The names of DM devices belonging to this pool that may generate events
-    pub fn get_eventing_dev_names(&self) -> Vec<DmNameBuf> {
+    pub fn get_eventing_dev_names(&self, pool_uuid: PoolUuid) -> Vec<DmNameBuf> {
         vec![
-            format_flex_ids(self.pool_uuid, FlexRole::ThinMeta).0,
-            format_flex_ids(self.pool_uuid, FlexRole::ThinData).0,
-            format_flex_ids(self.pool_uuid, FlexRole::MetadataVolume).0,
-            format_thinpool_ids(self.pool_uuid, ThinPoolRole::Pool).0,
+            format_flex_ids(pool_uuid, FlexRole::ThinMeta).0,
+            format_flex_ids(pool_uuid, FlexRole::ThinData).0,
+            format_flex_ids(pool_uuid, FlexRole::MetadataVolume).0,
+            format_thinpool_ids(pool_uuid, ThinPoolRole::Pool).0,
         ]
     }
 
@@ -910,7 +909,7 @@ mod tests {
 
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name).unwrap();
-        let fs_uuid = pool.create_filesystem(pool_name, "stratis_test_filesystem", None)
+        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
             .unwrap();
         let write_buf = &[8u8; BYTES_PER_WRITE];
         let source_tmp_dir = tempfile::Builder::new()
@@ -958,7 +957,7 @@ mod tests {
         };
         // Add block devices to the pool and run check() to extend
         backstore
-            .add_blockdevs(&remaining_paths, BlockDevTier::Data, true)
+            .add_blockdevs(pool_uuid, &remaining_paths, BlockDevTier::Data, true)
             .unwrap();
         pool.check(&mut backstore).unwrap();
         // Verify the pool is back in a Good state
@@ -1009,7 +1008,7 @@ mod tests {
 
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name).unwrap();
-        let fs_uuid = pool.create_filesystem(pool_name, "stratis_test_filesystem", None)
+        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
             .unwrap();
 
         let write_buf = &[8u8; SECTOR_SIZE];
@@ -1049,8 +1048,9 @@ mod tests {
         pool.extend_thinpool(INITIAL_DATA_SIZE, &mut backstore)
             .unwrap();
 
-        let snapshot_uuid = pool.snapshot_filesystem(pool_name, fs_uuid, "test_snapshot")
-            .unwrap();
+        let snapshot_uuid =
+            pool.snapshot_filesystem(pool_uuid, pool_name, fs_uuid, "test_snapshot")
+                .unwrap();
         let mut read_buf = [0u8; SECTOR_SIZE];
         let snapshot_tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
@@ -1112,7 +1112,8 @@ mod tests {
 
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name).unwrap();
-        let fs_uuid = pool.create_filesystem(pool_name, &name1, None).unwrap();
+        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, &name1, None)
+            .unwrap();
 
         let action = pool.rename_filesystem(pool_name, fs_uuid, name2).unwrap();
         assert_eq!(action, RenameAction::Renamed);
@@ -1164,7 +1165,8 @@ mod tests {
 
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name).unwrap();
-        let fs_uuid = pool.create_filesystem(pool_name, "fsname", None).unwrap();
+        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, "fsname", None)
+            .unwrap();
 
         let tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
@@ -1228,7 +1230,8 @@ mod tests {
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name).unwrap();
         let fs_name = "stratis_test_filesystem";
-        let fs_uuid = pool.create_filesystem(pool_name, &fs_name, None).unwrap();
+        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, &fs_name, None)
+            .unwrap();
         let thin_id = pool.get_filesystem_by_uuid(fs_uuid).unwrap().1.thin_id();
         let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
         let thindev = ThinDev::setup(
@@ -1362,7 +1365,8 @@ mod tests {
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name).unwrap();
         let fs_name = "stratis_test_filesystem";
-        let fs_uuid = pool.create_filesystem(pool_name, fs_name, None).unwrap();
+        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, fs_name, None)
+            .unwrap();
 
         let devnode = pool.get_filesystem_by_uuid(fs_uuid).unwrap().1.devnode();
         // Braces to ensure f is closed before destroy
@@ -1426,7 +1430,7 @@ mod tests {
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name).unwrap();
         let fs_name = "stratis_test_filesystem";
-        let fs_uuid = pool.create_filesystem(pool_name, fs_name, Some(fs_size))
+        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, fs_name, Some(fs_size))
             .unwrap();
 
         // Braces to ensure f is closed before destroy and the borrow of
@@ -1496,7 +1500,7 @@ mod tests {
 
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name).unwrap();
-        pool.create_filesystem(pool_name, "stratis_test_filesystem", None)
+        pool.create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
             .unwrap();
 
         pool.suspend().unwrap();
@@ -1544,7 +1548,7 @@ mod tests {
 
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name).unwrap();
-        let fs_uuid = pool.create_filesystem(pool_name, "stratis_test_filesystem", None)
+        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
             .unwrap();
 
         let tmp_dir = tempfile::Builder::new()
@@ -1583,7 +1587,7 @@ mod tests {
         pool.suspend().unwrap();
         let old_device = backstore.device();
         backstore
-            .add_blockdevs(paths1, BlockDevTier::Cache, false)
+            .add_blockdevs(pool_uuid, paths1, BlockDevTier::Cache, false)
             .unwrap();
         let new_device = backstore.device();
         assert!(old_device != new_device);

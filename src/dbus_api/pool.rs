@@ -51,6 +51,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let result = pool.create_filesystems(
+        pool_uuid,
         &pool_name,
         &filesystems
             .map(|x| (x, None))
@@ -157,7 +158,7 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let msg = match pool.snapshot_filesystem(&pool_name, fs_uuid, snapshot_name) {
+    let msg = match pool.snapshot_filesystem(pool_uuid, &pool_name, fs_uuid, snapshot_name) {
         Ok(uuid) => {
             let fs_object_path: dbus::Path =
                 create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
@@ -194,7 +195,7 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> Meth
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
-    let result = pool.add_blockdevs(&*pool_name, &blockdevs, tier, force);
+    let result = pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, tier, force);
     let msg = match result {
         Ok(uuids) => {
             let return_value = uuids

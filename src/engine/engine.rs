@@ -49,6 +49,7 @@ pub trait Pool: Debug {
     /// times, the size associated with the last item is used.
     fn create_filesystems<'a, 'b>(
         &'a mut self,
+        pool_uuid: PoolUuid,
         pool_name: &str,
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<Vec<(&'b str, FilesystemUuid)>>;
@@ -59,6 +60,7 @@ pub trait Pool: Debug {
     /// or there was an error while reading or writing a blockdev.
     fn add_blockdevs(
         &mut self,
+        pool_uuid: PoolUuid,
         pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
@@ -96,6 +98,7 @@ pub trait Pool: Debug {
     /// Create a CoW snapshot of the origin
     fn snapshot_filesystem(
         &mut self,
+        pool_uuid: PoolUuid,
         pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,

@@ -625,11 +625,11 @@ mod mda {
     /// Note that used is the amount used for metadata only.
     fn check_mda_region_size(used: Bytes, available: Bytes) -> StratisResult<()> {
         if MDA_REGION_HDR_SIZE + used > available {
-            return Err(StratisError::Engine(ErrorEnum::Invalid,
-                                            format!("metadata length {} exceeds region available {}",
-                                                    used,
-                                                    // available region > header size
-                                                    available - MDA_REGION_HDR_SIZE)));
+            let err_msg = format!("metadata length {} exceeds region available {}",
+                                  used,
+                                  // available region > header size
+                                  available - MDA_REGION_HDR_SIZE);
+            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
         };
         Ok(())
     }

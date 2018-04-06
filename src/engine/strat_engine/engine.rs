@@ -293,7 +293,7 @@ mod test {
 
     #[test]
     pub fn real_test_pool_rename() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_pool_rename);
+        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_pool_rename);
     }
 
     /// Test engine setup.
@@ -347,6 +347,6 @@ mod test {
 
     #[test]
     pub fn real_test_setup() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_setup);
+        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None), test_setup);
     }
 }

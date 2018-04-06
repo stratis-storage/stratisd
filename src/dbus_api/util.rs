@@ -36,7 +36,6 @@ pub fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr
 /// Translates an engine error to the (errorcode, string) tuple that Stratis
 /// D-Bus methods return.
 pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
-    #![allow(match_same_arms)]
     let error = match *err {
         StratisError::Error(_) => DbusErrorEnum::INTERNAL_ERROR,
         StratisError::Engine(ref e, _) => {
@@ -50,11 +49,11 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
         }
         StratisError::Io(_) => DbusErrorEnum::IO_ERROR,
         StratisError::Nix(_) => DbusErrorEnum::NIX_ERROR,
-        StratisError::Uuid(_) => DbusErrorEnum::INTERNAL_ERROR,
-        StratisError::Utf8(_) => DbusErrorEnum::INTERNAL_ERROR,
-        StratisError::Serde(_) => DbusErrorEnum::INTERNAL_ERROR,
-        StratisError::DM(_) => DbusErrorEnum::INTERNAL_ERROR,
-        StratisError::Dbus(_) => DbusErrorEnum::INTERNAL_ERROR,
+        StratisError::Uuid(_) |
+        StratisError::Utf8(_) |
+        StratisError::Serde(_) |
+        StratisError::DM(_) |
+        StratisError::Dbus(_) |
         StratisError::Udev(_) => DbusErrorEnum::INTERNAL_ERROR,
     };
     (error.into(), err.description().to_owned())

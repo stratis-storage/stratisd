@@ -221,7 +221,7 @@ pub fn connect<'a>
 
 /// Given the UUID of a pool, register all the pertinent information with dbus.
 pub fn register_pool(c: &Connection,
-                     engine: Rc<RefCell<Engine>>,
+                     engine: &Rc<RefCell<Engine>>,
                      dbus_context: &DbusContext,
                      tree: &mut Tree<MTFn<TData>, TData>,
                      pool_uuid: Uuid,

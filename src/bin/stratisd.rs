@@ -63,10 +63,8 @@ fn initialize_log(debug: bool) -> Result<(), SetLoggerError> {
     if debug {
         builder.filter(Some("stratisd"), LogLevelFilter::Debug);
         builder.filter(Some("libstratis"), LogLevelFilter::Debug);
-    } else {
-        if let Ok(s) = env::var("RUST_LOG") {
-            builder.parse(&s);
-        }
+    } else if let Ok(s) = env::var("RUST_LOG") {
+        builder.parse(&s);
     };
 
     builder.init()

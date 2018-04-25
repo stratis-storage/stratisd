@@ -50,7 +50,7 @@ use libstratis::stratis::{StratisError, StratisResult, VERSION};
 const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
 
 /// If writing a program error to stderr fails, panic.
-fn print_err(err: StratisError) -> () {
+fn print_err(err: &StratisError) -> () {
     eprintln!("{}", err);
 }
 
@@ -261,7 +261,7 @@ fn run() -> StratisResult<()> {
                                                                  &item,
                                                                  &mut tree,
                                                                  &dbus_context) {
-                        print_err(From::from(r));
+                        print_err(&From::from(r));
                     }
                 }
             }
@@ -282,7 +282,7 @@ fn main() {
     let error_code = match run() {
         Ok(_) => 0,
         Err(err) => {
-            print_err(err);
+            print_err(&err);
             1
         }
     };

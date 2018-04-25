@@ -99,7 +99,7 @@ fn create_pid_file() -> StratisResult<File> {
         .open(STRATISD_PID_PATH)?;
     match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
         Ok(_) => {
-            f.write(format!("{}\n", getpid()).as_bytes())?;
+            f.write_all(format!("{}\n", getpid()).as_bytes())?;
             Ok(f)
         }
         Err(_) => {

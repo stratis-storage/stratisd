@@ -204,36 +204,29 @@ fn run() -> StratisResult<()> {
     loop {
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
-            loop {
-                match udev.receive_event() {
-                    Some(event) => {
-                        if let Some((device, devnode)) = handle_udev_add(&event) {
+            while let Some(event) = udev.receive_event() {
+                if let Some((device, devnode)) = handle_udev_add(&event) {
 
-                            // If block evaluate returns an error we are going to ignore it as
-                            // there is nothing we can do for a device we are getting errors with.
-                            let pool_uuid = engine
-                                .borrow_mut()
-                                .block_evaluate(device, devnode)
-                                .unwrap_or(None);
+                    // If block evaluate returns an error we are going to ignore it as
+                    // there is nothing we can do for a device we are getting errors with.
+                    let pool_uuid = engine
+                        .borrow_mut()
+                        .block_evaluate(device, devnode)
+                        .unwrap_or(None);
 
-                            // We need to pretend that we aren't using the variable _pool_uuid so
-                            // that we can conditionally compile out the register_pool when dbus
-                            // is not enabled.
-                            if let Some(_pool_uuid) = pool_uuid {
+                    // We need to pretend that we aren't using the variable _pool_uuid so
+                    // that we can conditionally compile out the register_pool when dbus
+                    // is not enabled.
+                    if let Some(_pool_uuid) = pool_uuid {
                                 #[cfg(feature="dbus_enabled")]
-                                libstratis::dbus_api::register_pool(&mut dbus_conn,
-                                                                    &Rc::clone(&engine),
-                                                                    &mut dbus_context,
-                                                                    &mut tree,
-                                                                    _pool_uuid,
-                                                                    &base_object_path)?;
-                            }
-                        }
+                        libstratis::dbus_api::register_pool(&mut dbus_conn,
+                                                            &Rc::clone(&engine),
+                                                            &mut dbus_context,
+                                                            &mut tree,
+                                                            _pool_uuid,
+                                                            &base_object_path)?;
                     }
-                    None => {
-                        break;
-                    }
-                };
+                }
             }
         }
 

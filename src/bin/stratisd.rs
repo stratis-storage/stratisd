@@ -198,7 +198,7 @@ fn run() -> StratisResult<()> {
     };
 
     #[cfg(feature="dbus_enabled")]
-    let (mut dbus_conn, mut tree, base_object_path, mut dbus_context) =
+    let (dbus_conn, mut tree, base_object_path, dbus_context) =
         libstratis::dbus_api::connect(Rc::clone(&engine))?;
 
     loop {
@@ -219,9 +219,9 @@ fn run() -> StratisResult<()> {
                     // is not enabled.
                     if let Some(_pool_uuid) = pool_uuid {
                                 #[cfg(feature="dbus_enabled")]
-                        libstratis::dbus_api::register_pool(&mut dbus_conn,
+                        libstratis::dbus_api::register_pool(&dbus_conn,
                                                             &Rc::clone(&engine),
-                                                            &mut dbus_context,
+                                                            &dbus_context,
                                                             &mut tree,
                                                             _pool_uuid,
                                                             &base_object_path)?;

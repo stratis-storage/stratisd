@@ -218,7 +218,7 @@ fn run() -> StratisResult<()> {
                             if let Some(_pool_uuid) = pool_uuid {
                                 #[cfg(feature="dbus_enabled")]
                                 libstratis::dbus_api::register_pool(&mut dbus_conn,
-                                                                    Rc::clone(&engine),
+                                                                    &Rc::clone(&engine),
                                                                     &mut dbus_context,
                                                                     &mut tree,
                                                                     _pool_uuid,

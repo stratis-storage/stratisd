@@ -34,4 +34,5 @@ quickcheck = "0.6"
 loopdev = "0.2"
 
 [features]
+default = ["dbus_enabled"]
 dbus_enabled = ["dbus"]

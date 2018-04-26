@@ -28,7 +28,7 @@ fmt-travis:
 build:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS='-D warnings' \
-	cargo build --features "dbus_enabled" --target $(TARGET)
+	cargo build --target $(TARGET)
 
 test-loop:
 	sudo env "PATH=${PATH}" RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test loop_

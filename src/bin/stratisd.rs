@@ -2,6 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#![cfg_attr(feature = "clippy", feature(plugin))]
+#![cfg_attr(feature = "clippy", plugin(clippy))]
+#![cfg_attr(not(feature = "clippy"), allow(unknown_lints))]
+
+#![allow(doc_markdown)]
+
 extern crate devicemapper;
 extern crate libstratis;
 #[macro_use]
@@ -44,7 +50,7 @@ use libstratis::stratis::{StratisError, StratisResult, VERSION};
 const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
 
 /// If writing a program error to stderr fails, panic.
-fn print_err(err: StratisError) -> () {
+fn print_err(err: &StratisError) -> () {
     eprintln!("{}", err);
 }
 
@@ -57,10 +63,8 @@ fn initialize_log(debug: bool) -> Result<(), SetLoggerError> {
     if debug {
         builder.filter(Some("stratisd"), LogLevelFilter::Debug);
         builder.filter(Some("libstratis"), LogLevelFilter::Debug);
-    } else {
-        if let Ok(s) = env::var("RUST_LOG") {
-            builder.parse(&s);
-        }
+    } else if let Ok(s) = env::var("RUST_LOG") {
+        builder.parse(&s);
     };
 
     builder.init()
@@ -95,7 +99,7 @@ fn create_pid_file() -> StratisResult<File> {
         .open(STRATISD_PID_PATH)?;
     match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
         Ok(_) => {
-            f.write(format!("{}\n", getpid()).as_bytes())?;
+            f.write_all(format!("{}\n", getpid()).as_bytes())?;
             Ok(f)
         }
         Err(_) => {
@@ -194,42 +198,35 @@ fn run() -> StratisResult<()> {
     };
 
     #[cfg(feature="dbus_enabled")]
-    let (mut dbus_conn, mut tree, base_object_path, mut dbus_context) =
+    let (dbus_conn, mut tree, base_object_path, dbus_context) =
         libstratis::dbus_api::connect(Rc::clone(&engine))?;
 
     loop {
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
-            loop {
-                match udev.receive_event() {
-                    Some(event) => {
-                        if let Some((device, devnode)) = handle_udev_add(&event) {
+            while let Some(event) = udev.receive_event() {
+                if let Some((device, devnode)) = handle_udev_add(&event) {
 
-                            // If block evaluate returns an error we are going to ignore it as
-                            // there is nothing we can do for a device we are getting errors with.
-                            let pool_uuid = engine
-                                .borrow_mut()
-                                .block_evaluate(device, devnode)
-                                .unwrap_or(None);
+                    // If block evaluate returns an error we are going to ignore it as
+                    // there is nothing we can do for a device we are getting errors with.
+                    let pool_uuid = engine
+                        .borrow_mut()
+                        .block_evaluate(device, devnode)
+                        .unwrap_or(None);
 
-                            // We need to pretend that we aren't using the variable _pool_uuid so
-                            // that we can conditionally compile out the register_pool when dbus
-                            // is not enabled.
-                            if let Some(_pool_uuid) = pool_uuid {
+                    // We need to pretend that we aren't using the variable _pool_uuid so
+                    // that we can conditionally compile out the register_pool when dbus
+                    // is not enabled.
+                    if let Some(_pool_uuid) = pool_uuid {
                                 #[cfg(feature="dbus_enabled")]
-                                libstratis::dbus_api::register_pool(&mut dbus_conn,
-                                                                    &Rc::clone(&engine),
-                                                                    &mut dbus_context,
-                                                                    &mut tree,
-                                                                    _pool_uuid,
-                                                                    &base_object_path)?;
-                            }
-                        }
+                        libstratis::dbus_api::register_pool(&dbus_conn,
+                                                            &Rc::clone(&engine),
+                                                            &dbus_context,
+                                                            &mut tree,
+                                                            _pool_uuid,
+                                                            &base_object_path)?;
                     }
-                    None => {
-                        break;
-                    }
-                };
+                }
             }
         }
 
@@ -264,7 +261,7 @@ fn run() -> StratisResult<()> {
                                                                  &item,
                                                                  &mut tree,
                                                                  &dbus_context) {
-                        print_err(From::from(r));
+                        print_err(&From::from(r));
                     }
                 }
             }
@@ -285,7 +282,7 @@ fn main() {
     let error_code = match run() {
         Ok(_) => 0,
         Err(err) => {
-            print_err(err);
+            print_err(&err);
             1
         }
     };

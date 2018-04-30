@@ -119,9 +119,6 @@ fn create_pid_file() -> StratisResult<File> {
 
 fn run() -> StratisResult<()> {
 
-    // Exit immediately if stratisd is already running
-    let _ = create_pid_file()?;
-
     let matches = App::new("stratis")
         .version(VERSION)
         .about("Stratis storage management")
@@ -132,6 +129,12 @@ fn run() -> StratisResult<()> {
                  .long("sim")
                  .help("Use simulator engine"))
         .get_matches();
+
+    // Exit immediately after command-line arguments are parsed if stratisd is
+    // already running. Delaying until arguments are parsed allows invocations
+    // of stratisd which immediately exit, like --help and --version to succeed,
+    // regardless of user permissions or status of PID file.
+    let _ = create_pid_file()?;
 
     initialize_log(matches.is_present("debug"))
         .expect("This is the first and only invocation of this method; it must succeed.");

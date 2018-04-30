@@ -91,16 +91,11 @@ fn handle_udev_add(event: &libudev::Event) -> Option<(Device, PathBuf)> {
 
 /// To ensure only one instance of stratisd runs at a time, acquire an
 /// exclusive lock. Return an error if lock attempt fails.
-fn create_pid_file() -> StratisResult<File> {
-    let mut f = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(STRATISD_PID_PATH)?;
+fn write_pid_file(f: &mut File) -> StratisResult<()> {
     match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
         Ok(_) => {
             f.write_all(format!("{}\n", getpid()).as_bytes())?;
-            Ok(f)
+            Ok(())
         }
         Err(_) => {
             let mut buf = String::new();
@@ -134,7 +129,14 @@ fn run() -> StratisResult<()> {
     // already running. Delaying until arguments are parsed allows invocations
     // of stratisd which immediately exit, like --help and --version to succeed,
     // regardless of user permissions or status of PID file.
-    let _ = create_pid_file()?;
+    // Make the scope of the pid_file the whole run() method to ensure that
+    // the lock is held while stratisd is running.
+    let mut pid_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(STRATISD_PID_PATH)?;
+    write_pid_file(&mut pid_file)?;
 
     initialize_log(matches.is_present("debug"))
         .expect("This is the first and only invocation of this method; it must succeed.");

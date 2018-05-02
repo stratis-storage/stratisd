@@ -32,7 +32,7 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::rc::Rc;
 
-use clap::{App, Arg};
+use clap::{App, Arg, ArgMatches};
 use env_logger::LogBuilder;
 use libc::pid_t;
 use log::{LogLevelFilter, SetLoggerError};
@@ -91,7 +91,7 @@ fn handle_udev_add(event: &libudev::Event) -> Option<(Device, PathBuf)> {
 
 /// To ensure only one instance of stratisd runs at a time, acquire an
 /// exclusive lock. Return an error if lock attempt fails.
-fn create_pid_file() -> StratisResult<File> {
+fn trylock_pid_file() -> StratisResult<File> {
     let mut f = OpenOptions::new()
         .read(true)
         .write(true)
@@ -117,21 +117,7 @@ fn create_pid_file() -> StratisResult<File> {
     }
 }
 
-fn run() -> StratisResult<()> {
-
-    // Exit immediately if stratisd is already running
-    let _ = create_pid_file()?;
-
-    let matches = App::new("stratis")
-        .version(VERSION)
-        .about("Stratis storage management")
-        .arg(Arg::with_name("debug")
-                 .long("debug")
-                 .help("Print additional output for debugging"))
-        .arg(Arg::with_name("sim")
-                 .long("sim")
-                 .help("Use simulator engine"))
-        .get_matches();
+fn run(matches: &ArgMatches) -> StratisResult<()> {
 
     initialize_log(matches.is_present("debug"))
         .expect("This is the first and only invocation of this method; it must succeed.");
@@ -279,12 +265,22 @@ fn run() -> StratisResult<()> {
 }
 
 fn main() {
-    let error_code = match run() {
-        Ok(_) => 0,
-        Err(err) => {
-            print_err(&err);
-            1
-        }
-    };
-    exit(error_code);
+    let matches = App::new("stratis")
+        .version(VERSION)
+        .about("Stratis storage management")
+        .arg(Arg::with_name("debug")
+                 .long("debug")
+                 .help("Print additional output for debugging"))
+        .arg(Arg::with_name("sim")
+                 .long("sim")
+                 .help("Use simulator engine"))
+        .get_matches();
+
+    let result = trylock_pid_file().and_then(|_pidfile| run(&matches));
+    if let Err(err) = result {
+        print_err(&err);
+        exit(1);
+    } else {
+        exit(0);
+    }
 }

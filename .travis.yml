@@ -13,6 +13,8 @@ addons:
 language: rust
 
 matrix:
+    allow_failures:
+        - env: TASK=clippy TARGET=x86_64-unknown-linux-gnu
     include:
         - rust: stable
           env: TASK=fmt-travis TARGET=x86_64-unknown-linux-gnu

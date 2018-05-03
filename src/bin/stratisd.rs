@@ -122,13 +122,11 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
     initialize_log(matches.is_present("debug"))
         .expect("This is the first and only invocation of this method; it must succeed.");
 
-    // We must setup a udev listener before we initialize the
-    // engine. It is possible that a device may appear after the engine has read the
-    // /dev directory but before it has completed initialization. Unless the udev
-    // event has been recorded, the engine will be unaware of the existence of the
-    // device.
-    // This is especially important since stratisd is required to be able to run
-    // during early boot.
+    // Setup a udev listener before initializing the engine. A device may
+    // appear after the engine has read the /dev directory but before it has
+    // completed initialization. Unless the udev event has been recorded, the
+    // engine will miss the device.
+    // This is especially important since stratisd must run during early boot.
     let context = libudev::Context::new()?;
     let mut monitor = libudev::Monitor::new(&context)?;
     monitor.match_subsystem_devtype("block", "disk")?;

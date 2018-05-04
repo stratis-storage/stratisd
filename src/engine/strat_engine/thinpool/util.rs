@@ -30,7 +30,7 @@ pub fn execute_cmd(cmd: &mut Command, error_msg: &str) -> StratisResult<()> {
 
 /// Create a filesystem on devnode.
 pub fn create_fs(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
-    execute_cmd(Command::new("mkfs.xfs")
+    execute_cmd(Command::new("/usr/sbin/mkfs.xfs")
                     .arg("-f")
                     .arg("-q")
                     .arg(&devnode)
@@ -42,13 +42,15 @@ pub fn create_fs(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
 /// Use the xfs_growfs command to expand a filesystem mounted at the given
 /// mount point.
 pub fn xfs_growfs(mount_point: &Path) -> StratisResult<()> {
-    execute_cmd(Command::new("xfs_growfs").arg(mount_point).arg("-d"),
+    execute_cmd(Command::new("/usr/sbin/xfs_growfs")
+                    .arg(mount_point)
+                    .arg("-d"),
                 &format!("Failed to expand filesystem {:?}", mount_point))
 }
 
 /// Set a new UUID for filesystem on the devnode.
 pub fn set_uuid(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
-    execute_cmd(Command::new("xfs_admin")
+    execute_cmd(Command::new("/usr/sbin/xfs_admin")
                     .arg("-U")
                     .arg(format!("{}", uuid))
                     .arg(&devnode),

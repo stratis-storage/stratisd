@@ -6,7 +6,6 @@
 
 use std::borrow::BorrowMut;
 use std::cmp;
-use std::process::Command;
 
 use uuid::Uuid;
 
@@ -30,10 +29,10 @@ use super::super::dmnames::{FlexRole, ThinPoolRole, ThinRole, format_flex_ids, f
                             format_thinpool_ids};
 use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
+use super::cmd::{thin_check, thin_repair};
 use super::filesystem::{FilesystemStatus, StratFilesystem};
 use super::mdv::MetadataVol;
 use super::thinids::ThinDevIdPool;
-use super::util::execute_cmd;
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
@@ -785,11 +784,7 @@ fn setup_metadev
         // TODO: Refine policy about failure to run thin_check.
         // If, e.g., thin_check is unavailable, that doesn't necessarily
         // mean that data is corrupted.
-        if execute_cmd(Command::new("thin_check")
-                           .arg("-q")
-                           .arg(&meta_dev.devnode()),
-                       &format!("thin_check failed for pool {}", thinpool_name))
-                   .is_err() {
+        if thin_check(&meta_dev.devnode()).is_err() {
             meta_dev = attempt_thin_repair(pool_uuid, meta_dev, device, &spare_segments)?;
             return Ok((meta_dev, spare_segments, meta_segments));
         }
@@ -812,12 +807,7 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
                                             Some(&dm_uuid),
                                             segs_to_table(device, spare_segments))?;
 
-    execute_cmd(Command::new("thin_repair")
-                    .arg("-i")
-                    .arg(&meta_dev.devnode())
-                    .arg("-o")
-                    .arg(&new_meta_dev.devnode()),
-                &format!("thin_repair failed, pool ({:?}) unusable", pool_uuid))?;
+    thin_repair(&meta_dev.devnode(), &new_meta_dev.devnode())?;
 
     let name = meta_dev.name().to_owned();
     meta_dev.teardown(get_dm())?;

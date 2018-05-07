@@ -785,7 +785,7 @@ fn setup_metadev
         // TODO: Refine policy about failure to run thin_check.
         // If, e.g., thin_check is unavailable, that doesn't necessarily
         // mean that data is corrupted.
-        if execute_cmd(Command::new("thin_check")
+        if execute_cmd(Command::new("/usr/sbin/thin_check")
                            .arg("-q")
                            .arg(&meta_dev.devnode()),
                        &format!("thin_check failed for pool {}", thinpool_name))
@@ -812,7 +812,7 @@ fn attempt_thin_repair(pool_uuid: PoolUuid,
                                             Some(&dm_uuid),
                                             segs_to_table(device, spare_segments))?;
 
-    execute_cmd(Command::new("thin_repair")
+    execute_cmd(Command::new("/usr/sbin/thin_repair")
                     .arg("-i")
                     .arg(&meta_dev.devnode())
                     .arg("-o")

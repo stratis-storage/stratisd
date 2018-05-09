@@ -18,6 +18,8 @@ use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::engine::DevOwnership;
 
+use super::util::SyncAll;
+
 pub use self::mda::{MIN_MDA_SECTORS, validate_mda_size};
 
 const _BDA_STATIC_HDR_SECTORS: usize = 16;
@@ -37,14 +39,14 @@ pub struct BDA {
 
 impl BDA {
     /// Initialize a blockdev with a Stratis BDA.
-    pub fn initialize<F>(mut f: &mut F,
+    pub fn initialize<F>(f: &mut F,
                          pool_uuid: Uuid,
                          dev_uuid: Uuid,
                          mda_size: Sectors,
                          blkdev_size: Sectors,
                          initialization_time: u64)
                          -> StratisResult<BDA>
-        where F: Seek + Write
+        where F: Seek + Write + SyncAll
     {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
         let header = StaticHeader::new(pool_uuid,
@@ -59,12 +61,12 @@ impl BDA {
         f.write_all(&zeroed[..SECTOR_SIZE])?; // Zero 1 unused sector
         f.write_all(&hdr_buf)?;
         f.write_all(&zeroed[..SECTOR_SIZE * 7])?; // Zero 7 unused sectors
-        f.flush()?;
+        f.sync_all()?;
         f.write_all(&hdr_buf)?;
         f.write_all(&zeroed[..SECTOR_SIZE * 6])?; // Zero 6 unused sectors
-        f.flush()?;
+        f.sync_all()?;
 
-        let regions = mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, &mut f)?;
+        let regions = mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, f)?;
 
         Ok(BDA { header, regions })
     }
@@ -87,14 +89,14 @@ impl BDA {
     /// Zero out Static Header on the blockdev. This causes it to no
     /// longer be seen as a Stratis blockdev.
     pub fn wipe<F>(f: &mut F) -> StratisResult<()>
-        where F: Seek + Write
+        where F: Seek + Write + SyncAll
     {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
 
         // Wiping Static Header should do it
         f.seek(SeekFrom::Start(0))?;
         f.write_all(&zeroed)?;
-        f.flush()?;
+        f.sync_all()?;
         Ok(())
     }
 
@@ -102,12 +104,12 @@ impl BDA {
     pub fn save_state<F>(&mut self,
                          time: &DateTime<Utc>,
                          metadata: &[u8],
-                         mut f: &mut F)
+                         f: &mut F)
                          -> StratisResult<()>
-        where F: Seek + Write
+        where F: Seek + Write + SyncAll
     {
         self.regions
-            .save_state(BDA_STATIC_HDR_SIZE, time, metadata, &mut f)
+            .save_state(BDA_STATIC_HDR_SIZE, time, metadata, f)
     }
 
     /// Read latest metadata from the disk
@@ -318,6 +320,8 @@ mod mda {
 
     use stratis::{ErrorEnum, StratisError, StratisResult};
 
+    use super::super::util::SyncAll;
+
     const _MDA_REGION_HDR_SIZE: usize = 32;
     const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
 
@@ -352,7 +356,7 @@ mod mda {
                              size: Sectors,
                              f: &mut F)
                              -> StratisResult<MDARegions>
-            where F: Seek + Write
+            where F: Seek + Write + SyncAll
         {
             let hdr_buf = MDAHeader::default().to_buf();
 
@@ -423,7 +427,7 @@ mod mda {
                              data: &[u8],
                              f: &mut F)
                              -> StratisResult<()>
-            where F: Seek + Write
+            where F: Seek + Write + SyncAll
         {
             if self.last_update_time() >= Some(time) {
                 return Err(StratisError::Engine(ErrorEnum::Invalid,

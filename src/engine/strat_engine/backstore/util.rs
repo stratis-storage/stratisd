@@ -4,6 +4,8 @@
 
 // Utilities to support Stratis.
 
+use std::fs::File;
+use std::io::Cursor;
 use std::path::Path;
 
 use libudev;
@@ -35,4 +37,22 @@ pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<String>> {
         });
 
     result
+}
+
+/// Lets functions that take file-like types ensure that changes are
+/// flushed/synced, since flush() doesn't actually do anything.
+pub trait SyncAll {
+    fn sync_all(&mut self) -> StratisResult<()>;
+}
+
+impl SyncAll for File {
+    fn sync_all(&mut self) -> StratisResult<()> {
+        File::sync_all(self).map_err(|e| e.into())
+    }
+}
+
+impl<T> SyncAll for Cursor<T> {
+    fn sync_all(&mut self) -> StratisResult<()> {
+        Ok(())
+    }
 }

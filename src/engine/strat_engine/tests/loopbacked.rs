@@ -14,7 +14,7 @@ use devicemapper::{Bytes, IEC, Sectors};
 use self::loopdev::{LoopControl, LoopDevice};
 
 use super::logger::init_logger;
-use super::tempdir::TempDir;
+use super::tempfile;
 use super::util::clean_up;
 
 use super::super::device::wipe_sectors;
@@ -76,7 +76,7 @@ fn get_device_counts(limits: DeviceLimits) -> Vec<usize> {
 }
 
 /// Setup count loop backed devices in dir.
-fn get_devices(count: usize, dir: &TempDir) -> Vec<LoopTestDev> {
+fn get_devices(count: usize, dir: &tempfile::TempDir) -> Vec<LoopTestDev> {
     let lc = LoopControl::open().unwrap();
     let mut loop_devices = Vec::new();
 
@@ -97,7 +97,10 @@ pub fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
     init_logger();
 
     for count in counts {
-        let tmpdir = TempDir::new("stratis").unwrap();
+        let tmpdir = tempfile::Builder::new()
+            .prefix("stratis")
+            .tempdir()
+            .unwrap();
         let loop_devices: Vec<LoopTestDev> = get_devices(count, &tmpdir);
         let device_paths: Vec<PathBuf> = loop_devices
             .iter()

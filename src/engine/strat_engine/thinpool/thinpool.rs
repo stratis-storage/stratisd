@@ -831,7 +831,7 @@ mod tests {
 
     use super::super::super::backstore::MIN_MDA_SECTORS;
     use super::super::super::tests::{loopbacked, real};
-    use super::super::super::tests::tempdir::TempDir;
+    use super::super::super::tests::tempfile;
 
     use super::super::filesystem::{FILESYSTEM_LOWATER, fs_usage};
 
@@ -858,7 +858,10 @@ mod tests {
         let write_buf = &[8u8; SECTOR_SIZE];
         let file_count = 10;
 
-        let source_tmp_dir = TempDir::new("stratis_testing").unwrap();
+        let source_tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
         {
             // to allow mutable borrow of pool
             let (_, filesystem) = pool.get_filesystem_by_uuid(fs_uuid).unwrap();
@@ -893,7 +896,10 @@ mod tests {
         let snapshot_uuid = pool.snapshot_filesystem(pool_name, fs_uuid, "test_snapshot")
             .unwrap();
         let mut read_buf = [0u8; SECTOR_SIZE];
-        let snapshot_tmp_dir = TempDir::new("stratis_testing").unwrap();
+        let snapshot_tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
         {
             let (_, snapshot_filesystem) = pool.get_filesystem_by_uuid(snapshot_uuid).unwrap();
             mount(Some(&snapshot_filesystem.devnode()),
@@ -992,7 +998,10 @@ mod tests {
         let fs_uuid = pool.create_filesystem(pool_name, "fsname", None)
             .unwrap();
 
-        let tmp_dir = TempDir::new("stratis_testing").unwrap();
+        let tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
         let new_file = tmp_dir.path().join("stratis_test.txt");
         {
             let (_, fs) = pool.get_filesystem_by_uuid(fs_uuid).unwrap();
@@ -1236,7 +1245,10 @@ mod tests {
             // Write 2 MiB of data. The filesystem's free space is now 1 MiB
             // below FILESYSTEM_LOWATER.
             let write_size = Bytes(IEC::Mi * 2).sectors();
-            let tmp_dir = TempDir::new("stratis_testing").unwrap();
+            let tmp_dir = tempfile::Builder::new()
+                .prefix("stratis_testing")
+                .tempdir()
+                .unwrap();
             mount(Some(&filesystem.devnode()),
                   tmp_dir.path(),
                   Some("xfs"),
@@ -1335,7 +1347,10 @@ mod tests {
         let fs_uuid = pool.create_filesystem(pool_name, "stratis_test_filesystem", None)
             .unwrap();
 
-        let tmp_dir = TempDir::new("stratis_testing").unwrap();
+        let tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
         let new_file = tmp_dir.path().join("stratis_test.txt");
         let bytestring = b"some bytes";
         {

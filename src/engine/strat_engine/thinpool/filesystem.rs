@@ -10,7 +10,7 @@ use devicemapper::{Bytes, DmDevice, DmName, DmUuid, IEC, SECTOR_SIZE, Sectors, T
 use mnt::{MountIter, MountParam};
 use nix::mount::{MsFlags, mount, umount};
 use nix::sys::statvfs::statvfs;
-use tempdir::TempDir;
+use tempfile;
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -87,7 +87,9 @@ impl StratFilesystem {
                 // we can skip the mount/unmount.
 
                 // FIXME: get_mount_point doesn't work so assume we need to mount/unmount
-                let tmp_dir = TempDir::new("stratis_mp_")?;
+                let tmp_dir = tempfile::Builder::new()
+                    .prefix("stratis_mp_")
+                    .tempdir()?;
                 // Mount the snapshot with the "nouuid" option. mount
                 // will fail due to duplicate UUID otherwise.
                 mount(Some(&thin_dev.devnode()),

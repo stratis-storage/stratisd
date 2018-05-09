@@ -5,12 +5,23 @@
 // Functions for dealing with devices.
 
 use std::fs::OpenOptions;
-use std::io::{BufWriter, Seek, SeekFrom, Write};
+use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
 use stratis::StratisResult;
+
+use super::backstore::SyncAll;
+
+impl<T> SyncAll for BufWriter<T>
+where
+    T: SyncAll,
+{
+    fn sync_all(&mut self) -> io::Result<()> {
+        self.get_mut().sync_all()
+    }
+}
 
 /// Write buf at offset length times.
 pub fn write_sectors<P: AsRef<Path>>(
@@ -27,7 +38,7 @@ pub fn write_sectors<P: AsRef<Path>>(
         f.write_all(buf)?;
     }
 
-    f.flush()?;
+    f.sync_all()?;
     Ok(())
 }
 

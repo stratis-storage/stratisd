@@ -413,7 +413,7 @@ mod mda {
                 f.write_all(&hdr_buf)?;
             }
 
-            f.flush()?;
+            f.sync_all()?;
 
             Ok(MDARegions {
                 region_size,
@@ -505,7 +505,7 @@ mod mda {
                 )))?;
                 f.write_all(&hdr_buf)?;
                 f.write_all(data)?;
-                f.flush()?;
+                f.sync_all()?;
 
                 Ok(())
             };

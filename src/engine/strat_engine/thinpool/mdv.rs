@@ -8,12 +8,10 @@ use std::convert::From;
 use std::fs::{create_dir, read_dir, remove_dir, remove_file, rename, OpenOptions};
 use std::io::ErrorKind;
 use std::io::prelude::*;
-use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 
 use nix;
 use nix::mount::{mount, umount, MsFlags};
-use nix::unistd::fsync;
 use serde_json;
 
 use devicemapper::{DmDevice, LinearDev, LinearDevTargetParams, TargetLine};
@@ -150,8 +148,7 @@ impl MetadataVol {
             f.write_all(data.as_bytes())?;
 
             // Try really hard to make sure it goes to disk
-            f.flush()?;
-            fsync(f.as_raw_fd())?;
+            f.sync_all()?;
         }
 
         rename(temp_path, path)?;

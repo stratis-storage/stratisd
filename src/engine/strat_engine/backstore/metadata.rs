@@ -2,7 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::fs::File;
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::str::from_utf8;
 
 use byteorder::{ByteOrder, LittleEndian};
@@ -29,6 +30,33 @@ const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)
 
 const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
+
+/// The SyncAll trait unifies the File type with other types that do
+/// not implement sync_all(). The purpose is to allow testing of methods
+/// that sync to a File using other structs that also implement Write, but
+/// do not implement sync_all, e.g., the Cursor type.
+pub trait SyncAll: Write {
+    fn sync_all(&mut self) -> StratisResult<()>;
+}
+
+impl SyncAll for File {
+    /// Invokes File::sync_all() thereby syncing all the data
+    fn sync_all(&mut self) -> StratisResult<()> {
+        File::sync_all(self).map_err(|e| e.into())
+    }
+}
+
+impl<T> SyncAll for Cursor<T>
+    where Cursor<T>: Write
+{
+    /// A no-op. No data need be synced, because it is already in the Cursor
+    /// inner value, which has type T.
+    fn sync_all(&mut self) -> StratisResult<()> {
+        Ok(())
+    }
+}
+
+
 #[derive(Debug)]
 pub struct BDA {
     header: StaticHeader,
@@ -37,14 +65,14 @@ pub struct BDA {
 
 impl BDA {
     /// Initialize a blockdev with a Stratis BDA.
-    pub fn initialize<F>(mut f: &mut F,
+    pub fn initialize<F>(f: &mut F,
                          pool_uuid: Uuid,
                          dev_uuid: Uuid,
                          mda_size: Sectors,
                          blkdev_size: Sectors,
                          initialization_time: u64)
                          -> StratisResult<BDA>
-        where F: Seek + Write
+        where F: Seek + SyncAll
     {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
         let header = StaticHeader::new(pool_uuid,
@@ -59,12 +87,12 @@ impl BDA {
         f.write_all(&zeroed[..SECTOR_SIZE])?; // Zero 1 unused sector
         f.write_all(&hdr_buf)?;
         f.write_all(&zeroed[..SECTOR_SIZE * 7])?; // Zero 7 unused sectors
-        f.flush()?;
+        f.sync_all()?;
         f.write_all(&hdr_buf)?;
         f.write_all(&zeroed[..SECTOR_SIZE * 6])?; // Zero 6 unused sectors
-        f.flush()?;
+        f.sync_all()?;
 
-        let regions = mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, &mut f)?;
+        let regions = mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, f)?;
 
         Ok(BDA { header, regions })
     }
@@ -87,14 +115,14 @@ impl BDA {
     /// Zero out Static Header on the blockdev. This causes it to no
     /// longer be seen as a Stratis blockdev.
     pub fn wipe<F>(f: &mut F) -> StratisResult<()>
-        where F: Seek + Write
+        where F: Seek + SyncAll
     {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
 
         // Wiping Static Header should do it
         f.seek(SeekFrom::Start(0))?;
         f.write_all(&zeroed)?;
-        f.flush()?;
+        f.sync_all()?;
         Ok(())
     }
 
@@ -102,12 +130,12 @@ impl BDA {
     pub fn save_state<F>(&mut self,
                          time: &DateTime<Utc>,
                          metadata: &[u8],
-                         mut f: &mut F)
+                         f: &mut F)
                          -> StratisResult<()>
-        where F: Seek + Write
+        where F: Seek + SyncAll
     {
         self.regions
-            .save_state(BDA_STATIC_HDR_SIZE, time, metadata, &mut f)
+            .save_state(BDA_STATIC_HDR_SIZE, time, metadata, f)
     }
 
     /// Read latest metadata from the disk
@@ -308,7 +336,7 @@ impl StaticHeader {
 mod mda {
     use std;
     use std::cmp::Ordering;
-    use std::io::{Read, Seek, SeekFrom, Write};
+    use std::io::{Read, Seek, SeekFrom};
 
     use byteorder::{ByteOrder, LittleEndian};
     use chrono::{DateTime, TimeZone, Utc};
@@ -317,6 +345,9 @@ mod mda {
     use devicemapper::{Bytes, Sectors};
 
     use stratis::{ErrorEnum, StratisError, StratisResult};
+
+    use super::SyncAll;
+
 
     const _MDA_REGION_HDR_SIZE: usize = 32;
     const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
@@ -352,7 +383,7 @@ mod mda {
                              size: Sectors,
                              f: &mut F)
                              -> StratisResult<MDARegions>
-            where F: Seek + Write
+            where F: Seek + SyncAll
         {
             let hdr_buf = MDAHeader::default().to_buf();
 
@@ -423,7 +454,7 @@ mod mda {
                              data: &[u8],
                              f: &mut F)
                              -> StratisResult<()>
-            where F: Seek + Write
+            where F: Seek + SyncAll
         {
             if self.last_update_time() >= Some(time) {
                 return Err(StratisError::Engine(ErrorEnum::Invalid,

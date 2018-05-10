@@ -20,8 +20,6 @@ extern crate libc;
 extern crate libudev;
 extern crate nix;
 
-#[cfg(test)]
-extern crate quickcheck;
 
 use std::cell::RefCell;
 use std::env;

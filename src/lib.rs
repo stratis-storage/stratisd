@@ -15,7 +15,7 @@ extern crate chrono;
 #[cfg(feature="dbus_enabled")]
 extern crate dbus;
 
-extern crate tempdir;
+extern crate tempfile;
 extern crate rand;
 extern crate serde;
 extern crate mnt;

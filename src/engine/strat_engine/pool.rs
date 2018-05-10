@@ -289,7 +289,7 @@ mod tests {
     use super::super::backstore::{find_all, get_metadata};
     use super::super::devlinks;
     use super::super::tests::{loopbacked, real};
-    use super::super::tests::tempdir::TempDir;
+    use super::super::tests::tempfile;
 
     use super::*;
 
@@ -398,7 +398,10 @@ mod tests {
             .unwrap();
         invariant(&pool, &name);
 
-        let tmp_dir = TempDir::new("stratis_testing").unwrap();
+        let tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
         let new_file = tmp_dir.path().join("stratis_test.txt");
         let bytestring = b"some bytes";
         {

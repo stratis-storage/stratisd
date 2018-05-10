@@ -823,6 +823,7 @@ mod tests {
     use std::path::Path;
 
     use nix::mount::{MsFlags, mount, umount};
+    use tempfile;
     use uuid::Uuid;
 
     use devicemapper::{Bytes, SECTOR_SIZE};
@@ -831,7 +832,6 @@ mod tests {
 
     use super::super::super::backstore::MIN_MDA_SECTORS;
     use super::super::super::tests::{loopbacked, real};
-    use super::super::super::tests::tempfile;
 
     use super::super::filesystem::{FILESYSTEM_LOWATER, fs_usage};
 

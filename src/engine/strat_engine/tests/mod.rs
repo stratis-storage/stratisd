@@ -4,7 +4,6 @@
 
 extern crate env_logger;
 extern crate log;
-pub extern crate tempfile;
 
 mod logger;
 mod util;

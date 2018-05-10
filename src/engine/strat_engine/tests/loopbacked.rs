@@ -9,12 +9,13 @@ use std::io::{Seek, SeekFrom, Write};
 use std::panic;
 use std::path::{Path, PathBuf};
 
+use tempfile;
+
 use devicemapper::{Bytes, IEC, Sectors};
 
 use self::loopdev::{LoopControl, LoopDevice};
 
 use super::logger::init_logger;
-use super::tempfile;
 use super::util::clean_up;
 
 use super::super::device::wipe_sectors;

@@ -14,8 +14,8 @@ use super::super::engine::{BlockDev, BlockDevTier, BlockDevState};
 
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
-use super::util::{STRATIS_BASE_PATH, STRATIS_BASE_SERVICE, get_next_arg, get_parent, get_uuid,
-                  msg_code_ok, msg_string_ok};
+use super::util::{STRATIS_BASE_PATH, STRATIS_BASE_SERVICE, engine_to_dbus_err_tuple, get_next_arg,
+                  get_parent, get_uuid, msg_code_ok, msg_string_ok};
 
 
 pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
@@ -125,27 +125,15 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let id_changed = {
-        let (_, blockdev) = pool.get_mut_blockdev(blockdev_data.uuid)
-            .ok_or_else(|| {
-                            MethodErr::failed(&format!("no blockdev with uuid {}",
-                                                       blockdev_data.uuid))
-                        })?;
+    let result = pool.set_blockdev_user_info(&pool_name, blockdev_data.uuid, new_id);
 
-        blockdev.set_user_info(new_id)
+    let msg = match result {
+        Ok(id_changed) => return_message.append3(id_changed, msg_code_ok(), msg_string_ok()),
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
+            return_message.append3(default_return, rc, rs)
+        }
     };
-
-    // FIXME: engine should decide to save state, not this function
-    if id_changed {
-        pool.save_state(&pool_name)
-            .map_err(|err| {
-                         MethodErr::failed(&format!("Could not save state for object path {}: {}",
-                                                    object_path,
-                                                    err))
-                     })?;
-    }
-
-    let msg = return_message.append3(id_changed, msg_code_ok(), msg_string_ok());
 
     Ok(vec![msg])
 }

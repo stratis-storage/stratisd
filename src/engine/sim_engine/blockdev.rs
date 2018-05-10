@@ -35,10 +35,6 @@ impl BlockDev for SimDev {
         self.user_info.as_ref().map(|x| &**x)
     }
 
-    fn set_user_info(&mut self, user_info: Option<&str>) -> bool {
-        set_blockdev_user_info!(self; user_info)
-    }
-
     fn hardware_info(&self) -> Option<&str> {
         self.hardware_info.as_ref().map(|x| &**x)
     }
@@ -67,5 +63,12 @@ impl SimDev {
              hardware_info: None,
              initialization_time: Utc::now().timestamp() as u64,
          })
+    }
+
+    /// Set the user info on this blockdev.
+    /// The user_info may be None, which unsets user info.
+    /// Returns true if the user info was changed, otherwise false.
+    pub fn set_user_info(&mut self, user_info: Option<&str>) -> bool {
+        set_blockdev_user_info!(self; user_info)
     }
 }

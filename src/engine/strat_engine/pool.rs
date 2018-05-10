@@ -273,14 +273,17 @@ impl Pool for StratPool {
             .map(|(t, b)| (t, b as &BlockDev))
     }
 
-    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)> {
-        self.backstore
-            .get_mut_blockdev_by_uuid(uuid)
-            .map(|(t, b)| (t, b as &mut BlockDev))
-    }
-
-    fn save_state(&mut self, pool_name: &str) -> StratisResult<()> {
-        self.write_metadata(pool_name)
+    fn set_blockdev_user_info(&mut self,
+                              pool_name: &str,
+                              uuid: DevUuid,
+                              user_info: Option<&str>)
+                              -> StratisResult<bool> {
+        if self.backstore.set_blockdev_user_info(uuid, user_info)? {
+            self.write_metadata(pool_name)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 }
 

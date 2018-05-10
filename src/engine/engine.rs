@@ -27,9 +27,6 @@ pub trait BlockDev: Debug {
     /// Get the user-settable string associated with this blockdev.
     fn user_info(&self) -> Option<&str>;
 
-    /// Set the user-settable string associated with this blockdev.
-    fn set_user_info(&mut self, user_info: Option<&str>) -> bool;
-
     /// Get the hardware ID for this blockdev.
     fn hardware_info(&self) -> Option<&str>;
 
@@ -128,11 +125,13 @@ pub trait Pool: Debug {
     /// Get the blockdev in this pool with this UUID.
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)>;
 
-    /// Get the mutable filesystem in this pool with this UUID.
-    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)>;
-
-    /// Save the state of the pool. FIXME, see #614.
-    fn save_state(&mut self, pool_name: &str) -> StratisResult<()>;
+    /// Set the user-settable string associated with the blockdev specfied
+    /// by the uuid.
+    fn set_blockdev_user_info(&mut self,
+                              pool_name: &str,
+                              uuid: DevUuid,
+                              user_info: Option<&str>)
+                              -> StratisResult<bool>;
 }
 
 pub trait Engine: Debug {

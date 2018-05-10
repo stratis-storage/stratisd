@@ -55,6 +55,18 @@ impl SimPool {
     pub fn has_filesystems(&self) -> bool {
         !self.filesystems.is_empty()
     }
+
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut SimDev)> {
+        let cache_devs = &mut self.cache_devs;
+        self.block_devs
+            .get_mut(&uuid)
+            .and_then(|bd| Some((BlockDevTier::Data, bd)))
+            .or_else(move || {
+                         cache_devs
+                             .get_mut(&uuid)
+                             .and_then(|bd| Some((BlockDevTier::Cache, bd)))
+                     })
+    }
 }
 
 impl Pool for SimPool {
@@ -204,20 +216,18 @@ impl Pool for SimPool {
                      })
     }
 
-    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)> {
-        let cache_devs = &mut self.cache_devs;
-        self.block_devs
-            .get_mut(&uuid)
-            .and_then(|bd| Some((BlockDevTier::Data, bd as &mut BlockDev)))
-            .or_else(move || {
-                         cache_devs
-                             .get_mut(&uuid)
-                             .and_then(|bd| Some((BlockDevTier::Cache, bd as &mut BlockDev)))
-                     })
-    }
-
-    fn save_state(&mut self, _pool_name: &str) -> StratisResult<()> {
-        Ok(())
+    fn set_blockdev_user_info(&mut self,
+                              _pool_name: &str,
+                              uuid: DevUuid,
+                              user_info: Option<&str>)
+                              -> StratisResult<bool> {
+        self.get_mut_blockdev(uuid)
+            .map_or_else(|| {
+                             Err(StratisError::Engine(ErrorEnum::NotFound,
+                                                      format!("No blockdev for uuid {} found",
+                                                              uuid)))
+                         },
+                         |(_, b)| Ok(b.set_user_info(user_info)))
     }
 }
 

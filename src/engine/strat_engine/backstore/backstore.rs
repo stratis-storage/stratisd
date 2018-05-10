@@ -646,9 +646,9 @@ impl Backstore {
     }
 
     /// Lookup a mutable blockdev by its Stratis UUID.
-    pub fn get_mut_blockdev_by_uuid(&mut self,
-                                    uuid: DevUuid)
-                                    -> Option<(BlockDevTier, &mut StratBlockDev)> {
+    fn get_mut_blockdev_by_uuid(&mut self,
+                                uuid: DevUuid)
+                                -> Option<(BlockDevTier, &mut StratBlockDev)> {
         let cache_tier = &mut self.cache_tier;
         self.data_tier
             .get_mut_blockdev_by_uuid(uuid)
@@ -668,6 +668,21 @@ impl Backstore {
     /// Write the given data to the data tier's devices.
     pub fn save_state(&mut self, metadata: &[u8]) -> StratisResult<()> {
         self.data_tier.save_state(metadata)
+    }
+
+    /// Set user info field on the specified blockdev.
+    /// May return an error if there is no blockdev for the given UUID.
+    pub fn set_blockdev_user_info(&mut self,
+                                  uuid: DevUuid,
+                                  user_info: Option<&str>)
+                                  -> StratisResult<bool> {
+        self.get_mut_blockdev_by_uuid(uuid)
+            .map_or_else(|| {
+                             Err(StratisError::Engine(ErrorEnum::NotFound,
+                                                      format!("No blockdev for uuid {} found",
+                                                              uuid)))
+                         },
+                         |(_, b)| Ok(b.set_user_info(user_info)))
     }
 }
 

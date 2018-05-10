@@ -283,13 +283,13 @@ mod tests {
     use std::io::{Read, Write};
 
     use nix::mount::{MsFlags, mount, umount};
+    use tempfile;
 
     use super::super::super::types::Redundancy;
 
     use super::super::backstore::{find_all, get_metadata};
     use super::super::devlinks;
     use super::super::tests::{loopbacked, real};
-    use super::super::tests::tempfile;
 
     use super::*;
 

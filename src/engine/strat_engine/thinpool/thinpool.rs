@@ -871,8 +871,9 @@ fn attempt_thin_repair(
 
 #[cfg(test)]
 mod tests {
-    use std::fs::OpenOptions;
+    use std::fs::{File, OpenOptions};
     use std::io::{Read, Write};
+    use std::iter::FromIterator;
     use std::path::Path;
 
     use nix::mount::{mount, umount, MsFlags};
@@ -889,6 +890,110 @@ mod tests {
     use super::super::filesystem::{fs_usage, FILESYSTEM_LOWATER};
 
     use super::*;
+
+    const BYTES_PER_WRITE: usize = 2 * IEC::Ki as usize * SECTOR_SIZE as usize;
+
+    /// Verify that a full pool extends properly when additional space is added.
+    fn test_full_pool(paths: &[&Path]) {
+        let pool_uuid = Uuid::new_v4();
+        devlinks::setup_dev_path().unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        let first_path = Vec::from_iter(paths[0..1].iter().cloned());
+        let remaining_paths = Vec::from_iter(paths[1..paths.len()].iter().cloned());
+        let mut backstore =
+            Backstore::initialize(pool_uuid, &first_path, MIN_MDA_SECTORS, false).unwrap();
+        let mut pool = ThinPool::new(
+            pool_uuid,
+            &ThinPoolSizeParams::default(),
+            DATA_BLOCK_SIZE,
+            DATA_LOWATER,
+            &mut backstore,
+        ).unwrap();
+
+        let pool_name = "stratis_test_pool";
+        devlinks::pool_added(&pool_name).unwrap();
+        let fs_uuid = pool.create_filesystem(pool_name, "stratis_test_filesystem", None)
+            .unwrap();
+        let write_buf = &[8u8; BYTES_PER_WRITE];
+        let source_tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
+        {
+            // to allow mutable borrow of pool
+            let (_, filesystem) = pool.get_filesystem_by_uuid(fs_uuid).unwrap();
+            mount(
+                Some(&filesystem.devnode()),
+                source_tmp_dir.path(),
+                Some("xfs"),
+                MsFlags::empty(),
+                None as Option<&str>,
+            ).unwrap();
+            let file_path = source_tmp_dir.path().join("stratis_test.txt");
+            let mut f: File = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(file_path)
+                .unwrap();
+            // Write the write_buf until the pool is full
+            loop {
+                let status: dm::ThinPoolStatus = pool.thin_pool.status(get_dm()).unwrap();
+                match status {
+                    dm::ThinPoolStatus::Working(ref _status) => {
+                        f.write_all(write_buf).unwrap();
+                        if let Err(_e) = f.sync_data() {
+                            break;
+                        }
+                    }
+                    dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working."),
+                }
+            }
+        }
+        match pool.thin_pool.status(get_dm()).unwrap() {
+            dm::ThinPoolStatus::Working(ref status) => {
+                assert!(
+                    status.summary == ThinPoolStatusSummary::OutOfSpace,
+                    "Expected full pool",
+                );
+            }
+            dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working/full."),
+        };
+        // Add block devices to the pool and run check() to extend
+        backstore
+            .add_blockdevs(&remaining_paths, BlockDevTier::Data, true)
+            .unwrap();
+        pool.check(&mut backstore).unwrap();
+        // Verify the pool is back in a Good state
+        match pool.thin_pool.status(get_dm()).unwrap() {
+            dm::ThinPoolStatus::Working(ref status) => {
+                assert!(
+                    status.summary == ThinPoolStatusSummary::Good,
+                    "Expected pool to be restored to good state",
+                );
+            }
+            dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail.  Expected working/good."),
+        };
+    }
+
+    #[test]
+    pub fn loop_test_full_pool() {
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Exactly(2, Some(Bytes(IEC::Gi).sectors())),
+            test_full_pool,
+        );
+    }
+
+    #[test]
+    pub fn real_test_full_pool() {
+        real::test_with_spec(
+            real::DeviceLimits::Exactly(
+                2,
+                Some(Bytes(IEC::Gi).sectors()),
+                Some(Bytes(IEC::Gi * 4).sectors()),
+            ),
+            test_full_pool,
+        );
+    }
 
     /// Verify a snapshot has the same files and same contents as the origin.
     fn test_filesystem_snapshot(paths: &[&Path]) {

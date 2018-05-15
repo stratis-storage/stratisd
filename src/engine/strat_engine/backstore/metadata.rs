@@ -848,7 +848,8 @@ mod tests {
     fn prop_test_ownership() {
         fn test_ownership(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
             let sh = random_static_header(blkdev_size, mda_size_factor);
-            let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+            let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
+            let mut buf = Cursor::new(vec![0; buf_size]);
             let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
             match ownership {
                 DevOwnership::Unowned => {}
@@ -893,7 +894,8 @@ mod tests {
     fn prop_empty_bda() {
         fn empty_bda(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
             let sh = random_static_header(blkdev_size, mda_size_factor);
-            let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+            let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
+            let mut buf = Cursor::new(vec![0; buf_size]);
             let bda = BDA::initialize(&mut buf,
                                       sh.pool_uuid,
                                       sh.dev_uuid,
@@ -961,7 +963,8 @@ mod tests {
                        next_state: Vec<u8>)
                        -> TestResult {
             let sh = random_static_header(blkdev_size, mda_size_factor);
-            let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+            let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
+            let mut buf = Cursor::new(vec![0; buf_size]);
             let mut bda = BDA::initialize(&mut buf,
                                           sh.pool_uuid,
                                           sh.dev_uuid,

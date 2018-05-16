@@ -1,2 +1,2 @@
-tox
-yapf
+tox==3.0.0
+yapf==0.21.0

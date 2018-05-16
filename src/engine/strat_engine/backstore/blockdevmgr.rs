@@ -17,7 +17,6 @@ use devicemapper::{Bytes, Device, IEC, LinearDevTargetParams, LinearTargetParams
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::super::engine::BlockDev;
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::engine::DevOwnership;
@@ -297,25 +296,19 @@ impl BlockDevMgr {
     }
 
     /// Get references to managed blockdevs.
-    pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
+    pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
         self.block_devs
             .iter()
-            .map(|bd| (bd.uuid(), bd as &BlockDev))
+            .map(|bd| (bd.uuid(), bd))
             .collect()
     }
 
-    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<&BlockDev> {
-        self.block_devs
-            .iter()
-            .find(|bd| bd.uuid() == uuid)
-            .map(|bd| bd as &BlockDev)
+    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<&StratBlockDev> {
+        self.block_devs.iter().find(|bd| bd.uuid() == uuid)
     }
 
-    pub fn get_mut_blockdev_by_uuid(&mut self, uuid: DevUuid) -> Option<&mut BlockDev> {
-        self.block_devs
-            .iter_mut()
-            .find(|bd| bd.uuid() == uuid)
-            .map(|bd| bd as &mut BlockDev)
+    pub fn get_mut_blockdev_by_uuid(&mut self, uuid: DevUuid) -> Option<&mut StratBlockDev> {
+        self.block_devs.iter_mut().find(|bd| bd.uuid() == uuid)
     }
 
     // SIZE methods

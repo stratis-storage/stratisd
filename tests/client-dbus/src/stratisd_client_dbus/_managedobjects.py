@@ -28,7 +28,9 @@ filesystems = mo_query_builder(
 blockdevs = mo_query_builder(
     ET.fromstring(SPECS['org.storage.stratis1.blockdev']))
 
-MOPool = managed_object_class(
-    "MOPool", ET.fromstring(SPECS['org.storage.stratis1.pool']))
-MOBlockDev = managed_object_class(
-    "MOBlockDev", ET.fromstring(SPECS['org.storage.stratis1.blockdev']))
+MOPool = managed_object_class("MOPool",
+                              ET.fromstring(
+                                  SPECS['org.storage.stratis1.pool']))
+MOBlockDev = managed_object_class("MOBlockDev",
+                                  ET.fromstring(
+                                      SPECS['org.storage.stratis1.blockdev']))

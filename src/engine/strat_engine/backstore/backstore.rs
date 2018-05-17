@@ -13,7 +13,6 @@ use devicemapper::{CacheDev, Device, DmDevice, IEC, LinearDev, Sectors};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::super::engine::BlockDev;
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
 use super::super::device::wipe_sectors;
@@ -21,6 +20,7 @@ use super::super::dm::get_dm;
 use super::super::dmnames::{CacheRole, format_backstore_ids};
 use super::super::serde_structs::{BackstoreSave, Recordable};
 
+use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment, coalesce_blkdevsegs, map_to_dm};
 use super::metadata::MIN_MDA_SECTORS;
 use super::setup::get_blockdevs;
@@ -190,7 +190,7 @@ impl DataTier {
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.
-    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
+    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
         self.block_mgr
             .get_blockdev_by_uuid(uuid)
             .and_then(|bd| Some((BlockDevTier::Data, bd)))
@@ -199,14 +199,14 @@ impl DataTier {
     /// Lookup a mutable blockdev by its Stratis UUID.
     pub fn get_mut_blockdev_by_uuid(&mut self,
                                     uuid: DevUuid)
-                                    -> Option<(BlockDevTier, &mut BlockDev)> {
+                                    -> Option<(BlockDevTier, &mut StratBlockDev)> {
         self.block_mgr
             .get_mut_blockdev_by_uuid(uuid)
             .and_then(|bd| Some((BlockDevTier::Data, bd)))
     }
 
     /// Get the blockdevs belonging to this tier
-    pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
+    pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
         self.block_mgr.blockdevs()
     }
 }
@@ -385,12 +385,12 @@ impl CacheTier {
     }
 
     /// Get all the blockdevs belonging to this tier.
-    pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
+    pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
         self.block_mgr.blockdevs()
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.
-    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
+    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
         self.block_mgr
             .get_blockdev_by_uuid(uuid)
             .and_then(|bd| Some((BlockDevTier::Cache, bd)))
@@ -399,7 +399,7 @@ impl CacheTier {
     /// Lookup a mutable blockdev by its Stratis UUID.
     pub fn get_mut_blockdev_by_uuid(&mut self,
                                     uuid: DevUuid)
-                                    -> Option<(BlockDevTier, &mut BlockDev)> {
+                                    -> Option<(BlockDevTier, &mut StratBlockDev)> {
         self.block_mgr
             .get_mut_blockdev_by_uuid(uuid)
             .and_then(|bd| Some((BlockDevTier::Cache, bd)))
@@ -567,7 +567,7 @@ impl Backstore {
     /// Return a reference to all the blockdevs that this pool has ownership
     /// of. The blockdevs may be returned in any order. It is unsafe to assume
     /// that they are grouped by tier or any other organization.
-    pub fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
+    pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
         match self.cache_tier {
             Some(ref cache) => {
                 cache
@@ -635,7 +635,7 @@ impl Backstore {
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.
-    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
+    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
         self.data_tier
             .get_blockdev_by_uuid(uuid)
             .or_else(|| {
@@ -648,7 +648,7 @@ impl Backstore {
     /// Lookup a mutable blockdev by its Stratis UUID.
     pub fn get_mut_blockdev_by_uuid(&mut self,
                                     uuid: DevUuid)
-                                    -> Option<(BlockDevTier, &mut BlockDev)> {
+                                    -> Option<(BlockDevTier, &mut StratBlockDev)> {
         let cache_tier = &mut self.cache_tier;
         self.data_tier
             .get_mut_blockdev_by_uuid(uuid)

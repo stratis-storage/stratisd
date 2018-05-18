@@ -173,7 +173,7 @@ fn get_devices(limits: DeviceLimits, devpaths: &[&Path]) -> Vec<Vec<RealTestDev>
             (lower, Some(upper + 1), min_size, max_size)
         }
     };
-    assert!(max_size.is_none() || min_size < max_size,
+    assert!(max_size.is_none() || min_size <= max_size,
             "Minimum device size greater than maximum");
     let mut devices: Vec<Vec<RealTestDev>> = vec![];
     let correct_size: Vec<&Path> = devpaths

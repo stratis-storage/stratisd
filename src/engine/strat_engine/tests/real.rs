@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+extern crate either;
 
 use std::{cmp, panic};
 use std::fs::OpenOptions;
@@ -19,33 +20,32 @@ use super::super::backstore::blkdev_size;
 use super::super::device::wipe_sectors;
 use super::super::dm::get_dm;
 
+use self::either::Either;
+
 pub struct RealTestDev {
-    path: PathBuf,
-    linear: Option<LinearDev>,
+    dev: Either<PathBuf, LinearDev>,
 }
 
 impl RealTestDev {
     /// Construct a new test device for the given path.
     /// Wipe initial MiB to clear metadata.
-    pub fn new(path: &Path, linear_dev: Option<LinearDev>) -> RealTestDev {
-        wipe_sectors(path, Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
-        RealTestDev {
-            path: PathBuf::from(path),
-            linear: linear_dev,
-        }
+    pub fn new(dev: Either<PathBuf, LinearDev>) -> RealTestDev {
+        let result = RealTestDev { dev };
+        wipe_sectors(result.as_path(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
+        result
     }
 
     /// Get the device node of the device.
-    fn as_path(&self) -> &Path {
-        &self.path
+    fn as_path(&self) -> PathBuf {
+        self.dev.as_ref().either(|p| p.clone(), |l| l.devnode())
     }
 }
 
 impl Drop for RealTestDev {
     fn drop(&mut self) {
-        wipe_sectors(&self.path, Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
+        wipe_sectors(&self.as_path(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
         // If the block device is a LinearDev clean up
-        if let Some(ref ld) = self.linear {
+        if let Some(ref ld) = self.dev.as_ref().right() {
             // LinearDev::teardown() can't be called from a class that implements
             // drop.  TODO: Is there a better work around?
             get_dm()
@@ -164,7 +164,7 @@ fn slice_devices(devpaths: &[&Path], min_count: usize, min_size: Sectors) -> Vec
         // will cleanup the LinearDev.
         slices.append(&mut linear_devs
                                .into_iter()
-                               .map(|ld| RealTestDev::new(&ld.devnode(), Some(ld)))
+                               .map(|ld| RealTestDev::new(Either::Right(ld)))
                                .collect());
     }
     slices
@@ -204,13 +204,13 @@ fn get_devices(limits: DeviceLimits, devpaths: &[&Path]) -> Vec<Vec<RealTestDev>
         devices.push(correct_size[0..lower]
                          .to_vec()
                          .iter()
-                         .map(|x| RealTestDev::new(x, None))
+                         .map(|x| RealTestDev::new(Either::Left(x.to_path_buf())))
                          .collect());
         if maybe_upper.is_some() {
             devices.push(correct_size[0..(maybe_upper.unwrap() - 1)]
                              .to_vec()
                              .iter()
-                             .map(|x| RealTestDev::new(x, None))
+                             .map(|x| RealTestDev::new(Either::Left(x.to_path_buf())))
                              .collect());
         };
     }
@@ -246,8 +246,9 @@ pub fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
     for devices in runs {
         clean_up().unwrap();
 
-        let result =
-            panic::catch_unwind(|| test(&devices.iter().map(|x| x.as_path()).collect::<Vec<_>>()));
+        let paths: Vec<PathBuf> = devices.iter().map(|x| x.as_path()).collect();
+        let paths: Vec<&Path> = paths.iter().map(|x| x.as_path()).collect();
+        let result = panic::catch_unwind(|| test(&paths));
         let tear_down = clean_up();
 
         result.unwrap();

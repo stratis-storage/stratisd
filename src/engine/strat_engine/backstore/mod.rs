@@ -13,6 +13,8 @@ mod range_alloc;
 mod setup;
 mod util;
 
+#[cfg(test)]
+pub use self::device::blkdev_size;
 pub use self::metadata::MIN_MDA_SECTORS;
 pub use self::setup::{find_all, get_metadata, is_stratis_device, setup_pool};
 pub use self::backstore::Backstore;

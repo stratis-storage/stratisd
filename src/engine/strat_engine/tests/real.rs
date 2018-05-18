@@ -4,7 +4,7 @@
 
 extern crate either;
 
-use std::{cmp, panic};
+use std::panic;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
@@ -61,21 +61,10 @@ pub enum DeviceLimits {
     Range(usize, usize, Option<Sectors>, Option<Sectors>), // inclusive
 }
 
-/// Return true if the given path is >= min_size and <= max_size
-fn size_ok(dev: &Path, min_size: Option<Sectors>, max_size: Option<Sectors>) -> bool {
-    if min_size == None && max_size == None {
-        return true;
-    }
-    let file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(&dev)
-        .unwrap();
-    let blkdev_size = Some(blkdev_size(&file).unwrap().sectors());
-    min_size <= blkdev_size && (max_size.is_none() || max_size >= blkdev_size)
-}
 
-/// Create LinearDevs of min_size using the space from the path
+/// Create count LinearDevs of min_size from dev. Return a vector of the
+/// newly created LinearDevs.
+/// Precondition: min_size * count < the size of the device
 fn slice_disk(dev: &Path, min_size: Sectors, count: u64) -> Vec<LinearDev> {
     let mut start = Sectors(0);
     let mut lds = vec![];
@@ -98,41 +87,31 @@ fn slice_disk(dev: &Path, min_size: Sectors, count: u64) -> Vec<LinearDev> {
     lds
 }
 
-/// Return how many slices of min_size will fit on the block device
-fn slice_count(dev: &Path, min_size: Sectors) -> u64 {
-    let file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(&dev)
-        .unwrap();
-    blkdev_size(&file).unwrap().sectors() / min_size
-}
-
-/// Create min_count LinearDevs from the paths if possible
-fn slice_devices(devpaths: &[&Path], min_count: usize, min_size: Sectors) -> Vec<RealTestDev> {
-    let mut slices: Vec<RealTestDev> = vec![];
-
-    // Determine how many block devices of min_size can each of the paths provide
-    let path_slice_count = devpaths
-        .to_vec()
+/// Create exactly min_count LinearDevs of min_size from the paths in
+/// dev_sizes. If this is impossible, return an empty Vec.
+fn slice_devices(dev_sizes: &[(&Path, Sectors)],
+                 min_count: usize,
+                 min_size: Sectors)
+                 -> Vec<RealTestDev> {
+    // The number of devices of min_size that each device can provide
+    let path_slice_count = dev_sizes
         .iter()
-        .map(|&dev| (dev, slice_count(dev, min_size)))
+        .map(|(dev, size)| (dev, *size / min_size))
         .collect::<Vec<(_, u64)>>();
 
     // Get the sum of all the block devices for each path
     let total_possible_slices = path_slice_count
-        .to_vec()
         .iter()
         .fold(0u64, |sum, tup| sum + tup.1);
 
     // If the min_count can be provided, create linear devs to be returned,
     // Otherwise return an empty vec[].
     if total_possible_slices >= min_count as u64 {
-        let mut needed_count = 0;
-        let mut avail_slices: u64 = 0;
 
         // Determine how many of the paths we need to slice into LinearDevs to
         // meet min_count
+        let mut needed_count = 0;
+        let mut avail_slices: u64 = 0;
         for path in path_slice_count.iter() {
             needed_count += 1;
             avail_slices += path.1;
@@ -141,24 +120,25 @@ fn slice_devices(devpaths: &[&Path], min_count: usize, min_size: Sectors) -> Vec
             }
         }
 
-        // Create needed_count LinearDevs
-        let linear_devs: Vec<LinearDev> = path_slice_count[0..needed_count]
-            .to_vec()
+        let mut linear_devs: Vec<LinearDev> = path_slice_count[0..needed_count]
             .iter()
-            .map(|&tup| slice_disk(tup.0, min_size, cmp::min(tup.1, min_count as u64)))
-            .collect::<Vec<Vec<LinearDev>>>()
-            .into_iter()
+            .map(|&tup| slice_disk(tup.0, min_size, tup.1))
             .flat_map(|vec| vec.into_iter())
             .collect();
 
-        // Wrap the LinearDev in a RealTestDev.  The RealTestDev drop implementation
-        // will cleanup the LinearDev.
-        slices.append(&mut linear_devs
-                               .into_iter()
-                               .map(|ld| RealTestDev::new(Either::Right(ld)))
-                               .collect());
+        // Teardown any extra linear devs
+        for ld in linear_devs.split_off(min_count) {
+            ld.teardown(get_dm()).unwrap();
+        }
+
+        // Return the requested amount as RealTestDevs
+        linear_devs
+            .into_iter()
+            .map(|ld| RealTestDev::new(Either::Right(ld)))
+            .collect()
+    } else {
+        vec![]
     }
-    slices
 }
 
 /// Get a list of test devices to be used for tests.
@@ -173,30 +153,48 @@ fn get_devices(limits: DeviceLimits, devpaths: &[&Path]) -> Vec<Vec<RealTestDev>
             (lower, Some(upper + 1), min_size, max_size)
         }
     };
-    assert!(max_size.is_none() || min_size <= max_size,
+    let min_size = min_size.unwrap_or(Bytes(IEC::Gi).sectors());
+
+    assert!(max_size.is_none() || Some(min_size) <= max_size,
             "Minimum device size greater than maximum");
-    let mut devices: Vec<Vec<RealTestDev>> = vec![];
-    let correct_size: Vec<&Path> = devpaths
-        .to_vec()
+
+    let dev_sizes: Vec<(&Path, Sectors)> = devpaths
         .iter()
-        .cloned()
-        .filter(|dev| size_ok(dev, min_size, max_size))
+        .map(|p| {
+                 (*p,
+                  blkdev_size(&OpenOptions::new().read(true).open(p).unwrap())
+                      .unwrap()
+                      .sectors())
+             })
+        .collect();
+
+    let test_devices = dev_sizes
+        .iter()
+        .filter(|(_, s)| min_size < *s && (max_size.is_none() || Some(*s) <= max_size))
+        .map(|(p, _)| *p)
         .collect::<Vec<&Path>>();
-    if correct_size.len() <= lower {
-        let slices = slice_devices(devpaths,
-                                   lower,
-                                   min_size.unwrap_or(Bytes(IEC::Gi).sectors()));
-        assert!(slices.len() >= lower,
+
+    let mut devices: Vec<Vec<RealTestDev>> = vec![];
+
+    // FIXME: if it is necessary to partition the devices using linear devs,
+    // only return one list of devices, ever. mulhern believes that the only
+    // way to be able to make a selection of devices for an upper and lower
+    // bound is to make LinearDevs Clone. If LinearDevs were Clone, then it
+    // would be possible to clone portions of a vec of RealTestDevs for the
+    // upper and lower bounds.
+    if test_devices.len() < lower {
+        let test_devices = slice_devices(&dev_sizes, lower, min_size);
+        assert!(test_devices.len() == lower,
                 "Test devices supplied do not meet minimum requirements");
-        devices.push(slices);
+        devices.push(test_devices);
     } else {
-        devices.push(correct_size[0..lower]
+        devices.push(test_devices[0..lower]
                          .to_vec()
                          .iter()
                          .map(|x| RealTestDev::new(Either::Left(x.to_path_buf())))
                          .collect());
         if maybe_upper.is_some() {
-            devices.push(correct_size[0..(maybe_upper.unwrap() - 1)]
+            devices.push(test_devices[0..(maybe_upper.unwrap() - 1)]
                              .to_vec()
                              .iter()
                              .map(|x| RealTestDev::new(Either::Left(x.to_path_buf())))

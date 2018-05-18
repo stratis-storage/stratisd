@@ -170,10 +170,9 @@ fn slice_devices(devpaths: &[&Path], min_count: usize, min_size: Sectors) -> Vec
     slices
 }
 
-/// Get a list of counts of devices to use for tests.
-/// None of the counts can be greater than avail.
+/// Get a list of test devices to be used for tests.
 fn get_devices(limits: DeviceLimits, devpaths: &[&Path]) -> Vec<Vec<RealTestDev>> {
-    // Convert enum to [lower, Option<upper>) values
+    // Convert enum to [lower, Option<upper>, min_size, max_size) values
     let (lower, maybe_upper, min_size, max_size) = match limits {
         DeviceLimits::Exactly(num, min_size, max_size) => (num, None, min_size, max_size),
         DeviceLimits::AtLeast(num, min_size, max_size) => (num, None, min_size, max_size),

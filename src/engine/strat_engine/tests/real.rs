@@ -71,17 +71,8 @@ fn size_ok(dev: &Path, min_size: Option<Sectors>, max_size: Option<Sectors>) -> 
         .write(true)
         .open(&dev)
         .unwrap();
-    let blkdev_size = blkdev_size(&file).unwrap().sectors();
-
-    if min_size.unwrap_or(Sectors(0)) > blkdev_size {
-        return false;
-    }
-
-    if max_size.unwrap_or(Sectors(<u64>::max_value())) < blkdev_size {
-        return false;
-    }
-
-    return true;
+    let blkdev_size = Some(blkdev_size(&file).unwrap().sectors());
+    min_size <= blkdev_size && (max_size.is_none() || max_size >= blkdev_size)
 }
 
 /// Create LinearDevs of min_size using the space from the path
@@ -182,8 +173,7 @@ fn get_devices(limits: DeviceLimits, devpaths: &[&Path]) -> Vec<Vec<RealTestDev>
             (lower, Some(upper + 1), min_size, max_size)
         }
     };
-    assert!(min_size.unwrap_or(Sectors(u64::min_value())) <
-            max_size.unwrap_or(Sectors(u64::max_value())),
+    assert!(max_size.is_none() || min_size < max_size,
             "Minimum device size greater than maximum");
     let mut devices: Vec<Vec<RealTestDev>> = vec![];
     let correct_size: Vec<&Path> = devpaths

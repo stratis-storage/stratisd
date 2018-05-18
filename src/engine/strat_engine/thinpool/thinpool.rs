@@ -1201,8 +1201,7 @@ mod tests {
 
     #[test]
     pub fn real_test_meta_expand() {
-        real::test_with_spec(real::DeviceLimits::Range(2, 3, None, None),
-                             test_meta_expand);
+        real::test_with_spec(real::DeviceLimits::Range(2, 3), test_meta_expand);
     }
 
     /// Verify that the meta device backing a ThinPool is expanded when meta

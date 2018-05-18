@@ -58,7 +58,7 @@ impl Drop for RealTestDev {
 pub enum DeviceLimits {
     Exactly(usize, Option<Sectors>, Option<Sectors>),
     AtLeast(usize, Option<Sectors>, Option<Sectors>),
-    Range(usize, usize, Option<Sectors>, Option<Sectors>), // inclusive
+    Range(usize, usize), // inclusive
 }
 
 
@@ -147,10 +147,10 @@ fn get_devices(limits: DeviceLimits, devpaths: &[&Path]) -> Vec<Vec<RealTestDev>
     let (lower, maybe_upper, min_size, max_size) = match limits {
         DeviceLimits::Exactly(num, min_size, max_size) => (num, None, min_size, max_size),
         DeviceLimits::AtLeast(num, min_size, max_size) => (num, None, min_size, max_size),
-        DeviceLimits::Range(lower, upper, min_size, max_size) => {
+        DeviceLimits::Range(lower, upper) => {
             assert!(lower < upper,
                     "Upper bound of range must be greater than the lower bound");
-            (lower, Some(upper + 1), min_size, max_size)
+            (lower, Some(upper + 1), None, None)
         }
     };
     let min_size = min_size.unwrap_or(Bytes(IEC::Gi).sectors());
@@ -181,7 +181,8 @@ fn get_devices(limits: DeviceLimits, devpaths: &[&Path]) -> Vec<Vec<RealTestDev>
     // way to be able to make a selection of devices for an upper and lower
     // bound is to make LinearDevs Clone. If LinearDevs were Clone, then it
     // would be possible to clone portions of a vec of RealTestDevs for the
-    // upper and lower bounds.
+    // upper and lower bounds. If this is fixed, then Range constructor
+    // can be extended to include size bounds.
     if test_devices.len() < lower {
         let test_devices = slice_devices(&dev_sizes, lower, min_size);
         assert!(test_devices.len() == lower,

@@ -24,7 +24,6 @@ use super::thinpool::{ThinPool, ThinPoolSizeParams};
 
 pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
 
-
 /// Check the metadata of an individual pool for consistency.
 pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
     // If the amount allocated from the cache tier is not the same as that
@@ -359,7 +358,8 @@ mod tests {
 
     #[test]
     pub fn real_test_basic_metadata() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_basic_metadata);
+        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None),
+                             test_basic_metadata);
     }
 
     /// Verify that a pool with no devices does not have the minimum amount of
@@ -376,7 +376,7 @@ mod tests {
 
     #[test]
     pub fn real_test_empty_pool() {
-        real::test_with_spec(real::DeviceLimits::Exactly(0), test_empty_pool);
+        real::test_with_spec(real::DeviceLimits::Exactly(0, None, None), test_empty_pool);
     }
 
     /// Test that adding a cachedev causes metadata to be updated.
@@ -521,6 +521,7 @@ mod tests {
 
     #[test]
     pub fn real_test_add_cachedevs() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_add_cachedevs);
+        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None),
+                             test_add_cachedevs);
     }
 }

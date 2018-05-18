@@ -58,7 +58,6 @@ impl Drop for RealTestDev {
 pub enum DeviceLimits {
     Exactly(usize, Option<Sectors>, Option<Sectors>),
     AtLeast(usize, Option<Sectors>, Option<Sectors>),
-    #[allow(dead_code)]
     Range(usize, usize, Option<Sectors>, Option<Sectors>), // inclusive
 }
 

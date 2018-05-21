@@ -2,13 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+extern crate either;
+
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::{cmp, panic};
 
+use self::either::Either;
 use serde_json::{from_reader, Value};
 
-use devicemapper::{Bytes, Sectors, IEC};
+use devicemapper::{Bytes, DmDevice, LinearDev, Sectors, IEC};
 
 use super::super::backstore::blkdev_size;
 use super::super::device::wipe_sectors;
@@ -17,7 +20,7 @@ use super::logger::init_logger;
 use super::util::clean_up;
 
 pub struct RealTestDev {
-    path: PathBuf,
+    dev: Either<PathBuf, LinearDev>,
 }
 
 impl RealTestDev {
@@ -26,19 +29,19 @@ impl RealTestDev {
     pub fn new(path: &Path) -> RealTestDev {
         wipe_sectors(path, Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
         RealTestDev {
-            path: PathBuf::from(path),
+            dev: Either::Left(PathBuf::from(path)),
         }
     }
 
     /// Get the device node of the device.
-    fn as_path(&self) -> &Path {
-        &self.path
+    fn as_path(&self) -> PathBuf {
+        self.dev.as_ref().either(|p| p.clone(), |l| l.devnode())
     }
 }
 
 impl Drop for RealTestDev {
     fn drop(&mut self) {
-        wipe_sectors(&self.path, Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
+        wipe_sectors(&self.as_path(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
     }
 }
 
@@ -170,8 +173,9 @@ where
 
         clean_up().unwrap();
 
-        let result =
-            panic::catch_unwind(|| test(&devices.iter().map(|x| x.as_path()).collect::<Vec<_>>()));
+        let paths: Vec<PathBuf> = devices.iter().map(|x| x.as_path()).collect();
+        let paths: Vec<&Path> = paths.iter().map(|x| x.as_path()).collect();
+        let result = panic::catch_unwind(|| test(&paths));
         let tear_down = clean_up();
 
         result.unwrap();

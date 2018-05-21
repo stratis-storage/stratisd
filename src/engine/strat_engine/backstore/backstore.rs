@@ -854,7 +854,10 @@ mod tests {
 
     #[test]
     pub fn real_test_add_cache_devs() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(4, None), test_add_cache_devs);
+        real::test_with_spec(
+            real::DeviceLimits::AtLeast(4, None, None),
+            test_add_cache_devs,
+        );
     }
 
     #[test]
@@ -910,7 +913,7 @@ mod tests {
 
     #[test]
     pub fn real_test_setup() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2, None), test_setup);
+        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None), test_setup);
     }
 
     #[test]

@@ -984,7 +984,7 @@ mod tests {
     #[test]
     pub fn real_test_filesystem_snapshot() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(2, None),
+            real::DeviceLimits::AtLeast(2, None, None),
             test_filesystem_snapshot,
         );
     }
@@ -1037,7 +1037,10 @@ mod tests {
 
     #[test]
     pub fn real_test_filesystem_rename() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None), test_filesystem_rename);
+        real::test_with_spec(
+            real::DeviceLimits::AtLeast(1, None, None),
+            test_filesystem_rename,
+        );
     }
 
     /// Verify that setting up a pool when the pool has not been previously torn
@@ -1102,7 +1105,7 @@ mod tests {
 
     #[test]
     pub fn real_test_pool_setup() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None), test_pool_setup);
+        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_pool_setup);
     }
     /// Verify that destroy_filesystems actually deallocates the space
     /// from the thinpool, by attempting to reinstantiate it using the
@@ -1170,7 +1173,10 @@ mod tests {
 
     #[test]
     pub fn real_test_meta_expand() {
-        real::test_with_spec(real::DeviceLimits::Range(2, 3, None), test_meta_expand);
+        real::test_with_spec(
+            real::DeviceLimits::Range(2, 3, None, None),
+            test_meta_expand,
+        );
     }
 
     /// Verify that the meta device backing a ThinPool is expanded when meta
@@ -1221,7 +1227,10 @@ mod tests {
 
     #[test]
     pub fn real_test_thindev_destroy() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None), test_thindev_destroy);
+        real::test_with_spec(
+            real::DeviceLimits::AtLeast(1, None, None),
+            test_thindev_destroy,
+        );
     }
 
     /// Verify that the physical space allocated to a pool is expanded when
@@ -1274,7 +1283,10 @@ mod tests {
 
     #[test]
     pub fn real_test_thinpool_expand() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None), test_thinpool_expand);
+        real::test_with_spec(
+            real::DeviceLimits::AtLeast(1, None, None),
+            test_thinpool_expand,
+        );
     }
 
     /// Verify that the logical space allocated to a filesystem is expanded when
@@ -1351,7 +1363,7 @@ mod tests {
 
     #[test]
     pub fn real_test_xfs_expand() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None), test_xfs_expand);
+        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_xfs_expand);
     }
 
     /// Just suspend and resume the device and make sure it doesn't crash.
@@ -1388,7 +1400,10 @@ mod tests {
 
     #[test]
     pub fn real_test_suspend_resume() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None), test_suspend_resume);
+        real::test_with_spec(
+            real::DeviceLimits::AtLeast(1, None, None),
+            test_suspend_resume,
+        );
     }
 
     /// Set up thinpool and backstore. Set up filesystem and write to it.
@@ -1489,6 +1504,6 @@ mod tests {
 
     #[test]
     pub fn real_test_set_device() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2, None), test_set_device);
+        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None), test_set_device);
     }
 }

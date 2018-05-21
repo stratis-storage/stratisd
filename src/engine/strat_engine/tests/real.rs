@@ -48,9 +48,12 @@ pub enum DeviceLimits {
     Range(usize, usize), // inclusive
 }
 
-/// Get a list of counts of devices to use for tests.
+/// Get a list of lists of devices to use for tests.
 /// May return an empty list if the request is not satisfiable.
-fn get_device_counts(limits: DeviceLimits, dev_sizes: &[(&Path, Sectors)]) -> Vec<usize> {
+fn get_device_runs<'a>(
+    limits: DeviceLimits,
+    dev_sizes: &[(&'a Path, Sectors)],
+) -> Vec<Vec<&'a Path>> {
     let avail = dev_sizes.len();
 
     // Convert enum to [lower, Option<upper>) values
@@ -63,27 +66,45 @@ fn get_device_counts(limits: DeviceLimits, dev_sizes: &[(&Path, Sectors)]) -> Ve
         }
     };
 
-    let mut counts = vec![];
+    let mut device_lists = vec![];
 
     // Check these values against available blockdevs
     if lower > avail {
-        return counts;
+        return device_lists;
     }
 
-    counts.push(lower);
+    device_lists.push(
+        dev_sizes
+            .iter()
+            .take(lower)
+            .map(|&(d, _)| d)
+            .collect::<Vec<_>>(),
+    );
 
     if lower != avail {
         match maybe_upper {
-            None => counts.push(avail),
+            None => device_lists.push(
+                dev_sizes
+                    .iter()
+                    .take(avail)
+                    .map(|&(d, _)| d)
+                    .collect::<Vec<_>>(),
+            ),
             Some(upper) => {
                 if lower + 1 < upper {
-                    counts.push(cmp::min(upper - 1, avail))
+                    device_lists.push(
+                        dev_sizes
+                            .iter()
+                            .take(cmp::min(upper - 1, avail))
+                            .map(|&(d, _)| d)
+                            .collect::<Vec<_>>(),
+                    )
                 }
             }
         }
     }
 
-    counts
+    device_lists
 }
 
 /// Run test on real devices, using given constraints. Constraints may result
@@ -119,15 +140,11 @@ where
         })
         .collect();
 
-    let counts = get_device_counts(limits, &dev_sizes);
+    let runs = get_device_runs(limits, &dev_sizes);
 
-    assert!(!counts.is_empty());
+    assert!(!runs.is_empty());
 
     init_logger();
-
-    let runs = counts
-        .iter()
-        .map(|num| devpaths.iter().take(*num).collect::<Vec<_>>());
 
     for run_paths in runs {
         let devices: Vec<_> = run_paths.iter().map(|x| RealTestDev::new(x)).collect();

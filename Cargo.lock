@@ -330,6 +330,7 @@ dependencies = [
  "crc 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "dbus 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "devicemapper 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "either 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "error-chain 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.40 (registry+https://github.com/rust-lang/crates.io-index)",

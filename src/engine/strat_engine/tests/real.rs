@@ -47,16 +47,19 @@ impl Drop for RealTestDev {
 pub enum DeviceLimits {
     /// Use exactly the number of devices specified
     /// The second argument is the minimum size for all devices.
-    Exactly(usize, Option<Sectors>),
+    /// The third argument is the maximum size for all devices.
+    Exactly(usize, Option<Sectors>, Option<Sectors>),
     /// Use at least the number of devices specified, but if there are more
     /// devices available, also use the maximum number of devices.
     /// The second argument is the minimum size for all devices.
-    AtLeast(usize, Option<Sectors>),
+    /// The third argument is the maximum size for all devices.
+    AtLeast(usize, Option<Sectors>, Option<Sectors>),
     /// Use exactly the number of devices specified in the first argument,
     /// and the minimum of the number of devices specified and the number
     /// of devices available in the second argument.
     /// The third argument is the minimum size for all devices.
-    Range(usize, usize, Option<Sectors>),
+    /// The fourth argument is the maximum size for all devices.
+    Range(usize, usize, Option<Sectors>, Option<Sectors>),
 }
 
 /// Get a list of lists of devices to use for tests.
@@ -66,19 +69,20 @@ fn get_device_runs<'a>(
     dev_sizes: &[(&'a Path, Sectors)],
 ) -> Vec<Vec<&'a Path>> {
     // Convert enum to [lower, Option<upper>, min_size) values
-    let (lower, maybe_upper, min_size) = match limits {
-        DeviceLimits::Exactly(num, min_size) => (num, Some(num + 1), min_size),
-        DeviceLimits::AtLeast(num, min_size) => (num, None, min_size),
-        DeviceLimits::Range(lower, upper, min_size) => {
+    let (lower, maybe_upper, min_size, max_size) = match limits {
+        DeviceLimits::Exactly(num, min_size, max_size) => (num, Some(num + 1), min_size, max_size),
+        DeviceLimits::AtLeast(num, min_size, max_size) => (num, None, min_size, max_size),
+        DeviceLimits::Range(lower, upper, min_size, max_size) => {
             assert!(lower < upper);
-            (lower, Some(upper + 1), min_size)
+            (lower, Some(upper + 1), min_size, max_size)
         }
     };
 
     let min_size = min_size.unwrap_or(Bytes(IEC::Gi).sectors());
 
-    let (matches, _): (Vec<(&Path, Sectors)>, Vec<(&Path, Sectors)>) =
-        dev_sizes.iter().partition(|&(_p, s)| *s >= min_size);
+    let (matches, _): (Vec<(&Path, Sectors)>, Vec<(&Path, Sectors)>) = dev_sizes
+        .iter()
+        .partition(|&(_, s)| *s >= min_size && (max_size.is_none() || Some(*s) <= max_size));
 
     let avail = matches.len();
 

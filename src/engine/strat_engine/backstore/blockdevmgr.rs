@@ -504,7 +504,10 @@ mod tests {
 
     #[test]
     pub fn real_test_blockdevmgr_used() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None), test_blockdevmgr_used);
+        real::test_with_spec(
+            real::DeviceLimits::AtLeast(1, None, None),
+            test_blockdevmgr_used,
+        );
     }
 
     #[test]
@@ -564,7 +567,10 @@ mod tests {
 
     #[test]
     pub fn real_test_force_flag_dirty() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None), test_force_flag_dirty);
+        real::test_with_spec(
+            real::DeviceLimits::AtLeast(1, None, None),
+            test_force_flag_dirty,
+        );
     }
 
     #[test]
@@ -610,7 +616,7 @@ mod tests {
     #[test]
     pub fn real_test_force_flag_stratis() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(2, None),
+            real::DeviceLimits::AtLeast(2, None, None),
             test_force_flag_stratis,
         );
     }
@@ -676,7 +682,7 @@ mod tests {
 
     #[test]
     pub fn real_test_initialize() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2, None), test_initialize);
+        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None), test_initialize);
     }
 
     #[test]
@@ -718,7 +724,7 @@ mod tests {
 
     #[test]
     pub fn real_test_ownership() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None), test_ownership);
+        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_ownership);
     }
 
     #[test]

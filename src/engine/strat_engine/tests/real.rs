@@ -41,10 +41,17 @@ impl Drop for RealTestDev {
     }
 }
 
+/// Shorthand for specifying devices to use for tests
 pub enum DeviceLimits {
+    /// Use exactly the number of devices specified
     Exactly(usize),
+    /// Use at least the number of devices specified, but if there are more
+    /// devices available, also use the maximum number of devices.
     AtLeast(usize),
-    Range(usize, usize), // inclusive
+    /// Use exactly the number of devices specified in the first argument,
+    /// and the minimum of the number of devices specified and the number
+    /// of devices available in the second argument.
+    Range(usize, usize),
 }
 
 /// Get a list of counts of devices to use for tests.

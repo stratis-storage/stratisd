@@ -82,18 +82,31 @@ fn get_device_runs<'a>(
 
     let min_size = min_size.unwrap_or(Bytes(IEC::Gi).sectors());
 
-    let (matches, _): (Vec<(&Path, Sectors)>, Vec<(&Path, Sectors)>) = dev_sizes
-        .iter()
-        .partition(|&(_, s)| *s >= min_size && (max_size.is_none() || Some(*s) <= max_size));
+    let (matches, _): (Vec<(&Path, Sectors)>, Vec<(&Path, Sectors)>) =
+        dev_sizes.iter().partition(|&(_, s)| *s >= min_size);
+
+    // If there is not a sufficient number of devices large enough to match
+    // the lower bound, return an empty vec.
+    if lower > matches.len() {
+        return vec![];
+    }
+
+    let (matches, _): (Vec<(&Path, Sectors)>, Vec<(&Path, Sectors)>) = if max_size.is_none() {
+        (matches, vec![])
+    } else {
+        let max_size = max_size.expect("!max_size.is_none()");
+        matches.iter().partition(|&(_, s)| *s <= max_size)
+    };
 
     let avail = matches.len();
 
-    let mut device_lists = vec![];
-
-    // Check these values against available blockdevs
+    // If there is not a sufficient number of devices small enough to match
+    // the lower bound, return an empty vec.
     if lower > avail {
-        return device_lists;
+        return vec![]; // FIXME: generate more devices
     }
+
+    let mut device_lists = vec![];
 
     device_lists.push(
         matches

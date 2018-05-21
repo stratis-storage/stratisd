@@ -8,10 +8,10 @@ use std::rc::Rc;
 use std::vec::Vec;
 
 use dbus;
-use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
 use dbus::arg::{Array, IterAppend};
 use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult,
                  PropInfo, Tree};
+use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
 use uuid::Uuid;
 
 use engine::{Engine, Pool, PoolUuid};
@@ -21,8 +21,8 @@ use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;
 use super::pool::create_dbus_pool;
 use super::types::{ActionQueue, DbusContext, DbusErrorEnum, DeferredAction, TData};
-use super::util::{STRATIS_BASE_PATH, STRATIS_BASE_SERVICE, engine_to_dbus_err_tuple, get_next_arg,
-                  msg_code_ok, msg_string_ok, tuple_to_option};
+use super::util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok,
+                  tuple_to_option, STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
 
 fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
@@ -54,13 +54,15 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let bd_object_paths = pool.blockdevs()
                 .iter()
                 .map(|&(uuid, _)| {
-                         create_dbus_blockdev(dbus_context, pool_object_path.clone(), uuid)
-                     })
+                    create_dbus_blockdev(dbus_context, pool_object_path.clone(), uuid)
+                })
                 .collect::<Vec<_>>();
 
-            return_message.append3((pool_object_path, bd_object_paths),
-                                   msg_code_ok(),
-                                   msg_string_ok())
+            return_message.append3(
+                (pool_object_path, bd_object_paths),
+                msg_code_ok(),
+                msg_string_ok(),
+            )
         }
         Err(x) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&x);
@@ -71,7 +73,6 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 }
 
 fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -85,7 +86,9 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid = match m.tree.get(&object_path) {
         Some(pool_path) => get_data!(pool_path; default_return; return_message).uuid,
         None => {
-            return Ok(vec![return_message.append3(default_return, msg_code_ok(), msg_string_ok())]);
+            return Ok(vec![
+                return_message.append3(default_return, msg_code_ok(), msg_string_ok()),
+            ]);
         }
     };
 
@@ -135,7 +138,6 @@ fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 }
 
 fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, dbus::Path<'a>) {
-
     let f = Factory::new_fn();
 
     let base_tree = f.tree(dbus_context);
@@ -170,21 +172,25 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
     let obj_path = f.object_path(STRATIS_BASE_PATH, None)
         .introspectable()
         .object_manager()
-        .add(f.interface(interface_name, ())
-                 .add_m(create_pool_method)
-                 .add_m(destroy_pool_method)
-                 .add_m(configure_simulator_method)
-                 .add_p(version_property));
+        .add(
+            f.interface(interface_name, ())
+                .add_m(create_pool_method)
+                .add_m(destroy_pool_method)
+                .add_m(configure_simulator_method)
+                .add_p(version_property),
+        );
 
     let path = obj_path.get_name().to_owned();
     (base_tree.add(obj_path), path)
 }
 
 /// Given an Pool, create all the needed dbus objects to represent it.
-fn register_pool_dbus(dbus_context: &DbusContext,
-                      pool_uuid: PoolUuid,
-                      pool: &Pool,
-                      object_path: &dbus::Path<'static>) {
+fn register_pool_dbus(
+    dbus_context: &DbusContext,
+    pool_uuid: PoolUuid,
+    pool: &Pool,
+    object_path: &dbus::Path<'static>,
+) {
     let pool_path = create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
     for (_, fs_uuid, _) in pool.filesystems() {
         create_dbus_filesystem(dbus_context, pool_path.clone(), fs_uuid);
@@ -196,9 +202,17 @@ fn register_pool_dbus(dbus_context: &DbusContext,
 
 /// Connect a stratis engine to dbus.
 #[allow(type_complexity)]
-pub fn connect<'a>
-    (engine: Rc<RefCell<Engine>>)
-     -> Result<(Connection, Tree<MTFn<TData>, TData>, dbus::Path<'a>, DbusContext), dbus::Error> {
+pub fn connect<'a>(
+    engine: Rc<RefCell<Engine>>,
+) -> Result<
+    (
+        Connection,
+        Tree<MTFn<TData>, TData>,
+        dbus::Path<'a>,
+        DbusContext,
+    ),
+    dbus::Error,
+> {
     let c = Connection::get_private(BusType::System)?;
 
     let local_engine = Rc::clone(&engine);
@@ -220,14 +234,14 @@ pub fn connect<'a>
 }
 
 /// Given the UUID of a pool, register all the pertinent information with dbus.
-pub fn register_pool(c: &Connection,
-                     engine: &Rc<RefCell<Engine>>,
-                     dbus_context: &DbusContext,
-                     tree: &mut Tree<MTFn<TData>, TData>,
-                     pool_uuid: Uuid,
-                     object_path: &dbus::Path<'static>)
-                     -> Result<(), dbus::Error> {
-
+pub fn register_pool(
+    c: &Connection,
+    engine: &Rc<RefCell<Engine>>,
+    dbus_context: &DbusContext,
+    tree: &mut Tree<MTFn<TData>, TData>,
+    pool_uuid: Uuid,
+    object_path: &dbus::Path<'static>,
+) -> Result<(), dbus::Error> {
     if let Some((_, pool)) = engine.borrow().get_pool(pool_uuid) {
         register_pool_dbus(dbus_context, pool_uuid, pool, object_path);
         return process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut());
@@ -236,10 +250,11 @@ pub fn register_pool(c: &Connection,
 }
 
 /// Update the dbus tree with deferred adds and removes.
-fn process_deferred_actions(c: &Connection,
-                            tree: &mut Tree<MTFn<TData>, TData>,
-                            actions: &mut ActionQueue)
-                            -> Result<(), dbus::Error> {
+fn process_deferred_actions(
+    c: &Connection,
+    tree: &mut Tree<MTFn<TData>, TData>,
+    actions: &mut ActionQueue,
+) -> Result<(), dbus::Error> {
     for action in actions.drain() {
         match action {
             DeferredAction::Add(path) => {
@@ -255,11 +270,12 @@ fn process_deferred_actions(c: &Connection,
     Ok(())
 }
 
-pub fn handle(c: &Connection,
-              item: &ConnectionItem,
-              tree: &mut Tree<MTFn<TData>, TData>,
-              dbus_context: &DbusContext)
-              -> Result<(), dbus::Error> {
+pub fn handle(
+    c: &Connection,
+    item: &ConnectionItem,
+    tree: &mut Tree<MTFn<TData>, TData>,
+    dbus_context: &DbusContext,
+) -> Result<(), dbus::Error> {
     if let ConnectionItem::MethodCall(ref msg) = *item {
         if let Some(v) = tree.handle(msg) {
             // Probably the wisest is to ignore any send errors here -

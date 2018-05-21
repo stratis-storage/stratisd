@@ -16,14 +16,14 @@ use super::super::engine::Filesystem;
 
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
-use super::util::{STRATIS_BASE_PATH, STRATIS_BASE_SERVICE, engine_to_dbus_err_tuple, get_next_arg,
-                  get_parent, get_uuid, msg_code_ok, msg_string_ok};
+use super::util::{engine_to_dbus_err_tuple, get_next_arg, get_parent, get_uuid, msg_code_ok,
+                  msg_string_ok, STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
 
-
-pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext,
-                                  parent: dbus::Path<'static>,
-                                  uuid: Uuid)
-                                  -> dbus::Path<'a> {
+pub fn create_dbus_filesystem<'a>(
+    dbus_context: &DbusContext,
+    parent: dbus::Path<'static>,
+    uuid: Uuid,
+) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
     let rename_method = f.method("SetName", (), rename_filesystem)
@@ -52,20 +52,24 @@ pub fn create_dbus_filesystem<'a>(dbus_context: &DbusContext,
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid);
 
-    let object_name = format!("{}/{}",
-                              STRATIS_BASE_PATH,
-                              dbus_context.get_next_id().to_string());
+    let object_name = format!(
+        "{}/{}",
+        STRATIS_BASE_PATH,
+        dbus_context.get_next_id().to_string()
+    );
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "filesystem");
 
     let object_path = f.object_path(object_name, Some(OPContext::new(parent, uuid)))
         .introspectable()
-        .add(f.interface(interface_name, ())
-                 .add_m(rename_method)
-                 .add_p(devnode_property)
-                 .add_p(name_property)
-                 .add_p(pool_property)
-                 .add_p(uuid_property));
+        .add(
+            f.interface(interface_name, ())
+                .add_m(rename_method)
+                .add_p(devnode_property)
+                .add_p(name_property)
+                .add_p(pool_property)
+                .add_p(uuid_property),
+        );
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
@@ -96,9 +100,10 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match pool.rename_filesystem(&pool_name, filesystem_data.uuid, new_name) {
         Ok(RenameAction::NoSource) => {
-            let error_message = format!("pool {} doesn't know about filesystem {}",
-                                        pool_uuid,
-                                        filesystem_data.uuid);
+            let error_message = format!(
+                "pool {} doesn't know about filesystem {}",
+                pool_uuid, filesystem_data.uuid
+            );
             let (rc, rs) = (u16::from(DbusErrorEnum::INTERNAL_ERROR), error_message);
             return_message.append3(default_return, rc, rs)
         }
@@ -118,12 +123,14 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 /// Get a filesystem property and place it on the D-Bus. The property is
 /// found by means of the getter method which takes a reference to a
 /// Filesystem and obtains the property from the filesystem.
-fn get_filesystem_property<F, R>(i: &mut IterAppend,
-                                 p: &PropInfo<MTFn<TData>, TData>,
-                                 getter: F)
-                                 -> Result<(), MethodErr>
-    where F: Fn((Name, &Filesystem)) -> Result<R, MethodErr>,
-          R: dbus::arg::Append
+fn get_filesystem_property<F, R>(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+    getter: F,
+) -> Result<(), MethodErr>
+where
+    F: Fn((Name, &Filesystem)) -> Result<R, MethodErr>,
+    R: dbus::arg::Append,
 {
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
@@ -132,18 +139,17 @@ fn get_filesystem_property<F, R>(i: &mut IterAppend,
         .get(object_path)
         .expect("tree must contain implicit argument");
 
-    let filesystem_data =
-        filesystem_path
-            .get_data()
-            .as_ref()
-            .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
+    let filesystem_data = filesystem_path
+        .get_data()
+        .as_ref()
+        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
-    let pool_path = p.tree
-        .get(&filesystem_data.parent)
-        .ok_or_else(|| {
-                        MethodErr::failed(&format!("no path for parent object path {}",
-                                                   &filesystem_data.parent))
-                    })?;
+    let pool_path = p.tree.get(&filesystem_data.parent).ok_or_else(|| {
+        MethodErr::failed(&format!(
+            "no path for parent object path {}",
+            &filesystem_data.parent
+        ))
+    })?;
 
     let pool_uuid = pool_path
         .get_data()
@@ -152,32 +158,31 @@ fn get_filesystem_property<F, R>(i: &mut IterAppend,
         .uuid;
 
     let engine = dbus_context.engine.borrow();
-    let (_, pool) =
-        engine
-            .get_pool(pool_uuid)
-            .ok_or_else(|| {
-                            MethodErr::failed(&format!("no pool corresponding to uuid {}",
-                                                       &pool_uuid))
-                        })?;
+    let (_, pool) = engine.get_pool(pool_uuid).ok_or_else(|| {
+        MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))
+    })?;
     let filesystem_uuid = filesystem_data.uuid;
-    let context = pool.get_filesystem(filesystem_uuid)
-        .ok_or_else(|| {
-                        MethodErr::failed(&format!("no name for filesystem with uuid {}",
-                                                   &filesystem_uuid))
-                    })?;
+    let context = pool.get_filesystem(filesystem_uuid).ok_or_else(|| {
+        MethodErr::failed(&format!(
+            "no name for filesystem with uuid {}",
+            &filesystem_uuid
+        ))
+    })?;
     i.append(getter(context)?);
     Ok(())
 }
 
 /// Get the devnode for an object path.
-fn get_filesystem_devnode(i: &mut IterAppend,
-                          p: &PropInfo<MTFn<TData>, TData>)
-                          -> Result<(), MethodErr> {
+fn get_filesystem_devnode(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+) -> Result<(), MethodErr> {
     get_filesystem_property(i, p, |(_, fs)| Ok(format!("{}", fs.devnode().display())))
 }
 
-fn get_filesystem_name(i: &mut IterAppend,
-                       p: &PropInfo<MTFn<TData>, TData>)
-                       -> Result<(), MethodErr> {
+fn get_filesystem_name(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+) -> Result<(), MethodErr> {
     get_filesystem_property(i, p, |(name, _)| Ok(name.to_owned()))
 }

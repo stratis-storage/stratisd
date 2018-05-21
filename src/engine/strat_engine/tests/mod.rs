@@ -6,6 +6,6 @@ extern crate env_logger;
 extern crate log;
 
 mod logger;
-mod util;
 pub mod loopbacked;
 pub mod real;
+mod util;

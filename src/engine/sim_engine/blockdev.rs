@@ -9,7 +9,7 @@ use std::rc::Rc;
 use chrono::{DateTime, TimeZone, Utc};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, IEC, Sectors};
+use devicemapper::{Bytes, Sectors, IEC};
 
 use super::super::engine::BlockDev;
 use super::super::types::BlockDevState;
@@ -55,14 +55,16 @@ impl BlockDev for SimDev {
 impl SimDev {
     /// Generates a new device from any devnode.
     pub fn new(rdm: Rc<RefCell<Randomizer>>, devnode: &Path) -> (Uuid, SimDev) {
-        (Uuid::new_v4(),
-         SimDev {
-             devnode: devnode.to_owned(),
-             rdm,
-             user_info: None,
-             hardware_info: None,
-             initialization_time: Utc::now().timestamp() as u64,
-         })
+        (
+            Uuid::new_v4(),
+            SimDev {
+                devnode: devnode.to_owned(),
+                rdm,
+                user_info: None,
+                hardware_info: None,
+                initialization_time: Utc::now().timestamp() as u64,
+            },
+        )
     }
 
     /// Set the user info on this blockdev.

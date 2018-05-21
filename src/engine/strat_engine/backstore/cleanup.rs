@@ -23,8 +23,10 @@ pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
     if unerased_devnodes.is_empty() {
         Ok(())
     } else {
-        let err_msg = format!("Failed to wipe already initialized devnodes: {:?}",
-                              unerased_devnodes);
+        let err_msg = format!(
+            "Failed to wipe already initialized devnodes: {:?}",
+            unerased_devnodes
+        );
         Err(StratisError::Engine(ErrorEnum::Error, err_msg))
     }
 }

@@ -10,18 +10,18 @@ use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInf
 
 use uuid::Uuid;
 
-use super::super::engine::{BlockDev, BlockDevTier, BlockDevState};
+use super::super::engine::{BlockDev, BlockDevState, BlockDevTier};
 
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
-use super::util::{STRATIS_BASE_PATH, STRATIS_BASE_SERVICE, engine_to_dbus_err_tuple, get_next_arg,
-                  get_parent, get_uuid, msg_code_ok, msg_string_ok};
+use super::util::{engine_to_dbus_err_tuple, get_next_arg, get_parent, get_uuid, msg_code_ok,
+                  msg_string_ok, STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
 
-
-pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
-                                parent: dbus::Path<'static>,
-                                uuid: Uuid)
-                                -> dbus::Path<'a> {
+pub fn create_dbus_blockdev<'a>(
+    dbus_context: &DbusContext,
+    parent: dbus::Path<'static>,
+    uuid: Uuid,
+) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
     let set_userid_method = f.method("SetUserInfo", (), set_user_info)
@@ -75,25 +75,29 @@ pub fn create_dbus_blockdev<'a>(dbus_context: &DbusContext,
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_tier);
 
-    let object_name = format!("{}/{}",
-                              STRATIS_BASE_PATH,
-                              dbus_context.get_next_id().to_string());
+    let object_name = format!(
+        "{}/{}",
+        STRATIS_BASE_PATH,
+        dbus_context.get_next_id().to_string()
+    );
 
     let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "blockdev");
 
     let object_path = f.object_path(object_name, Some(OPContext::new(parent, uuid)))
         .introspectable()
-        .add(f.interface(interface_name, ())
-                 .add_m(set_userid_method)
-                 .add_p(devnode_property)
-                 .add_p(hardware_info_property)
-                 .add_p(initialization_time_property)
-                 .add_p(total_physical_size_property)
-                 .add_p(pool_property)
-                 .add_p(state_property)
-                 .add_p(tier_property)
-                 .add_p(user_info_property)
-                 .add_p(uuid_property));
+        .add(
+            f.interface(interface_name, ())
+                .add_m(set_userid_method)
+                .add_p(devnode_property)
+                .add_p(hardware_info_property)
+                .add_p(initialization_time_property)
+                .add_p(total_physical_size_property)
+                .add_p(pool_property)
+                .add_p(state_property)
+                .add_p(tier_property)
+                .add_p(user_info_property)
+                .add_p(uuid_property),
+        );
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
@@ -138,16 +142,17 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-
 /// Get a blockdev property and place it on the D-Bus. The property is
 /// found by means of the getter method which takes a reference to a
 /// blockdev and obtains the property from the blockdev.
-fn get_blockdev_property<F, R>(i: &mut IterAppend,
-                               p: &PropInfo<MTFn<TData>, TData>,
-                               getter: F)
-                               -> Result<(), MethodErr>
-    where F: Fn(BlockDevTier, &BlockDev) -> Result<R, MethodErr>,
-          R: dbus::arg::Append
+fn get_blockdev_property<F, R>(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+    getter: F,
+) -> Result<(), MethodErr>
+where
+    F: Fn(BlockDevTier, &BlockDev) -> Result<R, MethodErr>,
+    R: dbus::arg::Append,
 {
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
@@ -156,18 +161,17 @@ fn get_blockdev_property<F, R>(i: &mut IterAppend,
         .get(object_path)
         .expect("tree must contain implicit argument");
 
-    let blockdev_data =
-        blockdev_path
-            .get_data()
-            .as_ref()
-            .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
+    let blockdev_data = blockdev_path
+        .get_data()
+        .as_ref()
+        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
-    let pool_path = p.tree
-        .get(&blockdev_data.parent)
-        .ok_or_else(|| {
-                        MethodErr::failed(&format!("no path for parent object path {}",
-                                                   &blockdev_data.parent))
-                    })?;
+    let pool_path = p.tree.get(&blockdev_data.parent).ok_or_else(|| {
+        MethodErr::failed(&format!(
+            "no path for parent object path {}",
+            &blockdev_data.parent
+        ))
+    })?;
 
     let pool_uuid = pool_path
         .get_data()
@@ -176,57 +180,56 @@ fn get_blockdev_property<F, R>(i: &mut IterAppend,
         .uuid;
 
     let engine = dbus_context.engine.borrow();
-    let (_, pool) =
-        engine
-            .get_pool(pool_uuid)
-            .ok_or_else(|| {
-                            MethodErr::failed(&format!("no pool corresponding to uuid {}",
-                                                       &pool_uuid))
-                        })?;
-    let (tier, blockdev) =
-        pool.get_blockdev(blockdev_data.uuid)
-            .ok_or_else(|| {
-                            MethodErr::failed(&format!("no blockdev with uuid {}",
-                                                       blockdev_data.uuid))
-                        })?;
+    let (_, pool) = engine.get_pool(pool_uuid).ok_or_else(|| {
+        MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))
+    })?;
+    let (tier, blockdev) = pool.get_blockdev(blockdev_data.uuid).ok_or_else(|| {
+        MethodErr::failed(&format!("no blockdev with uuid {}", blockdev_data.uuid))
+    })?;
     i.append(getter(tier, blockdev)?);
     Ok(())
 }
 
 /// Get the devnode for an object path.
-fn get_blockdev_devnode(i: &mut IterAppend,
-                        p: &PropInfo<MTFn<TData>, TData>)
-                        -> Result<(), MethodErr> {
+fn get_blockdev_devnode(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |_, p| Ok(format!("{}", p.devnode().display())))
 }
 
-fn get_blockdev_hardware_info(i: &mut IterAppend,
-                              p: &PropInfo<MTFn<TData>, TData>)
-                              -> Result<(), MethodErr> {
+fn get_blockdev_hardware_info(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |_, p| Ok(p.hardware_info().unwrap_or("").to_owned()))
 }
 
-fn get_blockdev_user_info(i: &mut IterAppend,
-                          p: &PropInfo<MTFn<TData>, TData>)
-                          -> Result<(), MethodErr> {
+fn get_blockdev_user_info(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |_, p| Ok(p.user_info().unwrap_or("").to_owned()))
 }
 
-fn get_blockdev_initialization_time(i: &mut IterAppend,
-                                    p: &PropInfo<MTFn<TData>, TData>)
-                                    -> Result<(), MethodErr> {
+fn get_blockdev_initialization_time(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |_, p| Ok(p.initialization_time().timestamp() as u64))
 }
 
-fn get_blockdev_physical_size(i: &mut IterAppend,
-                              p: &PropInfo<MTFn<TData>, TData>)
-                              -> Result<(), MethodErr> {
+fn get_blockdev_physical_size(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |_, p| Ok(format!("{}", *p.total_size())))
 }
 
-fn get_blockdev_state(i: &mut IterAppend,
-                      p: &PropInfo<MTFn<TData>, TData>)
-                      -> Result<(), MethodErr> {
+fn get_blockdev_state(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+) -> Result<(), MethodErr> {
     fn get_state(_: BlockDevTier, blockdev: &BlockDev) -> Result<u16, MethodErr> {
         let state: u16 = match blockdev.state() {
             BlockDevState::Missing => 0,
@@ -241,9 +244,10 @@ fn get_blockdev_state(i: &mut IterAppend,
     get_blockdev_property(i, p, get_state)
 }
 
-fn get_blockdev_tier(i: &mut IterAppend,
-                     p: &PropInfo<MTFn<TData>, TData>)
-                     -> Result<(), MethodErr> {
+fn get_blockdev_tier(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+) -> Result<(), MethodErr> {
     fn get(tier: BlockDevTier, _: &BlockDev) -> Result<u16, MethodErr> {
         let tier: u16 = match tier {
             BlockDevTier::Data => 0,

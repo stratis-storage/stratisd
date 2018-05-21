@@ -129,19 +129,17 @@ impl ActionQueue {
     /// exist.
     // Note: Path x is a child of path y if x's context's parent field is y.
     pub fn push_remove(&mut self, item: &Path<'static>, tree: &Tree<MTFn<TData>, TData>) -> () {
-        for opath in tree.iter()
-                .filter(|opath| {
-                            opath
-                                .get_data()
-                                .as_ref()
-                                .map_or(false, |op_cxt| op_cxt.parent == *item)
-                        }) {
+        for opath in tree.iter().filter(|opath| {
+            opath
+                .get_data()
+                .as_ref()
+                .map_or(false, |op_cxt| op_cxt.parent == *item)
+        }) {
             self.queue
                 .push_back(DeferredAction::Remove(opath.get_name().clone()))
         }
 
-        self.queue
-            .push_back(DeferredAction::Remove(item.clone()))
+        self.queue.push_back(DeferredAction::Remove(item.clone()))
     }
 
     /// Drain the queue.

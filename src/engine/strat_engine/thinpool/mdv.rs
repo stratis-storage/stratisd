@@ -5,14 +5,14 @@
 // Manage the linear volume that stores metadata on pool levels 5-7.
 
 use std::convert::From;
-use std::fs::{OpenOptions, create_dir, read_dir, remove_dir, remove_file, rename};
+use std::fs::{create_dir, read_dir, remove_dir, remove_file, rename, OpenOptions};
 use std::io::ErrorKind;
 use std::io::prelude::*;
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 
 use nix;
-use nix::mount::{MsFlags, mount, umount};
+use nix::mount::{mount, umount, MsFlags};
 use nix::unistd::fsync;
 use serde_json;
 
@@ -57,11 +57,13 @@ impl<'a> MountedMDV<'a> {
             }
         }
 
-        match mount(Some(&mdv.dev.devnode()),
-                    &mdv.mount_pt,
-                    Some("xfs"),
-                    MsFlags::empty(),
-                    None as Option<&str>) {
+        match mount(
+            Some(&mdv.dev.devnode()),
+            &mdv.mount_pt,
+            Some("xfs"),
+            MsFlags::empty(),
+            None as Option<&str>,
+        ) {
             Err(nix::Error::Sys(nix::errno::Errno::EBUSY)) => {
                 // The device is already mounted at the specified mount point
                 Ok(())
@@ -123,11 +125,12 @@ impl MetadataVol {
     // Write to a temp file and then rename to actual filename, to
     // ensure file contents are not truncated if operation is
     // interrupted.
-    pub fn save_fs(&self,
-                   name: &Name,
-                   uuid: FilesystemUuid,
-                   fs: &StratFilesystem)
-                   -> StratisResult<()> {
+    pub fn save_fs(
+        &self,
+        name: &Name,
+        uuid: FilesystemUuid,
+        fs: &StratFilesystem,
+    ) -> StratisResult<()> {
         let data = serde_json::to_string(&fs.record(name, uuid))?;
         let path = self.mount_pt
             .join(FILESYSTEM_DIR)
@@ -222,9 +225,10 @@ impl MetadataVol {
     }
 
     /// Set the table of the backing device
-    pub fn set_table(&mut self,
-                     table: Vec<TargetLine<LinearDevTargetParams>>)
-                     -> StratisResult<()> {
+    pub fn set_table(
+        &mut self,
+        table: Vec<TargetLine<LinearDevTargetParams>>,
+    ) -> StratisResult<()> {
         self.dev.set_table(get_dm(), table)?;
         Ok(())
     }
@@ -243,7 +247,8 @@ fn remove_temp_files(dir: &Path) -> StratisResult<(u64, Vec<PathBuf>)> {
     for path in read_dir(dir)?
     .filter_map(|e| e.ok()) // Just ignore entry on intermittent IO error
     .map(|e| e.path())
-    .filter(|p| p.ends_with(".temp")) {
+    .filter(|p| p.ends_with(".temp"))
+    {
         found += 1;
         remove_file(&path).unwrap_or_else(|_| failed.push(path));
     }

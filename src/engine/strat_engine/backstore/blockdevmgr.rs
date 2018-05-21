@@ -12,8 +12,8 @@ use chrono::{DateTime, Duration, Utc};
 use rand::{seq, thread_rng};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Device, IEC, LinearDevTargetParams, LinearTargetParams, Sectors,
-                   TargetLine};
+use devicemapper::{Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine,
+                   IEC};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -25,12 +25,11 @@ use super::super::serde_structs::{BlockDevSave, Recordable};
 use super::blockdev::StratBlockDev;
 use super::cleanup::wipe_blockdevs;
 use super::device::{blkdev_size, resolve_devices};
-use super::metadata::{BDA, MIN_MDA_SECTORS, StaticHeader, validate_mda_size};
+use super::metadata::{validate_mda_size, StaticHeader, BDA, MIN_MDA_SECTORS};
 use super::util::hw_lookup;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 const MAX_NUM_TO_WRITE: usize = 10;
-
 
 /// struct to represent a continuous set of sectors on a disk
 #[derive(Debug, Clone)]
@@ -42,7 +41,6 @@ pub struct Segment {
     /// The device the segment is within.
     pub device: Device,
 }
-
 
 impl Segment {
     /// Create a new Segment with given attributes
@@ -103,8 +101,9 @@ pub fn coalesce_blkdevsegs(left: &[BlkDevSegment], right: &[BlkDevSegment]) -> V
     let coalesced = {
         let right_first = right.first().expect("!right.is_empty()");
         let left_last = segments.last_mut().expect("!left.is_empty()");
-        if left_last.uuid == right_first.uuid &&
-           (left_last.segment.start + left_last.segment.length == right_first.segment.start) {
+        if left_last.uuid == right_first.uuid
+            && (left_last.segment.start + left_last.segment.length == right_first.segment.start)
+        {
             left_last.segment.length += right_first.segment.length;
             true
         } else {
@@ -133,16 +132,17 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParam
     for segment in segments {
         let (physical_start_offset, length) = (segment.start, segment.length);
         let params = LinearTargetParams::new(segment.device, physical_start_offset);
-        let line = TargetLine::new(logical_start_offset,
-                                   length,
-                                   LinearDevTargetParams::Linear(params));
+        let line = TargetLine::new(
+            logical_start_offset,
+            length,
+            LinearDevTargetParams::Linear(params),
+        );
         table.push(line);
         logical_start_offset += length;
     }
 
     table
 }
-
 
 #[derive(Debug)]
 pub struct BlockDevMgr {
@@ -153,10 +153,11 @@ pub struct BlockDevMgr {
 
 impl BlockDevMgr {
     /// Make a struct that represents an existing BlockDevMgr.
-    pub fn new(pool_uuid: PoolUuid,
-               block_devs: Vec<StratBlockDev>,
-               last_update_time: Option<DateTime<Utc>>)
-               -> BlockDevMgr {
+    pub fn new(
+        pool_uuid: PoolUuid,
+        block_devs: Vec<StratBlockDev>,
+        last_update_time: Option<DateTime<Utc>>,
+    ) -> BlockDevMgr {
         BlockDevMgr {
             pool_uuid,
             block_devs,
@@ -165,15 +166,18 @@ impl BlockDevMgr {
     }
 
     /// Initialize a new StratBlockDevMgr with specified pool and devices.
-    pub fn initialize(pool_uuid: PoolUuid,
-                      paths: &[&Path],
-                      mda_size: Sectors,
-                      force: bool)
-                      -> StratisResult<BlockDevMgr> {
+    pub fn initialize(
+        pool_uuid: PoolUuid,
+        paths: &[&Path],
+        mda_size: Sectors,
+        force: bool,
+    ) -> StratisResult<BlockDevMgr> {
         let devices = resolve_devices(paths)?;
-        Ok(BlockDevMgr::new(pool_uuid,
-                            initialize(pool_uuid, devices, mda_size, force, &HashSet::new())?,
-                            None))
+        Ok(BlockDevMgr::new(
+            pool_uuid,
+            initialize(pool_uuid, devices, mda_size, force, &HashSet::new())?,
+            None,
+        ))
     }
 
     /// Return the UUID of the pool
@@ -197,11 +201,13 @@ impl BlockDevMgr {
     pub fn add(&mut self, paths: &[&Path], force: bool) -> StratisResult<Vec<DevUuid>> {
         let devices = resolve_devices(paths)?;
         let current_uuids = self.block_devs.iter().map(|bd| bd.uuid()).collect();
-        let bds = initialize(self.pool_uuid,
-                             devices,
-                             MIN_MDA_SECTORS,
-                             force,
-                             &current_uuids)?;
+        let bds = initialize(
+            self.pool_uuid,
+            devices,
+            MIN_MDA_SECTORS,
+            force,
+            &current_uuids,
+        )?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
         Ok(bdev_uuids)
@@ -239,12 +245,9 @@ impl BlockDevMgr {
                 }
 
                 let (gotten, r_segs) = bd.request_space(needed - alloc);
-                let blkdev_segs = r_segs
-                    .into_iter()
-                    .map(|(start, length)| {
-                             BlkDevSegment::new(bd.uuid(),
-                                                Segment::new(*bd.device(), start, length))
-                         });
+                let blkdev_segs = r_segs.into_iter().map(|(start, length)| {
+                    BlkDevSegment::new(bd.uuid(), Segment::new(*bd.device(), start, length))
+                });
                 segs.extend(blkdev_segs);
                 alloc += gotten;
             }
@@ -283,8 +286,9 @@ impl BlockDevMgr {
         let saved = seq::sample_iter(&mut thread_rng(), candidates, MAX_NUM_TO_WRITE)
             .unwrap_or_else(|e| e)
             .iter_mut()
-            .fold(false,
-                  |acc, b| acc | b.save_state(&stamp_time, metadata).is_ok());
+            .fold(false, |acc, b| {
+                acc | b.save_state(&stamp_time, metadata).is_ok()
+            });
 
         if saved {
             self.last_update_time = Some(stamp_time);
@@ -297,10 +301,7 @@ impl BlockDevMgr {
 
     /// Get references to managed blockdevs.
     pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
-        self.block_devs
-            .iter()
-            .map(|bd| (bd.uuid(), bd))
-            .collect()
+        self.block_devs.iter().map(|bd| (bd.uuid(), bd)).collect()
     }
 
     pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<&StratBlockDev> {
@@ -322,19 +323,13 @@ impl BlockDevMgr {
     /// self.current_capacity() > self.avail_space() because some sectors
     /// are certainly allocated for Stratis metadata
     pub fn current_capacity(&self) -> Sectors {
-        self.block_devs
-            .iter()
-            .map(|b| b.current_capacity())
-            .sum()
+        self.block_devs.iter().map(|b| b.current_capacity()).sum()
     }
 
     /// The number of sectors given over to Stratis metadata
     /// self.current_capacity() - self.metadata_size() >= self.avail_space()
     pub fn metadata_size(&self) -> Sectors {
-        self.block_devs
-            .iter()
-            .map(|bd| bd.metadata_size())
-            .sum()
+        self.block_devs.iter().map(|bd| bd.metadata_size()).sum()
     }
 }
 
@@ -346,23 +341,20 @@ impl Recordable<Vec<BlockDevSave>> for BlockDevMgr {
 
 /// Initialize multiple blockdevs at once. This allows all of them
 /// to be checked for usability before writing to any of them.
-fn initialize(pool_uuid: PoolUuid,
-              devices: HashMap<Device, &Path>,
-              mda_size: Sectors,
-              force: bool,
-              owned_devs: &HashSet<DevUuid>)
-              -> StratisResult<Vec<StratBlockDev>> {
-
+fn initialize(
+    pool_uuid: PoolUuid,
+    devices: HashMap<Device, &Path>,
+    mda_size: Sectors,
+    force: bool,
+    owned_devs: &HashSet<DevUuid>,
+) -> StratisResult<Vec<StratBlockDev>> {
     /// Get device information, returns an error if problem with obtaining
     /// that information.
     /// Returns a tuple with the device's path, its size in bytes,
     /// its ownership as determined by calling determine_ownership(),
     /// and an open File handle, all of which are needed later.
     fn dev_info(devnode: &Path) -> StratisResult<(&Path, Bytes, DevOwnership, File)> {
-        let mut f = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(&devnode)?;
+        let mut f = OpenOptions::new().read(true).write(true).open(&devnode)?;
         let dev_size = blkdev_size(&f)?;
         let ownership = StaticHeader::determine_ownership(&mut f)?;
 
@@ -373,28 +365,34 @@ fn initialize(pool_uuid: PoolUuid,
     /// If there is an error finding out the info, return that error.
     /// Also, return an error if a device is not appropriate for this pool.
     #[allow(type_complexity)]
-    fn filter_devs<'a, I>(dev_infos: I,
-                          pool_uuid: PoolUuid,
-                          force: bool,
-                          owned_devs: &HashSet<DevUuid>)
-                          -> StratisResult<Vec<(Device, (&'a Path, Bytes, File))>>
-        where I: Iterator<Item = (Device, StratisResult<(&'a Path, Bytes, DevOwnership, File)>)>
+    fn filter_devs<'a, I>(
+        dev_infos: I,
+        pool_uuid: PoolUuid,
+        force: bool,
+        owned_devs: &HashSet<DevUuid>,
+    ) -> StratisResult<Vec<(Device, (&'a Path, Bytes, File))>>
+    where
+        I: Iterator<Item = (Device, StratisResult<(&'a Path, Bytes, DevOwnership, File)>)>,
     {
         let mut add_devs = Vec::new();
         for (dev, dev_result) in dev_infos {
             let (devnode, dev_size, ownership, f) = dev_result?;
             if dev_size < MIN_DEV_SIZE {
-                let error_message = format!("{} too small, minimum {} bytes",
-                                            devnode.display(),
-                                            MIN_DEV_SIZE);
+                let error_message = format!(
+                    "{} too small, minimum {} bytes",
+                    devnode.display(),
+                    MIN_DEV_SIZE
+                );
                 return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
             };
             match ownership {
                 DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, f))),
                 DevOwnership::Theirs => {
                     if !force {
-                        let err_str = format!("Device {} appears to belong to another application",
-                                              devnode.display());
+                        let err_str = format!(
+                            "Device {} appears to belong to another application",
+                            devnode.display()
+                        );
                         return Err(StratisError::Engine(ErrorEnum::Invalid, err_str));
                     } else {
                         add_devs.push((dev, (devnode, dev_size, f)))
@@ -403,14 +401,18 @@ fn initialize(pool_uuid: PoolUuid,
                 DevOwnership::Ours(uuid, dev_uuid) => {
                     if pool_uuid == uuid {
                         if !owned_devs.contains(&dev_uuid) {
-                            let error_str = format!("Device {} with pool UUID is unknown to pool",
-                                                    devnode.display());
+                            let error_str = format!(
+                                "Device {} with pool UUID is unknown to pool",
+                                devnode.display()
+                            );
                             return Err(StratisError::Engine(ErrorEnum::Invalid, error_str));
                         }
                     } else {
-                        let error_str = format!("Device {} already belongs to Stratis pool {}",
-                                                devnode.display(),
-                                                uuid);
+                        let error_str = format!(
+                            "Device {} already belongs to Stratis pool {}",
+                            devnode.display(),
+                            uuid
+                        );
                         return Err(StratisError::Engine(ErrorEnum::Invalid, error_str));
                     }
                 }
@@ -427,24 +429,25 @@ fn initialize(pool_uuid: PoolUuid,
 
     let mut bds: Vec<StratBlockDev> = Vec::new();
     for (dev, (devnode, dev_size, mut f)) in add_devs {
-        let bda = BDA::initialize(&mut f,
-                                  pool_uuid,
-                                  Uuid::new_v4(),
-                                  mda_size,
-                                  dev_size.sectors(),
-                                  Utc::now().timestamp() as u64);
+        let bda = BDA::initialize(
+            &mut f,
+            pool_uuid,
+            Uuid::new_v4(),
+            mda_size,
+            dev_size.sectors(),
+            Utc::now().timestamp() as u64,
+        );
         if let Ok(bda) = bda {
             let hw_id = match hw_lookup(devnode) {
                 Ok(id) => id,
-                Err(_) => None,  // TODO: Log this failure so that it can be addressed.
+                Err(_) => None, // TODO: Log this failure so that it can be addressed.
             };
 
             // FIXME: The expect is only provisionally true.
             // The dev_size is at least MIN_DEV_SIZE, but the size of the
             // metadata is not really bounded from above.
-            let blockdev =
-                StratBlockDev::new(dev, devnode.to_owned(), bda, &[], None, hw_id)
-                    .expect("bda.size() == dev_size; only allocating space for metadata");
+            let blockdev = StratBlockDev::new(dev, devnode.to_owned(), bda, &[], None, hw_id)
+                .expect("bda.size() == dev_size; only allocating space for metadata");
             bds.push(blockdev);
         } else {
             // TODO: check the return values and update state machine on failure
@@ -457,14 +460,12 @@ fn initialize(pool_uuid: PoolUuid,
     Ok(bds)
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::fs::OpenOptions;
 
     use rand;
     use uuid::Uuid;
-
 
     use devicemapper::SECTOR_SIZE;
 
@@ -481,15 +482,19 @@ mod tests {
     /// After 2 Sectors have been allocated, that amount must also be included
     /// in balance.
     fn test_blockdevmgr_used(paths: &[&Path]) -> () {
-        let mut mgr = BlockDevMgr::initialize(Uuid::new_v4(), paths, MIN_MDA_SECTORS, false)
-            .unwrap();
-        assert_eq!(mgr.avail_space() + mgr.metadata_size(),
-                   mgr.current_capacity());
+        let mut mgr =
+            BlockDevMgr::initialize(Uuid::new_v4(), paths, MIN_MDA_SECTORS, false).unwrap();
+        assert_eq!(
+            mgr.avail_space() + mgr.metadata_size(),
+            mgr.current_capacity()
+        );
 
         let allocated = Sectors(2);
         mgr.alloc_space(&[allocated]).unwrap();
-        assert_eq!(mgr.avail_space() + allocated + mgr.metadata_size(),
-                   mgr.current_capacity());
+        assert_eq!(
+            mgr.avail_space() + allocated + mgr.metadata_size(),
+            mgr.current_capacity()
+        );
     }
 
     #[test]
@@ -516,26 +521,22 @@ mod tests {
     /// consistently.
     /// Verify that force flag allows all dirty disks to be initialized.
     fn test_force_flag_dirty(paths: &[&Path]) -> () {
-
         let index = rand::random::<u8>() as usize % paths.len();
-        write_sectors(paths[index],
-                      Sectors(index as u64 % *BDA_STATIC_HDR_SECTORS),
-                      Sectors(1),
-                      &[1u8; SECTOR_SIZE])
-                .unwrap();
+        write_sectors(
+            paths[index],
+            Sectors(index as u64 % *BDA_STATIC_HDR_SECTORS),
+            Sectors(1),
+            &[1u8; SECTOR_SIZE],
+        ).unwrap();
 
         let pool_uuid = Uuid::new_v4();
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).is_err());
-        assert!(paths
-                    .iter()
-                    .enumerate()
-                    .all(|(i, path)| {
+        assert!(paths.iter().enumerate().all(|(i, path)| {
             StaticHeader::determine_ownership(&mut OpenOptions::new()
-                                                       .read(true)
-                                                       .open(path)
-                                                       .unwrap())
-                    .unwrap() ==
-            if i == index {
+                .read(true)
+                .open(path)
+                .unwrap())
+                .unwrap() == if i == index {
                 DevOwnership::Theirs
             } else {
                 DevOwnership::Unowned
@@ -543,14 +544,13 @@ mod tests {
         }));
 
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, true).is_ok());
-        assert!(paths
-                    .iter()
-                    .all(|path| {
+        assert!(paths.iter().all(|path| {
             match StaticHeader::determine_ownership(&mut OpenOptions::new()
-                                                             .read(true)
-                                                             .open(path)
-                                                             .unwrap())
-                          .unwrap() {
+                .read(true)
+                .open(path)
+                .unwrap())
+                .unwrap()
+            {
                 DevOwnership::Ours(uuid, _) => pool_uuid == uuid,
                 _ => false,
             }
@@ -601,8 +601,10 @@ mod tests {
 
     #[test]
     pub fn loop_test_force_flag_stratis() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3),
-                                   test_force_flag_stratis);
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(2, 3),
+            test_force_flag_stratis,
+        );
     }
 
     #[test]
@@ -612,8 +614,10 @@ mod tests {
 
     #[test]
     pub fn travis_test_force_flag_stratis() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3),
-                                   test_force_flag_stratis);
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(2, 3),
+            test_force_flag_stratis,
+        );
     }
 
     /// Verify that find_all function locates and assigns pools appropriately.
@@ -654,10 +658,12 @@ mod tests {
         let devices2 = pools.get(&uuid2).expect("pools.contains_key() was true");
         assert_eq!(devices2.len(), paths2.len());
 
-        assert!(pools
-                    .iter()
-                    .map(|(uuid, devs)| get_metadata(*uuid, devs))
-                    .all(|x| x.unwrap().is_none()));
+        assert!(
+            pools
+                .iter()
+                .map(|(uuid, devs)| get_metadata(*uuid, devs))
+                .all(|x| x.unwrap().is_none())
+        );
     }
 
     #[test]
@@ -681,28 +687,25 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
 
-        assert!(paths
-                    .iter()
-                    .all(|path| {
+        assert!(paths.iter().all(|path| {
             match StaticHeader::determine_ownership(&mut OpenOptions::new()
-                                                             .read(true)
-                                                             .open(path)
-                                                             .unwrap())
-                          .unwrap() {
+                .read(true)
+                .open(path)
+                .unwrap())
+                .unwrap()
+            {
                 DevOwnership::Ours(uuid, _) => uuid == pool_uuid,
                 _ => false,
             }
         }));
         bd_mgr.destroy_all().unwrap();
-        assert!(paths
-                    .iter()
-                    .all(|path| {
-                             StaticHeader::determine_ownership(&mut OpenOptions::new()
-                                                                        .read(true)
-                                                                        .open(path)
-                                                                        .unwrap())
-                                     .unwrap() == DevOwnership::Unowned
-                         }));
+        assert!(paths.iter().all(|path| {
+            StaticHeader::determine_ownership(&mut OpenOptions::new()
+                .read(true)
+                .open(path)
+                .unwrap())
+                .unwrap() == DevOwnership::Unowned
+        }));
     }
 
     #[test]

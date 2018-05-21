@@ -2,11 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{fs, str};
 use std::collections::HashSet;
 use std::io::ErrorKind;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
+use std::{fs, str};
 
 use stratis::StratisResult;
 
@@ -32,9 +32,9 @@ pub fn setup_dev_path() -> StratisResult<()> {
 /// or filesystem.
 // Don't just remove and recreate everything in case there are processes
 // (e.g. user shells) with the current working directory within the tree.
-pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>
-    (pools: I)
-     -> StratisResult<()> {
+pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>(
+    pools: I,
+) -> StratisResult<()> {
     let mut existing_dirs = fs::read_dir(DEV_PATH)?
         .map(|dir_e| dir_e.and_then(|d| Ok(d.file_name().into_string().expect("Unix is utf-8"))))
         .collect::<Result<HashSet<_>, _>>()?;
@@ -48,8 +48,8 @@ pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>
 
         let mut existing_files = fs::read_dir(pool_path)?
             .map(|dir_e| {
-                     dir_e.and_then(|d| Ok(d.file_name().into_string().expect("Unix is utf-8")))
-                 })
+                dir_e.and_then(|d| Ok(d.file_name().into_string().expect("Unix is utf-8")))
+            })
             .collect::<Result<HashSet<_>, _>>()?;
 
         for (fs_name, _, fs) in pool.filesystems() {

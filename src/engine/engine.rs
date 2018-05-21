@@ -11,9 +11,9 @@ use uuid::Uuid;
 
 use devicemapper::{Device, Sectors};
 
-use stratis::StratisResult;
 use super::types::{BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid,
                    RenameAction};
+use stratis::StratisResult;
 
 pub trait Filesystem: Debug {
     /// path of the device node
@@ -47,21 +47,23 @@ pub trait Pool: Debug {
     /// Returns an error if any of the specified names are already in use
     /// for filesystems in this pool. If the same name is passed multiple
     /// times, the size associated with the last item is used.
-    fn create_filesystems<'a, 'b>(&'a mut self,
-                                  pool_name: &str,
-                                  specs: &[(&'b str, Option<Sectors>)])
-                                  -> StratisResult<Vec<(&'b str, FilesystemUuid)>>;
+    fn create_filesystems<'a, 'b>(
+        &'a mut self,
+        pool_name: &str,
+        specs: &[(&'b str, Option<Sectors>)],
+    ) -> StratisResult<Vec<(&'b str, FilesystemUuid)>>;
 
     /// Adds blockdevs specified by paths to pool.
     /// Returns a list of uuids corresponding to devices actually added.
     /// Returns an error if a blockdev can not be added because it is owned
     /// or there was an error while reading or writing a blockdev.
-    fn add_blockdevs(&mut self,
-                     pool_name: &str,
-                     paths: &[&Path],
-                     tier: BlockDevTier,
-                     force: bool)
-                     -> StratisResult<Vec<DevUuid>>;
+    fn add_blockdevs(
+        &mut self,
+        pool_name: &str,
+        paths: &[&Path],
+        tier: BlockDevTier,
+        force: bool,
+    ) -> StratisResult<Vec<DevUuid>>;
 
     /// Destroy the pool.
     /// Precondition: All filesystems belonging to this pool must be
@@ -72,29 +74,32 @@ pub trait Pool: Debug {
     /// Returns a list of the filesystems found, and actually destroyed.
     /// This list will be a subset of the uuids passed in fs_uuids.
     /// Precondition: All filesystems given must be unmounted.
-    fn destroy_filesystems<'a>(&'a mut self,
-                               pool_name: &str,
-                               fs_uuids: &[FilesystemUuid])
-                               -> StratisResult<Vec<FilesystemUuid>>;
+    fn destroy_filesystems<'a>(
+        &'a mut self,
+        pool_name: &str,
+        fs_uuids: &[FilesystemUuid],
+    ) -> StratisResult<Vec<FilesystemUuid>>;
 
     /// Rename filesystem
     /// Rename pool with uuid to new_name.
     /// Raises an error if the mapping can't be applied because
     /// new_name is already in use.
     /// The result indicate whether an action was performed, and if not, why.
-    fn rename_filesystem(&mut self,
-                         pool_name: &str,
-                         uuid: FilesystemUuid,
-                         new_name: &str)
-                         -> StratisResult<RenameAction>;
+    fn rename_filesystem(
+        &mut self,
+        pool_name: &str,
+        uuid: FilesystemUuid,
+        new_name: &str,
+    ) -> StratisResult<RenameAction>;
 
     /// Snapshot filesystem
     /// Create a CoW snapshot of the origin
-    fn snapshot_filesystem(&mut self,
-                           pool_name: &str,
-                           origin_uuid: FilesystemUuid,
-                           snapshot_name: &str)
-                           -> StratisResult<FilesystemUuid>;
+    fn snapshot_filesystem(
+        &mut self,
+        pool_name: &str,
+        origin_uuid: FilesystemUuid,
+        snapshot_name: &str,
+    ) -> StratisResult<FilesystemUuid>;
 
     /// The total number of Sectors belonging to this pool.
     /// There are no exclusions, so this number includes overhead sectors
@@ -127,11 +132,12 @@ pub trait Pool: Debug {
 
     /// Set the user-settable string associated with the blockdev specfied
     /// by the uuid.
-    fn set_blockdev_user_info(&mut self,
-                              pool_name: &str,
-                              uuid: DevUuid,
-                              user_info: Option<&str>)
-                              -> StratisResult<bool>;
+    fn set_blockdev_user_info(
+        &mut self,
+        pool_name: &str,
+        uuid: DevUuid,
+        user_info: Option<&str>,
+    ) -> StratisResult<bool>;
 }
 
 pub trait Engine: Debug {
@@ -139,20 +145,22 @@ pub trait Engine: Debug {
     /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a
     /// supported redundancy.
-    fn create_pool(&mut self,
-                   name: &str,
-                   blockdev_paths: &[&Path],
-                   redundancy: Option<u16>,
-                   force: bool)
-                   -> StratisResult<PoolUuid>;
+    fn create_pool(
+        &mut self,
+        name: &str,
+        blockdev_paths: &[&Path],
+        redundancy: Option<u16>,
+        force: bool,
+    ) -> StratisResult<PoolUuid>;
 
     /// Evaluate a device node & devicemapper::Device to see if it's a valid
     /// stratis device.  If all the devices are present in the pool and the pool isn't already
     /// up and running, it will get setup and the pool uuid will be returned.
-    fn block_evaluate(&mut self,
-                      device: Device,
-                      dev_node: PathBuf)
-                      -> StratisResult<Option<PoolUuid>>;
+    fn block_evaluate(
+        &mut self,
+        device: Device,
+        dev_node: PathBuf,
+    ) -> StratisResult<Option<PoolUuid>>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.

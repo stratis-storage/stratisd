@@ -4,7 +4,6 @@
 
 // Get ability to instantiate a devicemapper context.
 
-
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{Once, ONCE_INIT};
 
@@ -26,7 +25,6 @@ pub fn get_dm() -> &'static DM {
         }
     }
 }
-
 
 impl Eventable for DM {
     /// Get file we'd like to have monitored for activity

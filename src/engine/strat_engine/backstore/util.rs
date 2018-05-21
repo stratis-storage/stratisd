@@ -22,16 +22,16 @@ pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<String>> {
         .scan_devices()?
         .find(|x| x.devnode().map_or(false, |d| dev_node_search == d))
         .map_or(Ok(None), |dev| {
-            dev.property_value("ID_WWN")
-                .map_or(Ok(None), |i| {
-                    i.to_str()
-                        .ok_or_else(|| {
-                                        StratisError::Engine(ErrorEnum::Error,
-                                                            format!("Unable to convert {:?} to str",
-                                                                    i))
-                                    })
-                        .map(|i| Some(String::from(i)))
-                })
+            dev.property_value("ID_WWN").map_or(Ok(None), |i| {
+                i.to_str()
+                    .ok_or_else(|| {
+                        StratisError::Engine(
+                            ErrorEnum::Error,
+                            format!("Unable to convert {:?} to str", i),
+                        )
+                    })
+                    .map(|i| Some(String::from(i)))
+            })
         });
 
     result

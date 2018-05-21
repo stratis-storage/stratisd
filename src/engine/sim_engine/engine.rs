@@ -22,7 +22,6 @@ use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 use super::pool::SimPool;
 use super::randomization::Randomizer;
 
-
 #[derive(Debug, Default)]
 pub struct SimEngine {
     pools: Table<SimPool>,
@@ -32,13 +31,13 @@ pub struct SimEngine {
 impl SimEngine {}
 
 impl Engine for SimEngine {
-    fn create_pool(&mut self,
-                   name: &str,
-                   blockdev_paths: &[&Path],
-                   redundancy: Option<u16>,
-                   _force: bool)
-                   -> StratisResult<PoolUuid> {
-
+    fn create_pool(
+        &mut self,
+        name: &str,
+        blockdev_paths: &[&Path],
+        redundancy: Option<u16>,
+        _force: bool,
+    ) -> StratisResult<PoolUuid> {
         let redundancy = calculate_redundancy!(redundancy);
 
         if self.pools.contains_name(name) {
@@ -46,10 +45,7 @@ impl Engine for SimEngine {
         }
 
         let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
-        let devices = device_set
-            .into_iter()
-            .map(|x| *x)
-            .collect::<Vec<&Path>>();
+        let devices = device_set.into_iter().map(|x| *x).collect::<Vec<&Path>>();
 
         let (pool_uuid, pool) = SimPool::new(&Rc::clone(&self.rdm), &devices, redundancy);
 
@@ -63,10 +59,11 @@ impl Engine for SimEngine {
         Ok(pool_uuid)
     }
 
-    fn block_evaluate(&mut self,
-                      device: Device,
-                      dev_node: PathBuf)
-                      -> StratisResult<Option<PoolUuid>> {
+    fn block_evaluate(
+        &mut self,
+        device: Device,
+        dev_node: PathBuf,
+    ) -> StratisResult<Option<PoolUuid>> {
         assert_ne!(dev_node, PathBuf::from("/"));
         assert_ne!(libc::dev_t::from(device), 0);
         Ok(None)
@@ -75,8 +72,10 @@ impl Engine for SimEngine {
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<bool> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
             if pool.has_filesystems() {
-                return Err(StratisError::Engine(ErrorEnum::Busy,
-                                                "filesystems remaining on pool".into()));
+                return Err(StratisError::Engine(
+                    ErrorEnum::Busy,
+                    "filesystems remaining on pool".into(),
+                ));
             };
         } else {
             return Ok(false);
@@ -150,7 +149,6 @@ mod tests {
 
     #[test]
     fn prop_configure_simulator_runs() {
-
         /// Configure simulator should always return Ok.
         fn configure_simulator_runs(denominator: u32) -> bool {
             SimEngine::default()
@@ -217,16 +215,9 @@ mod tests {
         let mut engine = SimEngine::default();
         engine.create_pool(name, &[], None, false).unwrap();
         assert!(match engine.create_pool(name, &[], None, false) {
-                    Ok(uuid) => {
-                        engine
-                            .get_pool(uuid)
-                            .unwrap()
-                            .1
-                            .blockdevs()
-                            .is_empty()
-                    }
-                    Err(_) => false,
-                });
+            Ok(uuid) => engine.get_pool(uuid).unwrap().1.blockdevs().is_empty(),
+            Err(_) => false,
+        });
     }
 
     #[test]
@@ -238,9 +229,9 @@ mod tests {
             .create_pool(name, &[Path::new("/s/d")], None, false)
             .unwrap();
         assert!(match engine.create_pool(name, &[], None, false) {
-                    Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
-                    _ => false,
-                });
+            Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
+            _ => false,
+        });
     }
 
     #[test]
@@ -250,18 +241,20 @@ mod tests {
         let mut engine = SimEngine::default();
         let devices = vec![Path::new(path), Path::new(path)];
         assert!(match engine.create_pool("name", &devices, None, false) {
-                    Ok(uuid) => engine.get_pool(uuid).unwrap().1.blockdevs().len() == 1,
-                    _ => false,
-                });
+            Ok(uuid) => engine.get_pool(uuid).unwrap().1.blockdevs().len() == 1,
+            _ => false,
+        });
     }
 
     #[test]
     /// Creating a pool with an impossible raid level should fail
     fn create_pool_max_u16_raid() {
         let mut engine = SimEngine::default();
-        assert!(engine
-                    .create_pool("name", &[], Some(std::u16::MAX), false)
-                    .is_err());
+        assert!(
+            engine
+                .create_pool("name", &[], Some(std::u16::MAX), false)
+                .is_err()
+        );
     }
 
     #[test]
@@ -269,9 +262,9 @@ mod tests {
     fn rename_empty() {
         let mut engine = SimEngine::default();
         assert!(match engine.rename_pool(Uuid::new_v4(), "new_name") {
-                    Ok(RenameAction::NoSource) => true,
-                    _ => false,
-                });
+            Ok(RenameAction::NoSource) => true,
+            _ => false,
+        });
     }
 
     #[test]
@@ -281,9 +274,9 @@ mod tests {
         let mut engine = SimEngine::default();
         let uuid = engine.create_pool(name, &[], None, false).unwrap();
         assert!(match engine.rename_pool(uuid, name) {
-                    Ok(RenameAction::Identity) => true,
-                    _ => false,
-                });
+            Ok(RenameAction::Identity) => true,
+            _ => false,
+        });
     }
 
     #[test]
@@ -292,9 +285,9 @@ mod tests {
         let mut engine = SimEngine::default();
         let uuid = engine.create_pool("old_name", &[], None, false).unwrap();
         assert!(match engine.rename_pool(uuid, "new_name") {
-                    Ok(RenameAction::Renamed) => true,
-                    _ => false,
-                });
+            Ok(RenameAction::Renamed) => true,
+            _ => false,
+        });
     }
 
     #[test]
@@ -305,9 +298,9 @@ mod tests {
         let uuid = engine.create_pool("old_name", &[], None, false).unwrap();
         engine.create_pool(new_name, &[], None, false).unwrap();
         assert!(match engine.rename_pool(uuid, new_name) {
-                    Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
-                    _ => false,
-                });
+            Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
+            _ => false,
+        });
     }
 
     #[test]
@@ -317,9 +310,9 @@ mod tests {
         let mut engine = SimEngine::default();
         engine.create_pool(new_name, &[], None, false).unwrap();
         assert!(match engine.rename_pool(Uuid::new_v4(), new_name) {
-                    Ok(RenameAction::NoSource) => true,
-                    _ => false,
-                });
+            Ok(RenameAction::NoSource) => true,
+            _ => false,
+        });
     }
 
 }

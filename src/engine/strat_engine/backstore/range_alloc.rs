@@ -19,9 +19,10 @@ pub struct RangeAllocator {
 impl RangeAllocator {
     /// Create a new RangeAllocator with the specified (offset, length)
     /// ranges marked as used.
-    pub fn new(limit: Sectors,
-               initial_used: &[(Sectors, Sectors)])
-               -> StratisResult<RangeAllocator> {
+    pub fn new(
+        limit: Sectors,
+        initial_used: &[(Sectors, Sectors)],
+    ) -> StratisResult<RangeAllocator> {
         let mut allocator = RangeAllocator {
             limit,
             used: BTreeMap::new(),
@@ -38,16 +39,17 @@ impl RangeAllocator {
     fn check_for_overflow(&self, off: Sectors, len: Sectors) -> StratisResult<()> {
         if let Some(sum) = off.checked_add(len) {
             if sum > self.limit {
-                let err_msg = format!("elements in range ({}, {}) exceed limit {}",
-                                      off,
-                                      len,
-                                      self.limit);
+                let err_msg = format!(
+                    "elements in range ({}, {}) exceed limit {}",
+                    off, len, self.limit
+                );
                 return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
             }
         } else {
-            let err_msg = format!("elements in range ({}, {}) inexpressible in this format",
-                                  off,
-                                  len);
+            let err_msg = format!(
+                "elements in range ({}, {}) inexpressible in this format",
+                off, len
+            );
             return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
         }
         Ok(())
@@ -64,19 +66,15 @@ impl RangeAllocator {
         for &(off, len) in ranges {
             self.check_for_overflow(off, len)?;
 
-            let prev = self.used
-                .range(..off)
-                .rev()
-                .next()
-                .map(|(k, v)| (*k, *v));
+            let prev = self.used.range(..off).rev().next().map(|(k, v)| (*k, *v));
 
             let mut contig_prev = None;
             if let Some((prev_off, prev_len)) = prev {
                 if prev_off + prev_len > off {
-                    let err_msg = format!("range starting at {} overlaps previous range ({}, {})",
-                                          off,
-                                          prev_off,
-                                          prev_len);
+                    let err_msg = format!(
+                        "range starting at {} overlaps previous range ({}, {})",
+                        off, prev_off, prev_len
+                    );
                     return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
                 }
                 if prev_off + prev_len == off {
@@ -84,16 +82,15 @@ impl RangeAllocator {
                 }
             }
 
-
             let next = self.used.range(off..).next().map(|(k, v)| (*k, *v));
 
             let mut contig_next = None;
             if let Some((next_off, next_len)) = next {
                 if off + len > next_off {
-                    let err_msg = format!("range ({}, {}) overlaps subsequent range starting at {}",
-                                          off,
-                                          len,
-                                          next_off);
+                    let err_msg = format!(
+                        "range ({}, {}) overlaps subsequent range starting at {}",
+                        off, len, next_off
+                    );
                     return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
                 }
                 if off + len == next_off {
@@ -115,15 +112,15 @@ impl RangeAllocator {
                 (Some((prev_off, prev_len)), None) => {
                     // Contig with prev, just extend prev
                     *self.used
-                         .get_mut(&prev_off)
-                         .expect("matched Some((prev_off, ...") = prev_len + len;
+                        .get_mut(&prev_off)
+                        .expect("matched Some((prev_off, ...") = prev_len + len;
                 }
                 (Some((prev_off, prev_len)), Some((next_off, next_len))) => {
                     // Contig with both, remove next and extend prev
                     self.used.remove(&next_off);
                     *self.used
-                         .get_mut(&prev_off)
-                         .expect("matched Some((prev_off, ...") = prev_len + len + next_len;
+                        .get_mut(&prev_off)
+                        .expect("matched Some((prev_off, ...") = prev_len + len + next_len;
                 }
             }
         }
@@ -149,8 +146,10 @@ impl RangeAllocator {
                 None => panic!("Existing matching allocated range not found"),
             };
 
-            assert!(prev_off + prev_len >= off + len,
-                    "must not extend past existing range");
+            assert!(
+                prev_off + prev_len >= off + len,
+                "must not extend past existing range"
+            );
 
             // switch based on if the to-remove range starts or ends
             // at the same point as the existing range
@@ -204,13 +203,12 @@ impl RangeAllocator {
         let mut used = self.used_ranges();
         used.push((self.limit, Sectors(0)));
 
-        used.into_iter()
-            .fold(Sectors(0), |prev_end, (start, len)| {
-                if prev_end < start {
-                    free.push((prev_end, start - prev_end))
-                }
-                start + len
-            });
+        used.into_iter().fold(Sectors(0), |prev_end, (start, len)| {
+            if prev_end < start {
+                free.push((prev_end, start - prev_end))
+            }
+            start + len
+        });
 
         free
     }
@@ -290,9 +288,11 @@ mod tests {
     #[test]
     // Verify some proper functioning when allocator initialized with ranges.
     fn test_allocator_initialized_with_range() {
-        let ranges = [(Sectors(20), Sectors(10)),
-                      (Sectors(10), Sectors(10)),
-                      (Sectors(30), Sectors(10))];
+        let ranges = [
+            (Sectors(20), Sectors(10)),
+            (Sectors(10), Sectors(10)),
+            (Sectors(30), Sectors(10)),
+        ];
         let allocator = RangeAllocator::new(Sectors(128), &ranges).unwrap();
         let used = allocator.used_ranges();
         assert_eq!(used.len(), 1);
@@ -402,9 +402,11 @@ mod tests {
         assert_eq!(request.0, Sectors(128));
         assert_eq!(request.1, &[(Sectors(0), Sectors(128))]);
 
-        assert!(allocator
-                    .insert_ranges(&[(Sectors(1), Sectors(1))])
-                    .is_err());
+        assert!(
+            allocator
+                .insert_ranges(&[(Sectors(1), Sectors(1))])
+                .is_err()
+        );
     }
 
     #[test]
@@ -450,9 +452,11 @@ mod tests {
         let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
 
         // overflow limit range
-        assert!(allocator
-                    .insert_ranges(&[(Sectors(1), Sectors(128))])
-                    .is_err());
+        assert!(
+            allocator
+                .insert_ranges(&[(Sectors(1), Sectors(128))])
+                .is_err()
+        );
     }
 
     #[test]
@@ -464,8 +468,10 @@ mod tests {
         let mut allocator = RangeAllocator::new(Sectors(MAX), &[]).unwrap();
 
         // overflow max u64
-        assert!(allocator
-                    .insert_ranges(&[(Sectors(MAX), Sectors(1))])
-                    .is_err());
+        assert!(
+            allocator
+                .insert_ranges(&[(Sectors(MAX), Sectors(1))])
+                .is_err()
+        );
     }
 }

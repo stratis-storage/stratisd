@@ -21,7 +21,6 @@ use super::super::serde_structs::{BlockDevSave, Recordable};
 use super::metadata::BDA;
 use super::range_alloc::RangeAllocator;
 
-
 #[derive(Debug)]
 pub struct StratBlockDev {
     dev: Device,
@@ -48,25 +47,26 @@ impl StratBlockDev {
     /// on the device is simply invisible to the blockdev. Consequently, it
     /// is invisible to the engine, and is not part of the total size value
     /// reported on the D-Bus.
-    pub fn new(dev: Device,
-               devnode: PathBuf,
-               bda: BDA,
-               upper_segments: &[(Sectors, Sectors)],
-               user_info: Option<String>,
-               hardware_info: Option<String>)
-               -> StratisResult<StratBlockDev> {
+    pub fn new(
+        dev: Device,
+        devnode: PathBuf,
+        bda: BDA,
+        upper_segments: &[(Sectors, Sectors)],
+        user_info: Option<String>,
+        hardware_info: Option<String>,
+    ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.size())];
         segments.extend(upper_segments);
         let allocator = RangeAllocator::new(bda.dev_size(), &segments)?;
 
         Ok(StratBlockDev {
-               dev,
-               devnode,
-               bda,
-               used: allocator,
-               user_info,
-               hardware_info,
-           })
+            dev,
+            devnode,
+            bda,
+            used: allocator,
+            user_info,
+            hardware_info,
+        })
     }
 
     /// Returns the blockdev's Device

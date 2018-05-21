@@ -4,7 +4,7 @@
 
 extern crate env_logger;
 
-use std::sync::{ONCE_INIT, Once};
+use std::sync::{Once, ONCE_INIT};
 
 static LOGGER_INIT: Once = ONCE_INIT;
 
@@ -12,7 +12,7 @@ static LOGGER_INIT: Once = ONCE_INIT;
 /// errors.
 pub fn init_logger() {
     LOGGER_INIT.call_once(|| {
-                              env_logger::init()
+        env_logger::init()
             .expect("This is the first and only initialization of the logger; it must succeed");
-                          });
+    });
 }

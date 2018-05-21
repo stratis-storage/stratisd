@@ -98,13 +98,16 @@ impl Display for CacheRole {
 ///
 /// which is equivalent to len(format!("{}", FORMAT_VERSION) < 60 (61 for UUID)
 pub fn format_flex_ids(pool_uuid: PoolUuid, role: FlexRole) -> (DmNameBuf, DmUuidBuf) {
-    let value = format!("stratis-{}-private-{}-flex-{}",
-                        FORMAT_VERSION,
-                        pool_uuid.simple().to_string(),
-                        role);
-    (DmNameBuf::new(value.clone()).expect("FORMAT_VERSION display length < 60"),
-     DmUuidBuf::new(value).expect("FORMAT_VERSION display length < 61"))
-
+    let value = format!(
+        "stratis-{}-private-{}-flex-{}",
+        FORMAT_VERSION,
+        pool_uuid.simple().to_string(),
+        role
+    );
+    (
+        DmNameBuf::new(value.clone()).expect("FORMAT_VERSION display length < 60"),
+        DmUuidBuf::new(value).expect("FORMAT_VERSION display length < 61"),
+    )
 }
 
 /// Format a name & uuid for the thin layer.
@@ -119,12 +122,16 @@ pub fn format_flex_ids(pool_uuid: PoolUuid, role: FlexRole) -> (DmNameBuf, DmUui
 ///
 /// which is equivalent to len(format!("{}", FORMAT_VERSION) < 46 (47 for UUID)
 pub fn format_thin_ids(pool_uuid: PoolUuid, role: ThinRole) -> (DmNameBuf, DmUuidBuf) {
-    let value = format!("stratis-{}-{}-thin-{}",
-                        FORMAT_VERSION,
-                        pool_uuid.simple().to_string(),
-                        role);
-    (DmNameBuf::new(value.clone()).expect("FORMAT_VERSION display length < 46"),
-     DmUuidBuf::new(value).expect("FORMAT_VERSION display length < 47"))
+    let value = format!(
+        "stratis-{}-{}-thin-{}",
+        FORMAT_VERSION,
+        pool_uuid.simple().to_string(),
+        role
+    );
+    (
+        DmNameBuf::new(value.clone()).expect("FORMAT_VERSION display length < 46"),
+        DmUuidBuf::new(value).expect("FORMAT_VERSION display length < 47"),
+    )
 }
 
 /// Format a name & uuid for the thin pool layer.
@@ -140,12 +147,16 @@ pub fn format_thin_ids(pool_uuid: PoolUuid, role: ThinRole) -> (DmNameBuf, DmUui
 ///
 /// which is equivalent to len(format!("{}", FORMAT_VERSION) < 65 (66 for UUID)
 pub fn format_thinpool_ids(pool_uuid: PoolUuid, role: ThinPoolRole) -> (DmNameBuf, DmUuidBuf) {
-    let value = format!("stratis-{}-private-{}-thinpool-{}",
-                        FORMAT_VERSION,
-                        pool_uuid.simple().to_string(),
-                        role);
-    (DmNameBuf::new(value.clone()).expect("FORMAT_VERSION display_length < 65"),
-     DmUuidBuf::new(value).expect("FORMAT_VERSION display_length < 66"))
+    let value = format!(
+        "stratis-{}-private-{}-thinpool-{}",
+        FORMAT_VERSION,
+        pool_uuid.simple().to_string(),
+        role
+    );
+    (
+        DmNameBuf::new(value.clone()).expect("FORMAT_VERSION display_length < 65"),
+        DmUuidBuf::new(value).expect("FORMAT_VERSION display_length < 66"),
+    )
 }
 
 /// Format a name & uuid for dm devices in the backstore.
@@ -161,10 +172,14 @@ pub fn format_thinpool_ids(pool_uuid: PoolUuid, role: ThinPoolRole) -> (DmNameBu
 ///
 /// which is equivalent to len(format!("{}", FORMAT_VERSION) < 60 (61 for UUID)
 pub fn format_backstore_ids(pool_uuid: PoolUuid, role: CacheRole) -> (DmNameBuf, DmUuidBuf) {
-    let value = format!("stratis-{}-private-{}-physical-{}",
-                        FORMAT_VERSION,
-                        pool_uuid.simple().to_string(),
-                        role);
-    (DmNameBuf::new(value.clone()).expect("FORMAT_VERSION display_length < 60"),
-     DmUuidBuf::new(value).expect("FORMAT_VERSION display_length < 61"))
+    let value = format!(
+        "stratis-{}-private-{}-physical-{}",
+        FORMAT_VERSION,
+        pool_uuid.simple().to_string(),
+        role
+    );
+    (
+        DmNameBuf::new(value.clone()).expect("FORMAT_VERSION display_length < 60"),
+        DmUuidBuf::new(value).expect("FORMAT_VERSION display_length < 61"),
+    )
 }

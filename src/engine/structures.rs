@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::{HashMap, hash_map};
+use std::collections::{hash_map, HashMap};
 use std::iter::IntoIterator;
 
 use uuid::Uuid;
@@ -15,7 +15,6 @@ pub struct Table<T> {
     name_to_uuid: HashMap<Name, Uuid>,
     items: HashMap<Uuid, (Name, T)>,
 }
-
 
 impl<T> Default for Table<T> {
     fn default() -> Table<T> {
@@ -126,15 +125,21 @@ impl<T> Table<T> {
     }
 
     pub fn iter(&self) -> Iter<T> {
-        Iter { items: self.items.iter() }
+        Iter {
+            items: self.items.iter(),
+        }
     }
 
     pub fn iter_mut(&mut self) -> IterMut<T> {
-        IterMut { items: self.items.iter_mut() }
+        IterMut {
+            items: self.items.iter_mut(),
+        }
     }
 
     pub fn into_iter(self) -> IntoIter<T> {
-        IntoIter { items: self.items.into_iter() }
+        IntoIter {
+            items: self.items.into_iter(),
+        }
     }
 
     /// Returns true if map has an item corresponding to this name, else false.
@@ -188,12 +193,10 @@ impl<T> Table<T> {
 
     /// Removes the item corresponding to the uuid if there is one.
     pub fn remove_by_uuid(&mut self, uuid: Uuid) -> Option<(Name, T)> {
-        self.items
-            .remove(&uuid)
-            .and_then(|(name, item)| {
-                          self.name_to_uuid.remove(&name);
-                          Some((name, item))
-                      })
+        self.items.remove(&uuid).and_then(|(name, item)| {
+            self.name_to_uuid.remove(&name);
+            Some((name, item))
+        })
     }
 
     /// Inserts an item for given uuid and name.
@@ -207,23 +210,21 @@ impl<T> Table<T> {
             // Two possibilities: One entry with same name and uuid ejected OR
             // two entries, one with same name and different uuid and one with
             // same uuid and different name.
-            (Some(old_uuid), Some((old_name, old_item))) => {
-                Some(if old_uuid == uuid {
-                         assert_eq!(old_name, name);
-                         vec![(name, uuid, old_item)]
-                     } else {
-                         assert!(old_name != name);
-                         let other_uuid = self.name_to_uuid
-                             .remove(&old_name)
-                             .expect("invariant requires existence");
-                         let (other_name, other_item) = self.items
-                             .remove(&old_uuid)
-                             .expect("invariant requires existence");
-                         assert_eq!(other_name, name);
-                         assert_eq!(other_uuid, uuid);
-                         vec![(name, old_uuid, other_item), (old_name, uuid, old_item)]
-                     })
-            }
+            (Some(old_uuid), Some((old_name, old_item))) => Some(if old_uuid == uuid {
+                assert_eq!(old_name, name);
+                vec![(name, uuid, old_item)]
+            } else {
+                assert!(old_name != name);
+                let other_uuid = self.name_to_uuid
+                    .remove(&old_name)
+                    .expect("invariant requires existence");
+                let (other_name, other_item) = self.items
+                    .remove(&old_uuid)
+                    .expect("invariant requires existence");
+                assert_eq!(other_name, name);
+                assert_eq!(other_uuid, uuid);
+                vec![(name, old_uuid, other_item), (old_name, uuid, old_item)]
+            }),
             // entry with same name but different uuid ejected
             (Some(old_uuid), None) => {
                 let (other_name, other_item) = self.items
@@ -299,9 +300,11 @@ mod tests {
 
         let uuid = Uuid::new_v4();
         let name = "name";
-        t.insert(Name::new(name.to_owned()),
-                 uuid,
-                 TestThing::new(&name, uuid));
+        t.insert(
+            Name::new(name.to_owned()),
+            uuid,
+            TestThing::new(&name, uuid),
+        );
         table_invariant(&t);
 
         assert!(t.get_by_name(&name).is_some());

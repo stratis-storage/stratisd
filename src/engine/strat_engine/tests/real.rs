@@ -83,6 +83,8 @@ fn get_device_runs<'a>(
 
     let min_size = min_size.unwrap_or(Bytes(IEC::Gi).sectors());
 
+    assert!(max_size.is_none() || Some(min_size) <= max_size);
+
     let (matches, _): (Vec<(&Path, Sectors)>, Vec<(&Path, Sectors)>) =
         dev_sizes.iter().partition(|&(_, s)| *s >= min_size);
 

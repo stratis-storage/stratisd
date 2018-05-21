@@ -70,7 +70,7 @@ pub enum DeviceLimits {
 fn get_device_runs<'a>(
     limits: DeviceLimits,
     dev_sizes: &[(&'a Path, Sectors)],
-) -> Vec<Vec<&'a Path>> {
+) -> Vec<Vec<(&'a Path, Option<(Sectors, Sectors)>)>> {
     let (lower, maybe_upper, min_size, max_size) = match limits {
         DeviceLimits::Exactly(num, min_size, max_size) => (num, Some(num + 1), min_size, max_size),
         DeviceLimits::AtLeast(num, min_size, max_size) => (num, None, min_size, max_size),
@@ -112,7 +112,7 @@ fn get_device_runs<'a>(
         matches
             .iter()
             .take(lower)
-            .map(|&(d, _)| d)
+            .map(|&(d, _)| (d, None))
             .collect::<Vec<_>>(),
     );
 
@@ -122,7 +122,7 @@ fn get_device_runs<'a>(
                 matches
                     .iter()
                     .take(avail)
-                    .map(|&(d, _)| d)
+                    .map(|&(d, _)| (d, None))
                     .collect::<Vec<_>>(),
             ),
             Some(upper) => {
@@ -131,7 +131,7 @@ fn get_device_runs<'a>(
                         matches
                             .iter()
                             .take(cmp::min(upper - 1, avail))
-                            .map(|&(d, _)| d)
+                            .map(|&(d, _)| (d, None))
                             .collect::<Vec<_>>(),
                     )
                 }
@@ -182,7 +182,10 @@ where
     init_logger();
 
     for run_paths in runs {
-        let devices: Vec<_> = run_paths.iter().map(|x| RealTestDev::new(x)).collect();
+        let devices: Vec<_> = run_paths
+            .iter()
+            .map(|&(x, _)| RealTestDev::new(x))
+            .collect();
 
         clean_up().unwrap();
 

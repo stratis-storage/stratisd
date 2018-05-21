@@ -49,7 +49,9 @@ pub enum DeviceLimits {
 
 /// Get a list of counts of devices to use for tests.
 /// None of the counts can be greater than avail.
-fn get_device_counts(limits: DeviceLimits, avail: usize) -> Vec<usize> {
+fn get_device_counts(limits: DeviceLimits, devpaths: &[&Path]) -> Vec<usize> {
+    let avail = devpaths.len();
+
     // Convert enum to [lower, Option<upper>) values
     let (lower, maybe_upper) = match limits {
         DeviceLimits::Exactly(num) => (num, Some(num + 1)),
@@ -104,7 +106,7 @@ where
         .map(|x| Path::new(x.as_str().unwrap()))
         .collect();
 
-    let counts = get_device_counts(limits, devpaths.len());
+    let counts = get_device_counts(limits, &devpaths);
 
     assert!(!counts.is_empty());
 

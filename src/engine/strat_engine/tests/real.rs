@@ -10,10 +10,11 @@ use serde_json::{from_reader, Value};
 
 use devicemapper::{Bytes, Sectors, IEC};
 
+use super::super::backstore::blkdev_size;
+use super::super::device::wipe_sectors;
+
 use super::logger::init_logger;
 use super::util::clean_up;
-
-use super::super::device::wipe_sectors;
 
 pub struct RealTestDev {
     path: PathBuf,
@@ -48,9 +49,9 @@ pub enum DeviceLimits {
 }
 
 /// Get a list of counts of devices to use for tests.
-/// None of the counts can be greater than avail.
-fn get_device_counts(limits: DeviceLimits, devpaths: &[&Path]) -> Vec<usize> {
-    let avail = devpaths.len();
+/// May return an empty list if the request is not satisfiable.
+fn get_device_counts(limits: DeviceLimits, dev_sizes: &[(&Path, Sectors)]) -> Vec<usize> {
+    let avail = dev_sizes.len();
 
     // Convert enum to [lower, Option<upper>) values
     let (lower, maybe_upper) = match limits {
@@ -106,7 +107,19 @@ where
         .map(|x| Path::new(x.as_str().unwrap()))
         .collect();
 
-    let counts = get_device_counts(limits, &devpaths);
+    let dev_sizes: Vec<(&Path, Sectors)> = devpaths
+        .iter()
+        .map(|p| {
+            (
+                *p,
+                blkdev_size(&OpenOptions::new().read(true).open(p).unwrap())
+                    .unwrap()
+                    .sectors(),
+            )
+        })
+        .collect();
+
+    let counts = get_device_counts(limits, &dev_sizes);
 
     assert!(!counts.is_empty());
 

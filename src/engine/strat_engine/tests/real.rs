@@ -43,16 +43,20 @@ impl Drop for RealTestDev {
 }
 
 /// Shorthand for specifying devices to use for tests
+/// For the minimum size, if None is given, the default 1 GiB is chosen.
 pub enum DeviceLimits {
     /// Use exactly the number of devices specified
-    Exactly(usize),
+    /// The second argument is the minimum size for all devices.
+    Exactly(usize, Option<Sectors>),
     /// Use at least the number of devices specified, but if there are more
     /// devices available, also use the maximum number of devices.
-    AtLeast(usize),
+    /// The second argument is the minimum size for all devices.
+    AtLeast(usize, Option<Sectors>),
     /// Use exactly the number of devices specified in the first argument,
     /// and the minimum of the number of devices specified and the number
     /// of devices available in the second argument.
-    Range(usize, usize),
+    /// The third argument is the minimum size for all devices.
+    Range(usize, usize, Option<Sectors>),
 }
 
 /// Get a list of lists of devices to use for tests.
@@ -61,17 +65,22 @@ fn get_device_runs<'a>(
     limits: DeviceLimits,
     dev_sizes: &[(&'a Path, Sectors)],
 ) -> Vec<Vec<&'a Path>> {
-    let avail = dev_sizes.len();
-
-    // Convert enum to [lower, Option<upper>) values
-    let (lower, maybe_upper) = match limits {
-        DeviceLimits::Exactly(num) => (num, Some(num + 1)),
-        DeviceLimits::AtLeast(num) => (num, None),
-        DeviceLimits::Range(lower, upper) => {
+    // Convert enum to [lower, Option<upper>, min_size) values
+    let (lower, maybe_upper, min_size) = match limits {
+        DeviceLimits::Exactly(num, min_size) => (num, Some(num + 1), min_size),
+        DeviceLimits::AtLeast(num, min_size) => (num, None, min_size),
+        DeviceLimits::Range(lower, upper, min_size) => {
             assert!(lower < upper);
-            (lower, Some(upper + 1))
+            (lower, Some(upper + 1), min_size)
         }
     };
+
+    let min_size = min_size.unwrap_or(Bytes(IEC::Gi).sectors());
+
+    let (matches, _): (Vec<(&Path, Sectors)>, Vec<(&Path, Sectors)>) =
+        dev_sizes.iter().partition(|&(_p, s)| *s >= min_size);
+
+    let avail = matches.len();
 
     let mut device_lists = vec![];
 
@@ -81,7 +90,7 @@ fn get_device_runs<'a>(
     }
 
     device_lists.push(
-        dev_sizes
+        matches
             .iter()
             .take(lower)
             .map(|&(d, _)| d)
@@ -91,7 +100,7 @@ fn get_device_runs<'a>(
     if lower != avail {
         match maybe_upper {
             None => device_lists.push(
-                dev_sizes
+                matches
                     .iter()
                     .take(avail)
                     .map(|&(d, _)| d)
@@ -100,7 +109,7 @@ fn get_device_runs<'a>(
             Some(upper) => {
                 if lower + 1 < upper {
                     device_lists.push(
-                        dev_sizes
+                        matches
                             .iter()
                             .take(cmp::min(upper - 1, avail))
                             .map(|&(d, _)| d)

@@ -378,7 +378,7 @@ mod tests {
 
     #[test]
     pub fn real_test_basic_metadata() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_basic_metadata);
+        real::test_with_spec(real::DeviceLimits::AtLeast(2, None), test_basic_metadata);
     }
 
     /// Verify that a pool with no devices does not have the minimum amount of
@@ -395,7 +395,7 @@ mod tests {
 
     #[test]
     pub fn real_test_empty_pool() {
-        real::test_with_spec(real::DeviceLimits::Exactly(0), test_empty_pool);
+        real::test_with_spec(real::DeviceLimits::Exactly(0, None), test_empty_pool);
     }
 
     /// Test that adding a cachedev causes metadata to be updated.
@@ -547,6 +547,6 @@ mod tests {
 
     #[test]
     pub fn real_test_add_cachedevs() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_add_cachedevs);
+        real::test_with_spec(real::DeviceLimits::AtLeast(2, None), test_add_cachedevs);
     }
 }

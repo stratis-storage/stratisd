@@ -977,7 +977,7 @@ mod tests {
 
     #[test]
     pub fn loop_test_full_pool() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Exactly(2), test_full_pool);
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Exactly(2, None), test_full_pool);
     }
 
     #[test]

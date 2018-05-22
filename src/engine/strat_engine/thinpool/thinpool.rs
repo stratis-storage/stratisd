@@ -900,14 +900,15 @@ mod tests {
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
         let first_path = Vec::from_iter(paths[0..1].iter().cloned());
         let remaining_paths = Vec::from_iter(paths[1..paths.len()].iter().cloned());
-        let mut backstore = Backstore::initialize(pool_uuid, &first_path, MIN_MDA_SECTORS, false)
-            .unwrap();
-        let mut pool = ThinPool::new(pool_uuid,
-                                     &ThinPoolSizeParams::default(),
-                                     DATA_BLOCK_SIZE,
-                                     DATA_LOWATER,
-                                     &mut backstore)
-                .unwrap();
+        let mut backstore =
+            Backstore::initialize(pool_uuid, &first_path, MIN_MDA_SECTORS, false).unwrap();
+        let mut pool = ThinPool::new(
+            pool_uuid,
+            &ThinPoolSizeParams::default(),
+            DATA_BLOCK_SIZE,
+            DATA_LOWATER,
+            &mut backstore,
+        ).unwrap();
 
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name).unwrap();
@@ -921,12 +922,13 @@ mod tests {
         {
             // to allow mutable borrow of pool
             let (_, filesystem) = pool.get_filesystem_by_uuid(fs_uuid).unwrap();
-            mount(Some(&filesystem.devnode()),
-                  source_tmp_dir.path(),
-                  Some("xfs"),
-                  MsFlags::empty(),
-                  None as Option<&str>)
-                    .unwrap();
+            mount(
+                Some(&filesystem.devnode()),
+                source_tmp_dir.path(),
+                Some("xfs"),
+                MsFlags::empty(),
+                None as Option<&str>,
+            ).unwrap();
             let file_path = source_tmp_dir.path().join("stratis_test.txt");
             let mut f: File = OpenOptions::new()
                 .create(true)
@@ -980,10 +982,14 @@ mod tests {
 
     #[test]
     pub fn real_test_full_pool() {
-        real::test_with_spec(real::DeviceLimits::Exactly(2,
-                                                         Some(Bytes(IEC::Gi).sectors()),
-                                                         Some(Bytes(IEC::Gi * 4).sectors())),
-                             test_full_pool);
+        real::test_with_spec(
+            real::DeviceLimits::Exactly(
+                2,
+                Some(Bytes(IEC::Gi).sectors()),
+                Some(Bytes(IEC::Gi * 4).sectors()),
+            ),
+            test_full_pool,
+        );
     }
 
     /// Verify a snapshot has the same files and same contents as the origin.

@@ -39,11 +39,13 @@ impl RealTestDev {
     fn as_path(&self) -> PathBuf {
         self.dev.as_ref().either(|p| p.clone(), |l| l.devnode())
     }
-}
 
-impl Drop for RealTestDev {
-    fn drop(&mut self) {
+    /// Teardown a real test dev
+    fn teardown(self) -> () {
         wipe_sectors(&self.as_path(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
+        if let Some(ld) = self.dev.right() {
+            ld.teardown(get_dm()).unwrap();
+        }
     }
 }
 
@@ -217,7 +219,9 @@ where
     init_logger();
 
     for run_paths in runs {
-        let devices: Vec<_> = run_paths
+        clean_up().unwrap();
+
+        let mut devices: Vec<_> = run_paths
             .iter()
             .map(|&(path, spec)| match spec {
                 Some((start, length)) => {
@@ -227,8 +231,6 @@ where
             })
             .collect();
 
-        clean_up().unwrap();
-
         let paths: Vec<PathBuf> = devices.iter().map(|x| x.as_path()).collect();
         let paths: Vec<&Path> = paths.iter().map(|x| x.as_path()).collect();
         let result = panic::catch_unwind(|| test(&paths));
@@ -236,5 +238,9 @@ where
 
         result.unwrap();
         tear_down.unwrap();
+
+        for dev in devices.drain(..) {
+            dev.teardown();
+        }
     }
 }

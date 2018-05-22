@@ -289,7 +289,10 @@ mod test {
 
     #[test]
     pub fn loop_test_pool_rename() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_pool_rename);
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(1, 3, None),
+            test_pool_rename,
+        );
     }
 
     #[test]
@@ -343,7 +346,7 @@ mod test {
 
     #[test]
     pub fn loop_test_setup() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_setup);
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
     }
 
     #[test]

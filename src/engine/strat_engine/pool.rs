@@ -373,7 +373,10 @@ mod tests {
 
     #[test]
     pub fn loop_test_basic_metadata() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_basic_metadata);
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(2, 3, None),
+            test_basic_metadata,
+        );
     }
 
     #[test]
@@ -393,7 +396,7 @@ mod tests {
 
     #[test]
     pub fn loop_test_empty_pool() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Exactly(0), test_empty_pool);
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Exactly(0, None), test_empty_pool);
     }
 
     #[test]
@@ -545,7 +548,10 @@ mod tests {
 
     #[test]
     pub fn loop_test_add_cachedevs() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_add_cachedevs);
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(2, 3, None),
+            test_add_cachedevs,
+        );
     }
 
     #[test]

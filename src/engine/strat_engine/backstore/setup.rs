@@ -6,14 +6,14 @@
 // Initial setup steps are steps that do not alter the environment.
 
 use std::collections::{HashMap, HashSet};
-use std::fs::{OpenOptions, read_dir};
+use std::fs::{read_dir, OpenOptions};
 use std::io::ErrorKind;
 use std::path::PathBuf;
 
 use nix::errno::Errno;
 use serde_json;
 
-use devicemapper::{Device, devnode_to_devno};
+use devicemapper::{devnode_to_devno, Device};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -21,13 +21,12 @@ use super::super::super::structures::Table;
 use super::super::super::types::{Name, PoolUuid};
 
 use super::super::engine::DevOwnership;
-use super::super::pool::{StratPool, check_metadata};
+use super::super::pool::{check_metadata, StratPool};
 use super::super::serde_structs::{BackstoreSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
 use super::device::blkdev_size;
-use super::metadata::{BDA, StaticHeader};
-
+use super::metadata::{StaticHeader, BDA};
 
 /// Determine if devnode is a Stratis device. Return the device's Stratis
 /// pool UUID if it belongs to Stratis.
@@ -73,14 +72,14 @@ pub fn is_stratis_device(devnode: &PathBuf) -> StratisResult<Option<PoolUuid>> {
     }
 }
 
-
 /// Setup a pool from constituent devices in the context of some already
 /// setup pools. Return an error on anything that prevents the pool
 /// being set up.
-pub fn setup_pool(pool_uuid: PoolUuid,
-                  devices: &HashMap<Device, PathBuf>,
-                  pools: &Table<StratPool>)
-                  -> StratisResult<(Name, StratPool)> {
+pub fn setup_pool(
+    pool_uuid: PoolUuid,
+    devices: &HashMap<Device, PathBuf>,
+    pools: &Table<StratPool>,
+) -> StratisResult<(Name, StratPool)> {
     // FIXME: In this method, various errors are assembled from various
     // sources and combined into strings, so that they
     // can be printed as log messages if necessary. Instead, some kind of
@@ -96,34 +95,38 @@ pub fn setup_pool(pool_uuid: PoolUuid,
         format!("(pool UUID: {}, devnodes: {})", pool_uuid, dev_paths)
     };
 
-    let metadata = get_metadata(pool_uuid, devices)?
-        .ok_or_else(|| {
-                        let err_msg = format!("no metadata found for {}", info_string());
-                        StratisError::Engine(ErrorEnum::NotFound, err_msg)
-                    })?;
+    let metadata = get_metadata(pool_uuid, devices)?.ok_or_else(|| {
+        let err_msg = format!("no metadata found for {}", info_string());
+        StratisError::Engine(ErrorEnum::NotFound, err_msg)
+    })?;
 
     if pools.contains_name(&metadata.name) {
-        let err_msg = format!("pool with name \"{}\" set up; metadata specifies same name for {}",
-                              &metadata.name,
-                              info_string());
+        let err_msg = format!(
+            "pool with name \"{}\" set up; metadata specifies same name for {}",
+            &metadata.name,
+            info_string()
+        );
         return Err(StratisError::Engine(ErrorEnum::AlreadyExists, err_msg));
     }
 
     check_metadata(&metadata)
         .or_else(|e| {
-                     let err_msg = format!("inconsistent metadata for {}: reason: {:?}",
-                                           info_string(),
-                                           e);
-                     Err(StratisError::Engine(ErrorEnum::Error, err_msg))
-                 })
+            let err_msg = format!(
+                "inconsistent metadata for {}: reason: {:?}",
+                info_string(),
+                e
+            );
+            Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+        })
         .and_then(|_| {
-            StratPool::setup(pool_uuid, devices, &metadata)
-        .or_else(|e| {
-                     let err_msg = format!("failed to set up pool for {}: reason: {:?}",
-                                           info_string(),
-                                           e);
-                     Err(StratisError::Engine(ErrorEnum::Error, err_msg))
-                 })
+            StratPool::setup(pool_uuid, devices, &metadata).or_else(|e| {
+                let err_msg = format!(
+                    "failed to set up pool for {}: reason: {:?}",
+                    info_string(),
+                    e
+                );
+                Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+            })
         })
 }
 
@@ -131,7 +134,6 @@ pub fn setup_pool(pool_uuid: PoolUuid,
 ///
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
 pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
-
     let mut pool_map = HashMap::new();
     let mut devno_set = HashSet::new();
     for dir_e in read_dir("/dev")? {
@@ -142,13 +144,12 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
             None => continue,
             Some(devno) => {
                 if devno_set.insert(devno) {
-                    is_stratis_device(&devnode)?
-                        .and_then(|pool_uuid| {
-                                      pool_map
-                                          .entry(pool_uuid)
-                                          .or_insert_with(HashMap::new)
-                                          .insert(Device::from(devno), devnode)
-                                  });
+                    is_stratis_device(&devnode)?.and_then(|pool_uuid| {
+                        pool_map
+                            .entry(pool_uuid)
+                            .or_insert_with(HashMap::new)
+                            .insert(Device::from(devno), devnode)
+                    });
                 } else {
                     continue;
                 }
@@ -162,10 +163,10 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
 /// Get the most recent metadata from a set of Devices for a given pool UUID.
 /// Returns None if no metadata found for this pool.
 #[allow(implicit_hasher)]
-pub fn get_metadata(pool_uuid: PoolUuid,
-                    devnodes: &HashMap<Device, PathBuf>)
-                    -> StratisResult<Option<PoolSave>> {
-
+pub fn get_metadata(
+    pool_uuid: PoolUuid,
+    devnodes: &HashMap<Device, PathBuf>,
+) -> StratisResult<Option<PoolSave>> {
     // Get pairs of device nodes and matching BDAs
     // If no BDA, or BDA UUID does not match pool UUID, skip.
     // If there is an error reading the BDA, error. There could have been
@@ -186,8 +187,9 @@ pub fn get_metadata(pool_uuid: PoolUuid,
     // circumstances.
     let most_recent_time = {
         match bdas.iter()
-                  .filter_map(|&(_, ref bda)| bda.last_update_time())
-                  .max() {
+            .filter_map(|&(_, ref bda)| bda.last_update_time())
+            .max()
+        {
             Some(time) => time,
             None => return Ok(None),
         }
@@ -196,10 +198,9 @@ pub fn get_metadata(pool_uuid: PoolUuid,
     // Try to read from all available devnodes that could contain most
     // recent metadata. In the event of errors, continue to try until all are
     // exhausted.
-    for &(devnode, ref bda) in
-        bdas.iter()
-            .filter(|&&(_, ref bda)| bda.last_update_time() == Some(most_recent_time)) {
-
+    for &(devnode, ref bda) in bdas.iter()
+        .filter(|&&(_, ref bda)| bda.last_update_time() == Some(most_recent_time))
+    {
         let poolsave = OpenOptions::new()
             .read(true)
             .open(devnode)
@@ -226,10 +227,11 @@ pub fn get_metadata(pool_uuid: PoolUuid,
 /// Returns a tuple, of which the first are the data devs, and the second
 /// are the devs that support the cache tier.
 #[allow(implicit_hasher)]
-pub fn get_blockdevs(pool_uuid: PoolUuid,
-                     backstore_save: &BackstoreSave,
-                     devnodes: &HashMap<Device, PathBuf>)
-                     -> StratisResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
+pub fn get_blockdevs(
+    pool_uuid: PoolUuid,
+    backstore_save: &BackstoreSave,
+    devnodes: &HashMap<Device, PathBuf>,
+) -> StratisResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
     let recorded_data_map: HashMap<_, _> = backstore_save
         .data_devs
         .iter()
@@ -270,13 +272,15 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
         let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
         if let Some(bda) = bda {
             if bda.pool_uuid() == pool_uuid {
-                let actual_size = blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?
-                    .sectors();
+                let actual_size =
+                    blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?.sectors();
 
                 if actual_size < bda.dev_size() {
-                    let err_msg = format!("actual blockdev size ({}) < recorded size ({})",
-                                          actual_size,
-                                          bda.dev_size());
+                    let err_msg = format!(
+                        "actual blockdev size ({}) < recorded size ({})",
+                        actual_size,
+                        bda.dev_size()
+                    );
 
                     return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
                 }
@@ -285,16 +289,14 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
 
                 let (dev_vec, bd_save) = match recorded_data_map.get(&dev_uuid) {
                     Some(bd_save) => (&mut datadevs, bd_save),
-                    None => {
-                        match recorded_cache_map.get(&dev_uuid) {
-                            Some(bd_save) => (&mut cachedevs, bd_save),
-                            None => {
-                                let err_msg = format!("Blockdev {} not found in metadata",
-                                                      bda.dev_uuid());
-                                return Err(StratisError::Engine(ErrorEnum::NotFound, err_msg));
-                            }
+                    None => match recorded_cache_map.get(&dev_uuid) {
+                        Some(bd_save) => (&mut cachedevs, bd_save),
+                        None => {
+                            let err_msg =
+                                format!("Blockdev {} not found in metadata", bda.dev_uuid());
+                            return Err(StratisError::Engine(ErrorEnum::NotFound, err_msg));
                         }
-                    }
+                    },
                 };
 
                 // This should always succeed since the actual size is at
@@ -302,12 +304,14 @@ pub fn get_blockdevs(pool_uuid: PoolUuid,
                 // available to be allocated. If this fails, the most likely
                 // conclusion is metadata corruption.
                 let segments = segment_table.get(&dev_uuid);
-                dev_vec.push(StratBlockDev::new(*device,
-                                                devnode.to_owned(),
-                                                bda,
-                                                segments.unwrap_or(&vec![]),
-                                                bd_save.user_info.clone(),
-                                                bd_save.hardware_info.clone())?);
+                dev_vec.push(StratBlockDev::new(
+                    *device,
+                    devnode.to_owned(),
+                    bda,
+                    segments.unwrap_or(&vec![]),
+                    bd_save.user_info.clone(),
+                    bd_save.hardware_info.clone(),
+                )?);
             }
         }
     }

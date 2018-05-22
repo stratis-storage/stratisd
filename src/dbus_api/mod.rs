@@ -6,8 +6,8 @@
 mod macros;
 
 mod api;
-mod filesystem;
 mod blockdev;
+mod filesystem;
 mod pool;
 mod types;
 mod util;

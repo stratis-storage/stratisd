@@ -10,7 +10,6 @@ use super::super::structures::Table;
 
 use super::pool::StratPool;
 
-
 /// Teardown pools.
 pub fn teardown_pools(pools: Table<StratPool>) -> StratisResult<()> {
     let mut untorndown_pools = Vec::new();
@@ -21,8 +20,10 @@ pub fn teardown_pools(pools: Table<StratPool>) -> StratisResult<()> {
     if untorndown_pools.is_empty() {
         Ok(())
     } else {
-        let err_msg = format!("Failed to teardown already set up pools: {:?}",
-                              untorndown_pools);
+        let err_msg = format!(
+            "Failed to teardown already set up pools: {:?}",
+            untorndown_pools
+        );
         Err(StratisError::Engine(ErrorEnum::Error, err_msg))
     }
 }

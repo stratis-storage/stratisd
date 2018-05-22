@@ -24,7 +24,6 @@ use super::thinpool::{ThinPool, ThinPoolSizeParams};
 
 pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
 
-
 /// Check the metadata of an individual pool for consistency.
 pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
     // If the amount allocated from the cache tier is not the same as that
@@ -39,9 +38,10 @@ pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
         .map(|x| x.1)
         .sum::<Sectors>();
     if total_allocated != metadata.backstore.next {
-        let err_msg = format!("{} used in thinpool, but {} given up by cache",
-                              total_allocated,
-                              metadata.backstore.next);
+        let err_msg = format!(
+            "{} used in thinpool, but {} given up by cache",
+            total_allocated, metadata.backstore.next
+        );
         Err(StratisError::Engine(ErrorEnum::Invalid, err_msg))
     } else {
         Ok(())
@@ -59,20 +59,23 @@ impl StratPool {
     /// Initialize a Stratis Pool.
     /// 1. Initialize the block devices specified by paths.
     /// 2. Set up thinpool device to back filesystems.
-    pub fn initialize(name: &str,
-                      paths: &[&Path],
-                      redundancy: Redundancy,
-                      force: bool)
-                      -> StratisResult<(PoolUuid, StratPool)> {
+    pub fn initialize(
+        name: &str,
+        paths: &[&Path],
+        redundancy: Redundancy,
+        force: bool,
+    ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
 
-        let thinpool = ThinPool::new(pool_uuid,
-                                     &ThinPoolSizeParams::default(),
-                                     DATA_BLOCK_SIZE,
-                                     DATA_LOWATER,
-                                     &mut backstore);
+        let thinpool = ThinPool::new(
+            pool_uuid,
+            &ThinPoolSizeParams::default(),
+            DATA_BLOCK_SIZE,
+            DATA_LOWATER,
+            &mut backstore,
+        );
         let thinpool = match thinpool {
             Ok(thinpool) => thinpool,
             Err(err) => {
@@ -93,23 +96,28 @@ impl StratPool {
     }
 
     /// Setup a StratPool using its UUID and the list of devnodes it has.
-    pub fn setup(uuid: PoolUuid,
-                 devnodes: &HashMap<Device, PathBuf>,
-                 metadata: &PoolSave)
-                 -> StratisResult<(Name, StratPool)> {
+    pub fn setup(
+        uuid: PoolUuid,
+        devnodes: &HashMap<Device, PathBuf>,
+        metadata: &PoolSave,
+    ) -> StratisResult<(Name, StratPool)> {
         let backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, None)?;
-        let thinpool = ThinPool::setup(uuid,
-                                       metadata.thinpool_dev.data_block_size,
-                                       DATA_LOWATER,
-                                       &metadata.flex_devs,
-                                       &backstore)?;
+        let thinpool = ThinPool::setup(
+            uuid,
+            metadata.thinpool_dev.data_block_size,
+            DATA_LOWATER,
+            &metadata.flex_devs,
+            &backstore,
+        )?;
 
-        Ok((Name::new(metadata.name.to_owned()),
+        Ok((
+            Name::new(metadata.name.to_owned()),
             StratPool {
                 backstore,
                 redundancy: Redundancy::NONE,
                 thin_pool: thinpool,
-            }))
+            },
+        ))
     }
 
     /// Write current metadata to pool members.
@@ -138,10 +146,12 @@ impl StratPool {
     // TODO: Just check the device that evented. Currently checks
     // everything.
     pub fn event_on(&mut self, pool_name: &Name, dm_name: &DmName) -> StratisResult<()> {
-        assert!(self.thin_pool
-                    .get_eventing_dev_names()
-                    .iter()
-                    .any(|x| dm_name == &**x));
+        assert!(
+            self.thin_pool
+                .get_eventing_dev_names()
+                .iter()
+                .any(|x| dm_name == &**x)
+        );
         if self.thin_pool.check(&mut self.backstore)? {
             self.write_metadata(pool_name)?;
         }
@@ -159,16 +169,18 @@ impl StratPool {
 }
 
 impl Pool for StratPool {
-    fn create_filesystems<'a, 'b>(&'a mut self,
-                                  pool_name: &str,
-                                  specs: &[(&'b str, Option<Sectors>)])
-                                  -> StratisResult<Vec<(&'b str, FilesystemUuid)>> {
+    fn create_filesystems<'a, 'b>(
+        &'a mut self,
+        pool_name: &str,
+        specs: &[(&'b str, Option<Sectors>)],
+    ) -> StratisResult<Vec<(&'b str, FilesystemUuid)>> {
         let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
         for name in names.keys() {
-            if self.thin_pool
-                   .get_mut_filesystem_by_name(*name)
-                   .is_some() {
-                return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.to_string()));
+            if self.thin_pool.get_mut_filesystem_by_name(*name).is_some() {
+                return Err(StratisError::Engine(
+                    ErrorEnum::AlreadyExists,
+                    name.to_string(),
+                ));
             }
         }
 
@@ -182,12 +194,13 @@ impl Pool for StratPool {
         Ok(result)
     }
 
-    fn add_blockdevs(&mut self,
-                     pool_name: &str,
-                     paths: &[&Path],
-                     tier: BlockDevTier,
-                     force: bool)
-                     -> StratisResult<Vec<DevUuid>> {
+    fn add_blockdevs(
+        &mut self,
+        pool_name: &str,
+        paths: &[&Path],
+        tier: BlockDevTier,
+        force: bool,
+    ) -> StratisResult<Vec<DevUuid>> {
         self.thin_pool.suspend()?;
         let bdev_info = self.backstore.add_blockdevs(paths, tier, force)?;
         self.thin_pool.set_device(self.backstore.device())?;
@@ -202,10 +215,11 @@ impl Pool for StratPool {
         Ok(())
     }
 
-    fn destroy_filesystems<'a>(&'a mut self,
-                               pool_name: &str,
-                               fs_uuids: &[FilesystemUuid])
-                               -> StratisResult<Vec<FilesystemUuid>> {
+    fn destroy_filesystems<'a>(
+        &'a mut self,
+        pool_name: &str,
+        fs_uuids: &[FilesystemUuid],
+    ) -> StratisResult<Vec<FilesystemUuid>> {
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
             self.thin_pool.destroy_filesystem(pool_name, uuid)?;
@@ -215,20 +229,21 @@ impl Pool for StratPool {
         Ok(removed)
     }
 
-    fn rename_filesystem(&mut self,
-                         pool_name: &str,
-                         uuid: FilesystemUuid,
-                         new_name: &str)
-                         -> StratisResult<RenameAction> {
-        self.thin_pool
-            .rename_filesystem(pool_name, uuid, new_name)
+    fn rename_filesystem(
+        &mut self,
+        pool_name: &str,
+        uuid: FilesystemUuid,
+        new_name: &str,
+    ) -> StratisResult<RenameAction> {
+        self.thin_pool.rename_filesystem(pool_name, uuid, new_name)
     }
 
-    fn snapshot_filesystem(&mut self,
-                           pool_name: &str,
-                           origin_uuid: FilesystemUuid,
-                           snapshot_name: &str)
-                           -> StratisResult<FilesystemUuid> {
+    fn snapshot_filesystem(
+        &mut self,
+        pool_name: &str,
+        origin_uuid: FilesystemUuid,
+        snapshot_name: &str,
+    ) -> StratisResult<FilesystemUuid> {
         self.thin_pool
             .snapshot_filesystem(pool_name, origin_uuid, snapshot_name)
     }
@@ -273,11 +288,12 @@ impl Pool for StratPool {
             .map(|(t, b)| (t, b as &BlockDev))
     }
 
-    fn set_blockdev_user_info(&mut self,
-                              pool_name: &str,
-                              uuid: DevUuid,
-                              user_info: Option<&str>)
-                              -> StratisResult<bool> {
+    fn set_blockdev_user_info(
+        &mut self,
+        pool_name: &str,
+        uuid: DevUuid,
+        user_info: Option<&str>,
+    ) -> StratisResult<bool> {
         if self.backstore.set_blockdev_user_info(uuid, user_info)? {
             self.write_metadata(pool_name)?;
             Ok(true)
@@ -293,7 +309,7 @@ mod tests {
     use std::fs::OpenOptions;
     use std::io::{Read, Write};
 
-    use nix::mount::{MsFlags, mount, umount};
+    use nix::mount::{mount, umount, MsFlags};
     use tempfile;
 
     use super::super::super::types::Redundancy;
@@ -321,15 +337,15 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let name1 = "name1";
-        let (uuid1, pool1) = StratPool::initialize(&name1, paths1, Redundancy::NONE, false)
-            .unwrap();
+        let (uuid1, pool1) =
+            StratPool::initialize(&name1, paths1, Redundancy::NONE, false).unwrap();
         invariant(&pool1, &name1);
 
         let metadata1 = pool1.record(name1);
 
         let name2 = "name2";
-        let (uuid2, pool2) = StratPool::initialize(&name2, paths2, Redundancy::NONE, false)
-            .unwrap();
+        let (uuid2, pool2) =
+            StratPool::initialize(&name2, paths2, Redundancy::NONE, false).unwrap();
         invariant(&pool2, &name2);
 
         let metadata2 = pool2.record(name2);
@@ -393,8 +409,8 @@ mod tests {
 
         let name = "stratis-test-pool";
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let (uuid, mut pool) = StratPool::initialize(&name, paths2, Redundancy::NONE, false)
-            .unwrap();
+        let (uuid, mut pool) =
+            StratPool::initialize(&name, paths2, Redundancy::NONE, false).unwrap();
         devlinks::pool_added(&name).unwrap();
         invariant(&pool, &name);
 
@@ -417,12 +433,13 @@ mod tests {
         let bytestring = b"some bytes";
         {
             let (_, fs) = pool.get_filesystem(fs_uuid).unwrap();
-            mount(Some(&fs.devnode()),
-                  tmp_dir.path(),
-                  Some("xfs"),
-                  MsFlags::empty(),
-                  None as Option<&str>)
-                    .unwrap();
+            mount(
+                Some(&fs.devnode()),
+                tmp_dir.path(),
+                Some("xfs"),
+                MsFlags::empty(),
+                None as Option<&str>,
+            ).unwrap();
             OpenOptions::new()
                 .create(true)
                 .write(true)
@@ -459,10 +476,11 @@ mod tests {
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 1);
         let devices = pools.get(&uuid).unwrap();
-        let (name, pool) = StratPool::setup(uuid,
-                                            &devices,
-                                            &get_metadata(uuid, &devices).unwrap().unwrap())
-                .unwrap();
+        let (name, pool) = StratPool::setup(
+            uuid,
+            &devices,
+            &get_metadata(uuid, &devices).unwrap().unwrap(),
+        ).unwrap();
         invariant(&pool, &name);
 
         let metadata3 = pool.record(&name);
@@ -474,38 +492,43 @@ mod tests {
         assert!(metadata3.backstore.cache_segments.is_some());
         assert!(metadata3.backstore.meta_segments.is_some());
 
-        assert_eq!(metadata3
-                       .backstore
-                       .cache_devs
-                       .as_ref()
-                       .map(|bds| bds.iter().map(|bd| bd.uuid).collect::<HashSet<_>>()),
-                   metadata2
-                       .backstore
-                       .cache_devs
-                       .as_ref()
-                       .map(|bds| bds.iter().map(|bd| bd.uuid).collect::<HashSet<_>>()));
-        assert_eq!(metadata3
-                       .backstore
-                       .data_devs
-                       .iter()
-                       .map(|bd| bd.uuid)
-                       .collect::<HashSet<_>>(),
-                   metadata2
-                       .backstore
-                       .data_devs
-                       .iter()
-                       .map(|bd| bd.uuid)
-                       .collect::<HashSet<_>>());
+        assert_eq!(
+            metadata3
+                .backstore
+                .cache_devs
+                .as_ref()
+                .map(|bds| bds.iter().map(|bd| bd.uuid).collect::<HashSet<_>>()),
+            metadata2
+                .backstore
+                .cache_devs
+                .as_ref()
+                .map(|bds| bds.iter().map(|bd| bd.uuid).collect::<HashSet<_>>())
+        );
+        assert_eq!(
+            metadata3
+                .backstore
+                .data_devs
+                .iter()
+                .map(|bd| bd.uuid)
+                .collect::<HashSet<_>>(),
+            metadata2
+                .backstore
+                .data_devs
+                .iter()
+                .map(|bd| bd.uuid)
+                .collect::<HashSet<_>>()
+        );
 
         let mut buf = [0u8; 10];
         {
             let (_, fs) = pool.get_filesystem(fs_uuid).unwrap();
-            mount(Some(&fs.devnode()),
-                  tmp_dir.path(),
-                  Some("xfs"),
-                  MsFlags::empty(),
-                  None as Option<&str>)
-                    .unwrap();
+            mount(
+                Some(&fs.devnode()),
+                tmp_dir.path(),
+                Some("xfs"),
+                MsFlags::empty(),
+                None as Option<&str>,
+            ).unwrap();
             OpenOptions::new()
                 .read(true)
                 .open(&new_file)

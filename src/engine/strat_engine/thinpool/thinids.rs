@@ -4,7 +4,6 @@
 
 // Functions for handling thin ids.
 
-
 use devicemapper::ThinDevId;
 
 use stratis::StratisResult;
@@ -20,7 +19,9 @@ impl ThinDevIdPool {
     /// Does not verify the absence of duplicate ids.
     pub fn new_from_ids(ids: &[ThinDevId]) -> ThinDevIdPool {
         let max_id: Option<u32> = ids.into_iter().map(|x| (*x).into()).max();
-        ThinDevIdPool { next_id: max_id.map(|x| x + 1).unwrap_or(0) }
+        ThinDevIdPool {
+            next_id: max_id.map(|x| x + 1).unwrap_or(0),
+        }
     }
 
     /// Get a new id for a thindev.

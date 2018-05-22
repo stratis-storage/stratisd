@@ -12,7 +12,6 @@ use devicemapper::{DevId, DmFlags};
 
 use super::super::dm::get_dm;
 
-
 mod cleanup_errors {
     use mnt;
     use nix;
@@ -27,25 +26,24 @@ mod cleanup_errors {
 
 use self::cleanup_errors::{Error, Result};
 
-
 /// Attempt to remove all device mapper devices which match the stratis naming convention.
 /// FIXME: Current implementation complicated by https://bugzilla.redhat.com/show_bug.cgi?id=1506287
 fn dm_stratis_devices_remove() -> Result<()> {
-
     /// One iteration of removing devicemapper devices
     fn one_iteration() -> Result<(bool, Vec<String>)> {
         let mut progress_made = false;
         let mut remain = Vec::new();
 
         for n in get_dm()
-                .list_devices()
-                .map_err(|e| {
-                             let err_msg = "failed while listing DM devices, giving up";
-                             Error::with_chain(e, err_msg)
-                         })?
-                .iter()
-                .map(|d| &d.0)
-                .filter(|n| n.to_string().starts_with("stratis-1")) {
+            .list_devices()
+            .map_err(|e| {
+                let err_msg = "failed while listing DM devices, giving up";
+                Error::with_chain(e, err_msg)
+            })?
+            .iter()
+            .map(|d| &d.0)
+            .filter(|n| n.to_string().starts_with("stratis-1"))
+        {
             match get_dm().device_remove(&DevId::Name(n), DmFlags::empty()) {
                 Ok(_) => progress_made = true,
                 Err(_) => remain.push(n.to_string()),
@@ -69,15 +67,14 @@ fn dm_stratis_devices_remove() -> Result<()> {
             return Err("Unable to initialize DM".into());
         }
 
-        do_while_progress().and_then(|remain| if !remain.is_empty() {
-                                         Err(format!("Some Stratis DM devices remaining: {:?}",
-                                                     remain)
-                                                     .into())
-                                     } else {
-                                         Ok(())
-                                     })
-    }()
-            .map_err(|e| e.chain_err(|| "Failed to ensure removal of all Stratis DM devices"))
+        do_while_progress().and_then(|remain| {
+            if !remain.is_empty() {
+                Err(format!("Some Stratis DM devices remaining: {:?}", remain).into())
+            } else {
+                Ok(())
+            }
+        })
+    }().map_err(|e| e.chain_err(|| "Failed to ensure removal of all Stratis DM devices"))
 }
 
 /// Try and un-mount any filesystems that have the name stratis in the mount point, returning
@@ -86,13 +83,13 @@ fn stratis_filesystems_unmount() -> Result<()> {
     || -> Result<()> {
         let mounts = get_submounts(&PathBuf::from("/"))?;
         for m in mounts
-                .iter()
-                .filter(|m| m.file.to_str().map_or(false, |s| s.contains("stratis"))) {
+            .iter()
+            .filter(|m| m.file.to_str().map_or(false, |s| s.contains("stratis")))
+        {
             umount2(&m.file, MntFlags::MNT_DETACH)?;
         }
         Ok(())
-    }()
-            .map_err(|e| e.chain_err(|| "Failed to ensure all Stratis filesystems were unmounted"))
+    }().map_err(|e| e.chain_err(|| "Failed to ensure all Stratis filesystems were unmounted"))
 }
 
 /// When a unit test panics we can leave the system in an inconsistent state.  This function

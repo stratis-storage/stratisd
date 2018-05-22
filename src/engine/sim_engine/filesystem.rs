@@ -15,7 +15,9 @@ pub struct SimFilesystem {
 
 impl SimFilesystem {
     pub fn new() -> SimFilesystem {
-        SimFilesystem { rand: rand::random::<u32>() }
+        SimFilesystem {
+            rand: rand::random::<u32>(),
+        }
     }
 }
 

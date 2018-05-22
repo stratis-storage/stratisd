@@ -2,16 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{fmt, io};
 use std::error::Error;
 use std::str;
+use std::{fmt, io};
 
-#[cfg(feature="dbus_enabled")]
+#[cfg(feature = "dbus_enabled")]
 use dbus;
 use libudev;
 use nix;
-use uuid;
 use serde_json;
+use uuid;
 
 use devicemapper;
 
@@ -38,7 +38,7 @@ pub enum StratisError {
     Serde(serde_json::error::Error),
     DM(devicemapper::DmError),
 
-    #[cfg(feature="dbus_enabled")]
+    #[cfg(feature = "dbus_enabled")]
     Dbus(dbus::Error),
     Udev(libudev::Error),
 }
@@ -55,7 +55,7 @@ impl fmt::Display for StratisError {
             StratisError::Serde(ref err) => write!(f, "Serde error: {}", err),
             StratisError::DM(ref err) => write!(f, "DM error: {}", err),
 
-            #[cfg(feature="dbus_enabled")]
+            #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => {
                 write!(f, "Dbus error: {}", err.message().unwrap_or("Unknown"))
             }
@@ -76,7 +76,7 @@ impl Error for StratisError {
             StratisError::Serde(ref err) => err.description(),
             StratisError::DM(ref err) => err.description(),
 
-            #[cfg(feature="dbus_enabled")]
+            #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => err.message().unwrap_or("D-Bus Error"),
             StratisError::Udev(ref err) => Error::description(err),
         }
@@ -84,8 +84,7 @@ impl Error for StratisError {
 
     fn cause(&self) -> Option<&Error> {
         match *self {
-            StratisError::Error(_) |
-            StratisError::Engine(_, _) => None,
+            StratisError::Error(_) | StratisError::Engine(_, _) => None,
             StratisError::Io(ref err) => Some(err),
             StratisError::Nix(ref err) => Some(err),
             StratisError::Uuid(ref err) => Some(err),
@@ -93,7 +92,7 @@ impl Error for StratisError {
             StratisError::Serde(ref err) => Some(err),
             StratisError::DM(ref err) => Some(err),
 
-            #[cfg(feature="dbus_enabled")]
+            #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => Some(err),
             StratisError::Udev(ref err) => Some(err),
         }
@@ -136,7 +135,7 @@ impl From<devicemapper::DmError> for StratisError {
     }
 }
 
-#[cfg(feature="dbus_enabled")]
+#[cfg(feature = "dbus_enabled")]
 impl From<dbus::Error> for StratisError {
     fn from(err: dbus::Error) -> StratisError {
         StratisError::Dbus(err)

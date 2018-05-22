@@ -4,7 +4,7 @@
 
 use std::fmt;
 
-use rand::{Rng, ThreadRng, thread_rng};
+use rand::{thread_rng, Rng, ThreadRng};
 
 pub struct Randomizer {
     rng: ThreadRng,
@@ -19,7 +19,6 @@ impl Default for Randomizer {
         }
     }
 }
-
 
 /// Implement Debug explicitly as ThreadRng does not derive it.
 /// See: https://github.com/rust-lang-nursery/rand/issues/118
@@ -55,7 +54,6 @@ mod tests {
 
     #[test]
     fn prop_denominator_result() {
-
         /// Verify that if the denominator is 0 the result is always false,
         /// if 1, always true.
         fn denominator_result(denominator: u32) -> bool {

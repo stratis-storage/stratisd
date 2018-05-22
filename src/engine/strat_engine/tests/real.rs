@@ -2,14 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-
-use std::{cmp, panic};
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
+use std::{cmp, panic};
 
-use serde_json::{Value, from_reader};
+use serde_json::{from_reader, Value};
 
-use devicemapper::{Bytes, IEC, Sectors};
+use devicemapper::{Bytes, Sectors, IEC};
 
 use super::logger::init_logger;
 use super::util::clean_up;
@@ -25,7 +24,9 @@ impl RealTestDev {
     /// Wipe initial MiB to clear metadata.
     pub fn new(path: &Path) -> RealTestDev {
         wipe_sectors(path, Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
-        RealTestDev { path: PathBuf::from(path) }
+        RealTestDev {
+            path: PathBuf::from(path),
+        }
     }
 
     /// Get the device node of the device.
@@ -86,7 +87,8 @@ fn get_device_counts(limits: DeviceLimits, avail: usize) -> Vec<usize> {
 /// in multiple invocations of the test, with differing numbers of block
 /// devices.
 pub fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
-    where F: Fn(&[&Path]) -> () + panic::RefUnwindSafe
+where
+    F: Fn(&[&Path]) -> () + panic::RefUnwindSafe,
 {
     let file = OpenOptions::new()
         .read(true)

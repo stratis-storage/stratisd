@@ -9,7 +9,7 @@ use std::fs::File;
 use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
 
-use devicemapper::{Bytes, Device, devnode_to_devno};
+use devicemapper::{devnode_to_devno, Bytes, Device};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -23,7 +23,6 @@ pub fn blkdev_size(file: &File) -> StratisResult<Bytes> {
         Ok(_) => Ok(Bytes(val)),
     }
 }
-
 
 /// Resolve a list of Paths of some sort to a set of unique Devices.
 /// Return an IOError if there was a problem resolving any particular device.

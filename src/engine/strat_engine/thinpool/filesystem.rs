@@ -4,11 +4,11 @@
 
 use std::path::{Path, PathBuf};
 
-use devicemapper::{Bytes, DmDevice, DmName, DmUuid, IEC, SECTOR_SIZE, Sectors, ThinDev, ThinDevId,
-                   ThinPoolDev, ThinStatus};
+use devicemapper::{Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev,
+                   ThinStatus, IEC, SECTOR_SIZE};
 
 use mnt::{MountIter, MountParam};
-use nix::mount::{MsFlags, mount, umount};
+use nix::mount::{mount, umount, MsFlags};
 use nix::sys::statvfs::statvfs;
 use tempfile;
 
@@ -59,22 +59,23 @@ impl StratFilesystem {
     /// so snapshot_fs_uuid is used to update the new snapshot filesystem so it has
     /// a unique UUID.
     #[allow(too_many_arguments)]
-    pub fn snapshot(&self,
-                    thin_pool: &ThinPoolDev,
-                    snapshot_name: &str,
-                    snapshot_dm_name: &DmName,
-                    snapshot_dm_uuid: Option<&DmUuid>,
-                    snapshot_fs_name: &Name,
-                    snapshot_fs_uuid: FilesystemUuid,
-                    snapshot_thin_id: ThinDevId)
-                    -> StratisResult<StratFilesystem> {
-
-        match self.thin_dev
-                  .snapshot(get_dm(),
-                            snapshot_dm_name,
-                            snapshot_dm_uuid,
-                            thin_pool,
-                            snapshot_thin_id) {
+    pub fn snapshot(
+        &self,
+        thin_pool: &ThinPoolDev,
+        snapshot_name: &str,
+        snapshot_dm_name: &DmName,
+        snapshot_dm_uuid: Option<&DmUuid>,
+        snapshot_fs_name: &Name,
+        snapshot_fs_uuid: FilesystemUuid,
+        snapshot_thin_id: ThinDevId,
+    ) -> StratisResult<StratFilesystem> {
+        match self.thin_dev.snapshot(
+            get_dm(),
+            snapshot_dm_name,
+            snapshot_dm_uuid,
+            thin_pool,
+            snapshot_thin_id,
+        ) {
             Ok(thin_dev) => {
                 // If the source is mounted, XFS puts a dummy record in the
                 // log to enforce replay of the snapshot to deal with any
@@ -87,28 +88,28 @@ impl StratFilesystem {
                 // we can skip the mount/unmount.
 
                 // FIXME: get_mount_point doesn't work so assume we need to mount/unmount
-                let tmp_dir = tempfile::Builder::new()
-                    .prefix("stratis_mp_")
-                    .tempdir()?;
+                let tmp_dir = tempfile::Builder::new().prefix("stratis_mp_").tempdir()?;
                 // Mount the snapshot with the "nouuid" option. mount
                 // will fail due to duplicate UUID otherwise.
-                mount(Some(&thin_dev.devnode()),
-                      tmp_dir.path(),
-                      Some("xfs"),
-                      MsFlags::empty(),
-                      Some("nouuid"))?;
+                mount(
+                    Some(&thin_dev.devnode()),
+                    tmp_dir.path(),
+                    Some("xfs"),
+                    MsFlags::empty(),
+                    Some("nouuid"),
+                )?;
                 umount(tmp_dir.path())?;
 
                 set_uuid(&thin_dev.devnode(), snapshot_fs_uuid)?;
                 Ok(StratFilesystem::setup(thin_dev))
             }
-            Err(e) => {
-                Err(StratisError::Engine(ErrorEnum::Error,
-                                         format!("failed to create {} snapshot for {} - {}",
-                                                 snapshot_name,
-                                                 snapshot_fs_name,
-                                                 e)))
-            }
+            Err(e) => Err(StratisError::Engine(
+                ErrorEnum::Error,
+                format!(
+                    "failed to create {} snapshot for {} - {}",
+                    snapshot_name, snapshot_fs_name, e
+                ),
+            )),
         }
     }
 
@@ -122,8 +123,8 @@ impl StratFilesystem {
                     let free_bytes = fs_total_bytes - fs_total_used_bytes;
                     if free_bytes.sectors() < FILESYSTEM_LOWATER {
                         let mut table = self.thin_dev.table().table.clone();
-                        table.length = self.thin_dev.size() +
-                                       self.extend_size(self.thin_dev.size());
+                        table.length =
+                            self.thin_dev.size() + self.extend_size(self.thin_dev.size());
                         if self.thin_dev.set_table(get_dm(), table).is_err() {
                             return Ok(FilesystemStatus::ThinDevExtendFailed);
                         }
@@ -158,14 +159,19 @@ impl StratFilesystem {
     /// node, while ignoring parse errors as long as at least one mount point is found.
     pub fn get_mount_point(&self) -> StratisResult<Option<PathBuf>> {
         let device_node = self.devnode();
-        let search = device_node.to_str().ok_or_else(|| StratisError::Engine(ErrorEnum::Error,
-                                    format!("Unable to represent devnode as string {:?}", *self)))?;
+        let search = device_node.to_str().ok_or_else(|| {
+            StratisError::Engine(
+                ErrorEnum::Error,
+                format!("Unable to represent devnode as string {:?}", *self),
+            )
+        })?;
 
-        let m_iter = MountIter::new_from_proc()
-            .map_err(|e| {
-                         StratisError::Engine(ErrorEnum::Error,
-                                              format!("Error reading /proc/mounts {:?}", e))
-                     })?;
+        let m_iter = MountIter::new_from_proc().map_err(|e| {
+            StratisError::Engine(
+                ErrorEnum::Error,
+                format!("Error reading /proc/mounts {:?}", e),
+            )
+        })?;
 
         let mut last_error: Option<String> = None;
         for mp in m_iter {
@@ -227,7 +233,13 @@ pub fn fs_usage(mount_point: &Path) -> StratisResult<(Bytes, Bytes)> {
     let stat = statvfs(mount_point)?;
 
     // Upcast all arch-dependent variable width values to u64
-    let (block_size, blocks, blocks_free) =
-        (stat.block_size() as u64, stat.blocks() as u64, stat.blocks_free() as u64);
-    Ok((Bytes(block_size * blocks), Bytes(block_size * (blocks - blocks_free))))
+    let (block_size, blocks, blocks_free) = (
+        stat.block_size() as u64,
+        stat.blocks() as u64,
+        stat.blocks_free() as u64,
+    );
+    Ok((
+        Bytes(block_size * blocks),
+        Bytes(block_size * (blocks - blocks_free)),
+    ))
 }

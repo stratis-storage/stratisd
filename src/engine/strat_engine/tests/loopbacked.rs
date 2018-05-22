@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use tempfile;
 
-use devicemapper::{Bytes, IEC, Sectors};
+use devicemapper::{Bytes, Sectors, IEC};
 
 use self::loopdev::{LoopControl, LoopDevice};
 
@@ -19,7 +19,6 @@ use super::logger::init_logger;
 use super::util::clean_up;
 
 use super::super::device::wipe_sectors;
-
 
 /// Ways of specifying range of numbers of devices to use for tests.
 /// Unlike real tests, there is no AtLeast constructor, as, at least in theory
@@ -88,10 +87,10 @@ fn get_devices(count: usize, dir: &tempfile::TempDir) -> Vec<LoopTestDev> {
     loop_devices
 }
 
-
 /// Run the designated tests according to the specification.
 pub fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
-    where F: Fn(&[&Path]) -> () + panic::RefUnwindSafe
+where
+    F: Fn(&[&Path]) -> () + panic::RefUnwindSafe,
 {
     let counts = get_device_counts(limits);
 
@@ -103,15 +102,15 @@ pub fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
             .tempdir()
             .unwrap();
         let loop_devices: Vec<LoopTestDev> = get_devices(count, &tmpdir);
-        let device_paths: Vec<PathBuf> = loop_devices
-            .iter()
-            .map(|x| x.ld.path().unwrap())
-            .collect();
+        let device_paths: Vec<PathBuf> =
+            loop_devices.iter().map(|x| x.ld.path().unwrap()).collect();
         let device_paths: Vec<&Path> = device_paths.iter().map(|x| x.as_path()).collect();
 
         clean_up().unwrap();
 
-        let result = panic::catch_unwind(|| { test(&device_paths); });
+        let result = panic::catch_unwind(|| {
+            test(&device_paths);
+        });
         let tear_down = clean_up();
 
         result.unwrap();

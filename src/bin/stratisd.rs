@@ -5,21 +5,19 @@
 #![cfg_attr(feature = "clippy", feature(plugin))]
 #![cfg_attr(feature = "clippy", plugin(clippy))]
 #![cfg_attr(not(feature = "clippy"), allow(unknown_lints))]
-
 #![allow(doc_markdown)]
 
 extern crate devicemapper;
 extern crate libstratis;
 #[macro_use]
 extern crate log;
-extern crate env_logger;
 extern crate clap;
-#[cfg(feature="dbus_enabled")]
+#[cfg(feature = "dbus_enabled")]
 extern crate dbus;
+extern crate env_logger;
 extern crate libc;
 extern crate libudev;
 extern crate nix;
-
 
 use std::cell::RefCell;
 use std::env;
@@ -37,7 +35,7 @@ use log::{LogLevelFilter, SetLoggerError};
 use nix::fcntl::{flock, FlockArg};
 use nix::unistd::getpid;
 
-#[cfg(feature="dbus_enabled")]
+#[cfg(feature = "dbus_enabled")]
 use dbus::WatchEvent;
 
 use devicemapper::Device;
@@ -73,16 +71,11 @@ fn initialize_log(debug: bool) -> Result<(), SetLoggerError> {
 fn handle_udev_add(event: &libudev::Event) -> Option<(Device, PathBuf)> {
     if event.event_type() == libudev::EventType::Add {
         let device = event.device();
-        return device
-                   .devnode()
-                   .and_then(|devnode| {
-                                 device
-                                     .devnum()
-                                     .and_then(|devnum| {
-                                                   Some((Device::from(devnum),
-                                                         PathBuf::from(devnode)))
-                                               })
-                             });
+        return device.devnode().and_then(|devnode| {
+            device
+                .devnum()
+                .and_then(|devnum| Some((Device::from(devnum), PathBuf::from(devnode))))
+        });
     }
     None
 }
@@ -110,13 +103,15 @@ fn trylock_pid_file() -> StratisResult<File> {
                 .and_then(|s| s.parse::<pid_t>().ok())
                 .map(|pid| format!("{}", pid))
                 .unwrap_or_else(|| "<unknown>".into());
-            Err(StratisError::Error(format!("Daemon already running with pid: {}", pid_str)))
+            Err(StratisError::Error(format!(
+                "Daemon already running with pid: {}",
+                pid_str
+            )))
         }
     }
 }
 
 fn run(matches: &ArgMatches) -> StratisResult<()> {
-
     initialize_log(matches.is_present("debug"))
         .expect("This is the first and only invocation of this method; it must succeed.");
 
@@ -150,14 +145,13 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
     const FD_INDEX_UDEV: usize = 0;
     const FD_INDEX_ENGINE: usize = 1;
 
-
     let mut fds = Vec::new();
 
     fds.push(libc::pollfd {
-                 fd: udev.as_raw_fd(),
-                 revents: 0,
-                 events: libc::POLLIN,
-             });
+        fd: udev.as_raw_fd(),
+        revents: 0,
+        events: libc::POLLIN,
+    });
 
     let eventable = engine.borrow().get_eventable();
 
@@ -166,10 +160,10 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
     let (engine_eventable, poll_timeout, _dbus_client_index_start) = match eventable {
         Some(ref evt) => {
             fds.push(libc::pollfd {
-                         fd: evt.get_pollable_fd(),
-                         revents: 0,
-                         events: libc::POLLIN,
-                     });
+                fd: evt.get_pollable_fd(),
+                revents: 0,
+                events: libc::POLLIN,
+            });
 
             // Don't timeout if eventable, we are event driven
             (true, -1, FD_INDEX_ENGINE + 1)
@@ -179,7 +173,7 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
         None => (false, 10000, FD_INDEX_ENGINE),
     };
 
-    #[cfg(feature="dbus_enabled")]
+    #[cfg(feature = "dbus_enabled")]
     let (dbus_conn, mut tree, base_object_path, dbus_context) =
         libstratis::dbus_api::connect(Rc::clone(&engine))?;
 
@@ -188,7 +182,6 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
         if fds[FD_INDEX_UDEV].revents != 0 {
             while let Some(event) = udev.receive_event() {
                 if let Some((device, devnode)) = handle_udev_add(&event) {
-
                     // If block evaluate returns an error we are going to ignore it as
                     // there is nothing we can do for a device we are getting errors with.
                     let pool_uuid = engine
@@ -200,13 +193,15 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
                     // that we can conditionally compile out the register_pool when dbus
                     // is not enabled.
                     if let Some(_pool_uuid) = pool_uuid {
-                                #[cfg(feature="dbus_enabled")]
-                        libstratis::dbus_api::register_pool(&dbus_conn,
-                                                            &Rc::clone(&engine),
-                                                            &dbus_context,
-                                                            &mut tree,
-                                                            _pool_uuid,
-                                                            &base_object_path)?;
+                        #[cfg(feature = "dbus_enabled")]
+                        libstratis::dbus_api::register_pool(
+                            &dbus_conn,
+                            &Rc::clone(&engine),
+                            &dbus_context,
+                            &mut tree,
+                            _pool_uuid,
+                            &base_object_path,
+                        )?;
                     }
                 }
             }
@@ -233,16 +228,16 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
         }
 
         // Iterate through D-Bus file descriptors (if enabled)
-        #[cfg(feature="dbus_enabled")]
+        #[cfg(feature = "dbus_enabled")]
         {
             for pfd in fds[_dbus_client_index_start..]
-                    .iter()
-                    .filter(|pfd| pfd.revents != 0) {
+                .iter()
+                .filter(|pfd| pfd.revents != 0)
+            {
                 for item in dbus_conn.watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents)) {
-                    if let Err(r) = libstratis::dbus_api::handle(&dbus_conn,
-                                                                 &item,
-                                                                 &mut tree,
-                                                                 &dbus_context) {
+                    if let Err(r) =
+                        libstratis::dbus_api::handle(&dbus_conn, &item, &mut tree, &dbus_context)
+                    {
                         print_err(&From::from(r));
                     }
                 }
@@ -264,12 +259,16 @@ fn main() {
     let matches = App::new("stratis")
         .version(VERSION)
         .about("Stratis storage management")
-        .arg(Arg::with_name("debug")
-                 .long("debug")
-                 .help("Print additional output for debugging"))
-        .arg(Arg::with_name("sim")
-                 .long("sim")
-                 .help("Use simulator engine"))
+        .arg(
+            Arg::with_name("debug")
+                .long("debug")
+                .help("Print additional output for debugging"),
+        )
+        .arg(
+            Arg::with_name("sim")
+                .long("sim")
+                .help("Use simulator engine"),
+        )
         .get_matches();
 
     let result = trylock_pid_file().and_then(|_pidfile| run(&matches));

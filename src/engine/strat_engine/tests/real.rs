@@ -10,11 +10,14 @@ use std::{cmp, panic};
 
 use self::either::Either;
 use serde_json::{from_reader, Value};
+use uuid::Uuid;
 
-use devicemapper::{Bytes, DmDevice, LinearDev, Sectors, IEC};
+use devicemapper::{devnode_to_devno, Bytes, Device, DmDevice, DmName, LinearDev,
+                   LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine, IEC};
 
 use super::super::backstore::blkdev_size;
 use super::super::device::wipe_sectors;
+use super::super::dm::get_dm;
 
 use super::logger::init_logger;
 use super::util::clean_up;
@@ -26,11 +29,10 @@ pub struct RealTestDev {
 impl RealTestDev {
     /// Construct a new test device for the given path.
     /// Wipe initial MiB to clear metadata.
-    pub fn new(path: &Path) -> RealTestDev {
-        wipe_sectors(path, Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
-        RealTestDev {
-            dev: Either::Left(PathBuf::from(path)),
-        }
+    pub fn new(dev: Either<PathBuf, LinearDev>) -> RealTestDev {
+        let test_dev = RealTestDev { dev };
+        wipe_sectors(test_dev.as_path(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
+        test_dev
     }
 
     /// Get the device node of the device.
@@ -158,6 +160,23 @@ fn get_device_runs<'a>(
     device_lists
 }
 
+/// Make a new LinearDev according to specs
+fn make_linear_test_dev(devnode: &Path, start: Sectors, length: Sectors) -> LinearDev {
+    let params = LinearTargetParams::new(
+        Device::from(devnode_to_devno(devnode).unwrap().unwrap()),
+        start,
+    );
+    let table = vec![
+        TargetLine::new(Sectors(0), length, LinearDevTargetParams::Linear(params)),
+    ];
+    LinearDev::setup(
+        get_dm(),
+        DmName::new(&format!("stratis_test_{}", Uuid::new_v4())).expect("valid format"),
+        None,
+        table.clone(),
+    ).unwrap()
+}
+
 /// Run test on real devices, using given constraints. Constraints may result
 /// in multiple invocations of the test, with differing numbers of block
 /// devices.
@@ -200,7 +219,12 @@ where
     for run_paths in runs {
         let devices: Vec<_> = run_paths
             .iter()
-            .map(|&(x, _)| RealTestDev::new(x))
+            .map(|&(path, spec)| match spec {
+                Some((start, length)) => {
+                    RealTestDev::new(Either::Right(make_linear_test_dev(path, start, length)))
+                }
+                None => RealTestDev::new(Either::Left(path.to_path_buf())),
+            })
             .collect();
 
         clean_up().unwrap();

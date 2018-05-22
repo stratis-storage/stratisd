@@ -279,7 +279,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                         if let Some(ref mut handle) = dbus_handle {
                             if let Some(pool_uuid) = pool_uuid {
                                 libstratis::dbus_api::register_pool(
-                                    &handle.connection,
+                                    Rc::clone(&handle.connection),
                                     &handle.context,
                                     &mut handle.tree,
                                     pool_uuid,
@@ -354,10 +354,11 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 {
                     for item in handle
                         .connection
+                        .borrow()
                         .watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents))
                     {
                         if let Err(r) = libstratis::dbus_api::handle(
-                            &handle.connection,
+                            &handle.connection.borrow(),
                             &item,
                             &mut handle.tree,
                             &handle.context,
@@ -371,7 +372,14 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 // Refresh list of dbus fds to poll for. This can change as
                 // D-Bus clients come and go.
                 fds.truncate(dbus_client_index_start);
-                fds.extend(handle.connection.watch_fds().iter().map(|w| w.to_pollfd()));
+                fds.extend(
+                    handle
+                        .connection
+                        .borrow()
+                        .watch_fds()
+                        .iter()
+                        .map(|w| w.to_pollfd()),
+                );
             } else {
                 // See if we can bring up dbus.
                 if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
@@ -380,7 +388,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                     // Register all the pools with dbus
                     for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
                         libstratis::dbus_api::register_pool(
-                            &handle.connection,
+                            Rc::clone(&handle.connection),
                             &handle.context,
                             &mut handle.tree,
                             pool_uuid,
@@ -390,7 +398,14 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                     }
 
                     // Add dbus FD to fds as dbus is now available.
-                    fds.extend(handle.connection.watch_fds().iter().map(|w| w.to_pollfd()));
+                    fds.extend(
+                        handle
+                            .connection
+                            .borrow()
+                            .watch_fds()
+                            .iter()
+                            .map(|w| w.to_pollfd()),
+                    );
                     dbus_handle = Some(handle);
                 }
             }

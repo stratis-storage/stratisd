@@ -207,7 +207,7 @@ fn register_pool_dbus(
 
 /// Returned data from when you connect a stratis engine to dbus.
 pub struct DbusConnectionData<'a> {
-    pub connection: Connection,
+    pub connection: Rc<RefCell<Connection>>,
     pub tree: Tree<MTFn<TData>, TData>,
     pub path: dbus::Path<'a>,
     pub context: DbusContext,
@@ -221,7 +221,7 @@ pub fn connect<'a>(engine: Rc<RefCell<Engine>>) -> Result<DbusConnectionData<'a>
     tree.set_registered(&c, true)?;
     c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32)?;
     Ok(DbusConnectionData {
-        connection: c,
+        connection: Rc::new(RefCell::new(c)),
         tree,
         path: object_path,
         context: dbus_context,
@@ -230,7 +230,7 @@ pub fn connect<'a>(engine: Rc<RefCell<Engine>>) -> Result<DbusConnectionData<'a>
 
 /// Given the UUID of a pool, register all the pertinent information with dbus.
 pub fn register_pool(
-    c: &Connection,
+    c: Rc<RefCell<Connection>>,
     dbus_context: &DbusContext,
     tree: &mut Tree<MTFn<TData>, TData>,
     pool_uuid: Uuid,
@@ -238,7 +238,7 @@ pub fn register_pool(
     object_path: &dbus::Path<'static>,
 ) -> Result<(), dbus::Error> {
     register_pool_dbus(dbus_context, pool_uuid, pool, object_path);
-    process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut())
+    process_deferred_actions(&c.borrow(), tree, &mut dbus_context.actions.borrow_mut())
 }
 
 /// Update the dbus tree with deferred adds and removes.

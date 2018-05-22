@@ -110,7 +110,7 @@ fn trylock_pid_file() -> StratisResult<File> {
                 .and_then(|s| s.parse::<pid_t>().ok())
                 .map(|pid| format!("{}", pid))
                 .unwrap_or_else(|| "<unknown>".into());
-            Err(StratisError::Error(format!("Daemon already running with pid: {}", pid_str)))
+            Err(StratisError::Startup(format!("Daemon already running with pid: {}", pid_str)))
         }
     }
 }

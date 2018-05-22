@@ -37,7 +37,11 @@ pub fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr
 /// D-Bus methods return.
 pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
     let error = match *err {
-        StratisError::Error(_) => DbusErrorEnum::INTERNAL_ERROR,
+        StratisError::Startup(_) => {
+            panic!("This error can never be seen by the D-Bus layer, because \
+                    it can only occur when the engine is starting up, i.e., \
+                    before the d-bus connection is set up")
+        }
         StratisError::Engine(ref e, _) => {
             match *e {
                 ErrorEnum::Error => DbusErrorEnum::ERROR,

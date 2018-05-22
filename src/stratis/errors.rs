@@ -29,7 +29,8 @@ pub enum ErrorEnum {
 
 #[derive(Debug)]
 pub enum StratisError {
-    Error(String),
+    /// Error encountered on startup, before engine can be initialized
+    Startup(String),
     Engine(ErrorEnum, String),
     Io(io::Error),
     Nix(nix::Error),
@@ -46,7 +47,7 @@ pub enum StratisError {
 impl fmt::Display for StratisError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            StratisError::Error(ref s) => write!(f, "Error: {}", s),
+            StratisError::Startup(ref s) => write!(f, "Startup error: {}", s),
             StratisError::Engine(_, ref msg) => write!(f, "Engine error: {}", msg),
             StratisError::Io(ref err) => write!(f, "IO error: {}", err),
             StratisError::Nix(ref err) => write!(f, "Nix error: {}", err),
@@ -67,7 +68,7 @@ impl fmt::Display for StratisError {
 impl Error for StratisError {
     fn description(&self) -> &str {
         match *self {
-            StratisError::Error(ref s) => s,
+            StratisError::Startup(ref s) => s,
             StratisError::Engine(_, ref msg) => msg,
             StratisError::Io(ref err) => err.description(),
             StratisError::Nix(ref err) => err.description(),
@@ -84,7 +85,7 @@ impl Error for StratisError {
 
     fn cause(&self) -> Option<&Error> {
         match *self {
-            StratisError::Error(_) |
+            StratisError::Startup(_) |
             StratisError::Engine(_, _) => None,
             StratisError::Io(ref err) => Some(err),
             StratisError::Nix(ref err) => Some(err),

@@ -976,7 +976,7 @@ mod tests {
     #[test]
     pub fn loop_test_filesystem_snapshot() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3),
+            loopbacked::DeviceLimits::Range(2, 3, None),
             test_filesystem_snapshot,
         );
     }
@@ -1030,7 +1030,7 @@ mod tests {
     #[test]
     pub fn loop_test_filesystem_rename() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3),
+            loopbacked::DeviceLimits::Range(1, 3, None),
             test_filesystem_rename,
         );
     }
@@ -1100,7 +1100,7 @@ mod tests {
 
     #[test]
     pub fn loop_test_pool_setup() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_pool_setup);
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_pool_setup);
     }
 
     #[test]
@@ -1168,7 +1168,10 @@ mod tests {
     #[test]
     pub fn loop_test_meta_expand() {
         // This test requires more than 1 GiB.
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_meta_expand);
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(2, 3, None),
+            test_meta_expand,
+        );
     }
 
     #[test]
@@ -1222,7 +1225,10 @@ mod tests {
     #[test]
     pub fn loop_test_thindev_destroy() {
         // This test requires more than 1 GiB.
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_thindev_destroy);
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(2, 3, None),
+            test_thindev_destroy,
+        );
     }
 
     #[test]
@@ -1278,7 +1284,10 @@ mod tests {
     #[test]
     pub fn loop_test_thinpool_expand() {
         // This test requires more than 1 GiB.
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_thinpool_expand);
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(2, 3, None),
+            test_thinpool_expand,
+        );
     }
 
     #[test]
@@ -1358,7 +1367,7 @@ mod tests {
 
     #[test]
     pub fn loop_test_xfs_expand() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_xfs_expand);
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_xfs_expand);
     }
 
     #[test]
@@ -1395,7 +1404,10 @@ mod tests {
 
     #[test]
     pub fn loop_test_suspend_resume() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_suspend_resume);
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(1, 3, None),
+            test_suspend_resume,
+        );
     }
 
     #[test]
@@ -1499,7 +1511,7 @@ mod tests {
 
     #[test]
     pub fn loop_test_set_device() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_set_device);
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_set_device);
     }
 
     #[test]

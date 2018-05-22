@@ -72,11 +72,11 @@ fn get_device_runs<'a>(
     dev_sizes: &[(&'a Path, Sectors)],
 ) -> Vec<Vec<(&'a Path, Option<(Sectors, Sectors)>)>> {
     let (lower, maybe_upper, min_size, max_size) = match limits {
-        DeviceLimits::Exactly(num, min_size, max_size) => (num, Some(num + 1), min_size, max_size),
+        DeviceLimits::Exactly(num, min_size, max_size) => (num, Some(num), min_size, max_size),
         DeviceLimits::AtLeast(num, min_size, max_size) => (num, None, min_size, max_size),
         DeviceLimits::Range(lower, upper, min_size, max_size) => {
             assert!(lower < upper);
-            (lower, Some(upper + 1), min_size, max_size)
+            (lower, Some(upper), min_size, max_size)
         }
     };
 
@@ -84,56 +84,70 @@ fn get_device_runs<'a>(
 
     assert!(max_size.is_none() || Some(min_size) <= max_size);
 
+    // Retain only devices that are larger than min_size
     let (matches, _): (Vec<(&Path, Sectors)>, Vec<(&Path, Sectors)>) =
         dev_sizes.iter().partition(|&(_, s)| *s >= min_size);
 
     // If there is not a sufficient number of devices large enough to match
-    // the lower bound, return an empty vec.
+    // the lower bound, return an empty vec. TODO: It would be possible to try
+    // harder, by merging several devices into a single linear device. If this
+    // turns out to be necessary, this is the correct place to do it.
     if lower > matches.len() {
         return vec![];
     }
 
-    let (matches, _): (Vec<(&Path, Sectors)>, Vec<(&Path, Sectors)>) = if max_size.is_none() {
-        (matches, vec![])
-    } else {
-        let max_size = max_size.expect("!max_size.is_none()");
-        matches.iter().partition(|&(_, s)| *s <= max_size)
-    };
+    // Retain only devices that are less than max_size
+    let (mut matches, mut too_large): (Vec<(&Path, Sectors)>, Vec<(&Path, Sectors)>) =
+        if max_size.is_none() {
+            (matches, vec![])
+        } else {
+            let max_size = max_size.expect("!max_size.is_none()");
+            matches.iter().partition(|&(_, s)| *s <= max_size)
+        };
 
     let avail = matches.len();
+    let needed = maybe_upper.unwrap_or(lower);
+    let must_generate = if avail > needed { 0 } else { needed - avail };
+    let avail_specs = {
+        let mut avail_specs = vec![];
+        while avail_specs.len() < must_generate && (!too_large.is_empty() || !matches.is_empty()) {
+            let (path, size) = if too_large.is_empty() {
+                matches.pop().expect("!matches.is_empty()")
+            } else {
+                too_large.pop().expect("!too_large.is_empty()")
+            };
+            let mut new_pairs = vec![];
+            for i in 0..size / min_size {
+                new_pairs.push((path, Some((i * min_size, min_size))))
+            }
+            avail_specs.extend(new_pairs);
+        }
+        avail_specs.extend(matches.iter().map(|&(p, _)| (p, None)));
+        avail_specs
+    };
+
+    let avail = avail_specs.len();
 
     // If there is not a sufficient number of devices small enough to match
     // the lower bound, return an empty vec.
     if lower > avail {
-        return vec![]; // FIXME: generate more devices
+        return vec![];
     }
 
     let mut device_lists = vec![];
 
-    device_lists.push(
-        matches
-            .iter()
-            .take(lower)
-            .map(|&(d, _)| (d, None))
-            .collect::<Vec<_>>(),
-    );
+    device_lists.push(avail_specs.iter().take(lower).cloned().collect::<Vec<_>>());
 
     if lower != avail {
         match maybe_upper {
-            None => device_lists.push(
-                matches
-                    .iter()
-                    .take(avail)
-                    .map(|&(d, _)| (d, None))
-                    .collect::<Vec<_>>(),
-            ),
+            None => device_lists.push(avail_specs.iter().take(avail).cloned().collect::<Vec<_>>()),
             Some(upper) => {
-                if lower + 1 < upper {
+                if lower < upper {
                     device_lists.push(
-                        matches
+                        avail_specs
                             .iter()
-                            .take(cmp::min(upper - 1, avail))
-                            .map(|&(d, _)| (d, None))
+                            .take(cmp::min(upper, avail))
+                            .cloned()
                             .collect::<Vec<_>>(),
                     )
                 }

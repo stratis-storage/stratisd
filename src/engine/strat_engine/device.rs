@@ -4,15 +4,39 @@
 
 // Functions for dealing with devices.
 
-use std::fs::OpenOptions;
-use std::io::{self, BufWriter, Seek, SeekFrom, Write};
+use std::fs::{File, OpenOptions};
+use std::io::{self, BufWriter, Cursor, Seek, SeekFrom, Write};
 use std::path::Path;
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
 use stratis::StratisResult;
 
-use super::backstore::SyncAll;
+/// The SyncAll trait unifies the File type with other types that do
+/// not implement sync_all(). The purpose is to allow testing of methods
+/// that sync to a File using other structs that also implement Write, but
+/// do not implement sync_all, e.g., the Cursor type.
+pub trait SyncAll: Write {
+    fn sync_all(&mut self) -> io::Result<()>;
+}
+
+impl SyncAll for File {
+    /// Invokes File::sync_all() thereby syncing all the data
+    fn sync_all(&mut self) -> io::Result<()> {
+        File::sync_all(self)
+    }
+}
+
+impl<T> SyncAll for Cursor<T>
+where
+    Cursor<T>: Write,
+{
+    /// A no-op. No data need be synced, because it is already in the Cursor
+    /// inner value, which has type T.
+    fn sync_all(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 impl<T> SyncAll for BufWriter<T>
 where

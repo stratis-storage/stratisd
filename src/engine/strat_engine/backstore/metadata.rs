@@ -2,8 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::fs::File;
-use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
+use std::io::{Read, Seek, SeekFrom};
 use std::str::from_utf8;
 
 use byteorder::{ByteOrder, LittleEndian};
@@ -17,6 +16,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{DevUuid, PoolUuid};
 
+use super::super::device::SyncAll;
 use super::super::engine::DevOwnership;
 
 pub use self::mda::{validate_mda_size, MIN_MDA_SECTORS};
@@ -29,32 +29,6 @@ const BDA_STATIC_HDR_SIZE: Bytes = Bytes(_BDA_STATIC_HDR_SIZE as u64);
 const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
 
 const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
-
-/// The SyncAll trait unifies the File type with other types that do
-/// not implement sync_all(). The purpose is to allow testing of methods
-/// that sync to a File using other structs that also implement Write, but
-/// do not implement sync_all, e.g., the Cursor type.
-pub trait SyncAll: Write {
-    fn sync_all(&mut self) -> io::Result<()>;
-}
-
-impl SyncAll for File {
-    /// Invokes File::sync_all() thereby syncing all the data
-    fn sync_all(&mut self) -> io::Result<()> {
-        File::sync_all(self)
-    }
-}
-
-impl<T> SyncAll for Cursor<T>
-where
-    Cursor<T>: Write,
-{
-    /// A no-op. No data need be synced, because it is already in the Cursor
-    /// inner value, which has type T.
-    fn sync_all(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
 
 #[derive(Debug)]
 pub struct BDA {
@@ -413,7 +387,7 @@ mod mda {
                 f.write_all(&hdr_buf)?;
             }
 
-            f.flush()?;
+            f.sync_all()?;
 
             Ok(MDARegions {
                 region_size,
@@ -505,7 +479,7 @@ mod mda {
                 )))?;
                 f.write_all(&hdr_buf)?;
                 f.write_all(data)?;
-                f.flush()?;
+                f.sync_all()?;
 
                 Ok(())
             };
@@ -829,7 +803,7 @@ mod mda {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
+    use std::io::{Cursor, Write};
 
     use devicemapper::{Bytes, Sectors, IEC};
     use quickcheck::{QuickCheck, TestResult};

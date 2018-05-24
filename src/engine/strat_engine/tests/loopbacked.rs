@@ -47,7 +47,7 @@ impl LoopTestDev {
         // TODO: see https://github.com/nix-rust/nix/issues/596
         f.seek(SeekFrom::Start(IEC::Gi)).unwrap();
         f.write(&[0]).unwrap();
-        f.flush().unwrap();
+        f.sync_all().unwrap();
 
         let ld = lc.next_free().unwrap();
         ld.attach_file(path).unwrap();

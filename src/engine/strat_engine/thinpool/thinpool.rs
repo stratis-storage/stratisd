@@ -934,7 +934,7 @@ mod tests {
                     .open(file_path)
                     .unwrap();
                 f.write_all(write_buf).unwrap();
-                f.flush().unwrap();
+                f.sync_all().unwrap();
             }
         }
 

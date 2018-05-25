@@ -289,12 +289,15 @@ mod test {
 
     #[test]
     pub fn loop_test_pool_rename() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3), test_pool_rename);
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(1, 3, None),
+            test_pool_rename,
+        );
     }
 
     #[test]
     pub fn real_test_pool_rename() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1), test_pool_rename);
+        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_pool_rename);
     }
 
     /// Test engine setup.
@@ -343,11 +346,11 @@ mod test {
 
     #[test]
     pub fn loop_test_setup() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_setup);
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
     }
 
     #[test]
     pub fn real_test_setup() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_setup);
+        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None), test_setup);
     }
 }

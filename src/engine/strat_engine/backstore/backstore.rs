@@ -849,17 +849,26 @@ mod tests {
 
     #[test]
     pub fn loop_test_add_cache_devs() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(4, 5), test_add_cache_devs);
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(4, 5, None),
+            test_add_cache_devs,
+        );
     }
 
     #[test]
     pub fn real_test_add_cache_devs() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(4), test_add_cache_devs);
+        real::test_with_spec(
+            real::DeviceLimits::AtLeast(4, None, None),
+            test_add_cache_devs,
+        );
     }
 
     #[test]
     pub fn travis_test_add_cache_devs() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(4, 5), test_add_cache_devs);
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(4, 5, None),
+            test_add_cache_devs,
+        );
     }
 
     /// Create a backstore with a cache.
@@ -905,16 +914,16 @@ mod tests {
 
     #[test]
     pub fn loop_test_setup() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_setup);
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
     }
 
     #[test]
     pub fn real_test_setup() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_setup);
+        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None), test_setup);
     }
 
     #[test]
     pub fn travis_test_setup() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_setup);
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
     }
 }

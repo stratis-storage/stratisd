@@ -373,12 +373,18 @@ mod tests {
 
     #[test]
     pub fn loop_test_basic_metadata() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_basic_metadata);
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(2, 3, None),
+            test_basic_metadata,
+        );
     }
 
     #[test]
     pub fn real_test_basic_metadata() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_basic_metadata);
+        real::test_with_spec(
+            real::DeviceLimits::AtLeast(2, None, None),
+            test_basic_metadata,
+        );
     }
 
     /// Verify that a pool with no devices does not have the minimum amount of
@@ -390,12 +396,12 @@ mod tests {
 
     #[test]
     pub fn loop_test_empty_pool() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Exactly(0), test_empty_pool);
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Exactly(0, None), test_empty_pool);
     }
 
     #[test]
     pub fn real_test_empty_pool() {
-        real::test_with_spec(real::DeviceLimits::Exactly(0), test_empty_pool);
+        real::test_with_spec(real::DeviceLimits::Exactly(0, None, None), test_empty_pool);
     }
 
     /// Test that adding a cachedev causes metadata to be updated.
@@ -542,11 +548,17 @@ mod tests {
 
     #[test]
     pub fn loop_test_add_cachedevs() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3), test_add_cachedevs);
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(2, 3, None),
+            test_add_cachedevs,
+        );
     }
 
     #[test]
     pub fn real_test_add_cachedevs() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2), test_add_cachedevs);
+        real::test_with_spec(
+            real::DeviceLimits::AtLeast(2, None, None),
+            test_add_cachedevs,
+        );
     }
 }

@@ -32,6 +32,7 @@ features = ["serde", "v4"]
 [dev-dependencies]
 quickcheck = "0.6"
 loopdev = "0.2"
+either = "1.1.0"
 
 [features]
 default = ["dbus_enabled"]

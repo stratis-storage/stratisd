@@ -27,9 +27,9 @@ use super::randomization::Randomizer;
 
 #[derive(Debug)]
 pub struct SimPool {
-    pub block_devs: HashMap<DevUuid, SimDev>,
-    pub cache_devs: HashMap<DevUuid, SimDev>,
-    pub filesystems: Table<SimFilesystem>,
+    block_devs: HashMap<DevUuid, SimDev>,
+    cache_devs: HashMap<DevUuid, SimDev>,
+    filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
 }

@@ -63,8 +63,8 @@ pub enum DeferredAction {
 /// object itself.
 #[derive(Debug)]
 pub struct OPContext {
-    pub parent: Path<'static>,
-    pub uuid: Uuid,
+    pub(super) parent: Path<'static>,
+    pub(super) uuid: Uuid,
 }
 
 impl OPContext {
@@ -75,9 +75,9 @@ impl OPContext {
 
 #[derive(Debug, Clone)]
 pub struct DbusContext {
-    pub next_index: Rc<Cell<u64>>,
-    pub engine: Rc<RefCell<Engine>>,
-    pub actions: Rc<RefCell<ActionQueue>>,
+    pub(super) next_index: Rc<Cell<u64>>,
+    pub(super) engine: Rc<RefCell<Engine>>,
+    pub(super) actions: Rc<RefCell<ActionQueue>>,
 }
 
 impl DbusContext {

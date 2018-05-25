@@ -35,11 +35,11 @@ const MAX_NUM_TO_WRITE: usize = 10;
 #[derive(Debug, Clone)]
 pub struct Segment {
     /// The offset into the device where this segment starts.
-    pub start: Sectors,
+    pub(super) start: Sectors,
     /// The length of the segment.
-    pub length: Sectors,
+    pub(super) length: Sectors,
     /// The device the segment is within.
-    pub device: Device,
+    pub(super) device: Device,
 }
 
 impl Segment {
@@ -55,8 +55,8 @@ impl Segment {
 
 #[derive(Clone, Debug)]
 pub struct BlkDevSegment {
-    pub uuid: DevUuid,
-    pub segment: Segment,
+    pub(super) uuid: DevUuid,
+    pub(super) segment: Segment,
 }
 
 impl BlkDevSegment {

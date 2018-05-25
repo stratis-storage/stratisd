@@ -24,7 +24,7 @@ use super::range_alloc::RangeAllocator;
 #[derive(Debug)]
 pub struct StratBlockDev {
     dev: Device,
-    pub devnode: PathBuf,
+    pub(super) devnode: PathBuf,
     bda: BDA,
     used: RangeAllocator,
     user_info: Option<String>,

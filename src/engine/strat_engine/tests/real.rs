@@ -90,7 +90,7 @@ fn get_device_runs<'a>(
 
     // Retain only devices that are larger than min_size
     let (matches, _): (Vec<(&Path, Sectors)>, Vec<(&Path, Sectors)>) =
-        dev_sizes.iter().partition(|&(_, s)| *s >= min_size);
+        dev_sizes.iter().partition(|&&(_, s)| Sectors(*s) >= min_size);
 
     // If there is not a sufficient number of devices large enough to match
     // the lower bound, return an empty vec. TODO: It would be possible to try
@@ -106,7 +106,7 @@ fn get_device_runs<'a>(
             (matches, vec![])
         } else {
             let max_size = max_size.expect("!max_size.is_none()");
-            matches.iter().partition(|&(_, s)| *s <= max_size)
+            matches.iter().partition(|&&(_, s)| Sectors(*s) <= max_size)
         };
 
     let avail = matches.len();

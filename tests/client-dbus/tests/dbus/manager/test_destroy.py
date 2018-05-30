@@ -63,7 +63,11 @@ class Destroy1TestCase(unittest.TestCase):
         """
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        pool = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
+        pool = next(
+            pools(props={
+                'Name': self._POOLNAME
+            }).search(managed_objects),
+            None)
         self.assertIsNone(pool)
 
     def testBogusObjectPath(self):
@@ -110,8 +114,11 @@ class Destroy2TestCase(unittest.TestCase):
         """
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool1, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
-        blockdevs1 = blockdevs(managed_objects, {'Pool': pool1})
+        (pool1, _) = next(
+            pools(props={
+                'Name': self._POOLNAME
+            }).search(managed_objects))
+        blockdevs1 = blockdevs(props={'Pool': pool1}).search(managed_objects)
         self.assertEqual(
             frozenset(MOBlockDev(b).Devnode() for (_, b) in blockdevs1),
             frozenset(d for d in self._devices))
@@ -121,8 +128,12 @@ class Destroy2TestCase(unittest.TestCase):
 
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        blockdevs2 = blockdevs(managed_objects, {'Pool': pool1})
-        pool2 = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
+        blockdevs2 = blockdevs(props={'Pool': pool1}).search(managed_objects)
+        pool2 = next(
+            pools(props={
+                'Name': self._POOLNAME
+            }).search(managed_objects),
+            None)
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertIsNone(pool2)
@@ -169,7 +180,10 @@ class Destroy3TestCase(unittest.TestCase):
         """
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
+        (pool, _) = next(
+            pools(props={
+                'Name': self._POOLNAME
+            }).search(managed_objects))
 
         (result, rc, _) = \
            Manager.Methods.DestroyPool(self._proxy, {'pool': pool})
@@ -178,7 +192,10 @@ class Destroy3TestCase(unittest.TestCase):
 
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool1, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
+        (pool1, _) = next(
+            pools(props={
+                'Name': self._POOLNAME
+            }).search(managed_objects))
         self.assertEqual(pool, pool1)
 
 
@@ -217,7 +234,10 @@ class Destroy4TestCase(unittest.TestCase):
         """
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
+        (pool, _) = next(
+            pools(props={
+                'Name': self._POOLNAME
+            }).search(managed_objects))
 
         (result, rc, _) = \
            Manager.Methods.DestroyPool(self._proxy, {'pool': pool})
@@ -228,4 +248,8 @@ class Destroy4TestCase(unittest.TestCase):
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         self.assertIsNone(
-            next(pools(managed_objects, {'Name': self._POOLNAME}), None))
+            next(
+                pools(props={
+                    'Name': self._POOLNAME
+                }).search(managed_objects),
+                None))

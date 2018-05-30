@@ -69,7 +69,10 @@ class AddCacheDevsTestCase1(unittest.TestCase):
         """
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
+        (pool, _) = next(
+            pools(props={
+                'Name': self._POOLNAME
+            }).search(managed_objects))
 
         (result, rc, _) = Pool.Methods.AddCacheDevs(self._pool_object, {
             'force': False,
@@ -81,10 +84,10 @@ class AddCacheDevsTestCase1(unittest.TestCase):
 
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        blockdevs2 = blockdevs(managed_objects, {'Pool': pool})
+        blockdevs2 = blockdevs(props={'Pool': pool}).search(managed_objects)
         self.assertEqual(list(blockdevs2), [])
 
-        blockdevs3 = blockdevs(managed_objects, {})
+        blockdevs3 = blockdevs().search(managed_objects)
         self.assertEqual(list(blockdevs3), [])
 
     def testSomeDevs(self):
@@ -93,7 +96,10 @@ class AddCacheDevsTestCase1(unittest.TestCase):
         """
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
+        (pool, _) = next(
+            pools(props={
+                'Name': self._POOLNAME
+            }).search(managed_objects))
 
         (result, rc,
          _) = Pool.Methods.AddCacheDevs(self._pool_object, {
@@ -113,7 +119,10 @@ class AddCacheDevsTestCase1(unittest.TestCase):
         blockdev_object_paths = frozenset(result)
 
         # blockdevs exported on the D-Bus are exactly those added
-        blockdevs2 = list(blockdevs(managed_objects, {'Pool': pool}))
+        blockdevs2 = list(
+            blockdevs(props={
+                'Pool': pool
+            }).search(managed_objects))
         blockdevs2_object_paths = frozenset([op for (op, _) in blockdevs2])
         self.assertEqual(blockdevs2_object_paths, blockdev_object_paths)
 
@@ -121,11 +130,14 @@ class AddCacheDevsTestCase1(unittest.TestCase):
         self.assertEqual(len(blockdevs2), num_devices_added)
 
         # There are no blockdevs but for those in this pool
-        blockdevs3 = blockdevs(managed_objects, {})
+        blockdevs3 = blockdevs().search(managed_objects)
         self.assertEqual(len(list(blockdevs3)), num_devices_added)
 
         # There are no datadevs belonging to this pool
-        blockdevs4 = blockdevs(managed_objects, {'Pool': pool, 'Tier': 0})
+        blockdevs4 = blockdevs(props={
+            'Pool': pool,
+            'Tier': 0
+        }).search(managed_objects)
         self.assertEqual(list(blockdevs4), [])
 
 
@@ -166,12 +178,21 @@ class AddCacheDevsTestCase2(unittest.TestCase):
         """
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
+        (pool, _) = next(
+            pools(props={
+                'Name': self._POOLNAME
+            }).search(managed_objects))
 
-        blockdevs1 = blockdevs(managed_objects, {'Pool': pool, 'Tier': 0})
+        blockdevs1 = blockdevs(props={
+            'Pool': pool,
+            'Tier': 0
+        }).search(managed_objects)
         self.assertEqual(self._devpaths, frozenset(
             op for (op, _) in blockdevs1))
-        blockdevs2 = blockdevs(managed_objects, {'Pool': pool, 'Tier': 1})
+        blockdevs2 = blockdevs(props={
+            'Pool': pool,
+            'Tier': 1
+        }).search(managed_objects)
         self.assertEqual(list(blockdevs2), [])
 
         (result, rc, _) = Pool.Methods.AddCacheDevs(self._pool_object, {
@@ -184,7 +205,7 @@ class AddCacheDevsTestCase2(unittest.TestCase):
 
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        blockdevs3 = blockdevs(managed_objects, {'Pool': pool})
+        blockdevs3 = blockdevs(props={'Pool': pool}).search(managed_objects)
         self.assertEqual(
             frozenset(op for (op, _) in blockdevs3), self._devpaths)
 
@@ -194,9 +215,15 @@ class AddCacheDevsTestCase2(unittest.TestCase):
         """
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool, _) = next(pools(managed_objects, {'Name': self._POOLNAME}))
+        (pool, _) = next(
+            pools(props={
+                'Name': self._POOLNAME
+            }).search(managed_objects))
 
-        blockdevs1 = blockdevs(managed_objects, {'Pool': pool, 'Tier': 0})
+        blockdevs1 = blockdevs(props={
+            'Pool': pool,
+            'Tier': 0
+        }).search(managed_objects)
         self.assertEqual(self._devpaths, frozenset(
             op for (op, _) in blockdevs1))
         (result, rc,
@@ -218,10 +245,10 @@ class AddCacheDevsTestCase2(unittest.TestCase):
 
         # cache blockdevs exported on the D-Bus are exactly those added
         blockdevs2 = list(
-            blockdevs(managed_objects, {
+            blockdevs(props={
                 'Pool': pool,
                 'Tier': 1
-            }))
+            }).search(managed_objects))
         self.assertEqual(
             frozenset(op for (op, _) in blockdevs2), blockdev_object_paths)
 
@@ -229,11 +256,14 @@ class AddCacheDevsTestCase2(unittest.TestCase):
         self.assertEqual(len(blockdevs2), num_devices_added)
 
         # There are no blockdevs but for those in this pool
-        blockdevs3 = blockdevs(managed_objects, {'Pool': pool})
-        blockdevs4 = blockdevs(managed_objects, {})
+        blockdevs3 = blockdevs(props={'Pool': pool}).search(managed_objects)
+        blockdevs4 = blockdevs().search(managed_objects)
         self.assertEqual(len(list(blockdevs3)), len(list(blockdevs4)))
 
         # The number of datadevs has remained the same
-        blockdevs5 = blockdevs(managed_objects, {'Pool': pool, 'Tier': 0})
+        blockdevs5 = blockdevs(props={
+            'Pool': pool,
+            'Tier': 0
+        }).search(managed_objects)
         self.assertEqual(
             frozenset(op for (op, _) in blockdevs5), self._devpaths)

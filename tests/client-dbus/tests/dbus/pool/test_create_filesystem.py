@@ -75,8 +75,8 @@ class CreateFSTestCase(unittest.TestCase):
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
 
-        result = \
-           filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        result = filesystems().search(
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
         self.assertEqual(len([x for x in result]), 0)
 
     @unittest.skip("skip until creating multiple filesystems is supported")
@@ -95,8 +95,8 @@ class CreateFSTestCase(unittest.TestCase):
         (_, fs_name) = result[0]
         self.assertEqual(fs_name, new_name)
 
-        result = \
-           filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        result = filesystems().search(
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
         self.assertEqual(len([x for x in result]), 1)
 
 
@@ -146,8 +146,8 @@ class CreateFSTestCase1(unittest.TestCase):
         self.assertEqual(rc, StratisdErrors.ALREADY_EXISTS)
         self.assertEqual(len(result), 0)
 
-        result = \
-           filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        result = filesystems().search(
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
         self.assertEqual(len([x for x in result]), 1)
 
     def testCreateOne(self):
@@ -166,8 +166,8 @@ class CreateFSTestCase1(unittest.TestCase):
         (_, fs_name) = result[0]
         self.assertEqual(fs_name, new_name)
 
-        result = \
-           filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        result = filesystems().search(
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
         self.assertEqual(len([x for x in result]), 2)
 
     @unittest.skip("skip until creating multiple filesystems is supported")
@@ -183,8 +183,8 @@ class CreateFSTestCase1(unittest.TestCase):
         self.assertEqual(rc, StratisdErrors.ALREADY_EXISTS)
         self.assertEqual(len(result), 0)
 
-        result = \
-           filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        result = filesystems().search(
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
         self.assertEqual(len([x for x in result]), 1)
 
     def testCreateMultiple(self):
@@ -199,6 +199,6 @@ class CreateFSTestCase1(unittest.TestCase):
         self.assertEqual(rc, StratisdErrors.ERROR)
         self.assertEqual(len(result), 0)
 
-        result = \
-           filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        result = filesystems().search(
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
         self.assertEqual(len([x for x in result]), 1)

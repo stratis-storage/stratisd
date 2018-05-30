@@ -70,8 +70,12 @@ class Create2TestCase(unittest.TestCase):
 
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        all_pools = [x for x in pools(managed_objects)]
-        result = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
+        all_pools = [x for x in pools().search(managed_objects)]
+        result = next(
+            pools(props={
+                'Name': self._POOLNAME
+            }).search(managed_objects),
+            None)
 
         if rc == StratisdErrors.OK:
             self.assertIsNotNone(result)
@@ -135,7 +139,7 @@ class Create3TestCase(unittest.TestCase):
         """
         Create should fail trying to create new pool with same name as previous.
         """
-        pools1 = pools(
+        pools1 = pools().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
 
         (_, rc, _) = Manager.Methods.CreatePool(
@@ -150,8 +154,12 @@ class Create3TestCase(unittest.TestCase):
 
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        pools2 = [x for x in pools(managed_objects)]
-        pool = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
+        pools2 = [x for x in pools().search(managed_objects)]
+        pool = next(
+            pools(props={
+                'Name': self._POOLNAME
+            }).search(managed_objects),
+            None)
 
         self.assertIsNotNone(pool)
         self.assertEqual(

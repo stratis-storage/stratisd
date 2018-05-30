@@ -75,8 +75,8 @@ class DestroyFSTestCase(unittest.TestCase):
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
 
-        result = \
-           filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        result = filesystems().search(
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
         self.assertEqual(len([x for x in result]), 0)
 
     def testDestroyOne(self):
@@ -89,8 +89,8 @@ class DestroyFSTestCase(unittest.TestCase):
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertEqual(len(result), 0)
 
-        result = \
-           filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        result = filesystems().search(
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
         self.assertEqual(len([x for x in result]), 0)
 
 
@@ -140,8 +140,8 @@ class DestroyFSTestCase1(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(rc, StratisdErrors.OK)
 
-        result = \
-           filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        result = filesystems().search(
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
         self.assertEqual(len([x for x in result]), 0)
 
     def testDestroyTwo(self):
@@ -157,6 +157,6 @@ class DestroyFSTestCase1(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(rc, StratisdErrors.OK)
 
-        result = \
-           filesystems(ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+        result = filesystems().search(
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
         self.assertEqual(len([x for x in result]), 0)

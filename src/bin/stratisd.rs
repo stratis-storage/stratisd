@@ -22,7 +22,7 @@ extern crate nix;
 use std::cell::RefCell;
 use std::env;
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use std::process::exit;
@@ -83,11 +83,22 @@ fn handle_udev_add(event: &libudev::Event) -> Option<(Device, PathBuf)> {
 /// To ensure only one instance of stratisd runs at a time, acquire an
 /// exclusive lock. Return an error if lock attempt fails.
 fn trylock_pid_file() -> StratisResult<File> {
-    let mut f = OpenOptions::new()
+    let mut f = match OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
-        .open(STRATISD_PID_PATH)?;
+        .open(STRATISD_PID_PATH)
+    {
+        Ok(f) => f,
+        Err(e) => {
+            if e.kind() == ErrorKind::PermissionDenied {
+                return Err(StratisError::Error(
+                    "Must be running as root in order to start daemon.".to_string(),
+                ));
+            }
+            return Err(e.into());
+        }
+    };
     match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
         Ok(_) => {
             f.write_all(format!("{}\n", getpid()).as_bytes())?;

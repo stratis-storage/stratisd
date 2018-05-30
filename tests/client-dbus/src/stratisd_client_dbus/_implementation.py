@@ -17,9 +17,23 @@ Classes to implement dbus interface.
 
 import xml.etree.ElementTree as ET
 
+from dbus_client_gen import managed_object_class
+from dbus_client_gen import mo_query_builder
+
 from dbus_python_client_gen import make_class
 
 from ._data import SPECS
+
+_POOL_SPEC = ET.fromstring(SPECS['org.storage.stratis1.pool'])
+_FILESYSTEM_SPEC = ET.fromstring(SPECS['org.storage.stratis1.filesystem'])
+_BLOCKDEV_SPEC = ET.fromstring(SPECS['org.storage.stratis1.blockdev'])
+
+pools = mo_query_builder(_POOL_SPEC)
+filesystems = mo_query_builder(_FILESYSTEM_SPEC)
+blockdevs = mo_query_builder(_BLOCKDEV_SPEC)
+
+MOPool = managed_object_class("MOPool", _POOL_SPEC)
+MOBlockDev = managed_object_class("MOBlockDev", _BLOCKDEV_SPEC)
 
 TIME_OUT = 120  # In seconds
 
@@ -30,9 +44,5 @@ ObjectManager = make_class("ObjectManager",
 Manager = make_class("Manager",
                      ET.fromstring(SPECS['org.storage.stratis1.Manager']),
                      TIME_OUT)
-Filesystem = make_class("Filesystem",
-                        ET.fromstring(
-                            SPECS['org.storage.stratis1.filesystem']),
-                        TIME_OUT)
-Pool = make_class("Pool", ET.fromstring(SPECS['org.storage.stratis1.pool']),
-                  TIME_OUT)
+Filesystem = make_class("Filesystem", _FILESYSTEM_SPEC, TIME_OUT)
+Pool = make_class("Pool", _POOL_SPEC, TIME_OUT)

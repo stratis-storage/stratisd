@@ -5,10 +5,11 @@
 extern crate loopdev;
 
 use std::fs::OpenOptions;
-use std::io::{Seek, SeekFrom, Write};
+use std::os::unix::io::AsRawFd;
 use std::panic;
 use std::path::{Path, PathBuf};
 
+use nix::{self, fcntl::{fallocate, FallocateFlags}};
 use tempfile;
 
 use devicemapper::{Bytes, Sectors, IEC};
@@ -43,17 +44,19 @@ impl LoopTestDev {
     pub fn new(lc: &LoopControl, path: &Path, size: Option<Sectors>) -> LoopTestDev {
         let size = size.unwrap_or(Bytes(IEC::Gi).sectors());
 
-        let mut f = OpenOptions::new()
+        let f = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
             .open(&path)
             .unwrap();
 
-        // the proper way to do this is fallocate, but nix doesn't implement yet.
-        // TODO: see https://github.com/nix-rust/nix/issues/596
-        f.seek(SeekFrom::Start(*size.bytes())).unwrap();
-        f.write(&[0]).unwrap();
+        fallocate(
+            f.as_raw_fd(),
+            FallocateFlags::empty(),
+            0,
+            *size.bytes() as nix::libc::off_t,
+        ).unwrap();
         f.sync_all().unwrap();
 
         let ld = lc.next_free().unwrap();

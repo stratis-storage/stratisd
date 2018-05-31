@@ -873,7 +873,6 @@ fn attempt_thin_repair(
 mod tests {
     use std::fs::{File, OpenOptions};
     use std::io::{Read, Write};
-    use std::iter::FromIterator;
     use std::path::Path;
 
     use nix::mount::{mount, umount, MsFlags};
@@ -898,8 +897,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         devlinks::setup_dev_path().unwrap();
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let first_path = Vec::from_iter(paths[0..1].iter().cloned());
-        let remaining_paths = Vec::from_iter(paths[1..paths.len()].iter().cloned());
+        let (first_path, remaining_paths) = paths.split_at(1);
         let mut backstore =
             Backstore::initialize(pool_uuid, &first_path, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(

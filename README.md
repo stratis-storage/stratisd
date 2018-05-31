@@ -61,13 +61,13 @@ to `/etc/dbus-1/system.d/`.
 
 
 #### Rust tools
-Stratisd requires Rust 1.24+ and Cargo to build. These may be available via
+Stratisd requires Rust 1.26+ and Cargo to build. These may be available via
 your distribution's package manager. If not, [Rustup](https://www.rustup.rs/)
 is available to install and update the Rust toolchain.
 
 Stratisd makes use of `rustfmt` to enforce consistent formatting in Rust files.
 PRs must pass the `fmt` task in the CI in order to be merged. The `fmt`
-task currently uses rustfmt-preview.
+task currently uses rustfmt-preview (pinned to 0.4.1).
 
 
 #### Secondary dependencies

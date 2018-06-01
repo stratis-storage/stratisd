@@ -20,7 +20,6 @@ tempfile = "3.0.1"
 log = "0.3"
 env_logger="0.4"
 libc = "0.2.36"
-clippy = {version = "*", optional = true}
 mnt = "0.3.1"
 error-chain = "0.11.0"
 libudev = "0.2.0"

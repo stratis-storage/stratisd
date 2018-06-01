@@ -112,7 +112,7 @@ class UdevAdd(unittest.TestCase):
             get_object(TOP_OBJECT), {})
 
         selector = {} if name is None else {'Name': name}
-        return list(pools(managed_objects, selector))
+        return list(pools(props=selector).search(managed_objects))
 
     def _start_service(self):
         """

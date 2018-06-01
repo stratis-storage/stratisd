@@ -19,7 +19,7 @@ setuptools.setup(
     long_description=open(README, encoding='utf-8').read(),
     platforms=['Linux'],
     install_requires=[
-        'dbus-client-gen>=0.2',
+        'dbus-client-gen>=0.3',
         'dbus-python-client-gen>=0.6',
     ],
     package_dir={"": "src"},

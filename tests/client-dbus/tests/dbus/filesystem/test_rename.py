@@ -92,9 +92,14 @@ class SetNameTestCase(unittest.TestCase):
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (fs_object_path, _) = next(
-            filesystems(managed_objects, {'Name': 'new'}))
+            filesystems(props={
+                'Name': 'new'
+            }).search(managed_objects))
         self.assertEqual(self._filesystem_object_path, fs_object_path)
 
-        fs_object_path = \
-           next(filesystems(managed_objects, {'Name': self._fs_name}), None)
+        fs_object_path = next(
+            filesystems(props={
+                'Name': self._fs_name
+            }).search(managed_objects),
+            None)
         self.assertIsNone(fs_object_path)

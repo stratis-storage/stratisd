@@ -74,7 +74,11 @@ class SetNameTestCase(unittest.TestCase):
 
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        result = next(pools(managed_objects, {'Name': self._POOLNAME}), None)
+        result = next(
+            pools(props={
+                'Name': self._POOLNAME
+            }).search(managed_objects),
+            None)
         self.assertIsNotNone(result)
         (pool, _) = result
         self.assertEqual(pool, self._pool_object_path)
@@ -94,8 +98,15 @@ class SetNameTestCase(unittest.TestCase):
         managed_objects = \
            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         self.assertIsNone(
-            next(pools(managed_objects, {'Name': self._POOLNAME}), None))
-        result = next(pools(managed_objects, {'Name': new_name}), None)
+            next(
+                pools(props={
+                    'Name': self._POOLNAME
+                }).search(managed_objects),
+                None))
+        result = next(
+            pools(props={
+                'Name': new_name
+            }).search(managed_objects), None)
         self.assertIsNotNone(result)
         (pool, _) = result
         self.assertEqual(pool, self._pool_object_path)

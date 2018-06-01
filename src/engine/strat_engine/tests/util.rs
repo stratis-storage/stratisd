@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use mnt::get_submounts;
 use nix::mount::{MntFlags, umount2};
 
-use devicemapper::{DevId, DmFlags};
+use devicemapper::{DevId, DmOptions};
 
 use super::super::dm::get_dm;
 
@@ -44,7 +44,7 @@ fn dm_stratis_devices_remove() -> Result<()> {
             .map(|d| &d.0)
             .filter(|n| n.to_string().starts_with("stratis-1"))
         {
-            match get_dm().device_remove(&DevId::Name(n), DmFlags::empty()) {
+            match get_dm().device_remove(&DevId::Name(n), &DmOptions::new()) {
                 Ok(_) => progress_made = true,
                 Err(_) => remain.push(n.to_string()),
             }

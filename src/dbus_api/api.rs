@@ -294,7 +294,7 @@ impl DbusProxy {
 
 impl ApiProxy for DbusProxy {
     fn phys_used_changed(
-        &self,
+        &mut self,
         dbus_path: &Option<String>,
         new_value: Sectors,
     ) -> StratisResult<()> {
@@ -315,18 +315,13 @@ impl ApiProxy for DbusProxy {
         }
         Ok(())
     }
-    fn thinpool_data_expand_failed(
-        &self,
-        _dbus_path: &Option<String>,
-        _new_value: Sectors,
-    ) -> StratisResult<()> {
+    fn thinpool_data_expand_failed(&mut self, _dbus_path: &Option<String>) -> StratisResult<()> {
         Ok(())
     }
 
     fn thinpool_metadata_expand_failed(
-        &self,
+        &mut self,
         _dbus_path: &Option<String>,
-        _new_value: Sectors,
     ) -> StratisResult<()> {
         Ok(())
     }

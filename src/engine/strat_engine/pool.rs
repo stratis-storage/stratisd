@@ -156,7 +156,7 @@ impl StratPool {
         &mut self,
         pool_name: &Name,
         dm_name: &DmName,
-        api_proxy: &ApiProxy,
+        api_proxy: &mut ApiProxy,
     ) -> StratisResult<()> {
         assert!(
             self.thin_pool

@@ -358,7 +358,7 @@ impl ThinPool {
         &mut self,
         backstore: &mut Backstore,
         dbus_path: &Option<String>,
-        api_proxy: &ApiProxy,
+        api_proxy: &mut ApiProxy,
     ) -> StratisResult<bool> {
         #![allow(match_same_arms)]
         assert_eq!(backstore.device(), self.backstore_device);
@@ -904,6 +904,138 @@ mod tests {
 
     const BYTES_PER_WRITE: usize = 2 * IEC::Ki as usize * SECTOR_SIZE as usize;
 
+    #[derive(Debug)]
+    pub struct PhysUsedProxy {
+        called: bool,
+        new_value: Sectors,
+        dbus_path: Option<String>,
+    }
+
+    impl PhysUsedProxy {
+        pub fn new() -> PhysUsedProxy {
+            PhysUsedProxy {
+                called: false,
+                new_value: Sectors(0),
+                dbus_path: None,
+            }
+        }
+    }
+
+    impl ApiProxy for PhysUsedProxy {
+        fn phys_used_changed(
+            &mut self,
+            dbus_path: &Option<String>,
+            new_value: Sectors,
+        ) -> StratisResult<()> {
+            self.called = true;
+            self.new_value = new_value;
+            self.dbus_path = dbus_path.clone();
+            Ok(())
+        }
+    }
+
+    fn test_api_proxy(paths: &[&Path]) {
+        let tp = PhysUsedProxy::new();
+        let pool_uuid = Uuid::new_v4();
+        devlinks::setup_dev_path().unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        let (first_path, remaining_paths) = paths.split_at(1);
+        let mut backstore =
+            Backstore::initialize(pool_uuid, &first_path, MIN_MDA_SECTORS, false).unwrap();
+        let mut pool = ThinPool::new(
+            pool_uuid,
+            &ThinPoolSizeParams::default(),
+            DATA_BLOCK_SIZE,
+            DATA_LOWATER,
+            &mut backstore,
+        ).unwrap();
+
+        let pool_name = "stratis_test_pool";
+        devlinks::pool_added(&pool_name).unwrap();
+        let fs_uuid = pool.create_filesystem(pool_name, "stratis_test_filesystem", None)
+            .unwrap();
+        let write_buf = &[8u8; BYTES_PER_WRITE];
+        let source_tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
+        {
+            // to allow mutable borrow of pool
+            let (_, filesystem) = pool.get_filesystem_by_uuid(fs_uuid).unwrap();
+            mount(
+                Some(&filesystem.devnode()),
+                source_tmp_dir.path(),
+                Some("xfs"),
+                MsFlags::empty(),
+                None as Option<&str>,
+            ).unwrap();
+            let file_path = source_tmp_dir.path().join("stratis_test.txt");
+            let mut f: File = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(file_path)
+                .unwrap();
+            // Write the write_buf until the pool is full
+            loop {
+                let status: dm::ThinPoolStatus = pool.thin_pool.status(get_dm()).unwrap();
+                match status {
+                    dm::ThinPoolStatus::Working(ref _status) => {
+                        f.write_all(write_buf).unwrap();
+                        if let Err(_e) = f.sync_data() {
+                            break;
+                        }
+                    }
+                    dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working."),
+                }
+            }
+        }
+        match pool.thin_pool.status(get_dm()).unwrap() {
+            dm::ThinPoolStatus::Working(ref status) => {
+                assert!(
+                    status.summary == ThinPoolStatusSummary::OutOfSpace,
+                    "Expected full pool",
+                );
+            }
+            dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working/full."),
+        };
+        // Add block devices to the pool and run check() to extend
+        backstore
+            .add_blockdevs(&remaining_paths, BlockDevTier::Data, true)
+            .unwrap();
+        pool.check(&mut backstore, &None, &mut tp.borrow_mut())
+            .unwrap();
+        // Verify the pool is back in a Good state
+        match pool.thin_pool.status(get_dm()).unwrap() {
+            dm::ThinPoolStatus::Working(ref status) => {
+                assert!(
+                    status.summary == ThinPoolStatusSummary::Good,
+                    "Expected pool to be restored to good state",
+                );
+            }
+            dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail.  Expected working/good."),
+        };
+    }
+
+    #[test]
+    pub fn loop_test_api_proxy() {
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Exactly(2, Some(Bytes(IEC::Gi).sectors())),
+            test_api_proxy,
+        );
+    }
+
+    #[test]
+    pub fn real_test_api_proxy() {
+        real::test_with_spec(
+            real::DeviceLimits::Exactly(
+                2,
+                Some(Bytes(IEC::Gi).sectors()),
+                Some(Bytes(IEC::Gi * 4).sectors()),
+            ),
+            test_api_proxy,
+        );
+    }
+
     /// Verify that a full pool extends properly when additional space is added.
     fn test_full_pool(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
@@ -972,7 +1104,7 @@ mod tests {
         backstore
             .add_blockdevs(&remaining_paths, BlockDevTier::Data, true)
             .unwrap();
-        pool.check(&mut backstore, &None, &NullProxy).unwrap();
+        pool.check(&mut backstore, &None, &mut NullProxy).unwrap();
         // Verify the pool is back in a Good state
         match pool.thin_pool.status(get_dm()).unwrap() {
             dm::ThinPoolStatus::Working(ref status) => {
@@ -1326,7 +1458,9 @@ mod tests {
         }
         // The meta device is smaller than META_LOWATER, so it should be expanded
         // in the thin_pool.check() call.
-        thin_pool.check(&mut backstore, &None, &NullProxy).unwrap();
+        thin_pool
+            .check(&mut backstore, &None, &mut NullProxy)
+            .unwrap();
         match thin_pool.thin_pool.status(get_dm()).unwrap() {
             dm::ThinPoolStatus::Working(ref status) => {
                 let usage = &status.usage;

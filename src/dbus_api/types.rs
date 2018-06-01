@@ -12,7 +12,7 @@ use dbus::tree::{DataType, MTFn, ObjectPath, Tree};
 
 use uuid::Uuid;
 
-use engine::Engine;
+use super::super::engine::Engine;
 
 macro_attr! {
     #[derive(Clone, Copy, Debug)]

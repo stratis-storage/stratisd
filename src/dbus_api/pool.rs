@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use devicemapper::Sectors;
 
-use engine::{BlockDevTier, Name, Pool, RenameAction};
+use super::super::engine::{BlockDevTier, Name, Pool, RenameAction};
 
 use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;

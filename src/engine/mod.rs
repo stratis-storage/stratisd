@@ -24,11 +24,9 @@ pub use self::types::RenameAction;
 #[macro_use]
 mod macros;
 
-// strat_engine is public so that integration tests can access its internals.
-pub mod strat_engine;
-
 #[allow(module_inception)]
-pub mod engine;
+mod engine;
 mod sim_engine;
+mod strat_engine;
 mod structures;
-pub mod types;
+mod types;

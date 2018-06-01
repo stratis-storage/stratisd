@@ -14,8 +14,8 @@ use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInf
 use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
 use uuid::Uuid;
 
-use engine::{Engine, Pool, PoolUuid};
-use stratis::VERSION;
+use super::super::engine::{Engine, Pool, PoolUuid};
+use super::super::stratis::VERSION;
 
 use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;

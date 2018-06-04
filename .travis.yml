@@ -1,5 +1,5 @@
 os: linux
-group: edge
+group: stable
 
 addons:
     apt:
@@ -7,8 +7,8 @@ addons:
           - libdbus-1-dev
           - libudev-dev
           - libdbus-glib-1-dev
-          # needed for i686-unknown-linux-gnu target
-          - gcc-multilib
+            # needed for i686-unknown-linux-gnu target
+          #          - gcc-multilib
 
 language: rust
 
@@ -39,14 +39,14 @@ matrix:
           env: TASK=check TARGET=aarch64-unknown-linux-gnu PKG_CONFIG_ALLOW_CROSS=1
           install:
             - rustup target add $TARGET
-        - rust: stable
-          env: TASK=check TARGET=powerpc64-unknown-linux-gnu PKG_CONFIG_ALLOW_CROSS=1
-          install:
-            - rustup target add $TARGET
+            - sudo dpkg --add-architecture arm64
+            - sudo apt-get install -y libdbus-1-dev:arm64 libdbus-glib-1-dev:arm64 libglib2.0-dev:arm64 libudev-dev:arm64 gcc-aarch64-linux-gnu libc6-arm64-cross libc6-dev-arm64-cross
         - rust: stable
           env: TASK=check TARGET=powerpc64le-unknown-linux-gnu PKG_CONFIG_ALLOW_CROSS=1
           install:
             - rustup target add $TARGET
+            - sudo dpkg --add-architecture ppc64el
+              #            - sudo apt-get install -y gcc-multilib crossbuild-essential-ppc64el
         - rust: stable
           env: TASK=docs-travis TARGET=x86_64-unknown-linux-gnu
         - rust: stable

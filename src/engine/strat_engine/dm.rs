@@ -7,23 +7,35 @@
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{Once, ONCE_INIT};
 
-use devicemapper::DM;
+use devicemapper::{DmResult, DM};
 
-use stratis::StratisResult;
+use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::engine::Eventable;
 
 static INIT: Once = ONCE_INIT;
-static mut DM_CONTEXT: Option<DM> = None;
+static mut DM_CONTEXT: Option<DmResult<DM>> = None;
 
-pub fn get_dm() -> &'static DM {
+pub fn get_dm_init() -> StratisResult<&'static DM> {
     unsafe {
-        INIT.call_once(|| DM_CONTEXT = Some(DM::new().unwrap()));
+        INIT.call_once(|| DM_CONTEXT = Some(DM::new()));
         match DM_CONTEXT {
-            Some(ref context) => context,
+            Some(Ok(ref context)) => Ok(context),
+            // Can not move the error out of DM_CONTEXT, so synthesize a new
+            // error.
+            Some(Err(_)) => Err(StratisError::Engine(
+                ErrorEnum::Error,
+                "Failed to initialize DM context".into(),
+            )),
             _ => panic!("DM_CONTEXT.is_some()"),
         }
     }
+}
+
+pub fn get_dm() -> &'static DM {
+    get_dm_init().expect(
+        "the engine has already called get_dm_init() and exited if get_dm_init() returned an error",
+    )
 }
 
 impl Eventable for DM {

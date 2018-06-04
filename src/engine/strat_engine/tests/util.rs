@@ -2,7 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::panic::catch_unwind;
 use std::path::PathBuf;
 
 use mnt::get_submounts;
@@ -10,7 +9,7 @@ use nix::mount::{MntFlags, umount2};
 
 use devicemapper::{DevId, DmOptions};
 
-use super::super::dm::get_dm;
+use super::super::dm::{get_dm, get_dm_init};
 
 mod cleanup_errors {
     use mnt;
@@ -63,10 +62,7 @@ fn dm_stratis_devices_remove() -> Result<()> {
     }
 
     || -> Result<()> {
-        if catch_unwind(get_dm).is_err() {
-            return Err("Unable to initialize DM".into());
-        }
-
+        get_dm_init().map_err(|err| Error::with_chain(err, "Unable to initialize DM"))?;
         do_while_progress().and_then(|remain| {
             if !remain.is_empty() {
                 Err(format!("Some Stratis DM devices remaining: {:?}", remain).into())

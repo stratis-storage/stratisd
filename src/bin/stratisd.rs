@@ -201,21 +201,25 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
                     // that we can conditionally compile out the register_pool when dbus
                     // is not enabled.
                     if let Some(_pool_uuid) = pool_uuid {
-                        if let Some((_, pool)) = engine.borrow().get_pool(_pool_uuid) {
-                            #[cfg(feature = "dbus_enabled")]
-                            libstratis::dbus_api::register_pool(
-                                &dbus_context,
-                                _pool_uuid,
-                                pool,
-                                &base_object_path,
-                            );
-                            #[cfg(feature = "dbus_enabled")]
-                            libstratis::dbus_api::process_deferred_actions(
-                                &dbus_conn,
-                                &mut tree,
-                                &mut dbus_context.actions.borrow_mut(),
-                            )?;
-                        }
+                        #[cfg(feature = "dbus_enabled")]
+                        libstratis::dbus_api::register_pool(
+                            &dbus_context,
+                            _pool_uuid,
+                            engine
+                                .borrow()
+                                .get_pool(_pool_uuid)
+                                .expect(
+                                    "block_evaluate() returned a pool UUID, lookup must succeed",
+                                )
+                                .1,
+                            &base_object_path,
+                        );
+                        #[cfg(feature = "dbus_enabled")]
+                        libstratis::dbus_api::process_deferred_actions(
+                            &dbus_conn,
+                            &mut tree,
+                            &mut dbus_context.actions.borrow_mut(),
+                        )?;
                     }
                 }
             }

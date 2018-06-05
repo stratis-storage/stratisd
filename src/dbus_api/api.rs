@@ -2,9 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::cell::RefCell;
 use std::path::Path;
-use std::rc::Rc;
 use std::vec::Vec;
 
 use dbus;
@@ -13,7 +11,7 @@ use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInf
                  PropInfo, Tree};
 use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
 
-use engine::{Engine, Pool, PoolUuid};
+use engine::{Pool, PoolUuid};
 use stratis::VERSION;
 
 use super::blockdev::create_dbus_blockdev;
@@ -202,7 +200,7 @@ pub fn register_pool(
 /// Connect a stratis engine to dbus.
 #[allow(type_complexity)]
 pub fn connect<'a>(
-    engine: Rc<RefCell<Engine>>,
+    dbus_context: DbusContext,
 ) -> Result<
     (
         Connection,
@@ -214,15 +212,8 @@ pub fn connect<'a>(
 > {
     let c = Connection::get_private(BusType::System)?;
 
-    let local_engine = Rc::clone(&engine);
-
-    let (tree, object_path) = get_base_tree(DbusContext::new(engine));
+    let (tree, object_path) = get_base_tree(dbus_context);
     let dbus_context = tree.get_data().clone();
-
-    // This should never panic as register_pool does not borrow the engine.
-    for (_, pool_uuid, pool) in local_engine.borrow().pools() {
-        register_pool(&dbus_context, pool_uuid, pool, &object_path);
-    }
 
     tree.set_registered(&c, true)?;
     c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32)?;

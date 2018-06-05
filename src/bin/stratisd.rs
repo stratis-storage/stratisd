@@ -173,7 +173,12 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
 
     #[cfg(feature = "dbus_enabled")]
     let (dbus_conn, mut tree, base_object_path, dbus_context) =
-        libstratis::dbus_api::connect(Rc::clone(&engine))?;
+        libstratis::dbus_api::connect(libstratis::dbus_api::DbusContext::new(Rc::clone(&engine)))?;
+
+    #[cfg(feature = "dbus_enabled")]
+    for (_, pool_uuid, pool) in engine.borrow().pools() {
+        libstratis::dbus_api::register_pool(&dbus_context, pool_uuid, pool, &base_object_path);
+    }
 
     // The engine has been operating for a bit. If it accumulated any
     // actions before the D-Bus connection was set up, now is a good time

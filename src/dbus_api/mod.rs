@@ -13,3 +13,4 @@ mod types;
 mod util;
 
 pub use self::api::{connect, handle, process_deferred_actions, register_pool};
+pub use self::types::DbusContext;

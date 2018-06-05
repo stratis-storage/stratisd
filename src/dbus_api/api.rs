@@ -12,7 +12,6 @@ use dbus::arg::{Array, IterAppend};
 use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult,
                  PropInfo, Tree};
 use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
-use uuid::Uuid;
 
 use engine::{Engine, Pool, PoolUuid};
 use stratis::VERSION;
@@ -185,7 +184,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
 }
 
 /// Given an Pool, create all the needed dbus objects to represent it.
-fn register_pool_dbus(
+pub fn register_pool(
     dbus_context: &DbusContext,
     pool_uuid: PoolUuid,
     pool: &Pool,
@@ -220,26 +219,14 @@ pub fn connect<'a>(
     let (tree, object_path) = get_base_tree(DbusContext::new(engine));
     let dbus_context = tree.get_data().clone();
 
-    // This should never panic as register_pool_dbus does not borrow the engine.
+    // This should never panic as register_pool does not borrow the engine.
     for (_, pool_uuid, pool) in local_engine.borrow().pools() {
-        register_pool_dbus(&dbus_context, pool_uuid, pool, &object_path);
+        register_pool(&dbus_context, pool_uuid, pool, &object_path);
     }
 
     tree.set_registered(&c, true)?;
     c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32)?;
     Ok((c, tree, object_path, dbus_context))
-}
-
-/// Given the UUID of a pool, register all the pertinent information with dbus.
-pub fn register_pool(
-    engine: &Rc<RefCell<Engine>>,
-    dbus_context: &DbusContext,
-    pool_uuid: Uuid,
-    object_path: &dbus::Path<'static>,
-) -> () {
-    if let Some((_, pool)) = engine.borrow().get_pool(pool_uuid) {
-        register_pool_dbus(dbus_context, pool_uuid, pool, object_path);
-    }
 }
 
 /// Update the dbus tree with deferred adds and removes.

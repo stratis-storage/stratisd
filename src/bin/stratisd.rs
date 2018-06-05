@@ -201,19 +201,21 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
                     // that we can conditionally compile out the register_pool when dbus
                     // is not enabled.
                     if let Some(_pool_uuid) = pool_uuid {
-                        #[cfg(feature = "dbus_enabled")]
-                        libstratis::dbus_api::register_pool(
-                            &Rc::clone(&engine),
-                            &dbus_context,
-                            _pool_uuid,
-                            &base_object_path,
-                        );
-                        #[cfg(feature = "dbus_enabled")]
-                        libstratis::dbus_api::process_deferred_actions(
-                            &dbus_conn,
-                            &mut tree,
-                            &mut dbus_context.actions.borrow_mut(),
-                        )?;
+                        if let Some((_, pool)) = engine.borrow().get_pool(_pool_uuid) {
+                            #[cfg(feature = "dbus_enabled")]
+                            libstratis::dbus_api::register_pool(
+                                &dbus_context,
+                                _pool_uuid,
+                                pool,
+                                &base_object_path,
+                            );
+                            #[cfg(feature = "dbus_enabled")]
+                            libstratis::dbus_api::process_deferred_actions(
+                                &dbus_conn,
+                                &mut tree,
+                                &mut dbus_context.actions.borrow_mut(),
+                            )?;
+                        }
                     }
                 }
             }

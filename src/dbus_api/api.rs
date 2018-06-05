@@ -217,7 +217,7 @@ pub fn connect<'a>(
 
     let local_engine = Rc::clone(&engine);
 
-    let (mut tree, object_path) = get_base_tree(DbusContext::new(engine));
+    let (tree, object_path) = get_base_tree(DbusContext::new(engine));
     let dbus_context = tree.get_data().clone();
 
     // This should never panic as register_pool_dbus does not borrow the engine.
@@ -227,30 +227,23 @@ pub fn connect<'a>(
 
     tree.set_registered(&c, true)?;
     c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32)?;
-
-    process_deferred_actions(&c, &mut tree, &mut dbus_context.actions.borrow_mut())?;
-
     Ok((c, tree, object_path, dbus_context))
 }
 
 /// Given the UUID of a pool, register all the pertinent information with dbus.
 pub fn register_pool(
-    c: &Connection,
     engine: &Rc<RefCell<Engine>>,
     dbus_context: &DbusContext,
-    tree: &mut Tree<MTFn<TData>, TData>,
     pool_uuid: Uuid,
     object_path: &dbus::Path<'static>,
-) -> Result<(), dbus::Error> {
+) -> () {
     if let Some((_, pool)) = engine.borrow().get_pool(pool_uuid) {
         register_pool_dbus(dbus_context, pool_uuid, pool, object_path);
-        return process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut());
     }
-    Ok(())
 }
 
 /// Update the dbus tree with deferred adds and removes.
-fn process_deferred_actions(
+pub fn process_deferred_actions(
     c: &Connection,
     tree: &mut Tree<MTFn<TData>, TData>,
     actions: &mut ActionQueue,
@@ -270,12 +263,7 @@ fn process_deferred_actions(
     Ok(())
 }
 
-pub fn handle(
-    c: &Connection,
-    item: &ConnectionItem,
-    tree: &mut Tree<MTFn<TData>, TData>,
-    dbus_context: &DbusContext,
-) -> Result<(), dbus::Error> {
+pub fn handle(c: &Connection, item: &ConnectionItem, tree: &mut Tree<MTFn<TData>, TData>) -> () {
     if let ConnectionItem::MethodCall(ref msg) = *item {
         if let Some(v) = tree.handle(msg) {
             // Probably the wisest is to ignore any send errors here -
@@ -284,9 +272,5 @@ pub fn handle(
                 let _ = c.send(m);
             }
         }
-
-        process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut())?;
     }
-
-    Ok(())
 }

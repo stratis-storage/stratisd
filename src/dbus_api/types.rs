@@ -77,7 +77,7 @@ impl OPContext {
 pub struct DbusContext {
     pub(super) next_index: Rc<Cell<u64>>,
     pub(super) engine: Rc<RefCell<Engine>>,
-    pub(super) actions: Rc<RefCell<ActionQueue>>,
+    pub actions: Rc<RefCell<ActionQueue>>,
 }
 
 impl DbusContext {

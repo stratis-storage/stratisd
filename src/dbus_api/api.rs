@@ -236,17 +236,14 @@ pub fn connect<'a>(
 /// Given the UUID of a pool, register all the pertinent information with dbus.
 pub fn register_pool(
     c: &Connection,
-    engine: &Rc<RefCell<Engine>>,
     dbus_context: &DbusContext,
     tree: &mut Tree<MTFn<TData>, TData>,
     pool_uuid: Uuid,
+    pool: &Pool,
     object_path: &dbus::Path<'static>,
 ) -> Result<(), dbus::Error> {
-    if let Some((_, pool)) = engine.borrow().get_pool(pool_uuid) {
-        register_pool_dbus(dbus_context, pool_uuid, pool, object_path);
-        return process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut());
-    }
-    Ok(())
+    register_pool_dbus(dbus_context, pool_uuid, pool, object_path);
+    process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut())
 }
 
 /// Update the dbus tree with deferred adds and removes.

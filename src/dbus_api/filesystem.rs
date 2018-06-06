@@ -10,9 +10,7 @@ use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInf
 
 use uuid::Uuid;
 
-use engine::{Name, RenameAction};
-
-use super::super::engine::Filesystem;
+use super::super::engine::{Filesystem, Name, RenameAction};
 
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 

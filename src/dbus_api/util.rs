@@ -8,7 +8,7 @@ use dbus;
 use dbus::arg::{ArgType, Iter, IterAppend};
 use dbus::tree::{MTFn, MethodErr, PropInfo};
 
-use stratis::{ErrorEnum, StratisError};
+use super::super::stratis::{ErrorEnum, StratisError};
 
 use super::types::{DbusErrorEnum, TData};
 

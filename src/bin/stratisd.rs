@@ -121,9 +121,6 @@ fn trylock_pid_file() -> StratisResult<File> {
 }
 
 fn run(matches: &ArgMatches) -> StratisResult<()> {
-    initialize_log(matches.is_present("debug"))
-        .expect("This is the first and only invocation of this method; it must succeed.");
-
     // Setup a udev listener before initializing the engine. A device may
     // appear after the engine has read the /dev directory but before it has
     // completed initialization. Unless the udev event has been recorded, the
@@ -280,7 +277,12 @@ fn main() {
         )
         .get_matches();
 
-    let result = trylock_pid_file().and_then(|_pidfile| run(&matches));
+    let result = trylock_pid_file()
+        .and_then(|_pidfile| {
+            Ok(initialize_log(matches.is_present("debug"))
+                .expect("This is the first and only invocation of this method; it must succeed."))
+        })
+        .and_then(|_| run(&matches));
     if let Err(err) = result {
         print_err(&err);
         exit(1);

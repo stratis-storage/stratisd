@@ -184,7 +184,22 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
 
     #[cfg(feature = "dbus_enabled")]
     let (dbus_conn, mut tree, base_object_path, dbus_context) =
-        libstratis::dbus_api::connect(Rc::clone(&engine))?;
+        libstratis::dbus_api::connect(libstratis::dbus_api::DbusContext::new(Rc::clone(&engine)))?;
+
+    #[cfg(feature = "dbus_enabled")]
+    for (_, pool_uuid, pool) in engine.borrow().pools() {
+        libstratis::dbus_api::register_pool(&dbus_context, pool_uuid, pool, &base_object_path);
+    }
+
+    // The engine has been operating for a bit. If it accumulated any
+    // actions before the D-Bus connection was set up, now is a good time
+    // to process them.
+    #[cfg(feature = "dbus_enabled")]
+    libstratis::dbus_api::process_deferred_actions(
+        &dbus_conn,
+        &mut tree,
+        &mut dbus_context.actions.borrow_mut(),
+    )?;
 
     loop {
         // Process any udev block events
@@ -204,12 +219,22 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
                     if let Some(_pool_uuid) = pool_uuid {
                         #[cfg(feature = "dbus_enabled")]
                         libstratis::dbus_api::register_pool(
-                            &dbus_conn,
-                            &Rc::clone(&engine),
                             &dbus_context,
-                            &mut tree,
                             _pool_uuid,
+                            engine
+                                .borrow()
+                                .get_pool(_pool_uuid)
+                                .expect(
+                                    "block_evaluate() returned a pool UUID, lookup must succeed",
+                                )
+                                .1,
                             &base_object_path,
+                        );
+                        #[cfg(feature = "dbus_enabled")]
+                        libstratis::dbus_api::process_deferred_actions(
+                            &dbus_conn,
+                            &mut tree,
+                            &mut dbus_context.actions.borrow_mut(),
                         )?;
                     }
                 }
@@ -244,9 +269,14 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
                 .filter(|pfd| pfd.revents != 0)
             {
                 for item in dbus_conn.watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents)) {
-                    if let Err(r) =
-                        libstratis::dbus_api::handle(&dbus_conn, &item, &mut tree, &dbus_context)
-                    {
+                    libstratis::dbus_api::handle(&dbus_conn, &item, &mut tree);
+                    // Some actions may have arise due to the processing of
+                    // events via the D-Bus, handle them now.
+                    if let Err(r) = libstratis::dbus_api::process_deferred_actions(
+                        &dbus_conn,
+                        &mut tree,
+                        &mut dbus_context.actions.borrow_mut(),
+                    ) {
                         print_err(&From::from(r));
                     }
                 }

@@ -2,9 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::cell::RefCell;
 use std::path::Path;
-use std::rc::Rc;
 use std::vec::Vec;
 
 use dbus;
@@ -12,9 +10,8 @@ use dbus::arg::{Array, IterAppend};
 use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult,
                  PropInfo, Tree};
 use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
-use uuid::Uuid;
 
-use engine::{Engine, Pool, PoolUuid};
+use engine::{Pool, PoolUuid};
 use stratis::VERSION;
 
 use super::blockdev::create_dbus_blockdev;
@@ -185,7 +182,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
 }
 
 /// Given an Pool, create all the needed dbus objects to represent it.
-fn register_pool_dbus(
+pub fn register_pool(
     dbus_context: &DbusContext,
     pool_uuid: PoolUuid,
     pool: &Pool,
@@ -203,7 +200,7 @@ fn register_pool_dbus(
 /// Connect a stratis engine to dbus.
 #[allow(type_complexity)]
 pub fn connect<'a>(
-    engine: Rc<RefCell<Engine>>,
+    dbus_context: DbusContext,
 ) -> Result<
     (
         Connection,
@@ -215,42 +212,16 @@ pub fn connect<'a>(
 > {
     let c = Connection::get_private(BusType::System)?;
 
-    let local_engine = Rc::clone(&engine);
-
-    let (mut tree, object_path) = get_base_tree(DbusContext::new(engine));
+    let (tree, object_path) = get_base_tree(dbus_context);
     let dbus_context = tree.get_data().clone();
-
-    // This should never panic as register_pool_dbus does not borrow the engine.
-    for (_, pool_uuid, pool) in local_engine.borrow().pools() {
-        register_pool_dbus(&dbus_context, pool_uuid, pool, &object_path);
-    }
 
     tree.set_registered(&c, true)?;
     c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32)?;
-
-    process_deferred_actions(&c, &mut tree, &mut dbus_context.actions.borrow_mut())?;
-
     Ok((c, tree, object_path, dbus_context))
 }
 
-/// Given the UUID of a pool, register all the pertinent information with dbus.
-pub fn register_pool(
-    c: &Connection,
-    engine: &Rc<RefCell<Engine>>,
-    dbus_context: &DbusContext,
-    tree: &mut Tree<MTFn<TData>, TData>,
-    pool_uuid: Uuid,
-    object_path: &dbus::Path<'static>,
-) -> Result<(), dbus::Error> {
-    if let Some((_, pool)) = engine.borrow().get_pool(pool_uuid) {
-        register_pool_dbus(dbus_context, pool_uuid, pool, object_path);
-        return process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut());
-    }
-    Ok(())
-}
-
 /// Update the dbus tree with deferred adds and removes.
-fn process_deferred_actions(
+pub fn process_deferred_actions(
     c: &Connection,
     tree: &mut Tree<MTFn<TData>, TData>,
     actions: &mut ActionQueue,
@@ -270,12 +241,7 @@ fn process_deferred_actions(
     Ok(())
 }
 
-pub fn handle(
-    c: &Connection,
-    item: &ConnectionItem,
-    tree: &mut Tree<MTFn<TData>, TData>,
-    dbus_context: &DbusContext,
-) -> Result<(), dbus::Error> {
+pub fn handle(c: &Connection, item: &ConnectionItem, tree: &mut Tree<MTFn<TData>, TData>) -> () {
     if let ConnectionItem::MethodCall(ref msg) = *item {
         if let Some(v) = tree.handle(msg) {
             // Probably the wisest is to ignore any send errors here -
@@ -284,9 +250,5 @@ pub fn handle(
                 let _ = c.send(m);
             }
         }
-
-        process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut())?;
     }
-
-    Ok(())
 }

@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::collections::HashMap;
-use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 
 use devicemapper::{Device, DmNameBuf};
@@ -18,7 +17,7 @@ use super::backstore::{find_all, is_stratis_device, setup_pool};
 #[cfg(test)]
 use super::cleanup::teardown_pools;
 use super::devlinks;
-use super::dm::get_dm;
+use super::dm::{get_dm, get_dm_init};
 use super::pool::StratPool;
 
 pub const DEV_PATH: &str = "/dev/stratis";
@@ -54,13 +53,7 @@ impl StratEngine {
     /// Returns an error if the kernel doesn't support required DM features.
     /// Returns an error if there was an error reading device nodes.
     pub fn initialize() -> StratisResult<StratEngine> {
-        let dm = match catch_unwind(get_dm) {
-            Ok(dm) => dm,
-            Err(_) => {
-                let err_msg = "failed to instantiate DM context";
-                return Err(StratisError::Engine(ErrorEnum::Error, err_msg.into()));
-            }
-        };
+        let dm = get_dm_init()?;
         let minor_dm_version = dm.version()?.1;
         if minor_dm_version < REQUIRED_DM_MINOR_VERSION {
             let err_msg = format!(

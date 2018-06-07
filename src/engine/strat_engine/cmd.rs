@@ -60,7 +60,10 @@ pub fn verify_binaries() -> StratisResult<()> {
     // https://github.com/rust-lang/rust/issues/51415 makes that impossible.
     for (ref name, ref path) in BINARIES.iter() {
         if path.is_none() {
-            return Err(StratisError::Engine(ErrorEnum::NotFound, name.to_string()));
+            return Err(StratisError::Error(format!(
+                "Unable to find absolute path for \"{}\"",
+                name
+            )));
         }
     }
     Ok(())
@@ -92,7 +95,10 @@ fn get_executable(name: &str) -> StratisResult<PathBuf> {
         .as_ref()
         .expect("verify_binaries() was previously called and returned no error");
     if !executable.exists() {
-        return Err(StratisError::Engine(ErrorEnum::NotFound, name.into()));
+        return Err(StratisError::Error(format!(
+            "Unable to find absolute path for \"{}\"",
+            name
+        )));
     }
     Ok(executable.to_path_buf())
 }

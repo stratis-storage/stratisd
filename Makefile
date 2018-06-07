@@ -26,6 +26,7 @@ fmt-travis:
 build:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS='-D warnings' \
+	RUST_BACKTRACE=1 \
 	cargo build --target $(TARGET)
 
 test-loop:

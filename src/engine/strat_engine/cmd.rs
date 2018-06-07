@@ -14,6 +14,7 @@
 // the existence of the file is checked before the command is invoked, and
 // an explicit error is returned if the executable can not be found.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -31,41 +32,28 @@ fn find_binary(name: &str) -> Option<PathBuf> {
 }
 
 lazy_static! {
-    static ref MKFS_BIN: Option<PathBuf> = find_binary("mkfs.xfs");
     static ref XFS_GROWFS_BIN: Option<PathBuf> = find_binary("xfs_growfs");
     static ref XFS_ADMIN_BIN: Option<PathBuf> = find_binary("xfs_admin");
     static ref THIN_CHECK_BIN: Option<PathBuf> = find_binary("thin_check");
     static ref THIN_REPAIR_BIN: Option<PathBuf> = find_binary("thin_repair");
+    static ref BINARIES: HashMap<String, Option<PathBuf>> = [
+        ("mkfs.xfs".to_string(), find_binary("mkfs.xfs")),
+        ("thin_check".to_string(), find_binary("thin_check")),
+        ("thin_repair".to_string(), find_binary("thin_repair")),
+        ("xfs_admin".to_string(), find_binary("xfs_admin")),
+        ("xfs_growfs".to_string(), find_binary("xfs_growfs"))
+    ].iter()
+        .cloned()
+        .collect();
 }
 
 /// Verify that all binaries that the engine might invoke are available at some
 /// path. Return an error if any are missing. Required to be called on engine
 /// initialization.
 pub fn verify_binaries() -> StratisResult<()> {
-    if MKFS_BIN.is_none() {
-        Err(StratisError::Engine(ErrorEnum::NotFound, "mkfs.xfs".into()))
-    } else if XFS_GROWFS_BIN.is_none() {
-        Err(StratisError::Engine(
-            ErrorEnum::NotFound,
-            "xfs_growfs".into(),
-        ))
-    } else if XFS_ADMIN_BIN.is_none() {
-        Err(StratisError::Engine(
-            ErrorEnum::NotFound,
-            "xfs_admin".into(),
-        ))
-    } else if THIN_CHECK_BIN.is_none() {
-        Err(StratisError::Engine(
-            ErrorEnum::NotFound,
-            "thin_check".into(),
-        ))
-    } else if THIN_REPAIR_BIN.is_none() {
-        Err(StratisError::Engine(
-            ErrorEnum::NotFound,
-            "thin_repair".into(),
-        ))
-    } else {
-        Ok(())
+    match BINARIES.iter().find(|(_, &path)| path.is_none()) {
+        None => Ok(()),
+        Some((ref name, _)) => Err(StratisError::Engine(ErrorEnum::NotFound, name.to_string()))
     }
 }
 
@@ -88,7 +76,9 @@ fn execute_cmd(cmd: &mut Command, error_msg: &str) -> StratisResult<()> {
 
 /// Create a filesystem on devnode.
 pub fn create_fs(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
-    let executable = MKFS_BIN
+    let executable = BINARIES
+        .get("mkfs.bin")
+        .expect("explicitly inserted")
         .as_ref()
         .expect("verify_binaries() returned no error");
     if !executable.exists() {

@@ -180,6 +180,18 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
     let (dbus_conn, mut tree, base_object_path, dbus_context) =
         libstratis::dbus_api::connect(Rc::clone(&engine))?;
 
+    #[cfg(feature = "dbus_enabled")]
+    for (_, pool_uuid, pool) in engine.borrow().pools() {
+        libstratis::dbus_api::register_pool(
+            &dbus_conn,
+            &dbus_context,
+            &mut tree,
+            pool_uuid,
+            pool,
+            &base_object_path,
+        )?;
+    }
+
     loop {
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {

@@ -96,8 +96,8 @@ fn get_executable(name: &str) -> StratisResult<PathBuf> {
         .expect("verify_binaries() was previously called and returned no error");
     if !executable.exists() {
         return Err(StratisError::Error(format!(
-            "Unable to find absolute path for \"{}\"",
-            name
+            "Executable previously located at \"{}\" seems to have been removed since stratisd was started",
+            executable.to_str().expect("All parts of path are constructed from strictly ASCII components")
         )));
     }
     Ok(executable.to_path_buf())

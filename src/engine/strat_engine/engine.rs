@@ -16,6 +16,7 @@ use super::super::types::{DevUuid, Name, PoolUuid, Redundancy, RenameAction};
 use super::backstore::{find_all, is_stratis_device, setup_pool};
 #[cfg(test)]
 use super::cleanup::teardown_pools;
+use super::cmd::verify_binaries;
 use super::devlinks;
 use super::dm::{get_dm, get_dm_init};
 use super::pool::StratPool;
@@ -52,8 +53,10 @@ impl StratEngine {
     ///
     /// Returns an error if the kernel doesn't support required DM features.
     /// Returns an error if there was an error reading device nodes.
+    /// Returns an error if the binaries on which it depends can not be found.
     pub fn initialize() -> StratisResult<StratEngine> {
         let dm = get_dm_init()?;
+        verify_binaries()?;
         let minor_dm_version = dm.version()?.1;
         if minor_dm_version < REQUIRED_DM_MINOR_VERSION {
             let err_msg = format!(

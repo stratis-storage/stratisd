@@ -20,11 +20,10 @@ use stratis::StratisResult;
 
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid};
 
+use super::super::cmd::create_fs;
 use super::super::dm::get_dm;
 use super::super::engine::DEV_PATH;
 use super::super::serde_structs::FilesystemSave;
-
-use super::cmd::create_fs;
 
 use super::filesystem::StratFilesystem;
 

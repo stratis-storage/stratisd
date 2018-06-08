@@ -166,7 +166,7 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
 
     // The variable _dbus_client_index_start is only used when dbus support is compiled in, thus
     // we denote the value as not needed to compile when dbus support is not included.
-    let (engine_eventable, poll_timeout, _dbus_client_index_start) = match eventable {
+    let (poll_timeout, _dbus_client_index_start) = match eventable {
         Some(ref evt) => {
             fds.push(libc::pollfd {
                 fd: evt.get_pollable_fd(),
@@ -174,12 +174,9 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
                 events: libc::POLLIN,
             });
 
-            // Don't timeout if eventable, we are event driven
-            (true, -1, FD_INDEX_ENGINE + 1)
+            (-1, FD_INDEX_ENGINE + 1)
         }
-
-        // We periodically need to timeout as we are not event driven
-        None => (false, 10000, FD_INDEX_ENGINE),
+        None => (10000, FD_INDEX_ENGINE),
     };
 
     #[cfg(feature = "dbus_enabled")]
@@ -217,23 +214,21 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
         }
 
         // Handle engine events, if the engine is eventable
-        if engine_eventable {
-            if fds[FD_INDEX_ENGINE].revents != 0 {
-                fds[FD_INDEX_ENGINE].revents = 0;
-
-                eventable
-                    .as_ref()
-                    .expect("eventable.is_some()")
-                    .clear_event()?;
-
+        match eventable {
+            Some(ref evt) => {
+                if fds[FD_INDEX_ENGINE].revents != 0 {
+                    fds[FD_INDEX_ENGINE].revents = 0;
+                    evt.clear_event()?;
+                    engine.borrow_mut().evented()?;
+                }
+            }
+            None => {
+                // Unconditionally call evented() if engine has no eventable.
+                // This looks like a bad idea, but the only engine that has
+                // no eventable is the sim engine, and for that engine,
+                // evented() is essentially a no-op.
                 engine.borrow_mut().evented()?;
             }
-        } else {
-            // Unconditionally call evented() if engine has no eventable.
-            // This looks like a bad idea, but the only engine that has
-            // no eventable is the sim engine, and for that engine, evented()
-            // is essentially a no-op.
-            engine.borrow_mut().evented()?;
         }
 
         // Iterate through D-Bus file descriptors (if enabled)

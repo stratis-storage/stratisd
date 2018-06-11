@@ -5,6 +5,7 @@
 mod backstore;
 #[cfg(test)]
 mod cleanup;
+mod cmd;
 mod device;
 mod devlinks;
 mod dm;

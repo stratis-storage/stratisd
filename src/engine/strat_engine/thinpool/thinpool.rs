@@ -22,6 +22,7 @@ use super::super::super::structures::Table;
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid, RenameAction};
 
 use super::super::backstore::Backstore;
+use super::super::cmd::{thin_check, thin_repair};
 use super::super::device::wipe_sectors;
 use super::super::devlinks;
 use super::super::dm::get_dm;
@@ -29,7 +30,6 @@ use super::super::dmnames::{format_flex_ids, format_thin_ids, format_thinpool_id
                             ThinPoolRole, ThinRole};
 use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
-use super::cmd::{thin_check, thin_repair};
 use super::filesystem::{FilesystemStatus, StratFilesystem};
 use super::mdv::MetadataVol;
 use super::thinids::ThinDevIdPool;

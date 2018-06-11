@@ -30,6 +30,9 @@ extern crate error_chain;
 #[cfg(test)]
 extern crate quickcheck;
 
+#[macro_use]
+extern crate lazy_static;
+
 pub mod engine;
 
 #[cfg(feature = "dbus_enabled")]

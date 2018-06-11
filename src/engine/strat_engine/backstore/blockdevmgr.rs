@@ -4,9 +4,11 @@
 
 // Code to handle a collection of block devices.
 
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::path::Path;
+use std::rc::Rc;
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{seq, thread_rng};
@@ -25,7 +27,7 @@ use super::super::serde_structs::{BlockDevSave, Recordable};
 use super::blockdev::StratBlockDev;
 use super::cleanup::wipe_blockdevs;
 use super::device::{blkdev_size, resolve_devices};
-use super::metadata::{validate_mda_size, StaticHeader, BDA, MIN_MDA_SECTORS};
+use super::metadata::{validate_mda_size, RestoreState, StaticHeader, BDA, MIN_MDA_SECTORS};
 use super::util::hw_lookup;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
@@ -353,10 +355,13 @@ fn initialize(
     /// Returns a tuple with the device's path, its size in bytes,
     /// its ownership as determined by calling determine_ownership(),
     /// and an open File handle, all of which are needed later.
-    fn dev_info(devnode: &Path) -> StratisResult<(&Path, Bytes, DevOwnership, File)> {
-        let mut f = OpenOptions::new().read(true).write(true).open(&devnode)?;
-        let dev_size = blkdev_size(&f)?;
-        let ownership = StaticHeader::determine_ownership(&mut f)?;
+    fn dev_info(devnode: &Path) -> StratisResult<(&Path, Bytes, DevOwnership, Rc<RefCell<File>>)> {
+        let f = Rc::new(RefCell::new(OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&devnode)?));
+        let dev_size = blkdev_size(&f.borrow())?;
+        let ownership = StaticHeader::determine_ownership(&mut *f.borrow_mut())?;
 
         Ok((devnode, dev_size, ownership, f))
     }
@@ -370,9 +375,14 @@ fn initialize(
         pool_uuid: PoolUuid,
         force: bool,
         owned_devs: &HashSet<DevUuid>,
-    ) -> StratisResult<Vec<(Device, (&'a Path, Bytes, File))>>
+    ) -> StratisResult<Vec<(Device, (&'a Path, Bytes, Rc<RefCell<File>>))>>
     where
-        I: Iterator<Item = (Device, StratisResult<(&'a Path, Bytes, DevOwnership, File)>)>,
+        I: Iterator<
+            Item = (
+                Device,
+                StratisResult<(&'a Path, Bytes, DevOwnership, Rc<RefCell<File>>)>,
+            ),
+        >,
     {
         let mut add_devs = Vec::new();
         for (dev, dev_result) in dev_infos {
@@ -428,16 +438,18 @@ fn initialize(
     let add_devs = filter_devs(dev_infos, pool_uuid, force, owned_devs)?;
 
     let mut bds: Vec<StratBlockDev> = Vec::new();
-    for (dev, (devnode, dev_size, mut f)) in add_devs {
-        let bda = BDA::initialize(
-            &mut f,
+    let mut r_state = RestoreState::new();
+    for (dev, (devnode, dev_size, f)) in add_devs {
+        let result = BDA::initialize(
+            &f,
             pool_uuid,
             Uuid::new_v4(),
             mda_size,
             dev_size.sectors(),
             Utc::now().timestamp() as u64,
+            &mut r_state,
         );
-        if let Ok(bda) = bda {
+        if let Ok(bda) = result {
             let hw_id = match hw_lookup(devnode) {
                 Ok(id) => id,
                 Err(_) => None, // TODO: Log this failure so that it can be addressed.
@@ -451,10 +463,11 @@ fn initialize(
             bds.push(blockdev);
         } else {
             // TODO: check the return values and update state machine on failure
-            let _ = BDA::wipe(&mut f);
-            let _ = wipe_blockdevs(&bds);
 
-            return Err(bda.unwrap_err());
+            // Try to copy back old data
+            r_state.restore();
+
+            return Err(result.unwrap_err());
         }
     }
     Ok(bds)

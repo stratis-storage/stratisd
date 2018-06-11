@@ -2,7 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::io::{Read, Seek, SeekFrom};
+use std::cell::RefCell;
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::rc::Rc;
 use std::str::from_utf8;
 
 use byteorder::{ByteOrder, LittleEndian};
@@ -30,6 +32,38 @@ const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)
 
 const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
+/// A struct to encapsulate the F (File or Cursor), offset, and data that
+/// needs to be restored. This is useful to put data back where it was before,
+/// if a later operation fails.
+#[derive(Debug)]
+pub struct RestoreState<F: Seek + Write> {
+    state: Vec<(Rc<RefCell<F>>, u64, Vec<u8>)>,
+}
+
+impl<F> RestoreState<F>
+where
+    F: Seek + SyncAll,
+{
+    pub fn new() -> RestoreState<F> {
+        RestoreState { state: Vec::new() }
+    }
+
+    pub fn add(&mut self, f: &Rc<RefCell<F>>, offset: u64, buf: Vec<u8>) -> () {
+        self.state.push((Rc::clone(f), offset, buf))
+    }
+
+    pub fn restore(self) -> () {
+        for (rc_f, offset, bytes) in self.state {
+            let mut f = rc_f.borrow_mut();
+            // We *are* the error handling, so if a further error happens just
+            // do our best.
+            let _ = f.seek(SeekFrom::Start(offset))
+                .and_then(|_| f.write_all(&bytes))
+                .and_then(|_| f.sync_all());
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct BDA {
     header: StaticHeader,
@@ -39,16 +73,18 @@ pub struct BDA {
 impl BDA {
     /// Initialize a blockdev with a Stratis BDA.
     pub fn initialize<F>(
-        f: &mut F,
+        rc_f: &Rc<RefCell<F>>,
         pool_uuid: Uuid,
         dev_uuid: Uuid,
         mda_size: Sectors,
         blkdev_size: Sectors,
         initialization_time: u64,
+        r_state: &mut RestoreState<F>,
     ) -> StratisResult<BDA>
     where
-        F: Seek + SyncAll,
+        F: Read + Seek + SyncAll,
     {
+        let mut f = rc_f.borrow_mut();
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
         let header = StaticHeader::new(
             pool_uuid,
@@ -58,6 +94,15 @@ impl BDA {
             initialization_time,
         );
         let hdr_buf = header.sigblock_to_buf();
+
+        // Save off what was there before we overwrite it
+        let old_data = {
+            f.seek(SeekFrom::Start(0))?;
+            let mut buf = vec![0; _BDA_STATIC_HDR_SIZE];
+            f.read_exact(&mut buf)?;
+            buf
+        };
+        r_state.add(&rc_f, 0, old_data);
 
         // Write 8K header. Static_Header copies go in sectors 1 and 9.
         f.seek(SeekFrom::Start(0))?;
@@ -69,7 +114,12 @@ impl BDA {
         f.write_all(&zeroed[..SECTOR_SIZE * 6])?; // Zero 6 unused sectors
         f.sync_all()?;
 
-        let regions = mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, f)?;
+        // Manually drop f so we pass MDARegions::initialize() an unborrowed
+        // rc_f like it expects
+        drop(f);
+
+        let regions =
+            mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, &rc_f, r_state)?;
 
         Ok(BDA { header, regions })
     }
@@ -324,8 +374,10 @@ impl StaticHeader {
 
 mod mda {
     use std;
+    use std::cell::RefCell;
     use std::cmp::Ordering;
     use std::io::{Read, Seek, SeekFrom};
+    use std::rc::Rc;
 
     use byteorder::{ByteOrder, LittleEndian};
     use chrono::{DateTime, TimeZone, Utc};
@@ -335,7 +387,7 @@ mod mda {
 
     use stratis::{ErrorEnum, StratisError, StratisResult};
 
-    use super::SyncAll;
+    use super::{RestoreState, SyncAll};
 
     const _MDA_REGION_HDR_SIZE: usize = 32;
     const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
@@ -369,21 +421,27 @@ mod mda {
         pub fn initialize<F>(
             header_size: Bytes,
             size: Sectors,
-            f: &mut F,
+            rc_f: &Rc<RefCell<F>>,
+            r_state: &mut RestoreState<F>,
         ) -> StratisResult<MDARegions>
         where
-            F: Seek + SyncAll,
+            F: Read + Seek + SyncAll,
         {
+            let mut f = rc_f.borrow_mut();
             let hdr_buf = MDAHeader::default().to_buf();
 
             let region_size = size / NUM_MDA_REGIONS;
             let per_region_size = region_size.bytes();
             for region in 0..NUM_MDA_REGIONS {
-                f.seek(SeekFrom::Start(MDARegions::mda_offset(
-                    header_size,
-                    region,
-                    per_region_size,
-                )))?;
+                let offset = MDARegions::mda_offset(header_size, region, per_region_size);
+                let old_data = {
+                    f.seek(SeekFrom::Start(offset))?;
+                    let mut v = vec![0; *per_region_size as usize];
+                    f.read_exact(&mut v)?;
+                    v
+                };
+                r_state.add(&rc_f, offset, old_data);
+                f.seek(SeekFrom::Start(offset))?;
                 f.write_all(&hdr_buf)?;
             }
 
@@ -723,12 +781,19 @@ mod mda {
         /// Verify that loading MDARegions succeeds if the regions are properly
         /// initialized.
         fn test_reading_mda_regions() {
+            let mut r_state = RestoreState::new();
             let buf_length = *(BDA_STATIC_HDR_SIZE + 4usize * MIN_MDA_SECTORS.bytes()) as usize;
-            let mut buf = Cursor::new(vec![0; buf_length]);
-            assert!(MDARegions::load(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf).is_err());
+            let buf = Rc::new(RefCell::new(Cursor::new(vec![0; buf_length])));
+            assert!(
+                MDARegions::load(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut *buf.borrow_mut())
+                    .is_err()
+            );
 
-            MDARegions::initialize(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf).unwrap();
-            let regions = MDARegions::load(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf).unwrap();
+            MDARegions::initialize(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &buf, &mut r_state)
+                .unwrap();
+            let regions =
+                MDARegions::load(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut *buf.borrow_mut())
+                    .unwrap();
             assert!(regions.last_update_time().is_none());
         }
 
@@ -868,22 +933,24 @@ mod tests {
         fn test_ownership(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
             let sh = random_static_header(blkdev_size, mda_size_factor);
             let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
-            let mut buf = Cursor::new(vec![0; buf_size]);
-            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
+            let buf = Rc::new(RefCell::new(Cursor::new(vec![0; buf_size])));
+            let ownership = StaticHeader::determine_ownership(&mut *buf.borrow_mut()).unwrap();
             match ownership {
                 DevOwnership::Unowned => {}
                 _ => return TestResult::failed(),
             }
 
+            let mut r_state = RestoreState::new();
             BDA::initialize(
-                &mut buf,
+                &buf,
                 sh.pool_uuid,
                 sh.dev_uuid,
                 sh.mda_size,
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,
+                &mut r_state,
             ).unwrap();
-            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
+            let ownership = StaticHeader::determine_ownership(&mut *buf.borrow_mut()).unwrap();
             match ownership {
                 DevOwnership::Ours(pool_uuid, dev_uuid) => {
                     if sh.pool_uuid != pool_uuid || sh.dev_uuid != dev_uuid {
@@ -893,8 +960,8 @@ mod tests {
                 _ => return TestResult::failed(),
             }
 
-            BDA::wipe(&mut buf).unwrap();
-            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
+            BDA::wipe(&mut *buf.borrow_mut()).unwrap();
+            let ownership = StaticHeader::determine_ownership(&mut *buf.borrow_mut()).unwrap();
             match ownership {
                 DevOwnership::Unowned => {}
                 _ => return TestResult::failed(),
@@ -915,14 +982,16 @@ mod tests {
         fn empty_bda(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
             let sh = random_static_header(blkdev_size, mda_size_factor);
             let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
-            let mut buf = Cursor::new(vec![0; buf_size]);
+            let buf = Rc::new(RefCell::new(Cursor::new(vec![0; buf_size])));
+            let mut r_state = RestoreState::new();
             let bda = BDA::initialize(
-                &mut buf,
+                &buf,
                 sh.pool_uuid,
                 sh.dev_uuid,
                 sh.mda_size,
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,
+                &mut r_state,
             ).unwrap();
             TestResult::from_bool(bda.last_update_time().is_none())
         }
@@ -933,6 +1002,81 @@ mod tests {
     }
 
     #[test]
+    // Fail to construct a BDA but ensure r_state.restore() puts previous data
+    // back
+    fn test_restore_state() {
+        // Construct a BDA.
+        let sh = random_static_header(0, 0);
+
+        // Make a deliberately WAY too small BDA buffer
+        let buf_size = 16;
+        let sentinel_val = 0x3e;
+        let buf = Rc::new(RefCell::new(Cursor::new(vec![sentinel_val; buf_size])));
+        let mut r_state = RestoreState::new();
+        let result = BDA::initialize(
+            &buf,
+            sh.pool_uuid,
+            sh.dev_uuid,
+            sh.mda_size,
+            sh.blkdev_size,
+            Utc::now().timestamp() as u64,
+            &mut r_state,
+        );
+        assert!(result.is_err());
+        // Since the very small buf should have caused initialize() to fail
+        // before writing anything, the buffer should be unchanged.
+        assert!(
+            buf.borrow()
+                .get_ref()
+                .iter()
+                .all(|&val| val == sentinel_val)
+        );
+
+        // Restore should do nothing.
+        r_state.restore();
+        assert!(
+            buf.borrow()
+                .get_ref()
+                .iter()
+                .all(|&val| val == sentinel_val)
+        );
+
+        // Make a larger but still too small buffer
+        let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE - 256;
+        let sentinel_val = 0x3f;
+        let buf = Rc::new(RefCell::new(Cursor::new(vec![sentinel_val; buf_size])));
+        let mut r_state = RestoreState::new();
+        let result = BDA::initialize(
+            &buf,
+            sh.pool_uuid,
+            sh.dev_uuid,
+            sh.mda_size,
+            sh.blkdev_size,
+            Utc::now().timestamp() as u64,
+            &mut r_state,
+        );
+        assert!(result.is_err());
+
+        // Buffer was modified by BDA::initialize()
+        assert_eq!(
+            false,
+            buf.borrow()
+                .get_ref()
+                .iter()
+                .all(|&val| val == sentinel_val)
+        );
+
+        // Buffer is restored
+        r_state.restore();
+        assert!(
+            buf.borrow()
+                .get_ref()
+                .iter()
+                .all(|&val| val == sentinel_val)
+        )
+    }
+
+    #[test]
     /// Construct a BDA and verify that an error is returned if timestamp
     /// of saved data is older than timestamp of most recently written data.
     fn test_early_times_err() {
@@ -940,14 +1084,20 @@ mod tests {
 
         // Construct a BDA.
         let sh = random_static_header(0, 0);
-        let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+        let buf = Rc::new(RefCell::new(Cursor::new(vec![
+            0;
+            *sh.blkdev_size.bytes()
+                as usize
+        ])));
+        let mut r_state = RestoreState::new();
         let mut bda = BDA::initialize(
-            &mut buf,
+            &buf,
             sh.pool_uuid,
             sh.dev_uuid,
             sh.mda_size,
             sh.blkdev_size,
             Utc::now().timestamp() as u64,
+            &mut r_state,
         ).unwrap();
 
         let timestamp0 = Utc::now();
@@ -986,18 +1136,21 @@ mod tests {
         ) -> TestResult {
             let sh = random_static_header(blkdev_size, mda_size_factor);
             let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
-            let mut buf = Cursor::new(vec![0; buf_size]);
+            let buf = Rc::new(RefCell::new(Cursor::new(vec![0; buf_size])));
+            let mut r_state = RestoreState::new();
             let mut bda = BDA::initialize(
-                &mut buf,
+                &buf,
                 sh.pool_uuid,
                 sh.dev_uuid,
                 sh.mda_size,
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,
+                &mut r_state,
             ).unwrap();
             let current_time = Utc::now();
-            bda.save_state(&current_time, &state, &mut buf).unwrap();
-            let loaded_state = bda.load_state(&mut buf).unwrap();
+            bda.save_state(&current_time, &state, &mut *buf.borrow_mut())
+                .unwrap();
+            let loaded_state = bda.load_state(&mut *buf.borrow_mut()).unwrap();
 
             if let Some(t) = bda.last_update_time() {
                 if t != &current_time {
@@ -1015,8 +1168,8 @@ mod tests {
                 return TestResult::failed();
             }
 
-            let mut bda = BDA::load(&mut buf).unwrap().unwrap();
-            let loaded_state = bda.load_state(&mut buf).unwrap();
+            let mut bda = BDA::load(&mut *buf.borrow_mut()).unwrap().unwrap();
+            let loaded_state = bda.load_state(&mut *buf.borrow_mut()).unwrap();
 
             if let Some(s) = loaded_state {
                 if s != state {
@@ -1035,9 +1188,9 @@ mod tests {
             }
 
             let current_time = Utc::now();
-            bda.save_state(&current_time, &next_state, &mut buf)
+            bda.save_state(&current_time, &next_state, &mut *buf.borrow_mut())
                 .unwrap();
-            let loaded_state = bda.load_state(&mut buf).unwrap();
+            let loaded_state = bda.load_state(&mut *buf.borrow_mut()).unwrap();
 
             if let Some(s) = loaded_state {
                 if s != next_state {

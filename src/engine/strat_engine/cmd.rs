@@ -56,17 +56,13 @@ lazy_static! {
 /// path. Return an error if any are missing. Required to be called on engine
 /// initialization.
 pub fn verify_binaries() -> StratisResult<()> {
-    // Would like to use find() here instead of loop, but compiler bug
-    // https://github.com/rust-lang/rust/issues/51415 makes that impossible.
-    for (ref name, ref path) in BINARIES.iter() {
-        if path.is_none() {
-            return Err(StratisError::Error(format!(
-                "Unable to find absolute path for \"{}\"",
-                name
-            )));
-        }
+    match BINARIES.iter().find(|(_, ref path)| path.is_none()) {
+        None => Ok(()),
+        Some((ref name, _)) => Err(StratisError::Error(format!(
+            "Unable to find absolute path for \"{}\"",
+            name
+        ))),
     }
-    Ok(())
 }
 
 /// Common function to call a command line utility, returning an Result with an error message which

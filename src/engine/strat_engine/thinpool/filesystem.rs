@@ -17,10 +17,9 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 use super::super::super::engine::Filesystem;
 use super::super::super::types::{FilesystemUuid, Name};
 
+use super::super::cmd::{create_fs, set_uuid, xfs_growfs};
 use super::super::dm::get_dm;
 use super::super::serde_structs::FilesystemSave;
-
-use super::cmd::{create_fs, set_uuid, xfs_growfs};
 
 /// TODO: confirm that 256 MiB leaves enough time for stratisd to respond and extend before
 /// the filesystem is out of space.

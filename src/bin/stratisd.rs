@@ -199,10 +199,16 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
                         #[cfg(feature = "dbus_enabled")]
                         libstratis::dbus_api::register_pool(
                             &dbus_conn,
-                            &Rc::clone(&engine),
                             &dbus_context,
                             &mut tree,
                             _pool_uuid,
+                            engine
+                                .borrow()
+                                .get_pool(_pool_uuid)
+                                .expect(
+                                    "block_evaluate() returned a pool UUID, pool must be available",
+                                )
+                                .1,
                             &base_object_path,
                         )?;
                     }

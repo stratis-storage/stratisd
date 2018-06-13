@@ -9,7 +9,7 @@ use std::os::unix::io::AsRawFd;
 use std::panic;
 use std::path::{Path, PathBuf};
 
-use nix::{self, fcntl::{fallocate, FallocateFlags}};
+use nix;
 use tempfile;
 
 use devicemapper::{Bytes, Sectors, IEC};
@@ -18,8 +18,6 @@ use self::loopdev::{LoopControl, LoopDevice};
 
 use super::logger::init_logger;
 use super::util::clean_up;
-
-use super::super::device::wipe_sectors;
 
 /// Ways of specifying range of numbers of devices to use for tests.
 /// Unlike real tests, there is no AtLeast constructor, as, at least in theory
@@ -40,7 +38,8 @@ pub struct LoopTestDev {
 
 impl LoopTestDev {
     /// Create a new loopbacked device.
-    /// Create its backing store of specified size wiping the first 1 MiB.
+    /// Create its backing store of specified size. The file is sparse but
+    /// will appear to be zeroed.
     pub fn new(lc: &LoopControl, path: &Path, size: Option<Sectors>) -> LoopTestDev {
         let size = size.unwrap_or(Bytes(IEC::Gi).sectors());
 
@@ -51,18 +50,11 @@ impl LoopTestDev {
             .open(&path)
             .unwrap();
 
-        fallocate(
-            f.as_raw_fd(),
-            FallocateFlags::empty(),
-            0,
-            *size.bytes() as nix::libc::off_t,
-        ).unwrap();
+        nix::unistd::ftruncate(f.as_raw_fd(), *size.bytes() as nix::libc::off_t).unwrap();
         f.sync_all().unwrap();
 
         let ld = lc.next_free().unwrap();
         ld.attach_file(path).unwrap();
-        // Wipe 1 MiB at the beginning, as data sits around on the files.
-        wipe_sectors(&ld.path().unwrap(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
 
         LoopTestDev { ld }
     }

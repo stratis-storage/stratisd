@@ -214,22 +214,10 @@ pub fn connect<'a>(
     dbus::Error,
 > {
     let c = Connection::get_private(BusType::System)?;
-
-    let local_engine = Rc::clone(&engine);
-
-    let (mut tree, object_path) = get_base_tree(DbusContext::new(engine));
+    let (tree, object_path) = get_base_tree(DbusContext::new(engine));
     let dbus_context = tree.get_data().clone();
-
-    // This should never panic as register_pool_dbus does not borrow the engine.
-    for (_, pool_uuid, pool) in local_engine.borrow().pools() {
-        register_pool_dbus(&dbus_context, pool_uuid, pool, &object_path);
-    }
-
     tree.set_registered(&c, true)?;
     c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32)?;
-
-    process_deferred_actions(&c, &mut tree, &mut dbus_context.actions.borrow_mut())?;
-
     Ok((c, tree, object_path, dbus_context))
 }
 

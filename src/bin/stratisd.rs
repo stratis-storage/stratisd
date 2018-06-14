@@ -281,7 +281,17 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
         }
 
         let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, poll_timeout) };
-        assert!(r >= 0);
+
+        // TODO: refine this behavior.
+        // Different behaviors may be indicated, depending on the value of
+        // errno when return value is -1.
+        if r < 0 {
+            return Err(StratisError::Error(format!(
+                "poll command failed: number of fds: {}, timeout: {}",
+                fds.len(),
+                poll_timeout
+            )));
+        }
     }
 }
 

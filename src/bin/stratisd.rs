@@ -151,6 +151,17 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
     const FD_INDEX_UDEV: usize = 0;
     const FD_INDEX_ENGINE: usize = 1;
 
+    /*
+    fds is a Vec of libc::pollfd structs. Ideally, it would be possible
+    to use the higher level nix crate to handle polling. If this were possible,
+    then the Vec would be one of nix::poll::PollFds and this would be more
+    rustic. Unfortunately, the rust D-Bus library requires an explicit file
+    descriptor to be passed as an argument to Connection::watch_handle(),
+    and the explicit file descriptor can not be extracted from the PollFd
+    struct. So, at this time, sticking with libc is less complex than
+    converting to using nix, because if using nix, the file descriptor would
+    have to be maintained in the Vec as well as the PollFd struct.
+    */
     let mut fds = Vec::new();
 
     fds.push(libc::pollfd {

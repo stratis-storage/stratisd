@@ -232,7 +232,6 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
         match eventable {
             Some(ref evt) => {
                 if fds[FD_INDEX_ENGINE].revents != 0 {
-                    fds[FD_INDEX_ENGINE].revents = 0;
                     evt.clear_event()?;
                     engine.borrow_mut().evented()?;
                 }

@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{self, Read, Seek, SeekFrom};
 use std::str::from_utf8;
 
 use byteorder::{ByteOrder, LittleEndian};
@@ -36,7 +36,65 @@ pub struct BDA {
     regions: mda::MDARegions,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MetadataLocation {
+    Both,
+    First,
+    Second,
+}
+
 impl BDA {
+    /// Read the BDA from the device and returning a byte array of the entire area.
+    fn read<F>(f: &mut F) -> io::Result<[u8; _BDA_STATIC_HDR_SIZE]>
+    where
+        F: Read + Seek,
+    {
+        #![allow(unused_io_amount)]
+        f.seek(SeekFrom::Start(0))?;
+        let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
+
+        // FIXME: See https://github.com/stratis-storage/stratisd/pull/476
+        f.read(&mut buf)?;
+        Ok(buf)
+    }
+
+    // Writes bda_buf according to the value of which.
+    // If first location is specified, write zeroes to empty regions in the
+    // first 8 sectors. If the second location is specified, writes zeroes to empty
+    // regions in the second 8 sectors.
+    fn write<F>(f: &mut F, bda_buf: &[u8], which: MetadataLocation) -> io::Result<()>
+    where
+        F: Seek + SyncAll,
+    {
+        let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
+        f.seek(SeekFrom::Start(0))?;
+
+        // Write to a single region in the header. Zeroes the first sector,
+        // writes bda_buf to the second sector, and then zeroes the remaining
+        // six sectors.
+        fn write_region<F>(f: &mut F, bda_buf: &[u8], zeroed: &[u8]) -> io::Result<()>
+        where
+            F: Seek + SyncAll,
+        {
+            f.write_all(&zeroed[..SECTOR_SIZE])?; // Zero 1 unused sector
+            f.write_all(bda_buf)?;
+            f.write_all(&zeroed[..SECTOR_SIZE * 6])?; // Zero 6 unused sectors
+            f.sync_all()?;
+            Ok(())
+        };
+
+        if which == MetadataLocation::Both || which == MetadataLocation::First {
+            write_region(f, bda_buf, &zeroed)?;
+        } else {
+            f.seek(SeekFrom::Start(8 * SECTOR_SIZE as u64))?;
+        }
+
+        if which == MetadataLocation::Both || which == MetadataLocation::Second {
+            write_region(f, bda_buf, &zeroed)?;
+        }
+        Ok(())
+    }
+
     /// Initialize a blockdev with a Stratis BDA.
     pub fn initialize<F>(
         f: &mut F,
@@ -49,7 +107,6 @@ impl BDA {
     where
         F: Seek + SyncAll,
     {
-        let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
         let header = StaticHeader::new(
             pool_uuid,
             dev_uuid,
@@ -57,17 +114,8 @@ impl BDA {
             blkdev_size,
             initialization_time,
         );
-        let hdr_buf = header.sigblock_to_buf();
 
-        // Write 8K header. Static_Header copies go in sectors 1 and 9.
-        f.seek(SeekFrom::Start(0))?;
-        f.write_all(&zeroed[..SECTOR_SIZE])?; // Zero 1 unused sector
-        f.write_all(&hdr_buf)?;
-        f.write_all(&zeroed[..SECTOR_SIZE * 7])?; // Zero 7 unused sectors
-        f.sync_all()?;
-        f.write_all(&hdr_buf)?;
-        f.write_all(&zeroed[..SECTOR_SIZE * 6])?; // Zero 6 unused sectors
-        f.sync_all()?;
+        BDA::write(f, &header.sigblock_to_buf(), MetadataLocation::Both)?;
 
         let regions = mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, f)?;
 
@@ -78,7 +126,7 @@ impl BDA {
     /// Returns None if no BDA appears to exist.
     pub fn load<F>(f: &mut F) -> StratisResult<Option<BDA>>
     where
-        F: Read + Seek,
+        F: Read + Seek + SyncAll,
     {
         let header = match StaticHeader::setup(f)? {
             Some(header) => header,
@@ -164,7 +212,7 @@ impl BDA {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct StaticHeader {
     blkdev_size: Sectors,
     pool_uuid: PoolUuid,
@@ -196,68 +244,95 @@ impl StaticHeader {
     }
 
     /// Try to find a valid StaticHeader on a device.
-    /// If there is no StaticHeader on the device, return None.
-    /// If there is a problem reading a header, return an error.
+    /// Return the latest copy that validates as a Stratis BDA, however verify both
+    /// copies and if one validates but one does not, re-write the one that is incorrect.  If both
+    /// copies are valid, but one is newer than the other, rewrite the older one to match.
+    /// Return None if the static header's magic does not match for *both* copies.
     fn setup<F>(f: &mut F) -> StratisResult<Option<StaticHeader>>
     where
-        F: Read + Seek,
+        F: Read + Seek + SyncAll,
     {
-        #![allow(unused_io_amount)]
-        f.seek(SeekFrom::Start(0))?;
-        let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
+        let buf = BDA::read(f)?;
+        let buf_loc_1 = &buf[SECTOR_SIZE..2 * SECTOR_SIZE];
+        let buf_loc_2 = &buf[9 * SECTOR_SIZE..10 * SECTOR_SIZE];
 
-        // FIXME: See https://github.com/stratis-storage/stratisd/pull/476
-        f.read(&mut buf)?;
-
-        // TODO: repair static header if one incorrect?
-        // Note: this would require some adjustment or some revision to
-        // setup_from_buf().
-        StaticHeader::setup_from_buf(&buf)
-    }
-
-    /// Try to find a valid StaticHeader in a buffer.
-    /// If there is an error in reading the first, try the next. If there is
-    /// no error in reading the first, assume it is correct, i.e., do not
-    /// verify that it matches the next.
-    /// Return None if the static header's magic number is wrong.
-    fn setup_from_buf(buf: &[u8; _BDA_STATIC_HDR_SIZE]) -> StratisResult<Option<StaticHeader>> {
-        let sigblock_spots = [
-            &buf[SECTOR_SIZE..2 * SECTOR_SIZE],
-            &buf[9 * SECTOR_SIZE..10 * SECTOR_SIZE],
-        ];
-
-        for buf in &sigblock_spots {
-            match StaticHeader::sigblock_from_buf(buf) {
-                Ok(val) => return Ok(val),
-                _ => continue,
+        match (
+            StaticHeader::sigblock_from_buf(buf_loc_1),
+            StaticHeader::sigblock_from_buf(buf_loc_2),
+        ) {
+            (Ok(loc_1), Ok(loc_2)) => {
+                match (loc_1, loc_2) {
+                    (Some(loc_1), Some(loc_2)) => {
+                        if loc_1 == loc_2 {
+                            Ok(Some(loc_1))
+                        } else {
+                            if loc_1.initialization_time > loc_2.initialization_time {
+                                BDA::write(f, buf_loc_1, MetadataLocation::Second)?;
+                                Ok(Some(loc_1))
+                            } else {
+                                BDA::write(f, buf_loc_2, MetadataLocation::First)?;
+                                Ok(Some(loc_2))
+                            }
+                        }
+                    }
+                    (None, None) => Ok(None),
+                    (Some(loc_1), None) => {
+                        // Copy 1 has valid Stratis BDA, copy 2 has no magic, re-write copy 2
+                        BDA::write(f, buf_loc_1, MetadataLocation::Second)?;
+                        Ok(Some(loc_1))
+                    }
+                    (None, Some(loc_2)) => {
+                        // Copy 2 has valid Stratis BDA, copy 1 has no magic, re-write copy 1
+                        BDA::write(f, buf_loc_2, MetadataLocation::First)?;
+                        Ok(Some(loc_2))
+                    }
+                }
+            }
+            (Ok(loc_1), Err(loc_2)) => {
+                // Re-write copy 2
+                if loc_1.is_some() {
+                    BDA::write(f, buf_loc_1, MetadataLocation::Second)?;
+                    Ok(loc_1)
+                } else {
+                    // Location 1 doesn't have a signature, but location 2 did, but it got an error,
+                    // lets return the error instead as this appears to be a stratis device that
+                    // has gotten in a bad state.
+                    Err(loc_2)
+                }
+            }
+            (Err(loc_1), Ok(loc_2)) => {
+                // Re-write copy 1
+                if loc_2.is_some() {
+                    BDA::write(f, buf_loc_2, MetadataLocation::First)?;
+                    Ok(loc_2)
+                } else {
+                    // Location 2 doesn't have a signature, but location 1 did, but it got an error,
+                    // lets return the error instead as this appears to be a stratis device that
+                    // has gotten in a bad state.
+                    Err(loc_1)
+                }
+            }
+            (Err(_), Err(_)) => {
+                let err_str = "Appeared to be a Stratis device, but no valid sigblock found";
+                Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
             }
         }
-
-        let err_str = "Appeared to be a Stratis device, but no valid sigblock found";
-        Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
     }
 
     /// Determine the ownership of a device.
     /// If the device is owned by Stratis, return its device UUID.
     pub fn determine_ownership<F>(f: &mut F) -> StratisResult<DevOwnership>
     where
-        F: Read + Seek,
+        F: Read + Seek + SyncAll,
     {
-        #![allow(unused_io_amount)]
-
-        f.seek(SeekFrom::Start(0))?;
-        let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
-
-        // FIXME: See https://github.com/stratis-storage/stratisd/pull/476
-        f.read(&mut buf)?;
-
         // Using setup() as a test of ownership sets a high bar. It is
         // not sufficient to have STRAT_MAGIC to be considered "Ours",
         // it must also have correct CRC, no weird stuff in fields,
         // etc!
-        match StaticHeader::setup_from_buf(&buf) {
+        match StaticHeader::setup(f) {
             Ok(Some(sh)) => Ok(DevOwnership::Ours(sh.pool_uuid, sh.dev_uuid)),
             Ok(None) => {
+                let buf = BDA::read(f)?;
                 if buf.iter().any(|x| *x != 0) {
                     Ok(DevOwnership::Theirs)
                 } else {
@@ -1084,5 +1159,133 @@ mod tests {
         QuickCheck::new()
             .tests(30)
             .quickcheck(static_header as fn(u64, u32) -> TestResult);
+    }
+
+    #[test]
+    /// Verify that we correctly handle reading up the BDA when we walk a byte of corruption through
+    /// the BDA sector for each copy and correct the corrupt copy and return an error when
+    /// we corrupt both copies.
+    fn bda_test_recovery() {
+        fn corrupt_byte<F>(f: &mut F, position: u64) -> io::Result<()>
+        where
+            F: Read + Seek + SyncAll,
+        {
+            let mut byte_to_corrupt = [0; 1];
+            f.seek(SeekFrom::Start(position))?;
+            f.read(&mut byte_to_corrupt)?;
+            byte_to_corrupt[0] = !byte_to_corrupt[0];
+            f.seek(SeekFrom::Start(position))?;
+            f.write(&byte_to_corrupt)?;
+            f.sync_all()?;
+            Ok(())
+        }
+
+        let sh = random_static_header(10000, 4);
+        let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
+        let mut buf = Cursor::new(vec![0; buf_size]);
+        BDA::initialize(
+            &mut buf,
+            sh.pool_uuid,
+            sh.dev_uuid,
+            sh.mda_size,
+            sh.blkdev_size,
+            Utc::now().timestamp() as u64,
+        ).unwrap();
+
+        let reference_buf = buf.clone();
+
+        for i in 0..SECTOR_SIZE {
+            for primary in &[true, false] {
+                for secondary in &[true, false] {
+                    if !*primary {
+                        // Corrupt primary copy
+                        corrupt_byte(&mut buf, (1 * SECTOR_SIZE + i) as u64).unwrap();
+                    }
+
+                    if !*secondary {
+                        // Corrupt secondary copy
+                        corrupt_byte(&mut buf, (9 * SECTOR_SIZE + i) as u64).unwrap();
+                    }
+
+                    let setup_result = StaticHeader::setup(&mut buf);
+
+                    if *primary || *secondary {
+                        // Setup should work and buffer should be corrected
+                        assert!(setup_result.is_ok() && setup_result.unwrap().is_some());
+
+                        // Check buffer, should be corrected.
+                        assert_eq!(reference_buf.get_ref(), buf.get_ref());
+                    } else {
+                        // Setup should fail to find a usable Stratis BDA
+                        match i {
+                            4...19 => {
+                                // When we corrupt the magics then we believe that the signature is
+                                // not ours and will return Ok(None)
+                                assert!(setup_result.is_ok() && setup_result.unwrap().is_none());
+                            }
+                            _ => {
+                                assert!(setup_result.is_err());
+                            }
+                        }
+
+                        // Check buffer, should be different
+                        {
+                            assert_ne!(reference_buf.get_ref(), buf.get_ref());
+                        }
+
+                        // Reset the buffer as we didn't correct it
+                        buf = reference_buf.clone();
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    /// Test that we re-write the older of two BDAs if they don't match.
+    fn bda_test_rewrite_older() {
+        let sh = random_static_header(10000, 4);
+        let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
+        let mut buf = Cursor::new(vec![0; buf_size]);
+        let ts = Utc::now().timestamp() as u64;
+
+        BDA::initialize(
+            &mut buf,
+            sh.pool_uuid,
+            sh.dev_uuid,
+            sh.mda_size,
+            sh.blkdev_size,
+            ts,
+        ).unwrap();
+
+        let mut buf_newer = Cursor::new(vec![0; buf_size]);
+        BDA::initialize(
+            &mut buf_newer,
+            sh.pool_uuid,
+            sh.dev_uuid,
+            sh.mda_size,
+            sh.blkdev_size,
+            ts + 1,
+        ).unwrap();
+
+        // We should always match this reference buffer as it's the newer one.
+        let reference_buf = buf_newer.clone();
+
+        for offset in &[SECTOR_SIZE, 9 * SECTOR_SIZE] {
+            // Copy the older BDA to newer BDA buffer
+            buf.seek(SeekFrom::Start(*offset as u64)).unwrap();
+            buf_newer.seek(SeekFrom::Start(*offset as u64)).unwrap();
+            let mut sector = [0u8; SECTOR_SIZE];
+            buf.read_exact(&mut sector).unwrap();
+            buf_newer.write_all(&sector).unwrap();
+
+            assert_ne!(reference_buf.get_ref(), buf_newer.get_ref());
+
+            let setup_result = StaticHeader::setup(&mut buf_newer);
+            assert!(setup_result.is_ok() && setup_result.unwrap().is_some());
+
+            // We should match the reference buffer
+            assert_eq!(reference_buf.get_ref(), buf_newer.get_ref());
+        }
     }
 }

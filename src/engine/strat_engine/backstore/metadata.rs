@@ -1160,4 +1160,132 @@ mod tests {
             .tests(30)
             .quickcheck(static_header as fn(u64, u32) -> TestResult);
     }
+
+    #[test]
+    /// Verify that we correctly handle reading up the BDA when we walk a byte of corruption through
+    /// the BDA sector for each copy and correct the corrupt copy and return an error when
+    /// we corrupt both copies.
+    fn bda_test_recovery() {
+        fn corrupt_byte<F>(f: &mut F, position: u64) -> io::Result<()>
+        where
+            F: Read + Seek + SyncAll,
+        {
+            let mut byte_to_corrupt = [0; 1];
+            f.seek(SeekFrom::Start(position))?;
+            f.read(&mut byte_to_corrupt)?;
+            byte_to_corrupt[0] = !byte_to_corrupt[0];
+            f.seek(SeekFrom::Start(position))?;
+            f.write(&byte_to_corrupt)?;
+            f.sync_all()?;
+            Ok(())
+        }
+
+        let sh = random_static_header(10000, 4);
+        let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
+        let mut buf = Cursor::new(vec![0; buf_size]);
+        BDA::initialize(
+            &mut buf,
+            sh.pool_uuid,
+            sh.dev_uuid,
+            sh.mda_size,
+            sh.blkdev_size,
+            Utc::now().timestamp() as u64,
+        ).unwrap();
+
+        let reference_buf = buf.clone();
+
+        for i in 0..SECTOR_SIZE {
+            for primary in &[true, false] {
+                for secondary in &[true, false] {
+                    if !*primary {
+                        // Corrupt primary copy
+                        corrupt_byte(&mut buf, (1 * SECTOR_SIZE + i) as u64).unwrap();
+                    }
+
+                    if !*secondary {
+                        // Corrupt secondary copy
+                        corrupt_byte(&mut buf, (9 * SECTOR_SIZE + i) as u64).unwrap();
+                    }
+
+                    let setup_result = StaticHeader::setup(&mut buf);
+
+                    if *primary || *secondary {
+                        // Setup should work and buffer should be corrected
+                        assert!(setup_result.is_ok() && setup_result.unwrap().is_some());
+
+                        // Check buffer, should be corrected.
+                        assert_eq!(reference_buf.get_ref(), buf.get_ref());
+                    } else {
+                        // Setup should fail to find a usable Stratis BDA
+                        match i {
+                            4...19 => {
+                                // When we corrupt the magics then we believe that the signature is
+                                // not ours and will return Ok(None)
+                                assert!(setup_result.is_ok() && setup_result.unwrap().is_none());
+                            }
+                            _ => {
+                                assert!(setup_result.is_err());
+                            }
+                        }
+
+                        // Check buffer, should be different
+                        {
+                            assert_ne!(reference_buf.get_ref(), buf.get_ref());
+                        }
+
+                        // Reset the buffer as we didn't correct it
+                        buf = reference_buf.clone();
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    /// Test that we re-write the older of two BDAs if they don't match.
+    fn bda_test_rewrite_older() {
+        let sh = random_static_header(10000, 4);
+        let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
+        let mut buf = Cursor::new(vec![0; buf_size]);
+        let ts = Utc::now().timestamp() as u64;
+
+        BDA::initialize(
+            &mut buf,
+            sh.pool_uuid,
+            sh.dev_uuid,
+            sh.mda_size,
+            sh.blkdev_size,
+            ts,
+        ).unwrap();
+
+        let mut buf_newer = Cursor::new(vec![0; buf_size]);
+        BDA::initialize(
+            &mut buf_newer,
+            sh.pool_uuid,
+            sh.dev_uuid,
+            sh.mda_size,
+            sh.blkdev_size,
+            ts + 1,
+        ).unwrap();
+
+        // We should always match this reference buffer as it's the newer one.
+        let reference_buf = buf_newer.clone();
+
+        for offset in &[SECTOR_SIZE, 9 * SECTOR_SIZE] {
+            // Copy the older BDA to newer BDA buffer
+            buf.seek(SeekFrom::Start(*offset as u64)).unwrap();
+            buf_newer.seek(SeekFrom::Start(*offset as u64)).unwrap();
+            let mut sector = [0u8; SECTOR_SIZE];
+            buf.read_exact(&mut sector).unwrap();
+            buf_newer.write_all(&sector).unwrap();
+
+            assert_ne!(reference_buf.get_ref(), buf_newer.get_ref());
+
+            let setup_result = StaticHeader::setup(&mut buf_newer);
+            assert!(setup_result.is_ok() && setup_result.unwrap().is_some());
+
+            // We should match the reference buffer
+            assert_eq!(reference_buf.get_ref(), buf_newer.get_ref());
+        }
+    }
 }

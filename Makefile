@@ -32,6 +32,7 @@ build-no-default:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS='-D warnings' \
 	cargo build --no-default-features --target $(TARGET)
+	ldd ./target/${TARGET}/debug/stratisd
 	! (ldd ./target/${TARGET}/debug/stratisd | grep libdbus)
 
 test-loop:

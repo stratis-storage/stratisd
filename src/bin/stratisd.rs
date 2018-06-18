@@ -172,19 +172,23 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
 
     let eventable = engine.borrow().get_eventable();
 
-    // The variable _dbus_client_index_start is only used when dbus support is compiled in, thus
-    // we denote the value as not needed to compile when dbus support is not included.
-    let (poll_timeout, _dbus_client_index_start) = match eventable {
+    let poll_timeout = match eventable {
         Some(ref evt) => {
             fds.push(libc::pollfd {
                 fd: evt.get_pollable_fd(),
                 revents: 0,
                 events: libc::POLLIN,
             });
-
-            (-1, FD_INDEX_ENGINE + 1)
+            -1
         }
-        None => (10000, FD_INDEX_ENGINE),
+        None => 10000,
+    };
+
+    #[cfg(feature = "dbus_enabled")]
+    let dbus_client_index_start = if eventable.is_some() {
+        FD_INDEX_ENGINE + 1
+    } else {
+        FD_INDEX_ENGINE
     };
 
     #[cfg(feature = "dbus_enabled")]
@@ -261,7 +265,7 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
         // Iterate through D-Bus file descriptors (if enabled)
         #[cfg(feature = "dbus_enabled")]
         {
-            for pfd in fds[_dbus_client_index_start..]
+            for pfd in fds[dbus_client_index_start..]
                 .iter()
                 .filter(|pfd| pfd.revents != 0)
             {
@@ -276,7 +280,7 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
 
             // Refresh list of dbus fds to poll for every time. This can change as
             // D-Bus clients come and go.
-            fds.truncate(_dbus_client_index_start);
+            fds.truncate(dbus_client_index_start);
 
             fds.extend(dbus_conn.watch_fds().iter().map(|w| w.to_pollfd()));
         }

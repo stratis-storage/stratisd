@@ -70,22 +70,20 @@ mod prelude {
     /// To ensure only one instance of stratisd runs at a time, acquire an
     /// exclusive lock. Return an error if lock attempt fails.
     fn trylock_pid_file() -> StratisResult<File> {
-        let mut f = match OpenOptions::new()
+        let mut f = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
             .open(STRATISD_PID_PATH)
-        {
-            Ok(f) => f,
-            Err(e) => {
-                if e.kind() == ErrorKind::PermissionDenied {
-                    return Err(StratisError::Error(
+            .map_err(|err| {
+                if err.kind() == ErrorKind::PermissionDenied {
+                    StratisError::Error(
                         "Must be running as root in order to start daemon.".to_string(),
-                    ));
+                    )
+                } else {
+                    err.into()
                 }
-                return Err(e.into());
-            }
-        };
+            })?;
         match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
             Ok(_) => {
                 f.write_all(format!("{}\n", getpid()).as_bytes())?;

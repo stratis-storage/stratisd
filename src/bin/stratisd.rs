@@ -18,20 +18,12 @@ extern crate libudev;
 extern crate nix;
 
 use std::cell::RefCell;
-use std::env;
-use std::fs::{File, OpenOptions};
-use std::io::{ErrorKind, Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use std::process::exit;
 use std::rc::Rc;
 
 use clap::{App, Arg, ArgMatches};
-use env_logger::LogBuilder;
-use libc::pid_t;
-use log::{LogLevelFilter, SetLoggerError};
-use nix::fcntl::{flock, FlockArg};
-use nix::unistd::getpid;
 
 #[cfg(feature = "dbus_enabled")]
 use dbus::WatchEvent;
@@ -41,27 +33,94 @@ use devicemapper::Device;
 use libstratis::engine::{Engine, SimEngine, StratEngine};
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
 
-const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
+/// Handle preliminary setup for stratisd.
+mod prelude {
+    use std::env;
+    use std::fs::{File, OpenOptions};
+    use std::io::{ErrorKind, Read, Write};
+    use std::os::unix::io::AsRawFd;
+
+    use clap::ArgMatches;
+    use env_logger::LogBuilder;
+    use libc::pid_t;
+    use log::{LogLevelFilter, SetLoggerError};
+    use nix::fcntl::{flock, FlockArg};
+    use nix::unistd::getpid;
+
+    use libstratis::stratis::{StratisError, StratisResult};
+
+    const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
+
+    /// Configure and initialize the logger.
+    /// If debug is true, log at debug level. Otherwise read log configuration
+    /// parameters from the environment if RUST_LOG is set. Otherwise, just
+    /// accept the default configuration.
+    fn initialize_log(debug: bool) -> Result<(), SetLoggerError> {
+        let mut builder = LogBuilder::new();
+        if debug {
+            builder.filter(Some("stratisd"), LogLevelFilter::Debug);
+            builder.filter(Some("libstratis"), LogLevelFilter::Debug);
+        } else if let Ok(s) = env::var("RUST_LOG") {
+            builder.parse(&s);
+        };
+
+        builder.init()
+    }
+
+    /// To ensure only one instance of stratisd runs at a time, acquire an
+    /// exclusive lock. Return an error if lock attempt fails.
+    fn trylock_pid_file() -> StratisResult<File> {
+        let mut f = match OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(STRATISD_PID_PATH)
+        {
+            Ok(f) => f,
+            Err(e) => {
+                if e.kind() == ErrorKind::PermissionDenied {
+                    return Err(StratisError::Error(
+                        "Must be running as root in order to start daemon.".to_string(),
+                    ));
+                }
+                return Err(e.into());
+            }
+        };
+        match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
+            Ok(_) => {
+                f.write_all(format!("{}\n", getpid()).as_bytes())?;
+                Ok(f)
+            }
+            Err(_) => {
+                let mut buf = String::new();
+                f.read_to_string(&mut buf)?;
+                // pidfile is supposed to contain pid of holder. But you never
+                // know so be paranoid.
+                let pid_str = buf.split_whitespace()
+                    .next()
+                    .and_then(|s| s.parse::<pid_t>().ok())
+                    .map(|pid| format!("{}", pid))
+                    .unwrap_or_else(|| "<unknown>".into());
+                Err(StratisError::Error(format!(
+                    "Daemon already running with pid: {}",
+                    pid_str
+                )))
+            }
+        }
+    }
+
+    /// Do very preliminary stratisd initialization steps.
+    pub fn initialize(matches: &ArgMatches) -> StratisResult<()> {
+        trylock_pid_file().and_then(|_pidfile| {
+            Ok(initialize_log(matches.is_present("debug"))
+                .expect("This is the first and only invocation of this method; it must succeed."))
+        })
+    }
+}
 
 /// If writing a program error to stderr fails, panic.
 fn print_err(err: &StratisError) -> () {
     eprintln!("{}", err);
-}
-
-/// Configure and initialize the logger.
-/// If debug is true, log at debug level. Otherwise read log configuration
-/// parameters from the environment if RUST_LOG is set. Otherwise, just
-/// accept the default configuration.
-fn initialize_log(debug: bool) -> Result<(), SetLoggerError> {
-    let mut builder = LogBuilder::new();
-    if debug {
-        builder.filter(Some("stratisd"), LogLevelFilter::Debug);
-        builder.filter(Some("libstratis"), LogLevelFilter::Debug);
-    } else if let Ok(s) = env::var("RUST_LOG") {
-        builder.parse(&s);
-    };
-
-    builder.init()
 }
 
 /// Given a udev event check to see if it's an add and if it is return the device node and
@@ -76,48 +135,6 @@ fn handle_udev_add(event: &libudev::Event) -> Option<(Device, PathBuf)> {
         });
     }
     None
-}
-
-/// To ensure only one instance of stratisd runs at a time, acquire an
-/// exclusive lock. Return an error if lock attempt fails.
-fn trylock_pid_file() -> StratisResult<File> {
-    let mut f = match OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(STRATISD_PID_PATH)
-    {
-        Ok(f) => f,
-        Err(e) => {
-            if e.kind() == ErrorKind::PermissionDenied {
-                return Err(StratisError::Error(
-                    "Must be running as root in order to start daemon.".to_string(),
-                ));
-            }
-            return Err(e.into());
-        }
-    };
-    match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
-        Ok(_) => {
-            f.write_all(format!("{}\n", getpid()).as_bytes())?;
-            Ok(f)
-        }
-        Err(_) => {
-            let mut buf = String::new();
-            f.read_to_string(&mut buf)?;
-            // pidfile is supposed to contain pid of holder. But you never
-            // know so be paranoid.
-            let pid_str = buf.split_whitespace()
-                .next()
-                .and_then(|s| s.parse::<pid_t>().ok())
-                .map(|pid| format!("{}", pid))
-                .unwrap_or_else(|| "<unknown>".into());
-            Err(StratisError::Error(format!(
-                "Daemon already running with pid: {}",
-                pid_str
-            )))
-        }
-    }
 }
 
 fn run(matches: &ArgMatches) -> StratisResult<()> {
@@ -310,12 +327,7 @@ fn main() {
         )
         .get_matches();
 
-    let result = trylock_pid_file()
-        .and_then(|_pidfile| {
-            Ok(initialize_log(matches.is_present("debug"))
-                .expect("This is the first and only invocation of this method; it must succeed."))
-        })
-        .and_then(|_| run(&matches));
+    let result = prelude::initialize(&matches).and_then(|_| run(&matches));
     if let Err(err) = result {
         print_err(&err);
         exit(1);

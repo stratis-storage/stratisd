@@ -127,8 +127,8 @@ mod run {
     use super::libudev;
     use super::print_err;
 
-    /// Given a udev event check to see if it's an add and if it is return the device node and
-    /// devicemapper::Device.
+    /// Given a udev event check to see if it's an add and if it is return
+    /// the device node and devicemapper::Device.
     fn handle_udev_add(event: &libudev::Event) -> Option<(Device, PathBuf)> {
         if event.event_type() == libudev::EventType::Add {
             let device = event.device();
@@ -143,10 +143,11 @@ mod run {
 
     pub fn run(matches: &ArgMatches) -> StratisResult<()> {
         // Setup a udev listener before initializing the engine. A device may
-        // appear after the engine has read the /dev directory but before it has
-        // completed initialization. Unless the udev event has been recorded, the
-        // engine will miss the device.
-        // This is especially important since stratisd must run during early boot.
+        // appear after the engine has read the /dev directory but before it
+        // has completed initialization. Unless the udev event has been
+        // recorded, the engine will miss the device.
+        // This is especially important since stratisd must run during early
+        // boot.
         let context = libudev::Context::new()?;
         let mut monitor = libudev::Monitor::new(&context)?;
         monitor.match_subsystem_devtype("block", "disk")?;
@@ -163,26 +164,29 @@ mod run {
         };
 
         /*
-    The file descriptor array indexes are laid out in the following:
+        The file descriptor array indexes are laid out in the following:
 
-    0   == Always udev fd index
-    1   == engine index if eventable
-    1/2 == Start of dbus client file descriptor(s), 1 if engine is not eventable, else 2
-    */
+        0   == Always udev fd index
+        1   == engine index if eventable
+        1/2 == Start of dbus client file descriptor(s)
+          * 1 if engine is not eventable, else
+          * 2
+        */
         const FD_INDEX_UDEV: usize = 0;
         const FD_INDEX_ENGINE: usize = 1;
 
         /*
-    fds is a Vec of libc::pollfd structs. Ideally, it would be possible
-    to use the higher level nix crate to handle polling. If this were possible,
-    then the Vec would be one of nix::poll::PollFds and this would be more
-    rustic. Unfortunately, the rust D-Bus library requires an explicit file
-    descriptor to be passed as an argument to Connection::watch_handle(),
-    and the explicit file descriptor can not be extracted from the PollFd
-    struct. So, at this time, sticking with libc is less complex than
-    converting to using nix, because if using nix, the file descriptor would
-    have to be maintained in the Vec as well as the PollFd struct.
-    */
+        fds is a Vec of libc::pollfd structs. Ideally, it would be possible
+        to use the higher level nix crate to handle polling. If this were
+        possible, then the Vec would be one of nix::poll::PollFds and this
+        would be more rustic. Unfortunately, the rust D-Bus library requires
+        an explicit file descriptor to be passed as an argument to
+        Connection::watch_handle(), and the explicit file descriptor can not
+        be extracted from the PollFd struct. So, at this time, sticking with
+        libc is less complex than converting to using nix, because if using
+        nix, the file descriptor would have to be maintained in the Vec as
+        well as the PollFd struct.
+        */
         let mut fds = Vec::new();
 
         fds.push(libc::pollfd {
@@ -193,8 +197,9 @@ mod run {
 
         let eventable = engine.borrow().get_eventable();
 
-        // The variable _dbus_client_index_start is only used when dbus support is compiled in, thus
-        // we denote the value as not needed to compile when dbus support is not included.
+        // The variable _dbus_client_index_start is only used when dbus
+        // support is compiled in, thus we denote the value as not needed to
+        // compile when dbus support is not included.
         let (poll_timeout, _dbus_client_index_start) = match eventable {
             Some(ref evt) => {
                 fds.push(libc::pollfd {
@@ -229,32 +234,30 @@ mod run {
             if fds[FD_INDEX_UDEV].revents != 0 {
                 while let Some(event) = udev.receive_event() {
                     if let Some((device, devnode)) = handle_udev_add(&event) {
-                        // If block evaluate returns an error we are going to ignore it as
-                        // there is nothing we can do for a device we are getting errors with.
+                        // Ignore any error returned by block_evaluate. There
+                        // was an error in assessing the block device, which
+                        // may not be a Stratis device. It does no good to
+                        // return an error in this situation.
                         let pool_uuid = engine
                             .borrow_mut()
                             .block_evaluate(device, devnode)
                             .unwrap_or(None);
 
-                        // We need to pretend that we aren't using the variable _pool_uuid so
-                        // that we can conditionally compile out the register_pool when dbus
-                        // is not enabled.
-                        if let Some(_pool_uuid) = pool_uuid {
-                            #[cfg(feature = "dbus_enabled")]
-                        dbus_api::register_pool(
-                            &dbus_conn,
-                            &dbus_context,
-                            &mut tree,
-                            _pool_uuid,
-                            engine
-                                .borrow()
-                                .get_pool(_pool_uuid)
-                                .expect(
-                                    "block_evaluate() returned a pool UUID, pool must be available",
-                                )
-                                .1,
-                            &base_object_path,
-                        )?;
+                        #[cfg(feature = "dbus_enabled")]
+                        {
+                            if let Some(pool_uuid) = pool_uuid {
+                                dbus_api::register_pool(
+                                &dbus_conn,
+                                &dbus_context,
+                                &mut tree,
+                                pool_uuid,
+                                engine
+                                    .borrow()
+                                    .get_pool(pool_uuid)
+                                    .expect( "block_evaluate() returned a pool UUID, pool must be available",)
+                                    .1,
+                                &base_object_path,)?;
+                            }
                         }
                     }
                 }
@@ -269,10 +272,10 @@ mod run {
                     }
                 }
                 None => {
-                    // Unconditionally call evented() if engine has no eventable.
-                    // This looks like a bad idea, but the only engine that has
-                    // no eventable is the sim engine, and for that engine,
-                    // evented() is essentially a no-op.
+                    // Unconditionally call evented() if engine has no
+                    // eventable. This looks like a bad idea, but the only
+                    // engine that has no eventable is the sim engine, and
+                    // for that engine, evented() is essentially a no-op.
                     engine.borrow_mut().evented()?;
                 }
             }
@@ -295,8 +298,8 @@ mod run {
                     }
                 }
 
-                // Refresh list of dbus fds to poll for every time. This can change as
-                // D-Bus clients come and go.
+                // Refresh list of dbus fds to poll for every time. This can
+                // change as D-Bus clients come and go.
                 fds.truncate(_dbus_client_index_start);
 
                 fds.extend(dbus_conn.watch_fds().iter().map(|w| w.to_pollfd()));

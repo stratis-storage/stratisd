@@ -252,6 +252,7 @@ impl StaticHeader {
     where
         F: Read + Seek + SyncAll,
     {
+        #![allow(collapsible_if)]
         let buf = BDA::read(f)?;
         let buf_loc_1 = &buf[SECTOR_SIZE..2 * SECTOR_SIZE];
         let buf_loc_2 = &buf[9 * SECTOR_SIZE..10 * SECTOR_SIZE];

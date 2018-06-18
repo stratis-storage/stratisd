@@ -38,8 +38,8 @@ impl From<DbusErrorEnum> for u16 {
 }
 
 impl DbusErrorEnum {
-    pub fn get_error_string(&self) -> &str {
-        match *self {
+    pub fn get_error_string(self) -> &'static str {
+        match self {
             DbusErrorEnum::OK => "Ok",
             DbusErrorEnum::ERROR => "A general error happened",
             DbusErrorEnum::ALREADY_EXISTS => "Already exists",

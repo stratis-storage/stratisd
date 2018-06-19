@@ -12,15 +12,19 @@ use super::device::is_stratis_device;
 use stratis::StratisResult;
 
 /// Takes a libudev device entry and returns the properties as a HashMap.
+/// Omits any properties with names or values that can not be translated from
+/// the internal encoding.
 fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
     device
         .properties()
         .map(|i| {
             (
-                String::from(i.name().to_str().expect("Unix is utf-8")),
-                String::from(i.value().to_str().expect("Unix is utf-8")),
+                i.name().to_str().and_then(|n| Some(n.to_string())),
+                i.value().to_str().and_then(|v| Some(v.to_string())),
             )
         })
+        .filter(|&(ref n, ref v)| n.is_some() && v.is_some())
+        .map(|(n, v)| (n.expect("!n.is_none()"), v.expect("!v.is_none()")))
         .collect()
 }
 

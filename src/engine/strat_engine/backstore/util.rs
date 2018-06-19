@@ -13,7 +13,7 @@ use stratis::StratisResult;
 
 /// Takes a libudev device entry and returns the properties as a HashMap.
 fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
-    let rc: HashMap<_, _> = device
+    device
         .properties()
         .map(|i| {
             (
@@ -21,8 +21,7 @@ fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
                 String::from(i.value().to_str().expect("Unix is utf-8")),
             )
         })
-        .collect();
-    rc
+        .collect()
 }
 
 /// Common function used to retrieve the udev db entry for a block device as a HashMap when found

@@ -47,6 +47,7 @@ pub trait Pool: Debug {
     /// Returns an error if any of the specified names are already in use
     /// for filesystems in this pool. If the same name is passed multiple
     /// times, the size associated with the last item is used.
+    #[cfg(feature = "full_runtime")]
     fn create_filesystems<'a, 'b>(
         &'a mut self,
         pool_name: &str,
@@ -94,6 +95,7 @@ pub trait Pool: Debug {
 
     /// Snapshot filesystem
     /// Create a CoW snapshot of the origin
+    #[cfg(feature = "full_runtime")]
     fn snapshot_filesystem(
         &mut self,
         pool_name: &str,
@@ -145,6 +147,7 @@ pub trait Engine: Debug {
     /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a
     /// supported redundancy.
+    #[cfg(feature = "full_runtime")]
     fn create_pool(
         &mut self,
         name: &str,
@@ -191,6 +194,7 @@ pub trait Engine: Debug {
     fn get_eventable(&self) -> Option<&'static Eventable>;
 
     /// Notify the engine that an event has occurred on the Eventable.
+    #[cfg(feature = "full_runtime")]
     fn evented(&mut self) -> StratisResult<()>;
 }
 

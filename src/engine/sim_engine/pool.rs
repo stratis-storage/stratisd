@@ -10,6 +10,7 @@ use std::path::Path;
 use std::rc::Rc;
 use std::vec::Vec;
 
+#[cfg(feature = "full_runtime")]
 use uuid::Uuid;
 
 use devicemapper::{Sectors, IEC};
@@ -18,8 +19,9 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::structures::Table;
-use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
-                          RenameAction};
+#[cfg(feature = "full_runtime")]
+use super::super::types::PoolUuid;
+use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, Redundancy, RenameAction};
 
 use super::blockdev::SimDev;
 use super::filesystem::SimFilesystem;
@@ -35,6 +37,7 @@ pub struct SimPool {
 }
 
 impl SimPool {
+    #[cfg(feature = "full_runtime")]
     pub fn new(
         rdm: &Rc<RefCell<Randomizer>>,
         paths: &[&Path],
@@ -72,6 +75,7 @@ impl SimPool {
 }
 
 impl Pool for SimPool {
+    #[cfg(feature = "full_runtime")]
     fn create_filesystems<'a, 'b>(
         &'a mut self,
         _pool_name: &str,
@@ -159,6 +163,7 @@ impl Pool for SimPool {
         Ok(RenameAction::Renamed)
     }
 
+    #[cfg(feature = "full_runtime")]
     fn snapshot_filesystem(
         &mut self,
         _pool_name: &str,

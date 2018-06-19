@@ -6,7 +6,7 @@ use std::error::Error;
 use std::str;
 use std::{fmt, io};
 
-#[cfg(feature = "dbus_enabled")]
+#[cfg(feature = "full_runtime")]
 use dbus;
 use libudev;
 use nix;
@@ -38,7 +38,7 @@ pub enum StratisError {
     Serde(serde_json::error::Error),
     DM(devicemapper::DmError),
 
-    #[cfg(feature = "dbus_enabled")]
+    #[cfg(feature = "full_runtime")]
     Dbus(dbus::Error),
     Udev(libudev::Error),
 }
@@ -55,7 +55,7 @@ impl fmt::Display for StratisError {
             StratisError::Serde(ref err) => write!(f, "Serde error: {}", err),
             StratisError::DM(ref err) => write!(f, "DM error: {}", err),
 
-            #[cfg(feature = "dbus_enabled")]
+            #[cfg(feature = "full_runtime")]
             StratisError::Dbus(ref err) => {
                 write!(f, "Dbus error: {}", err.message().unwrap_or("Unknown"))
             }
@@ -76,7 +76,7 @@ impl Error for StratisError {
             StratisError::Serde(ref err) => err.description(),
             StratisError::DM(ref err) => err.description(),
 
-            #[cfg(feature = "dbus_enabled")]
+            #[cfg(feature = "full_runtime")]
             StratisError::Dbus(ref err) => err.message().unwrap_or("D-Bus Error"),
             StratisError::Udev(ref err) => Error::description(err),
         }
@@ -92,7 +92,7 @@ impl Error for StratisError {
             StratisError::Serde(ref err) => Some(err),
             StratisError::DM(ref err) => Some(err),
 
-            #[cfg(feature = "dbus_enabled")]
+            #[cfg(feature = "full_runtime")]
             StratisError::Dbus(ref err) => Some(err),
             StratisError::Udev(ref err) => Some(err),
         }
@@ -135,7 +135,7 @@ impl From<devicemapper::DmError> for StratisError {
     }
 }
 
-#[cfg(feature = "dbus_enabled")]
+#[cfg(feature = "full_runtime")]
 impl From<dbus::Error> for StratisError {
     fn from(err: dbus::Error) -> StratisError {
         StratisError::Dbus(err)

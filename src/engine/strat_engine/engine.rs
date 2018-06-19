@@ -3,7 +3,9 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+#[cfg(feature = "full_runtime")]
+use std::path::Path;
+use std::path::PathBuf;
 
 use devicemapper::{Device, DmNameBuf};
 
@@ -11,7 +13,9 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::engine::{Engine, Eventable, Pool};
 use super::super::structures::Table;
-use super::super::types::{DevUuid, Name, PoolUuid, Redundancy, RenameAction};
+#[cfg(feature = "full_runtime")]
+use super::super::types::Redundancy;
+use super::super::types::{DevUuid, Name, PoolUuid, RenameAction};
 
 use super::backstore::{find_all, is_stratis_device, setup_pool};
 #[cfg(test)]
@@ -103,6 +107,7 @@ impl StratEngine {
 }
 
 impl Engine for StratEngine {
+    #[cfg(feature = "full_runtime")]
     fn create_pool(
         &mut self,
         name: &str,
@@ -231,6 +236,7 @@ impl Engine for StratEngine {
         Some(get_dm())
     }
 
+    #[cfg(feature = "full_runtime")]
     fn evented(&mut self) -> StratisResult<()> {
         let device_list: HashMap<_, _> = get_dm()
             .list_devices()?

@@ -20,6 +20,7 @@ use stratis::StratisResult;
 
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid};
 
+#[cfg(feature = "full_runtime")]
 use super::super::cmd::create_fs;
 use super::super::dm::get_dm;
 use super::super::engine::DEV_PATH;
@@ -89,6 +90,7 @@ impl<'a> Drop for MountedMDV<'a> {
 
 impl MetadataVol {
     /// Initialize a new Metadata Volume.
+    #[cfg(feature = "full_runtime")]
     pub fn initialize(pool_uuid: PoolUuid, dev: LinearDev) -> StratisResult<MetadataVol> {
         create_fs(&dev.devnode(), pool_uuid)?;
         MetadataVol::setup(pool_uuid, dev)

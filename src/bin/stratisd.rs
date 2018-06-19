@@ -10,7 +10,7 @@ extern crate libstratis;
 #[macro_use]
 extern crate log;
 extern crate clap;
-#[cfg(feature = "dbus_enabled")]
+#[cfg(feature = "full_runtime")]
 extern crate dbus;
 extern crate env_logger;
 extern crate libc;
@@ -33,7 +33,7 @@ use log::{LogLevelFilter, SetLoggerError};
 use nix::fcntl::{flock, FlockArg};
 use nix::unistd::getpid;
 
-#[cfg(feature = "dbus_enabled")]
+#[cfg(feature = "full_runtime")]
 use dbus::WatchEvent;
 
 use devicemapper::Device;
@@ -187,11 +187,11 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
         None => (10000, FD_INDEX_ENGINE),
     };
 
-    #[cfg(feature = "dbus_enabled")]
+    #[cfg(feature = "full_runtime")]
     let (dbus_conn, mut tree, base_object_path, dbus_context) =
         libstratis::dbus_api::connect(Rc::clone(&engine))?;
 
-    #[cfg(feature = "dbus_enabled")]
+    #[cfg(feature = "full_runtime")]
     for (_, pool_uuid, pool) in engine.borrow().pools() {
         libstratis::dbus_api::register_pool(
             &dbus_conn,
@@ -219,7 +219,7 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
                     // that we can conditionally compile out the register_pool when dbus
                     // is not enabled.
                     if let Some(_pool_uuid) = pool_uuid {
-                        #[cfg(feature = "dbus_enabled")]
+                        #[cfg(feature = "full_runtime")]
                         libstratis::dbus_api::register_pool(
                             &dbus_conn,
                             &dbus_context,
@@ -240,24 +240,27 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
         }
 
         // Handle engine events, if the engine is eventable
-        match eventable {
-            Some(ref evt) => {
-                if fds[FD_INDEX_ENGINE].revents != 0 {
-                    evt.clear_event()?;
+        #[cfg(feature = "full_runtime")]
+        {
+            match eventable {
+                Some(ref evt) => {
+                    if fds[FD_INDEX_ENGINE].revents != 0 {
+                        evt.clear_event()?;
+                        engine.borrow_mut().evented()?;
+                    }
+                }
+                None => {
+                    // Unconditionally call evented() if engine has no eventable.
+                    // This looks like a bad idea, but the only engine that has
+                    // no eventable is the sim engine, and for that engine,
+                    // evented() is essentially a no-op.
                     engine.borrow_mut().evented()?;
                 }
-            }
-            None => {
-                // Unconditionally call evented() if engine has no eventable.
-                // This looks like a bad idea, but the only engine that has
-                // no eventable is the sim engine, and for that engine,
-                // evented() is essentially a no-op.
-                engine.borrow_mut().evented()?;
             }
         }
 
         // Iterate through D-Bus file descriptors (if enabled)
-        #[cfg(feature = "dbus_enabled")]
+        #[cfg(feature = "full_runtime")]
         {
             for pfd in fds[_dbus_client_index_start..]
                 .iter()

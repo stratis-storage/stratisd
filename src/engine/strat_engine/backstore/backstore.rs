@@ -100,6 +100,7 @@ impl DataTier {
     /// Returns the DataTier and the linear device that was created.
     ///
     /// WARNING: metadata changing event
+    #[cfg(feature = "full_runtime")]
     pub fn new(mut block_mgr: BlockDevMgr) -> StratisResult<(DataTier, LinearDev)> {
         let avail_space = block_mgr.avail_space();
         let segments = block_mgr
@@ -507,6 +508,7 @@ impl Backstore {
 
     /// Initialize a Backstore object, by initializing the specified devs.
     /// WARNING: metadata changing event
+    #[cfg(feature = "full_runtime")]
     pub fn initialize(
         pool_uuid: PoolUuid,
         paths: &[&Path],
@@ -592,6 +594,7 @@ impl Backstore {
     /// WARNING: All this must change when it becomes possible to return
     /// sectors to the store.
     /// WARNING: metadata changing event
+    #[cfg(feature = "full_runtime")]
     pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<(Sectors, Sectors)>>> {
         if self.available() < sizes.iter().cloned().sum() {
             return None;
@@ -626,6 +629,7 @@ impl Backstore {
     }
 
     /// The available number of Sectors.
+    #[cfg(feature = "full_runtime")]
     pub fn available(&self) -> Sectors {
         self.data_tier.capacity() - self.next
     }

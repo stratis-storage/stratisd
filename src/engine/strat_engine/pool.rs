@@ -3,14 +3,19 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::collections::HashMap;
+#[cfg(feature = "full_runtime")]
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::vec::Vec;
 
 use serde_json;
+
+#[cfg(feature = "full_runtime")]
 use uuid::Uuid;
 
-use devicemapper::{Device, DmName, DmNameBuf, Sectors};
+use devicemapper::{Device, Sectors};
+#[cfg(feature = "full_runtime")]
+use devicemapper::{DmName, DmNameBuf};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -18,11 +23,18 @@ use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
                           RenameAction};
 
-use super::backstore::{Backstore, MIN_MDA_SECTORS};
-use super::serde_structs::{PoolSave, Recordable};
-use super::thinpool::{ThinPool, ThinPoolSizeParams};
+use super::backstore::Backstore;
+#[cfg(feature = "full_runtime")]
+use super::backstore::MIN_MDA_SECTORS;
 
-pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
+use super::serde_structs::{PoolSave, Recordable};
+use super::thinpool::ThinPool;
+#[cfg(feature = "full_runtime")]
+use super::thinpool::ThinPoolSizeParams;
+
+#[cfg(feature = "full_runtime")]
+pub use super::thinpool::INITIAL_DATA_SIZE;
+pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER};
 
 /// Check the metadata of an individual pool for consistency.
 pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
@@ -59,6 +71,7 @@ impl StratPool {
     /// Initialize a Stratis Pool.
     /// 1. Initialize the block devices specified by paths.
     /// 2. Set up thinpool device to back filesystems.
+    #[cfg(feature = "full_runtime")]
     pub fn initialize(
         name: &str,
         paths: &[&Path],
@@ -138,6 +151,7 @@ impl StratPool {
     }
 
     /// The names of DM devices belonging to this pool that may generate events
+    #[cfg(feature = "full_runtime")]
     pub fn get_eventing_dev_names(&self) -> Vec<DmNameBuf> {
         self.thin_pool.get_eventing_dev_names()
     }
@@ -145,6 +159,7 @@ impl StratPool {
     /// Called when a DM device in this pool has generated an event.
     // TODO: Just check the device that evented. Currently checks
     // everything.
+    #[cfg(feature = "full_runtime")]
     pub fn event_on(&mut self, pool_name: &Name, dm_name: &DmName) -> StratisResult<()> {
         assert!(
             self.thin_pool
@@ -169,6 +184,7 @@ impl StratPool {
 }
 
 impl Pool for StratPool {
+    #[cfg(feature = "full_runtime")]
     fn create_filesystems<'a, 'b>(
         &'a mut self,
         pool_name: &str,
@@ -238,6 +254,7 @@ impl Pool for StratPool {
         self.thin_pool.rename_filesystem(pool_name, uuid, new_name)
     }
 
+    #[cfg(feature = "full_runtime")]
     fn snapshot_filesystem(
         &mut self,
         pool_name: &str,

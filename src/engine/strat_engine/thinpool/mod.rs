@@ -8,5 +8,6 @@ mod thinids;
 #[allow(module_inception)]
 mod thinpool;
 
-pub use self::thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE, DATA_LOWATER,
-                         INITIAL_DATA_SIZE};
+pub use self::thinpool::{ThinPool, DATA_BLOCK_SIZE, DATA_LOWATER};
+#[cfg(feature = "full_runtime")]
+pub use self::thinpool::{ThinPoolSizeParams, INITIAL_DATA_SIZE};

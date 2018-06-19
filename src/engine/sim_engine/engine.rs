@@ -5,10 +5,19 @@
 extern crate libc;
 
 use std::cell::RefCell;
+
+#[cfg(feature = "full_runtime")]
 use std::collections::HashSet;
+
+#[cfg(feature = "full_runtime")]
 use std::collections::hash_map::RandomState;
+
+#[cfg(feature = "full_runtime")]
 use std::iter::FromIterator;
-use std::path::{Path, PathBuf};
+
+#[cfg(feature = "full_runtime")]
+use std::path::Path;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use devicemapper::Device;
@@ -17,7 +26,9 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::engine::{Engine, Eventable, Pool};
 use super::super::structures::Table;
-use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
+#[cfg(feature = "full_runtime")]
+use super::super::types::Redundancy;
+use super::super::types::{Name, PoolUuid, RenameAction};
 
 use super::pool::SimPool;
 use super::randomization::Randomizer;
@@ -31,6 +42,7 @@ pub struct SimEngine {
 impl SimEngine {}
 
 impl Engine for SimEngine {
+    #[cfg(feature = "full_runtime")]
     fn create_pool(
         &mut self,
         name: &str,
@@ -125,6 +137,7 @@ impl Engine for SimEngine {
         None
     }
 
+    #[cfg(feature = "full_runtime")]
     fn evented(&mut self) -> StratisResult<()> {
         Ok(())
     }

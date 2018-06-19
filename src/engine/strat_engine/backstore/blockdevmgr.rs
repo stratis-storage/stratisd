@@ -476,23 +476,6 @@ mod tests {
 
     use super::*;
 
-    /// Returns true if two usages have the same type.  This is needed because
-    /// if Usage::Theirs(String::from("foo") != Usage::Theirs(String::from("bar").
-    /// TODO: See if there is a better way to solve this.
-    fn usage_equal(left: &DevOwnership, right: &DevOwnership) -> bool {
-        if left == right {
-            true
-        } else {
-            match left {
-                &DevOwnership::Theirs(_) => match right {
-                    &DevOwnership::Theirs(_) => true,
-                    _ => false,
-                },
-                _ => false,
-            }
-        }
-    }
-
     /// Verify that initially,
     /// current_capacity() - metadata_size() = avail_space().
     /// After 2 Sectors have been allocated, that amount must also be included
@@ -550,13 +533,18 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).is_err());
         assert!(paths.iter().enumerate().all(|(i, path)| {
-            let tmp = if i == index {
-                DevOwnership::Theirs(String::from(""))
+            let real_ownership = identify(path).unwrap();
+            if i == index {
+                match real_ownership {
+                    DevOwnership::Theirs(_) => true,
+                    _ => false,
+                }
             } else {
-                DevOwnership::Unowned
-            };
-
-            usage_equal(&identify(path).unwrap(), &tmp)
+                match real_ownership {
+                    DevOwnership::Unowned => true,
+                    _ => false,
+                }
+            }
         }));
 
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, true).is_ok());

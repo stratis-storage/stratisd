@@ -28,6 +28,11 @@ build:
 	RUSTFLAGS='-D warnings' \
 	cargo build --target $(TARGET)
 
+build-no-default:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS='-D warnings' \
+	cargo build --no-default-features --target $(TARGET)
+
 test-loop:
 	sudo env "PATH=${PATH}" RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test loop_
 

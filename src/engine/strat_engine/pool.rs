@@ -315,6 +315,7 @@ mod tests {
     use super::super::super::types::Redundancy;
 
     use super::super::backstore::{find_all, get_metadata};
+    use super::super::cmd;
     use super::super::devlinks;
     use super::super::tests::{loopbacked, real};
 
@@ -350,6 +351,7 @@ mod tests {
 
         let metadata2 = pool2.record(name2);
 
+        cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 2);
         let devnodes1 = pools.get(&uuid1).unwrap();
@@ -361,6 +363,8 @@ mod tests {
 
         pool1.teardown().unwrap();
         pool2.teardown().unwrap();
+
+        cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 2);
         let devnodes1 = pools.get(&uuid1).unwrap();
@@ -479,6 +483,7 @@ mod tests {
 
         pool.teardown().unwrap();
 
+        cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 1);
         let devices = pools.get(&uuid).unwrap();

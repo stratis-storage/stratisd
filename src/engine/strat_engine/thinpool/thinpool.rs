@@ -4,16 +4,21 @@
 
 // Code to handle management of a pool's thinpool device.
 
+#[cfg(feature = "full_runtime")]
 use std::borrow::BorrowMut;
+
+#[cfg(feature = "full_runtime")]
 use std::cmp;
 
+#[cfg(feature = "full_runtime")]
 use uuid::Uuid;
 
 use devicemapper as dm;
-use devicemapper::{device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf,
-                   FlakeyTargetParams, LinearDev, LinearDevTargetParams, LinearTargetParams,
-                   MetaBlocks, Sectors, TargetLine, ThinDev, ThinDevId, ThinPoolDev,
-                   ThinPoolStatusSummary, IEC};
+use devicemapper::{device_exists, DataBlocks, Device, DmDevice, DmName, FlakeyTargetParams,
+                   LinearDev, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine,
+                   ThinDev, ThinDevId, ThinPoolDev, IEC};
+#[cfg(feature = "full_runtime")]
+use devicemapper::{DmNameBuf, MetaBlocks, ThinPoolStatusSummary};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -23,6 +28,7 @@ use super::super::super::types::{FilesystemUuid, Name, PoolUuid, RenameAction};
 
 use super::super::backstore::Backstore;
 use super::super::cmd::{thin_check, thin_repair};
+#[cfg(feature = "full_runtime")]
 use super::super::device::wipe_sectors;
 use super::super::devlinks;
 use super::super::dm::get_dm;
@@ -30,18 +36,29 @@ use super::super::dmnames::{format_flex_ids, format_thin_ids, format_thinpool_id
                             ThinPoolRole, ThinRole};
 use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
-use super::filesystem::{FilesystemStatus, StratFilesystem};
+#[cfg(feature = "full_runtime")]
+use super::filesystem::FilesystemStatus;
+use super::filesystem::StratFilesystem;
+
 use super::mdv::MetadataVol;
 use super::thinids::ThinDevIdPool;
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
+
+#[cfg(feature = "full_runtime")]
 const META_LOWATER: MetaBlocks = MetaBlocks(512);
 
+#[cfg(feature = "full_runtime")]
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
+#[cfg(feature = "full_runtime")]
 const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
+
+#[cfg(feature = "full_runtime")]
 pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
+
+#[cfg(feature = "full_runtime")]
 const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 
 /// Transform a list of segments belonging to a single device into a
@@ -75,6 +92,7 @@ fn segs_to_table(
 // coalesce_blkdevsegs. These methods should either be unified into a single
 // method OR one should go away entirely in solution to:
 // https://github.com/stratis-storage/stratisd/issues/762.
+#[cfg(feature = "full_runtime")]
 fn coalesce_segs(
     left: &[(Sectors, Sectors)],
     right: &[(Sectors, Sectors)],
@@ -109,12 +127,14 @@ fn coalesce_segs(
     segments
 }
 
+#[cfg(feature = "full_runtime")]
 pub struct ThinPoolSizeParams {
     meta_size: MetaBlocks,
     data_size: DataBlocks,
     mdv_size: Sectors,
 }
 
+#[cfg(feature = "full_runtime")]
 impl ThinPoolSizeParams {
     /// The number of Sectors in the MetaBlocks.
     pub fn meta_size(&self) -> Sectors {
@@ -130,6 +150,7 @@ impl ThinPoolSizeParams {
     }
 }
 
+#[cfg(feature = "full_runtime")]
 impl Default for ThinPoolSizeParams {
     fn default() -> ThinPoolSizeParams {
         ThinPoolSizeParams {
@@ -162,6 +183,7 @@ pub struct ThinPool {
 
 impl ThinPool {
     /// Make a new thin pool.
+    #[cfg(feature = "full_runtime")]
     pub fn new(
         pool_uuid: PoolUuid,
         thin_pool_size: &ThinPoolSizeParams,
@@ -354,6 +376,7 @@ impl ThinPool {
     /// Run status checks and take actions on the thinpool and its components.
     /// Returns a bool communicating if a configuration change requiring a
     /// metadata save has been made.
+    #[cfg(feature = "full_runtime")]
     pub fn check(&mut self, backstore: &mut Backstore) -> StratisResult<bool> {
         #![allow(match_same_arms)]
         assert_eq!(backstore.device(), self.backstore_device);
@@ -448,6 +471,7 @@ impl ThinPool {
     /// Return the number of DataBlocks added.
     // TODO: Refine this method. A hard fail if the request can not be
     // satisfied may not be correct.
+    #[cfg(feature = "full_runtime")]
     fn extend_thinpool(
         &mut self,
         extend_size: DataBlocks,
@@ -476,6 +500,7 @@ impl ThinPool {
 
     /// Expand the physical space allocated to a pool meta by extend_size.
     /// Return the number of MetaBlocks added.
+    #[cfg(feature = "full_runtime")]
     fn extend_thinpool_meta(
         &mut self,
         extend_size: MetaBlocks,
@@ -503,6 +528,7 @@ impl ThinPool {
     }
 
     /// Extend the thinpool with new data regions.
+    #[cfg(feature = "full_runtime")]
     fn extend_data(
         &mut self,
         device: Device,
@@ -518,6 +544,7 @@ impl ThinPool {
     }
 
     /// Extend the thinpool meta device with additional segments.
+    #[cfg(feature = "full_runtime")]
     fn extend_meta(
         &mut self,
         device: Device,
@@ -571,6 +598,7 @@ impl ThinPool {
         self.filesystems.get_by_name(name)
     }
 
+    #[cfg(feature = "full_runtime")]
     pub fn get_mut_filesystem_by_name(
         &mut self,
         name: &str,
@@ -591,6 +619,7 @@ impl ThinPool {
 
     /// Create a filesystem within the thin pool. Given name must not
     /// already be in use.
+    #[cfg(feature = "full_runtime")]
     pub fn create_filesystem(
         &mut self,
         pool_name: &str,
@@ -619,6 +648,7 @@ impl ThinPool {
 
     /// Create a filesystem snapshot of the origin.  Given origin_uuid
     /// must exist.  Returns the Uuid of the new filesystem.
+    #[cfg(feature = "full_runtime")]
     pub fn snapshot_filesystem(
         &mut self,
         pool_name: &str,
@@ -695,6 +725,7 @@ impl ThinPool {
     }
 
     /// The names of DM devices belonging to this pool that may generate events
+    #[cfg(feature = "full_runtime")]
     pub fn get_eventing_dev_names(&self) -> Vec<DmNameBuf> {
         vec![
             format_flex_ids(self.pool_uuid, FlexRole::ThinMeta).0,

@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#[cfg(feature = "full_runtime")]
 use rand;
 
 use std::path::PathBuf;
@@ -14,6 +15,7 @@ pub struct SimFilesystem {
 }
 
 impl SimFilesystem {
+    #[cfg(feature = "full_runtime")]
     pub fn new() -> SimFilesystem {
         SimFilesystem {
             rand: rand::random::<u32>(),

@@ -6,6 +6,7 @@
 
 use devicemapper::ThinDevId;
 
+#[cfg(feature = "full_runtime")]
 use stratis::StratisResult;
 
 #[derive(Debug)]
@@ -28,6 +29,7 @@ impl ThinDevIdPool {
     /// Returns an error if no thindev id can be constructed.
     // TODO: Improve this so that it is guaranteed only to fail if every 24 bit
     // number has been used.
+    #[cfg(feature = "full_runtime")]
     pub fn new_id(&mut self) -> StratisResult<ThinDevId> {
         let next_id = ThinDevId::new_u64(u64::from(self.next_id))?;
         self.next_id += 1;

@@ -18,6 +18,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[cfg(feature = "full_runtime")]
 use uuid::Uuid;
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
@@ -37,18 +38,24 @@ fn find_binary(name: &str) -> Option<PathBuf> {
 // These are the external binaries that stratisd relies on.
 // Any change in this list requires a corresponding change to BINARIES,
 // and vice-versa.
+#[cfg(feature = "full_runtime")]
 const MKFS_XFS: &str = "mkfs.xfs";
 const THIN_CHECK: &str = "thin_check";
 const THIN_REPAIR: &str = "thin_repair";
+#[cfg(feature = "full_runtime")]
 const XFS_ADMIN: &str = "xfs_admin";
+#[cfg(feature = "full_runtime")]
 const XFS_GROWFS: &str = "xfs_growfs";
 
 lazy_static! {
     static ref BINARIES: HashMap<String, Option<PathBuf>> = [
+        #[cfg(feature = "full_runtime")]
         (MKFS_XFS.to_string(), find_binary(MKFS_XFS)),
         (THIN_CHECK.to_string(), find_binary(THIN_CHECK)),
         (THIN_REPAIR.to_string(), find_binary(THIN_REPAIR)),
+        #[cfg(feature = "full_runtime")]
         (XFS_ADMIN.to_string(), find_binary(XFS_ADMIN)),
+        #[cfg(feature = "full_runtime")]
         (XFS_GROWFS.to_string(), find_binary(XFS_GROWFS))
     ].iter()
         .cloned()
@@ -103,6 +110,7 @@ fn get_executable(name: &str) -> StratisResult<PathBuf> {
 }
 
 /// Create a filesystem on devnode.
+#[cfg(feature = "full_runtime")]
 pub fn create_fs(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
     execute_cmd(
         Command::new(get_executable(MKFS_XFS)?.as_os_str())
@@ -117,6 +125,7 @@ pub fn create_fs(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
 
 /// Use the xfs_growfs command to expand a filesystem mounted at the given
 /// mount point.
+#[cfg(feature = "full_runtime")]
 pub fn xfs_growfs(mount_point: &Path) -> StratisResult<()> {
     execute_cmd(
         Command::new(get_executable(XFS_GROWFS)?.as_os_str())
@@ -127,6 +136,7 @@ pub fn xfs_growfs(mount_point: &Path) -> StratisResult<()> {
 }
 
 /// Set a new UUID for filesystem on the devnode.
+#[cfg(feature = "full_runtime")]
 pub fn set_uuid(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
     execute_cmd(
         Command::new(get_executable(XFS_ADMIN)?.as_os_str())

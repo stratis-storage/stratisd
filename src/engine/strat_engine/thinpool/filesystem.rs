@@ -2,27 +2,41 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::path::{Path, PathBuf};
+#[cfg(feature = "full_runtime")]
+use std::path::Path;
+use std::path::PathBuf;
 
-use devicemapper::{Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev,
-                   ThinStatus, IEC, SECTOR_SIZE};
+#[cfg(feature = "full_runtime")]
+use devicemapper::{Bytes, DmName, DmUuid, Sectors, ThinDevId, ThinStatus, IEC, SECTOR_SIZE};
+use devicemapper::{DmDevice, ThinDev, ThinPoolDev};
 
+#[cfg(feature = "full_runtime")]
 use mnt::{MountIter, MountParam};
+
+#[cfg(feature = "full_runtime")]
 use nix::mount::{mount, umount, MsFlags};
+
+#[cfg(feature = "full_runtime")]
 use nix::sys::statvfs::statvfs;
+
+#[cfg(feature = "full_runtime")]
 use tempfile;
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
+use stratis::StratisResult;
+#[cfg(feature = "full_runtime")]
+use stratis::{ErrorEnum, StratisError};
 
 use super::super::super::engine::Filesystem;
 use super::super::super::types::{FilesystemUuid, Name};
 
+#[cfg(feature = "full_runtime")]
 use super::super::cmd::{create_fs, set_uuid, xfs_growfs};
 use super::super::dm::get_dm;
 use super::super::serde_structs::FilesystemSave;
 
 /// TODO: confirm that 256 MiB leaves enough time for stratisd to respond and extend before
 /// the filesystem is out of space.
+#[cfg(feature = "full_runtime")]
 pub const FILESYSTEM_LOWATER: Sectors = Sectors(256 * IEC::Mi / (SECTOR_SIZE as u64)); // = 256 MiB
 
 #[derive(Debug)]
@@ -30,6 +44,7 @@ pub struct StratFilesystem {
     thin_dev: ThinDev,
 }
 
+#[cfg(feature = "full_runtime")]
 pub enum FilesystemStatus {
     Good,
     XfsGrowFailed,
@@ -39,6 +54,7 @@ pub enum FilesystemStatus {
 
 impl StratFilesystem {
     /// Create a StratFilesystem on top of the given ThinDev.
+    #[cfg(feature = "full_runtime")]
     pub fn initialize(fs_id: FilesystemUuid, thin_dev: ThinDev) -> StratisResult<StratFilesystem> {
         let fs = StratFilesystem::setup(thin_dev);
 
@@ -58,6 +74,7 @@ impl StratFilesystem {
     /// so snapshot_fs_uuid is used to update the new snapshot filesystem so it has
     /// a unique UUID.
     #[allow(too_many_arguments)]
+    #[cfg(feature = "full_runtime")]
     pub fn snapshot(
         &self,
         thin_pool: &ThinPoolDev,
@@ -114,6 +131,7 @@ impl StratFilesystem {
 
     /// check if filesystem is getting full and needs to be extended
     /// TODO: deal with the thindev in a Fail state.
+    #[cfg(feature = "full_runtime")]
     pub fn check(&mut self) -> StratisResult<FilesystemStatus> {
         match self.thin_dev.status(get_dm())? {
             ThinStatus::Working(_) => {
@@ -149,6 +167,7 @@ impl StratFilesystem {
     /// Return an extend size for the thindev under the filesystem
     /// TODO: returning the current size will double the space provisioned to
     /// the thin device.  We should determine if this is a reasonable value.
+    #[cfg(feature = "full_runtime")]
     fn extend_size(&self, current_size: Sectors) -> Sectors {
         current_size
     }
@@ -156,6 +175,7 @@ impl StratFilesystem {
     /// Get one (non-deterministic in the presence of errors) of the mount_point(s) for the file
     /// system that is contained on the block device referred to as self.devnode(), i.e. the device
     /// node, while ignoring parse errors as long as at least one mount point is found.
+    #[cfg(feature = "full_runtime")]
     pub fn get_mount_point(&self) -> StratisResult<Option<PathBuf>> {
         let device_node = self.devnode();
         let search = device_node.to_str().ok_or_else(|| {
@@ -228,6 +248,7 @@ impl Filesystem for StratFilesystem {
 }
 
 /// Return total bytes allocated to the filesystem, total bytes used by data/metadata
+#[cfg(feature = "full_runtime")]
 pub fn fs_usage(mount_point: &Path) -> StratisResult<(Bytes, Bytes)> {
     let stat = statvfs(mount_point)?;
 

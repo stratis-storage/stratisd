@@ -9,7 +9,7 @@ extern crate chrono;
 extern crate crc;
 extern crate uuid;
 
-#[cfg(feature = "dbus_enabled")]
+#[cfg(feature = "full_runtime")]
 extern crate dbus;
 
 extern crate mnt;
@@ -35,7 +35,7 @@ extern crate lazy_static;
 
 pub mod engine;
 
-#[cfg(feature = "dbus_enabled")]
+#[cfg(feature = "full_runtime")]
 pub mod dbus_api;
 
 pub mod stratis;

@@ -4,9 +4,11 @@
 
 use std::fmt;
 
+#[cfg(feature = "full_runtime")]
 use rand::{thread_rng, Rng, ThreadRng};
 
 pub struct Randomizer {
+    #[cfg(feature = "full_runtime")]
     rng: ThreadRng,
     denominator: u32,
 }
@@ -14,6 +16,7 @@ pub struct Randomizer {
 impl Default for Randomizer {
     fn default() -> Randomizer {
         Randomizer {
+            #[cfg(feature = "full_runtime")]
             rng: thread_rng(),
             denominator: 0u32,
         }
@@ -31,6 +34,7 @@ impl fmt::Debug for Randomizer {
 impl Randomizer {
     /// Throw a denominator sided die, returning true if 1 comes up
     /// If denominator is 0, return false
+    #[cfg(feature = "full_runtime")]
     pub fn throw_die(&mut self) -> bool {
         if self.denominator == 0 {
             false

@@ -51,7 +51,8 @@ pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<String>> {
     }))
 }
 
-/// Collect paths for all the devices that appear to be empty from a udev db perspective.
+/// Collect paths for all the devices that appear to be empty based on the
+/// values of udev properties and have device nodes.
 fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
     let context = libudev::Context::new()?;
     let mut enumerator = libudev::Enumerator::new(&context)?;
@@ -64,7 +65,9 @@ fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
                 || dev.property_value("ID_PART_ENTRY_DISK").is_some())
                 && dev.property_value("ID_FS_USAGE").is_none()
         })
-        .map(|i| i.devnode().expect("block devices have devnode").into())
+        .map(|i| i.devnode().and_then(|d| Some(d.to_path_buf())))
+        .filter(|d| d.is_some())
+        .map(|d| d.expect("!d.is_none()"))
         .collect())
 }
 
@@ -77,7 +80,9 @@ pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
 
     let devices: Vec<PathBuf> = enumerator
         .scan_devices()?
-        .map(|x| x.devnode().expect("block devices have devnode").into())
+        .map(|x| x.devnode().and_then(|d| Some(d.to_path_buf())))
+        .filter(|d| d.is_some())
+        .map(|d| d.expect("!d.is_none()"))
         .collect();
 
     if devices.is_empty() {

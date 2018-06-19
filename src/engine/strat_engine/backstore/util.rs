@@ -60,9 +60,9 @@ fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
     Ok(enumerator
         .scan_devices()?
         .filter(|dev| {
-            !((dev.property_value("ID_PART_TABLE_TYPE").is_some()
-                && !dev.property_value("ID_PART_ENTRY_DISK").is_some())
-                || dev.property_value("ID_FS_USAGE").is_some())
+            (dev.property_value("ID_PART_TABLE_TYPE").is_none()
+                || dev.property_value("ID_PART_ENTRY_DISK").is_some())
+                && dev.property_value("ID_FS_USAGE").is_none()
         })
         .map(|i| i.devnode().expect("block devices have devnode").into())
         .collect())

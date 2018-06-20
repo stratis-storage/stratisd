@@ -89,23 +89,24 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
             } else {
                 Ok(DevOwnership::Unowned)
             }
-        } else if device.contains_key("ID_FS_TYPE")
-            && device.get("ID_FS_TYPE").unwrap() == "stratis"
-        {
-            // Device is ours, but we don't get everything we need from udev db, lets go to disk.
-            if let Some((pool_uuid, device_uuid)) = StaticHeader::device_identifiers(
-                &mut OpenOptions::new().read(true).open(&devnode)?,
-            )? {
-                Ok(DevOwnership::Ours(pool_uuid, device_uuid))
-            } else {
-                // In this case the udev db says it's ours, but our check says otherwise.  We should
-                // trust ourselves.  Should we raise an error here?
-                Ok(DevOwnership::Theirs(String::from(
-                    "Udev db says stratis, disk meta says no",
-                )))
-            }
         } else {
-            Ok(DevOwnership::Theirs(signature(&device)))
+            match device.get("ID_FS_TYPE") {
+                Some(value) if value == "stratis" => {
+                    // Device is ours, but we don't get everything we need from udev db, lets go to disk.
+                    if let Some((pool_uuid, device_uuid)) = StaticHeader::device_identifiers(
+                        &mut OpenOptions::new().read(true).open(&devnode)?,
+                    )? {
+                        Ok(DevOwnership::Ours(pool_uuid, device_uuid))
+                    } else {
+                        // In this case the udev db says it's ours, but our check says otherwise.  We should
+                        // trust ourselves.  Should we raise an error here?
+                        Ok(DevOwnership::Theirs(String::from(
+                            "Udev db says stratis, disk meta says no",
+                        )))
+                    }
+                }
+                _ => Ok(DevOwnership::Theirs(signature(&device))),
+            }
         }
     } else {
         Err(StratisError::Engine(

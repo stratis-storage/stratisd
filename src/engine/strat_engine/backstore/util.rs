@@ -77,7 +77,7 @@ pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
         .map(|x| x.devnode().expect("block devices have devnode").into())
         .collect();
 
-    if devices.len() == 0 {
+    if devices.is_empty() {
         // Either we don't have any stratis devices or we are using a distribution that doesn't
         // have a version of libblkid that supports stratis, lets make sure.
         // TODO: At some point in the future we can remove this and just return the devices.

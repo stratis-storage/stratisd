@@ -69,7 +69,7 @@ fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
         .collect())
 }
 
-/// Retrieve all the block devices on the system that have a Stratis signature.
+/// Retrieve all the block devices on the system that belong to Stratis.
 pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
     let context = libudev::Context::new()?;
     let mut enumerator = libudev::Enumerator::new(&context)?;
@@ -84,10 +84,13 @@ pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
         .collect();
 
     if devices.is_empty() {
-        // Either we don't have any stratis devices or we are using a distribution that doesn't
-        // have a version of libblkid that supports stratis, lets make sure.
-        // TODO: At some point in the future we can remove this and just return the devices.
-
+        // There are no Stratis devices OR iibblkid is an early version that
+        // doesn't support identifying Stratis devices. Fall back to using
+        // udev to get all devices, and then checking each for a Stratis
+        // header.
+        // TODO: If at some point it is guaranteed that libblkid version is
+        // not less than that required to identify Stratis devices, this
+        // code can be removed.
         Ok(get_all_empty_devices()?
             .into_iter()
             .filter(|x| is_stratis_device(&x).ok().is_some())

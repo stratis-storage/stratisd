@@ -39,16 +39,14 @@ pub fn get_udev_block_device(
     let result = enumerator
         .scan_devices()?
         .find(|x| x.devnode().map_or(false, |d| dev_node_search == d))
-        .map_or(None, |dev| Some(device_as_map(&dev)));
+        .and_then(|dev| Some(device_as_map(&dev)));
     Ok(result)
 }
 
 /// Lookup the WWN from the udev db using the device node eg. /dev/sda
 pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<String>> {
     let dev = get_udev_block_device(dev_node_search)?;
-    Ok(dev.map_or(None, |dev| {
-        dev.get("ID_WWN").map_or(None, |i| Some(i.clone()))
-    }))
+    Ok(dev.and_then(|dev| dev.get("ID_WWN").and_then(|i| Some(i.clone()))))
 }
 
 /// Collect paths for all the devices that appear to be empty based on the

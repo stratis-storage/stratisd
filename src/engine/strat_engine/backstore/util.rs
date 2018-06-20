@@ -4,11 +4,10 @@
 
 // Utilities to support Stratis.
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use libudev;
 
-use super::device::is_stratis_device;
 use stratis::StratisResult;
 
 /// Takes a libudev device entry and returns the properties as a HashMap.
@@ -47,55 +46,4 @@ pub fn get_udev_block_device(
 pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<String>> {
     let dev = get_udev_block_device(dev_node_search)?;
     Ok(dev.and_then(|dev| dev.get("ID_WWN").and_then(|i| Some(i.clone()))))
-}
-
-/// Collect paths for all the devices that appear to be empty based on the
-/// values of udev properties and have device nodes.
-fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
-    let context = libudev::Context::new()?;
-    let mut enumerator = libudev::Enumerator::new(&context)?;
-    enumerator.match_subsystem("block")?;
-
-    Ok(enumerator
-        .scan_devices()?
-        .filter(|dev| {
-            (dev.property_value("ID_PART_TABLE_TYPE").is_none()
-                || dev.property_value("ID_PART_ENTRY_DISK").is_some())
-                && dev.property_value("ID_FS_USAGE").is_none()
-        })
-        .map(|i| i.devnode().and_then(|d| Some(d.to_path_buf())))
-        .filter(|d| d.is_some())
-        .map(|d| d.expect("!d.is_none()"))
-        .collect())
-}
-
-/// Retrieve all the block devices on the system that belong to Stratis.
-pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
-    let context = libudev::Context::new()?;
-    let mut enumerator = libudev::Enumerator::new(&context)?;
-    enumerator.match_subsystem("block")?;
-    enumerator.match_property("ID_FS_TYPE", "stratis")?;
-
-    let devices: Vec<PathBuf> = enumerator
-        .scan_devices()?
-        .map(|x| x.devnode().and_then(|d| Some(d.to_path_buf())))
-        .filter(|d| d.is_some())
-        .map(|d| d.expect("!d.is_none()"))
-        .collect();
-
-    if devices.is_empty() {
-        // There are no Stratis devices OR iibblkid is an early version that
-        // doesn't support identifying Stratis devices. Fall back to using
-        // udev to get all devices, and then checking each for a Stratis
-        // header.
-        // TODO: If at some point it is guaranteed that libblkid version is
-        // not less than that required to identify Stratis devices, this
-        // code can be removed.
-        Ok(get_all_empty_devices()?
-            .into_iter()
-            .filter(|x| is_stratis_device(&x).ok().is_some())
-            .collect())
-    } else {
-        Ok(devices)
-    }
 }

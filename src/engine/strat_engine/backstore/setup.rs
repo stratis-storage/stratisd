@@ -9,6 +9,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 
+use libudev;
 use serde_json;
 
 use devicemapper::{devnode_to_devno, Device};
@@ -24,7 +25,6 @@ use super::super::serde_structs::{BackstoreSave, PoolSave};
 use super::blockdev::StratBlockDev;
 use super::device::{blkdev_size, is_stratis_device};
 use super::metadata::BDA;
-use super::util::get_stratis_block_devices;
 
 /// Setup a pool from constituent devices in the context of some already
 /// setup pools. Return an error on anything that prevents the pool
@@ -88,9 +88,48 @@ pub fn setup_pool(
 ///
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
 pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
+    let context = libudev::Context::new()?;
+
+    let mut enumerator = libudev::Enumerator::new(&context)?;
+    enumerator.match_subsystem("block")?;
+    enumerator.match_property("ID_FS_TYPE", "stratis")?;
+
+    let devices: Vec<PathBuf> = enumerator
+        .scan_devices()?
+        .map(|x| x.devnode().and_then(|d| Some(d.to_path_buf())))
+        .filter(|d| d.is_some())
+        .map(|d| d.expect("!d.is_none()"))
+        .collect();
+
+    // TODO: If at some point it is guaranteed that libblkid version is
+    // not less than that required to identify Stratis devices, this
+    // block can be removed.
+    let devices = if devices.is_empty() {
+        // There are no Stratis devices OR iibblkid is an early version that
+        // doesn't support identifying Stratis devices. Fall back to using
+        // udev to get all devices that are lacking any signature which
+        // identifies them as belonging to some other system or application.
+        let mut enumerator = libudev::Enumerator::new(&context)?;
+        enumerator.match_subsystem("block")?;
+
+        enumerator
+            .scan_devices()?
+            .filter(|dev| {
+                (dev.property_value("ID_PART_TABLE_TYPE").is_none()
+                    || dev.property_value("ID_PART_ENTRY_DISK").is_some())
+                    && dev.property_value("ID_FS_USAGE").is_none()
+            })
+            .map(|i| i.devnode().and_then(|d| Some(d.to_path_buf())))
+            .filter(|d| d.is_some())
+            .map(|d| d.expect("!d.is_none()"))
+            .collect()
+    } else {
+        devices
+    };
+
     let mut pool_map = HashMap::new();
 
-    for devnode in get_stratis_block_devices()? {
+    for devnode in devices {
         match devnode_to_devno(&devnode)? {
             None => continue,
             Some(devno) => {

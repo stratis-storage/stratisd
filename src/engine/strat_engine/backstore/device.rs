@@ -76,6 +76,7 @@ fn signature(device: &HashMap<String, String>) -> String {
 }
 
 /// Determine what a block device is used for.
+/// If the block device has no entry in the udev database, return an error.
 pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
     if let Some(device) = get_udev_block_device(devnode)? {
         if empty(&device) {

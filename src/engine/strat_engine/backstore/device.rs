@@ -13,7 +13,8 @@ use devicemapper::{devnode_to_devno, Bytes, Device};
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{DevUuid, PoolUuid};
-use super::metadata::StaticHeader;
+
+use super::metadata::BDA;
 use super::util::get_udev_block_device;
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);
@@ -83,9 +84,9 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
             // The device is either really empty or we are running on a distribution that hasn't
             // picked up the latest libblkid, lets read down to the device and find out for sure.
             // TODO: At some point in the future we can remove this and just return Unowned.
-            if let Some((pool_uuid, device_uuid)) = StaticHeader::device_identifiers(
-                &mut OpenOptions::new().read(true).open(&devnode)?,
-            )? {
+            if let Some((pool_uuid, device_uuid)) =
+                BDA::device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+            {
                 Ok(DevOwnership::Ours(pool_uuid, device_uuid))
             } else {
                 Ok(DevOwnership::Unowned)
@@ -94,9 +95,9 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
             match device.get("ID_FS_TYPE") {
                 Some(value) if value == "stratis" => {
                     // Device is ours, but we don't get everything we need from udev db, lets go to disk.
-                    if let Some((pool_uuid, device_uuid)) = StaticHeader::device_identifiers(
-                        &mut OpenOptions::new().read(true).open(&devnode)?,
-                    )? {
+                    if let Some((pool_uuid, device_uuid)) =
+                        BDA::device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+                    {
                         Ok(DevOwnership::Ours(pool_uuid, device_uuid))
                     } else {
                         // In this case the udev db says it's ours, but our check says otherwise.  We should

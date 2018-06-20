@@ -469,7 +469,7 @@ mod tests {
 
     use super::super::super::tests::{loopbacked, real};
 
-    use super::super::metadata::{StaticHeader, MIN_MDA_SECTORS};
+    use super::super::metadata::{BDA, MIN_MDA_SECTORS};
     use super::super::setup::{find_all, get_metadata};
 
     use super::super::super::cmd;
@@ -551,12 +551,10 @@ mod tests {
         cmd::udev_settle().unwrap();
 
         assert!(paths.iter().all(|path| {
-            let (t_pool_uuid, _) = StaticHeader::device_identifiers(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap()
-                .unwrap();
+            let (t_pool_uuid, _) =
+                BDA::device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap()
+                    .unwrap();
             pool_uuid == t_pool_uuid
         }));
     }
@@ -712,22 +710,18 @@ mod tests {
         cmd::udev_settle().unwrap();
 
         assert!(paths.iter().all(|path| {
-            let (t_pool_uuid, _) = StaticHeader::device_identifiers(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap()
-                .unwrap();
+            let (t_pool_uuid, _) =
+                BDA::device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap()
+                    .unwrap();
             pool_uuid == t_pool_uuid
         }));
 
         bd_mgr.destroy_all().unwrap();
         assert!(paths.iter().all(|path| {
-            let id = StaticHeader::device_identifiers(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap();
+            let id =
+                BDA::device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap();
             id.is_none()
         }));
     }

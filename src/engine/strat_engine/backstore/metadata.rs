@@ -209,10 +209,26 @@ impl BDA {
     pub fn initialization_time(&self) -> u64 {
         self.header.initialization_time
     }
+
+    /// Retrieve the device and pool UUIDs from a stratis device.
+    pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<((PoolUuid, DevUuid))>>
+    where
+        F: Read + Seek + SyncAll,
+    {
+        // Using setup() as a test of ownership sets a high bar. It is
+        // not sufficient to have STRAT_MAGIC to be considered "Ours",
+        // it must also have correct CRC, no weird stuff in fields,
+        // etc!
+        match StaticHeader::setup(f) {
+            Ok(Some(sh)) => Ok(Some((sh.pool_uuid, sh.dev_uuid))),
+            Ok(None) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct StaticHeader {
+struct StaticHeader {
     blkdev_size: Sectors,
     pool_uuid: PoolUuid,
     dev_uuid: DevUuid,
@@ -316,22 +332,6 @@ impl StaticHeader {
                 let err_str = "Appeared to be a Stratis device, but no valid sigblock found";
                 Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
             }
-        }
-    }
-
-    /// Retrieve the device and pool UUIDs from a stratis device.
-    pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<((PoolUuid, DevUuid))>>
-    where
-        F: Read + Seek + SyncAll,
-    {
-        // Using setup() as a test of ownership sets a high bar. It is
-        // not sufficient to have STRAT_MAGIC to be considered "Ours",
-        // it must also have correct CRC, no weird stuff in fields,
-        // etc!
-        match StaticHeader::setup(f) {
-            Ok(Some(sh)) => Ok(Some((sh.pool_uuid, sh.dev_uuid))),
-            Ok(None) => Ok(None),
-            Err(err) => Err(err),
         }
     }
 
@@ -906,7 +906,7 @@ mod tests {
             let sh = random_static_header(blkdev_size, mda_size_factor);
             let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
-            let ownership = StaticHeader::device_identifiers(&mut buf).unwrap();
+            let ownership = BDA::device_identifiers(&mut buf).unwrap();
             if ownership.is_some() {
                 return TestResult::failed();
             }
@@ -919,7 +919,7 @@ mod tests {
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,
             ).unwrap();
-            if let Some((t_p, t_d)) = StaticHeader::device_identifiers(&mut buf).unwrap() {
+            if let Some((t_p, t_d)) = BDA::device_identifiers(&mut buf).unwrap() {
                 if t_p != sh.pool_uuid || t_d != sh.dev_uuid {
                     return TestResult::failed();
                 }
@@ -928,7 +928,7 @@ mod tests {
             }
 
             BDA::wipe(&mut buf).unwrap();
-            let ownership = StaticHeader::device_identifiers(&mut buf).unwrap();
+            let ownership = BDA::device_identifiers(&mut buf).unwrap();
             if ownership.is_some() {
                 return TestResult::failed();
             }

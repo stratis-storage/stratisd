@@ -24,7 +24,7 @@ use super::super::serde_structs::{BackstoreSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
 use super::device::blkdev_size;
-use super::metadata::{StaticHeader, BDA};
+use super::metadata::BDA;
 
 /// Setup a pool from constituent devices in the context of some already
 /// setup pools. Return an error on anything that prevents the pool
@@ -130,7 +130,7 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
     let mut pool_map = HashMap::new();
     for devnode in devices {
         if let Some((pool_uuid, _)) =
-            StaticHeader::device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+            BDA::device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
         {
             match devnode_to_devno(&devnode)? {
                 None => {

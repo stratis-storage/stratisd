@@ -110,10 +110,10 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
     } else {
         Err(StratisError::Engine(
             ErrorEnum::NotFound,
-            String::from(format!(
+            format!(
                 "We expected to find the block device {:?} in the udev db",
                 devnode
-            )),
+            ),
         ))
     }
 }

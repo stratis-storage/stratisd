@@ -11,9 +11,10 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::engine::{Engine, Eventable, Pool};
 use super::super::structures::Table;
-use super::super::types::{DevUuid, Name, PoolUuid, Redundancy, RenameAction};
+use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
-use super::backstore::{find_all, is_stratis_device, setup_pool};
+use super::backstore::device::is_stratis_device;
+use super::backstore::{find_all, setup_pool};
 #[cfg(test)]
 use super::cleanup::teardown_pools;
 use super::cmd::verify_binaries;
@@ -23,13 +24,6 @@ use super::pool::StratPool;
 
 pub const DEV_PATH: &str = "/dev/stratis";
 const REQUIRED_DM_MINOR_VERSION: u32 = 37;
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum DevOwnership {
-    Ours(PoolUuid, DevUuid),
-    Unowned,
-    Theirs,
-}
 
 #[derive(Debug)]
 pub struct StratEngine {

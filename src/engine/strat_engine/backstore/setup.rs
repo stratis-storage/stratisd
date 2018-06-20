@@ -23,8 +23,8 @@ use super::super::pool::{check_metadata, StratPool};
 use super::super::serde_structs::{BackstoreSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
-use super::device::{blkdev_size, is_stratis_device};
-use super::metadata::BDA;
+use super::device::blkdev_size;
+use super::metadata::{StaticHeader, BDA};
 
 /// Setup a pool from constituent devices in the context of some already
 /// setup pools. Return an error on anything that prevents the pool
@@ -128,17 +128,21 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
     };
 
     let mut pool_map = HashMap::new();
-
     for devnode in devices {
-        match devnode_to_devno(&devnode)? {
-            None => continue,
-            Some(devno) => {
-                is_stratis_device(&devnode)?.and_then(|pool_uuid| {
+        if let Some((pool_uuid, _)) =
+            StaticHeader::device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+        {
+            match devnode_to_devno(&devnode)? {
+                None => {
+                    let err_msg = "Stratis metadata indicates that this device is a Stratis block device, but device metadata indicates that it is not even a block device.";
+                    return Err(StratisError::Engine(ErrorEnum::Error, err_msg.into()));
+                }
+                Some(devno) => {
                     pool_map
                         .entry(pool_uuid)
                         .or_insert_with(HashMap::new)
-                        .insert(Device::from(devno), devnode)
-                });
+                        .insert(Device::from(devno), devnode);
+                }
             }
         }
     }

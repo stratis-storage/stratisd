@@ -5,13 +5,17 @@
 // Functions for dealing with devices.
 
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
 
 use devicemapper::{devnode_to_devno, Bytes, Device};
-
 use stratis::{ErrorEnum, StratisError, StratisResult};
+
+use super::super::super::types::{DevUuid, PoolUuid};
+
+use super::metadata::BDA;
+use super::util::get_udev_block_device;
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);
 
@@ -42,4 +46,155 @@ pub fn resolve_devices<'a>(paths: &'a [&Path]) -> StratisResult<HashMap<Device, 
         }
     }
     Ok(map)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum DevOwnership {
+    Ours(PoolUuid, DevUuid),
+    Unowned,
+    Theirs(String), // String is something useful to give back to end user about what's on device
+}
+
+/// Returns true if a device has no signature, yes this is a bit convoluted.  Logic gleaned from
+/// blivet library.
+fn empty(device: &HashMap<String, String>) -> bool {
+    !((device.contains_key("ID_PART_TABLE_TYPE") && !device.contains_key("ID_PART_ENTRY_DISK"))
+        || device.contains_key("ID_FS_USAGE"))
+}
+
+/// Generate some kind of human readable text about what's on a device.
+fn signature(device: &HashMap<String, String>) -> String {
+    if empty(device) {
+        String::from("empty")
+    } else {
+        device
+            .iter()
+            .filter(|&(k, _)| k.contains("ID_FS_") || k.contains("ID_PART_TABLE_"))
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<String>>()
+            .join(" ")
+    }
+}
+
+/// Determine what a block device is used for.
+/// If the block device has no entry in the udev database, return an error.
+pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
+    if let Some(device) = get_udev_block_device(devnode)? {
+        if empty(&device) {
+            // The device is either really empty or we are running on a distribution that hasn't
+            // picked up the latest libblkid, lets read down to the device and find out for sure.
+            // TODO: At some point in the future we can remove this and just return Unowned.
+            if let Some((pool_uuid, device_uuid)) =
+                BDA::device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+            {
+                Ok(DevOwnership::Ours(pool_uuid, device_uuid))
+            } else {
+                Ok(DevOwnership::Unowned)
+            }
+        } else {
+            match device.get("ID_FS_TYPE") {
+                Some(value) if value == "stratis" => {
+                    // Device is ours, but we don't get everything we need from udev db, lets go to disk.
+                    if let Some((pool_uuid, device_uuid)) =
+                        BDA::device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+                    {
+                        Ok(DevOwnership::Ours(pool_uuid, device_uuid))
+                    } else {
+                        // In this case the udev db says it's ours, but our check says otherwise.  We should
+                        // trust ourselves.  Should we raise an error here?
+                        Ok(DevOwnership::Theirs(String::from(
+                            "Udev db says stratis, disk meta says no",
+                        )))
+                    }
+                }
+                _ => Ok(DevOwnership::Theirs(signature(&device))),
+            }
+        }
+    } else {
+        Err(StratisError::Engine(
+            ErrorEnum::NotFound,
+            format!(
+                "We expected to find the block device {:?} in the udev db",
+                devnode
+            ),
+        ))
+    }
+}
+
+/// Determine if devnode is a Stratis device. Return the device's Stratis
+/// pool UUID if it belongs to Stratis.
+pub fn is_stratis_device(devnode: &Path) -> StratisResult<Option<PoolUuid>> {
+    match identify(devnode)? {
+        DevOwnership::Ours(pool_uuid, _) => Ok(Some(pool_uuid)),
+        _ => Ok(None),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::path::Path;
+
+    use super::super::super::cmd::{udev_settle, create_ext3_fs};
+    use super::super::super::tests::{loopbacked, real};
+
+    use super::super::device;
+
+    /// Verify that the device is not stratis by creating a device with XFS fs.
+    fn test_other_ownership(paths: &[&Path]) {
+        create_ext3_fs(paths[0]).unwrap();
+
+        udev_settle().unwrap();
+
+        assert_eq!(device::is_stratis_device(paths[0]).unwrap(), None);
+
+        assert!(match device::identify(paths[0]).unwrap() {
+            device::DevOwnership::Theirs(identity) => {
+                assert!(identity.contains("ID_FS_USAGE=filesystem"));
+                assert!(identity.contains("ID_FS_TYPE=ext3"));
+                assert!(identity.contains("ID_FS_UUID"));
+                true
+            }
+            _ => false,
+        });
+    }
+
+    /// Test a blank device and ensure it comes up as device::Usage::Unowned
+    fn test_empty(paths: &[&Path]) {
+        udev_settle().unwrap();
+
+        assert_eq!(device::is_stratis_device(paths[0]).unwrap(), None);
+
+        assert!(match device::identify(paths[0]).unwrap() {
+            device::DevOwnership::Unowned => true,
+            _ => false,
+        });
+
+        assert_eq!(device::is_stratis_device(paths[0]).unwrap(), None);
+    }
+
+    #[test]
+    pub fn loop_test_device_other_ownership() {
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(1, 3, None),
+            test_other_ownership,
+        );
+    }
+
+    #[test]
+    pub fn real_test_device_other_ownership() {
+        real::test_with_spec(
+            real::DeviceLimits::AtLeast(1, None, None),
+            test_other_ownership,
+        );
+    }
+
+    #[test]
+    pub fn loop_test_device_empty() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_empty);
+    }
+
+    #[test]
+    pub fn real_test_device_empty() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_empty);
+    }
 }

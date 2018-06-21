@@ -17,7 +17,6 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::device::SyncAll;
-use super::super::engine::DevOwnership;
 
 pub use self::mda::{validate_mda_size, MIN_MDA_SECTORS};
 
@@ -210,10 +209,22 @@ impl BDA {
     pub fn initialization_time(&self) -> u64 {
         self.header.initialization_time
     }
+
+    /// Retrieve the device and pool UUIDs from a stratis device.
+    pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<((PoolUuid, DevUuid))>>
+    where
+        F: Read + Seek + SyncAll,
+    {
+        match StaticHeader::setup(f) {
+            Ok(Some(sh)) => Ok(Some((sh.pool_uuid, sh.dev_uuid))),
+            Ok(None) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct StaticHeader {
+struct StaticHeader {
     blkdev_size: Sectors,
     pool_uuid: PoolUuid,
     dev_uuid: DevUuid,
@@ -317,30 +328,6 @@ impl StaticHeader {
                 let err_str = "Appeared to be a Stratis device, but no valid sigblock found";
                 Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
             }
-        }
-    }
-
-    /// Determine the ownership of a device.
-    /// If the device is owned by Stratis, return its device UUID.
-    pub fn determine_ownership<F>(f: &mut F) -> StratisResult<DevOwnership>
-    where
-        F: Read + Seek + SyncAll,
-    {
-        // Using setup() as a test of ownership sets a high bar. It is
-        // not sufficient to have STRAT_MAGIC to be considered "Ours",
-        // it must also have correct CRC, no weird stuff in fields,
-        // etc!
-        match StaticHeader::setup(f) {
-            Ok(Some(sh)) => Ok(DevOwnership::Ours(sh.pool_uuid, sh.dev_uuid)),
-            Ok(None) => {
-                let buf = BDA::read(f)?;
-                if buf.iter().any(|x| *x != 0) {
-                    Ok(DevOwnership::Theirs)
-                } else {
-                    Ok(DevOwnership::Unowned)
-                }
-            }
-            Err(err) => Err(err),
         }
     }
 
@@ -885,8 +872,6 @@ mod tests {
     use quickcheck::{QuickCheck, TestResult};
     use uuid::Uuid;
 
-    use super::super::super::engine::DevOwnership;
-
     use super::*;
 
     /// Return a static header with random block device and MDA size.
@@ -906,49 +891,20 @@ mod tests {
     }
 
     #[test]
-    /// Verify that the file is theirs, if there are any non-zero bits in BDA.
-    /// Unowned if all bits are 0.
-    fn test_other_ownership() {
-        fn property(offset: u8, length: u8, value: u8) -> TestResult {
-            if value == 0 || length == 0 {
-                return TestResult::discard();
-            }
-            let mut buf = Cursor::new(vec![0; _BDA_STATIC_HDR_SIZE]);
-            match StaticHeader::determine_ownership(&mut buf).unwrap() {
-                DevOwnership::Unowned => {}
-                _ => return TestResult::failed(),
-            }
-
-            let data = vec![value; length as usize];
-            buf.seek(SeekFrom::Start(offset as u64)).unwrap();
-            buf.write(&data).unwrap();
-            match StaticHeader::determine_ownership(&mut buf).unwrap() {
-                DevOwnership::Theirs => {}
-                _ => return TestResult::failed(),
-            }
-            TestResult::passed()
-        }
-        QuickCheck::new()
-            .tests(10)
-            .quickcheck(property as fn(u8, u8, u8) -> TestResult);
-    }
-
-    #[test]
     /// Construct an arbitrary StaticHeader object.
-    /// Verify that the "file" is unowned.
+    /// Verify that the "memory buffer" is unowned.
     /// Initialize a BDA.
-    /// Verify that Stratis owns the file.
+    /// Verify that Stratis buffer validates.
     /// Wipe the BDA.
-    /// Verify that the file is again unowned.
+    /// Verify that the buffer is again unowned.
     fn prop_test_ownership() {
         fn test_ownership(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
             let sh = random_static_header(blkdev_size, mda_size_factor);
             let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
-            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
-            match ownership {
-                DevOwnership::Unowned => {}
-                _ => return TestResult::failed(),
+            let ownership = BDA::device_identifiers(&mut buf).unwrap();
+            if ownership.is_some() {
+                return TestResult::failed();
             }
 
             BDA::initialize(
@@ -959,21 +915,18 @@ mod tests {
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,
             ).unwrap();
-            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
-            match ownership {
-                DevOwnership::Ours(pool_uuid, dev_uuid) => {
-                    if sh.pool_uuid != pool_uuid || sh.dev_uuid != dev_uuid {
-                        return TestResult::failed();
-                    }
+            if let Some((t_p, t_d)) = BDA::device_identifiers(&mut buf).unwrap() {
+                if t_p != sh.pool_uuid || t_d != sh.dev_uuid {
+                    return TestResult::failed();
                 }
-                _ => return TestResult::failed(),
+            } else {
+                return TestResult::failed();
             }
 
             BDA::wipe(&mut buf).unwrap();
-            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
-            match ownership {
-                DevOwnership::Unowned => {}
-                _ => return TestResult::failed(),
+            let ownership = BDA::device_identifiers(&mut buf).unwrap();
+            if ownership.is_some() {
+                return TestResult::failed();
             }
 
             TestResult::passed()

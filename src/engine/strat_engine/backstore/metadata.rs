@@ -265,14 +265,12 @@ impl StaticHeader {
                     (Some(loc_1), Some(loc_2)) => {
                         if loc_1 == loc_2 {
                             Ok(Some(loc_1))
+                        } else if loc_1.initialization_time > loc_2.initialization_time {
+                            BDA::write(f, buf_loc_1, MetadataLocation::Second)?;
+                            Ok(Some(loc_1))
                         } else {
-                            if loc_1.initialization_time > loc_2.initialization_time {
-                                BDA::write(f, buf_loc_1, MetadataLocation::Second)?;
-                                Ok(Some(loc_1))
-                            } else {
-                                BDA::write(f, buf_loc_2, MetadataLocation::First)?;
-                                Ok(Some(loc_2))
-                            }
+                            BDA::write(f, buf_loc_2, MetadataLocation::First)?;
+                            Ok(Some(loc_2))
                         }
                     }
                     (None, None) => Ok(None),

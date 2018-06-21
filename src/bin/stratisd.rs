@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #![cfg_attr(not(feature = "clippy"), allow(unknown_lints))]
+#![cfg_attr(not(feature = "clippy"), allow(unit_arg))]
 #![allow(doc_markdown)]
 
 extern crate devicemapper;

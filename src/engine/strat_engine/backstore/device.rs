@@ -57,13 +57,8 @@ pub enum DevOwnership {
 /// Returns true if a device has no signature, yes this is a bit convoluted.  Logic gleaned from
 /// blivet library.
 fn empty(device: &HashMap<String, String>) -> bool {
-    if (device.contains_key("ID_PART_TABLE_TYPE") && !device.contains_key("ID_PART_ENTRY_DISK"))
-        || device.contains_key("ID_FS_USAGE")
-    {
-        false
-    } else {
-        true
-    }
+    !((device.contains_key("ID_PART_TABLE_TYPE") && !device.contains_key("ID_PART_ENTRY_DISK"))
+        || device.contains_key("ID_FS_USAGE"))
 }
 
 /// Generate some kind of human readable text about what's on a device.
@@ -82,7 +77,7 @@ fn signature(device: &HashMap<String, String>) -> String {
 
 /// Determine what a block device is used for.
 pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
-    let rc = if let Some(device) = get_udev_block_device(devnode)? {
+    if let Some(device) = get_udev_block_device(devnode)? {
         if empty(&device) {
             // The device is either really empty or we are running on a distribution that hasn't
             // picked up the latest libblkid, lets read down to the device and find out for sure.
@@ -94,9 +89,7 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
             } else {
                 Ok(DevOwnership::Unowned)
             }
-        } else if device.contains_key("ID_FS_TYPE")
-            && device.get("ID_FS_TYPE").unwrap() == "stratis"
-        {
+        } else if device.contains_key("ID_FS_TYPE") && device["ID_FS_TYPE"] == "stratis" {
             // Device is ours, but we don't get everything we need from udev db, lets go to disk.
             if let Some((pool_uuid, device_uuid)) = StaticHeader::device_identifiers(
                 &mut OpenOptions::new().read(true).open(&devnode)?,
@@ -115,14 +108,13 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
     } else {
         Err(StratisError::Engine(
             ErrorEnum::NotFound,
-            String::from(format!(
+            format!(
                 "We expected to find the block device {:?} \
                  in the udev db",
                 devnode
-            )),
+            ),
         ))
-    };
-    rc
+    }
 }
 
 /// Determine if devnode is a Stratis device. Return the device's Stratis
@@ -138,7 +130,7 @@ pub fn is_stratis_device(devnode: &Path) -> StratisResult<Option<PoolUuid>> {
 mod test {
     use std::path::Path;
 
-    use super::super::super::cmd::{udev_settle, create_ext3_fs};
+    use super::super::super::cmd::{create_ext3_fs, udev_settle};
     use super::super::super::tests::{loopbacked, real};
 
     use super::super::device;

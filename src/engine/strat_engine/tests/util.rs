@@ -2,9 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::fs::File;
+use std::io::Read;
 use std::path::PathBuf;
 
-use mnt::get_submounts;
+use libmount;
 use nix::mount::{MntFlags, umount2};
 
 use devicemapper::{DevId, DmOptions};
@@ -13,12 +15,14 @@ use super::super::dm::{get_dm, get_dm_init};
 
 #[allow(renamed_and_removed_lints)]
 mod cleanup_errors {
-    use mnt;
+    use libmount;
     use nix;
+    use std;
 
     error_chain!{
         foreign_links {
-            Mnt(mnt::ParseError);
+            Ioe(std::io::Error);
+            Mnt(libmount::mountinfo::ParseError);
             Nix(nix::Error);
         }
     }
@@ -78,13 +82,19 @@ fn dm_stratis_devices_remove() -> Result<()> {
 /// immediately on the first one we are unable to unmount.
 fn stratis_filesystems_unmount() -> Result<()> {
     || -> Result<()> {
-        let mounts = get_submounts(&PathBuf::from("/"))?;
-        for m in mounts
-            .iter()
-            .filter(|m| m.file.to_str().map_or(false, |s| s.contains("stratis")))
+        let mut mount_data = String::new();
+        File::open("/proc/self/mountinfo")?.read_to_string(&mut mount_data)?;
+        let parser = libmount::mountinfo::Parser::new(mount_data.as_bytes());
+
+        for mount_point in parser
+            .into_iter()
+            .filter_map(|x| x.ok())
+            .filter_map(|m| m.mount_point.into_owned().into_string().ok())
+            .filter(|mp| mp.contains("stratis"))
         {
-            umount2(&m.file, MntFlags::MNT_DETACH)?;
+            umount2(&PathBuf::from(mount_point), MntFlags::MNT_DETACH)?;
         }
+
         Ok(())
     }().map_err(|e| e.chain_err(|| "Failed to ensure all Stratis filesystems were unmounted"))
 }

@@ -43,6 +43,7 @@ pub fn get_udev_block_device(
     Ok(result)
 }
 
+#[allow(dead_code)]
 /// Get a udev property.
 /// Return an error if the property value can not be converted to a String.
 pub fn get_udev_property<T: AsRef<OsStr>>(

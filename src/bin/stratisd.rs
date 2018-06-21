@@ -42,7 +42,7 @@ use dbus::WatchEvent;
 
 use devicemapper::Device;
 
-use libstratis::engine::{Engine, SimEngine, StratEngine};
+use libstratis::engine::{get_udev_init, Engine, SimEngine, StratEngine};
 use libstratis::stratis::{alarm, buff_log};
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
 
@@ -170,7 +170,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     // completed initialization. Unless the udev event has been recorded, the
     // engine will miss the device.
     // This is especially important since stratisd must run during early boot.
-    let context = libudev::Context::new()?;
+    let context = get_udev_init()?;
     let mut monitor = libudev::Monitor::new(&context)?;
     monitor.match_subsystem_devtype("block", "disk")?;
     let mut udev = monitor.listen()?;

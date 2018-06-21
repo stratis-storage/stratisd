@@ -10,10 +10,12 @@ use libudev;
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
+use super::super::super::udev::get_udev;
+
 /// Lookup the WWN from the udev db using the device node eg. /dev/sda
 pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<String>> {
     #![allow(let_and_return)]
-    let context = libudev::Context::new()?;
+    let context = get_udev();
     let mut enumerator = libudev::Enumerator::new(&context)?;
     enumerator.match_subsystem("block")?;
     enumerator.match_property("DEVTYPE", "disk")?;

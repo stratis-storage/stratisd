@@ -1162,25 +1162,26 @@ mod tests {
             .quickcheck(static_header as fn(u64, u32) -> TestResult);
     }
 
+    /// Corrupt a byte at the specified position.
+    fn corrupt_byte<F>(f: &mut F, position: u64) -> io::Result<()>
+    where
+        F: Read + Seek + SyncAll,
+    {
+        let mut byte_to_corrupt = [0; 1];
+        f.seek(SeekFrom::Start(position))?;
+        f.read(&mut byte_to_corrupt)?;
+        byte_to_corrupt[0] = !byte_to_corrupt[0];
+        f.seek(SeekFrom::Start(position))?;
+        f.write(&byte_to_corrupt)?;
+        f.sync_all()?;
+        Ok(())
+    }
+
     #[test]
     /// Verify that we correctly handle reading up the BDA when we walk a byte of corruption through
     /// the BDA sector for each copy and correct the corrupt copy and return an error when
     /// we corrupt both copies.
     fn bda_test_recovery() {
-        fn corrupt_byte<F>(f: &mut F, position: u64) -> io::Result<()>
-        where
-            F: Read + Seek + SyncAll,
-        {
-            let mut byte_to_corrupt = [0; 1];
-            f.seek(SeekFrom::Start(position))?;
-            f.read(&mut byte_to_corrupt)?;
-            byte_to_corrupt[0] = !byte_to_corrupt[0];
-            f.seek(SeekFrom::Start(position))?;
-            f.write(&byte_to_corrupt)?;
-            f.sync_all()?;
-            Ok(())
-        }
-
         let sh = random_static_header(10000, 4);
         let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
         let mut buf = Cursor::new(vec![0; buf_size]);
@@ -1288,5 +1289,31 @@ mod tests {
             // We should match the reference buffer
             assert_eq!(reference_buf.get_ref(), buf_newer.get_ref());
         }
+    }
+
+    #[test]
+    /// Test that we get an error and not Ok(None) when one copy is missing a valid signature
+    /// and the other copy fails (eg. CRC).
+    fn bda_none_and_err() {
+        let sh = random_static_header(10000, 4);
+        let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
+        let mut buf = Cursor::new(vec![0; buf_size]);
+
+        BDA::initialize(
+            &mut buf,
+            sh.pool_uuid,
+            sh.dev_uuid,
+            sh.mda_size,
+            sh.blkdev_size,
+            Utc::now().timestamp() as u64,
+        ).unwrap();
+
+        // Corrupt magic in copy 1 to induce Ok(None)
+        corrupt_byte(&mut buf, (SECTOR_SIZE + 10) as u64).unwrap();
+
+        // Corrupt a non-magic byte in copy 2 to induce Err()
+        corrupt_byte(&mut buf, (SECTOR_SIZE * 9 + 128) as u64).unwrap();
+
+        assert!(StaticHeader::setup(&mut buf).is_err());
     }
 }

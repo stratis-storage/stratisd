@@ -26,6 +26,8 @@ pub use self::types::PoolUuid;
 pub use self::types::Redundancy;
 pub use self::types::RenameAction;
 
+pub use self::udev::get_udev_init;
+
 #[macro_use]
 mod macros;
 
@@ -37,3 +39,4 @@ mod sim_engine;
 mod strat_engine;
 mod structures;
 mod types;
+mod udev;

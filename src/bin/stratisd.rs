@@ -49,9 +49,9 @@ use libstratis::dbus_api::{consts, prop_changed_dispatch};
 use libstratis::engine::{
     get_engine_listener_list_mut, EngineEvent, EngineListener, MaybeDbusPath,
 };
-use libstratis::engine::{Engine, SimEngine, StratEngine};
-use libstratis::stratis::buff_log;
-use libstratis::stratis::{StratisError, StratisResult, VERSION};
+
+use libstratis::engine::{get_udev_init, Engine, SimEngine, StratEngine};
+use libstratis::stratis::{buff_log, StratisError, StratisResult, VERSION};
 
 const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
 
@@ -305,7 +305,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     // completed initialization. Unless the udev event has been recorded, the
     // engine will miss the device.
     // This is especially important since stratisd must run during early boot.
-    let context = libudev::Context::new()?;
+    let context = get_udev_init()?;
     let mut monitor = libudev::Monitor::new(&context)?;
     monitor.match_subsystem_devtype("block", "disk")?;
     let mut udev = monitor.listen()?;

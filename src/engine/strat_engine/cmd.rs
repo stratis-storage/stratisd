@@ -49,7 +49,7 @@ lazy_static! {
         (THIN_CHECK.to_string(), find_binary(THIN_CHECK)),
         (THIN_REPAIR.to_string(), find_binary(THIN_REPAIR)),
         (XFS_ADMIN.to_string(), find_binary(XFS_ADMIN)),
-        (XFS_GROWFS.to_string(), find_binary(XFS_GROWFS))
+        (XFS_GROWFS.to_string(), find_binary(XFS_GROWFS)),
     ].iter()
         .cloned()
         .collect();
@@ -158,16 +158,10 @@ pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> StratisResult<()> {
 /// Call udevadm settle
 #[cfg(test)]
 pub fn udev_settle() -> StratisResult<()> {
-    execute_cmd(
-        Command::new("udevadm").arg("settle"),
-        &format!("udevadm settle failed"),
-    )
+    execute_cmd(Command::new("udevadm").arg("settle"))
 }
 
 #[cfg(test)]
 pub fn create_ext3_fs(devnode: &Path) -> StratisResult<()> {
-    execute_cmd(
-        Command::new("mkfs.ext3").arg(&devnode),
-        &format!("Failed to create new ext3 filesystem at {:?}", devnode),
-    )
+    execute_cmd(Command::new("mkfs.ext3").arg(&devnode))
 }

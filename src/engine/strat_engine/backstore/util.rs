@@ -4,11 +4,12 @@
 
 // Utilities to support Stratis.
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::path::Path;
 
 use libudev;
 
-use stratis::StratisResult;
+use stratis::{ErrorEnum, StratisError, StratisResult};
 
 /// Takes a libudev device entry and returns the properties as a HashMap.
 /// Omits any properties with names or values that can not be translated from
@@ -40,6 +41,24 @@ pub fn get_udev_block_device(
         .find(|x| x.devnode().map_or(false, |d| dev_node_search == d))
         .and_then(|dev| Some(device_as_map(&dev)));
     Ok(result)
+}
+
+/// Get a udev property.
+/// Return an error if the property value can not be converted to a String.
+pub fn get_udev_property<T: AsRef<OsStr>>(
+    device: &libudev::Device,
+    property_name: T,
+) -> StratisResult<Option<String>> {
+    match device.property_value(property_name) {
+        Some(value) => match value.to_str() {
+            Some(value) => Ok(Some(value.into())),
+            None => Err(StratisError::Engine(
+                ErrorEnum::Error,
+                format!("Unable to convert {:?} to str", value),
+            )),
+        },
+        None => Ok(None),
+    }
 }
 
 /// Lookup the WWN from the udev db using the device node eg. /dev/sda

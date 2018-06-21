@@ -20,7 +20,7 @@ use std::process::Command;
 
 use uuid::Uuid;
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
+use stratis::{StratisError, StratisResult};
 
 /// Find the binary with the given name by looking in likely locations.
 /// Return None if no binary was found.
@@ -68,38 +68,39 @@ pub fn verify_binaries() -> StratisResult<()> {
     }
 }
 
-/// Common function to call a command line utility, returning an Result with an error message which
-/// also includes stdout & stderr if it fails.
-fn execute_cmd(cmd: &mut Command, error_msg: &str) -> StratisResult<()> {
-    let result = cmd.output()?;
-    if result.status.success() {
-        Ok(())
-    } else {
-        let std_out_txt = String::from_utf8_lossy(&result.stdout);
-        let std_err_txt = String::from_utf8_lossy(&result.stderr);
-        let err_msg = format!(
-            "{} stdout: {} stderr: {}",
-            error_msg, std_out_txt, std_err_txt
-        );
-        Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+/// Invoke the specified command. Return an error if invoking the command
+/// fails or if the command itself fails.
+fn execute_cmd(cmd: &mut Command) -> StratisResult<()> {
+    match cmd.output() {
+        Err(err) => Err(StratisError::Error(format!(
+            "Failed to execute command {:?}, err: {:?}",
+            cmd, err
+        ))),
+        Ok(result) => {
+            if result.status.success() {
+                Ok(())
+            } else {
+                let std_out_txt = String::from_utf8_lossy(&result.stdout);
+                let std_err_txt = String::from_utf8_lossy(&result.stderr);
+                let err_msg = format!(
+                    "Command failed: cmd: {:?}, stdout: {} stderr: {}",
+                    cmd, std_out_txt, std_err_txt
+                );
+                Err(StratisError::Error(err_msg))
+            }
+        }
     }
 }
 
 /// Get an absolute path for the executable with the given name.
 /// Precondition: verify_binaries() has already been invoked.
 fn get_executable(name: &str) -> StratisResult<PathBuf> {
-    let executable = BINARIES
+    Ok(BINARIES
         .get(name)
         .expect("name arguments are all constants defined with BINARIES, lookup can not fail")
         .as_ref()
-        .expect("verify_binaries() was previously called and returned no error");
-    if !executable.exists() {
-        return Err(StratisError::Error(format!(
-            "Executable previously located at \"{}\" seems to have been removed since stratisd was started",
-            executable.to_str().expect("All parts of path are constructed from strictly ASCII components")
-        )));
-    }
-    Ok(executable.to_path_buf())
+        .expect("verify_binaries() was previously called and returned no error")
+        .to_path_buf())
 }
 
 /// Create a filesystem on devnode.
@@ -111,7 +112,6 @@ pub fn create_fs(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
             .arg(&devnode)
             .arg("-m")
             .arg(format!("uuid={}", uuid)),
-        &format!("Failed to create new filesystem at {:?}", devnode),
     )
 }
 
@@ -122,7 +122,6 @@ pub fn xfs_growfs(mount_point: &Path) -> StratisResult<()> {
         Command::new(get_executable(XFS_GROWFS)?.as_os_str())
             .arg(mount_point)
             .arg("-d"),
-        &format!("Failed to expand filesystem {:?}", mount_point),
     )
 }
 
@@ -133,7 +132,6 @@ pub fn set_uuid(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
             .arg("-U")
             .arg(format!("{}", uuid))
             .arg(&devnode),
-        &format!("Failed to set UUID for filesystem {:?}", devnode),
     )
 }
 
@@ -143,7 +141,6 @@ pub fn thin_check(devnode: &Path) -> StratisResult<()> {
         Command::new(get_executable(THIN_CHECK)?.as_os_str())
             .arg("-q")
             .arg(devnode),
-        &format!("thin_check for thin pool meta device {:?} failed", devnode),
     )
 }
 
@@ -155,6 +152,5 @@ pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> StratisResult<()> {
             .arg(meta_dev)
             .arg("-o")
             .arg(new_meta_dev),
-        &format!("thin_repair of thin pool meta device {:?} failed", meta_dev),
     )
 }

@@ -11,6 +11,7 @@ use devicemapper::{DevId, DmOptions};
 
 use super::super::dm::{get_dm, get_dm_init};
 
+#[allow(renamed_and_removed_lints)]
 mod cleanup_errors {
     use mnt;
     use nix;

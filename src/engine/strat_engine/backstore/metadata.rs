@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::fmt::{self, Display};
 use std::io::{self, Read, Seek, SeekFrom};
 use std::str::from_utf8;
 
@@ -29,11 +30,52 @@ const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)
 
 const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
+/// Something to identify a device that is not a StratisDevice.
+/// This type is extremely rudimentary and may have to be modified as Stratis's
+/// notion of how to obtain a signature for a deivce that is not Stratis's
+/// changes.
+#[derive(Debug, PartialEq, Eq)]
+pub enum TheirsReason {
+    /// Something at start of device.
+    Dirty,
+    /// Udev identifies device as belonging to another.
+    #[allow(dead_code)]
+    Udev {
+        id_part_table_type: Option<String>,
+        id_fs_type: Option<String>,
+    },
+}
+
+impl Display for TheirsReason {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TheirsReason::Dirty => write!(f, "Some non-zero bits at start of device"),
+            TheirsReason::Udev {
+                id_part_table_type,
+                id_fs_type,
+            } => write!(
+                f,
+                "ID_PART_TABLE_TYPE: {}, ID_FS_TYPE: {}",
+                match id_part_table_type {
+                    Some(val) => val,
+                    None => "not available",
+                },
+                match id_fs_type {
+                    Some(val) => val,
+                    None => "not found",
+                }
+            ),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum DevOwnership {
+    #[allow(dead_code)]
+    Contradiction,
     Ours(PoolUuid, DevUuid),
     Unowned,
-    Theirs,
+    Theirs(TheirsReason),
 }
 
 #[derive(Debug)]
@@ -59,7 +101,7 @@ where
         Ok(None) => {
             let buf = BDA::read(f)?;
             if buf.iter().any(|x| *x != 0) {
-                Ok(DevOwnership::Theirs)
+                Ok(DevOwnership::Theirs(TheirsReason::Dirty))
             } else {
                 Ok(DevOwnership::Unowned)
             }
@@ -922,7 +964,7 @@ mod tests {
             buf.seek(SeekFrom::Start(offset as u64)).unwrap();
             buf.write(&data).unwrap();
             match determine_ownership(&mut buf).unwrap() {
-                DevOwnership::Theirs => {}
+                DevOwnership::Theirs(_) => {}
                 _ => return TestResult::failed(),
             }
             TestResult::passed()

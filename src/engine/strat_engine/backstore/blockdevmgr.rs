@@ -386,11 +386,17 @@ fn initialize(
             };
             match ownership {
                 DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, f))),
-                DevOwnership::Theirs => {
+                DevOwnership::Contradiction =>
+                {
+                    return Err(StratisError::Engine(ErrorEnum::Invalid,
+                        "udev has identified this device as a Stratis device, but no Stratis header was found on the device".into()))
+                }
+                DevOwnership::Theirs(whose) => {
                     if !force {
                         let err_str = format!(
-                            "Device {} appears to belong to another application",
-                            devnode.display()
+                            "Device {} appears to belong to another application, reason: {}",
+                            devnode.display(),
+                            whose
                         );
                         return Err(StratisError::Engine(ErrorEnum::Invalid, err_str));
                     } else {
@@ -541,12 +547,20 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).is_err());
         assert!(paths.iter().enumerate().all(|(i, path)| {
-            determine_ownership(&mut OpenOptions::new().read(true).open(path).unwrap()).unwrap()
-                == if i == index {
-                    DevOwnership::Theirs
-                } else {
-                    DevOwnership::Unowned
+            let real_ownership =
+                determine_ownership(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap();
+            if i == index {
+                match real_ownership {
+                    DevOwnership::Theirs(_) => true,
+                    _ => false,
                 }
+            } else {
+                match real_ownership {
+                    DevOwnership::Unowned => true,
+                    _ => false,
+                }
+            }
         }));
 
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, true).is_ok());

@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #![cfg_attr(not(feature = "clippy"), allow(unknown_lints))]
-#![cfg_attr(not(feature = "clippy"), allow(unit_arg))]
 #![allow(doc_markdown)]
 
 extern crate devicemapper;
@@ -319,8 +318,9 @@ fn main() {
 
     let result = trylock_pid_file()
         .and_then(|_pidfile| {
-            Ok(initialize_log(matches.is_present("debug"))
-                .expect("This is the first and only invocation of this method; it must succeed."))
+            initialize_log(matches.is_present("debug")).map_err(|_| {
+                StratisError::Error("The log was not initialized successfully. This is surprising, since this is the first and only initialization of the log, which is guaranteed to succeed".into())
+            })
         })
         .and_then(|_| run(&matches));
     if let Err(err) = result {

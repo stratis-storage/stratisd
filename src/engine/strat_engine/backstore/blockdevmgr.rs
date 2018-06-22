@@ -26,7 +26,7 @@ use super::blockdev::StratBlockDev;
 use super::cleanup::wipe_blockdevs;
 use super::device::{blkdev_size, resolve_devices};
 use super::metadata::{validate_mda_size, StaticHeader, BDA, MIN_MDA_SECTORS};
-use super::udev::hw_lookup;
+use super::udev::{get_udev_property, udev_block_device_apply};
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 const MAX_NUM_TO_WRITE: usize = 10;
@@ -438,10 +438,11 @@ fn initialize(
             Utc::now().timestamp() as u64,
         );
         if let Ok(bda) = bda {
-            let hw_id = match hw_lookup(devnode) {
-                Ok(id) => id,
-                Err(_) => None, // TODO: Log this failure so that it can be addressed.
-            };
+            let hw_id =
+                match udev_block_device_apply(devnode, |dev| get_udev_property(dev, "ID_WWN")) {
+                    Ok(Some(Ok(Some(id)))) => Some(id),
+                    _ => None, // TODO: Log this failure so that it can be addressed.
+                };
 
             // FIXME: The expect is only provisionally true.
             // The dev_size is at least MIN_DEV_SIZE, but the size of the

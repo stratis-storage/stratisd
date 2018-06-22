@@ -4,37 +4,55 @@
 
 // Udev dependent code for getting information about devices.
 
+use std::ffi::OsStr;
 use std::path::Path;
 
 use libudev;
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
+use stratis::{StratisError, StratisResult};
 
 use super::super::super::udev::get_udev;
 
-/// Lookup the WWN from the udev db using the device node eg. /dev/sda
-pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<String>> {
+/// Get a udev property with the given name for the given device.
+/// Returns an error if the value of the property can not be converted
+/// to a String using the standard conversion for this OS.
+pub fn get_udev_property<T: AsRef<OsStr>>(
+    device: &libudev::Device,
+    property_name: T,
+) -> StratisResult<Option<String>> {
+    match device.property_value(property_name) {
+        Some(value) => match value.to_str() {
+            Some(value) => Ok(Some(value.into())),
+            None => Err(StratisError::Error(format!(
+                "Unable to convert {:?} to str",
+                value
+            ))),
+        },
+        None => Ok(None),
+    }
+}
+
+/// Locate a udev block device by using its device node and apply a function
+/// to it, returning the result of the function.
+/// This approach is necessitated by the libudev lifetimes, which do not
+/// allow returning anything directly obtained from the enumerator value
+/// created in the method itself.
+pub fn udev_block_device_apply<F, U>(devnode: &Path, f: F) -> StratisResult<Option<U>>
+where
+    F: FnOnce(&libudev::Device<'_>) -> U,
+{
     #![allow(let_and_return)]
     let context = get_udev();
-    let mut enumerator = libudev::Enumerator::new(&context)?;
+
+    let mut enumerator = libudev::Enumerator::new(context)?;
     enumerator.match_subsystem("block")?;
-    enumerator.match_property("DEVTYPE", "disk")?;
 
-    let result = enumerator
+    let result = match enumerator
         .scan_devices()?
-        .find(|x| x.devnode().map_or(false, |d| dev_node_search == d))
-        .map_or(Ok(None), |dev| {
-            dev.property_value("ID_WWN").map_or(Ok(None), |i| {
-                i.to_str()
-                    .ok_or_else(|| {
-                        StratisError::Engine(
-                            ErrorEnum::Error,
-                            format!("Unable to convert {:?} to str", i),
-                        )
-                    })
-                    .map(|i| Some(String::from(i)))
-            })
-        });
-
+        .find(|x| x.devnode().map_or(false, |d| devnode == d))
+    {
+        Some(device) => Ok(Some(f(&device))),
+        None => Ok(None),
+    };
     result
 }

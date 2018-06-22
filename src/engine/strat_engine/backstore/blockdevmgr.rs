@@ -439,8 +439,8 @@ fn initialize(
         );
         if let Ok(bda) = bda {
             let hw_id = match hw_lookup(devnode) {
-                Ok(id) => id,
-                Err(_) => None, // TODO: Log this failure so that it can be addressed.
+                Ok(Some(Ok(Some(id)))) => Some(id),
+                _ => None, // TODO: Log this failure so that it can be addressed.
             };
 
             // FIXME: The expect is only provisionally true.

@@ -44,18 +44,37 @@ pub fn get_udev_property<T: AsRef<OsStr>>(
     }
 }
 
-/// Lookup the WWN from the udev db using the device node eg. /dev/sda
-pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<String>> {
+/// Locate a udev block device by using its device node and apply a function
+/// to it, returning the result of the function.
+/// This approach is necessitated by the libudev lifetimes, which do not
+/// allow returning anything directly obtained from the enumerator value
+/// created in the method itself.
+pub fn udev_block_device_apply<F, U>(devnode: &Path, f: F) -> StratisResult<Option<U>>
+where
+    F: FnOnce(&libudev::Device<'_>) -> U,
+{
     #![allow(let_and_return)]
     let context = get_udev();
-    let mut enumerator = libudev::Enumerator::new(&context)?;
+
+    let mut enumerator = libudev::Enumerator::new(context)?;
     enumerator.match_subsystem("block")?;
-    enumerator.match_property("DEVTYPE", "disk")?;
 
-    let result = enumerator
+    let result = match enumerator
         .scan_devices()?
-        .find(|x| x.devnode().map_or(false, |d| dev_node_search == d))
-        .map_or(Ok(None), |dev| get_udev_property(&dev, "ID_WWN"));
-
+        .find(|x| x.devnode().map_or(false, |d| devnode == d))
+    {
+        Some(device) => Ok(Some(f(&device))),
+        None => Ok(None),
+    };
     result
+}
+
+/// Lookup the WWN from the udev db using the device node.
+/// Returns an error if there was an error looking up the device.
+/// Returns None if the device could not be found.
+/// Returns Ok(Some(Err(...))) if the device was found but there was an
+/// error interpreting the value.
+/// Returns Ok(Some(Ok(None))) if there was no ID_WNN in the database.
+pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<StratisResult<Option<String>>>> {
+    udev_block_device_apply(dev_node_search, |dev| get_udev_property(dev, "ID_WWN"))
 }

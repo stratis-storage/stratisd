@@ -173,19 +173,23 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
 
     let eventable = engine.borrow().get_eventable();
 
-    // The variable _dbus_client_index_start is only used when dbus support is compiled in, thus
-    // we denote the value as not needed to compile when dbus support is not included.
-    let (poll_timeout, _dbus_client_index_start) = match eventable {
+    let poll_timeout = match eventable {
         Some(ref evt) => {
             fds.push(libc::pollfd {
                 fd: evt.get_pollable_fd(),
                 revents: 0,
                 events: libc::POLLIN,
             });
-
-            (-1, FD_INDEX_ENGINE + 1)
+            -1
         }
-        None => (10000, FD_INDEX_ENGINE),
+        None => 10000,
+    };
+
+    #[cfg(feature = "dbus_enabled")]
+    let dbus_client_index_start = if eventable.is_some() {
+        FD_INDEX_ENGINE + 1
+    } else {
+        FD_INDEX_ENGINE
     };
 
     #[cfg(feature = "dbus_enabled")]
@@ -211,30 +215,32 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
                 if let Some((device, devnode)) = handle_udev_add(&event) {
                     // If block evaluate returns an error we are going to ignore it as
                     // there is nothing we can do for a device we are getting errors with.
-                    let pool_uuid = engine
-                        .borrow_mut()
-                        .block_evaluate(device, devnode)
-                        .unwrap_or(None);
+                    #[cfg(not(feature = "dbus_enabled"))]
+                    let _ = engine.borrow_mut().block_evaluate(device, devnode);
 
-                    // We need to pretend that we aren't using the variable _pool_uuid so
-                    // that we can conditionally compile out the register_pool when dbus
-                    // is not enabled.
-                    if let Some(_pool_uuid) = pool_uuid {
-                        #[cfg(feature = "dbus_enabled")]
-                        libstratis::dbus_api::register_pool(
-                            &dbus_conn,
-                            &dbus_context,
-                            &mut tree,
-                            _pool_uuid,
-                            engine
-                                .borrow()
-                                .get_pool(_pool_uuid)
-                                .expect(
-                                    "block_evaluate() returned a pool UUID, pool must be available",
-                                )
-                                .1,
-                            &base_object_path,
-                        )?;
+                    #[cfg(feature = "dbus_enabled")]
+                    {
+                        let pool_uuid = engine
+                            .borrow_mut()
+                            .block_evaluate(device, devnode)
+                            .unwrap_or(None);
+
+                        if let Some(pool_uuid) = pool_uuid {
+                            libstratis::dbus_api::register_pool(
+                                &dbus_conn,
+                                &dbus_context,
+                                &mut tree,
+                                pool_uuid,
+                                engine
+                                    .borrow()
+                                    .get_pool(pool_uuid)
+                                    .expect(
+                                        "block_evaluate() returned a pool UUID, pool must be available",
+                                    )
+                                    .1,
+                                &base_object_path,
+                            )?;
+                        }
                     }
                 }
             }
@@ -260,7 +266,7 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
         // Iterate through D-Bus file descriptors (if enabled)
         #[cfg(feature = "dbus_enabled")]
         {
-            for pfd in fds[_dbus_client_index_start..]
+            for pfd in fds[dbus_client_index_start..]
                 .iter()
                 .filter(|pfd| pfd.revents != 0)
             {
@@ -275,7 +281,7 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
 
             // Refresh list of dbus fds to poll for every time. This can change as
             // D-Bus clients come and go.
-            fds.truncate(_dbus_client_index_start);
+            fds.truncate(dbus_client_index_start);
 
             fds.extend(dbus_conn.watch_fds().iter().map(|w| w.to_pollfd()));
         }

@@ -19,13 +19,12 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{DevUuid, PoolUuid};
 
-use super::super::engine::DevOwnership;
 use super::super::serde_structs::{BlockDevSave, Recordable};
 
 use super::blockdev::StratBlockDev;
 use super::cleanup::wipe_blockdevs;
 use super::device::{blkdev_size, resolve_devices};
-use super::metadata::{determine_ownership, validate_mda_size, BDA, MIN_MDA_SECTORS};
+use super::metadata::{determine_ownership, validate_mda_size, DevOwnership, BDA, MIN_MDA_SECTORS};
 use super::udev::{get_udev_property, udev_block_device_apply};
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);

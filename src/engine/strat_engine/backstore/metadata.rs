@@ -17,7 +17,6 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::device::SyncAll;
-use super::super::engine::DevOwnership;
 
 pub use self::mda::{validate_mda_size, MIN_MDA_SECTORS};
 
@@ -29,6 +28,13 @@ const BDA_STATIC_HDR_SIZE: Bytes = Bytes(_BDA_STATIC_HDR_SIZE as u64);
 const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
 
 const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum DevOwnership {
+    Ours(PoolUuid, DevUuid),
+    Unowned,
+    Theirs,
+}
 
 #[derive(Debug)]
 pub struct BDA {
@@ -879,8 +885,6 @@ mod tests {
     use devicemapper::{Bytes, Sectors, IEC};
     use quickcheck::{QuickCheck, TestResult};
     use uuid::Uuid;
-
-    use super::super::super::engine::DevOwnership;
 
     use super::*;
 

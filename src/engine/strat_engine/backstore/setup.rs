@@ -20,13 +20,12 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 use super::super::super::structures::Table;
 use super::super::super::types::{Name, PoolUuid};
 
-use super::super::engine::DevOwnership;
 use super::super::pool::{check_metadata, StratPool};
 use super::super::serde_structs::{BackstoreSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
 use super::device::blkdev_size;
-use super::metadata::{determine_ownership, BDA};
+use super::metadata::{determine_ownership, DevOwnership, BDA};
 
 /// Determine if devnode is a Stratis device. Return the device's Stratis
 /// pool UUID if it belongs to Stratis.

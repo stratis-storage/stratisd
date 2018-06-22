@@ -10,6 +10,7 @@ use std::fs::{read_dir, OpenOptions};
 use std::io::ErrorKind;
 use std::path::PathBuf;
 
+use libudev;
 use nix::errno::Errno;
 use serde_json;
 
@@ -19,6 +20,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::structures::Table;
 use super::super::super::types::{Name, PoolUuid};
+use super::super::super::udev::get_udev;
 
 use super::super::pool::{check_metadata, StratPool};
 use super::super::serde_structs::{BackstoreSave, PoolSave};
@@ -26,6 +28,7 @@ use super::super::serde_structs::{BackstoreSave, PoolSave};
 use super::blockdev::StratBlockDev;
 use super::device::blkdev_size;
 use super::metadata::{determine_ownership, DevOwnership, BDA};
+use super::udev::unclaimed;
 
 /// Determine if devnode is a Stratis device. Return the device's Stratis
 /// pool UUID if it belongs to Stratis.
@@ -133,6 +136,40 @@ pub fn setup_pool(
 ///
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
 pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
+    let context = get_udev();
+
+    let mut enumerator = libudev::Enumerator::new(context)?;
+    enumerator.match_subsystem("block")?;
+    enumerator.match_property("ID_FS_TYPE", "stratis")?;
+
+    // Skip any block devices w/out devnodes. There should never be any, but
+    // there is no point in crashing if there are.
+    let devices: Vec<PathBuf> = enumerator
+        .scan_devices()?
+        .filter_map(|x| x.devnode().map(|d| d.to_path_buf()))
+        .collect();
+
+    // TODO: If at some point it is guaranteed that libblkid version is
+    // not less than that required to identify Stratis devices, this block
+    // can be removed.
+    let _devices = if devices.is_empty() {
+        // There are no Stratis devices OR libblkid is an early version that
+        // doesn't support identifying Stratis devices. Fall back to using
+        // udev to get all devices that are lacking any signature which
+        // identifies them as belonging to some other system or application.
+
+        let mut enumerator = libudev::Enumerator::new(context)?;
+        enumerator.match_subsystem("block")?;
+
+        enumerator
+            .scan_devices()?
+            .filter(|d| unclaimed(d))
+            .filter_map(|i| i.devnode().map(|d| d.to_path_buf()))
+            .collect()
+    } else {
+        devices
+    };
+
     let mut pool_map = HashMap::new();
     let mut devno_set = HashSet::new();
     for dir_e in read_dir("/dev")? {

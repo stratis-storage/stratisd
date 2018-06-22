@@ -5,13 +5,18 @@
 // Functions for dealing with devices.
 
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
+
+use libudev;
 
 use devicemapper::{devnode_to_devno, Bytes, Device};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
+
+use super::metadata::{device_identifiers, DevOwnership, TheirsReason};
+use super::udev::{get_udev_property, udev_block_device_apply, unclaimed};
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);
 
@@ -42,4 +47,71 @@ pub fn resolve_devices<'a>(paths: &'a [&Path]) -> StratisResult<HashMap<Device, 
         }
     }
     Ok(map)
+}
+
+/// Identify a device node using a combination of udev information and
+/// Stratis signature information.
+/// Return an error if the device is not in the udev database.
+/// Return an error if the necessary udev information can not be read.
+pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
+    /// A helper function. None if the device is unclaimed, the value of
+    /// ID_FS_TYPE, which may yet be None, if it is.
+    #[allow(option_option)]
+    fn udev_info(device: &libudev::Device) -> StratisResult<Option<Option<String>>> {
+        if unclaimed(device) {
+            Ok(None)
+        } else {
+            Ok(Some(get_udev_property(device, "ID_FS_TYPE")?))
+        }
+    }
+
+    match udev_block_device_apply(devnode, udev_info)? {
+        Some(Ok(Some(Some(value)))) => {
+            if value == "stratis" {
+                if let Some((pool_uuid, device_uuid)) =
+                    device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+                {
+                    Ok(DevOwnership::Ours(pool_uuid, device_uuid))
+                } else {
+                    Ok(DevOwnership::Contradiction)
+                }
+            } else {
+                Ok(DevOwnership::Theirs(TheirsReason::Udev {
+                    id_part_table_type: None,
+                    id_fs_type: None,
+                }))
+            }
+        }
+        Some(Ok(Some(None))) => Ok(DevOwnership::Theirs(TheirsReason::Udev {
+            id_part_table_type: None,
+            id_fs_type: None,
+        })),
+        Some(Ok(None)) => {
+            // Not a Stratis device OR running an older version of libblkid
+            // that does not interpret Stratis devices. Fall back on reading
+            // Stratis header via Stratis.
+            // NOTE: This is a bit kludgy. If, at any time during stratisd
+            // execution, a device is identified as a Stratis device by libblkid
+            // then it is clear that the version of libblkid being run is new
+            // enough. But to track that information requires some kind of
+            // stateful global variable. So, instead, fall back on the safe
+            // approach of just always reading the Stratis header, regardless
+            // of what has happened in the past.
+            Ok(if let Some((pool_uuid, device_uuid)) =
+                device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+            {
+                DevOwnership::Ours(pool_uuid, device_uuid)
+            } else {
+                DevOwnership::Unowned
+            })
+        }
+        Some(Err(err)) => Err(err),
+        None => Err(StratisError::Engine(
+            ErrorEnum::NotFound,
+            format!(
+                "No device in udev database corresponding to device node {:?}",
+                devnode
+            ),
+        )),
+    }
 }

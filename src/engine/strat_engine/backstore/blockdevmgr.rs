@@ -23,8 +23,8 @@ use super::super::serde_structs::{BlockDevSave, Recordable};
 
 use super::blockdev::StratBlockDev;
 use super::cleanup::wipe_blockdevs;
-use super::device::{blkdev_size, resolve_devices};
-use super::metadata::{determine_ownership, validate_mda_size, DevOwnership, BDA, MIN_MDA_SECTORS};
+use super::device::{blkdev_size, identify, resolve_devices};
+use super::metadata::{validate_mda_size, DevOwnership, BDA, MIN_MDA_SECTORS};
 use super::udev::{get_udev_property, udev_block_device_apply};
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
@@ -353,9 +353,10 @@ fn initialize(
     /// its ownership as determined by calling determine_ownership(),
     /// and an open File handle, all of which are needed later.
     fn dev_info(devnode: &Path) -> StratisResult<(&Path, Bytes, DevOwnership, File)> {
-        let mut f = OpenOptions::new().read(true).write(true).open(&devnode)?;
+        let ownership = identify(devnode)?;
+
+        let f = OpenOptions::new().read(true).write(true).open(&devnode)?;
         let dev_size = blkdev_size(&f)?;
-        let ownership = determine_ownership(&mut f)?;
 
         Ok((devnode, dev_size, ownership, f))
     }
@@ -478,7 +479,7 @@ mod tests {
     use super::super::super::device::write_sectors;
     use super::super::super::tests::{loopbacked, real};
 
-    use super::super::metadata::{BDA_STATIC_HDR_SECTORS, MIN_MDA_SECTORS};
+    use super::super::metadata::{determine_ownership, BDA_STATIC_HDR_SECTORS, MIN_MDA_SECTORS};
     use super::super::setup::{find_all, get_metadata};
 
     use super::*;

@@ -191,6 +191,8 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
         if fds[FD_INDEX_UDEV].revents != 0 {
             while let Some(event) = udev.receive_event() {
                 if event.event_type() == libudev::EventType::Add {
+                    // Skip any device that does not have a device number and
+                    // a device node.
                     if let Some((device, devnode)) = get_device_devnode(event.device()) {
                         // If block evaluate returns an error we are going to ignore it as
                         // there is nothing we can do for a device we are getting errors with.

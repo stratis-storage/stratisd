@@ -71,7 +71,6 @@ impl Display for TheirsReason {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DevOwnership {
-    #[allow(dead_code)]
     Contradiction,
     Ours(PoolUuid, DevUuid),
     Unowned,
@@ -89,6 +88,15 @@ enum MetadataLocation {
     Both,
     First,
     Second,
+}
+
+/// Return the pool and device UUID of a Stratis device.
+/// If no Stratis header on the device, return None.
+pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<((PoolUuid, DevUuid))>>
+where
+    F: Read + Seek + SyncAll,
+{
+    StaticHeader::setup(f).map(|res| res.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
 }
 
 /// Determine the ownership of a device.

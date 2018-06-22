@@ -29,7 +29,7 @@ use super::blockdev::StratBlockDev;
 use super::cleanup::wipe_blockdevs;
 use super::device::{blkdev_size, resolve_devices};
 use super::metadata::{validate_mda_size, StaticHeader, BDA, MIN_MDA_SECTORS};
-use super::util::hw_lookup;
+use super::udev::hw_lookup;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 const MAX_NUM_TO_WRITE: usize = 10;

@@ -26,14 +26,14 @@ use super::super::serde_structs::{BackstoreSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
 use super::device::blkdev_size;
-use super::metadata::{StaticHeader, BDA};
+use super::metadata::{determine_ownership, BDA};
 
 /// Determine if devnode is a Stratis device. Return the device's Stratis
 /// pool UUID if it belongs to Stratis.
 pub fn is_stratis_device(devnode: &PathBuf) -> StratisResult<Option<PoolUuid>> {
     match OpenOptions::new().read(true).open(&devnode) {
         Ok(mut f) => {
-            if let DevOwnership::Ours(pool_uuid, _) = StaticHeader::determine_ownership(&mut f)? {
+            if let DevOwnership::Ours(pool_uuid, _) = determine_ownership(&mut f)? {
                 Ok(Some(pool_uuid))
             } else {
                 Ok(None)

@@ -43,18 +43,37 @@ enum MetadataLocation {
 }
 
 impl BDA {
-    /// Read the BDA from the device and returning a byte array of the entire area.
+    /// Read the BDA from the device and returning a byte array of the entire area.  Only the BDA
+    /// sectors are read up from disk, zero areas are *not* read up.
     fn read<F>(f: &mut F) -> io::Result<[u8; _BDA_STATIC_HDR_SIZE]>
     where
         F: Read + Seek,
     {
-        #![allow(unused_io_amount)]
-        f.seek(SeekFrom::Start(0))?;
+        // Theory of read procedure
+        // We write the BDA in two operations with a sync in between.  The write operation
+        // could fail (loss of power) for either write leaving sector(s) with potentially hard
+        // read errors. It's best to read each of the specific BDA blocks individually, to limit
+        // the probability of hitting a read error on a non-essential sector.
+
         let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
 
-        // FIXME: See https://github.com/stratis-storage/stratisd/pull/476
-        f.read(&mut buf)?;
-        Ok(buf)
+        /// Read a bda sector worth of data at the specified offset.
+        fn read_sector_at_offset<F>(f: &mut F, offset: usize, buf: &mut [u8]) -> io::Result<bool>
+        where
+            F: Read + Seek,
+        {
+            f.seek(SeekFrom::Start(offset as u64))?;
+            f.read_exact(&mut buf[offset..offset + SECTOR_SIZE])?;
+            Ok(true)
+        }
+
+        let loc_1_read_result = read_sector_at_offset(f, SECTOR_SIZE, &mut buf);
+        let loc_2_read_result = read_sector_at_offset(f, 9 * SECTOR_SIZE, &mut buf);
+
+        match (loc_1_read_result, loc_2_read_result) {
+            (Err(loc_1_err), Err(_)) => Err(loc_1_err),
+            _ => Ok(buf),
+        }
     }
 
     // Writes bda_buf according to the value of which.

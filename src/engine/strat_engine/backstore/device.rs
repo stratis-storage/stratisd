@@ -127,12 +127,12 @@ pub fn is_stratis_device(devnode: &Path) -> StratisResult<Option<PoolUuid>> {
 }
 
 #[cfg(test)]
-// rustfmt bug requires this?
-#[cfg_attr(rustfmt, rustfmt_skip)]
 mod test {
     use std::path::Path;
 
-    use super::super::super::cmd::{create_ext3_fs, udev_settle};
+    // Current version of rustfmt alphabetizes this one line incorrectly.
+    // https://github.com/rust-lang-nursery/rustfmt/issues/2800
+    use super::super::super::cmd::{udev_settle, create_ext3_fs};
     use super::super::super::tests::{loopbacked, real};
 
     use super::super::device;

@@ -25,7 +25,7 @@ use super::super::serde_structs::{BlockDevSave, Recordable};
 use super::blockdev::StratBlockDev;
 use super::cleanup::wipe_blockdevs;
 use super::device::{blkdev_size, resolve_devices};
-use super::metadata::{validate_mda_size, StaticHeader, BDA, MIN_MDA_SECTORS};
+use super::metadata::{determine_ownership, validate_mda_size, BDA, MIN_MDA_SECTORS};
 use super::udev::{get_udev_property, udev_block_device_apply};
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
@@ -356,7 +356,7 @@ fn initialize(
     fn dev_info(devnode: &Path) -> StratisResult<(&Path, Bytes, DevOwnership, File)> {
         let mut f = OpenOptions::new().read(true).write(true).open(&devnode)?;
         let dev_size = blkdev_size(&f)?;
-        let ownership = StaticHeader::determine_ownership(&mut f)?;
+        let ownership = determine_ownership(&mut f)?;
 
         Ok((devnode, dev_size, ownership, f))
     }
@@ -542,23 +542,17 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).is_err());
         assert!(paths.iter().enumerate().all(|(i, path)| {
-            StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap() == if i == index {
-                DevOwnership::Theirs
-            } else {
-                DevOwnership::Unowned
-            }
+            determine_ownership(&mut OpenOptions::new().read(true).open(path).unwrap()).unwrap()
+                == if i == index {
+                    DevOwnership::Theirs
+                } else {
+                    DevOwnership::Unowned
+                }
         }));
 
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, true).is_ok());
         assert!(paths.iter().all(|path| {
-            match StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
+            match determine_ownership(&mut OpenOptions::new().read(true).open(path).unwrap())
                 .unwrap()
             {
                 DevOwnership::Ours(uuid, _) => pool_uuid == uuid,
@@ -710,10 +704,7 @@ mod tests {
         let bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
 
         assert!(paths.iter().all(|path| {
-            match StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
+            match determine_ownership(&mut OpenOptions::new().read(true).open(path).unwrap())
                 .unwrap()
             {
                 DevOwnership::Ours(uuid, _) => uuid == pool_uuid,
@@ -722,11 +713,8 @@ mod tests {
         }));
         bd_mgr.destroy_all().unwrap();
         assert!(paths.iter().all(|path| {
-            StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap() == DevOwnership::Unowned
+            determine_ownership(&mut OpenOptions::new().read(true).open(path).unwrap()).unwrap()
+                == DevOwnership::Unowned
         }));
     }
 

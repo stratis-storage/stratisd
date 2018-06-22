@@ -13,6 +13,18 @@ use stratis::{StratisError, StratisResult};
 
 use super::super::super::udev::get_udev;
 
+/// If the expression is true, then it seems that no other system is
+/// known to udev to claim this device.
+/// Note from mulhern: I have no idea myself why this particular expression
+/// should be correct. The expression is equivalent to that used in PR:
+/// https://github.com/stratis-storage/stratisd/pull/936.
+#[allow(dead_code)]
+pub fn unclaimed(device: &libudev::Device) -> StratisResult<bool> {
+    Ok((get_udev_property(device, "ID_PART_TABLE_TYPE")?.is_none()
+        || get_udev_property(device, "ID_PART_ENTRY_DISK")?.is_some())
+        && get_udev_property(device, "ID_FS_USAGE")?.is_none())
+}
+
 /// Get a udev property with the given name for the given device.
 /// Returns an error if the value of the property can not be converted
 /// to a String using the standard conversion for this OS.

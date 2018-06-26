@@ -876,6 +876,21 @@ mod tests {
 
     use super::*;
 
+    /// Corrupt a byte at the specified position.
+    fn corrupt_byte<F>(f: &mut F, position: u64) -> io::Result<()>
+    where
+        F: Read + Seek + SyncAll,
+    {
+        let mut byte_to_corrupt = [0; 1];
+        f.seek(SeekFrom::Start(position))?;
+        f.read(&mut byte_to_corrupt)?;
+        byte_to_corrupt[0] = !byte_to_corrupt[0];
+        f.seek(SeekFrom::Start(position))?;
+        f.write(&byte_to_corrupt)?;
+        f.sync_all()?;
+        Ok(())
+    }
+
     /// Return a static header with random block device and MDA size.
     /// The block device is less than the minimum, for efficiency in testing.
     fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
@@ -1115,21 +1130,6 @@ mod tests {
         QuickCheck::new()
             .tests(30)
             .quickcheck(static_header as fn(u64, u32) -> TestResult);
-    }
-
-    /// Corrupt a byte at the specified position.
-    fn corrupt_byte<F>(f: &mut F, position: u64) -> io::Result<()>
-    where
-        F: Read + Seek + SyncAll,
-    {
-        let mut byte_to_corrupt = [0; 1];
-        f.seek(SeekFrom::Start(position))?;
-        f.read(&mut byte_to_corrupt)?;
-        byte_to_corrupt[0] = !byte_to_corrupt[0];
-        f.seek(SeekFrom::Start(position))?;
-        f.write(&byte_to_corrupt)?;
-        f.sync_all()?;
-        Ok(())
     }
 
     #[test]

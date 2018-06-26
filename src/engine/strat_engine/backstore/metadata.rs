@@ -37,9 +37,9 @@ const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 #[derive(Debug, PartialEq, Eq)]
 pub enum TheirsReason {
     /// Something at start of device.
+    #[cfg(test)]
     Dirty,
     /// Udev identifies device as belonging to another.
-    #[allow(dead_code)]
     Udev {
         id_part_table_type: Option<String>,
         id_fs_type: Option<String>,
@@ -49,6 +49,7 @@ pub enum TheirsReason {
 impl Display for TheirsReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            #[cfg(test)]
             TheirsReason::Dirty => write!(f, "Some non-zero bits at start of device"),
             TheirsReason::Udev {
                 id_part_table_type,
@@ -100,6 +101,7 @@ where
 }
 
 /// Determine the ownership of a device.
+#[cfg(test)]
 pub fn determine_ownership<F>(f: &mut F) -> StratisResult<DevOwnership>
 where
     F: Read + Seek + SyncAll,

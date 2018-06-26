@@ -2,12 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use devicemapper::{Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev,
                    ThinStatus, IEC, SECTOR_SIZE};
 
-use mnt::{MountIter, MountParam};
+use libmount;
 use nix::mount::{mount, umount, MsFlags};
 use nix::sys::statvfs::statvfs;
 use tempfile;
@@ -85,19 +87,19 @@ impl StratFilesystem {
                 //
                 // If the source is unmounted the XFS log will be clean so
                 // we can skip the mount/unmount.
-
-                // FIXME: get_mount_point doesn't work so assume we need to mount/unmount
-                let tmp_dir = tempfile::Builder::new().prefix("stratis_mp_").tempdir()?;
-                // Mount the snapshot with the "nouuid" option. mount
-                // will fail due to duplicate UUID otherwise.
-                mount(
-                    Some(&thin_dev.devnode()),
-                    tmp_dir.path(),
-                    Some("xfs"),
-                    MsFlags::empty(),
-                    Some("nouuid"),
-                )?;
-                umount(tmp_dir.path())?;
+                if self.get_mount_point()?.is_some() {
+                    let tmp_dir = tempfile::Builder::new().prefix("stratis_mp_").tempdir()?;
+                    // Mount the snapshot with the "nouuid" option. mount
+                    // will fail due to duplicate UUID otherwise.
+                    mount(
+                        Some(&thin_dev.devnode()),
+                        tmp_dir.path(),
+                        Some("xfs"),
+                        MsFlags::empty(),
+                        Some("nouuid"),
+                    )?;
+                    umount(tmp_dir.path())?;
+                }
 
                 set_uuid(&thin_dev.devnode(), snapshot_fs_uuid)?;
                 Ok(StratFilesystem::setup(thin_dev))
@@ -157,27 +159,19 @@ impl StratFilesystem {
     /// system that is contained on the block device referred to as self.devnode(), i.e. the device
     /// node, while ignoring parse errors as long as at least one mount point is found.
     pub fn get_mount_point(&self) -> StratisResult<Option<PathBuf>> {
-        let device_node = self.devnode();
-        let search = device_node.to_str().ok_or_else(|| {
-            StratisError::Engine(
-                ErrorEnum::Error,
-                format!("Unable to represent devnode as string {:?}", *self),
-            )
-        })?;
+        let major = u64::from(self.thin_dev.device().major);
+        let minor = u64::from(self.thin_dev.device().minor);
 
-        let m_iter = MountIter::new_from_proc().map_err(|e| {
-            StratisError::Engine(
-                ErrorEnum::Error,
-                format!("Error reading /proc/mounts {:?}", e),
-            )
-        })?;
+        let mut mount_data = String::new();
+        File::open("/proc/self/mountinfo")?.read_to_string(&mut mount_data)?;
+        let parser = libmount::mountinfo::Parser::new(mount_data.as_bytes());
 
         let mut last_error: Option<String> = None;
-        for mp in m_iter {
+        for mp in parser {
             match mp {
                 Ok(mount) => {
-                    if mount.contains(&MountParam::Spec(search)) {
-                        return Ok(Some(mount.file));
+                    if mount.major as u64 == major && mount.minor as u64 == minor {
+                        return Ok(Some(PathBuf::from(mount.mount_point.into_owned())));
                     }
                 }
                 Err(e) => {

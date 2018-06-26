@@ -56,13 +56,3 @@ where
     };
     result
 }
-
-/// Lookup the WWN from the udev db using the device node.
-/// Returns an error if there was an error looking up the device.
-/// Returns None if the device could not be found.
-/// Returns Ok(Some(Err(...))) if the device was found but there was an
-/// error interpreting the value.
-/// Returns Ok(Some(Ok(None))) if there was no ID_WNN in the database.
-pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<StratisResult<Option<String>>>> {
-    udev_block_device_apply(dev_node_search, |dev| get_udev_property(dev, "ID_WWN"))
-}

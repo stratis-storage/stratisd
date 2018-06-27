@@ -38,7 +38,7 @@ use dbus::WatchEvent;
 
 use devicemapper::Device;
 
-use libstratis::engine::{get_udev_init, Engine, SimEngine, StratEngine};
+use libstratis::engine::{get_device_devnode, get_udev_init, Engine, SimEngine, StratEngine};
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
 
 const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
@@ -68,14 +68,10 @@ fn initialize_log(debug: bool) -> () {
 /// devicemapper::Device.
 fn handle_udev_add(event: &libudev::Event) -> Option<(Device, PathBuf)> {
     if event.event_type() == libudev::EventType::Add {
-        let device = event.device();
-        return device.devnode().and_then(|devnode| {
-            device
-                .devnum()
-                .and_then(|devnum| Some((Device::from(devnum), PathBuf::from(devnode))))
-        });
+        get_device_devnode(event.device())
+    } else {
+        None
     }
-    None
 }
 
 /// To ensure only one instance of stratisd runs at a time, acquire an

@@ -36,9 +36,6 @@ const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 /// changes.
 #[derive(Debug, PartialEq, Eq)]
 pub enum TheirsReason {
-    /// Something at start of device.
-    #[cfg(test)]
-    Dirty,
     /// Udev identifies device as belonging to another.
     Udev {
         id_part_table_type: Option<String>,
@@ -49,8 +46,6 @@ pub enum TheirsReason {
 impl Display for TheirsReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            #[cfg(test)]
-            TheirsReason::Dirty => write!(f, "Some non-zero bits at start of device"),
             TheirsReason::Udev {
                 id_part_table_type,
                 id_fs_type,
@@ -98,26 +93,6 @@ where
     F: Read + Seek + SyncAll,
 {
     StaticHeader::setup(f).map(|res| res.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
-}
-
-/// Determine the ownership of a device.
-#[cfg(test)]
-pub fn determine_ownership<F>(f: &mut F) -> StratisResult<DevOwnership>
-where
-    F: Read + Seek + SyncAll,
-{
-    match StaticHeader::setup(f) {
-        Ok(Some(sh)) => Ok(DevOwnership::Ours(sh.pool_uuid, sh.dev_uuid)),
-        Ok(None) => {
-            let buf = BDA::read(f)?;
-            if buf.iter().any(|x| *x != 0) {
-                Ok(DevOwnership::Theirs(TheirsReason::Dirty))
-            } else {
-                Ok(DevOwnership::Unowned)
-            }
-        }
-        Err(err) => Err(err),
-    }
 }
 
 impl BDA {
@@ -957,34 +932,6 @@ mod tests {
     }
 
     #[test]
-    /// Verify that the file is theirs, if there are any non-zero bits in BDA.
-    /// Unowned if all bits are 0.
-    fn test_other_ownership() {
-        fn property(offset: u8, length: u8, value: u8) -> TestResult {
-            if value == 0 || length == 0 {
-                return TestResult::discard();
-            }
-            let mut buf = Cursor::new(vec![0; _BDA_STATIC_HDR_SIZE]);
-            match determine_ownership(&mut buf).unwrap() {
-                DevOwnership::Unowned => {}
-                _ => return TestResult::failed(),
-            }
-
-            let data = vec![value; length as usize];
-            buf.seek(SeekFrom::Start(offset as u64)).unwrap();
-            buf.write(&data).unwrap();
-            match determine_ownership(&mut buf).unwrap() {
-                DevOwnership::Theirs(_) => {}
-                _ => return TestResult::failed(),
-            }
-            TestResult::passed()
-        }
-        QuickCheck::new()
-            .tests(10)
-            .quickcheck(property as fn(u8, u8, u8) -> TestResult);
-    }
-
-    #[test]
     /// Construct an arbitrary StaticHeader object.
     /// Verify that the "file" is unowned.
     /// Initialize a BDA.
@@ -996,10 +943,9 @@ mod tests {
             let sh = random_static_header(blkdev_size, mda_size_factor);
             let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
-            let ownership = determine_ownership(&mut buf).unwrap();
-            match ownership {
-                DevOwnership::Unowned => {}
-                _ => return TestResult::failed(),
+            let ownership = device_identifiers(&mut buf).unwrap();
+            if ownership.is_some() {
+                return TestResult::failed();
             }
 
             BDA::initialize(
@@ -1010,21 +956,18 @@ mod tests {
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,
             ).unwrap();
-            let ownership = determine_ownership(&mut buf).unwrap();
-            match ownership {
-                DevOwnership::Ours(pool_uuid, dev_uuid) => {
-                    if sh.pool_uuid != pool_uuid || sh.dev_uuid != dev_uuid {
-                        return TestResult::failed();
-                    }
+            if let Some((t_p, t_d)) = device_identifiers(&mut buf).unwrap() {
+                if t_p != sh.pool_uuid || t_d != sh.dev_uuid {
+                    return TestResult::failed();
                 }
-                _ => return TestResult::failed(),
+            } else {
+                return TestResult::failed();
             }
 
             BDA::wipe(&mut buf).unwrap();
-            let ownership = determine_ownership(&mut buf).unwrap();
-            match ownership {
-                DevOwnership::Unowned => {}
-                _ => return TestResult::failed(),
+            let ownership = device_identifiers(&mut buf).unwrap();
+            if ownership.is_some() {
+                return TestResult::failed();
             }
 
             TestResult::passed()

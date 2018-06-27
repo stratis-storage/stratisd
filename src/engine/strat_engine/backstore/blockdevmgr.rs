@@ -350,7 +350,7 @@ fn initialize(
     /// Get device information, returns an error if problem with obtaining
     /// that information.
     /// Returns a tuple with the device's path, its size in bytes,
-    /// its ownership as determined by calling determine_ownership(),
+    /// its ownership as determined by calling identify(),
     /// and an open File handle, all of which are needed later.
     fn dev_info(devnode: &Path) -> StratisResult<(&Path, Bytes, DevOwnership, File)> {
         let ownership = identify(devnode)?;
@@ -479,7 +479,7 @@ mod tests {
     use super::super::super::device::write_sectors;
     use super::super::super::tests::{loopbacked, real};
 
-    use super::super::metadata::{determine_ownership, BDA_STATIC_HDR_SECTORS, MIN_MDA_SECTORS};
+    use super::super::metadata::{device_identifiers, BDA_STATIC_HDR_SECTORS, MIN_MDA_SECTORS};
     use super::super::setup::{find_all, get_metadata};
 
     use super::*;
@@ -548,9 +548,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).is_err());
         assert!(paths.iter().enumerate().all(|(i, path)| {
-            let real_ownership =
-                determine_ownership(&mut OpenOptions::new().read(true).open(path).unwrap())
-                    .unwrap();
+            let real_ownership = identify(&path).unwrap();
             if i == index {
                 match real_ownership {
                     DevOwnership::Theirs(_) => true,
@@ -566,12 +564,11 @@ mod tests {
 
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, true).is_ok());
         assert!(paths.iter().all(|path| {
-            match determine_ownership(&mut OpenOptions::new().read(true).open(path).unwrap())
-                .unwrap()
-            {
-                DevOwnership::Ours(uuid, _) => pool_uuid == uuid,
-                _ => false,
-            }
+            let (t_pool_uuid, _) =
+                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap()
+                    .unwrap();
+            pool_uuid == t_pool_uuid
         }));
     }
 
@@ -718,17 +715,17 @@ mod tests {
         let bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
 
         assert!(paths.iter().all(|path| {
-            match determine_ownership(&mut OpenOptions::new().read(true).open(path).unwrap())
-                .unwrap()
-            {
-                DevOwnership::Ours(uuid, _) => uuid == pool_uuid,
-                _ => false,
-            }
+            let (t_pool_uuid, _) =
+                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap()
+                    .unwrap();
+            pool_uuid == t_pool_uuid
         }));
         bd_mgr.destroy_all().unwrap();
         assert!(paths.iter().all(|path| {
-            determine_ownership(&mut OpenOptions::new().read(true).open(path).unwrap()).unwrap()
-                == DevOwnership::Unowned
+            device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                .unwrap()
+                .is_none()
         }));
     }
 

@@ -60,17 +60,13 @@ impl BDA {
         let mut buf_loc_2 = [0u8; SECTOR_SIZE];
 
         /// Read a bda sector worth of data at the specified offset into buffer.
-        fn read_sector_at_offset<F>(
-            f: &mut F,
-            offset: usize,
-            mut buf: &mut [u8],
-        ) -> io::Result<bool>
+        fn read_sector_at_offset<F>(f: &mut F, offset: usize, mut buf: &mut [u8]) -> io::Result<()>
         where
             F: Read + Seek,
         {
             f.seek(SeekFrom::Start(offset as u64))?;
             f.read_exact(&mut buf)?;
-            Ok(true)
+            Ok(())
         }
 
         let loc_1_read_result = read_sector_at_offset(f, SECTOR_SIZE, &mut buf_loc_1);

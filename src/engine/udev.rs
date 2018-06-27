@@ -4,9 +4,12 @@
 
 // Get ability to instantiate a devicemapper context.
 
+use std::path::PathBuf;
 use std::sync::{Once, ONCE_INIT};
 
 use libudev::{self, Context};
+
+use devicemapper::Device;
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -33,4 +36,14 @@ pub fn get_udev() -> &'static Context {
     get_udev_init().expect(
         "stratisd has already invoked get_udev_init() and exited if get_dm_init() returned an error",
     )
+}
+
+/// Get a devicemapper device and a device node from a libudev device.
+/// Returns None if either could not be found.
+pub fn get_device_devnode(device: &libudev::Device) -> Option<(Device, PathBuf)> {
+    device.devnode().and_then(|devnode| {
+        device
+            .devnum()
+            .and_then(|devnum| Some((Device::from(devnum), PathBuf::from(devnode))))
+    })
 }

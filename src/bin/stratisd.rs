@@ -23,7 +23,6 @@ use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{ErrorKind, Read, Write};
 use std::os::unix::io::AsRawFd;
-use std::path::PathBuf;
 use std::process::exit;
 use std::rc::Rc;
 
@@ -39,8 +38,6 @@ use nix::unistd::getpid;
 
 #[cfg(feature = "dbus_enabled")]
 use dbus::WatchEvent;
-
-use devicemapper::Device;
 
 use libstratis::engine::{get_device_devnode, get_udev_init, Engine, SimEngine, StratEngine};
 use libstratis::stratis::{alarm, buff_log};
@@ -98,16 +95,6 @@ fn initialize_log(debug: bool) -> buff_log::Handle<env_logger::Logger> {
             false,
             Some(Duration::minutes(DEFAULT_LOG_HOLD_MINUTES)),
         )
-    }
-}
-
-/// Given a udev event check to see if it's an add and if it is return the device node and
-/// devicemapper::Device.
-fn handle_udev_add(event: &libudev::Event) -> Option<(Device, PathBuf)> {
-    if event.event_type() == libudev::EventType::Add {
-        get_device_devnode(event.device())
-    } else {
-        None
     }
 }
 
@@ -259,22 +246,26 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
             while let Some(event) = udev.receive_event() {
-                if let Some((device, devnode)) = handle_udev_add(&event) {
-                    // If block evaluate returns an error we are going to ignore it as
-                    // there is nothing we can do for a device we are getting errors with.
-                    #[cfg(not(feature = "dbus_enabled"))]
-                    let _ = engine.borrow_mut().block_evaluate(device, devnode);
+                if event.event_type() == libudev::EventType::Add {
+                    // Skip any device that does not have a device number and
+                    // a device node.
+                    if let Some((device, devnode)) = get_device_devnode(event.device()) {
+                        // Ignore block_evaluate error return. Such an error
+                        // indicates that there was a difficulty obtaining
+                        // information about the block device.
+                        #[cfg(not(feature = "dbus_enabled"))]
+                        let _ = engine.borrow_mut().block_evaluate(device, devnode);
 
-                    #[cfg(feature = "dbus_enabled")]
-                    {
-                        let pool_uuid = engine
-                            .borrow_mut()
-                            .block_evaluate(device, devnode)
-                            .unwrap_or(None);
+                        #[cfg(feature = "dbus_enabled")]
+                        {
+                            let pool_uuid = engine
+                                .borrow_mut()
+                                .block_evaluate(device, devnode)
+                                .unwrap_or(None);
 
-                        if let Some(ref mut handle) = dbus_handle {
-                            if let Some(pool_uuid) = pool_uuid {
-                                libstratis::dbus_api::register_pool(
+                            if let Some(ref mut handle) = dbus_handle {
+                                if let Some(pool_uuid) = pool_uuid {
+                                    libstratis::dbus_api::register_pool(
                                     &handle.connection,
                                     &handle.context,
                                     &mut handle.tree,
@@ -288,6 +279,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                                         .1,
                                     &handle.path,
                                 )?;
+                                }
                             }
                         }
                     }

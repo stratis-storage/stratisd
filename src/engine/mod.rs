@@ -21,6 +21,7 @@ pub use self::types::PoolUuid;
 pub use self::types::Redundancy;
 pub use self::types::RenameAction;
 
+pub use self::udev::get_device_devnode;
 pub use self::udev::get_udev_init;
 
 #[macro_use]

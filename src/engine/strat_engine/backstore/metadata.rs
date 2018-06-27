@@ -43,9 +43,10 @@ enum MetadataLocation {
 }
 
 impl BDA {
-    /// Read the BDA from the device and returning a byte array of the entire area.  Only the BDA
-    /// sectors are read up from disk, zero areas are *not* read up.
-    fn read<F>(f: &mut F) -> io::Result<[u8; _BDA_STATIC_HDR_SIZE]>
+    /// Read the BDA from the device and return 2 SECTORS worth of data, one for each BDA returned
+    /// in the order of layout on disk (location 1, location 2).
+    /// Only the BDA sectors are read up from disk, zero areas are *not* read.
+    fn read<F>(f: &mut F) -> io::Result<([u8; SECTOR_SIZE], [u8; SECTOR_SIZE])>
     where
         F: Read + Seek,
     {
@@ -55,24 +56,29 @@ impl BDA {
         // read errors. It's best to read each of the specific BDA blocks individually, to limit
         // the probability of hitting a read error on a non-essential sector.
 
-        let mut buf = [0u8; _BDA_STATIC_HDR_SIZE];
+        let mut buf_loc_1 = [0u8; SECTOR_SIZE];
+        let mut buf_loc_2 = [0u8; SECTOR_SIZE];
 
-        /// Read a bda sector worth of data at the specified offset.
-        fn read_sector_at_offset<F>(f: &mut F, offset: usize, buf: &mut [u8]) -> io::Result<bool>
+        /// Read a bda sector worth of data at the specified offset into buffer.
+        fn read_sector_at_offset<F>(
+            f: &mut F,
+            offset: usize,
+            mut buf: &mut [u8],
+        ) -> io::Result<bool>
         where
             F: Read + Seek,
         {
             f.seek(SeekFrom::Start(offset as u64))?;
-            f.read_exact(&mut buf[offset..offset + SECTOR_SIZE])?;
+            f.read_exact(&mut buf)?;
             Ok(true)
         }
 
-        let loc_1_read_result = read_sector_at_offset(f, SECTOR_SIZE, &mut buf);
-        let loc_2_read_result = read_sector_at_offset(f, 9 * SECTOR_SIZE, &mut buf);
+        let loc_1_read_result = read_sector_at_offset(f, SECTOR_SIZE, &mut buf_loc_1);
+        let loc_2_read_result = read_sector_at_offset(f, 9 * SECTOR_SIZE, &mut buf_loc_2);
 
         match (loc_1_read_result, loc_2_read_result) {
             (Err(loc_1_err), Err(_)) => Err(loc_1_err),
-            _ => Ok(buf),
+            _ => Ok((buf_loc_1, buf_loc_2)),
         }
     }
 
@@ -270,14 +276,11 @@ impl StaticHeader {
     where
         F: Read + Seek + SyncAll,
     {
-        #![allow(collapsible_if)]
-        let buf = BDA::read(f)?;
-        let buf_loc_1 = &buf[SECTOR_SIZE..2 * SECTOR_SIZE];
-        let buf_loc_2 = &buf[9 * SECTOR_SIZE..10 * SECTOR_SIZE];
+        let (buf_loc_1, buf_loc_2) = BDA::read(f)?;
 
         match (
-            StaticHeader::sigblock_from_buf(buf_loc_1),
-            StaticHeader::sigblock_from_buf(buf_loc_2),
+            StaticHeader::sigblock_from_buf(&buf_loc_1),
+            StaticHeader::sigblock_from_buf(&buf_loc_2),
         ) {
             (Ok(loc_1), Ok(loc_2)) => {
                 match (loc_1, loc_2) {
@@ -285,22 +288,22 @@ impl StaticHeader {
                         if loc_1 == loc_2 {
                             Ok(Some(loc_1))
                         } else if loc_1.initialization_time > loc_2.initialization_time {
-                            BDA::write(f, buf_loc_1, MetadataLocation::Second)?;
+                            BDA::write(f, &buf_loc_1, MetadataLocation::Second)?;
                             Ok(Some(loc_1))
                         } else {
-                            BDA::write(f, buf_loc_2, MetadataLocation::First)?;
+                            BDA::write(f, &buf_loc_2, MetadataLocation::First)?;
                             Ok(Some(loc_2))
                         }
                     }
                     (None, None) => Ok(None),
                     (Some(loc_1), None) => {
                         // Copy 1 has valid Stratis BDA, copy 2 has no magic, re-write copy 2
-                        BDA::write(f, buf_loc_1, MetadataLocation::Second)?;
+                        BDA::write(f, &buf_loc_1, MetadataLocation::Second)?;
                         Ok(Some(loc_1))
                     }
                     (None, Some(loc_2)) => {
                         // Copy 2 has valid Stratis BDA, copy 1 has no magic, re-write copy 1
-                        BDA::write(f, buf_loc_2, MetadataLocation::First)?;
+                        BDA::write(f, &buf_loc_2, MetadataLocation::First)?;
                         Ok(Some(loc_2))
                     }
                 }
@@ -308,7 +311,7 @@ impl StaticHeader {
             (Ok(loc_1), Err(loc_2)) => {
                 // Re-write copy 2
                 if loc_1.is_some() {
-                    BDA::write(f, buf_loc_1, MetadataLocation::Second)?;
+                    BDA::write(f, &buf_loc_1, MetadataLocation::Second)?;
                     Ok(loc_1)
                 } else {
                     // Location 1 doesn't have a signature, but location 2 did, but it got an error,
@@ -320,7 +323,7 @@ impl StaticHeader {
             (Err(loc_1), Ok(loc_2)) => {
                 // Re-write copy 1
                 if loc_2.is_some() {
-                    BDA::write(f, buf_loc_2, MetadataLocation::First)?;
+                    BDA::write(f, &buf_loc_2, MetadataLocation::First)?;
                     Ok(loc_2)
                 } else {
                     // Location 2 doesn't have a signature, but location 1 did, but it got an error,

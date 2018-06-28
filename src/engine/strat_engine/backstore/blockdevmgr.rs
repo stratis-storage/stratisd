@@ -19,14 +19,13 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{DevUuid, PoolUuid};
 
-use super::super::engine::DevOwnership;
 use super::super::serde_structs::{BlockDevSave, Recordable};
 
 use super::blockdev::StratBlockDev;
 use super::cleanup::wipe_blockdevs;
-use super::device::{blkdev_size, resolve_devices};
-use super::metadata::{validate_mda_size, StaticHeader, BDA, MIN_MDA_SECTORS};
-use super::util::hw_lookup;
+use super::device::{blkdev_size, identify, resolve_devices, DevOwnership};
+use super::metadata::{validate_mda_size, BDA, MIN_MDA_SECTORS};
+use super::udev::{get_udev_property, udev_block_device_apply};
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 const MAX_NUM_TO_WRITE: usize = 10;
@@ -351,12 +350,13 @@ fn initialize(
     /// Get device information, returns an error if problem with obtaining
     /// that information.
     /// Returns a tuple with the device's path, its size in bytes,
-    /// its ownership as determined by calling determine_ownership(),
+    /// its ownership as determined by calling identify(),
     /// and an open File handle, all of which are needed later.
     fn dev_info(devnode: &Path) -> StratisResult<(&Path, Bytes, DevOwnership, File)> {
-        let mut f = OpenOptions::new().read(true).write(true).open(&devnode)?;
+        let ownership = identify(devnode)?;
+
+        let f = OpenOptions::new().read(true).write(true).open(&devnode)?;
         let dev_size = blkdev_size(&f)?;
-        let ownership = StaticHeader::determine_ownership(&mut f)?;
 
         Ok((devnode, dev_size, ownership, f))
     }
@@ -387,11 +387,17 @@ fn initialize(
             };
             match ownership {
                 DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, f))),
-                DevOwnership::Theirs => {
+                DevOwnership::Contradiction =>
+                {
+                    return Err(StratisError::Engine(ErrorEnum::Invalid,
+                        "udev has identified this device as a Stratis device, but no Stratis header was found on the device".into()))
+                }
+                DevOwnership::Theirs(whose) => {
                     if !force {
                         let err_str = format!(
-                            "Device {} appears to belong to another application",
-                            devnode.display()
+                            "Device {} appears to belong to another application, reason: {}",
+                            devnode.display(),
+                            whose
                         );
                         return Err(StratisError::Engine(ErrorEnum::Invalid, err_str));
                     } else {
@@ -438,10 +444,11 @@ fn initialize(
             Utc::now().timestamp() as u64,
         );
         if let Ok(bda) = bda {
-            let hw_id = match hw_lookup(devnode) {
-                Ok(id) => id,
-                Err(_) => None, // TODO: Log this failure so that it can be addressed.
-            };
+            let hw_id =
+                match udev_block_device_apply(devnode, |dev| get_udev_property(dev, "ID_WWN")) {
+                    Ok(Some(Ok(Some(id)))) => Some(id),
+                    _ => None, // TODO: Log this failure so that it can be addressed.
+                };
 
             // FIXME: The expect is only provisionally true.
             // The dev_size is at least MIN_DEV_SIZE, but the size of the
@@ -472,7 +479,7 @@ mod tests {
     use super::super::super::device::write_sectors;
     use super::super::super::tests::{loopbacked, real};
 
-    use super::super::metadata::{BDA_STATIC_HDR_SECTORS, MIN_MDA_SECTORS};
+    use super::super::metadata::{device_identifiers, BDA_STATIC_HDR_SECTORS, MIN_MDA_SECTORS};
     use super::super::setup::{find_all, get_metadata};
 
     use super::*;
@@ -541,28 +548,27 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).is_err());
         assert!(paths.iter().enumerate().all(|(i, path)| {
-            StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap() == if i == index {
-                DevOwnership::Theirs
+            let real_ownership = identify(&path).unwrap();
+            if i == index {
+                match real_ownership {
+                    DevOwnership::Theirs(_) => true,
+                    _ => false,
+                }
             } else {
-                DevOwnership::Unowned
+                match real_ownership {
+                    DevOwnership::Unowned => true,
+                    _ => false,
+                }
             }
         }));
 
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, true).is_ok());
         assert!(paths.iter().all(|path| {
-            match StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap()
-            {
-                DevOwnership::Ours(uuid, _) => pool_uuid == uuid,
-                _ => false,
-            }
+            let (t_pool_uuid, _) =
+                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap()
+                    .unwrap();
+            pool_uuid == t_pool_uuid
         }));
     }
 
@@ -709,23 +715,17 @@ mod tests {
         let bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
 
         assert!(paths.iter().all(|path| {
-            match StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap()
-            {
-                DevOwnership::Ours(uuid, _) => uuid == pool_uuid,
-                _ => false,
-            }
+            let (t_pool_uuid, _) =
+                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap()
+                    .unwrap();
+            pool_uuid == t_pool_uuid
         }));
         bd_mgr.destroy_all().unwrap();
         assert!(paths.iter().all(|path| {
-            StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap() == DevOwnership::Unowned
+            device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                .unwrap()
+                .is_none()
         }));
     }
 

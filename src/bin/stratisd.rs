@@ -22,7 +22,6 @@ use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{ErrorKind, Read, Write};
 use std::os::unix::io::AsRawFd;
-use std::path::PathBuf;
 use std::process::exit;
 use std::rc::Rc;
 
@@ -36,9 +35,7 @@ use nix::unistd::getpid;
 #[cfg(feature = "dbus_enabled")]
 use dbus::WatchEvent;
 
-use devicemapper::Device;
-
-use libstratis::engine::{Engine, SimEngine, StratEngine};
+use libstratis::engine::{get_device_devnode, get_udev_init, Engine, SimEngine, StratEngine};
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
 
 const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
@@ -62,20 +59,6 @@ fn initialize_log(debug: bool) -> Result<(), SetLoggerError> {
     };
 
     builder.init()
-}
-
-/// Given a udev event check to see if it's an add and if it is return the device node and
-/// devicemapper::Device.
-fn handle_udev_add(event: &libudev::Event) -> Option<(Device, PathBuf)> {
-    if event.event_type() == libudev::EventType::Add {
-        let device = event.device();
-        return device.devnode().and_then(|devnode| {
-            device
-                .devnum()
-                .and_then(|devnum| Some((Device::from(devnum), PathBuf::from(devnode))))
-        });
-    }
-    None
 }
 
 /// To ensure only one instance of stratisd runs at a time, acquire an
@@ -126,7 +109,7 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
     // completed initialization. Unless the udev event has been recorded, the
     // engine will miss the device.
     // This is especially important since stratisd must run during early boot.
-    let context = libudev::Context::new()?;
+    let context = get_udev_init()?;
     let mut monitor = libudev::Monitor::new(&context)?;
     monitor.match_subsystem_devtype("block", "disk")?;
     let mut udev = monitor.listen()?;
@@ -207,33 +190,36 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
             while let Some(event) = udev.receive_event() {
-                if let Some((device, devnode)) = handle_udev_add(&event) {
-                    // If block evaluate returns an error we are going to ignore it as
-                    // there is nothing we can do for a device we are getting errors with.
-                    let pool_uuid = engine
-                        .borrow_mut()
-                        .block_evaluate(device, devnode)
-                        .unwrap_or(None);
+                if event.event_type() == libudev::EventType::Add {
+                    // Skip any device that does not have a device number and
+                    // a device node.
+                    if let Some((device, devnode)) = get_device_devnode(event.device()) {
+                        // If block evaluate returns an error we are going to ignore it as
+                        // there is nothing we can do for a device we are getting errors with.
+                        let pool_uuid = engine
+                            .borrow_mut()
+                            .block_evaluate(device, devnode)
+                            .unwrap_or(None);
 
-                    // We need to pretend that we aren't using the variable _pool_uuid so
-                    // that we can conditionally compile out the register_pool when dbus
-                    // is not enabled.
-                    if let Some(_pool_uuid) = pool_uuid {
-                        #[cfg(feature = "dbus_enabled")]
-                        libstratis::dbus_api::register_pool(
-                            &dbus_conn,
-                            &dbus_context,
-                            &mut tree,
-                            _pool_uuid,
-                            engine
-                                .borrow()
-                                .get_pool(_pool_uuid)
-                                .expect(
-                                    "block_evaluate() returned a pool UUID, pool must be available",
-                                )
-                                .1,
-                            &base_object_path,
-                        )?;
+                        // We need to pretend that we aren't using the variable _pool_uuid so
+                        // that we can conditionally compile out the register_pool when dbus
+                        // is not enabled.
+                        if let Some(_pool_uuid) = pool_uuid {
+                            #[cfg(feature = "dbus_enabled")]
+                            libstratis::dbus_api::register_pool(
+                               &dbus_conn,
+                                &dbus_context,
+                                &mut tree,
+                                _pool_uuid,
+                                engine
+                                    .borrow()
+                                    .get_pool(_pool_uuid)
+                                    .expect(
+                                        "block_evaluate() returned a pool UUID, pool must be available",
+                                    ).1,
+                                &base_object_path,
+                            )?;
+                        }
                     }
                 }
             }

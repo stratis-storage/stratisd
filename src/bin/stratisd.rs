@@ -27,9 +27,9 @@ use std::process::exit;
 use std::rc::Rc;
 
 use clap::{App, Arg, ArgMatches};
-use env_logger::LogBuilder;
+use env_logger::Builder;
 use libc::pid_t;
-use log::{LogLevelFilter, SetLoggerError};
+use log::LevelFilter;
 use nix::fcntl::{flock, FlockArg};
 use nix::unistd::getpid;
 
@@ -52,11 +52,11 @@ fn print_err(err: &StratisError) -> () {
 /// If debug is true, log at debug level. Otherwise read log configuration
 /// parameters from the environment if RUST_LOG is set. Otherwise, just
 /// accept the default configuration.
-fn initialize_log(debug: bool) -> Result<(), SetLoggerError> {
-    let mut builder = LogBuilder::new();
+fn initialize_log(debug: bool) -> () {
+    let mut builder = Builder::new();
     if debug {
-        builder.filter(Some("stratisd"), LogLevelFilter::Debug);
-        builder.filter(Some("libstratis"), LogLevelFilter::Debug);
+        builder.filter(Some("stratisd"), LevelFilter::Debug);
+        builder.filter(Some("libstratis"), LevelFilter::Debug);
     } else if let Ok(s) = env::var("RUST_LOG") {
         builder.parse(&s);
     };
@@ -323,11 +323,10 @@ fn main() {
     let result = {
         match lock_file {
             Err(err) => Err(err),
-            Ok(_) => initialize_log(matches.is_present("debug"))
-                .map_err(|_| {
-                    StratisError::Error("The log was not initialized successfully. This is surprising, since this is the first and only initialization of the log, which is guaranteed to succeed".into())
-                })
-                .and_then(|_| run(&matches)),
+            Ok(_) => {
+                initialize_log(matches.is_present("debug"));
+                run(&matches)
+            }
         }
     };
 

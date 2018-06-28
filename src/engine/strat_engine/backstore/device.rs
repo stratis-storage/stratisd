@@ -161,3 +161,76 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
         )),
     }
 }
+
+#[cfg(test)]
+mod test {
+
+    use std::path::Path;
+
+    use super::super::super::cmd;
+    use super::super::super::tests::{loopbacked, real};
+
+    use super::*;
+
+    /// Verify that a device with an ext3 filesystem directly on it is
+    /// identified as not a Stratis device.
+    fn test_other_ownership(paths: &[&Path]) {
+        cmd::create_ext3_fs(paths[0]).unwrap();
+
+        cmd::udev_settle().unwrap();
+
+        assert!(match identify(paths[0]).unwrap() {
+            DevOwnership::Theirs(_) => true,
+            _ => false,
+        })
+    }
+
+    #[test]
+    pub fn loop_test_other_ownership() {
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(1, 3, None),
+            test_other_ownership,
+        );
+    }
+
+    #[test]
+    pub fn travis_test_other_ownership() {
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(1, 3, None),
+            test_other_ownership,
+        );
+    }
+
+    #[test]
+    pub fn real_test_other_ownership() {
+        real::test_with_spec(
+            real::DeviceLimits::AtLeast(1, None, None),
+            test_other_ownership,
+        );
+    }
+
+    /// Verify that an empty device is unowned.
+    fn test_empty(paths: &[&Path]) {
+        cmd::udev_settle().unwrap();
+
+        assert!(match identify(paths[0]).unwrap() {
+            DevOwnership::Unowned => true,
+            _ => false,
+        });
+    }
+
+    #[test]
+    pub fn loop_test_device_empty() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_empty);
+    }
+
+    #[test]
+    pub fn travis_test_device_empty() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_empty);
+    }
+
+    #[test]
+    pub fn real_test_device_empty() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_empty);
+    }
+}

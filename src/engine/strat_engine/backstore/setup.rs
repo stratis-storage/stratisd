@@ -6,94 +6,79 @@
 // Initial setup steps are steps that do not alter the environment.
 
 use std::collections::{HashMap, HashSet};
-use std::fs::{read_dir, OpenOptions};
-use std::io::ErrorKind;
+use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
-use nix::errno::Errno;
+use libudev;
 use serde_json;
 
-use devicemapper::{devnode_to_devno, Device, Sectors};
+use devicemapper::{Device, Sectors};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
+use super::super::super::udev::{get_device_devnode, get_udev};
 
-use super::super::engine::DevOwnership;
 use super::super::serde_structs::{BackstoreSave, BlockDevSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
 use super::device::blkdev_size;
-use super::metadata::{StaticHeader, BDA};
-
-/// Determine if devnode is a Stratis device. Return the device's Stratis
-/// pool UUID if it belongs to Stratis.
-pub fn is_stratis_device(devnode: &PathBuf) -> StratisResult<Option<PoolUuid>> {
-    match OpenOptions::new().read(true).open(&devnode) {
-        Ok(mut f) => {
-            if let DevOwnership::Ours(pool_uuid, _) = StaticHeader::determine_ownership(&mut f)? {
-                Ok(Some(pool_uuid))
-            } else {
-                Ok(None)
-            }
-        }
-        Err(err) => {
-            // There are some reasons for OpenOptions::open() to return an error
-            // which are not reasons for this method to return an error.
-            // Try to distinguish. Non-error conditions are:
-            //
-            // 1. ENXIO: The device does not exist anymore. This means that the device
-            // was volatile for some reason; in that case it can not belong to
-            // Stratis so it is safe to ignore it.
-            //
-            // 2. ENOMEDIUM: The device has no medium. An example of this case is an
-            // empty optical drive.
-            //
-            // Note that it is better to be conservative and return with an
-            // error in any case where failure to read the device could result
-            // in bad data for Stratis. Additional exceptions may be added,
-            // but only with a complete justification.
-            match err.kind() {
-                ErrorKind::NotFound => Ok(None),
-                _ => {
-                    if let Some(errno) = err.raw_os_error() {
-                        match Errno::from_i32(errno) {
-                            Errno::ENXIO | Errno::ENOMEDIUM => Ok(None),
-                            _ => Err(StratisError::Io(err)),
-                        }
-                    } else {
-                        Err(StratisError::Io(err))
-                    }
-                }
-            }
-        }
-    }
-}
+use super::metadata::{device_identifiers, BDA};
+use super::udev::unclaimed;
 
 /// Find all Stratis devices.
 ///
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
 pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
-    let mut pool_map = HashMap::new();
-    let mut devno_set = HashSet::new();
-    for dir_e in read_dir("/dev")? {
-        let dir_e = dir_e?;
-        let devnode = dir_e.path();
+    let context = get_udev();
 
-        match devnode_to_devno(&devnode)? {
-            None => continue,
-            Some(devno) => {
-                if devno_set.insert(devno) {
-                    is_stratis_device(&devnode)?.and_then(|pool_uuid| {
-                        pool_map
-                            .entry(pool_uuid)
-                            .or_insert_with(HashMap::new)
-                            .insert(Device::from(devno), devnode)
-                    });
-                } else {
-                    continue;
-                }
+    let mut enumerator = libudev::Enumerator::new(context)?;
+    enumerator.match_subsystem("block")?;
+    enumerator.match_property("ID_FS_TYPE", "stratis")?;
+
+    // Skip any block devices w/out a devnode and a device number.
+    let devices: Vec<(Device, PathBuf)> = enumerator
+        .scan_devices()?
+        .filter_map(|x| get_device_devnode(&x))
+        .collect();
+
+    // TODO: If at some point it is guaranteed that libblkid version is
+    // not less than that required to identify Stratis devices, this block
+    // can be removed.
+    let (devices, only_stratis) = if devices.is_empty() {
+        // There are no Stratis devices OR libblkid is an early version that
+        // doesn't support identifying Stratis devices. Fall back to using
+        // udev to get all devices that are lacking any signature which
+        // identifies them as belonging to some other system or application.
+
+        let mut enumerator = libudev::Enumerator::new(context)?;
+        enumerator.match_subsystem("block")?;
+
+        (
+            enumerator
+                .scan_devices()?
+                .filter(|d| unclaimed(d))
+                .filter_map(|x| get_device_devnode(&x))
+                .collect(),
+            false,
+        )
+    } else {
+        (devices, true)
+    };
+
+    let mut pool_map = HashMap::new();
+    for (device, devnode) in devices {
+        match device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)? {
+            Some((pool_uuid, _)) => {
+                pool_map
+                    .entry(pool_uuid)
+                    .or_insert_with(HashMap::new)
+                    .insert(device, devnode);
             }
+            None => if only_stratis {
+                return Err(StratisError::Engine(ErrorEnum::Invalid,
+                                                "udev has identified this device as a Stratis device, but no Stratis header was found on the device".into()));
+            },
         }
     }
 

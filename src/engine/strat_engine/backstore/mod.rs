@@ -18,5 +18,6 @@ mod udev;
 pub use self::backstore::Backstore;
 #[cfg(test)]
 pub use self::device::blkdev_size;
+pub use self::device::{identify, DevOwnership};
 pub use self::metadata::MIN_MDA_SECTORS;
-pub use self::setup::{find_all, get_metadata, is_stratis_device};
+pub use self::setup::{find_all, get_metadata};

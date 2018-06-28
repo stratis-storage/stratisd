@@ -114,10 +114,10 @@ impl Engine for SimEngine {
         Ok(())
     }
 
-    fn pools(&self) -> Vec<(Name, PoolUuid, &Pool)> {
+    fn pools(&mut self) -> Vec<(Name, PoolUuid, &mut Pool)> {
         self.pools
-            .iter()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &Pool))
+            .iter_mut()
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut Pool))
             .collect()
     }
 

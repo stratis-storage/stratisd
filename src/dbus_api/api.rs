@@ -14,15 +14,18 @@ use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInf
 use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
 use uuid::Uuid;
 
-use super::super::engine::{Engine, Pool, PoolUuid};
-use super::super::stratis::VERSION;
+use devicemapper::Sectors;
+
+use engine::{ApiProxy, Engine, Pool, PoolUuid};
+
+use stratis::{ErrorEnum, StratisError, StratisResult, VERSION};
 
 use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;
 use super::pool::create_dbus_pool;
 use super::types::{ActionQueue, DbusContext, DbusErrorEnum, DeferredAction, TData};
-use super::util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok,
-                  tuple_to_option, STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
+use super::util::{build_propchanged, engine_to_dbus_err_tuple, get_next_arg, msg_code_ok,
+                  msg_string_ok, tuple_to_option, STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
 
 fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
@@ -50,7 +53,8 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
 
             let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
-
+            debug!("create pool - set dbus path : {:?}", object_path);
+            pool.set_dbus_path(&object_path.to_string());
             let bd_object_paths = pool.blockdevs()
                 .iter()
                 .map(|&(uuid, _)| {
@@ -188,10 +192,11 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
 fn register_pool_dbus(
     dbus_context: &DbusContext,
     pool_uuid: PoolUuid,
-    pool: &Pool,
+    pool: &mut Pool,
     object_path: &dbus::Path<'static>,
 ) {
     let pool_path = create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
+    pool.set_dbus_path(&pool_path.as_cstr().to_string_lossy());
     for (_, fs_uuid, _) in pool.filesystems() {
         create_dbus_filesystem(dbus_context, pool_path.clone(), fs_uuid);
     }
@@ -227,7 +232,7 @@ pub fn register_pool(
     dbus_context: &DbusContext,
     tree: &mut Tree<MTFn<TData>, TData>,
     pool_uuid: Uuid,
-    pool: &Pool,
+    pool: &mut Pool,
     object_path: &dbus::Path<'static>,
 ) -> Result<(), dbus::Error> {
     register_pool_dbus(dbus_context, pool_uuid, pool, object_path);
@@ -274,4 +279,50 @@ pub fn handle(
     }
 
     Ok(())
+}
+
+#[derive(Debug)]
+pub struct DbusProxy {
+    pub conn: Rc<RefCell<dbus::Connection>>,
+}
+
+impl DbusProxy {
+    pub fn new(conn: Rc<RefCell<dbus::Connection>>) -> DbusProxy {
+        DbusProxy { conn }
+    }
+}
+
+impl ApiProxy for DbusProxy {
+    fn phys_used_changed(
+        &mut self,
+        dbus_path: &Option<String>,
+        new_value: Sectors,
+    ) -> StratisResult<()> {
+        debug!("phys_used_changed - ");
+        if let Some(ref dbus_path) = *dbus_path {
+            debug!("dbus path  - {:?}", dbus_path);
+            let msg = build_propchanged(
+                "TotalPhysicalUsed",
+                &(*new_value.to_string()),
+                &dbus_path.into(),
+            );
+            if let Err(_) = self.conn.borrow().send(msg) {
+                return Err(StratisError::Engine(
+                    ErrorEnum::Error,
+                    "conn.send() failed".to_owned(),
+                ));
+            }
+        }
+        Ok(())
+    }
+    fn thinpool_data_expand_failed(&mut self, _dbus_path: &Option<String>) -> StratisResult<()> {
+        Ok(())
+    }
+
+    fn thinpool_metadata_expand_failed(
+        &mut self,
+        _dbus_path: &Option<String>,
+    ) -> StratisResult<()> {
+        Ok(())
+    }
 }

@@ -9,7 +9,7 @@ use devicemapper::{Device, DmNameBuf};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::engine::{Engine, Eventable, Pool};
+use super::super::engine::{ApiProxy, Engine, Eventable, Pool};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
@@ -36,6 +36,8 @@ pub struct StratEngine {
     // Maps name of DM devices we are watching to the most recent event number
     // we've handled for each
     watched_dev_last_event_nrs: HashMap<DmNameBuf, u32>,
+
+    api_proxy: Box<ApiProxy>,
 }
 
 impl StratEngine {
@@ -47,8 +49,8 @@ impl StratEngine {
     ///
     /// Returns an error if the kernel doesn't support required DM features.
     /// Returns an error if there was an error reading device nodes.
-    /// Returns an error if the binaries on which it depends can not be found.
-    pub fn initialize() -> StratisResult<StratEngine> {
+    /// Returns an error if the binaries on which it depends can not be found.       
+    pub fn initialize(api_proxy: Box<ApiProxy>) -> StratisResult<StratEngine> {
         let dm = get_dm_init()?;
         verify_binaries()?;
         let minor_dm_version = dm.version()?.1;
@@ -78,10 +80,11 @@ impl StratEngine {
             }
         }
 
-        let engine = StratEngine {
+        let mut engine = StratEngine {
             pools: table,
             incomplete_pools,
             watched_dev_last_event_nrs: HashMap::new(),
+            api_proxy: api_proxy,
         };
 
         devlinks::setup_devlinks(engine.pools().iter())?;
@@ -214,10 +217,10 @@ impl Engine for StratEngine {
         Ok(()) // we're not the simulator and not configurable, so just say ok
     }
 
-    fn pools(&self) -> Vec<(Name, PoolUuid, &Pool)> {
+    fn pools(&mut self) -> Vec<(Name, PoolUuid, &mut Pool)> {
         self.pools
-            .iter()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &Pool))
+            .iter_mut()
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut Pool))
             .collect()
     }
 
@@ -240,7 +243,7 @@ impl Engine for StratEngine {
         for (pool_name, _, pool) in &mut self.pools {
             for dm_name in pool.get_eventing_dev_names() {
                 if device_list.get(&dm_name) > self.watched_dev_last_event_nrs.get(&dm_name) {
-                    pool.event_on(pool_name, &dm_name)?;
+                    pool.event_on(pool_name, &dm_name, &mut *self.api_proxy)?;
                 }
             }
         }
@@ -253,15 +256,16 @@ impl Engine for StratEngine {
 
 #[cfg(test)]
 mod test {
-    use std::fs::remove_dir_all;
-
+    use super::super::super::engine::NullProxy;
     use super::super::tests::{loopbacked, real};
+    use std::boxed::Box;
+    use std::fs::remove_dir_all;
 
     use super::*;
 
     /// Verify that a pool rename causes the pool metadata to get the new name.
     fn test_pool_rename(paths: &[&Path]) {
-        let mut engine = StratEngine::initialize().unwrap();
+        let mut engine = StratEngine::initialize(Box::new(NullProxy)).unwrap();
 
         let name1 = "name1";
         let uuid1 = engine.create_pool(&name1, paths, None, false).unwrap();
@@ -272,7 +276,7 @@ mod test {
         assert_eq!(action, RenameAction::Renamed);
         engine.teardown().unwrap();
 
-        let engine = StratEngine::initialize().unwrap();
+        let engine = StratEngine::initialize(Box::new(NullProxy)).unwrap();
         let pool_name: String = engine.get_pool(uuid1).unwrap().0.to_owned();
         assert_eq!(pool_name, name2);
     }
@@ -304,7 +308,7 @@ mod test {
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
-        let mut engine = StratEngine::initialize().unwrap();
+        let mut engine = StratEngine::initialize(Box::new(NullProxy)).unwrap();
 
         let name1 = "name1";
         let uuid1 = engine.create_pool(&name1, paths1, None, false).unwrap();
@@ -317,7 +321,7 @@ mod test {
 
         engine.teardown().unwrap();
 
-        let engine = StratEngine::initialize().unwrap();
+        let engine = StratEngine::initialize(Box::new(NullProxy)).unwrap();
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());
@@ -325,7 +329,7 @@ mod test {
         engine.teardown().unwrap();
         remove_dir_all(DEV_PATH).unwrap();
 
-        let engine = StratEngine::initialize().unwrap();
+        let engine = StratEngine::initialize(Box::new(NullProxy)).unwrap();
         assert_eq!(engine.incomplete_pools, HashMap::new());
 
         assert!(engine.get_pool(uuid1).is_some());

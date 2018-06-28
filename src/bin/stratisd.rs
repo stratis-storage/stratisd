@@ -34,12 +34,17 @@ use nix::fcntl::{flock, FlockArg};
 use nix::unistd::getpid;
 
 #[cfg(feature = "dbus_enabled")]
-use dbus::WatchEvent;
+use dbus::{BusType, Connection, WatchEvent};
 
 use devicemapper::Device;
 
 use libstratis::engine::{Engine, SimEngine, StratEngine};
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
+
+#[cfg(feature = "dbus_enabled")]
+use libstratis::dbus_api::DbusProxy;
+#[cfg(not(feature = "dbus_enabled"))]
+use libstratis::engine::engine::NullProxy;
 
 const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
 
@@ -131,13 +136,23 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
     monitor.match_subsystem_devtype("block", "disk")?;
     let mut udev = monitor.listen()?;
 
+    #[cfg(feature = "dbus_enabled")]
+    let dbus_conn = Rc::new(RefCell::new(Connection::get_private(BusType::System)?));
+
     let engine: Rc<RefCell<Engine>> = {
         if matches.is_present("sim") {
             info!("Using SimEngine");
             Rc::new(RefCell::new(SimEngine::default()))
         } else {
             info!("Using StratEngine");
-            Rc::new(RefCell::new(StratEngine::initialize()?))
+
+            // Create and pass-in an object to let the engine make API callbacks
+            #[cfg(feature = "dbus_enabled")]
+            let proxy = Box::new(DbusProxy::new(dbus_conn.clone()));
+            #[cfg(not(feature = "dbus_enabled"))]
+            let proxy = Box::new(NullProxy);
+
+            Rc::new(RefCell::new(StratEngine::initialize(proxy)?))
         }
     };
 
@@ -196,7 +211,7 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
         libstratis::dbus_api::connect(Rc::clone(&engine))?;
 
     #[cfg(feature = "dbus_enabled")]
-    for (_, pool_uuid, pool) in engine.borrow().pools() {
+    for (_, pool_uuid, pool) in engine.borrow_mut().pools() {
         libstratis::dbus_api::register_pool(
             &dbus_conn,
             &dbus_context,
@@ -214,32 +229,30 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
                 if let Some((device, devnode)) = handle_udev_add(&event) {
                     // If block evaluate returns an error we are going to ignore it as
                     // there is nothing we can do for a device we are getting errors with.
-                    #[cfg(not(feature = "dbus_enabled"))]
-                    let _ = engine.borrow_mut().block_evaluate(device, devnode);
+                    let pool_uuid = engine
+                        .borrow_mut()
+                        .block_evaluate(device, devnode)
+                        .unwrap_or(None);
 
-                    #[cfg(feature = "dbus_enabled")]
-                    {
-                        let pool_uuid = engine
-                            .borrow_mut()
-                            .block_evaluate(device, devnode)
-                            .unwrap_or(None);
-
-                        if let Some(pool_uuid) = pool_uuid {
-                            libstratis::dbus_api::register_pool(
-                                &dbus_conn,
-                                &dbus_context,
-                                &mut tree,
-                                pool_uuid,
-                                engine
-                                    .borrow()
-                                    .get_pool(pool_uuid)
-                                    .expect(
-                                        "block_evaluate() returned a pool UUID, pool must be available",
-                                    )
-                                    .1,
-                                &base_object_path,
-                            )?;
-                        }
+                    // We need to pretend that we aren't using the variable _pool_uuid so
+                    // that we can conditionally compile out the register_pool when dbus
+                    // is not enabled.
+                    if let Some(_pool_uuid) = pool_uuid {
+                        #[cfg(feature = "dbus_enabled")]
+                        libstratis::dbus_api::register_pool(
+                            &dbus_conn,
+                            &dbus_context,
+                            &mut tree,
+                            _pool_uuid,
+                            engine
+                                .borrow_mut()
+                                .get_mut_pool(_pool_uuid)
+                                .expect(
+                                    "block_evaluate() returned a pool UUID, pool must be available",
+                                )
+                                .1,
+                            &base_object_path,
+                        )?;
                     }
                 }
             }

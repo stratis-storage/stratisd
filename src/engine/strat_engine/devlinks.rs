@@ -32,14 +32,14 @@ pub fn setup_dev_path() -> StratisResult<()> {
 /// or filesystem.
 // Don't just remove and recreate everything in case there are processes
 // (e.g. user shells) with the current working directory within the tree.
-pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>(
+pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a mut Pool)>>(
     pools: I,
 ) -> StratisResult<()> {
     let mut existing_dirs = fs::read_dir(DEV_PATH)?
         .map(|dir_e| dir_e.and_then(|d| Ok(d.file_name().into_string().expect("Unix is utf-8"))))
         .collect::<Result<HashSet<_>, _>>()?;
 
-    for &(ref pool_name, _, pool) in pools {
+    for &(ref pool_name, _, ref pool) in pools {
         if !existing_dirs.remove(&pool_name.to_owned()) {
             pool_added(pool_name)?;
         }

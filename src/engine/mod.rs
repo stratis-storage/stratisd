@@ -4,9 +4,11 @@
 
 pub use devicemapper::{IEC, SECTOR_SIZE};
 
+pub use self::engine::ApiProxy;
 pub use self::engine::BlockDev;
 pub use self::engine::Engine;
 pub use self::engine::Filesystem;
+pub use self::engine::NullProxy;
 pub use self::engine::Pool;
 
 pub use self::sim_engine::SimEngine;

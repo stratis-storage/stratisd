@@ -14,10 +14,9 @@ use super::super::devlinks;
 use super::super::engine::{Engine, Eventable, Pool};
 use super::super::event::{get_engine_listener_list, EngineEvent};
 use super::super::structures::Table;
-use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
+use super::super::types::{DevUuid, Name, PoolUuid, Redundancy, RenameAction};
 
-use super::backstore::device::is_stratis_device;
-use super::backstore::{find_all, get_metadata};
+use super::backstore::{find_all, get_metadata, is_stratis_device};
 #[cfg(test)]
 use super::cleanup::teardown_pools;
 use super::cmd::verify_binaries;
@@ -84,6 +83,13 @@ pub fn setup_pool(
                 Err(StratisError::Engine(ErrorEnum::Error, err_msg))
             })
         })
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum DevOwnership {
+    Ours(PoolUuid, DevUuid),
+    Unowned,
+    Theirs,
 }
 
 #[derive(Debug)]

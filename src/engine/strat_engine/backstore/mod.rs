@@ -9,7 +9,7 @@ mod blockdevmgr;
 mod cache_tier;
 mod cleanup;
 mod data_tier;
-pub mod device;
+mod device;
 mod metadata;
 mod range_alloc;
 mod setup;
@@ -17,7 +17,7 @@ mod util;
 
 pub use self::backstore::Backstore;
 pub use self::blockdev::StratBlockDev;
+#[cfg(test)]
 pub use self::device::blkdev_size;
-pub use self::device::is_stratis_device;
 pub use self::metadata::MIN_MDA_SECTORS;
-pub use self::setup::{find_all, get_metadata};
+pub use self::setup::{find_all, get_metadata, is_stratis_device};

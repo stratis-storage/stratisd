@@ -11,8 +11,5 @@ static LOGGER_INIT: Once = ONCE_INIT;
 /// Initialize the logger once.  More than one init() attempt returns
 /// errors.
 pub fn init_logger() {
-    LOGGER_INIT.call_once(|| {
-        env_logger::init()
-            .expect("This is the first and only initialization of the logger; it must succeed");
-    });
+    LOGGER_INIT.call_once(|| env_logger::init());
 }

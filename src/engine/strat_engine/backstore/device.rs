@@ -127,8 +127,6 @@ pub fn is_stratis_device(devnode: &Path) -> StratisResult<Option<PoolUuid>> {
 }
 
 #[cfg(test)]
-// rustfmt bug requires this?
-#[cfg_attr(rustfmt, rustfmt_skip)]
 mod test {
     use std::path::Path;
 

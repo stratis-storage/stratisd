@@ -127,18 +127,43 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
     };
 
     let mut pool_map = HashMap::new();
-    for (device, devnode) in devices {
-        match device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)? {
-            Some((pool_uuid, _)) => {
+    if only_stratis {
+        // If these are devices that udev has identified as Stratis:
+        // 1. Assume that not being able to open the device is an error.
+        // 2. Return an error if the device has no Stratis header.
+        for (device, devnode) in devices {
+            match device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)? {
+                Some((pool_uuid, _)) => {
+                    pool_map
+                        .entry(pool_uuid)
+                        .or_insert_with(HashMap::new)
+                        .insert(device, devnode);
+                }
+                None => {
+                    return Err(StratisError::Engine(ErrorEnum::Invalid,
+                                                "udev has identified this device as a Stratis device, but no Stratis header was found on the device".into()));
+                }
+            }
+        }
+    } else {
+        // If these are only unclaimed devices (a fallback when libblkid is
+        // not a recent version that can identify Stratis devices):
+        // 1. Assume that failure to open the device is not an error.
+        // 2. Do not treat failure to find the Stratis header as an error.
+        // 3. Do not treat failure when reading the device for the Stratis
+        // header as an error.
+        for (device, devnode) in devices {
+            if let Ok(Some((pool_uuid, _))) = OpenOptions::new()
+                .read(true)
+                .open(&devnode)
+                .map_err(|e| e.into())
+                .and_then(|mut file| device_identifiers(&mut file))
+            {
                 pool_map
                     .entry(pool_uuid)
                     .or_insert_with(HashMap::new)
                     .insert(device, devnode);
             }
-            None => if only_stratis {
-                return Err(StratisError::Engine(ErrorEnum::Invalid,
-                                                "udev has identified this device as a Stratis device, but no Stratis header was found on the device".into()));
-            },
         }
     }
 

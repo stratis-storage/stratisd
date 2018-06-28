@@ -138,17 +138,22 @@ impl StratPool {
     }
 
     /// The names of DM devices belonging to this pool that may generate events
-    pub fn get_eventing_dev_names(&self) -> Vec<DmNameBuf> {
-        self.thin_pool.get_eventing_dev_names()
+    pub fn get_eventing_dev_names(&self, pool_uuid: PoolUuid) -> Vec<DmNameBuf> {
+        self.thin_pool.get_eventing_dev_names(pool_uuid)
     }
 
     /// Called when a DM device in this pool has generated an event.
     // TODO: Just check the device that evented. Currently checks
     // everything.
-    pub fn event_on(&mut self, pool_name: &Name, dm_name: &DmName) -> StratisResult<()> {
+    pub fn event_on(
+        &mut self,
+        pool_uuid: PoolUuid,
+        pool_name: &Name,
+        dm_name: &DmName,
+    ) -> StratisResult<()> {
         assert!(
             self.thin_pool
-                .get_eventing_dev_names()
+                .get_eventing_dev_names(pool_uuid)
                 .iter()
                 .any(|x| dm_name == &**x)
         );
@@ -171,6 +176,7 @@ impl StratPool {
 impl Pool for StratPool {
     fn create_filesystems<'a, 'b>(
         &'a mut self,
+        pool_uuid: PoolUuid,
         pool_name: &str,
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<Vec<(&'b str, FilesystemUuid)>> {
@@ -187,7 +193,8 @@ impl Pool for StratPool {
         // TODO: Roll back on filesystem initialization failure.
         let mut result = Vec::new();
         for (name, size) in names {
-            let fs_uuid = self.thin_pool.create_filesystem(pool_name, name, size)?;
+            let fs_uuid = self.thin_pool
+                .create_filesystem(pool_uuid, pool_name, name, size)?;
             result.push((name, fs_uuid));
         }
 
@@ -196,13 +203,14 @@ impl Pool for StratPool {
 
     fn add_blockdevs(
         &mut self,
+        pool_uuid: PoolUuid,
         pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
         force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
         self.thin_pool.suspend()?;
-        let bdev_info = self.backstore.add_blockdevs(paths, tier, force)?;
+        let bdev_info = self.backstore.add_blockdevs(pool_uuid, paths, tier, force)?;
         self.thin_pool.set_device(self.backstore.device())?;
         self.thin_pool.resume()?;
         self.write_metadata(pool_name)?;
@@ -240,12 +248,13 @@ impl Pool for StratPool {
 
     fn snapshot_filesystem(
         &mut self,
+        pool_uuid: PoolUuid,
         pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
     ) -> StratisResult<FilesystemUuid> {
         self.thin_pool
-            .snapshot_filesystem(pool_name, origin_uuid, snapshot_name)
+            .snapshot_filesystem(pool_uuid, pool_name, origin_uuid, snapshot_name)
     }
 
     fn total_physical_size(&self) -> Sectors {
@@ -429,7 +438,7 @@ mod tests {
         assert!(metadata1.backstore.cache_segments.is_none());
         assert!(metadata1.backstore.meta_segments.is_none());
 
-        let (_, fs_uuid) = pool.create_filesystems(&name, &[("stratis-filesystem", None)])
+        let (_, fs_uuid) = pool.create_filesystems(uuid, &name, &[("stratis-filesystem", None)])
             .unwrap()
             .pop()
             .unwrap();
@@ -459,7 +468,7 @@ mod tests {
                 .unwrap();
         }
 
-        pool.add_blockdevs(&name, paths1, BlockDevTier::Cache, false)
+        pool.add_blockdevs(uuid, &name, paths1, BlockDevTier::Cache, false)
             .unwrap();
         invariant(&pool, &name);
 

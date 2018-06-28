@@ -201,7 +201,7 @@ mod tests {
             .unwrap();
         {
             let pool = engine.get_mut_pool(uuid).unwrap().1;
-            pool.create_filesystems(pool_name, &[("test", None)])
+            pool.create_filesystems(uuid, pool_name, &[("test", None)])
                 .unwrap();
         }
         assert!(engine.destroy_pool(uuid).is_err());

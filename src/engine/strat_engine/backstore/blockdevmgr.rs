@@ -145,7 +145,6 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParam
 
 #[derive(Debug)]
 pub struct BlockDevMgr {
-    pool_uuid: PoolUuid,
     block_devs: Vec<StratBlockDev>,
     last_update_time: Option<DateTime<Utc>>,
 }
@@ -153,12 +152,10 @@ pub struct BlockDevMgr {
 impl BlockDevMgr {
     /// Make a struct that represents an existing BlockDevMgr.
     pub fn new(
-        pool_uuid: PoolUuid,
         block_devs: Vec<StratBlockDev>,
         last_update_time: Option<DateTime<Utc>>,
     ) -> BlockDevMgr {
         BlockDevMgr {
-            pool_uuid,
             block_devs,
             last_update_time,
         }
@@ -173,15 +170,9 @@ impl BlockDevMgr {
     ) -> StratisResult<BlockDevMgr> {
         let devices = resolve_devices(paths)?;
         Ok(BlockDevMgr::new(
-            pool_uuid,
             initialize(pool_uuid, devices, mda_size, force, &HashSet::new())?,
             None,
         ))
-    }
-
-    /// Return the UUID of the pool
-    pub fn pool_uuid(&self) -> PoolUuid {
-        self.pool_uuid
     }
 
     /// Get a function that maps UUIDs to Devices.
@@ -197,16 +188,15 @@ impl BlockDevMgr {
     /// Add paths to self.
     /// Return the uuids of all blockdevs corresponding to paths that were
     /// added.
-    pub fn add(&mut self, paths: &[&Path], force: bool) -> StratisResult<Vec<DevUuid>> {
+    pub fn add(
+        &mut self,
+        pool_uuid: PoolUuid,
+        paths: &[&Path],
+        force: bool,
+    ) -> StratisResult<Vec<DevUuid>> {
         let devices = resolve_devices(paths)?;
         let current_uuids = self.block_devs.iter().map(|bd| bd.uuid()).collect();
-        let bds = initialize(
-            self.pool_uuid,
-            devices,
-            MIN_MDA_SECTORS,
-            force,
-            &current_uuids,
-        )?;
+        let bds = initialize(pool_uuid, devices, MIN_MDA_SECTORS, force, &current_uuids)?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
         Ok(bdev_uuids)
@@ -619,13 +609,13 @@ mod tests {
         assert!(BlockDevMgr::initialize(uuid2, paths1, MIN_MDA_SECTORS, true).is_err());
 
         let original_length = bd_mgr.block_devs.len();
-        assert!(bd_mgr.add(paths1, false).is_ok());
+        assert!(bd_mgr.add(uuid, paths1, false).is_ok());
         assert_eq!(bd_mgr.block_devs.len(), original_length);
 
         BlockDevMgr::initialize(uuid, paths2, MIN_MDA_SECTORS, false).unwrap();
         cmd::udev_settle().unwrap();
 
-        assert!(bd_mgr.add(paths2, false).is_err());
+        assert!(bd_mgr.add(uuid, paths2, false).is_err());
     }
 
     #[test]

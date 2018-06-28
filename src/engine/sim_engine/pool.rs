@@ -74,6 +74,7 @@ impl SimPool {
 impl Pool for SimPool {
     fn create_filesystems<'a, 'b>(
         &'a mut self,
+        _pool_uuid: PoolUuid,
         _pool_name: &str,
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<Vec<(&'b str, FilesystemUuid)>> {
@@ -101,6 +102,7 @@ impl Pool for SimPool {
 
     fn add_blockdevs(
         &mut self,
+        _pool_uuid: PoolUuid,
         _pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
@@ -161,6 +163,7 @@ impl Pool for SimPool {
 
     fn snapshot_filesystem(
         &mut self,
+        _pool_uuid: PoolUuid,
         _pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
@@ -281,7 +284,7 @@ mod tests {
         let pool_name = "pool_name";
         let uuid = engine.create_pool(pool_name, &[], None, false).unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        let infos = pool.create_filesystems(pool_name, &[("old_name", None)])
+        let infos = pool.create_filesystems(uuid, pool_name, &[("old_name", None)])
             .unwrap();
         assert!(
             match pool.rename_filesystem(pool_name, infos[0].1, "new_name") {
@@ -300,8 +303,9 @@ mod tests {
         let pool_name = "pool_name";
         let uuid = engine.create_pool(pool_name, &[], None, false).unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        let results = pool.create_filesystems(pool_name, &[(old_name, None), (new_name, None)])
-            .unwrap();
+        let results =
+            pool.create_filesystems(uuid, pool_name, &[(old_name, None), (new_name, None)])
+                .unwrap();
         let old_uuid = results.iter().find(|x| x.0 == old_name).unwrap().1;
         assert!(
             match pool.rename_filesystem(pool_name, old_uuid, new_name) {
@@ -360,7 +364,7 @@ mod tests {
         let pool_name = "pool_name";
         let uuid = engine.create_pool(pool_name, &[], None, false).unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        let fs_results = pool.create_filesystems(pool_name, &[("fs_name", None)])
+        let fs_results = pool.create_filesystems(uuid, pool_name, &[("fs_name", None)])
             .unwrap();
         let fs_uuid = fs_results[0].1;
         assert!(
@@ -378,7 +382,7 @@ mod tests {
         let pool_name = "pool_name";
         let uuid = engine.create_pool(pool_name, &[], None, false).unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        assert!(match pool.create_filesystems(pool_name, &[]) {
+        assert!(match pool.create_filesystems(uuid, pool_name, &[]) {
             Ok(names) => names.is_empty(),
             _ => false,
         });
@@ -392,7 +396,7 @@ mod tests {
         let uuid = engine.create_pool(pool_name, &[], None, false).unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert!(
-            match pool.create_filesystems(pool_name, &[("name", None)]) {
+            match pool.create_filesystems(uuid, pool_name, &[("name", None)]) {
                 Ok(names) => (names.len() == 1) & (names[0].0 == "name"),
                 _ => false,
             }
@@ -407,10 +411,10 @@ mod tests {
         let pool_name = "pool_name";
         let uuid = engine.create_pool(pool_name, &[], None, false).unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        pool.create_filesystems(pool_name, &[(fs_name, None)])
+        pool.create_filesystems(uuid, pool_name, &[(fs_name, None)])
             .unwrap();
         assert!(
-            match pool.create_filesystems(pool_name, &[(fs_name, None)]) {
+            match pool.create_filesystems(uuid, pool_name, &[(fs_name, None)]) {
                 Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
                 _ => false,
             }
@@ -426,7 +430,7 @@ mod tests {
         let uuid = engine.create_pool(pool_name, &[], None, false).unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert!(
-            match pool.create_filesystems(pool_name, &[(fs_name, None), (fs_name, None)]) {
+            match pool.create_filesystems(uuid, pool_name, &[(fs_name, None), (fs_name, None)]) {
                 Ok(names) => (names.len() == 1) & (names[0].0 == fs_name),
                 _ => false,
             }
@@ -441,7 +445,7 @@ mod tests {
         let (pool_name, pool) = engine.get_mut_pool(uuid).unwrap();
         let devices = [Path::new("/s/a"), Path::new("/s/b")];
         assert!(
-            match pool.add_blockdevs(&*pool_name, &devices, BlockDevTier::Data, false) {
+            match pool.add_blockdevs(uuid, &*pool_name, &devices, BlockDevTier::Data, false) {
                 Ok(devs) => devs.len() == devices.len(),
                 _ => false,
             }

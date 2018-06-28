@@ -6,9 +6,11 @@
 // Initial setup steps are steps that do not alter the environment.
 
 use std::collections::{HashMap, HashSet};
-use std::fs::OpenOptions;
+use std::fs::{read_dir, OpenOptions};
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
+use nix::errno::Errno;
 use serde_json;
 
 use devicemapper::{devnode_to_devno, Device, Sectors};
@@ -17,32 +19,84 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
+use super::super::engine::DevOwnership;
 use super::super::serde_structs::{BackstoreSave, BlockDevSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
-use super::device::{blkdev_size, is_stratis_device};
-use super::metadata::BDA;
-use super::util::get_stratis_block_devices;
+use super::device::blkdev_size;
+use super::metadata::{StaticHeader, BDA};
+
+/// Determine if devnode is a Stratis device. Return the device's Stratis
+/// pool UUID if it belongs to Stratis.
+pub fn is_stratis_device(devnode: &PathBuf) -> StratisResult<Option<PoolUuid>> {
+    match OpenOptions::new().read(true).open(&devnode) {
+        Ok(mut f) => {
+            if let DevOwnership::Ours(pool_uuid, _) = StaticHeader::determine_ownership(&mut f)? {
+                Ok(Some(pool_uuid))
+            } else {
+                Ok(None)
+            }
+        }
+        Err(err) => {
+            // There are some reasons for OpenOptions::open() to return an error
+            // which are not reasons for this method to return an error.
+            // Try to distinguish. Non-error conditions are:
+            //
+            // 1. ENXIO: The device does not exist anymore. This means that the device
+            // was volatile for some reason; in that case it can not belong to
+            // Stratis so it is safe to ignore it.
+            //
+            // 2. ENOMEDIUM: The device has no medium. An example of this case is an
+            // empty optical drive.
+            //
+            // Note that it is better to be conservative and return with an
+            // error in any case where failure to read the device could result
+            // in bad data for Stratis. Additional exceptions may be added,
+            // but only with a complete justification.
+            match err.kind() {
+                ErrorKind::NotFound => Ok(None),
+                _ => {
+                    if let Some(errno) = err.raw_os_error() {
+                        match Errno::from_i32(errno) {
+                            Errno::ENXIO | Errno::ENOMEDIUM => Ok(None),
+                            _ => Err(StratisError::Io(err)),
+                        }
+                    } else {
+                        Err(StratisError::Io(err))
+                    }
+                }
+            }
+        }
+    }
+}
 
 /// Find all Stratis devices.
 ///
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
 pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     let mut pool_map = HashMap::new();
+    let mut devno_set = HashSet::new();
+    for dir_e in read_dir("/dev")? {
+        let dir_e = dir_e?;
+        let devnode = dir_e.path();
 
-    for devnode in get_stratis_block_devices()? {
         match devnode_to_devno(&devnode)? {
             None => continue,
             Some(devno) => {
-                is_stratis_device(&devnode)?.and_then(|pool_uuid| {
-                    pool_map
-                        .entry(pool_uuid)
-                        .or_insert_with(HashMap::new)
-                        .insert(Device::from(devno), devnode)
-                });
+                if devno_set.insert(devno) {
+                    is_stratis_device(&devnode)?.and_then(|pool_uuid| {
+                        pool_map
+                            .entry(pool_uuid)
+                            .or_insert_with(HashMap::new)
+                            .insert(Device::from(devno), devnode)
+                    });
+                } else {
+                    continue;
+                }
             }
         }
     }
+
     Ok(pool_map)
 }
 

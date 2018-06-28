@@ -17,6 +17,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::device::SyncAll;
+use super::super::engine::DevOwnership;
 
 pub use self::mda::{validate_mda_size, MIN_MDA_SECTORS};
 
@@ -333,8 +334,9 @@ impl StaticHeader {
         }
     }
 
-    /// Retrieve the device and pool UUIDs from a stratis device.
-    pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<((PoolUuid, DevUuid))>>
+    /// Determine the ownership of a device.
+    /// If the device is owned by Stratis, return its device UUID.
+    pub fn determine_ownership<F>(f: &mut F) -> StratisResult<DevOwnership>
     where
         F: Read + Seek + SyncAll,
     {
@@ -343,8 +345,15 @@ impl StaticHeader {
         // it must also have correct CRC, no weird stuff in fields,
         // etc!
         match StaticHeader::setup(f) {
-            Ok(Some(sh)) => Ok(Some((sh.pool_uuid, sh.dev_uuid))),
-            Ok(None) => Ok(None),
+            Ok(Some(sh)) => Ok(DevOwnership::Ours(sh.pool_uuid, sh.dev_uuid)),
+            Ok(None) => {
+                let (buf1, _) = BDA::read(f)?;
+                if buf1.iter().any(|x| *x != 0) {
+                    Ok(DevOwnership::Theirs)
+                } else {
+                    Ok(DevOwnership::Unowned)
+                }
+            }
             Err(err) => Err(err),
         }
     }
@@ -890,6 +899,8 @@ mod tests {
     use quickcheck::{QuickCheck, TestResult};
     use uuid::Uuid;
 
+    use super::super::super::engine::DevOwnership;
+
     use super::*;
 
     /// Corrupt a byte at the specified position.
@@ -925,19 +936,20 @@ mod tests {
 
     #[test]
     /// Construct an arbitrary StaticHeader object.
-    /// Verify that the "memory buffer" is unowned.
+    /// Verify that the "file" is unowned.
     /// Initialize a BDA.
-    /// Verify that Stratis buffer validates.
+    /// Verify that Stratis owns the file.
     /// Wipe the BDA.
-    /// Verify that the buffer is again unowned.
+    /// Verify that the file is again unowned.
     fn prop_test_ownership() {
         fn test_ownership(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
             let sh = random_static_header(blkdev_size, mda_size_factor);
             let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
-            let ownership = StaticHeader::device_identifiers(&mut buf).unwrap();
-            if ownership.is_some() {
-                return TestResult::failed();
+            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
+            match ownership {
+                DevOwnership::Unowned => {}
+                _ => return TestResult::failed(),
             }
 
             BDA::initialize(
@@ -948,18 +960,21 @@ mod tests {
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,
             ).unwrap();
-            if let Some((t_p, t_d)) = StaticHeader::device_identifiers(&mut buf).unwrap() {
-                if t_p != sh.pool_uuid || t_d != sh.dev_uuid {
-                    return TestResult::failed();
+            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
+            match ownership {
+                DevOwnership::Ours(pool_uuid, dev_uuid) => {
+                    if sh.pool_uuid != pool_uuid || sh.dev_uuid != dev_uuid {
+                        return TestResult::failed();
+                    }
                 }
-            } else {
-                return TestResult::failed();
+                _ => return TestResult::failed(),
             }
 
             BDA::wipe(&mut buf).unwrap();
-            let ownership = StaticHeader::device_identifiers(&mut buf).unwrap();
-            if ownership.is_some() {
-                return TestResult::failed();
+            let ownership = StaticHeader::determine_ownership(&mut buf).unwrap();
+            match ownership {
+                DevOwnership::Unowned => {}
+                _ => return TestResult::failed(),
             }
 
             TestResult::passed()

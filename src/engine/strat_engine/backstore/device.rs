@@ -120,7 +120,11 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
         Some(None) => {
             // Not a Stratis device OR running an older version of libblkid
             // that does not interpret Stratis devices. Fall back on reading
-            // Stratis header via Stratis.
+            // Stratis header via Stratis. Be more accepting of failures
+            // while reading the Stratis header from the device than in
+            // the case where udev has actually identified this device as
+            // belonging to Stratis.
+            //
             // NOTE: This is a bit kludgy. If, at any time during stratisd
             // execution, a device is identified as a Stratis device by libblkid
             // then it is clear that the version of libblkid being run is new
@@ -128,13 +132,18 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
             // stateful global variable. So, instead, fall back on the safe
             // approach of just always reading the Stratis header, regardless
             // of what has happened in the past.
-            Ok(if let Some((pool_uuid, device_uuid)) =
-                device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
-            {
-                DevOwnership::Ours(pool_uuid, device_uuid)
-            } else {
-                DevOwnership::Unowned
-            })
+            Ok(
+                if let Ok(Some((pool_uuid, device_uuid))) = OpenOptions::new()
+                    .read(true)
+                    .open(&devnode)
+                    .map_err(|e| e.into())
+                    .and_then(|mut file| device_identifiers(&mut file))
+                {
+                    DevOwnership::Ours(pool_uuid, device_uuid)
+                } else {
+                    DevOwnership::Unowned
+                },
+            )
         }
         None => Err(StratisError::Engine(
             ErrorEnum::NotFound,

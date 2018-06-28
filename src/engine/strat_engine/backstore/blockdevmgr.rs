@@ -464,12 +464,10 @@ mod tests {
     use rand;
     use uuid::Uuid;
 
-    use devicemapper::SECTOR_SIZE;
-
-    use super::super::super::device::write_sectors;
+    use super::super::super::cmd;
     use super::super::super::tests::{loopbacked, real};
 
-    use super::super::metadata::{device_identifiers, BDA_STATIC_HDR_SECTORS, MIN_MDA_SECTORS};
+    use super::super::metadata::{device_identifiers, MIN_MDA_SECTORS};
     use super::super::setup::{find_all, get_metadata};
 
     use super::*;
@@ -481,6 +479,8 @@ mod tests {
     fn test_blockdevmgr_used(paths: &[&Path]) -> () {
         let mut mgr =
             BlockDevMgr::initialize(Uuid::new_v4(), paths, MIN_MDA_SECTORS, false).unwrap();
+        cmd::udev_settle().unwrap();
+
         assert_eq!(
             mgr.avail_space() + mgr.metadata_size(),
             mgr.current_capacity()
@@ -519,24 +519,16 @@ mod tests {
     }
 
     /// Verify that it is impossible to initialize a set of disks of which
-    /// even one is dirty, i.e, has some data written within BDA_STATIC_HDR_SECTORS
-    /// of start of disk. Choose the dirty disk randomly. This means that even
-    /// if our code is broken with respect to this property, this test might
-    /// sometimes succeed.
-    /// FIXME: Consider enriching device specs so that this test will fail
-    /// consistently.
-    /// Verify that force flag allows all dirty disks to be initialized.
+    /// even one has a signature. Choose the dirty disk randomly.
+    /// Verify that force flag allows owned disks to be initialized.
     fn test_force_flag_dirty(paths: &[&Path]) -> () {
         let index = rand::random::<u8>() as usize % paths.len();
-        write_sectors(
-            paths[index],
-            Sectors(index as u64 % *BDA_STATIC_HDR_SECTORS),
-            Sectors(1),
-            &[1u8; SECTOR_SIZE],
-        ).unwrap();
+        cmd::create_ext3_fs(paths[index]).unwrap();
+        cmd::udev_settle().unwrap();
 
         let pool_uuid = Uuid::new_v4();
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).is_err());
+
         assert!(paths.iter().enumerate().all(|(i, path)| {
             let real_ownership = identify(&path).unwrap();
             if i == index {
@@ -553,6 +545,8 @@ mod tests {
         }));
 
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, true).is_ok());
+        cmd::udev_settle().unwrap();
+
         assert!(paths.iter().all(|path| {
             let (t_pool_uuid, _) =
                 device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
@@ -600,6 +594,8 @@ mod tests {
         let uuid2 = Uuid::new_v4();
 
         let mut bd_mgr = BlockDevMgr::initialize(uuid, paths1, MIN_MDA_SECTORS, false).unwrap();
+        cmd::udev_settle().unwrap();
+
         assert!(BlockDevMgr::initialize(uuid2, paths1, MIN_MDA_SECTORS, false).is_err());
         // FIXME: this should succeed, but currently it fails, to be extra safe.
         // See: https://github.com/stratis-storage/stratisd/pull/292
@@ -610,6 +606,8 @@ mod tests {
         assert_eq!(bd_mgr.block_devs.len(), original_length);
 
         BlockDevMgr::initialize(uuid, paths2, MIN_MDA_SECTORS, false).unwrap();
+        cmd::udev_settle().unwrap();
+
         assert!(bd_mgr.add(uuid, paths2, false).is_err());
     }
 
@@ -655,6 +653,7 @@ mod tests {
         let uuid1 = Uuid::new_v4();
         BlockDevMgr::initialize(uuid1, paths1, MIN_MDA_SECTORS, false).unwrap();
 
+        cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 1);
         assert!(pools.contains_key(&uuid1));
@@ -664,6 +663,7 @@ mod tests {
         let uuid2 = Uuid::new_v4();
         BlockDevMgr::initialize(uuid2, paths2, MIN_MDA_SECTORS, false).unwrap();
 
+        cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 2);
 
@@ -703,6 +703,8 @@ mod tests {
     fn test_ownership(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
         let bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+
+        cmd::udev_settle().unwrap();
 
         assert!(paths.iter().all(|path| {
             let (t_pool_uuid, _) =

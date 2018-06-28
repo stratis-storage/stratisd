@@ -761,6 +761,7 @@ mod tests {
 
     use devicemapper::{CacheDevStatus, DataBlocks};
 
+    use super::super::super::cmd;
     use super::super::super::tests::{loopbacked, real};
 
     use super::super::setup::find_all;
@@ -916,6 +917,7 @@ mod tests {
 
         let backstore_save = backstore.record();
 
+        cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
         let backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
@@ -923,6 +925,7 @@ mod tests {
 
         backstore.teardown().unwrap();
 
+        cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
         let backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();

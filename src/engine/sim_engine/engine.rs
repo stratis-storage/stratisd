@@ -121,6 +121,13 @@ impl Engine for SimEngine {
             .collect()
     }
 
+    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut Pool)> {
+        self.pools
+            .iter_mut()
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut Pool))
+            .collect()
+    }
+
     fn get_eventable(&self) -> Option<&'static Eventable> {
         None
     }

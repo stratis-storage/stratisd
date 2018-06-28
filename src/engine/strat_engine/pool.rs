@@ -2,6 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#[cfg(feature = "dbus_enabled")]
+use dbus;
+
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
@@ -78,6 +81,8 @@ pub struct StratPool {
     backstore: Backstore,
     redundancy: Redundancy,
     thin_pool: ThinPool,
+    #[cfg(feature = "dbus_enabled")]
+    dbus_path: Option<dbus::Path<'static>>,
 }
 
 impl StratPool {
@@ -113,6 +118,8 @@ impl StratPool {
             backstore,
             redundancy,
             thin_pool: thinpool,
+            #[cfg(feature = "dbus_enabled")]
+            dbus_path: None,
         };
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
@@ -149,6 +156,8 @@ impl StratPool {
                 backstore,
                 redundancy: Redundancy::NONE,
                 thin_pool: thinpool,
+                #[cfg(feature = "dbus_enabled")]
+                dbus_path: None,
             },
         ))
     }
@@ -285,7 +294,7 @@ impl Pool for StratPool {
         pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<FilesystemUuid> {
+    ) -> StratisResult<(FilesystemUuid, &mut Filesystem)> {
         self.thin_pool
             .snapshot_filesystem(pool_uuid, pool_name, origin_uuid, snapshot_name)
     }
@@ -302,6 +311,10 @@ impl Pool for StratPool {
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)> {
         self.thin_pool.filesystems()
+    }
+
+    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut Filesystem)> {
+        self.thin_pool.filesystems_mut()
     }
 
     fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &Filesystem)> {
@@ -324,10 +337,24 @@ impl Pool for StratPool {
             .collect()
     }
 
+    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut BlockDev)> {
+        self.backstore
+            .blockdevs_mut()
+            .into_iter()
+            .map(|(u, b)| (u, b as &mut BlockDev))
+            .collect()
+    }
+
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
         self.backstore
             .get_blockdev_by_uuid(uuid)
             .map(|(t, b)| (t, b as &BlockDev))
+    }
+
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)> {
+        self.backstore
+            .get_mut_blockdev_by_uuid(uuid)
+            .map(|(t, b)| (t, b as &mut BlockDev))
     }
 
     fn set_blockdev_user_info(
@@ -342,6 +369,16 @@ impl Pool for StratPool {
         } else {
             Ok(false)
         }
+    }
+
+    #[cfg(feature = "dbus_enabled")]
+    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> () {
+        self.dbus_path = Some(path)
+    }
+
+    #[cfg(feature = "dbus_enabled")]
+    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>> {
+        &self.dbus_path
     }
 }
 

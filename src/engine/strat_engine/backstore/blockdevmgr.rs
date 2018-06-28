@@ -21,13 +21,12 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{DevUuid, PoolUuid};
 
-use super::super::engine::DevOwnership;
 use super::super::serde_structs::{BlockDevSave, Recordable};
 
 use super::blockdev::StratBlockDev;
 use super::cleanup::wipe_blockdevs;
-use super::device::{blkdev_size, resolve_devices};
-use super::metadata::{validate_mda_size, StaticHeader, BDA, MIN_MDA_SECTORS};
+use super::device::{blkdev_size, identify, resolve_devices, DevOwnership};
+use super::metadata::{validate_mda_size, BDA, MIN_MDA_SECTORS};
 use super::udev::{get_udev_property, udev_block_device_apply};
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
@@ -352,12 +351,13 @@ fn initialize(
     /// Get device information, returns an error if problem with obtaining
     /// that information.
     /// Returns a tuple with the device's path, its size in bytes,
-    /// its ownership as determined by calling determine_ownership(),
+    /// its ownership as determined by calling identify(),
     /// and an open File handle, all of which are needed later.
     fn dev_info(devnode: &Path) -> StratisResult<(&Path, Bytes, DevOwnership, File)> {
-        let mut f = OpenOptions::new().read(true).write(true).open(&devnode)?;
+        let ownership = identify(devnode)?;
+
+        let f = OpenOptions::new().read(true).write(true).open(&devnode)?;
         let dev_size = blkdev_size(&f)?;
-        let ownership = StaticHeader::determine_ownership(&mut f)?;
 
         Ok((devnode, dev_size, ownership, f))
     }
@@ -388,11 +388,17 @@ fn initialize(
             };
             match ownership {
                 DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, f))),
-                DevOwnership::Theirs => {
+                DevOwnership::Contradiction =>
+                {
+                    return Err(StratisError::Engine(ErrorEnum::Invalid,
+                        "udev has identified this device as a Stratis device, but no Stratis header was found on the device".into()))
+                }
+                DevOwnership::Theirs(whose) => {
                     if !force {
                         let err_str = format!(
-                            "Device {} appears to belong to another application",
-                            devnode.display()
+                            "Device {} appears to udev to belong to another application, udev properties: {:?}",
+                            devnode.display(),
+                            whose
                         );
                         return Err(StratisError::Engine(ErrorEnum::Invalid, err_str));
                     } else {
@@ -469,12 +475,10 @@ mod tests {
     use rand;
     use uuid::Uuid;
 
-    use devicemapper::SECTOR_SIZE;
-
-    use super::super::super::device::write_sectors;
+    use super::super::super::cmd;
     use super::super::super::tests::{loopbacked, real};
 
-    use super::super::metadata::{BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS};
+    use super::super::metadata::{device_identifiers, MIN_MDA_SECTORS};
     use super::super::setup::{find_all, get_metadata};
 
     use super::*;
@@ -486,6 +490,8 @@ mod tests {
     fn test_blockdevmgr_used(paths: &[&Path]) -> () {
         let mut mgr =
             BlockDevMgr::initialize(Uuid::new_v4(), paths, MIN_MDA_SECTORS, false).unwrap();
+        cmd::udev_settle().unwrap();
+
         assert_eq!(
             mgr.avail_space() + mgr.metadata_size(),
             mgr.current_capacity()
@@ -524,47 +530,40 @@ mod tests {
     }
 
     /// Verify that it is impossible to initialize a set of disks of which
-    /// even one is dirty, i.e, has some data written within BDA_STATIC_HDR_SECTORS
-    /// of start of disk. Choose the dirty disk randomly. This means that even
-    /// if our code is broken with respect to this property, this test might
-    /// sometimes succeed.
-    /// FIXME: Consider enriching device specs so that this test will fail
-    /// consistently.
-    /// Verify that force flag allows all dirty disks to be initialized.
+    /// even one has a signature. Choose the dirty disk randomly.
+    /// Verify that force flag allows owned disks to be initialized.
     fn test_force_flag_dirty(paths: &[&Path]) -> () {
         let index = rand::random::<u8>() as usize % paths.len();
-        write_sectors(
-            paths[index],
-            Sectors(index as u64 % *BDA_STATIC_HDR_SIZE.sectors()),
-            Sectors(1),
-            &[1u8; SECTOR_SIZE],
-        ).unwrap();
+        cmd::create_ext3_fs(paths[index]).unwrap();
+        cmd::udev_settle().unwrap();
 
         let pool_uuid = Uuid::new_v4();
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).is_err());
+
         assert!(paths.iter().enumerate().all(|(i, path)| {
-            StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap() == if i == index {
-                DevOwnership::Theirs
+            let real_ownership = identify(&path).unwrap();
+            if i == index {
+                match real_ownership {
+                    DevOwnership::Theirs(_) => true,
+                    _ => false,
+                }
             } else {
-                DevOwnership::Unowned
+                match real_ownership {
+                    DevOwnership::Unowned => true,
+                    _ => false,
+                }
             }
         }));
 
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, true).is_ok());
+        cmd::udev_settle().unwrap();
+
         assert!(paths.iter().all(|path| {
-            match StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap()
-            {
-                DevOwnership::Ours(uuid, _) => pool_uuid == uuid,
-                _ => false,
-            }
+            let (t_pool_uuid, _) =
+                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap()
+                    .unwrap();
+            pool_uuid == t_pool_uuid
         }));
     }
 
@@ -606,6 +605,8 @@ mod tests {
         let uuid2 = Uuid::new_v4();
 
         let mut bd_mgr = BlockDevMgr::initialize(uuid, paths1, MIN_MDA_SECTORS, false).unwrap();
+        cmd::udev_settle().unwrap();
+
         assert!(BlockDevMgr::initialize(uuid2, paths1, MIN_MDA_SECTORS, false).is_err());
         // FIXME: this should succeed, but currently it fails, to be extra safe.
         // See: https://github.com/stratis-storage/stratisd/pull/292
@@ -616,6 +617,8 @@ mod tests {
         assert_eq!(bd_mgr.block_devs.len(), original_length);
 
         BlockDevMgr::initialize(uuid, paths2, MIN_MDA_SECTORS, false).unwrap();
+        cmd::udev_settle().unwrap();
+
         assert!(bd_mgr.add(uuid, paths2, false).is_err());
     }
 
@@ -661,6 +664,7 @@ mod tests {
         let uuid1 = Uuid::new_v4();
         BlockDevMgr::initialize(uuid1, paths1, MIN_MDA_SECTORS, false).unwrap();
 
+        cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 1);
         assert!(pools.contains_key(&uuid1));
@@ -670,6 +674,7 @@ mod tests {
         let uuid2 = Uuid::new_v4();
         BlockDevMgr::initialize(uuid2, paths2, MIN_MDA_SECTORS, false).unwrap();
 
+        cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 2);
 
@@ -710,24 +715,20 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
 
+        cmd::udev_settle().unwrap();
+
         assert!(paths.iter().all(|path| {
-            match StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap()
-            {
-                DevOwnership::Ours(uuid, _) => uuid == pool_uuid,
-                _ => false,
-            }
+            let (t_pool_uuid, _) =
+                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap()
+                    .unwrap();
+            pool_uuid == t_pool_uuid
         }));
         bd_mgr.destroy_all().unwrap();
         assert!(paths.iter().all(|path| {
-            StaticHeader::determine_ownership(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap() == DevOwnership::Unowned
+            device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                .unwrap()
+                .is_none()
         }));
     }
 

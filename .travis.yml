@@ -54,6 +54,8 @@ matrix:
           env: TASK=fmt-travis
 
 branches:
-    only: master
+    only:
+        - master
+        - fixup-branch
 
 script: make -f Makefile $TASK

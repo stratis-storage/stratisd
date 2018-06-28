@@ -316,13 +316,21 @@ fn main() {
         )
         .get_matches();
 
-    let result = trylock_pid_file()
-        .and_then(|_pidfile| {
-            initialize_log(matches.is_present("debug")).map_err(|_| {
-                StratisError::Error("The log was not initialized successfully. This is surprising, since this is the first and only initialization of the log, which is guaranteed to succeed".into())
-            })
-        })
-        .and_then(|_| run(&matches));
+    // Using a let-expression here so that the scope of the lock file
+    // is the rest of the block.
+    let lock_file = trylock_pid_file();
+
+    let result = {
+        match lock_file {
+            Err(err) => Err(err),
+            Ok(_) => initialize_log(matches.is_present("debug"))
+                .map_err(|_| {
+                    StratisError::Error("The log was not initialized successfully. This is surprising, since this is the first and only initialization of the log, which is guaranteed to succeed".into())
+                })
+                .and_then(|_| run(&matches)),
+        }
+    };
+
     if let Err(err) = result {
         print_err(&err);
         exit(1);

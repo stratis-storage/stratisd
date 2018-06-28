@@ -4,6 +4,9 @@
 
 // Code to handle a single block device.
 
+#[cfg(feature = "dbus_enabled")]
+use dbus;
+
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 
@@ -29,6 +32,8 @@ pub struct StratBlockDev {
     used: RangeAllocator,
     user_info: Option<String>,
     hardware_info: Option<String>,
+    #[cfg(feature = "dbus_enabled")]
+    user_data: Option<dbus::Path<'static>>,
 }
 
 impl StratBlockDev {
@@ -66,6 +71,8 @@ impl StratBlockDev {
             used: allocator,
             user_info,
             hardware_info,
+            #[cfg(feature = "dbus_enabled")]
+            user_data: None,
         })
     }
 
@@ -170,6 +177,16 @@ impl BlockDev for StratBlockDev {
     fn state(&self) -> BlockDevState {
         // TODO: Implement states for blockdevs
         BlockDevState::InUse
+    }
+
+    #[cfg(feature = "dbus_enabled")]
+    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> () {
+        self.user_data = Some(path)
+    }
+
+    #[cfg(feature = "dbus_enabled")]
+    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>> {
+        &self.user_data
     }
 }
 

@@ -2,6 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#[cfg(feature = "dbus_enabled")]
+use dbus;
+
 use std::fmt::Debug;
 use std::os::unix::io::RawFd;
 use std::path::{Path, PathBuf};
@@ -18,6 +21,14 @@ use stratis::StratisResult;
 pub trait Filesystem: Debug {
     /// path of the device node
     fn devnode(&self) -> PathBuf;
+
+    /// Set dbus path associated with the Pool.
+    #[cfg(feature = "dbus_enabled")]
+    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> ();
+
+    /// Get dbus path associated with the Pool.
+    #[cfg(feature = "dbus_enabled")]
+    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>>;
 }
 
 pub trait BlockDev: Debug {
@@ -39,6 +50,14 @@ pub trait BlockDev: Debug {
 
     /// The current state of the blockdev.
     fn state(&self) -> BlockDevState;
+
+    /// Set dbus path associated with the BlockDev.
+    #[cfg(feature = "dbus_enabled")]
+    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> ();
+
+    /// Get dbus path associated with the BlockDev.
+    #[cfg(feature = "dbus_enabled")]
+    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>>;
 }
 
 pub trait Pool: Debug {
@@ -141,6 +160,14 @@ pub trait Pool: Debug {
         uuid: DevUuid,
         user_info: Option<&str>,
     ) -> StratisResult<bool>;
+
+    /// Set dbus path associated with the Pool.
+    #[cfg(feature = "dbus_enabled")]
+    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> ();
+
+    /// Get dbus path associated with the Pool.
+    #[cfg(feature = "dbus_enabled")]
+    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>>;
 }
 
 pub trait Engine: Debug {

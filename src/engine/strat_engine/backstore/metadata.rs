@@ -18,6 +18,8 @@ use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::device::SyncAll;
 
+use super::util::read_exact_aligned;
+
 pub use self::mda::{validate_mda_size, MIN_MDA_SECTORS};
 
 const _BDA_STATIC_HDR_SECTORS: usize = 16;
@@ -60,12 +62,12 @@ impl BDA {
         let mut buf_loc_2 = [0u8; SECTOR_SIZE];
 
         /// Read a bda sector worth of data at the specified offset into buffer.
-        fn read_sector_at_offset<F>(f: &mut F, offset: usize, mut buf: &mut [u8]) -> io::Result<()>
+        fn read_sector_at_offset<F>(f: &mut F, offset: usize, buf: &mut [u8]) -> io::Result<()>
         where
             F: Read + Seek,
         {
             f.seek(SeekFrom::Start(offset as u64))?;
-            f.read_exact(&mut buf)?;
+            read_exact_aligned(f, buf, SECTOR_SIZE, SECTOR_SIZE as u64)?;
             Ok(())
         }
 
@@ -414,10 +416,11 @@ mod mda {
     use chrono::{DateTime, TimeZone, Utc};
     use crc::crc32;
 
-    use devicemapper::{Bytes, Sectors};
+    use devicemapper::{Bytes, Sectors, SECTOR_SIZE};
 
     use stratis::{ErrorEnum, StratisError, StratisResult};
 
+    use super::super::util::read_exact_aligned;
     use super::SyncAll;
 
     const _MDA_REGION_HDR_SIZE: usize = 32;
@@ -501,7 +504,7 @@ mod mda {
                     index,
                     per_region_size,
                 )))?;
-                f.read_exact(&mut hdr_buf)?;
+                read_exact_aligned(f, &mut hdr_buf, _MDA_REGION_HDR_SIZE, SECTOR_SIZE as u64)?;
                 Ok(MDAHeader::from_buf(&hdr_buf, per_region_size)?)
             };
 
@@ -720,7 +723,7 @@ mod mda {
         // MDAHeader cannot seek because it doesn't know which region it's in
         fn load_region<F>(&self, f: &mut F) -> StratisResult<Vec<u8>>
         where
-            F: Read,
+            F: Read + Seek,
         {
             // This cast could fail if running on a 32-bit machine and
             // size of metadata is greater than 2^32 - 1 bytes, which is
@@ -733,7 +736,7 @@ mod mda {
             assert!(*self.used <= std::usize::MAX as u64);
             let mut data_buf = vec![0u8; *self.used as usize];
 
-            f.read_exact(&mut data_buf)?;
+            read_exact_aligned(f, &mut data_buf, *self.used as usize, SECTOR_SIZE as u64)?;
 
             if self.data_crc != crc32::checksum_castagnoli(&data_buf) {
                 return Err(StratisError::Engine(

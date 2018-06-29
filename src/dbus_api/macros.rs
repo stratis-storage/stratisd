@@ -42,3 +42,16 @@ macro_rules! get_mut_pool {
         }
     };
 }
+
+
+macro_rules! get_engine {
+    ($dbus_context:ident; $default:expr; $message:expr) => {
+        if let Ok(engine) = $dbus_context.engine.lock() {
+            engine
+        } else {
+            let (rc, rs) = (u16::from(DbusErrorEnum::INTERNAL_ERROR),
+                            "Unable to obtain engine lock");
+            return Ok(vec![$message.append3($default, rc, rs)]);
+        }
+    };
+}

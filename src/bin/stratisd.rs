@@ -17,14 +17,13 @@ extern crate libc;
 extern crate libudev;
 extern crate nix;
 
-use std::cell::RefCell;
 use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{ErrorKind, Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::PathBuf;
 use std::process::exit;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use clap::{App, Arg, ArgMatches};
 use env_logger::Builder;
@@ -120,6 +119,11 @@ fn trylock_pid_file() -> StratisResult<File> {
     }
 }
 
+// Compile check for needed traits for thread safety
+pub fn is_send_sync(_engine: Box<Engine + Send + Sync>) -> bool {
+    true
+}
+
 fn run(matches: &ArgMatches) -> StratisResult<()> {
     // Setup a udev listener before initializing the engine. A device may
     // appear after the engine has read the /dev directory but before it has
@@ -131,15 +135,17 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
     monitor.match_subsystem_devtype("block", "disk")?;
     let mut udev = monitor.listen()?;
 
-    let engine: Rc<RefCell<Engine>> = {
+    let engine: Arc<Mutex<Engine>> = {
         if matches.is_present("sim") {
             info!("Using SimEngine");
-            Rc::new(RefCell::new(SimEngine::default()))
+            Arc::new(Mutex::new(SimEngine::default()))
         } else {
             info!("Using StratEngine");
-            Rc::new(RefCell::new(StratEngine::initialize()?))
+            Arc::new(Mutex::new(StratEngine::initialize()?))
         }
     };
+
+    is_send_sync(Box::new(Arc::clone(&engine)));
 
     /*
     The file descriptor array indexes are laid out in the following:
@@ -170,7 +176,9 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
         events: libc::POLLIN,
     });
 
-    let eventable = engine.borrow().get_eventable();
+    let eventable = {
+        engine.lock().expect("lock is not poisoned").get_eventable()
+    };
 
     let poll_timeout = match eventable {
         Some(ref evt) => {
@@ -193,10 +201,10 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
 
     #[cfg(feature = "dbus_enabled")]
     let (dbus_conn, mut tree, base_object_path, dbus_context) =
-        libstratis::dbus_api::connect(Rc::clone(&engine))?;
+        libstratis::dbus_api::connect(Arc::clone(&engine))?;
 
     #[cfg(feature = "dbus_enabled")]
-    for (_, pool_uuid, pool) in engine.borrow().pools() {
+    for (_, pool_uuid, pool) in engine.lock().expect("lock not poisoned").pools() {
         libstratis::dbus_api::register_pool(
             &dbus_conn,
             &dbus_context,
@@ -220,7 +228,8 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
                     #[cfg(feature = "dbus_enabled")]
                     {
                         let pool_uuid = engine
-                            .borrow_mut()
+                            .lock()
+                            .unwrap()
                             .block_evaluate(device, devnode)
                             .unwrap_or(None);
 
@@ -231,7 +240,8 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
                                 &mut tree,
                                 pool_uuid,
                                 engine
-                                    .borrow()
+                                    .lock()
+                                    .unwrap()
                                     .get_pool(pool_uuid)
                                     .expect(
                                         "block_evaluate() returned a pool UUID, pool must be available",
@@ -250,7 +260,7 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
             Some(ref evt) => {
                 if fds[FD_INDEX_ENGINE].revents != 0 {
                     evt.clear_event()?;
-                    engine.borrow_mut().evented()?;
+                    engine.lock().unwrap().evented()?;
                 }
             }
             None => {
@@ -258,7 +268,7 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
                 // This looks like a bad idea, but the only engine that has
                 // no eventable is the sim engine, and for that engine,
                 // evented() is essentially a no-op.
-                engine.borrow_mut().evented()?;
+                engine.lock().unwrap().evented()?;
             }
         }
 

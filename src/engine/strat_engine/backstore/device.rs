@@ -5,7 +5,6 @@
 // Functions for dealing with devices.
 
 use std::collections::HashMap;
-use std::fmt::{self, Display};
 use std::fs::{File, OpenOptions};
 use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
@@ -19,7 +18,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::metadata::device_identifiers;
-use super::udev::{get_udev_property, udev_block_device_apply, unclaimed};
+use super::udev::{udev_block_device_apply, unclaimed};
 
 ioctl!(read blkgetsize64 with 0x12, 114; u64);
 
@@ -52,47 +51,12 @@ pub fn resolve_devices<'a>(paths: &'a [&Path]) -> StratisResult<HashMap<Device, 
     Ok(map)
 }
 
-/// Something to identify a device that is not a StratisDevice.
-/// This type is extremely rudimentary and may have to be modified as Stratis's
-/// notion of how to obtain a signature for a deivce that is not Stratis's
-/// changes.
-#[derive(Debug, PartialEq, Eq)]
-pub enum TheirsReason {
-    /// Udev identifies device as belonging to another.
-    Udev {
-        id_part_table_type: Option<String>,
-        id_fs_type: Option<String>,
-    },
-}
-
-impl Display for TheirsReason {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            TheirsReason::Udev {
-                id_part_table_type,
-                id_fs_type,
-            } => write!(
-                f,
-                "ID_PART_TABLE_TYPE: {}, ID_FS_TYPE: {}",
-                match id_part_table_type {
-                    Some(val) => val,
-                    None => "not available",
-                },
-                match id_fs_type {
-                    Some(val) => val,
-                    None => "not found",
-                }
-            ),
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum DevOwnership {
     Contradiction,
     Ours(PoolUuid, DevUuid),
     Unowned,
-    Theirs(TheirsReason),
+    Theirs(HashMap<String, String>),
 }
 
 /// Identify a device node using a combination of udev information and
@@ -100,20 +64,34 @@ pub enum DevOwnership {
 /// Return an error if the device is not in the udev database.
 /// Return an error if the necessary udev information can not be read.
 pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
-    /// A helper function. None if the device is unclaimed, the value of
-    /// ID_FS_TYPE, which may yet be None, if it is.
-    #[allow(option_option)]
-    fn udev_info(device: &libudev::Device) -> StratisResult<Option<Option<String>>> {
+    /// A helper function. None if the device is unclaimed, a HashMap of udev
+    /// properties otherwise. Omits all udev properties that can not be
+    /// converted to Strings.
+    fn udev_info(device: &libudev::Device) -> Option<HashMap<String, String>> {
         if unclaimed(device) {
-            Ok(None)
+            None
         } else {
-            Ok(Some(get_udev_property(device, "ID_FS_TYPE")?))
+            Some(
+                device
+                    .properties()
+                    .map(|i| {
+                        (
+                            i.name().to_str().map(|s| s.to_string()),
+                            i.value().to_str().map(|s| s.to_string()),
+                        )
+                    })
+                    .filter_map(|(n, v)| match (n, v) {
+                        (Some(n), Some(v)) => Some((n, v)),
+                        _ => None,
+                    })
+                    .collect(),
+            )
         }
     }
 
     match udev_block_device_apply(devnode, udev_info)? {
-        Some(Ok(Some(Some(value)))) => {
-            if value == "stratis" {
+        Some(Some(properties)) => {
+            if properties.get("ID_FS_TYPE") == Some(&"stratis".to_string()) {
                 if let Some((pool_uuid, device_uuid)) =
                     device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
                 {
@@ -122,17 +100,16 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
                     Ok(DevOwnership::Contradiction)
                 }
             } else {
-                Ok(DevOwnership::Theirs(TheirsReason::Udev {
-                    id_part_table_type: None,
-                    id_fs_type: None,
-                }))
+                Ok(DevOwnership::Theirs(
+                    properties
+                        .iter()
+                        .filter(|&(k, _)| k.contains("ID_FS_") || k.contains("ID_PART_TABLE_"))
+                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                        .collect(),
+                ))
             }
         }
-        Some(Ok(Some(None))) => Ok(DevOwnership::Theirs(TheirsReason::Udev {
-            id_part_table_type: None,
-            id_fs_type: None,
-        })),
-        Some(Ok(None)) => {
+        Some(None) => {
             // Not a Stratis device OR running an older version of libblkid
             // that does not interpret Stratis devices. Fall back on reading
             // Stratis header via Stratis.
@@ -151,7 +128,6 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
                 DevOwnership::Unowned
             })
         }
-        Some(Err(err)) => Err(err),
         None => Err(StratisError::Engine(
             ErrorEnum::NotFound,
             format!(
@@ -180,7 +156,15 @@ mod test {
         cmd::udev_settle().unwrap();
 
         assert!(match identify(paths[0]).unwrap() {
-            DevOwnership::Theirs(_) => true,
+            DevOwnership::Theirs(properties) => {
+                assert_eq!(
+                    properties.get("ID_FS_USAGE"),
+                    Some(&"filesystem".to_string())
+                );
+                assert_eq!(properties.get("ID_FS_TYPE"), Some(&"ext3".to_string()));
+                assert!(properties.get("ID_FS_UUID").is_some());
+                true
+            }
             _ => false,
         })
     }

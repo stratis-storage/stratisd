@@ -385,7 +385,7 @@ fn initialize(
                 DevOwnership::Theirs(whose) => {
                     if !force {
                         let err_str = format!(
-                            "Device {} appears to belong to another application, reason: {}",
+                            "Device {} appears to udev to belong to another application, udev properties: {:?}",
                             devnode.display(),
                             whose
                         );

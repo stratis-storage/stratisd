@@ -52,10 +52,18 @@ pub fn resolve_devices<'a>(paths: &'a [&Path]) -> StratisResult<HashMap<Device, 
 }
 
 #[derive(Debug, PartialEq, Eq)]
+/// Designations of device ownership
 pub enum DevOwnership {
+    /// Udev thinks the device belongs to Stratis, but Stratis does not
     Contradiction,
+    /// Udev and Stratis agree that the device belongs to Stratis, these
+    /// are the device's pool and device UUID.
     Ours(PoolUuid, DevUuid),
+    /// Udev believes that the device is unowned.
     Unowned,
+    /// Udev believes that the device is owned by something other than
+    /// Stratis, and the constructor argument contains some relevant
+    /// udev properties.
     Theirs(HashMap<String, String>),
 }
 

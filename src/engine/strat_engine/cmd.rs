@@ -94,19 +94,18 @@ fn execute_cmd(cmd: &mut Command) -> StratisResult<()> {
 
 /// Get an absolute path for the executable with the given name.
 /// Precondition: verify_binaries() has already been invoked.
-fn get_executable(name: &str) -> StratisResult<PathBuf> {
-    Ok(BINARIES
+fn get_executable(name: &str) -> &Path {
+    BINARIES
         .get(name)
         .expect("name arguments are all constants defined with BINARIES, lookup can not fail")
         .as_ref()
         .expect("verify_binaries() was previously called and returned no error")
-        .to_path_buf())
 }
 
 /// Create a filesystem on devnode.
 pub fn create_fs(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
     execute_cmd(
-        Command::new(get_executable(MKFS_XFS)?.as_os_str())
+        Command::new(get_executable(MKFS_XFS).as_os_str())
             .arg("-f")
             .arg("-q")
             .arg(&devnode)
@@ -119,7 +118,7 @@ pub fn create_fs(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
 /// mount point.
 pub fn xfs_growfs(mount_point: &Path) -> StratisResult<()> {
     execute_cmd(
-        Command::new(get_executable(XFS_GROWFS)?.as_os_str())
+        Command::new(get_executable(XFS_GROWFS).as_os_str())
             .arg(mount_point)
             .arg("-d"),
     )
@@ -128,7 +127,7 @@ pub fn xfs_growfs(mount_point: &Path) -> StratisResult<()> {
 /// Set a new UUID for filesystem on the devnode.
 pub fn set_uuid(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
     execute_cmd(
-        Command::new(get_executable(XFS_ADMIN)?.as_os_str())
+        Command::new(get_executable(XFS_ADMIN).as_os_str())
             .arg("-U")
             .arg(format!("{}", uuid))
             .arg(&devnode),
@@ -138,7 +137,7 @@ pub fn set_uuid(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
 /// Call thin_check on a thinpool
 pub fn thin_check(devnode: &Path) -> StratisResult<()> {
     execute_cmd(
-        Command::new(get_executable(THIN_CHECK)?.as_os_str())
+        Command::new(get_executable(THIN_CHECK).as_os_str())
             .arg("-q")
             .arg(devnode),
     )
@@ -147,7 +146,7 @@ pub fn thin_check(devnode: &Path) -> StratisResult<()> {
 /// Call thin_repair on a thinpool
 pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> StratisResult<()> {
     execute_cmd(
-        Command::new(get_executable(THIN_REPAIR)?.as_os_str())
+        Command::new(get_executable(THIN_REPAIR).as_os_str())
             .arg("-i")
             .arg(meta_dev)
             .arg("-o")

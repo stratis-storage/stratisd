@@ -20,9 +20,7 @@ use super::super::device::SyncAll;
 
 pub use self::mda::{validate_mda_size, MIN_MDA_SECTORS};
 
-const _BDA_STATIC_HDR_SECTORS: usize = 16;
-pub const BDA_STATIC_HDR_SECTORS: Sectors = Sectors(_BDA_STATIC_HDR_SECTORS as u64);
-const _BDA_STATIC_HDR_SIZE: usize = _BDA_STATIC_HDR_SECTORS * SECTOR_SIZE;
+const _BDA_STATIC_HDR_SIZE: usize = 16 * SECTOR_SIZE;
 const BDA_STATIC_HDR_SIZE: Bytes = Bytes(_BDA_STATIC_HDR_SIZE as u64);
 
 const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
@@ -218,7 +216,7 @@ impl BDA {
 
     /// The number of sectors the BDA itself occupies.
     pub fn size(&self) -> Sectors {
-        BDA_STATIC_HDR_SECTORS + self.header.mda_size + self.header.reserved_size
+        BDA_STATIC_HDR_SIZE.sectors() + self.header.mda_size + self.header.reserved_size
     }
 
     /// The maximum size of variable length metadata that can be accommodated.

@@ -142,9 +142,8 @@ mod tests {
     use std;
     use std::path::Path;
 
+    use proptest::prelude::any;
     use uuid::Uuid;
-
-    use quickcheck::QuickCheck;
 
     use stratis::{ErrorEnum, StratisError};
 
@@ -153,18 +152,15 @@ mod tests {
     use engine::Engine;
     use engine::RenameAction;
 
-    #[test]
-    fn prop_configure_simulator_runs() {
-        /// Configure simulator should always return Ok.
-        fn configure_simulator_runs(denominator: u32) -> bool {
-            SimEngine::default()
+    proptest! {
+        #[test]
+        /// This method should always return Ok.
+        fn configure_simulator_runs(denominator in any::<u32>()) {
+            prop_assert!(SimEngine::default()
                 .configure_simulator(denominator)
-                .is_ok()
+                .is_ok())
         }
 
-        QuickCheck::new()
-            .tests(10)
-            .quickcheck(configure_simulator_runs as fn(u32) -> bool);
     }
 
     #[test]

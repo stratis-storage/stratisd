@@ -838,10 +838,16 @@ mod mda {
         use std::io::Cursor;
 
         use chrono::Utc;
-        use quickcheck::{QuickCheck, TestResult};
+        use proptest::{
+            collection::{self, SizeRange}, num, prelude::any,
+        };
 
         use super::super::*;
         use super::*;
+
+        // 82102984128000 in decimal, approx 17 million years
+        const UTC_TIMESTAMP_SECS_BOUND: i64 = 0x7779beb9f00;
+        const UTC_TIMESTAMP_NSECS_BOUND: u32 = 2_000_000_000u32;
 
         #[test]
         /// Verify that default MDAHeader is all 0s except for CRC and versions.
@@ -869,22 +875,23 @@ mod mda {
             assert!(regions.last_update_time().is_none());
         }
 
-        #[test]
-        /// Using an arbitrary data buffer, construct an mda header buffer
-        /// Read the mda header buffer twice.
-        /// Verify that the resulting MDAHeaders have all equal components.
-        /// Verify timestamp and data CRC against original values.
-        fn prop_mda_header() {
-            fn mda_header(data: Vec<u8>, sec: i64, nsec: u32, region_size_ext: u32) -> TestResult {
-                // sec < 0: unwritable timestamp
-                // sec == 0: value of 0 is interpreted as no timestamp when read
-                if sec <= 0 {
-                    return TestResult::discard();
-                }
+        proptest! {
+            #[test]
+            /// Using an arbitrary data buffer, construct an mda header buffer
+            /// Read the mda header buffer twice.
+            /// Verify that the resulting MDAHeaders have all equal components.
+            /// Verify timestamp and data CRC against original values.
+            fn mda_header(ref data in collection::vec(num::u8::ANY, SizeRange::default()),
+                          // sec < 0: unwritable timestamp
+                          // sec == 0: value of 0 is interpreted as no timestamp when read
+                          sec in 1..UTC_TIMESTAMP_SECS_BOUND,
+                          nsec in 0..UTC_TIMESTAMP_NSECS_BOUND,
+                          region_size_ext in any::<u32>()) {
 
                 // 4 is NUM_MDA_REGIONS which is not imported from super.
                 let region_size =
                     (MIN_MDA_SECTORS / 4usize).bytes() + Bytes(region_size_ext as u64);
+
                 let header = MDAHeader {
                     last_updated: Utc.timestamp(sec, nsec),
                     used: Bytes(data.len() as u64),
@@ -894,18 +901,12 @@ mod mda {
                 let mda1 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
                 let mda2 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
 
-                TestResult::from_bool(
-                    mda1.last_updated == mda2.last_updated
-                        && mda1.used == mda2.used
-                        && mda1.data_crc == mda2.data_crc
-                        && header.last_updated == mda1.last_updated
-                        && header.data_crc == mda1.data_crc,
-                )
+                prop_assert_eq!(mda1.last_updated, mda2.last_updated);
+                prop_assert_eq!(mda1.used, mda2.used);
+                prop_assert_eq!(mda1.data_crc, mda2.data_crc);
+                prop_assert_eq!(header.last_updated, mda1.last_updated);
+                prop_assert_eq!(header.data_crc, mda1.data_crc);
             }
-
-            QuickCheck::new()
-                .tests(50)
-                .quickcheck(mda_header as fn(Vec<u8>, i64, u32, u32) -> TestResult);
         }
 
         /// Verify that bad crc causes an error.
@@ -944,7 +945,9 @@ mod tests {
     use std::io::{Cursor, Write};
 
     use devicemapper::{Bytes, Sectors, IEC};
-    use quickcheck::{QuickCheck, TestResult};
+    use proptest::{
+        collection::{vec, SizeRange}, num,
+    };
     use uuid::Uuid;
 
     use super::*;
@@ -980,22 +983,19 @@ mod tests {
         )
     }
 
-    #[test]
-    /// Construct an arbitrary StaticHeader object.
-    /// Verify that the "memory buffer" is unowned.
-    /// Initialize a BDA.
-    /// Verify that Stratis buffer validates.
-    /// Wipe the BDA.
-    /// Verify that the buffer is again unowned.
-    fn prop_test_ownership() {
-        fn test_ownership(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
+    proptest! {
+        #[test]
+        /// Construct an arbitrary StaticHeader object.
+        /// Verify that the "memory buffer" is unowned.
+        /// Initialize a BDA.
+        /// Verify that Stratis buffer validates.
+        /// Wipe the BDA.
+        /// Verify that the buffer is again unowned.
+        fn test_ownership(blkdev_size in 0..64u64, mda_size_factor in 0..64u32) {
             let sh = random_static_header(blkdev_size, mda_size_factor);
             let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
-            let ownership = StaticHeader::device_identifiers(&mut buf).unwrap();
-            if ownership.is_some() {
-                return TestResult::failed();
-            }
+            prop_assert!(StaticHeader::device_identifiers(&mut buf).unwrap().is_none());
 
             BDA::initialize(
                 &mut buf,
@@ -1005,33 +1005,23 @@ mod tests {
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,
             ).unwrap();
-            if let Some((t_p, t_d)) = StaticHeader::device_identifiers(&mut buf).unwrap() {
-                if t_p != sh.pool_uuid || t_d != sh.dev_uuid {
-                    return TestResult::failed();
-                }
-            } else {
-                return TestResult::failed();
-            }
+
+            prop_assert!(StaticHeader::device_identifiers(&mut buf)
+                         .unwrap()
+                         .map(|(t_p, t_d)| t_p == sh.pool_uuid && t_d == sh.dev_uuid)
+                         .unwrap_or(false));
 
             BDA::wipe(&mut buf).unwrap();
-            let ownership = StaticHeader::device_identifiers(&mut buf).unwrap();
-            if ownership.is_some() {
-                return TestResult::failed();
-            }
-
-            TestResult::passed()
+            prop_assert!(StaticHeader::device_identifiers(&mut buf).unwrap().is_none());
         }
-        QuickCheck::new()
-            .tests(20)
-            .quickcheck(test_ownership as fn(u64, u32) -> TestResult);
     }
 
-    #[test]
-    /// Construct an arbitrary StaticHeader object.
-    /// Initialize a BDA.
-    /// Verify that the last update time is None.
-    fn prop_empty_bda() {
-        fn empty_bda(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
+    proptest! {
+        #[test]
+        /// Construct an arbitrary StaticHeader object.
+        /// Initialize a BDA.
+        /// Verify that the last update time is None.
+        fn empty_bda(blkdev_size in 0..64u64, mda_size_factor in 0..64u32) {
             let sh = random_static_header(blkdev_size, mda_size_factor);
             let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
@@ -1043,12 +1033,8 @@ mod tests {
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,
             ).unwrap();
-            TestResult::from_bool(bda.last_update_time().is_none())
+            prop_assert!(bda.last_update_time().is_none());
         }
-
-        QuickCheck::new()
-            .tests(20)
-            .quickcheck(empty_bda as fn(u64, u32) -> TestResult);
     }
 
     #[test]
@@ -1089,20 +1075,20 @@ mod tests {
         assert!(bda.save_state(&timestamp2, &data, &mut buf).is_err());
     }
 
-    #[test]
-    /// Construct an arbitrary StaticHeader object.
-    /// Initialize a BDA.
-    /// Save metadata and verify correct update time and state.
-    /// Reload BDA and verify that new BDA has correct update time.
-    /// Load state using new BDA and verify correct state.
-    /// Save metadata again, and reload one more time, verifying new timestamp.
-    fn prop_check_state() {
+    proptest! {
+        #[test]
+        /// Construct an arbitrary StaticHeader object.
+        /// Initialize a BDA.
+        /// Save metadata and verify correct update time and state.
+        /// Reload BDA and verify that new BDA has correct update time.
+        /// Load state using new BDA and verify correct state.
+        /// Save metadata again, and reload one more time, verifying new timestamp.
         fn check_state(
-            blkdev_size: u64,
-            mda_size_factor: u32,
-            state: Vec<u8>,
-            next_state: Vec<u8>,
-        ) -> TestResult {
+            blkdev_size in 0..64u64,
+            mda_size_factor in 0..64u32,
+            ref state in vec(num::u8::ANY, SizeRange::default()),
+            ref next_state in vec(num::u8::ANY, SizeRange::default())
+        ) {
             let sh = random_static_header(blkdev_size, mda_size_factor);
             let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
@@ -1117,93 +1103,40 @@ mod tests {
             let current_time = Utc::now();
             bda.save_state(&current_time, &state, &mut buf).unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();
-
-            if let Some(t) = bda.last_update_time() {
-                if t != &current_time {
-                    return TestResult::failed();
-                }
-            } else {
-                return TestResult::failed();
-            }
-
-            if let Some(s) = loaded_state {
-                if s != state {
-                    return TestResult::failed();
-                }
-            } else {
-                return TestResult::failed();
-            }
+            prop_assert!(bda.last_update_time().map(|t| t == &current_time).unwrap_or(false));
+            prop_assert!(loaded_state.map(|s| &s == state).unwrap_or(false));
 
             let mut bda = BDA::load(&mut buf).unwrap().unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();
-
-            if let Some(s) = loaded_state {
-                if s != state {
-                    return TestResult::failed();
-                }
-            } else {
-                return TestResult::failed();
-            }
-
-            if let Some(t) = bda.last_update_time() {
-                if t != &current_time {
-                    return TestResult::failed();
-                }
-            } else {
-                return TestResult::failed();
-            }
+            prop_assert!(loaded_state.map(|s| &s == state).unwrap_or(false));
+            prop_assert!(bda.last_update_time().map(|t| t == &current_time).unwrap_or(false));
 
             let current_time = Utc::now();
             bda.save_state(&current_time, &next_state, &mut buf)
                 .unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();
+            prop_assert!(loaded_state.map(|s| &s == next_state).unwrap_or(false));
+            prop_assert!(bda.last_update_time().map(|t| t == &current_time).unwrap_or(false));
 
-            if let Some(s) = loaded_state {
-                if s != next_state {
-                    return TestResult::failed();
-                }
-            } else {
-                return TestResult::failed();
-            }
-
-            if let Some(t) = bda.last_update_time() {
-                if t != &current_time {
-                    return TestResult::failed();
-                }
-            } else {
-                return TestResult::failed();
-            }
-
-            TestResult::passed()
         }
-
-        QuickCheck::new()
-            .tests(20)
-            .quickcheck(check_state as fn(u64, u32, Vec<u8>, Vec<u8>) -> TestResult);
     }
 
-    #[test]
-    /// Construct an arbitrary StaticHeader object.
-    /// Write it to a buffer, read it out and make sure you get the same thing.
-    fn prop_static_header() {
-        fn static_header(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
+    proptest! {
+        #[test]
+        /// Construct an arbitrary StaticHeader object.
+        /// Write it to a buffer, read it out and make sure you get the same thing.
+        fn static_header(blkdev_size in 0..64u64, mda_size_factor in 0..64u32) {
             let sh1 = random_static_header(blkdev_size, mda_size_factor);
             let buf = sh1.sigblock_to_buf();
             let sh2 = StaticHeader::sigblock_from_buf(&buf).unwrap().unwrap();
-            TestResult::from_bool(
-                sh1.pool_uuid == sh2.pool_uuid
-                    && sh1.dev_uuid == sh2.dev_uuid
-                    && sh1.blkdev_size == sh2.blkdev_size
-                    && sh1.mda_size == sh2.mda_size
-                    && sh1.reserved_size == sh2.reserved_size
-                    && sh1.flags == sh2.flags
-                    && sh1.initialization_time == sh2.initialization_time,
-            )
+            prop_assert_eq!(sh1.pool_uuid, sh2.pool_uuid);
+            prop_assert_eq!(sh1.dev_uuid, sh2.dev_uuid);
+            prop_assert_eq!(sh1.blkdev_size, sh2.blkdev_size);
+            prop_assert_eq!(sh1.mda_size, sh2.mda_size);
+            prop_assert_eq!(sh1.reserved_size, sh2.reserved_size);
+            prop_assert_eq!(sh1.flags, sh2.flags);
+            prop_assert_eq!(sh1.initialization_time, sh2.initialization_time);
         }
-
-        QuickCheck::new()
-            .tests(30)
-            .quickcheck(static_header as fn(u64, u32) -> TestResult);
     }
 
     #[test]

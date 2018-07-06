@@ -946,7 +946,7 @@ mod tests {
 
     use devicemapper::{Bytes, Sectors, IEC};
     use proptest::{
-        collection::{vec, SizeRange}, num, prelude::BoxedStrategy, strategy::Strategy,
+        collection::{vec, SizeRange}, num, option, prelude::BoxedStrategy, strategy::Strategy,
     };
     use uuid::Uuid;
 
@@ -1141,67 +1141,64 @@ mod tests {
         }
     }
 
-    #[test]
-    /// Verify that we correctly handle reading up the BDA when we walk a byte of corruption through
-    /// the BDA sector for each copy and correct the corrupt copy and return an error when
-    /// we corrupt both copies.
-    fn bda_test_recovery() {
-        let sh = random_static_header(10000, 4);
-        let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
-        let mut buf = Cursor::new(vec![0; buf_size]);
-        BDA::initialize(
-            &mut buf,
-            sh.pool_uuid,
-            sh.dev_uuid,
-            sh.mda_size,
-            sh.blkdev_size,
-            Utc::now().timestamp() as u64,
-        ).unwrap();
+    proptest! {
+        #[test]
+        /// Verify correct reading of the static header if only one of
+        /// the two static headers is corrupted. Verify expected behavior
+        /// if both are corrupted, which varies depending on whether the
+        /// Stratis magic number or some other part of the header is corrupted.
+        fn bda_test_recovery(primary in option::of(0..SECTOR_SIZE),
+                             secondary in option::of(0..SECTOR_SIZE)) {
+            let sh = random_static_header(10000, 4);
+            let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
+            let mut buf = Cursor::new(vec![0; buf_size]);
+            BDA::initialize(
+                &mut buf,
+                sh.pool_uuid,
+                sh.dev_uuid,
+                sh.mda_size,
+                sh.blkdev_size,
+                Utc::now().timestamp() as u64,
+            ).unwrap();
 
-        let reference_buf = buf.clone();
+            let reference_buf = buf.clone();
 
-        for i in 0..SECTOR_SIZE {
-            for primary in &[true, false] {
-                for secondary in &[true, false] {
-                    if !*primary {
-                        // Corrupt primary copy
-                        corrupt_byte(&mut buf, (1 * SECTOR_SIZE + i) as u64).unwrap();
-                    }
+            if let Some(index) = primary {
+                // Corrupt primary copy
+                corrupt_byte(&mut buf, (1 * SECTOR_SIZE + index) as u64).unwrap();
+            }
 
-                    if !*secondary {
-                        // Corrupt secondary copy
-                        corrupt_byte(&mut buf, (9 * SECTOR_SIZE + i) as u64).unwrap();
-                    }
+            if let Some(index) = secondary {
+                // Corrupt secondary copy
+                corrupt_byte(&mut buf, (9 * SECTOR_SIZE + index) as u64).unwrap();
+            }
 
-                    let setup_result = StaticHeader::setup(&mut buf);
+            let setup_result = StaticHeader::setup(&mut buf);
 
-                    if *primary || *secondary {
-                        // Setup should work and buffer should be corrected
-                        assert!(setup_result.is_ok() && setup_result.unwrap().is_some());
-
-                        // Check buffer, should be corrected.
-                        assert_eq!(reference_buf.get_ref(), buf.get_ref());
-                    } else {
-                        // Setup should fail to find a usable Stratis BDA
-                        match i {
-                            4...19 => {
-                                // When we corrupt the magics then we believe that the signature is
-                                // not ours and will return Ok(None)
-                                assert!(setup_result.is_ok() && setup_result.unwrap().is_none());
-                            }
-                            _ => {
-                                assert!(setup_result.is_err());
-                            }
+            match (primary, secondary) {
+                (Some(p_index), Some(s_index)) => {
+                    // Setup should fail to find a usable Stratis BDA
+                    match (p_index, s_index) {
+                        (4...19, 4...19) => {
+                            // When we corrupt both magics then we believe that
+                            // the signature is not ours and will return Ok(None)
+                            prop_assert!(setup_result.is_ok() && setup_result.unwrap().is_none());
                         }
-
-                        // Check buffer, should be different
-                        {
-                            assert_ne!(reference_buf.get_ref(), buf.get_ref());
+                        _ => {
+                            prop_assert!(setup_result.is_err());
                         }
-
-                        // Reset the buffer as we didn't correct it
-                        buf = reference_buf.clone();
                     }
+
+                    // Check buffer, should be different
+                    prop_assert_ne!(reference_buf.get_ref(), buf.get_ref());
+
+                }
+                _ => {
+                    // Setup should work and buffer should be corrected
+                    prop_assert!(setup_result.is_ok() && setup_result.unwrap().is_some());
+
+                    // Check buffer, should be corrected.
+                    prop_assert_eq!(reference_buf.get_ref(), buf.get_ref());
                 }
             }
         }
@@ -1255,29 +1252,4 @@ mod tests {
         }
     }
 
-    #[test]
-    /// Test that we get an error and not Ok(None) when one copy is missing a valid signature
-    /// and the other copy fails (eg. CRC).
-    fn bda_none_and_err() {
-        let sh = random_static_header(10000, 4);
-        let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
-        let mut buf = Cursor::new(vec![0; buf_size]);
-
-        BDA::initialize(
-            &mut buf,
-            sh.pool_uuid,
-            sh.dev_uuid,
-            sh.mda_size,
-            sh.blkdev_size,
-            Utc::now().timestamp() as u64,
-        ).unwrap();
-
-        // Corrupt magic in copy 1 to induce Ok(None)
-        corrupt_byte(&mut buf, (SECTOR_SIZE + 10) as u64).unwrap();
-
-        // Corrupt a non-magic byte in copy 2 to induce Err()
-        corrupt_byte(&mut buf, (SECTOR_SIZE * 9 + 128) as u64).unwrap();
-
-        assert!(StaticHeader::setup(&mut buf).is_err());
-    }
 }

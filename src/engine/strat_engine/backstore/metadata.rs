@@ -946,7 +946,7 @@ mod tests {
 
     use devicemapper::{Bytes, Sectors, IEC};
     use proptest::{
-        collection::{vec, SizeRange}, num,
+        collection::{vec, SizeRange}, num, prelude::BoxedStrategy, strategy::Strategy,
     };
     use uuid::Uuid;
 
@@ -983,6 +983,13 @@ mod tests {
         )
     }
 
+    /// Make a static header strategy
+    fn static_header_strategy() -> BoxedStrategy<StaticHeader> {
+        (0..64u64, 0..64u32)
+            .prop_map(|(b, m)| random_static_header(b, m))
+            .boxed()
+    }
+
     proptest! {
         #[test]
         /// Construct an arbitrary StaticHeader object.
@@ -991,8 +998,7 @@ mod tests {
         /// Verify that Stratis buffer validates.
         /// Wipe the BDA.
         /// Verify that the buffer is again unowned.
-        fn test_ownership(blkdev_size in 0..64u64, mda_size_factor in 0..64u32) {
-            let sh = random_static_header(blkdev_size, mda_size_factor);
+        fn test_ownership(ref sh in static_header_strategy()) {
             let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
             prop_assert!(StaticHeader::device_identifiers(&mut buf).unwrap().is_none());
@@ -1021,8 +1027,7 @@ mod tests {
         /// Construct an arbitrary StaticHeader object.
         /// Initialize a BDA.
         /// Verify that the last update time is None.
-        fn empty_bda(blkdev_size in 0..64u64, mda_size_factor in 0..64u32) {
-            let sh = random_static_header(blkdev_size, mda_size_factor);
+        fn empty_bda(ref sh in static_header_strategy()) {
             let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
             let bda = BDA::initialize(
@@ -1084,12 +1089,10 @@ mod tests {
         /// Load state using new BDA and verify correct state.
         /// Save metadata again, and reload one more time, verifying new timestamp.
         fn check_state(
-            blkdev_size in 0..64u64,
-            mda_size_factor in 0..64u32,
+            ref sh in static_header_strategy(),
             ref state in vec(num::u8::ANY, SizeRange::default()),
             ref next_state in vec(num::u8::ANY, SizeRange::default())
         ) {
-            let sh = random_static_header(blkdev_size, mda_size_factor);
             let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
             let mut bda = BDA::initialize(
@@ -1125,8 +1128,7 @@ mod tests {
         #[test]
         /// Construct an arbitrary StaticHeader object.
         /// Write it to a buffer, read it out and make sure you get the same thing.
-        fn static_header(blkdev_size in 0..64u64, mda_size_factor in 0..64u32) {
-            let sh1 = random_static_header(blkdev_size, mda_size_factor);
+        fn static_header(ref sh1 in static_header_strategy()) {
             let buf = sh1.sigblock_to_buf();
             let sh2 = StaticHeader::sigblock_from_buf(&buf).unwrap().unwrap();
             prop_assert_eq!(sh1.pool_uuid, sh2.pool_uuid);

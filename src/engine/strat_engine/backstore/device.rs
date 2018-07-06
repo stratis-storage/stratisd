@@ -5,11 +5,12 @@
 // Functions for dealing with devices.
 
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
 use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
+use std::{fs::File, fs::OpenOptions, os::unix::fs::OpenOptionsExt};
 
 use devicemapper::{devnode_to_devno, Bytes, Device};
+use libc::O_DIRECT;
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{DevUuid, PoolUuid};
@@ -82,18 +83,24 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
             // The device is either really empty or we are running on a distribution that hasn't
             // picked up the latest libblkid, lets read down to the device and find out for sure.
             // TODO: At some point in the future we can remove this and just return Unowned.
-            if let Some((pool_uuid, device_uuid)) = StaticHeader::device_identifiers(
-                &mut OpenOptions::new().read(true).open(&devnode)?,
-            )? {
+            if let Some((pool_uuid, device_uuid)) =
+                StaticHeader::device_identifiers(&mut OpenOptions::new()
+                    .read(true)
+                    .custom_flags(O_DIRECT)
+                    .open(&devnode)?)?
+            {
                 Ok(DevOwnership::Ours(pool_uuid, device_uuid))
             } else {
                 Ok(DevOwnership::Unowned)
             }
         } else if device.contains_key("ID_FS_TYPE") && device["ID_FS_TYPE"] == "stratis" {
             // Device is ours, but we don't get everything we need from udev db, lets go to disk.
-            if let Some((pool_uuid, device_uuid)) = StaticHeader::device_identifiers(
-                &mut OpenOptions::new().read(true).open(&devnode)?,
-            )? {
+            if let Some((pool_uuid, device_uuid)) =
+                StaticHeader::device_identifiers(&mut OpenOptions::new()
+                    .read(true)
+                    .custom_flags(O_DIRECT)
+                    .open(&devnode)?)?
+            {
                 Ok(DevOwnership::Ours(pool_uuid, device_uuid))
             } else {
                 // In this case the udev db says it's ours, but our check says otherwise.  We should

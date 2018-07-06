@@ -6,9 +6,10 @@
 // Initial setup steps are steps that do not alter the environment.
 
 use std::collections::{HashMap, HashSet};
-use std::fs::OpenOptions;
 use std::path::PathBuf;
+use std::{fs::OpenOptions, os::unix::fs::OpenOptionsExt};
 
+use libc::O_DIRECT;
 use serde_json;
 
 use devicemapper::{devnode_to_devno, Device};
@@ -120,7 +121,10 @@ pub fn get_metadata(
     // the newest metadata.
     let mut bdas = Vec::new();
     for devnode in devnodes.values() {
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
+        let bda = BDA::load(&mut OpenOptions::new()
+            .read(true)
+            .custom_flags(O_DIRECT)
+            .open(devnode)?)?;
         if let Some(bda) = bda {
             if bda.pool_uuid() == pool_uuid {
                 bdas.push((devnode, bda));
@@ -215,7 +219,10 @@ pub fn get_blockdevs(
 
     let (mut datadevs, mut cachedevs) = (vec![], vec![]);
     for (device, devnode) in devnodes {
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
+        let bda = BDA::load(&mut OpenOptions::new()
+            .read(true)
+            .custom_flags(O_DIRECT)
+            .open(devnode)?)?;
         if let Some(bda) = bda {
             if bda.pool_uuid() == pool_uuid {
                 let actual_size =

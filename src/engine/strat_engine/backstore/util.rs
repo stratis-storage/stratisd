@@ -4,6 +4,7 @@
 
 // Utilities to support Stratis.
 use std::collections::HashMap;
+use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 use libudev;
@@ -87,4 +88,65 @@ pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
     } else {
         Ok(devices)
     }
+}
+
+/// Read the amount specified, making sure we read on sector boundaries to an aligned buffer with
+/// a read amount that is multiples of sector size.
+pub fn read_exact_aligned<F>(
+    f: &mut F,
+    buf: &mut [u8],
+    amount: usize,
+    physical_block_size: u64,
+) -> io::Result<()>
+where
+    F: Read + Seek,
+{
+    // TODO We need the pyhsical sector size from the device for this to work
+    const MEMORY_ALIGNMENT: u64 = 4096;
+
+    let current_location = f.seek(SeekFrom::Current(0))?;
+
+    /// Round up to the specified amount
+    fn r_up(position: u64, amount: u64) -> u64 {
+        if position % amount == 0 {
+            position
+        } else {
+            (position + amount) - (position % amount)
+        }
+    }
+
+    /// Round down to the specified amount
+    fn r_down(position: u64, amount: u64) -> u64 {
+        position - (position % amount)
+    }
+
+    // Move the file position back to align with a sector size.
+    let stream_offset = current_location - r_down(current_location, physical_block_size);
+
+    // Place the stream on a sector boundary
+    f.seek(SeekFrom::Start(current_location - stream_offset))?;
+
+    // Round the amount to be read to multiple of SECTOR_SIZE, remembering to add in the offset too
+    let read_size = r_up(amount as u64 + stream_offset, physical_block_size);
+
+    // Align the buffer to be used to read the data
+    let raw_buff_size = (amount + stream_offset as usize) + 2 * MEMORY_ALIGNMENT as usize;
+    let mut buf_read = vec![0u8; raw_buff_size];
+    let base_addr = (&buf_read[0] as *const _) as u64;
+    let aligned_addr = (base_addr + MEMORY_ALIGNMENT - 1) & (!(MEMORY_ALIGNMENT - 1));
+
+    let start: usize = (aligned_addr - base_addr) as usize;
+    let end: usize = start + read_size as usize;
+
+    f.read_exact(&mut buf_read[start..end])?;
+
+    // Copy the data to the output buffer
+    for i in 0..amount {
+        buf[i] = buf_read[start + stream_offset as usize + i];
+    }
+
+    // Put the file position where is should be
+    f.seek(SeekFrom::Start(current_location + amount as u64))?;
+
+    Ok(())
 }

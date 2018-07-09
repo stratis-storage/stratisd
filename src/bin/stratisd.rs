@@ -199,6 +199,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         let mut mask = SigSet::empty();
         mask.add(signal::SIGINT);
         mask.add(signal::SIGALRM);
+        mask.add(signal::SIGUSR1);
         mask.thread_block()?;
         SignalFd::with_flags(&mask, SfdFlags::SFD_NONBLOCK)?
     };
@@ -296,6 +297,10 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                         info!("got SIGALRM");
                         log_engine_state(&*engine.borrow());
                         alarm(STRATISD_ALARM_SECONDS);
+                    }
+                    nix::libc::SIGUSR1 => {
+                        info!("SIGUSR1 received, dumping buffered log entries");
+                        buff_log.dump()
                     }
                     signo => {
                         info!("Caught a signal {:?}", signo);

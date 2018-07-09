@@ -299,7 +299,10 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                         alarm(STRATISD_ALARM_SECONDS);
                     }
                     nix::libc::SIGUSR1 => {
-                        info!("SIGUSR1 received, dumping buffered log entries");
+                        info!(
+                            "SIGUSR1 received, dumping {} buffered log entries",
+                            buff_log.buffered_count()
+                        );
                         buff_log.dump()
                     }
                     signo => {

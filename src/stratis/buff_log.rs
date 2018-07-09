@@ -46,6 +46,12 @@ impl<L: Log> Handle<L> {
         }
     }
 
+    pub fn buffered_count(&self) -> usize {
+        let shared = self.shared.lock().expect("should not be poisoned");
+        let vec = shared.buff.lock().expect("should not be poisoned");
+        vec.len()
+    }
+
     /// Construct a HandleGuard, that will call `dump()` when it goes out of
     /// scope.
     pub fn to_guard(&self) -> HandleGuard<L> {

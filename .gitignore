@@ -28,3 +28,6 @@ tests/test_config.json
 
 # coverage output
 htmlcov
+
+# proptest
+proptest-regression

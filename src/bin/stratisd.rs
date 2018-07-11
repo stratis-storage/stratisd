@@ -60,27 +60,40 @@ fn log_engine_state(engine: &Engine) {
     debug!("Engine state: \n{:#?}", engine);
 }
 
+/// Configure the env_logger as necessary in order to allow the buffered
+/// logger to work correctly. Return a Handle to the underlying env_logger.
+pub fn from_env_logger(
+    mut builder: env_logger::Builder,
+    pass_through: bool,
+    hold_time: Option<Duration>,
+) -> buff_log::Handle<env_logger::Logger> {
+    // Do not have the env_logger set the timestamp. Because the entries are
+    // buffered, the timestamp set by the env_logger will correspond to the
+    // time at which the entry was dumped, not the time of its origination.
+    builder.default_format_timestamp(false);
+    buff_log::Logger::new(builder.build(), pass_through, hold_time).init()
+}
+
 /// Configure and initialize the logger.
 /// If debug is true, log at debug level. Otherwise read log configuration
 /// parameters from the environment if RUST_LOG is set. Otherwise, just
 /// accept the default configuration.
 fn initialize_log(debug: bool) -> buff_log::Handle<env_logger::Logger> {
     let mut builder = Builder::new();
-    builder.default_format_timestamp(false);
     if debug {
         builder.filter(Some("stratisd"), LevelFilter::Debug);
         builder.filter(Some("libstratis"), LevelFilter::Debug);
-        buff_log::Logger::new(builder.build(), true, None).init()
+        from_env_logger(builder, true, None)
     } else {
         builder.filter_level(LevelFilter::Trace);
         if let Ok(s) = env::var("RUST_LOG") {
             builder.parse(&s);
         }
-        buff_log::Logger::new(
-            builder.build(),
+        from_env_logger(
+            builder,
             false,
             Some(Duration::minutes(DEFAULT_LOG_HOLD_MINUTES)),
-        ).init()
+        )
     }
 }
 

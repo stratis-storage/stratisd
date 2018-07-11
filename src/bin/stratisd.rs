@@ -328,6 +328,8 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 },
                 // No signals waiting (SFD_NONBLOCK flag is set)
                 Ok(None) => (),
+
+                // Pessimistically exit on an error reading the signal.
                 Err(err) => return Err(err.into()),
             }
         }

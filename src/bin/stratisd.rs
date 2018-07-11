@@ -66,21 +66,20 @@ fn log_engine_state(engine: &Engine) {
 /// accept the default configuration.
 fn initialize_log(debug: bool) -> buff_log::Handle<env_logger::Logger> {
     let mut builder = Builder::new();
-    builder.default_format_timestamp(false);
     if debug {
         builder.filter(Some("stratisd"), LevelFilter::Debug);
         builder.filter(Some("libstratis"), LevelFilter::Debug);
-        buff_log::Logger::new(builder.build(), true, None).init()
+        buff_log::from_env_logger(builder, true, None)
     } else {
         builder.filter_level(LevelFilter::Trace);
         if let Ok(s) = env::var("RUST_LOG") {
             builder.parse(&s);
         }
-        buff_log::Logger::new(
-            builder.build(),
+        buff_log::from_env_logger(
+            builder,
             false,
             Some(Duration::minutes(DEFAULT_LOG_HOLD_MINUTES)),
-        ).init()
+        )
     }
 }
 

@@ -11,7 +11,22 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Duration, Utc};
+use env_logger;
 use log::{self, Level, Log, Metadata, MetadataBuilder, Record};
+
+/// Configure the env_logger as necessary via its builder.
+/// Return a Handle to the underlying env_logger.
+pub fn from_env_logger(
+    mut builder: env_logger::Builder,
+    pass_through: bool,
+    hold_time: Option<Duration>,
+) -> Handle<env_logger::Logger> {
+    // Do not have the env_logger set the timestamp. Because the entries are
+    // buffered, the timestamp set by the env_logger will correspond to the
+    // time at which the entry was dumped, not the time of its origination.
+    builder.default_format_timestamp(false);
+    Logger::new(builder.build(), pass_through, hold_time).init()
+}
 
 #[derive(Debug, Clone)]
 /// A structure that allows interaction with the installed buff_log.

@@ -267,8 +267,8 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         )?;
     }
 
-    alarm(STRATISD_ALARM_SECONDS);
     log_engine_state(&*engine.borrow());
+    alarm(STRATISD_ALARM_SECONDS);
 
     loop {
         // Process any udev block events

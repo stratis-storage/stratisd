@@ -14,6 +14,9 @@ use chrono::{DateTime, Duration, Utc};
 use env_logger;
 use log::{self, Level, Log, Metadata, MetadataBuilder, Record};
 
+const LOCK_EXPECT_MSG: &str =
+    "No code in this module can panic; therefore the mutex can not be poisoned.";
+
 /// Configure the env_logger as necessary via its builder.
 /// Return a Handle to the underlying env_logger.
 pub fn from_env_logger(
@@ -43,8 +46,8 @@ impl<L: Log> Handle<L> {
 
     /// Send buffered logs to the wrapped logger.
     pub fn dump(&self) -> () {
-        let shared = self.shared.lock().expect("should not be poisoned");
-        let mut vec = shared.buff.lock().expect("should not be poisoned");
+        let shared = self.shared.lock().expect(LOCK_EXPECT_MSG);
+        let mut vec = shared.buff.lock().expect(LOCK_EXPECT_MSG);
         for (time, item) in vec.drain(..) {
             shared.log.log(&Record::builder()
                 .metadata(
@@ -62,8 +65,8 @@ impl<L: Log> Handle<L> {
     }
 
     pub fn buffered_count(&self) -> usize {
-        let shared = self.shared.lock().expect("should not be poisoned");
-        let vec = shared.buff.lock().expect("should not be poisoned");
+        let shared = self.shared.lock().expect(LOCK_EXPECT_MSG);
+        let vec = shared.buff.lock().expect(LOCK_EXPECT_MSG);
         vec.len()
     }
 
@@ -107,7 +110,7 @@ impl<L: Log + 'static> Logger<L> {
     /// Set buff_log as the global logging instance.
     pub fn init(self) -> Handle<L> {
         let (pass_through, hold_time) = {
-            let shared = self.0.lock().expect("should not be poisoned");
+            let shared = self.0.lock().expect(LOCK_EXPECT_MSG);
             (shared.pass_through, shared.hold_time)
         };
         let handle = Handle::new(&self.0);
@@ -126,19 +129,15 @@ impl<L: Log + 'static> Logger<L> {
 
 impl<L: Log> Log for Logger<L> {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        self.0
-            .lock()
-            .expect("should not be poisoned")
-            .log
-            .enabled(metadata)
+        self.0.lock().expect(LOCK_EXPECT_MSG).log.enabled(metadata)
     }
     fn log(&self, record: &Record) {
-        let shared = self.0.lock().expect("should not be poisoned");
+        let shared = self.0.lock().expect(LOCK_EXPECT_MSG);
         if shared.pass_through {
             shared.log.log(record)
         } else {
             let now = Utc::now();
-            let mut v = shared.buff.lock().expect("should not be poisoned");
+            let mut v = shared.buff.lock().expect(LOCK_EXPECT_MSG);
             v.push_back((now, OwnedRecord::from_record(record)));
 
             // Drop entries that are older than hold time
@@ -148,7 +147,7 @@ impl<L: Log> Log for Logger<L> {
         }
     }
     fn flush(&self) {
-        self.0.lock().expect("should not be poisoned").log.flush()
+        self.0.lock().expect(LOCK_EXPECT_MSG).log.flush()
     }
 }
 

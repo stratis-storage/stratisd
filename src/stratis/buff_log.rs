@@ -187,8 +187,3 @@ impl<L: Log> BuffLogger<L> {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    // I'm really not sure what we can test here.
-}

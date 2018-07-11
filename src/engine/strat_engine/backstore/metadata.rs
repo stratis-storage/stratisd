@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::fmt;
 use std::io::{self, Read, Seek, SeekFrom};
 use std::str::from_utf8;
 
@@ -230,7 +231,7 @@ impl BDA {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct StaticHeader {
     blkdev_size: Sectors,
     pool_uuid: PoolUuid,
@@ -400,6 +401,20 @@ impl StaticHeader {
             flags: 0,
             initialization_time: LittleEndian::read_u64(&buf[120..128]),
         }))
+    }
+}
+
+impl fmt::Debug for StaticHeader {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("StaticHeader")
+            .field("blkdev_size", &self.blkdev_size)
+            .field("pool_uuid", &self.pool_uuid.simple().to_string())
+            .field("dev_uuid", &self.dev_uuid.simple().to_string())
+            .field("mda_size", &self.mda_size)
+            .field("reserved_size", &self.reserved_size)
+            .field("flags", &self.flags)
+            .field("initialization_time", &self.initialization_time)
+            .finish()
     }
 }
 

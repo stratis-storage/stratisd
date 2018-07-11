@@ -47,7 +47,11 @@ use libstratis::stratis::{StratisError, StratisResult, VERSION};
 use libstratis::stratis::{alarm, buff_log};
 
 const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
+
+/// Interval at which to have stratisd perform periodic tasks.
 const STRATISD_ALARM_SECONDS: u32 = 600;
+
+/// Number of minutes to buffer log entries.
 const DEFAULT_LOG_HOLD_MINUTES: i64 = 30;
 
 /// If writing a program error to stderr fails, panic.

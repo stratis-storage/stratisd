@@ -304,7 +304,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 // we caught a signal
                 Ok(Some(sig)) => match sig.ssi_signo as i32 {
                     nix::libc::SIGALRM => {
-                        info!("got SIGALRM");
+                        info!("SIGALRM received, performing periodic tasks");
                         log_engine_state(&*engine.borrow());
                         alarm(STRATISD_ALARM_SECONDS);
                     }
@@ -315,9 +315,12 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                         );
                         buff_log.dump()
                     }
-                    signo => {
-                        info!("Caught a signal {:?}", signo);
+                    nix::libc::SIGINT => {
+                        info!("SIGINT received, exiting");
                         return Ok(());
+                    }
+                    signo => {
+                        panic!("Caught an impossible signal {:?}", signo);
                     }
                 },
                 // No signals waiting (SFD_NONBLOCK flag is set)

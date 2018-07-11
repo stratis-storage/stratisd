@@ -92,7 +92,7 @@ impl<L: Log> Drop for HandleGuard<L> {
 
 /// Create a new BuffLog wrapping another implementer of the `Log` trait.
 #[derive(Debug)]
-pub struct Logger<L: Log>(Arc<Mutex<BuffLogger<L>>>);
+struct Logger<L: Log>(Arc<Mutex<BuffLogger<L>>>);
 
 impl<L: Log + 'static> Logger<L> {
     /// If `pass_through` is `true`, no buffering is performed. One may wish to disable

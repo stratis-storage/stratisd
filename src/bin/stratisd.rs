@@ -315,7 +315,10 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         // Process any signals off signalfd
         if fds[FD_INDEX_SIGNALFD].revents != 0 {
             match sfd.read_signal() {
-                // we caught a signal
+                // This is an unsafe conversion, but in this context that is
+                // mostly harmless. A negative converted value, which is
+                // virtually impossible, will not match any of the masked
+                // values, and stratisd will panic and exit.
                 Ok(Some(sig)) => match sig.ssi_signo as i32 {
                     nix::libc::SIGALRM => {
                         info!("SIGALRM received, performing periodic tasks");

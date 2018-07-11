@@ -157,6 +157,10 @@ fn trylock_pid_file() -> StratisResult<File> {
     }
 }
 
+/// Set up all sorts of signal and event handling mechanisms.
+/// Initialize the engine and keep it running until a signal is received
+/// or a fatal error is encountered. Dump log entries on specified signal
+/// via buff_log.
 fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) -> StratisResult<()> {
     // Ensure that the debug log is output when we leave this function.
     let _guard = buff_log.to_guard();

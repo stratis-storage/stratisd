@@ -168,11 +168,14 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     };
 
     /*
-    The file descriptor array indexes are laid out in the following:
+    The file descriptor array indexes are:
 
     0   == Always udev fd index
-    1   == engine index if eventable
-    1/2 == Start of dbus client file descriptor(s), 1 if engine is not eventable, else 2
+    1   == SIGNAL FD index
+    2   == engine index if eventable
+    2/3 == Start of dbus client file descriptor(s)
+            * 2 if engine is not eventable
+            * else 3
     */
     const FD_INDEX_UDEV: usize = 0;
     const FD_INDEX_SIGNALFD: usize = 1;

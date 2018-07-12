@@ -28,6 +28,8 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 /// Setup a pool from constituent devices in the context of some already
 /// setup pools. Return an error on anything that prevents the pool
 /// being set up.
+/// Precondition: every device in devices has already been determined to belong
+/// to the pool with pool_uuid.
 pub fn setup_pool(
     pool_uuid: PoolUuid,
     devices: &HashMap<Device, PathBuf>,

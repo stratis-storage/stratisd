@@ -24,7 +24,6 @@ use super::device::{blkdev_size, is_stratis_device};
 use super::metadata::BDA;
 use super::util::get_stratis_block_devices;
 
-
 /// Find all Stratis devices.
 ///
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.

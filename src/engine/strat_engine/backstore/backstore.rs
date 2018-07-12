@@ -25,7 +25,6 @@ use super::data_tier::DataTier;
 use super::metadata::MIN_MDA_SECTORS;
 use super::setup::get_blockdevs;
 
-
 /// This structure can allocate additional space to the upper layer, but it
 /// cannot accept returned space. When it is extended to be able to accept
 /// returned space the allocation algorithm will have to be revised.
@@ -156,6 +155,23 @@ impl Backstore {
         }
     }
 
+    /// Add datadevs to the backstore. The data tier always exists if the
+    /// backstore exists at all, so there is no need to create it.
+    fn add_datadevs(
+        &mut self,
+        pool_uuid: PoolUuid,
+        paths: &[&Path],
+        force: bool,
+    ) -> StratisResult<Vec<DevUuid>> {
+        self.data_tier.add(
+            pool_uuid,
+            self.cache.as_mut(),
+            self.linear.as_mut(),
+            paths,
+            force,
+        )
+    }
+
     /// Add the given paths to self. Return UUIDs of the new blockdevs
     /// corresponding to the specified paths.
     /// WARNING: metadata changing event
@@ -168,13 +184,7 @@ impl Backstore {
     ) -> StratisResult<Vec<DevUuid>> {
         match tier {
             BlockDevTier::Cache => self.add_cachedevs(pool_uuid, paths, force),
-            BlockDevTier::Data => self.data_tier.add(
-                pool_uuid,
-                self.cache.as_mut(),
-                self.linear.as_mut(),
-                paths,
-                force,
-            ),
+            BlockDevTier::Data => self.add_datadevs(pool_uuid, paths, force),
         }
     }
 

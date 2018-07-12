@@ -49,7 +49,7 @@ lazy_static! {
         (THIN_CHECK.to_string(), find_binary(THIN_CHECK)),
         (THIN_REPAIR.to_string(), find_binary(THIN_REPAIR)),
         (XFS_ADMIN.to_string(), find_binary(XFS_ADMIN)),
-        (XFS_GROWFS.to_string(), find_binary(XFS_GROWFS)),
+        (XFS_GROWFS.to_string(), find_binary(XFS_GROWFS))
     ].iter()
         .cloned()
         .collect();
@@ -162,5 +162,5 @@ pub fn udev_settle() -> StratisResult<()> {
 
 #[cfg(test)]
 pub fn create_ext3_fs(devnode: &Path) -> StratisResult<()> {
-    execute_cmd(Command::new("mkfs.ext3").arg(&devnode))
+    execute_cmd(Command::new("mkfs.ext3").arg(devnode))
 }

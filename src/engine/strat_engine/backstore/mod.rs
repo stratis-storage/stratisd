@@ -7,14 +7,15 @@ mod backstore;
 mod blockdev;
 mod blockdevmgr;
 mod cleanup;
-pub mod device;
+mod device;
 mod metadata;
 mod range_alloc;
 mod setup;
-mod util;
+mod udev;
 
 pub use self::backstore::Backstore;
+#[cfg(test)]
 pub use self::device::blkdev_size;
-pub use self::device::is_stratis_device;
+pub use self::device::{identify, DevOwnership};
 pub use self::metadata::MIN_MDA_SECTORS;
 pub use self::setup::{find_all, get_metadata, setup_pool};

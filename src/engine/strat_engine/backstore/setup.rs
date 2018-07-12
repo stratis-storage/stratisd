@@ -109,9 +109,13 @@ pub fn get_metadata(
 
 /// Get all the blockdevs corresponding to this pool that can be obtained from
 /// the given devices.
+/// Returns an error if a BDA can not be read or can not be found on any
+/// blockdev in devnodes.
 /// Returns an error if the blockdevs obtained do not match the metadata.
 /// Returns a tuple, of which the first are the data devs, and the second
 /// are the devs that support the cache tier.
+/// Precondition: Every device in devnodes has already been determined to
+/// belong to the pool with the specified pool uuid.
 #[allow(implicit_hasher)]
 pub fn get_blockdevs(
     pool_uuid: PoolUuid,
@@ -155,51 +159,52 @@ pub fn get_blockdevs(
 
     let (mut datadevs, mut cachedevs) = (vec![], vec![]);
     for (device, devnode) in devnodes {
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
-        if let Some(bda) = bda {
-            if bda.pool_uuid() == pool_uuid {
-                let actual_size =
-                    blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?.sectors();
+        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?.ok_or_else(|| {
+            StratisError::Engine(ErrorEnum::NotFound,
+                                                 format!("Device {} with devnode {} was previously determined to belong to pool with uuid {} but no BDA was found",
+                                                 device,
+                                                 devnode.display(),
+                                                 pool_uuid))
+        })?;
 
-                if actual_size < bda.dev_size() {
-                    let err_msg = format!(
-                        "actual blockdev size ({}) < recorded size ({})",
-                        actual_size,
-                        bda.dev_size()
-                    );
+        let actual_size = blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?.sectors();
 
-                    return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
-                }
+        if actual_size < bda.dev_size() {
+            let err_msg = format!(
+                "actual blockdev size ({}) < recorded size ({})",
+                actual_size,
+                bda.dev_size()
+            );
 
-                let dev_uuid = bda.dev_uuid();
-
-                let (dev_vec, bd_save) = match recorded_data_map.get(&dev_uuid) {
-                    Some(bd_save) => (&mut datadevs, bd_save),
-                    None => match recorded_cache_map.get(&dev_uuid) {
-                        Some(bd_save) => (&mut cachedevs, bd_save),
-                        None => {
-                            let err_msg =
-                                format!("Blockdev {} not found in metadata", bda.dev_uuid());
-                            return Err(StratisError::Engine(ErrorEnum::NotFound, err_msg));
-                        }
-                    },
-                };
-
-                // This should always succeed since the actual size is at
-                // least the recorded size, so all segments should be
-                // available to be allocated. If this fails, the most likely
-                // conclusion is metadata corruption.
-                let segments = segment_table.get(&dev_uuid);
-                dev_vec.push(StratBlockDev::new(
-                    *device,
-                    devnode.to_owned(),
-                    bda,
-                    segments.unwrap_or(&vec![]),
-                    bd_save.user_info.clone(),
-                    bd_save.hardware_info.clone(),
-                )?);
-            }
+            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
         }
+
+        let dev_uuid = bda.dev_uuid();
+
+        let (dev_vec, bd_save) = match recorded_data_map.get(&dev_uuid) {
+            Some(bd_save) => (&mut datadevs, bd_save),
+            None => match recorded_cache_map.get(&dev_uuid) {
+                Some(bd_save) => (&mut cachedevs, bd_save),
+                None => {
+                    let err_msg = format!("Blockdev {} not found in metadata", bda.dev_uuid());
+                    return Err(StratisError::Engine(ErrorEnum::NotFound, err_msg));
+                }
+            },
+        };
+
+        // This should always succeed since the actual size is at
+        // least the recorded size, so all segments should be
+        // available to be allocated. If this fails, the most likely
+        // conclusion is metadata corruption.
+        let segments = segment_table.get(&dev_uuid);
+        dev_vec.push(StratBlockDev::new(
+            *device,
+            devnode.to_owned(),
+            bda,
+            segments.unwrap_or(&vec![]),
+            bd_save.user_info.clone(),
+            bd_save.hardware_info.clone(),
+        )?);
     }
 
     // Verify that datadevs found match datadevs recorded.

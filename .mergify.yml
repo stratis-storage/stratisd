@@ -1,0 +1,12 @@
+rules:
+  default:
+    disabling_label: "do not merge"
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - continuous-integration/travis-ci
+          - stratisd
+          - cli-with-stratisd
+      required_pull_request_reviews:
+        required_approving_review_count: 2

@@ -8,6 +8,5 @@ rules:
           - continuous-integration/travis-ci
           - stratisd
           - cli-with-stratisd
-          - pyup.io/safety-ci
       required_pull_request_reviews:
         required_approving_review_count: 2

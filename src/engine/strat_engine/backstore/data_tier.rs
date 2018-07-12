@@ -172,9 +172,7 @@ impl DataTier {
 
     /// The total size of all the blockdevs combined
     pub fn current_capacity(&self) -> Sectors {
-        let size = self.block_mgr.current_capacity();
-        assert_eq!(size - self.metadata_size(), self.capacity());
-        size
+        self.block_mgr.current_capacity()
     }
 
     /// The number of sectors used for metadata by all the blockdevs
@@ -213,5 +211,14 @@ impl DataTier {
     /// Get the blockdevs belonging to this tier
     pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
         self.block_mgr.blockdevs()
+    }
+
+    /// Assert things that should always hold true of a DataTier
+    #[allow(dead_code)]
+    fn invariant(&self) -> () {
+        assert_eq!(
+            self.block_mgr.current_capacity() - self.metadata_size(),
+            self.capacity()
+        )
     }
 }

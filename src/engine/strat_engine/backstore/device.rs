@@ -130,16 +130,16 @@ pub fn is_stratis_device(devnode: &Path) -> StratisResult<Option<PoolUuid>> {
 mod test {
     use std::path::Path;
 
-    use super::super::super::cmd::{create_ext3_fs, udev_settle};
+    use super::super::super::cmd;
     use super::super::super::tests::{loopbacked, real};
 
     use super::super::device;
 
     /// Verify that the device is not stratis by creating a device with XFS fs.
     fn test_other_ownership(paths: &[&Path]) {
-        create_ext3_fs(paths[0]).unwrap();
+        cmd::create_ext3_fs(paths[0]).unwrap();
 
-        udev_settle().unwrap();
+        cmd::udev_settle().unwrap();
 
         assert_eq!(device::is_stratis_device(paths[0]).unwrap(), None);
 
@@ -156,7 +156,7 @@ mod test {
 
     /// Test a blank device and ensure it comes up as device::Usage::Unowned
     fn test_empty(paths: &[&Path]) {
-        udev_settle().unwrap();
+        cmd::udev_settle().unwrap();
 
         assert_eq!(device::is_stratis_device(paths[0]).unwrap(), None);
 

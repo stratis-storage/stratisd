@@ -181,14 +181,14 @@ impl DataTier {
     /// WARNING: All this must change when it becomes possible to return
     /// sectors to the store.
     /// WARNING: metadata changing event
-    pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<(Sectors, Sectors)>>> {
+    pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<(Sectors, Sectors)>> {
         if self.available() < sizes.iter().cloned().sum() {
             return None;
         }
 
         let mut chunks = Vec::new();
         for size in sizes {
-            chunks.push(vec![(self.next, *size)]);
+            chunks.push((self.next, *size));
             self.next += *size;
         }
         Some(chunks)

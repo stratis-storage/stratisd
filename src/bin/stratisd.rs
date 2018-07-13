@@ -9,6 +9,7 @@ extern crate devicemapper;
 extern crate libstratis;
 #[macro_use]
 extern crate log;
+extern crate chrono;
 extern crate clap;
 #[cfg(feature = "dbus_enabled")]
 extern crate dbus;
@@ -26,11 +27,14 @@ use std::path::PathBuf;
 use std::process::exit;
 use std::rc::Rc;
 
+use chrono::Duration;
 use clap::{App, Arg, ArgMatches};
 use env_logger::Builder;
 use libc::pid_t;
 use log::LevelFilter;
 use nix::fcntl::{flock, FlockArg};
+use nix::sys::signal::{self, SigSet};
+use nix::sys::signalfd::{SfdFlags, SignalFd};
 use nix::unistd::getpid;
 
 #[cfg(feature = "dbus_enabled")]
@@ -40,28 +44,47 @@ use devicemapper::Device;
 
 use libstratis::engine::{Engine, SimEngine, StratEngine};
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
+use libstratis::stratis::{alarm, buff_log};
 
 const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
+
+/// Interval at which to have stratisd perform periodic tasks.
+const STRATISD_ALARM_SECONDS: u32 = 600;
+
+/// Number of minutes to buffer log entries.
+const DEFAULT_LOG_HOLD_MINUTES: i64 = 30;
 
 /// If writing a program error to stderr fails, panic.
 fn print_err(err: &StratisError) -> () {
     eprintln!("{}", err);
 }
 
+/// Log the engine state in a formatted way.
+fn log_engine_state(engine: &Engine) {
+    debug!("Engine state: \n{:#?}", engine);
+}
+
 /// Configure and initialize the logger.
 /// If debug is true, log at debug level. Otherwise read log configuration
 /// parameters from the environment if RUST_LOG is set. Otherwise, just
 /// accept the default configuration.
-fn initialize_log(debug: bool) -> () {
+fn initialize_log(debug: bool) -> buff_log::Handle<env_logger::Logger> {
     let mut builder = Builder::new();
     if debug {
         builder.filter(Some("stratisd"), LevelFilter::Debug);
         builder.filter(Some("libstratis"), LevelFilter::Debug);
-    } else if let Ok(s) = env::var("RUST_LOG") {
-        builder.parse(&s);
-    };
-
-    builder.init()
+        buff_log::from_env_logger(builder, true, None)
+    } else {
+        builder.filter_level(LevelFilter::Trace);
+        if let Ok(s) = env::var("RUST_LOG") {
+            builder.parse(&s);
+        }
+        buff_log::from_env_logger(
+            builder,
+            false,
+            Some(Duration::minutes(DEFAULT_LOG_HOLD_MINUTES)),
+        )
+    }
 }
 
 /// Given a udev event check to see if it's an add and if it is return the device node and
@@ -120,7 +143,14 @@ fn trylock_pid_file() -> StratisResult<File> {
     }
 }
 
-fn run(matches: &ArgMatches) -> StratisResult<()> {
+/// Set up all sorts of signal and event handling mechanisms.
+/// Initialize the engine and keep it running until a signal is received
+/// or a fatal error is encountered. Dump log entries on specified signal
+/// via buff_log.
+fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) -> StratisResult<()> {
+    // Ensure that the debug log is output when we leave this function.
+    let _guard = buff_log.to_guard();
+
     // Setup a udev listener before initializing the engine. A device may
     // appear after the engine has read the /dev directory but before it has
     // completed initialization. Unless the udev event has been recorded, the
@@ -142,14 +172,18 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
     };
 
     /*
-    The file descriptor array indexes are laid out in the following:
+    The file descriptor array indexes are:
 
     0   == Always udev fd index
-    1   == engine index if eventable
-    1/2 == Start of dbus client file descriptor(s), 1 if engine is not eventable, else 2
+    1   == SIGNAL FD index
+    2   == engine index if eventable
+    2/3 == Start of dbus client file descriptor(s)
+            * 2 if engine is not eventable
+            * else 3
     */
     const FD_INDEX_UDEV: usize = 0;
-    const FD_INDEX_ENGINE: usize = 1;
+    const FD_INDEX_SIGNALFD: usize = 1;
+    const FD_INDEX_ENGINE: usize = 2;
 
     /*
     fds is a Vec of libc::pollfd structs. Ideally, it would be possible
@@ -166,6 +200,22 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
 
     fds.push(libc::pollfd {
         fd: udev.as_raw_fd(),
+        revents: 0,
+        events: libc::POLLIN,
+    });
+
+    // Signals can be queued up on this file descriptor
+    let mut sfd = {
+        let mut mask = SigSet::empty();
+        mask.add(signal::SIGINT);
+        mask.add(signal::SIGALRM);
+        mask.add(signal::SIGUSR1);
+        mask.thread_block()?;
+        SignalFd::with_flags(&mask, SfdFlags::SFD_NONBLOCK)?
+    };
+
+    fds.push(libc::pollfd {
+        fd: sfd.as_raw_fd(),
         revents: 0,
         events: libc::POLLIN,
     });
@@ -207,6 +257,9 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
         )?;
     }
 
+    log_engine_state(&*engine.borrow());
+    alarm(STRATISD_ALARM_SECONDS);
+
     loop {
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
@@ -245,6 +298,42 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
             }
         }
 
+        // Process any signals off signalfd
+        if fds[FD_INDEX_SIGNALFD].revents != 0 {
+            match sfd.read_signal() {
+                // This is an unsafe conversion, but in this context that is
+                // mostly harmless. A negative converted value, which is
+                // virtually impossible, will not match any of the masked
+                // values, and stratisd will panic and exit.
+                Ok(Some(sig)) => match sig.ssi_signo as i32 {
+                    nix::libc::SIGALRM => {
+                        info!("SIGALRM received, performing periodic tasks");
+                        log_engine_state(&*engine.borrow());
+                        alarm(STRATISD_ALARM_SECONDS);
+                    }
+                    nix::libc::SIGUSR1 => {
+                        info!(
+                            "SIGUSR1 received, dumping {} buffered log entries",
+                            buff_log.buffered_count()
+                        );
+                        buff_log.dump()
+                    }
+                    nix::libc::SIGINT => {
+                        info!("SIGINT received, exiting");
+                        return Ok(());
+                    }
+                    signo => {
+                        panic!("Caught an impossible signal {:?}", signo);
+                    }
+                },
+                // No signals waiting (SFD_NONBLOCK flag is set)
+                Ok(None) => (),
+
+                // Pessimistically exit on an error reading the signal.
+                Err(err) => return Err(err.into()),
+            }
+        }
+
         // Handle engine events, if the engine is eventable
         match eventable {
             Some(ref evt) => {
@@ -273,6 +362,7 @@ fn run(matches: &ArgMatches) -> StratisResult<()> {
                     if let Err(r) =
                         libstratis::dbus_api::handle(&dbus_conn, &item, &mut tree, &dbus_context)
                     {
+                        log_engine_state(&*engine.borrow());
                         print_err(&From::from(r));
                     }
                 }
@@ -324,8 +414,8 @@ fn main() {
         match lock_file {
             Err(err) => Err(err),
             Ok(_) => {
-                initialize_log(matches.is_present("debug"));
-                run(&matches)
+                let log_handle = initialize_log(matches.is_present("debug"));
+                run(&matches, &log_handle)
             }
         }
     };

@@ -453,10 +453,8 @@ impl ThinPool {
         let backstore_device = self.backstore_device;
         assert_eq!(backstore.device(), backstore_device);
         if let Some(mut regions) = backstore.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
-            let new_data_region = regions.pop().expect("len(regions) == 1");
-
             self.suspend()?;
-            self.extend_data(backstore_device, &[new_data_region])?;
+            self.extend_data(backstore_device, regions.pop().expect("len(regions) == 1"))?;
             self.resume()?;
         } else {
             let err_msg = format!(
@@ -478,10 +476,8 @@ impl ThinPool {
         let backstore_device = self.backstore_device;
         assert_eq!(backstore.device(), backstore_device);
         if let Some(mut regions) = backstore.alloc_space(&[extend_size.sectors()]) {
-            let new_meta_region = regions.pop().expect("len(regions) == 1");
-
             self.suspend()?;
-            self.extend_meta(backstore_device, &[new_meta_region])?;
+            self.extend_meta(backstore_device, regions.pop().expect("len(regions) == 1"))?;
             self.resume()?;
         } else {
             let err_msg = format!(
@@ -493,13 +489,9 @@ impl ThinPool {
         Ok(extend_size)
     }
 
-    /// Extend the thinpool with new data regions.
-    fn extend_data(
-        &mut self,
-        device: Device,
-        new_segs: &[(Sectors, Sectors)],
-    ) -> StratisResult<()> {
-        let segments = coalesce_segs(&self.data_segments, &new_segs.to_vec());
+    /// Extend the thinpool with a new data region.
+    fn extend_data(&mut self, device: Device, new_seg: (Sectors, Sectors)) -> StratisResult<()> {
+        let segments = coalesce_segs(&self.data_segments, &[new_seg]);
         self.thin_pool
             .set_data_table(get_dm(), segs_to_table(device, &segments))?;
         self.thin_pool.resume(get_dm())?;
@@ -508,13 +500,9 @@ impl ThinPool {
         Ok(())
     }
 
-    /// Extend the thinpool meta device with additional segments.
-    fn extend_meta(
-        &mut self,
-        device: Device,
-        new_segs: &[(Sectors, Sectors)],
-    ) -> StratisResult<()> {
-        let segments = coalesce_segs(&self.meta_segments, &new_segs.to_vec());
+    /// Extend the thinpool meta device with an additional segment.
+    fn extend_meta(&mut self, device: Device, new_seg: (Sectors, Sectors)) -> StratisResult<()> {
+        let segments = coalesce_segs(&self.meta_segments, &[new_seg]);
         self.thin_pool
             .set_meta_table(get_dm(), segs_to_table(device, &segments))?;
         self.thin_pool.resume(get_dm())?;

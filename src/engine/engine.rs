@@ -122,7 +122,7 @@ pub trait Pool: Debug {
         pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<FilesystemUuid>;
+    ) -> StratisResult<(FilesystemUuid, &mut Filesystem)>;
 
     /// The total number of Sectors belonging to this pool.
     /// There are no exclusions, so this number includes overhead sectors

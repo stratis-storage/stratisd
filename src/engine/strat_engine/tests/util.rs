@@ -11,6 +11,7 @@ use nix::mount::{MntFlags, umount2};
 
 use devicemapper::{DevId, DmOptions};
 
+use super::super::cmd;
 use super::super::dm::{get_dm, get_dm_init};
 
 #[allow(renamed_and_removed_lints)]
@@ -67,6 +68,7 @@ fn dm_stratis_devices_remove() -> Result<()> {
     }
 
     || -> Result<()> {
+        cmd::udev_settle().unwrap();
         get_dm_init().map_err(|err| Error::with_chain(err, "Unable to initialize DM"))?;
         do_while_progress().and_then(|remain| {
             if !remain.is_empty() {

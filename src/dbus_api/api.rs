@@ -54,6 +54,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
             let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
+            pool.set_dbus_path(object_path.clone());
             let bd_object_paths = pool.blockdevs()
                 .iter()
                 .map(|&(uuid, _)| {
@@ -193,10 +194,11 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
 fn register_pool_dbus(
     dbus_context: &DbusContext,
     pool_uuid: PoolUuid,
-    pool: &Pool,
+    pool: &mut Pool,
     object_path: &dbus::Path<'static>,
 ) {
     let pool_path = create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
+    pool.set_dbus_path(object_path.clone());
     for (_, fs_uuid, _) in pool.filesystems() {
         create_dbus_filesystem(dbus_context, pool_path.clone(), fs_uuid);
     }
@@ -232,7 +234,7 @@ pub fn register_pool(
     dbus_context: &DbusContext,
     tree: &mut Tree<MTFn<TData>, TData>,
     pool_uuid: Uuid,
-    pool: &Pool,
+    pool: &mut Pool,
     object_path: &dbus::Path<'static>,
 ) -> Result<(), dbus::Error> {
     register_pool_dbus(dbus_context, pool_uuid, pool, object_path);

@@ -199,8 +199,12 @@ fn register_pool_dbus(
 ) {
     let pool_path = create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
     pool.set_dbus_path(object_path.clone());
-    for (_, fs_uuid, _) in pool.filesystems() {
-        create_dbus_filesystem(dbus_context, pool_path.clone(), fs_uuid);
+    for fs_uuid in pool.filesystem_uuids() {
+        let fs_object_path: dbus::Path =
+            create_dbus_filesystem(dbus_context, pool_path.clone(), fs_uuid);
+        if let Some(name_fs) = pool.get_mut_filesystem(fs_uuid) {
+            name_fs.1.set_dbus_path(fs_object_path);
+        }
     }
     for (dev_uuid, _) in pool.blockdevs() {
         create_dbus_blockdev(dbus_context, pool_path.clone(), dev_uuid);

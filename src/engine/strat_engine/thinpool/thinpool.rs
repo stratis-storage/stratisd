@@ -588,6 +588,13 @@ impl ThinPool {
             .collect()
     }
 
+    pub fn filesystem_uuids(&self) -> Vec<FilesystemUuid> {
+        self.filesystems
+            .iter()
+            .map(|(_, uuid, _)| uuid.clone())
+            .collect()
+    }
+
     /// Create a filesystem within the thin pool. Given name must not
     /// already be in use.
     pub fn create_filesystem(

@@ -67,6 +67,9 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             for &(name, uuid) in infos {
                 let fs_object_path: dbus::Path =
                     create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
+                if let Some(name_fs) = pool.get_mut_filesystem(uuid) {
+                    name_fs.1.set_dbus_path(fs_object_path.clone());
+                }
                 return_value.push((fs_object_path, name));
             }
 
@@ -165,6 +168,9 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(uuid) => {
             let fs_object_path: dbus::Path =
                 create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
+            if let Some(name_fs) = pool.get_mut_filesystem(fs_uuid) {
+                name_fs.1.set_dbus_path(fs_object_path.clone());
+            }
             return_message.append3(fs_object_path, msg_code_ok(), msg_string_ok())
         }
         Err(err) => {

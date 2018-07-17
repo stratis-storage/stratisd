@@ -20,7 +20,7 @@ import dbus
 from ._constants import SERVICE
 
 
-class Bus(object):
+class Bus():
     """
     Our bus.
     """

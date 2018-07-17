@@ -187,3 +187,44 @@ impl<L: Log> BuffLogger<L> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct TestLog {}
+
+    impl Log for TestLog {
+        fn enabled(&self, _metadata: &Metadata) -> bool {
+            true
+        }
+        fn log(&self, record: &Record) {
+            println!(
+                "{}:{} -- {}",
+                record.level(),
+                record.target(),
+                record.args()
+            );
+        }
+        fn flush(&self) {}
+    }
+
+    #[test]
+    fn test_buffering() {
+        let logger = Logger::new(TestLog {}, false, None);
+        let handle = logger.init();
+
+        // buff-log adds its own initial (buffered) log message
+        assert_eq!(handle.buffered_count(), 1);
+
+        error!("error 1");
+        warn!("warn 1");
+        info!("info 1");
+        debug!("debug 1");
+        trace!("trace 1");
+
+        assert_eq!(handle.buffered_count(), 6);
+        handle.dump();
+        assert_eq!(handle.buffered_count(), 0);
+    }
+}

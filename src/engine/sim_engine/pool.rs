@@ -253,6 +253,18 @@ impl Pool for SimPool {
             })
     }
 
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)> {
+        if let Some(bd) = self.block_devs.get_mut(&uuid) {
+            Some((BlockDevTier::Data, bd))
+        } else {
+            if let Some(cd) = self.cache_devs.get_mut(&uuid) {
+                Some((BlockDevTier::Cache, cd))
+            } else {
+                None
+            }
+        }
+    }
+
     fn set_blockdev_user_info(
         &mut self,
         _pool_name: &str,

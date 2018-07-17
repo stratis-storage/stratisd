@@ -241,6 +241,13 @@ impl Pool for SimPool {
             .collect()
     }
 
+    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut BlockDev)> {
+        self.block_devs
+            .iter_mut()
+            .map(|(uuid, b)| (uuid.clone(), b as &mut BlockDev))
+            .collect()
+    }
+
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
         self.block_devs
             .get(&uuid)

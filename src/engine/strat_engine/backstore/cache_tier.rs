@@ -11,7 +11,6 @@ use devicemapper::{CacheDev, DmDevice, LinearDev, Sectors, IEC};
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
-
 use super::super::device::wipe_sectors;
 use super::super::dm::get_dm;
 use super::super::dmnames::{format_backstore_ids, CacheRole};
@@ -227,6 +226,10 @@ impl CacheTier {
     /// Get all the blockdevs belonging to this tier.
     pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
         self.block_mgr.blockdevs()
+    }
+
+    pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
+        self.block_mgr.blockdevs_mut()
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.

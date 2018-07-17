@@ -307,6 +307,14 @@ impl Pool for StratPool {
             .collect()
     }
 
+    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut BlockDev)> {
+        self.backstore
+            .blockdevs_mut()
+            .into_iter()
+            .map(|(u, b)| (u, b as &mut BlockDev))
+            .collect()
+    }
+
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
         self.backstore
             .get_blockdev_by_uuid(uuid)

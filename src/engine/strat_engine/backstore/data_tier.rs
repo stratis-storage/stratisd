@@ -245,6 +245,10 @@ impl DataTier {
         self.block_mgr.blockdevs()
     }
 
+    pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
+        self.block_mgr.blockdevs_mut()
+    }
+
     /// Assert things that should always hold true of a DataTier
     #[allow(dead_code)]
     fn invariant(&self) -> () {

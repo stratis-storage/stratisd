@@ -217,6 +217,9 @@ pub trait Engine: Debug {
     /// Get all pools belonging to this engine.
     fn pools(&self) -> Vec<(Name, PoolUuid, &Pool)>;
 
+    /// Get mutable references to all pools belonging to this engine.
+    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut Pool)>;
+
     /// If the engine would like to include an event in the message loop, it
     /// may return an Eventable from this method.
     fn get_eventable(&self) -> Option<&'static Eventable>;

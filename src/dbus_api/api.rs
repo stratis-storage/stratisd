@@ -2,9 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::cell::RefCell;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::vec::Vec;
 
 use dbus;
@@ -37,12 +36,11 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
-    let mut engine = dbus_context.engine.borrow_mut();
-    let result = engine.create_pool(name, &blockdevs, tuple_to_option(redundancy), force);
-
     let return_message = message.method_return();
-
     let default_return: (dbus::Path, Vec<dbus::Path>) = (dbus::Path::default(), Vec::new());
+
+    let mut engine = get_engine!(dbus_context; default_return; return_message);
+    let result = engine.create_pool(name, &blockdevs, tuple_to_option(redundancy), force);
 
     let msg = match result {
         Ok(pool_uuid) => {
@@ -92,7 +90,8 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     };
 
-    let msg = match dbus_context.engine.borrow_mut().destroy_pool(pool_uuid) {
+    let msg = match get_engine!(dbus_context; default_return; return_message)
+        .destroy_pool(pool_uuid) {
         Ok(action) => {
             dbus_context
                 .actions
@@ -118,14 +117,12 @@ fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut iter = message.iter_init();
 
     let denominator: u32 = get_next_arg(&mut iter, 0)?;
+    let return_message = message.method_return();
 
     let dbus_context = m.tree.get_data();
-    let result = dbus_context
-        .engine
-        .borrow_mut()
-        .configure_simulator(denominator);
 
-    let return_message = message.method_return();
+    let result = get_engine!(dbus_context; false; return_message)
+                    .configure_simulator(denominator);
 
     let msg = match result {
         Ok(_) => return_message.append2(msg_code_ok(), msg_string_ok()),
@@ -203,7 +200,7 @@ fn register_pool_dbus(
 /// Connect a stratis engine to dbus.
 #[allow(type_complexity)]
 pub fn connect<'a>(
-    engine: Rc<RefCell<Engine>>,
+    engine: Arc<Mutex<Engine>>,
 ) -> Result<
     (
         Connection,
@@ -261,7 +258,11 @@ pub fn handle(
     tree: &mut Tree<MTFn<TData>, TData>,
     dbus_context: &DbusContext,
 ) -> Result<(), dbus::Error> {
+
+    println!("api::handle {:?}", *item);
+
     if let ConnectionItem::MethodCall(ref msg) = *item {
+        println!("Matches for MethodCall");
         if let Some(v) = tree.handle(msg) {
             // Probably the wisest is to ignore any send errors here -
             // maybe the remote has disconnected during our processing.

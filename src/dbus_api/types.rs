@@ -6,6 +6,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::vec_deque::{Drain, VecDeque};
 use std::convert::From;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use dbus::Path;
 use dbus::tree::{DataType, MTFn, ObjectPath, Tree};
@@ -75,13 +76,15 @@ impl OPContext {
 
 #[derive(Debug, Clone)]
 pub struct DbusContext {
+    // TODO: We will want to change this to Arc<Mutex<Engine>> as the dbus thread and the backend
+    // thread will want to use the engine concurrently
     pub(super) next_index: Rc<Cell<u64>>,
-    pub(super) engine: Rc<RefCell<Engine>>,
+    pub(super) engine: Arc<Mutex<Engine>>,
     pub(super) actions: Rc<RefCell<ActionQueue>>,
 }
 
 impl DbusContext {
-    pub fn new(engine: Rc<RefCell<Engine>>) -> DbusContext {
+    pub fn new(engine: Arc<Mutex<Engine>>) -> DbusContext {
         DbusContext {
             actions: Rc::new(RefCell::new(ActionQueue::default())),
             engine,

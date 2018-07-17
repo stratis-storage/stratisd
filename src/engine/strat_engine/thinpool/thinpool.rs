@@ -570,6 +570,13 @@ impl ThinPool {
             .collect()
     }
 
+    pub fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut Filesystem)> {
+        self.filesystems
+            .iter_mut()
+            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &mut Filesystem))
+            .collect()
+    }
+
     /// Create a filesystem within the thin pool. Given name must not
     /// already be in use.
     pub fn create_filesystem(

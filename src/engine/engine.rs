@@ -140,6 +140,9 @@ pub trait Pool: Debug {
     /// Get all the filesystems belonging to this pool.
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)>;
 
+    /// Get all the filesystems belonging to this pool as mutable references.
+    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut Filesystem)>;
+
     /// Get the filesystem in this pool with this UUID.
     fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &Filesystem)>;
 

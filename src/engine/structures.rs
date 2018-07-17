@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::collections::{hash_map, HashMap};
+use std::fmt;
 use std::iter::IntoIterator;
 
 use uuid::Uuid;
@@ -10,10 +11,21 @@ use uuid::Uuid;
 use engine::Name;
 
 /// Map UUID and name to T items.
-#[derive(Debug)]
 pub struct Table<T> {
     name_to_uuid: HashMap<Name, Uuid>,
     items: HashMap<Uuid, (Name, T)>,
+}
+
+impl<T: fmt::Debug> fmt::Debug for Table<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_map()
+            .entries(
+                self.iter().map(|(name, uuid, item)| {
+                    ((name.to_string(), uuid.simple().to_string()), item)
+                }),
+            )
+            .finish()
+    }
 }
 
 impl<T> Default for Table<T> {

@@ -23,7 +23,7 @@ import uuid
 _LOSETUP_BIN = os.getenv('STRATIS_LOSETUP_BIN', "/usr/sbin/losetup")
 
 
-class LoopBackDevices(object):
+class LoopBackDevices():
     """
     Class for creating and managing loop back devices which are needed for
     specific types of udev event testing.

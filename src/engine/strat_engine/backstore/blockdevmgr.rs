@@ -5,6 +5,7 @@
 // Code to handle a collection of block devices.
 
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::path::Path;
 
@@ -52,7 +53,7 @@ impl Segment {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct BlkDevSegment {
     pub(super) uuid: DevUuid,
     pub(super) segment: Segment,
@@ -65,6 +66,15 @@ impl BlkDevSegment {
 
     pub fn to_segment(&self) -> Segment {
         self.segment.clone()
+    }
+}
+
+impl fmt::Debug for BlkDevSegment {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("BlkDevSegment")
+            .field("uuid", &self.uuid.simple().to_string())
+            .field("segment", &self.segment)
+            .finish()
     }
 }
 

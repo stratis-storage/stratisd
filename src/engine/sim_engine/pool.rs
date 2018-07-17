@@ -208,6 +208,13 @@ impl Pool for SimPool {
             .collect()
     }
 
+    fn filesystem_uuids(&self) -> Vec<FilesystemUuid> {
+        self.filesystems
+            .iter()
+            .map(|(_, uuid, _)| uuid.clone())
+            .collect()
+    }
+
     fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &Filesystem)> {
         self.filesystems
             .get_by_uuid(uuid)

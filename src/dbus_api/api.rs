@@ -55,10 +55,12 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
             pool.set_dbus_path(object_path.clone());
-            let bd_object_paths = pool.blockdevs()
-                .iter()
-                .map(|&(uuid, _)| {
-                    create_dbus_blockdev(dbus_context, pool_object_path.clone(), uuid)
+            let bd_object_paths = pool.blockdevs_mut()
+                .into_iter()
+                .map(|(uuid, bd)| {
+                    let blockdev_object_path =
+                        create_dbus_blockdev(dbus_context, pool_object_path.clone(), uuid, bd);
+                    blockdev_object_path
                 })
                 .collect::<Vec<_>>();
 
@@ -202,8 +204,8 @@ fn register_pool_dbus(
     for (_, fs_uuid, fs) in pool.filesystems_mut() {
         create_dbus_filesystem(dbus_context, pool_path.clone(), fs_uuid, fs);
     }
-    for (dev_uuid, _) in pool.blockdevs() {
-        create_dbus_blockdev(dbus_context, pool_path.clone(), dev_uuid);
+    for (uuid, bd) in pool.blockdevs_mut() {
+        create_dbus_blockdev(dbus_context, pool_path.clone(), uuid, bd);
     }
 }
 

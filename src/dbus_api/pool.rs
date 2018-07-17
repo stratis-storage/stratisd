@@ -206,10 +206,10 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> Meth
 
     let result = pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, tier, force);
     let msg = match result {
-        Ok(uuids) => {
-            let return_value = uuids
-                .iter()
-                .map(|uuid| create_dbus_blockdev(dbus_context, object_path.clone(), *uuid))
+        Ok(_uuids) => {
+            let return_value = pool.blockdevs_mut()
+                .into_iter()
+                .map(|(uuid, bd)| create_dbus_blockdev(dbus_context, object_path.clone(), uuid, bd))
                 .collect::<Vec<_>>();
 
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())

@@ -33,6 +33,8 @@ extern crate quickcheck;
 #[macro_use]
 extern crate lazy_static;
 
+extern crate env_logger;
+
 pub mod engine;
 
 #[cfg(feature = "dbus_enabled")]

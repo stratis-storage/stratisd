@@ -96,6 +96,8 @@ impl StratPool {
     }
 
     /// Setup a StratPool using its UUID and the list of devnodes it has.
+    /// Precondition: every device in devnodes has already been determined
+    /// to belong to the pool with the specified uuid.
     pub fn setup(
         uuid: PoolUuid,
         devnodes: &HashMap<Device, PathBuf>,

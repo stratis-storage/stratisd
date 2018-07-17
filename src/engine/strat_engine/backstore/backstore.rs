@@ -474,6 +474,8 @@ pub struct Backstore {
 
 impl Backstore {
     /// Make a Backstore object from blockdevs that already belong to Stratis.
+    /// Precondition: every device in devnodes has already been determined to
+    /// belong to the pool with the specified pool_uuid.
     pub fn setup(
         pool_uuid: PoolUuid,
         backstore_save: &BackstoreSave,

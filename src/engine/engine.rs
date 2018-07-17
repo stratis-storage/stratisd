@@ -153,6 +153,9 @@ pub trait Pool: Debug {
     /// All really means all. For example, it does not exclude cache blockdevs.
     fn blockdevs(&self) -> Vec<(Uuid, &BlockDev)>;
 
+    /// Get all the blockdev uuids belonging to this pool.
+    fn blockdev_uuids(&self) -> Vec<DevUuid>;
+
     /// Get the blockdev in this pool with this UUID.
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)>;
 

@@ -777,9 +777,11 @@ mod tests {
     ///   everything is allocated to the DM device.
     fn invariant(backstore: &Backstore) -> () {
         assert!(
-            (backstore.cache_tier.is_none() && backstore.cache.is_none()
+            (backstore.cache_tier.is_none()
+                && backstore.cache.is_none()
                 && backstore.linear.is_some())
-                || (backstore.cache_tier.is_some() && backstore.cache.is_some()
+                || (backstore.cache_tier.is_some()
+                    && backstore.cache.is_some()
                     && backstore.linear.is_none())
         );
         assert_eq!(backstore.data_tier.block_mgr.avail_space(), Sectors(0));

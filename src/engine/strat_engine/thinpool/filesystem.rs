@@ -6,8 +6,10 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use devicemapper::{Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev,
-                   ThinStatus, IEC, SECTOR_SIZE};
+use devicemapper::{
+    Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus, IEC,
+    SECTOR_SIZE,
+};
 
 use libmount;
 use nix::mount::{mount, umount, MsFlags};

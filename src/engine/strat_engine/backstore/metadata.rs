@@ -854,7 +854,8 @@ mod mda {
                 let mda2 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
 
                 TestResult::from_bool(
-                    mda1.last_updated == mda2.last_updated && mda1.used == mda2.used
+                    mda1.last_updated == mda2.last_updated
+                        && mda1.used == mda2.used
                         && mda1.data_crc == mda2.data_crc
                         && header.last_updated == mda1.last_updated
                         && header.data_crc == mda1.data_crc,
@@ -1149,7 +1150,8 @@ mod tests {
             let buf = sh1.sigblock_to_buf();
             let sh2 = StaticHeader::sigblock_from_buf(&buf).unwrap().unwrap();
             TestResult::from_bool(
-                sh1.pool_uuid == sh2.pool_uuid && sh1.dev_uuid == sh2.dev_uuid
+                sh1.pool_uuid == sh2.pool_uuid
+                    && sh1.dev_uuid == sh2.dev_uuid
                     && sh1.blkdev_size == sh2.blkdev_size
                     && sh1.mda_size == sh2.mda_size
                     && sh1.reserved_size == sh2.reserved_size

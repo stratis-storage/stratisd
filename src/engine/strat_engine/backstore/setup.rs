@@ -122,16 +122,22 @@ pub fn get_blockdevs(
     backstore_save: &BackstoreSave,
     devnodes: &HashMap<Device, PathBuf>,
 ) -> StratisResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
-    let recorded_data_map: HashMap<DevUuid, &BlockDevSave> = backstore_save
+    let recorded_data_map: HashMap<DevUuid, (usize, &BlockDevSave)> = backstore_save
         .data_devs
         .iter()
-        .map(|bds| (bds.uuid, bds))
+        .enumerate()
+        .map(|(i, bds)| (bds.uuid, (i, bds)))
         .collect();
 
-    let recorded_cache_map: HashMap<DevUuid, &BlockDevSave> = match backstore_save.cache_devs {
-        Some(ref cache_devs) => cache_devs.iter().map(|bds| (bds.uuid, bds)).collect(),
-        None => HashMap::new(),
-    };
+    let recorded_cache_map: HashMap<DevUuid, (usize, &BlockDevSave)> =
+        match backstore_save.cache_devs {
+            Some(ref cache_devs) => cache_devs
+                .iter()
+                .enumerate()
+                .map(|(i, bds)| (bds.uuid, (i, bds)))
+                .collect(),
+            None => HashMap::new(),
+        };
 
     let mut segment_table: HashMap<DevUuid, Vec<(Sectors, Sectors)>> = HashMap::new();
     for seg in &backstore_save.data_segments {
@@ -193,7 +199,7 @@ pub fn get_blockdevs(
 
         // Locate the device in the metadata using its uuid. Return the device
         // metadata and whether it was a cache or a datadev.
-        let (tier, bd_save) = recorded_data_map
+        let (tier, (_, bd_save)) = recorded_data_map
             .get(&dev_uuid)
             .map(|bd_save| (BlockDevTier::Data, bd_save))
             .or_else(|| {

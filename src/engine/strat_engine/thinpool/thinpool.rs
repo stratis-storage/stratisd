@@ -10,10 +10,11 @@ use std::cmp;
 use uuid::Uuid;
 
 use devicemapper as dm;
-use devicemapper::{device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf,
-                   FlakeyTargetParams, LinearDev, LinearDevTargetParams, LinearTargetParams,
-                   MetaBlocks, Sectors, TargetLine, ThinDev, ThinDevId, ThinPoolDev,
-                   ThinPoolStatusSummary, IEC};
+use devicemapper::{
+    device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams, LinearDev,
+    LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine, ThinDev, ThinDevId,
+    ThinPoolDev, ThinPoolStatusSummary, IEC,
+};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -26,8 +27,9 @@ use super::super::cmd::{thin_check, thin_repair};
 use super::super::device::wipe_sectors;
 use super::super::devlinks;
 use super::super::dm::get_dm;
-use super::super::dmnames::{format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole,
-                            ThinPoolRole, ThinRole};
+use super::super::dmnames::{
+    format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole, ThinRole,
+};
 use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
 use super::filesystem::{FilesystemStatus, StratFilesystem};

@@ -6,8 +6,8 @@
 
 use std::convert::From;
 use std::fs::{create_dir, read_dir, remove_dir, remove_file, rename, OpenOptions};
-use std::io::ErrorKind;
 use std::io::prelude::*;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use nix;

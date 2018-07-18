@@ -5,8 +5,8 @@
 extern crate libc;
 
 use std::cell::RefCell;
-use std::collections::HashSet;
 use std::collections::hash_map::RandomState;
+use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;

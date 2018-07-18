@@ -13,8 +13,9 @@ use chrono::{DateTime, Duration, Utc};
 use rand::{seq, thread_rng};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine,
-                   IEC};
+use devicemapper::{
+    Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine, IEC,
+};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 

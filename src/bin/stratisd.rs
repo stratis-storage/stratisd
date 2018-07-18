@@ -43,8 +43,8 @@ use dbus::WatchEvent;
 use devicemapper::Device;
 
 use libstratis::engine::{Engine, SimEngine, StratEngine};
-use libstratis::stratis::{StratisError, StratisResult, VERSION};
 use libstratis::stratis::{alarm, buff_log};
+use libstratis::stratis::{StratisError, StratisResult, VERSION};
 
 const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
 

@@ -41,6 +41,15 @@ enum MetadataLocation {
     Second,
 }
 
+/// Return the pool and device UUID of a Stratis device.
+/// If no Stratis header on the device, return None.
+pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<((PoolUuid, DevUuid))>>
+where
+    F: Read + Seek + SyncAll,
+{
+    StaticHeader::setup(f).map(|res| res.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
+}
+
 impl BDA {
     /// Read the BDA from the device and return 2 SECTORS worth of data, one for each BDA returned
     /// in the order of layout on disk (location 1, location 2).
@@ -232,7 +241,7 @@ impl BDA {
 }
 
 #[derive(Eq, PartialEq)]
-pub struct StaticHeader {
+struct StaticHeader {
     blkdev_size: Sectors,
     pool_uuid: PoolUuid,
     dev_uuid: DevUuid,
@@ -331,22 +340,6 @@ impl StaticHeader {
                 let err_str = "Appeared to be a Stratis device, but no valid sigblock found";
                 Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
             }
-        }
-    }
-
-    /// Retrieve the device and pool UUIDs from a stratis device.
-    pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<((PoolUuid, DevUuid))>>
-    where
-        F: Read + Seek + SyncAll,
-    {
-        // Using setup() as a test of ownership sets a high bar. It is
-        // not sufficient to have STRAT_MAGIC to be considered "Ours",
-        // it must also have correct CRC, no weird stuff in fields,
-        // etc!
-        match StaticHeader::setup(f) {
-            Ok(Some(sh)) => Ok(Some((sh.pool_uuid, sh.dev_uuid))),
-            Ok(None) => Ok(None),
-            Err(err) => Err(err),
         }
     }
 
@@ -941,17 +934,17 @@ mod tests {
 
     #[test]
     /// Construct an arbitrary StaticHeader object.
-    /// Verify that the "memory buffer" is unowned.
+    /// Verify that the "file" is unowned.
     /// Initialize a BDA.
-    /// Verify that Stratis buffer validates.
+    /// Verify that Stratis owns the file.
     /// Wipe the BDA.
-    /// Verify that the buffer is again unowned.
+    /// Verify that the file is again unowned.
     fn prop_test_ownership() {
         fn test_ownership(blkdev_size: u64, mda_size_factor: u32) -> TestResult {
             let sh = random_static_header(blkdev_size, mda_size_factor);
             let buf_size = *sh.mda_size.bytes() as usize + _BDA_STATIC_HDR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
-            let ownership = StaticHeader::device_identifiers(&mut buf).unwrap();
+            let ownership = device_identifiers(&mut buf).unwrap();
             if ownership.is_some() {
                 return TestResult::failed();
             }
@@ -964,7 +957,7 @@ mod tests {
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,
             ).unwrap();
-            if let Some((t_p, t_d)) = StaticHeader::device_identifiers(&mut buf).unwrap() {
+            if let Some((t_p, t_d)) = device_identifiers(&mut buf).unwrap() {
                 if t_p != sh.pool_uuid || t_d != sh.dev_uuid {
                     return TestResult::failed();
                 }
@@ -973,7 +966,7 @@ mod tests {
             }
 
             BDA::wipe(&mut buf).unwrap();
-            let ownership = StaticHeader::device_identifiers(&mut buf).unwrap();
+            let ownership = device_identifiers(&mut buf).unwrap();
             if ownership.is_some() {
                 return TestResult::failed();
             }

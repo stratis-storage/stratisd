@@ -11,13 +11,13 @@ use std::path::PathBuf;
 
 use serde_json;
 
-use devicemapper::{devnode_to_devno, Device};
+use devicemapper::{devnode_to_devno, Device, Sectors};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::super::types::{BlockDevTier, PoolUuid};
+use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
-use super::super::serde_structs::{BackstoreSave, PoolSave};
+use super::super::serde_structs::{BackstoreSave, BlockDevSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
 use super::device::{blkdev_size, is_stratis_device};
@@ -122,18 +122,18 @@ pub fn get_blockdevs(
     backstore_save: &BackstoreSave,
     devnodes: &HashMap<Device, PathBuf>,
 ) -> StratisResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
-    let recorded_data_map: HashMap<_, _> = backstore_save
+    let recorded_data_map: HashMap<DevUuid, &BlockDevSave> = backstore_save
         .data_devs
         .iter()
         .map(|bds| (bds.uuid, bds))
         .collect();
 
-    let recorded_cache_map: HashMap<_, _> = match backstore_save.cache_devs {
+    let recorded_cache_map: HashMap<DevUuid, &BlockDevSave> = match backstore_save.cache_devs {
         Some(ref cache_devs) => cache_devs.iter().map(|bds| (bds.uuid, bds)).collect(),
         None => HashMap::new(),
     };
 
-    let mut segment_table = HashMap::new();
+    let mut segment_table: HashMap<DevUuid, Vec<(Sectors, Sectors)>> = HashMap::new();
     for seg in &backstore_save.data_segments {
         segment_table
             .entry(seg.0)

@@ -2,6 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#[cfg(feature = "dbus_enabled")]
+use dbus;
+
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
@@ -54,6 +57,8 @@ pub struct StratPool {
     backstore: Backstore,
     redundancy: Redundancy,
     thin_pool: ThinPool,
+    #[cfg(feature = "dbus_enabled")]
+    user_data: Option<dbus::Path<'static>>,
 }
 
 impl StratPool {
@@ -89,6 +94,8 @@ impl StratPool {
             backstore,
             redundancy,
             thin_pool: thinpool,
+            #[cfg(feature = "dbus_enabled")]
+            user_data: None,
         };
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
@@ -119,6 +126,8 @@ impl StratPool {
                 backstore,
                 redundancy: Redundancy::NONE,
                 thin_pool: thinpool,
+                #[cfg(feature = "dbus_enabled")]
+                user_data: None,
             },
         ))
     }
@@ -312,6 +321,16 @@ impl Pool for StratPool {
         } else {
             Ok(false)
         }
+    }
+
+    #[cfg(feature = "dbus_enabled")]
+    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> () {
+        self.user_data = Some(path)
+    }
+
+    #[cfg(feature = "dbus_enabled")]
+    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>> {
+        &self.user_data
     }
 }
 

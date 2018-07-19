@@ -7,7 +7,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs::OpenOptions;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde_json;
 
@@ -163,16 +163,19 @@ pub fn get_blockdevs(
         }
     }
 
-    let (mut datadevs, mut cachedevs) = (vec![], vec![]);
-    for (device, devnode) in devnodes {
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?.ok_or_else(|| {
-            StratisError::Engine(ErrorEnum::NotFound,
-                                                 format!("Device {} with devnode {} was previously determined to belong to pool with uuid {} but no BDA was found",
-                                                 device,
-                                                 devnode.display(),
-                                                 pool_uuid))
-        })?;
-
+    // Construct a single StratBlockDev. Return the tier to which the
+    // blockdev has been found to belong. Returns an error if the block
+    // device has shrunk, no metadata can be found for the block device,
+    // or it is impossible to set up the device because the recorded
+    // allocation information is impossible.
+    fn get_blockdev(
+        device: Device,
+        devnode: &Path,
+        bda: BDA,
+        data_map: &HashMap<DevUuid, (usize, &BlockDevSave)>,
+        cache_map: &HashMap<DevUuid, (usize, &BlockDevSave)>,
+        segment_table: &HashMap<DevUuid, Vec<(Sectors, Sectors)>>,
+    ) -> StratisResult<(BlockDevTier, StratBlockDev)> {
         // Return an error if apparent size of Stratis block device appears to
         // have decreased since metadata was recorded or if size of block
         // device could not be obtained.
@@ -199,11 +202,11 @@ pub fn get_blockdevs(
 
         // Locate the device in the metadata using its uuid. Return the device
         // metadata and whether it was a cache or a datadev.
-        let (tier, (_, bd_save)) = recorded_data_map
+        let (tier, (_, bd_save)) = data_map
             .get(&dev_uuid)
             .map(|bd_save| (BlockDevTier::Data, bd_save))
             .or_else(|| {
-                recorded_cache_map
+                cache_map
                     .get(&dev_uuid)
                     .map(|bd_save| (BlockDevTier::Cache, bd_save))
             })
@@ -223,17 +226,42 @@ pub fn get_blockdevs(
         // available to be allocated. If this fails, the most likely
         // conclusion is metadata corruption.
         let segments = segment_table.get(&dev_uuid);
-        match tier {
-            BlockDevTier::Data => &mut datadevs,
-            BlockDevTier::Cache => &mut cachedevs,
-        }.push(StratBlockDev::new(
+        Ok((
+            tier,
+            StratBlockDev::new(
+                device,
+                devnode.to_owned(),
+                bda,
+                segments.unwrap_or(&vec![]),
+                bd_save.user_info.clone(),
+                bd_save.hardware_info.clone(),
+            )?,
+        ))
+    }
+
+    let (mut datadevs, mut cachedevs) = (vec![], vec![]);
+    for (device, devnode) in devnodes {
+        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?.ok_or_else(|| {
+            StratisError::Engine(ErrorEnum::NotFound,
+                                                 format!("Device {} with devnode {} was previously determined to belong to pool with uuid {} but no BDA was found",
+                                                 device,
+                                                 devnode.display(),
+                                                 pool_uuid))
+        })?;
+
+        get_blockdev(
             *device,
-            devnode.to_owned(),
+            devnode,
             bda,
-            segments.unwrap_or(&vec![]),
-            bd_save.user_info.clone(),
-            bd_save.hardware_info.clone(),
-        )?);
+            &recorded_data_map,
+            &recorded_cache_map,
+            &segment_table,
+        ).map(|(tier, blockdev)| {
+            match tier {
+                BlockDevTier::Data => &mut datadevs,
+                BlockDevTier::Cache => &mut cachedevs,
+            }.push(blockdev)
+        })?;
     }
 
     // Verify that datadevs found match datadevs recorded.

@@ -208,10 +208,10 @@ impl Pool for SimPool {
             .collect()
     }
 
-    fn filesystem_uuids(&self) -> Vec<FilesystemUuid> {
+    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut Filesystem)> {
         self.filesystems
-            .iter()
-            .map(|(_, uuid, _)| uuid.clone())
+            .iter_mut()
+            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &mut Filesystem))
             .collect()
     }
 

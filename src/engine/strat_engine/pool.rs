@@ -283,8 +283,8 @@ impl Pool for StratPool {
         self.thin_pool.filesystems()
     }
 
-    fn filesystem_uuids(&self) -> Vec<FilesystemUuid> {
-        self.thin_pool.filesystem_uuids()
+    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut Filesystem)> {
+        self.thin_pool.filesystems_mut()
     }
 
     fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &Filesystem)> {

@@ -203,12 +203,10 @@ fn register_pool_dbus(
 ) {
     let pool_path = create_dbus_pool(dbus_context, object_path.clone(), pool_uuid, pool);
 
-    for fs_uuid in pool.filesystem_uuids() {
+    for (_, fs_uuid, fs) in pool.filesystems_mut() {
         let fs_object_path: dbus::Path =
             create_dbus_filesystem(dbus_context, pool_path.clone(), fs_uuid);
-        if let Some(name_fs) = pool.get_mut_filesystem(fs_uuid) {
-            name_fs.1.set_dbus_path(fs_object_path);
-        }
+        fs.set_dbus_path(fs_object_path);
     }
     for dev_uuid in pool.blockdev_uuids() {
         let blockdev_object_path: dbus::Path =

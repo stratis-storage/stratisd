@@ -108,7 +108,8 @@ pub fn get_metadata(
 }
 
 /// Get all the blockdevs corresponding to this pool that can be obtained from
-/// the given devices.
+/// the given devices. Sort the blockdevs in the order in which they were
+/// recorded in the metadata.
 /// Returns an error if a BDA can not be read or can not be found on any
 /// blockdev in devnodes.
 /// Returns an error if the blockdevs obtained do not match the metadata.
@@ -265,9 +266,10 @@ pub fn get_blockdevs(
     }
 
     // Verify that devices located are congruent with the metadata recorded
-    // and generally consistent with expectations.
-    fn check_devs(
-        devs: Vec<StratBlockDev>,
+    // and generally consistent with expectations. If all seems correct,
+    // sort the devices according to their order in the metadata.
+    fn check_and_sort_devs(
+        mut devs: Vec<StratBlockDev>,
         dev_map: &HashMap<DevUuid, (usize, &BlockDevSave)>,
     ) -> StratisResult<Vec<StratBlockDev>> {
         let mut uuids = HashSet::new();
@@ -296,11 +298,17 @@ pub fn get_blockdevs(
             );
             return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
         }
+
+        // Sort the devices according to their original location in the
+        // metadata. Use a faster unstable sort, because the order of
+        // devs before the sort is arbitrary and does not need to be
+        // preserved.
+        devs.sort_unstable_by_key(|dev| dev_map[&dev.uuid()].0);
         Ok(devs)
     }
 
-    let datadevs = check_devs(datadevs, &recorded_data_map)?;
-    let cachedevs = check_devs(cachedevs, &recorded_cache_map)?;
+    let datadevs = check_and_sort_devs(datadevs, &recorded_data_map)?;
+    let cachedevs = check_and_sort_devs(cachedevs, &recorded_cache_map)?;
 
     Ok((datadevs, cachedevs))
 }

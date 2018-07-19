@@ -897,8 +897,10 @@ mod tests {
 
     /// Create a backstore with a cache.
     /// Setup the same backstore, should succeed.
+    /// Verify that blockdev metadatas are the same for the backstores.
     /// Tear down the backstore.
     /// Setup the same backstore again.
+    /// Verify blockdev metadata again.
     /// Destroy all.
     fn test_setup(paths: &[&Path]) -> () {
         assert!(paths.len() > 1);
@@ -927,6 +929,10 @@ mod tests {
         let backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
         invariant(&backstore);
 
+        let backstore_save2 = backstore.record();
+        assert_eq!(backstore_save.cache_devs, backstore_save2.cache_devs);
+        assert_eq!(backstore_save.data_devs, backstore_save2.data_devs);
+
         backstore.teardown().unwrap();
 
         cmd::udev_settle().unwrap();
@@ -934,6 +940,10 @@ mod tests {
         let map = map.get(&pool_uuid).unwrap();
         let backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
         invariant(&backstore);
+
+        let backstore_save2 = backstore.record();
+        assert_eq!(backstore_save.cache_devs, backstore_save2.cache_devs);
+        assert_eq!(backstore_save.data_devs, backstore_save2.data_devs);
 
         backstore.destroy().unwrap();
     }

@@ -239,7 +239,7 @@ pub fn get_blockdevs(
         ))
     }
 
-    let (mut datadevs, mut cachedevs) = (vec![], vec![]);
+    let (mut datadevs, mut cachedevs): (Vec<StratBlockDev>, Vec<StratBlockDev>) = (vec![], vec![]);
     for (device, devnode) in devnodes {
         let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?.ok_or_else(|| {
             StratisError::Engine(ErrorEnum::NotFound,

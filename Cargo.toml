@@ -21,7 +21,7 @@ log = "0.4"
 env_logger="0.5"
 libc = "0.2.36"
 libmount = "0.1.10"
-error-chain = "0.11.0"
+error-chain = "0.12"
 libudev = "0.2.0"
 lazy_static = "1.0.0"
 

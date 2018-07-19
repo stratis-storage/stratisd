@@ -49,12 +49,11 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(pool_uuid) => {
-            let pool_object_path: dbus::Path =
-                create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
-
             let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-            pool.set_dbus_path(object_path.clone());
+            let pool_object_path: dbus::Path =
+                create_dbus_pool(dbus_context, object_path.clone(), pool_uuid, pool);
+
             let bd_object_paths = pool.blockdev_uuids()
                 .iter()
                 .map(|&uuid| {
@@ -202,8 +201,8 @@ fn register_pool_dbus(
     pool: &mut Pool,
     object_path: &dbus::Path<'static>,
 ) {
-    let pool_path = create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
-    pool.set_dbus_path(object_path.clone());
+    let pool_path = create_dbus_pool(dbus_context, object_path.clone(), pool_uuid, pool);
+
     for fs_uuid in pool.filesystem_uuids() {
         let fs_object_path: dbus::Path =
             create_dbus_filesystem(dbus_context, pool_path.clone(), fs_uuid);
@@ -248,9 +247,9 @@ pub fn register_pool(
     tree: &mut Tree<MTFn<TData>, TData>,
     pool_uuid: Uuid,
     pool: &mut Pool,
-    object_path: &dbus::Path<'static>,
+    parent_object_path: &dbus::Path<'static>,
 ) -> Result<(), dbus::Error> {
-    register_pool_dbus(dbus_context, pool_uuid, pool, object_path);
+    register_pool_dbus(dbus_context, pool_uuid, pool, parent_object_path);
     process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut())
 }
 

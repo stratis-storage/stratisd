@@ -165,12 +165,11 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let msg = match pool.snapshot_filesystem(pool_uuid, &pool_name, fs_uuid, snapshot_name) {
-        Ok(uuid) => {
+        Ok((uuid, fs)) => {
             let fs_object_path: dbus::Path =
                 create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
-            if let Some(name_fs) = pool.get_mut_filesystem(fs_uuid) {
-                name_fs.1.set_dbus_path(fs_object_path.clone());
-            }
+            fs.set_dbus_path(fs_object_path.clone());
+
             return_message.append3(fs_object_path, msg_code_ok(), msg_string_ok())
         }
         Err(err) => {

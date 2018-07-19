@@ -115,14 +115,15 @@ pub trait Pool: Debug {
     ) -> StratisResult<RenameAction>;
 
     /// Snapshot filesystem
-    /// Create a CoW snapshot of the origin
+    /// Create a CoW snapshot of the origin.
+    /// Return a reference to the newly created snapshot.
     fn snapshot_filesystem(
         &mut self,
         pool_uuid: PoolUuid,
         pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<FilesystemUuid>;
+    ) -> StratisResult<(FilesystemUuid, &mut Filesystem)>;
 
     /// The total number of Sectors belonging to this pool.
     /// There are no exclusions, so this number includes overhead sectors

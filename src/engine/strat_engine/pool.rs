@@ -264,7 +264,7 @@ impl Pool for StratPool {
         pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<FilesystemUuid> {
+    ) -> StratisResult<(FilesystemUuid, &mut Filesystem)> {
         self.thin_pool
             .snapshot_filesystem(pool_uuid, pool_name, origin_uuid, snapshot_name)
     }

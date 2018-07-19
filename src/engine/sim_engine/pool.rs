@@ -175,7 +175,7 @@ impl Pool for SimPool {
         _pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<FilesystemUuid> {
+    ) -> StratisResult<(FilesystemUuid, &mut Filesystem)> {
         let uuid = Uuid::new_v4();
         let snapshot = match self.get_filesystem(origin_uuid) {
             Some(_filesystem) => SimFilesystem::new(),
@@ -188,7 +188,13 @@ impl Pool for SimPool {
         };
         self.filesystems
             .insert(Name::new(snapshot_name.to_owned()), uuid, snapshot);
-        Ok(uuid)
+        Ok((
+            uuid,
+            self.filesystems
+                .get_mut_by_uuid(uuid)
+                .expect("just inserted")
+                .1,
+        ))
     }
 
     fn total_physical_size(&self) -> Sectors {

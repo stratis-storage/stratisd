@@ -16,7 +16,7 @@ use super::super::super::types::{DevUuid, PoolUuid};
 use super::metadata::StaticHeader;
 use super::util::get_udev_block_device;
 
-ioctl!(read blkgetsize64 with 0x12, 114; u64);
+ioctl_read!(blkgetsize64, 0x12, 114, u64);
 
 pub fn blkdev_size(file: &File) -> StratisResult<Bytes> {
     let mut val: u64 = 0;

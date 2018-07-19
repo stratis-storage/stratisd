@@ -264,31 +264,43 @@ pub fn get_blockdevs(
         })?;
     }
 
-    // Verify that datadevs found match datadevs recorded.
-    let current_data_uuids: HashSet<_> = datadevs.iter().map(|b| b.uuid()).collect();
-    let recorded_data_uuids: HashSet<_> = recorded_data_map.keys().cloned().collect();
-    if current_data_uuids != recorded_data_uuids {
-        let err_msg = "Recorded data dev UUIDs != discovered datadev UUIDs";
-        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
+    // Verify that devices located are congruent with the metadata recorded
+    // and generally consistent with expectations.
+    fn check_devs(
+        devs: Vec<StratBlockDev>,
+        dev_map: &HashMap<DevUuid, (usize, &BlockDevSave)>,
+    ) -> StratisResult<Vec<StratBlockDev>> {
+        let mut uuids = HashSet::new();
+        let mut duplicate_uuids = Vec::new();
+        for dev in &devs {
+            let dev_uuid = dev.uuid();
+            if !uuids.insert(dev_uuid) {
+                duplicate_uuids.push(dev_uuid);
+            }
+        }
+
+        if !duplicate_uuids.is_empty() {
+            let err_msg = format!(
+                "The following list of Stratis UUIDs were each claimed by more than one Stratis device: {:?}",
+                duplicate_uuids
+            );
+            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
+        }
+
+        let recorded_uuids: HashSet<_> = dev_map.keys().cloned().collect();
+        if uuids != recorded_uuids {
+            let err_msg = format!(
+                "UUIDs of devices found ({:?}) did not correspond with UUIDs specified in the metadata for this group of devices ({:?})",
+                uuids,
+                recorded_uuids
+            );
+            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
+        }
+        Ok(devs)
     }
 
-    if datadevs.len() != current_data_uuids.len() {
-        let err_msg = "Duplicate data devices found in environment";
-        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
-    }
-
-    // Verify that cachedevs found match cachedevs recorded.
-    let current_cache_uuids: HashSet<_> = cachedevs.iter().map(|b| b.uuid()).collect();
-    let recorded_cache_uuids: HashSet<_> = recorded_cache_map.keys().cloned().collect();
-    if current_cache_uuids != recorded_cache_uuids {
-        let err_msg = "Recorded cache dev UUIDs != discovered cachedev UUIDs";
-        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
-    }
-
-    if cachedevs.len() != current_cache_uuids.len() {
-        let err_msg = "Duplicate cache devices found in environment";
-        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
-    }
+    let datadevs = check_devs(datadevs, &recorded_data_map)?;
+    let cachedevs = check_devs(cachedevs, &recorded_cache_map)?;
 
     Ok((datadevs, cachedevs))
 }

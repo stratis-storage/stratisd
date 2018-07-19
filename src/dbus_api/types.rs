@@ -7,8 +7,8 @@ use std::collections::vec_deque::{Drain, VecDeque};
 use std::convert::From;
 use std::rc::Rc;
 
-use dbus::Path;
 use dbus::tree::{DataType, MTFn, ObjectPath, Tree};
+use dbus::Path;
 
 use uuid::Uuid;
 

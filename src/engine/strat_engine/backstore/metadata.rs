@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::fmt;
 use std::io::{self, Read, Seek, SeekFrom};
 use std::str::from_utf8;
 
@@ -230,7 +231,7 @@ impl BDA {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct StaticHeader {
     blkdev_size: Sectors,
     pool_uuid: PoolUuid,
@@ -400,6 +401,20 @@ impl StaticHeader {
             flags: 0,
             initialization_time: LittleEndian::read_u64(&buf[120..128]),
         }))
+    }
+}
+
+impl fmt::Debug for StaticHeader {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("StaticHeader")
+            .field("blkdev_size", &self.blkdev_size)
+            .field("pool_uuid", &self.pool_uuid.simple().to_string())
+            .field("dev_uuid", &self.dev_uuid.simple().to_string())
+            .field("mda_size", &self.mda_size)
+            .field("reserved_size", &self.reserved_size)
+            .field("flags", &self.flags)
+            .field("initialization_time", &self.initialization_time)
+            .finish()
     }
 }
 
@@ -839,7 +854,8 @@ mod mda {
                 let mda2 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
 
                 TestResult::from_bool(
-                    mda1.last_updated == mda2.last_updated && mda1.used == mda2.used
+                    mda1.last_updated == mda2.last_updated
+                        && mda1.used == mda2.used
                         && mda1.data_crc == mda2.data_crc
                         && header.last_updated == mda1.last_updated
                         && header.data_crc == mda1.data_crc,
@@ -1134,7 +1150,8 @@ mod tests {
             let buf = sh1.sigblock_to_buf();
             let sh2 = StaticHeader::sigblock_from_buf(&buf).unwrap().unwrap();
             TestResult::from_bool(
-                sh1.pool_uuid == sh2.pool_uuid && sh1.dev_uuid == sh2.dev_uuid
+                sh1.pool_uuid == sh2.pool_uuid
+                    && sh1.dev_uuid == sh2.dev_uuid
                     && sh1.blkdev_size == sh2.blkdev_size
                     && sh1.mda_size == sh2.mda_size
                     && sh1.reserved_size == sh2.reserved_size

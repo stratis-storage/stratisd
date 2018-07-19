@@ -11,8 +11,9 @@ use uuid::Uuid;
 
 use devicemapper::{Device, Sectors};
 
-use super::types::{BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid,
-                   RenameAction};
+use super::types::{
+    BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, RenameAction,
+};
 use stratis::StratisResult;
 
 pub trait Filesystem: Debug {

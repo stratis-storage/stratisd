@@ -18,8 +18,9 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::structures::Table;
-use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
-                          RenameAction};
+use super::super::types::{
+    BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction,
+};
 
 use super::blockdev::SimDev;
 use super::filesystem::SimFilesystem;

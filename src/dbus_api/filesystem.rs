@@ -3,10 +3,11 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use dbus;
-use dbus::Message;
 use dbus::arg::IterAppend;
-use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult,
-                 PropInfo};
+use dbus::tree::{
+    Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
+};
+use dbus::Message;
 
 use uuid::Uuid;
 
@@ -14,8 +15,10 @@ use super::super::engine::{Filesystem, Name, RenameAction};
 
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
-use super::util::{engine_to_dbus_err_tuple, get_next_arg, get_parent, get_uuid, msg_code_ok,
-                  msg_string_ok, STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
+use super::util::{
+    engine_to_dbus_err_tuple, get_next_arg, get_parent, get_uuid, msg_code_ok, msg_string_ok,
+    STRATIS_BASE_PATH, STRATIS_BASE_SERVICE,
+};
 
 pub fn create_dbus_filesystem<'a>(
     dbus_context: &DbusContext,

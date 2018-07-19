@@ -19,4 +19,4 @@ pub use self::backstore::Backstore;
 pub use self::device::blkdev_size;
 pub use self::device::is_stratis_device;
 pub use self::metadata::MIN_MDA_SECTORS;
-pub use self::setup::{find_all, get_metadata, setup_pool};
+pub use self::setup::{find_all, get_metadata};

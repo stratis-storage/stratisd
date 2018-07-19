@@ -15,8 +15,9 @@ use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
-use super::super::types::{BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
-                          RenameAction};
+use super::super::types::{
+    BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction,
+};
 
 use super::backstore::{Backstore, MIN_MDA_SECTORS};
 use super::serde_structs::{PoolSave, Recordable};
@@ -96,6 +97,8 @@ impl StratPool {
     }
 
     /// Setup a StratPool using its UUID and the list of devnodes it has.
+    /// Precondition: every device in devnodes has already been determined
+    /// to belong to the pool with the specified uuid.
     pub fn setup(
         uuid: PoolUuid,
         devnodes: &HashMap<Device, PathBuf>,

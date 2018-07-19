@@ -12,8 +12,10 @@ use self::either::Either;
 use serde_json::{from_reader, Value};
 use uuid::Uuid;
 
-use devicemapper::{devnode_to_devno, Bytes, Device, DmDevice, DmName, LinearDev,
-                   LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine, IEC};
+use devicemapper::{
+    devnode_to_devno, Bytes, Device, DmDevice, DmName, LinearDev, LinearDevTargetParams,
+    LinearTargetParams, Sectors, TargetLine, IEC,
+};
 
 use super::super::backstore::blkdev_size;
 use super::super::device::wipe_sectors;
@@ -168,9 +170,11 @@ fn make_linear_test_dev(devnode: &Path, start: Sectors, length: Sectors) -> Line
         Device::from(devnode_to_devno(devnode).unwrap().unwrap()),
         start,
     );
-    let table = vec![
-        TargetLine::new(Sectors(0), length, LinearDevTargetParams::Linear(params)),
-    ];
+    let table = vec![TargetLine::new(
+        Sectors(0),
+        length,
+        LinearDevTargetParams::Linear(params),
+    )];
     LinearDev::setup(
         get_dm(),
         DmName::new(&format!("stratis_test_{}", Uuid::new_v4())).expect("valid format"),

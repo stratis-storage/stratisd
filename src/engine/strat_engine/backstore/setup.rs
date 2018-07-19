@@ -15,74 +15,14 @@ use devicemapper::{devnode_to_devno, Device};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::super::structures::Table;
-use super::super::super::types::{Name, PoolUuid};
+use super::super::super::types::PoolUuid;
 
-use super::super::pool::{check_metadata, StratPool};
 use super::super::serde_structs::{BackstoreSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
 use super::device::{blkdev_size, is_stratis_device};
 use super::metadata::BDA;
 use super::util::get_stratis_block_devices;
-
-/// Setup a pool from constituent devices in the context of some already
-/// setup pools. Return an error on anything that prevents the pool
-/// being set up.
-pub fn setup_pool(
-    pool_uuid: PoolUuid,
-    devices: &HashMap<Device, PathBuf>,
-    pools: &Table<StratPool>,
-) -> StratisResult<(Name, StratPool)> {
-    // FIXME: In this method, various errors are assembled from various
-    // sources and combined into strings, so that they
-    // can be printed as log messages if necessary. Instead, some kind of
-    // error-chaining should be used here and if it is necessary
-    // to log the error, the log code should be able to reduce the error
-    // chain to something that can be sensibly logged.
-    let info_string = || {
-        let dev_paths = devices
-            .values()
-            .map(|p| p.to_str().expect("Unix is utf-8"))
-            .collect::<Vec<&str>>()
-            .join(" ,");
-        format!("(pool UUID: {}, devnodes: {})", pool_uuid, dev_paths)
-    };
-
-    let metadata = get_metadata(pool_uuid, devices)?.ok_or_else(|| {
-        let err_msg = format!("no metadata found for {}", info_string());
-        StratisError::Engine(ErrorEnum::NotFound, err_msg)
-    })?;
-
-    if pools.contains_name(&metadata.name) {
-        let err_msg = format!(
-            "pool with name \"{}\" set up; metadata specifies same name for {}",
-            &metadata.name,
-            info_string()
-        );
-        return Err(StratisError::Engine(ErrorEnum::AlreadyExists, err_msg));
-    }
-
-    check_metadata(&metadata)
-        .or_else(|e| {
-            let err_msg = format!(
-                "inconsistent metadata for {}: reason: {:?}",
-                info_string(),
-                e
-            );
-            Err(StratisError::Engine(ErrorEnum::Error, err_msg))
-        })
-        .and_then(|_| {
-            StratPool::setup(pool_uuid, devices, &metadata).or_else(|e| {
-                let err_msg = format!(
-                    "failed to set up pool for {}: reason: {:?}",
-                    info_string(),
-                    e
-                );
-                Err(StratisError::Engine(ErrorEnum::Error, err_msg))
-            })
-        })
-}
 
 /// Find all Stratis devices.
 ///
@@ -169,9 +109,13 @@ pub fn get_metadata(
 
 /// Get all the blockdevs corresponding to this pool that can be obtained from
 /// the given devices.
+/// Returns an error if a BDA can not be read or can not be found on any
+/// blockdev in devnodes.
 /// Returns an error if the blockdevs obtained do not match the metadata.
 /// Returns a tuple, of which the first are the data devs, and the second
 /// are the devs that support the cache tier.
+/// Precondition: Every device in devnodes has already been determined to
+/// belong to the pool with the specified pool uuid.
 #[allow(implicit_hasher)]
 pub fn get_blockdevs(
     pool_uuid: PoolUuid,
@@ -215,51 +159,52 @@ pub fn get_blockdevs(
 
     let (mut datadevs, mut cachedevs) = (vec![], vec![]);
     for (device, devnode) in devnodes {
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
-        if let Some(bda) = bda {
-            if bda.pool_uuid() == pool_uuid {
-                let actual_size =
-                    blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?.sectors();
+        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?.ok_or_else(|| {
+            StratisError::Engine(ErrorEnum::NotFound,
+                                                 format!("Device {} with devnode {} was previously determined to belong to pool with uuid {} but no BDA was found",
+                                                 device,
+                                                 devnode.display(),
+                                                 pool_uuid))
+        })?;
 
-                if actual_size < bda.dev_size() {
-                    let err_msg = format!(
-                        "actual blockdev size ({}) < recorded size ({})",
-                        actual_size,
-                        bda.dev_size()
-                    );
+        let actual_size = blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?.sectors();
 
-                    return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
-                }
+        if actual_size < bda.dev_size() {
+            let err_msg = format!(
+                "actual blockdev size ({}) < recorded size ({})",
+                actual_size,
+                bda.dev_size()
+            );
 
-                let dev_uuid = bda.dev_uuid();
-
-                let (dev_vec, bd_save) = match recorded_data_map.get(&dev_uuid) {
-                    Some(bd_save) => (&mut datadevs, bd_save),
-                    None => match recorded_cache_map.get(&dev_uuid) {
-                        Some(bd_save) => (&mut cachedevs, bd_save),
-                        None => {
-                            let err_msg =
-                                format!("Blockdev {} not found in metadata", bda.dev_uuid());
-                            return Err(StratisError::Engine(ErrorEnum::NotFound, err_msg));
-                        }
-                    },
-                };
-
-                // This should always succeed since the actual size is at
-                // least the recorded size, so all segments should be
-                // available to be allocated. If this fails, the most likely
-                // conclusion is metadata corruption.
-                let segments = segment_table.get(&dev_uuid);
-                dev_vec.push(StratBlockDev::new(
-                    *device,
-                    devnode.to_owned(),
-                    bda,
-                    segments.unwrap_or(&vec![]),
-                    bd_save.user_info.clone(),
-                    bd_save.hardware_info.clone(),
-                )?);
-            }
+            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
         }
+
+        let dev_uuid = bda.dev_uuid();
+
+        let (dev_vec, bd_save) = match recorded_data_map.get(&dev_uuid) {
+            Some(bd_save) => (&mut datadevs, bd_save),
+            None => match recorded_cache_map.get(&dev_uuid) {
+                Some(bd_save) => (&mut cachedevs, bd_save),
+                None => {
+                    let err_msg = format!("Blockdev {} not found in metadata", bda.dev_uuid());
+                    return Err(StratisError::Engine(ErrorEnum::NotFound, err_msg));
+                }
+            },
+        };
+
+        // This should always succeed since the actual size is at
+        // least the recorded size, so all segments should be
+        // available to be allocated. If this fails, the most likely
+        // conclusion is metadata corruption.
+        let segments = segment_table.get(&dev_uuid);
+        dev_vec.push(StratBlockDev::new(
+            *device,
+            devnode.to_owned(),
+            bda,
+            segments.unwrap_or(&vec![]),
+            bd_save.user_info.clone(),
+            bd_save.hardware_info.clone(),
+        )?);
     }
 
     // Verify that datadevs found match datadevs recorded.

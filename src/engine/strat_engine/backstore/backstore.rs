@@ -46,6 +46,8 @@ pub struct Backstore {
 
 impl Backstore {
     /// Make a Backstore object from blockdevs that already belong to Stratis.
+    /// Precondition: every device in devnodes has already been determined to
+    /// belong to the pool with the specified pool_uuid.
     pub fn setup(
         pool_uuid: PoolUuid,
         backstore_save: &BackstoreSave,
@@ -351,9 +353,11 @@ mod tests {
     ///   everything is allocated to the DM device.
     fn invariant(backstore: &Backstore) -> () {
         assert!(
-            (backstore.cache_tier.is_none() && backstore.cache.is_none()
+            (backstore.cache_tier.is_none()
+                && backstore.cache.is_none()
                 && backstore.linear.is_some())
-                || (backstore.cache_tier.is_some() && backstore.cache.is_some()
+                || (backstore.cache_tier.is_some()
+                    && backstore.cache.is_some()
                     && backstore.linear.is_none())
         );
         assert_eq!(backstore.data_tier.block_mgr.avail_space(), Sectors(0));

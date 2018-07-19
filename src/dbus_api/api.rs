@@ -9,8 +9,9 @@ use std::vec::Vec;
 
 use dbus;
 use dbus::arg::{Array, IterAppend};
-use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult,
-                 PropInfo, Tree};
+use dbus::tree::{
+    Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo, Tree,
+};
 use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
 use uuid::Uuid;
 
@@ -21,8 +22,10 @@ use super::blockdev::create_dbus_blockdev;
 use super::filesystem::create_dbus_filesystem;
 use super::pool::create_dbus_pool;
 use super::types::{ActionQueue, DbusContext, DbusErrorEnum, DeferredAction, TData};
-use super::util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok,
-                  tuple_to_option, STRATIS_BASE_PATH, STRATIS_BASE_SERVICE};
+use super::util::{
+    engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, tuple_to_option,
+    STRATIS_BASE_PATH, STRATIS_BASE_SERVICE,
+};
 
 fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
@@ -86,9 +89,11 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid = match m.tree.get(&object_path) {
         Some(pool_path) => get_data!(pool_path; default_return; return_message).uuid,
         None => {
-            return Ok(vec![
-                return_message.append3(default_return, msg_code_ok(), msg_string_ok()),
-            ]);
+            return Ok(vec![return_message.append3(
+                default_return,
+                msg_code_ok(),
+                msg_string_ok(),
+            )]);
         }
     };
 

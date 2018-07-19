@@ -7,7 +7,7 @@ use std::io::Read;
 use std::path::PathBuf;
 
 use libmount;
-use nix::mount::{MntFlags, umount2};
+use nix::mount::{umount2, MntFlags};
 
 use devicemapper::{DevId, DmOptions};
 

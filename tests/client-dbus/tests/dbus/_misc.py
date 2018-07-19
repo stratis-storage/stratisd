@@ -36,7 +36,7 @@ def _device_list(minimum):
         min_size=minimum)
 
 
-class Service(object):
+class Service():
     """
     Handle starting and stopping the Rust service.
     """

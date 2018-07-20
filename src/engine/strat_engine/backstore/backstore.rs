@@ -360,7 +360,6 @@ mod tests {
                     && backstore.cache.is_some()
                     && backstore.linear.is_none())
         );
-        assert_eq!(backstore.data_tier.block_mgr.avail_space(), Sectors(0));
         assert_eq!(
             backstore.data_tier.capacity(),
             match (&backstore.linear, &backstore.cache) {

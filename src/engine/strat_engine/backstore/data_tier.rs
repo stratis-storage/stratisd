@@ -19,20 +19,14 @@ use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{coalesce_blkdevsegs, map_to_dm, BlkDevSegment, BlockDevMgr, Segment};
 
 /// Handles the lowest level, base layer of this tier.
-/// The dm_device organizes all block devs into a single linear allocation
-/// pool. This structure can allocate additional space to the upper layer,
+/// This structure can allocate additional space to the upper layer,
 /// but it cannot accept returned space. When it is extended to be able to
 /// accept returned space the allocation algorithm will have to be revised.
-/// All available sectors on blockdevs in the manager are allocated to
-/// the DM device.
 #[derive(Debug)]
 pub struct DataTier {
-    /// Manages the individual block devices
-    /// it is always the case block_mgr.avail_space() == 0.
+    /// Manages the individual block devices.
     pub block_mgr: BlockDevMgr,
-    /// The list of segments granted by block_mgr and used by dm_device
-    /// It is always the case that block_mgr.avail_space() == 0, i.e., all
-    /// available space in block_mgr is allocated to the DM device.
+    /// The list of segments granted by block_mgr to the cap device.
     pub segments: Vec<BlkDevSegment>,
     /// Index for managing allocation from dm_device.
     pub next: Sectors,
@@ -52,14 +46,6 @@ impl DataTier {
         segments: &[(DevUuid, Sectors, Sectors)],
         next: Sectors,
     ) -> StratisResult<(DataTier, LinearDev)> {
-        if block_mgr.avail_space() != Sectors(0) {
-            let err_msg = format!(
-                "{} unallocated to device; probable metadata corruption",
-                block_mgr.avail_space()
-            );
-            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
-        }
-
         let uuid_to_devno = block_mgr.uuid_to_devno();
         let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> StratisResult<BlkDevSegment> {
             let device = uuid_to_devno(triple.0).ok_or_else(|| {

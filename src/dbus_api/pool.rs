@@ -67,12 +67,14 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(ref infos) => {
             let mut return_value = Vec::new();
             for &(name, uuid) in infos {
-                let fs_object_path: dbus::Path =
-                    create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
-                pool.get_mut_filesystem(uuid)
-                    .expect("just inserted by create_filesystems")
-                    .1
-                    .set_dbus_path(fs_object_path.clone());
+                let fs_object_path: dbus::Path = create_dbus_filesystem(
+                    dbus_context,
+                    object_path.clone(),
+                    uuid,
+                    pool.get_mut_filesystem(uuid)
+                        .expect("just inserted by create_filesystems")
+                        .1,
+                );
 
                 return_value.push((fs_object_path, name));
             }
@@ -171,8 +173,7 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match pool.snapshot_filesystem(pool_uuid, &pool_name, fs_uuid, snapshot_name) {
         Ok((uuid, fs)) => {
             let fs_object_path: dbus::Path =
-                create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
-            fs.set_dbus_path(fs_object_path.clone());
+                create_dbus_filesystem(dbus_context, object_path.clone(), uuid, fs);
 
             return_message.append3(fs_object_path, msg_code_ok(), msg_string_ok())
         }

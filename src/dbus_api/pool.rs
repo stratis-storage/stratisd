@@ -62,14 +62,18 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     );
 
     let msg = match result {
+        // TODO: fix create_filesystems() so that the infos returned include
+        // the filesystems just created.
         Ok(ref infos) => {
             let mut return_value = Vec::new();
             for &(name, uuid) in infos {
                 let fs_object_path: dbus::Path =
                     create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
-                if let Some(name_fs) = pool.get_mut_filesystem(uuid) {
-                    name_fs.1.set_dbus_path(fs_object_path.clone());
-                }
+                pool.get_mut_filesystem(uuid)
+                    .expect("just inserted by create_filesystems")
+                    .1
+                    .set_dbus_path(fs_object_path.clone());
+
                 return_value.push((fs_object_path, name));
             }
 

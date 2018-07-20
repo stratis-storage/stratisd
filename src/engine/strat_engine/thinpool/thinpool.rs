@@ -10,9 +10,9 @@ use uuid::Uuid;
 
 use devicemapper as dm;
 use devicemapper::{
-    device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams, LinearDev,
-    LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine, ThinDev, ThinDevId,
-    ThinPoolDev, ThinPoolStatusSummary, IEC,
+    device_exists, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams,
+    LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine, ThinDev,
+    ThinDevId, ThinPoolDev, ThinPoolStatusSummary, IEC,
 };
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
@@ -30,6 +30,7 @@ use super::super::dmnames::{
     format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole, ThinRole,
 };
 use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
+use super::super::set_write_throttling;
 
 use super::filesystem::{FilesystemStatus, StratFilesystem};
 use super::mdv::MetadataVol;
@@ -41,9 +42,23 @@ const META_LOWATER: MetaBlocks = MetaBlocks(512);
 
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
-const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
-pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
+const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki); // 16 MiB
+pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768); // 768 MiB
 const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
+
+const SPACE_WARN_PCT: u8 = 90;
+const SPACE_CRIT_PCT: u8 = 95;
+
+// This is kind of low, maybe.
+const SPACE_WARN_THROTTLE_BLOCKS_PER_SEC: DataBlocks = DataBlocks(10);
+
+fn sectors_to_datablocks(sectors: Sectors) -> DataBlocks {
+    DataBlocks(*sectors / *DATA_BLOCK_SIZE)
+}
+
+fn datablocks_to_sectors(data_blocks: DataBlocks) -> Sectors {
+    Sectors(*data_blocks * *DATA_BLOCK_SIZE)
+}
 
 /// Transform a list of segments belonging to a single device into a
 /// list of target lines for a linear device.
@@ -147,6 +162,32 @@ enum PoolState {
     Bad,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum FreeSpaceState {
+    Good,
+    Warn,
+    Crit,
+}
+
+/// Return a value from 0 to 100 that is the percentage that "used" makes up
+/// in "total".
+fn used_pct(used: u64, total: u64) -> u8 {
+    assert!(total >= used);
+    let mut val = (used * 100) / total;
+    if (used * 100) % total != 0 {
+        val += 1; // round up
+    }
+    assert!(val <= 100);
+    val as u8
+}
+
+// Calculate what to set lowater to, to achieve "event when XX% of the data
+// device is used"
+fn calc_data_lowater(percent_used: u8, total: DataBlocks) -> DataBlocks {
+    assert!(percent_used <= 100);
+    DataBlocks(*total - ((*total * percent_used as u64) / 100))
+}
+
 /// A ThinPool struct contains the thinpool itself, the spare
 /// segments for its metadata device, and the filesystems and filesystem
 /// metadata associated with it.
@@ -165,6 +206,8 @@ pub struct ThinPool {
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
     pool_state: PoolState,
+    free_space_state: FreeSpaceState,
+    next_event_point: DataBlocks,
 }
 
 impl ThinPool {
@@ -230,6 +273,7 @@ impl ThinPool {
         let mdv = MetadataVol::initialize(pool_uuid, mdv_dev)?;
 
         let (dm_name, dm_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
+        let next_event_point = DATA_LOWATER;
         let thinpool_dev = ThinPoolDev::new(
             get_dm(),
             &dm_name,
@@ -237,7 +281,7 @@ impl ThinPool {
             meta_dev,
             data_dev,
             data_block_size,
-            DATA_LOWATER,
+            next_event_point,
         )?;
         Ok(ThinPool {
             thin_pool: thinpool_dev,
@@ -250,6 +294,8 @@ impl ThinPool {
             mdv,
             backstore_device,
             pool_state: PoolState::Good,
+            free_space_state: FreeSpaceState::Good,
+            next_event_point,
         })
     }
 
@@ -290,6 +336,7 @@ impl ThinPool {
             segs_to_table(backstore_device, &data_segments),
         )?;
 
+        let next_event_point = DATA_LOWATER;
         let thinpool_dev = ThinPoolDev::setup(
             get_dm(),
             &thinpool_name,
@@ -297,7 +344,7 @@ impl ThinPool {
             meta_dev,
             data_dev,
             thin_pool_save.data_block_size,
-            DATA_LOWATER,
+            next_event_point,
         )?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);
@@ -353,6 +400,8 @@ impl ThinPool {
             mdv,
             backstore_device,
             pool_state: PoolState::Good,
+            free_space_state: FreeSpaceState::Good,
+            next_event_point,
         })
     }
 
@@ -361,25 +410,6 @@ impl ThinPool {
     /// metadata save has been made.
     pub fn check(&mut self, backstore: &mut Backstore) -> StratisResult<bool> {
         #![allow(match_same_arms)]
-
-        /// Calculate requested additional amount to allocate given total,
-        /// used, and low_water. Return None if there is no need to allocate
-        /// a new amount.
-        /// Postcondition: 2 * usage.used = usage.total - low_water AND
-        /// usage.total > low_water. In other words, usage can double before
-        /// it is necessary to expand again.
-        fn calculate_request(total: Sectors, used: Sectors, low_water: Sectors) -> Option<Sectors> {
-            if total >= low_water {
-                let excess = total - low_water;
-                if used >= excess {
-                    Some((used - excess) + used)
-                } else {
-                    None
-                }
-            } else {
-                Some((low_water - total) + 2usize * used)
-            }
-        }
 
         assert_eq!(backstore.device(), self.backstore_device);
 
@@ -405,50 +435,71 @@ impl ThinPool {
                     }
                 }
 
-                {
-                    let usage = &status.usage;
+                let usage = &status.usage;
 
-                    if let Some(request) = calculate_request(
-                        usage.total_meta.sectors(),
-                        usage.used_meta.sectors(),
-                        META_LOWATER.sectors(),
-                    ) {
-                        match self.extend_thinpool(backstore, request, false) {
-                            Ok(actual) => {
-                                if request != actual {
-                                    // TODO: take an appropriate action in the
-                                    // case where actual amount allocated was
-                                    // less than the requested.
-                                }
-                                should_save = true;
-                            }
-                            Err(_) => {
-                                error!("Thinpool meta extend failed! -> BAD");
-                                self.pool_state = PoolState::Bad;
-                            }
+                // TODO: This is not right. We need to compare metadata usage
+                // against kernel-set meta lowater, and only extend if the
+                // lowater is crossed. There's a kernel patch pending to tell
+                // us this value. For now, assume it is META_LOWATER.
+                let meta_remaining = usage.total_meta - usage.used_meta;
+                if meta_remaining <= META_LOWATER {
+                    // Extend by INITIAL_META_SIZE (16MiB)
+                    match self.extend_thin_meta(backstore, INITIAL_META_SIZE.sectors()) {
+                        Ok(extend_size) => {
+                            info!("Extended thin meta device by {}", extend_size);
+
+                            should_save = true;
+                        }
+                        Err(_) => {
+                            error!("Thinpool meta extend failed! -> BAD");
+                            self.pool_state = PoolState::Bad;
                         }
                     }
+                }
 
-                    if let Some(request) = calculate_request(
-                        *usage.total_data * DATA_BLOCK_SIZE,
-                        *usage.used_data * DATA_BLOCK_SIZE,
-                        *DATA_LOWATER * DATA_BLOCK_SIZE,
-                    ) {
-                        match self.extend_thinpool(backstore, request, true) {
-                            Ok(actual) => {
-                                if request != actual {
-                                    // TODO: take an appropriate action in the
-                                    // case where actual amount allocated was
-                                    // less than the requested.
-                                }
-                                should_save = true;
-                            }
-                            Err(_) => {
-                                error!("Thinpool data extend failed! -> BAD");
-                                self.pool_state = PoolState::Bad;
-                            }
+                if usage.used_data >= self.next_event_point {
+                    // Let's ask for 1 GiB.
+                    let request = Bytes(IEC::Gi).sectors();
+                    info!("Requesting extending data device by {}", request,);
+
+                    let extend_size = match self.extend_thin_data(backstore, request) {
+                        Ok(Sectors(0)) => {
+                            info!("data device fully extended, cannot extend further");
+                            DataBlocks(0)
                         }
-                    }
+                        Ok(extend_size) => {
+                            info!("Extended thin data device by {}", extend_size);
+                            should_save = true;
+                            sectors_to_datablocks(extend_size)
+                        }
+                        Err(_) => {
+                            error!("Thinpool data extend failed! -> BAD");
+                            self.pool_state = PoolState::Bad;
+                            DataBlocks(0)
+                        }
+                    };
+
+                    info!(
+                        "used data {} total data {} extend size {} available {}",
+                        usage.used_data,
+                        usage.total_data,
+                        extend_size,
+                        sectors_to_datablocks(backstore.available())
+                    );
+
+                    // Update pool space state
+                    self.free_space_state = self.free_space_check(
+                        usage.used_data,
+                        usage.total_data - usage.used_data
+                            + extend_size
+                            + sectors_to_datablocks(backstore.available()),
+                    )?;
+
+                    // Trigger next event depending on pool space state
+                    self.next_event_point = self.set_next_event_point(
+                        usage.total_data + extend_size,
+                        sectors_to_datablocks(backstore.available()),
+                    )?;
                 }
             }
             dm::ThinPoolStatus::Fail => {
@@ -457,7 +508,7 @@ impl ThinPool {
                 // TODO: Take pool offline?
                 // TODO: Run thin_check
             }
-        };
+        }
 
         let filesystems = self.filesystems
             .borrow_mut()
@@ -470,8 +521,158 @@ impl ThinPool {
                 // TODO: filesystem failed, how to recover?
             }
         }
-
         Ok(should_save)
+    }
+
+    /// Possibly transition to a new FreeSpaceState based on usage, and invoke
+    /// policies (throttling, suspension) accordingly.
+    fn free_space_check(
+        &mut self,
+        used: DataBlocks,
+        available: DataBlocks,
+    ) -> StratisResult<FreeSpaceState> {
+        let overall_used_pct = used_pct(*used, *used + *available);
+        info!("Data tier percent used: {}", overall_used_pct);
+
+        let prev_state = self.free_space_state;
+
+        let new_state = match (prev_state, overall_used_pct) {
+            (FreeSpaceState::Good, 0...SPACE_WARN_PCT) => FreeSpaceState::Good,
+            (FreeSpaceState::Good, SPACE_WARN_PCT...SPACE_CRIT_PCT) => {
+                // TODO: other steps to regain space: schedule fstrims?
+
+                // good->warn. Throttle.
+                set_write_throttling(
+                    self.thin_pool.data_dev().device(),
+                    Some(*datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()),
+                )?;
+                info!(
+                    "throttling to {} bytes/sec",
+                    *datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()
+                );
+
+                FreeSpaceState::Warn
+            }
+            (FreeSpaceState::Good, _) => {
+                // good->warn->crit. Both throttle and suspend.
+                set_write_throttling(
+                    self.thin_pool.data_dev().device(),
+                    Some(*datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()),
+                )?;
+                info!(
+                    "throttling to {} bytes/sec",
+                    *datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()
+                );
+
+                for (_, _, fs) in &mut self.filesystems {
+                    fs.suspend(true)?;
+                }
+
+                FreeSpaceState::Crit
+            }
+            (FreeSpaceState::Warn, 0...SPACE_WARN_PCT) => {
+                // warn->good.
+                set_write_throttling(self.thin_pool.data_dev().device(), None)?;
+                info!("throttling disabled");
+                FreeSpaceState::Good
+            }
+            (FreeSpaceState::Warn, SPACE_WARN_PCT...SPACE_CRIT_PCT) => FreeSpaceState::Warn,
+            (FreeSpaceState::Warn, _) => {
+                // warn->crit. Suspend.
+                for (_, _, fs) in &mut self.filesystems {
+                    fs.suspend(true)?;
+                }
+
+                FreeSpaceState::Crit
+            }
+            (FreeSpaceState::Crit, 0...SPACE_WARN_PCT) => {
+                // crit->warn->good. Unthrottle and unsuspend.
+
+                for (_, _, fs) in &mut self.filesystems {
+                    fs.resume()?;
+                }
+                set_write_throttling(self.thin_pool.data_dev().device(), None)?;
+                info!("throttling disabled");
+
+                FreeSpaceState::Good
+            }
+            (FreeSpaceState::Crit, SPACE_WARN_PCT...SPACE_CRIT_PCT) => {
+                // crit->warn. Unsuspend.
+                for (_, _, fs) in &mut self.filesystems {
+                    fs.resume()?;
+                }
+
+                FreeSpaceState::Warn
+            }
+            (FreeSpaceState::Crit, _) => FreeSpaceState::Crit,
+        };
+
+        if prev_state != new_state {
+            info!(
+                "Prev space state: {:?} New space state: {:?}",
+                prev_state, new_state
+            );
+
+            // TODO: Dbus signal
+        }
+
+        Ok(new_state)
+    }
+
+    /// Set next event point, based on pool space state and if we also want
+    /// events to extend the pool, or not.
+    /// Returns the usage.used value that will trigger this event point.
+    fn set_next_event_point(
+        &mut self,
+        data_dev_size: DataBlocks,
+        available: DataBlocks,
+    ) -> StratisResult<DataBlocks> {
+        let total = data_dev_size + available;
+        info!(
+            "total {} data_dev_size {} available {}",
+            total, data_dev_size, available
+        );
+
+        // warn/crit points as if pool was fully extended
+        let warn_lowat_for_total = calc_data_lowater(SPACE_WARN_PCT, total);
+        let crit_lowat_for_total = calc_data_lowater(SPACE_CRIT_PCT, total);
+        info!(
+            "warn_lowat_for_total {} crit_lowat_for_total {}",
+            warn_lowat_for_total, crit_lowat_for_total
+        );
+
+        // Make it be the higher of point for next extension event and point
+        // for FreeSpaceState change
+        let lowater = match self.free_space_state {
+            FreeSpaceState::Good => {
+                // DATA_LOWATER relative to end of data_dev_size, so add
+                // 'available' for correct comparison
+                if DATA_LOWATER + available > warn_lowat_for_total {
+                    DATA_LOWATER
+                } else {
+                    warn_lowat_for_total - available
+                }
+            }
+            _ => {
+                // We're throttled, so can set a tighter event and still get
+                // called before out of space
+                if SPACE_WARN_THROTTLE_BLOCKS_PER_SEC + available > crit_lowat_for_total {
+                    SPACE_WARN_THROTTLE_BLOCKS_PER_SEC
+                } else {
+                    crit_lowat_for_total - available
+                }
+            }
+        };
+
+        let next_event_point = data_dev_size - lowater;
+        info!(
+            "setting lowater to {}, next event point to {}",
+            lowater, next_event_point
+        );
+
+        self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
+        self.resume()?;
+        Ok(next_event_point)
     }
 
     /// Tear down the components managed here: filesystems, the MDV,
@@ -490,70 +691,64 @@ impl ThinPool {
         Ok(())
     }
 
-    /// Extend the thinpool's data or meta devices. Attempt to allocate
-    /// extend_size, but if that fails, try smaller values until smallest
-    /// allocation chunk for meta or data device is reached.
+    /// Extend the thinpool's meta device by amount requested, or a smaller
+    /// amount if requested amount is not available.
     /// Return the amount the device was extended by.
-    /// Always allocate sectors in increments of allocation chunk.
-    fn extend_thinpool(
+    /// Always allocate sectors in increments of meta block size.
+    fn extend_thin_meta(
         &mut self,
         backstore: &mut Backstore,
         extend_size: Sectors,
-        data: bool,
     ) -> StratisResult<Sectors> {
-        /// Get the meta block size. It is stored internally in MetaBlocks as it
-        /// does not vary.
-        fn meta_block_size() -> Sectors {
-            Sectors(*INITIAL_META_SIZE.sectors() / *INITIAL_META_SIZE)
+        let min_size = MetaBlocks(1).sectors();
+        if let Some(region) = backstore.request(extend_size, min_size) {
+            self.suspend()?;
+
+            let segments = coalesce_segs(&self.meta_segments, &[region]);
+            self.thin_pool
+                .set_meta_table(get_dm(), segs_to_table(backstore.device(), &segments))?;
+            self.thin_pool.resume(get_dm())?;
+            self.meta_segments = segments;
+            self.resume()?;
+            Ok(region.1)
+        } else {
+            info!(
+                "Insufficient space to accommodate metadev request for at least {}",
+                min_size
+            );
+            Ok(Sectors(0))
         }
+    }
 
-        /// Extend the thinpool w/ a new data region if data is true, else a new
-        /// metadata region. There may be multiple segments, but they are all on
-        /// the same device. Returns an error if any of the devicemapper
-        /// operations fails.
-        fn extend(
-            thinpool: &mut ThinPool,
-            device: Device,
-            new_seg: (Sectors, Sectors),
-            data: bool,
-        ) -> StratisResult<()> {
-            thinpool.suspend()?;
-
-            if data {
-                let segments = coalesce_segs(&thinpool.data_segments, &[new_seg]);
-                thinpool
-                    .thin_pool
-                    .set_data_table(get_dm(), segs_to_table(device, &segments))?;
-                thinpool.thin_pool.resume(get_dm())?;
-                thinpool.data_segments = segments;
-            } else {
-                let segments = coalesce_segs(&thinpool.meta_segments, &[new_seg]);
-                thinpool
-                    .thin_pool
-                    .set_meta_table(get_dm(), segs_to_table(device, &segments))?;
-                thinpool.thin_pool.resume(get_dm())?;
-                thinpool.meta_segments = segments;
-            }
-
-            thinpool.resume()?;
-
-            Ok(())
-        }
-
+    /// Extend the thinpool's data device by amount requested, or a smaller
+    /// amount if requested amount is not available.
+    /// Return the amount the device was extended by.
+    /// Always allocate sectors in increments of DATA_BLOCK_SIZE.
+    fn extend_thin_data(
+        &mut self,
+        backstore: &mut Backstore,
+        extend_size: Sectors,
+    ) -> StratisResult<Sectors> {
         let backstore_device = self.backstore_device;
         assert_eq!(backstore.device(), backstore_device);
 
-        let modulus = if data {
-            DATA_BLOCK_SIZE
-        } else {
-            meta_block_size()
-        };
-        if let Some(region) = backstore.request(extend_size, modulus) {
-            extend(self, backstore_device, region, data)?;
+        if let Some(region) = backstore.request(extend_size, DATA_BLOCK_SIZE) {
+            self.suspend()?;
+
+            let segments = coalesce_segs(&self.data_segments, &[region]);
+            self.thin_pool
+                .set_data_table(get_dm(), segs_to_table(backstore.device(), &segments))?;
+            self.thin_pool.resume(get_dm())?;
+            self.data_segments = segments;
+
+            self.resume()?;
             Ok(region.1)
         } else {
-            let err_msg = format!("Insufficient space to accommodate request for {}", modulus);
-            Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+            info!(
+                "Insufficient space to accommodate datadev request for at least {}",
+                DATA_BLOCK_SIZE
+            );
+            Ok(Sectors(0))
         }
     }
 
@@ -1080,7 +1275,7 @@ mod tests {
         // written above. If we attempt to update the UUID on the snapshot
         // without expanding the pool, the pool will go into out-of-data-space
         // (queue IO) mode, causing the test to fail.
-        pool.extend_thinpool(&mut backstore, *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE, true)
+        pool.extend_thin_data(&mut backstore, *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE)
             .unwrap();
 
         let (_, snapshot_filesystem) =
@@ -1397,11 +1592,8 @@ mod tests {
                 // the amount of free space in pool has decreased to the
                 // DATA_LOWATER value.
                 if i == *(*(INITIAL_DATA_SIZE - DATA_LOWATER) * DATA_BLOCK_SIZE) {
-                    pool.extend_thinpool(
-                        &mut backstore,
-                        *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE,
-                        true,
-                    ).unwrap();
+                    pool.extend_thin_data(&mut backstore, *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE)
+                        .unwrap();
                 }
             }
         }

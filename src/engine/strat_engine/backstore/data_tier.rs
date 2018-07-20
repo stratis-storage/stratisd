@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use devicemapper::{CacheDev, DmDevice, LinearDev, Sectors};
+use devicemapper::{LinearDev, Sectors};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -16,7 +16,7 @@ use super::super::dm::get_dm;
 use super::super::dmnames::{format_backstore_ids, CacheRole};
 
 use super::blockdev::StratBlockDev;
-use super::blockdevmgr::{coalesce_blkdevsegs, map_to_dm, BlkDevSegment, BlockDevMgr, Segment};
+use super::blockdevmgr::{map_to_dm, BlkDevSegment, BlockDevMgr, Segment};
 
 /// Handles the lowest level, base layer of this tier.
 /// This structure can allocate additional space to the upper layer,
@@ -112,47 +112,10 @@ impl DataTier {
     pub fn add(
         &mut self,
         pool_uuid: PoolUuid,
-        cache: Option<&mut CacheDev>,
-        linear: Option<&mut LinearDev>,
         paths: &[&Path],
         force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
-        // These are here so that if invariant is false, the method fails
-        // before allocating the segments from the block_mgr.
-        // These two statements combined are equivalent to
-        // cache.is_some() XOR linear.is_some(), but they may be clearer and
-        // Rust does not seem to have a boolean XOR operator, anyway.
-        assert!(!(cache.is_some() && linear.is_some()));
-        assert!(!(cache.is_none() && linear.is_none()));
-
-        let uuids = self.block_mgr.add(pool_uuid, paths, force)?;
-
-        let avail_space = self.block_mgr.avail_space();
-        let segments = self.block_mgr
-            .alloc_space(&[avail_space])
-            .expect("asked for exactly the space available, must get")
-            .iter()
-            .flat_map(|s| s.iter())
-            .cloned()
-            .collect::<Vec<_>>();
-        let coalesced = coalesce_blkdevsegs(&self.segments, &segments);
-        let table = map_to_dm(&coalesced);
-
-        match (cache, linear) {
-            (Some(cache), None) => {
-                cache.set_origin_table(get_dm(), table)?;
-                cache.resume(get_dm())
-            }
-            (None, Some(linear)) => {
-                linear.set_table(get_dm(), table)?;
-                linear.resume(get_dm())
-            }
-            _ => panic!("see assertions at top of method"),
-        }?;
-
-        self.segments = coalesced;
-
-        Ok(uuids)
+        Ok(self.block_mgr.add(pool_uuid, paths, force)?)
     }
 
     /// The number of Sectors that remain to be allocated.

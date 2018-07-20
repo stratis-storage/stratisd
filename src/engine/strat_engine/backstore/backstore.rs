@@ -165,13 +165,7 @@ impl Backstore {
         paths: &[&Path],
         force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
-        self.data_tier.add(
-            pool_uuid,
-            self.cache.as_mut(),
-            self.linear.as_mut(),
-            paths,
-            force,
-        )
+        self.data_tier.add(pool_uuid, paths, force)
     }
 
     /// Add the given paths to self. Return UUIDs of the new blockdevs

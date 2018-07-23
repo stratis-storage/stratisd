@@ -214,7 +214,10 @@ impl Pool for StratPool {
     ) -> StratisResult<Vec<DevUuid>> {
         self.thin_pool.suspend()?;
         let bdev_info = self.backstore.add_blockdevs(pool_uuid, paths, tier, force)?;
-        self.thin_pool.set_device(self.backstore.device())?;
+        self.thin_pool
+            .set_device(self.backstore
+                        .device()
+                        .expect("backstore has already allocated a non zero amount to support the pool; there must be a cap device."))?;
         self.thin_pool.resume()?;
         self.write_metadata(pool_name)?;
         Ok(bdev_info)

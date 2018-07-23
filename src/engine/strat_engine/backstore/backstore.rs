@@ -251,13 +251,13 @@ impl Backstore {
 
     /// Return the device that this tier is currently using.
     /// This changes, depending on whether the backstore is supporting a cache
-    /// or not.
-    pub fn device(&self) -> Device {
+    /// or not. The device is None immediately after the backstore has been
+    /// created until it is required to satisfy a non-zero allocation request.
+    pub fn device(&self) -> Option<Device> {
         self.cache
             .as_ref()
             .map(|d| d.device())
             .or_else(|| self.linear.as_ref().map(|d| d.device()))
-            .expect("must be one or the other")
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.

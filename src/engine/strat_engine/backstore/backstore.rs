@@ -28,9 +28,6 @@ use super::setup::get_blockdevs;
 /// This structure can allocate additional space to the upper layer, but it
 /// cannot accept returned space. When it is extended to be able to accept
 /// returned space the allocation algorithm will have to be revised.
-///
-/// self.linear.is_some() XOR self.cache.is_some()
-/// self.cache.is_some() <=> self.cache_tier.is_some()
 #[derive(Debug)]
 pub struct Backstore {
     /// A cache DM Device.
@@ -104,14 +101,10 @@ impl Backstore {
         mda_size: Sectors,
         force: bool,
     ) -> StratisResult<Backstore> {
-        let (data_tier, dm_device) = DataTier::new(
-            pool_uuid,
-            BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?,
-        )?;
         Ok(Backstore {
-            data_tier,
+            data_tier: DataTier::new(BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?)?,
             cache_tier: None,
-            linear: Some(dm_device),
+            linear: None,
             cache: None,
         })
     }
@@ -120,6 +113,8 @@ impl Backstore {
     ///
     /// If the cache tier does not already exist, create it.
     ///
+    /// Precondition: At least some segments have been allocated from this
+    /// backstore.
     // Postcondition: self.cache.is_some() && self.linear.is_none()
     fn add_cachedevs(
         &mut self,
@@ -137,6 +132,11 @@ impl Backstore {
             None => {
                 let bdm = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
 
+                // NOTE: The expect is only true under the assumption that a
+                // pool has already been created on top of this backstore and
+                // that, therefore, at least some segments have been allocated
+                // to support the pool and therefore, some DM device must exist
+                // for this backstore.
                 let linear = self.linear
                     .take()
                     .expect("cache_tier.is_none() <=> self.linear.is_some()");
@@ -349,7 +349,10 @@ mod tests {
         assert!(
             (backstore.cache_tier.is_none()
                 && backstore.cache.is_none()
-                && backstore.linear.is_some())
+                && backstore.linear.is_none())
+                || (backstore.cache_tier.is_none()
+                    && backstore.cache.is_none()
+                    && backstore.linear.is_some())
                 || (backstore.cache_tier.is_some()
                     && backstore.cache.is_some()
                     && backstore.linear.is_none())
@@ -357,6 +360,7 @@ mod tests {
         assert_eq!(
             backstore.data_tier.capacity(),
             match (&backstore.linear, &backstore.cache) {
+                (&None, &None) => Sectors(0),
                 (&None, &Some(ref cache)) => cache.size(),
                 (&Some(ref linear), &None) => linear.size(),
                 _ => panic!("impossible; see first assertion"),

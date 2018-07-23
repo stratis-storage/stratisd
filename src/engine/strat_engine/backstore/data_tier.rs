@@ -80,30 +80,12 @@ impl DataTier {
     /// Setup a new DataTier struct from the block_mgr.
     ///
     /// Returns the DataTier and the linear device that was created.
-    ///
-    /// WARNING: metadata changing event
-    pub fn new(
-        pool_uuid: PoolUuid,
-        mut block_mgr: BlockDevMgr,
-    ) -> StratisResult<(DataTier, LinearDev)> {
-        let avail_space = block_mgr.avail_space();
-        let segments = block_mgr
-            .alloc_space(&[avail_space])
-            .expect("asked for exactly the space available, must get")
-            .iter()
-            .flat_map(|s| s.iter())
-            .cloned()
-            .collect::<Vec<_>>();
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
-        let ld = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), map_to_dm(&segments))?;
-        Ok((
-            DataTier {
-                block_mgr,
-                segments,
-                next: Sectors(0),
-            },
-            ld,
-        ))
+    pub fn new(block_mgr: BlockDevMgr) -> StratisResult<DataTier> {
+        Ok(DataTier {
+            block_mgr,
+            segments: vec![],
+            next: Sectors(0),
+        })
     }
 
     /// Add the given paths to self. Return UUIDs of the new blockdevs

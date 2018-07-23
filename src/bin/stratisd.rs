@@ -157,6 +157,39 @@ fn trylock_pid_file() -> StratisResult<File> {
     }
 }
 
+/// What type of file descriptor we have.
+#[derive(PartialEq)]
+enum FdType {
+    Udev,
+    Signal,
+    Engine,
+    #[cfg(feature = "dbus_enabled")]
+    Dbus,
+}
+
+/// Append a libc::pollfd and FdType to the two supplied vectors.  The fds_type vector supplies
+/// needed metadata for the matching pollfd.
+fn push(fds: &mut Vec<libc::pollfd>, fds_type: &mut Vec<FdType>, t: FdType, fd: libc::pollfd) {
+    assert_eq!(fds.len(), fds_type.len());
+    fds.push(fd);
+    fds_type.push(t);
+}
+
+/// Remove any items from both vectors which match the specified FdType.
+/// Note: we iterate backwards to reduce amount of memory movement within the vector.
+#[cfg(feature = "dbus_enabled")]
+fn fd_filter_remove(fds: &mut Vec<libc::pollfd>, fds_type: &mut Vec<FdType>, filter: FdType) {
+    assert_eq!(fds.len(), fds_type.len());
+    for i in (0..fds_type.len())
+        .rev()
+        .filter(|x| fds_type[*x] == filter)
+        .collect::<Vec<usize>>()
+    {
+        fds_type.remove(i);
+        fds.remove(i);
+    }
+}
+
 /// Set up all sorts of signal and event handling mechanisms.
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered. Dump log entries on specified signal
@@ -186,20 +219,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     };
 
     /*
-    The file descriptor array indexes are:
-
-    0   == Always udev fd index
-    1   == SIGNAL FD index
-    2   == engine index if eventable
-    2/3 == Start of dbus client file descriptor(s)
-            * 2 if engine is not eventable
-            * else 3
-    */
-    const FD_INDEX_UDEV: usize = 0;
-    const FD_INDEX_SIGNALFD: usize = 1;
-    const FD_INDEX_ENGINE: usize = 2;
-
-    /*
     fds is a Vec of libc::pollfd structs. Ideally, it would be possible
     to use the higher level nix crate to handle polling. If this were possible,
     then the Vec would be one of nix::poll::PollFds and this would be more
@@ -211,12 +230,18 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     have to be maintained in the Vec as well as the PollFd struct.
     */
     let mut fds = Vec::new();
+    let mut fds_type = Vec::new();
 
-    fds.push(libc::pollfd {
-        fd: udev.as_raw_fd(),
-        revents: 0,
-        events: libc::POLLIN,
-    });
+    push(
+        &mut fds,
+        &mut fds_type,
+        FdType::Udev,
+        libc::pollfd {
+            fd: udev.as_raw_fd(),
+            revents: 0,
+            events: libc::POLLIN,
+        },
+    );
 
     // Signals can be queued up on this file descriptor
     let mut sfd = {
@@ -228,31 +253,34 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         SignalFd::with_flags(&mask, SfdFlags::SFD_NONBLOCK)?
     };
 
-    fds.push(libc::pollfd {
-        fd: sfd.as_raw_fd(),
-        revents: 0,
-        events: libc::POLLIN,
-    });
+    push(
+        &mut fds,
+        &mut fds_type,
+        FdType::Signal,
+        libc::pollfd {
+            fd: sfd.as_raw_fd(),
+            revents: 0,
+            events: libc::POLLIN,
+        },
+    );
 
     let eventable = engine.borrow().get_eventable();
 
     let poll_timeout = match eventable {
         Some(ref evt) => {
-            fds.push(libc::pollfd {
-                fd: evt.get_pollable_fd(),
-                revents: 0,
-                events: libc::POLLIN,
-            });
+            push(
+                &mut fds,
+                &mut fds_type,
+                FdType::Engine,
+                libc::pollfd {
+                    fd: evt.get_pollable_fd(),
+                    revents: 0,
+                    events: libc::POLLIN,
+                },
+            );
             -1
         }
         None => 10000,
-    };
-
-    #[cfg(feature = "dbus_enabled")]
-    let dbus_client_index_start = if eventable.is_some() {
-        FD_INDEX_ENGINE + 1
-    } else {
-        FD_INDEX_ENGINE
     };
 
     #[cfg(feature = "dbus_enabled")]
@@ -271,122 +299,126 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         )?;
     }
 
+    // Setup the listening dbus fd
+    #[cfg(feature = "dbus_enabled")]
+    for i in dbus_conn.watch_fds().iter().map(|w| w.to_pollfd()) {
+        push(&mut fds, &mut fds_type, FdType::Dbus, i);
+    }
+
     log_engine_state(&*engine.borrow());
     alarm(STRATISD_ALARM_SECONDS);
 
     loop {
-        // Process any udev block events
-        if fds[FD_INDEX_UDEV].revents != 0 {
-            while let Some(event) = udev.receive_event() {
-                if let Some((device, devnode)) = handle_udev_add(&event) {
-                    // If block evaluate returns an error we are going to ignore it as
-                    // there is nothing we can do for a device we are getting errors with.
-                    #[cfg(not(feature = "dbus_enabled"))]
-                    let _ = engine.borrow_mut().block_evaluate(device, devnode);
+        // We are modifying the vectors in this loop, so we need to utilize indicies.
+        for i in fds.iter()
+            .enumerate()
+            .filter(|(_, p)| p.revents != 0)
+            .map(|(i, _)| i)
+            .collect::<Vec<usize>>()
+        {
+            match fds_type[i] {
+                FdType::Udev => {
+                    while let Some(event) = udev.receive_event() {
+                        if let Some((device, devnode)) = handle_udev_add(&event) {
+                            // If block evaluate returns an error we are going to ignore it as
+                            // there is nothing we can do for a device we are getting errors with.
+                            #[cfg(not(feature = "dbus_enabled"))]
+                            let _ = engine.borrow_mut().block_evaluate(device, devnode);
 
-                    #[cfg(feature = "dbus_enabled")]
-                    {
-                        let pool_uuid = engine
-                            .borrow_mut()
-                            .block_evaluate(device, devnode)
-                            .unwrap_or(None);
+                            #[cfg(feature = "dbus_enabled")]
+                            {
+                                let pool_uuid = engine
+                                    .borrow_mut()
+                                    .block_evaluate(device, devnode)
+                                    .unwrap_or(None);
 
-                        if let Some(pool_uuid) = pool_uuid {
-                            libstratis::dbus_api::register_pool(
-                                &dbus_conn,
-                                &dbus_context,
-                                &mut tree,
-                                pool_uuid,
-                                engine
-                                    .borrow()
-                                    .get_pool(pool_uuid)
-                                    .expect(
-                                        "block_evaluate() returned a pool UUID, pool must be available",
-                                    )
-                                    .1,
-                                &base_object_path,
-                            )?;
+                                if let Some(pool_uuid) = pool_uuid {
+                                    libstratis::dbus_api::register_pool(
+                                            &dbus_conn,
+                                            &dbus_context,
+                                            &mut tree,
+                                            pool_uuid,
+                                            engine
+                                                .borrow()
+                                                .get_pool(pool_uuid)
+                                                .expect(
+                                                    "block_evaluate() returned a pool UUID, pool must be available",
+                                                )
+                                                .1,
+                                            &base_object_path,
+                                        )?;
+                                }
+                            }
                         }
                     }
                 }
-            }
-        }
+                FdType::Signal => {
+                    match sfd.read_signal() {
+                        // This is an unsafe conversion, but in this context that is
+                        // mostly harmless. A negative converted value, which is
+                        // virtually impossible, will not match any of the masked
+                        // values, and stratisd will panic and exit.
+                        Ok(Some(sig)) => match sig.ssi_signo as i32 {
+                            nix::libc::SIGALRM => {
+                                info!("SIGALRM received, performing periodic tasks");
+                                log_engine_state(&*engine.borrow());
+                                alarm(STRATISD_ALARM_SECONDS);
+                            }
+                            nix::libc::SIGUSR1 => {
+                                info!(
+                                    "SIGUSR1 received, dumping {} buffered log entries",
+                                    buff_log.buffered_count()
+                                );
+                                buff_log.dump()
+                            }
+                            nix::libc::SIGINT => {
+                                info!("SIGINT received, exiting");
+                                return Ok(());
+                            }
+                            signo => {
+                                panic!("Caught an impossible signal {:?}", signo);
+                            }
+                        },
+                        // No signals waiting (SFD_NONBLOCK flag is set)
+                        Ok(None) => (),
 
-        // Process any signals off signalfd
-        if fds[FD_INDEX_SIGNALFD].revents != 0 {
-            match sfd.read_signal() {
-                // This is an unsafe conversion, but in this context that is
-                // mostly harmless. A negative converted value, which is
-                // virtually impossible, will not match any of the masked
-                // values, and stratisd will panic and exit.
-                Ok(Some(sig)) => match sig.ssi_signo as i32 {
-                    nix::libc::SIGALRM => {
-                        info!("SIGALRM received, performing periodic tasks");
-                        log_engine_state(&*engine.borrow());
-                        alarm(STRATISD_ALARM_SECONDS);
+                        // Pessimistically exit on an error reading the signal.
+                        Err(err) => return Err(err.into()),
                     }
-                    nix::libc::SIGUSR1 => {
-                        info!(
-                            "SIGUSR1 received, dumping {} buffered log entries",
-                            buff_log.buffered_count()
-                        );
-                        buff_log.dump()
-                    }
-                    nix::libc::SIGINT => {
-                        info!("SIGINT received, exiting");
-                        return Ok(());
-                    }
-                    signo => {
-                        panic!("Caught an impossible signal {:?}", signo);
-                    }
-                },
-                // No signals waiting (SFD_NONBLOCK flag is set)
-                Ok(None) => (),
-
-                // Pessimistically exit on an error reading the signal.
-                Err(err) => return Err(err.into()),
-            }
-        }
-
-        // Handle engine events, if the engine is eventable
-        match eventable {
-            Some(ref evt) => {
-                if fds[FD_INDEX_ENGINE].revents != 0 {
-                    evt.clear_event()?;
-                    engine.borrow_mut().evented()?;
                 }
-            }
-            None => {
-                // Unconditionally call evented() if engine has no eventable.
-                // This looks like a bad idea, but the only engine that has
-                // no eventable is the sim engine, and for that engine,
-                // evented() is essentially a no-op.
-                engine.borrow_mut().evented()?;
-            }
-        }
-
-        // Iterate through D-Bus file descriptors (if enabled)
-        #[cfg(feature = "dbus_enabled")]
-        {
-            for pfd in fds[dbus_client_index_start..]
-                .iter()
-                .filter(|pfd| pfd.revents != 0)
-            {
-                for item in dbus_conn.watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents)) {
-                    if let Err(r) =
-                        libstratis::dbus_api::handle(&dbus_conn, &item, &mut tree, &dbus_context)
+                FdType::Engine => {
+                    // If this type is in the vector then we have an eventable engine, so
+                    // just call it!
+                    if let Some(evt) = eventable {
+                        evt.clear_event()?;
+                        engine.borrow_mut().evented()?;
+                    }
+                }
+                #[cfg(feature = "dbus_enabled")]
+                FdType::Dbus => {
+                    for item in
+                        dbus_conn.watch_handle(fds[i].fd, WatchEvent::from_revents(fds[i].revents))
                     {
-                        log_engine_state(&*engine.borrow());
-                        print_err(&From::from(r));
+                        if let Err(r) = libstratis::dbus_api::handle(
+                            &dbus_conn,
+                            &item,
+                            &mut tree,
+                            &dbus_context,
+                        ) {
+                            log_engine_state(&*engine.borrow());
+                            print_err(&From::from(r));
+                        }
+                    }
+
+                    // Refresh list of dbus fds to poll. This can change as
+                    // D-Bus clients come and go.
+                    fd_filter_remove(&mut fds, &mut fds_type, FdType::Dbus);
+
+                    for to_add in dbus_conn.watch_fds().iter().map(|w| w.to_pollfd()) {
+                        push(&mut fds, &mut fds_type, FdType::Dbus, to_add);
                     }
                 }
             }
-
-            // Refresh list of dbus fds to poll for every time. This can change as
-            // D-Bus clients come and go.
-            fds.truncate(dbus_client_index_start);
-
-            fds.extend(dbus_conn.watch_fds().iter().map(|w| w.to_pollfd()));
         }
 
         let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, poll_timeout) };

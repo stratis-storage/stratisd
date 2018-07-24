@@ -199,10 +199,20 @@ impl Backstore {
             Some(available) => {
                 let total_requested = sizes.iter().cloned().sum();
                 if available < total_requested {
-                    // Get additional space from the data tier and extend
-                    // the linear dev with the additional segments.
-                    unimplemented!()
+                    if self.data_tier
+                        .alloc_segments(
+                            total_requested - available,
+                            self.cache.as_mut(),
+                            self.linear.as_mut(),
+                        )
+                        .is_err()
+                    {
+                        return None;
+                    }
                 }
+
+                // Cap device now has at least enough space to satisfy the
+                // request, so satisfy it.
                 let mut chunks = Vec::new();
                 for size in sizes {
                     chunks.push((self.next, *size));

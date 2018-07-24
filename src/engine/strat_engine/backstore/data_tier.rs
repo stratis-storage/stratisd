@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use devicemapper::{LinearDev, Sectors};
+use devicemapper::{CacheDev, LinearDev, Sectors};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -91,6 +91,17 @@ impl DataTier {
         force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
         Ok(self.block_mgr.add(pool_uuid, paths, force)?)
+    }
+
+    /// Allocate requested segments and add to the end of the linear device.
+    /// Return None if the request can not be satisfied.
+    pub fn alloc_segments(
+        &mut self,
+        _request: Sectors,
+        _cache: Option<&mut CacheDev>,
+        _linear: Option<&mut LinearDev>,
+    ) -> StratisResult<()> {
+        unimplemented!()
     }
 
     /// All the sectors available to this device

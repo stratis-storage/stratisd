@@ -95,13 +95,15 @@ impl DataTier {
 
     /// Allocate requested segments and add to the end of the linear device.
     /// Return None if the request can not be satisfied.
+    /// Precondition: This method is called only when
     pub fn alloc_segments(
         &mut self,
         _request: Sectors,
-        _cache: Option<&mut CacheDev>,
-        _linear: Option<&mut LinearDev>,
+        cache: Option<&mut CacheDev>,
+        linear: Option<&mut LinearDev>,
     ) -> StratisResult<()> {
-        unimplemented!()
+        assert!(!(cache.is_some() && linear.is_some()));
+        unimplemented!();
     }
 
     /// All the sectors available to this device

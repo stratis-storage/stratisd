@@ -403,7 +403,8 @@ impl ThinPool {
                     match self.extend_thinpool(
                         DataBlocks(cmp::min(
                             *usage.total_data,
-                            backstore.available() / DATA_BLOCK_SIZE,
+                            backstore.available()
+                            .expect("thinpool exists, therefore backstore must have a cap device allocated")/ DATA_BLOCK_SIZE,
                         )),
                         backstore,
                     ) {

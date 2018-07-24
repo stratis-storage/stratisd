@@ -28,15 +28,11 @@ pub struct DataTier {
     pub block_mgr: BlockDevMgr,
     /// The list of segments granted by block_mgr to the cap device.
     pub segments: Vec<BlkDevSegment>,
-    /// Index for managing allocation from dm_device.
-    pub next: Sectors,
 }
 
 impl DataTier {
     /// Setup a previously existing data layer from the block_mgr and
     /// previously allocated segments.
-    ///
-    /// next is the location of the next sector that can be allocated.
     ///
     /// Returns the DataTier and the linear DM device that was created during
     /// setup.
@@ -44,7 +40,6 @@ impl DataTier {
         pool_uuid: PoolUuid,
         block_mgr: BlockDevMgr,
         segments: &[(DevUuid, Sectors, Sectors)],
-        next: Sectors,
     ) -> StratisResult<(DataTier, LinearDev)> {
         let uuid_to_devno = block_mgr.uuid_to_devno();
         let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> StratisResult<BlkDevSegment> {
@@ -71,7 +66,6 @@ impl DataTier {
             DataTier {
                 block_mgr,
                 segments,
-                next,
             },
             ld,
         ))
@@ -84,7 +78,6 @@ impl DataTier {
         Ok(DataTier {
             block_mgr,
             segments: vec![],
-            next: Sectors(0),
         })
     }
 
@@ -98,34 +91,6 @@ impl DataTier {
         force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
         Ok(self.block_mgr.add(pool_uuid, paths, force)?)
-    }
-
-    /// The number of Sectors that remain to be allocated.
-    pub fn available(&self) -> Sectors {
-        self.capacity() - self.next
-    }
-
-    /// Allocate requested chunks from device.
-    /// Returns None if it is not possible to satisfy the request.
-    /// Each segment allocated is contiguous with its neighbors in the return
-    /// vector.
-    /// WARNING: All this must change when it becomes possible to return
-    /// sectors to the store.
-    /// WARNING: metadata changing event
-    /// Postcondition: forall i, sizes_i == result_i.1. The second value in each
-    /// pair in the returned vector is therefore redundant, but is retained
-    /// as a convenience to the caller.
-    pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<(Sectors, Sectors)>> {
-        if self.available() < sizes.iter().cloned().sum() {
-            return None;
-        }
-
-        let mut chunks = Vec::new();
-        for size in sizes {
-            chunks.push((self.next, *size));
-            self.next += *size;
-        }
-        Some(chunks)
     }
 
     /// All the sectors available to this device

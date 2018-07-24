@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use devicemapper::{CacheDev, LinearDev, Sectors};
+use devicemapper::{LinearDev, Sectors};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -93,17 +93,29 @@ impl DataTier {
         Ok(self.block_mgr.add(pool_uuid, paths, force)?)
     }
 
-    /// Allocate requested segments and add to the end of the linear device.
-    /// Return None if the request can not be satisfied.
-    /// Precondition: This method is called only when
-    pub fn alloc_segments(
-        &mut self,
-        _request: Sectors,
-        cache: Option<&mut CacheDev>,
-        linear: Option<&mut LinearDev>,
-    ) -> StratisResult<()> {
-        assert!(!(cache.is_some() && linear.is_some()));
-        unimplemented!();
+    /// Find some free segments to satisfy the request.
+    /// Return None if the request can not be satisfied. If there is no cache
+    /// tier and there is no linear device then this is the first time this
+    /// method has been called; it is necessary to construct a linear device.
+    pub fn alloc_segments(&mut self, request: Sectors) -> StratisResult<Vec<BlkDevSegment>> {
+        let avail_space = self.block_mgr.avail_space();
+        if avail_space < request {
+            return Err(StratisError::Engine(
+                ErrorEnum::Error,
+                format!(
+                    "Can not satisfy request for {}, only {} remaining",
+                    request, avail_space
+                ),
+            ));
+        } else {
+            Ok(self.block_mgr
+                .alloc_space(&[request])
+                .expect("asked for no more than available, must receive")
+                .iter()
+                .flat_map(|s| s.iter())
+                .cloned()
+                .collect::<Vec<_>>())
+        }
     }
 
     /// All the sectors available to this device

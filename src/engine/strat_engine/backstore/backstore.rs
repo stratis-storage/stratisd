@@ -200,11 +200,7 @@ impl Backstore {
                 let total_requested = sizes.iter().cloned().sum();
                 if available < total_requested {
                     if self.data_tier
-                        .alloc_segments(
-                            total_requested - available,
-                            self.cache.as_mut(),
-                            self.linear.as_mut(),
-                        )
+                        .alloc_segments(total_requested - available)
                         .is_err()
                     {
                         return None;

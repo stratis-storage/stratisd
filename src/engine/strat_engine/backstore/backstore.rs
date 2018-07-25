@@ -230,13 +230,23 @@ impl Backstore {
         self.data_tier.current_capacity()
     }
 
-    /// The available number of Sectors.
-    pub fn available(&self) -> Sectors {
+    /// The size of the cap device.
+    ///
+    /// The size of the cap device is obtained from the size of the component
+    /// DM devices. But the devicemapper library stores the data from which
+    /// the size of each DM device is calculated; the result is computed and
+    /// no ioctl is required.
+    fn size(&self) -> Sectors {
         self.linear
             .as_ref()
             .map(|d| d.size())
             .or_else(|| self.cache.as_ref().map(|d| d.size()))
-            .expect("either linear or cache must be Some") - self.next
+            .expect("either linear or cache must be Some")
+    }
+
+    /// The available number of Sectors.
+    pub fn available(&self) -> Sectors {
+        self.size() - self.next
     }
 
     /// Destroy the entire store.

@@ -34,15 +34,11 @@ pub struct DataTier {
     /// It is always the case that block_mgr.avail_space() == 0, i.e., all
     /// available space in block_mgr is allocated to the DM device.
     pub segments: Vec<BlkDevSegment>,
-    /// Index for managing allocation from dm_device.
-    pub next: Sectors,
 }
 
 impl DataTier {
     /// Setup a previously existing data layer from the block_mgr and
     /// previously allocated segments.
-    ///
-    /// next is the location of the next sector that can be allocated.
     ///
     /// Returns the DataTier and the linear DM device that was created during
     /// setup.
@@ -50,7 +46,6 @@ impl DataTier {
         pool_uuid: PoolUuid,
         block_mgr: BlockDevMgr,
         segments: &[(DevUuid, Sectors, Sectors)],
-        next: Sectors,
     ) -> StratisResult<(DataTier, LinearDev)> {
         if block_mgr.avail_space() != Sectors(0) {
             let err_msg = format!(
@@ -85,7 +80,6 @@ impl DataTier {
             DataTier {
                 block_mgr,
                 segments,
-                next,
             },
             ld,
         ))
@@ -114,7 +108,6 @@ impl DataTier {
             DataTier {
                 block_mgr,
                 segments,
-                next: Sectors(0),
             },
             ld,
         ))
@@ -167,31 +160,6 @@ impl DataTier {
         self.segments = coalesced;
 
         Ok(uuids)
-    }
-
-    /// The number of Sectors that remain to be allocated.
-    pub fn available(&self) -> Sectors {
-        self.capacity() - self.next
-    }
-
-    /// Allocate requested chunks from device.
-    /// Returns None if it is not possible to satisfy the request.
-    /// Each segment allocated is contiguous with its neighbors in the return
-    /// vector.
-    /// WARNING: All this must change when it becomes possible to return
-    /// sectors to the store.
-    /// WARNING: metadata changing event
-    pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<(Sectors, Sectors)>> {
-        if self.available() < sizes.iter().cloned().sum() {
-            return None;
-        }
-
-        let mut chunks = Vec::new();
-        for size in sizes {
-            chunks.push((self.next, *size));
-            self.next += *size;
-        }
-        Some(chunks)
     }
 
     /// All the sectors available to this device

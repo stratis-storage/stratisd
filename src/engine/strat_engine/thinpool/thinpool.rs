@@ -188,7 +188,9 @@ impl ThinPool {
         let spare_segments = segments_list.pop().expect("len(segments_list) == 2");
         let meta_segments = segments_list.pop().expect("len(segments_list) == 1");
 
-        let backstore_device = backstore.device();
+        let backstore_device = backstore
+            .device()
+            .expect("A non-zero number of segments was allocated from the backstore; therefore it must have a cap device");
 
         // When constructing a thin-pool, Stratis reserves the first N
         // sectors on a block device by creating a linear device with a
@@ -266,7 +268,9 @@ impl ThinPool {
         let data_segments = flex_devs.thin_data_dev.to_vec();
         let spare_segments = flex_devs.thin_meta_dev_spare.to_vec();
 
-        let backstore_device = backstore.device();
+        let backstore_device = backstore
+            .device()
+            .expect("backstore must have a DM device because Backstore::setup() was previously called, and that always creates a DM device, either linear or cache.");
 
         let (thinpool_name, thinpool_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
         let (meta_dev, meta_segments, spare_segments) = setup_metadev(
@@ -355,7 +359,9 @@ impl ThinPool {
     /// metadata save has been made.
     pub fn check(&mut self, backstore: &mut Backstore) -> StratisResult<bool> {
         #![allow(match_same_arms)]
-        assert_eq!(backstore.device(), self.backstore_device);
+        assert_eq!(backstore.device()
+                   .expect("The thinpool is already set up, therefore the the backstore must have a cap device."),
+                   self.backstore_device);
 
         let mut should_save: bool = false;
 
@@ -397,7 +403,8 @@ impl ThinPool {
                     match self.extend_thinpool(
                         DataBlocks(cmp::min(
                             *usage.total_data,
-                            backstore.available() / DATA_BLOCK_SIZE,
+                            backstore.available()
+                            .expect("thinpool exists, therefore backstore must have a cap device allocated")/ DATA_BLOCK_SIZE,
                         )),
                         backstore,
                     ) {
@@ -453,7 +460,12 @@ impl ThinPool {
         backstore: &mut Backstore,
     ) -> StratisResult<DataBlocks> {
         let backstore_device = self.backstore_device;
-        assert_eq!(backstore.device(), backstore_device);
+        assert_eq!(
+            backstore
+                .device()
+                .expect("backstore supports a pool, so it must export a device"),
+            backstore_device
+        );
         if let Some(mut regions) = backstore.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
             self.suspend()?;
             self.extend_data(backstore_device, regions.pop().expect("len(regions) == 1"))?;
@@ -476,7 +488,12 @@ impl ThinPool {
         backstore: &mut Backstore,
     ) -> StratisResult<MetaBlocks> {
         let backstore_device = self.backstore_device;
-        assert_eq!(backstore.device(), backstore_device);
+        assert_eq!(
+            backstore
+                .device()
+                .expect("backstore device supports a pool, so it must export a device"),
+            backstore_device
+        );
         if let Some(mut regions) = backstore.alloc_space(&[extend_size.sectors()]) {
             self.suspend()?;
             self.extend_meta(backstore_device, regions.pop().expect("len(regions) == 1"))?;
@@ -1569,11 +1586,15 @@ mod tests {
         );
 
         pool.suspend().unwrap();
-        let old_device = backstore.device();
+        let old_device = backstore
+            .device()
+            .expect("backstore must have a device, because it supports a pool");
         backstore
             .add_blockdevs(pool_uuid, paths1, BlockDevTier::Cache, false)
             .unwrap();
-        let new_device = backstore.device();
+        let new_device = backstore
+            .device()
+            .expect("backstore must have a device because it supports a pool");
         assert!(old_device != new_device);
         pool.set_device(new_device).unwrap();
         pool.resume().unwrap();

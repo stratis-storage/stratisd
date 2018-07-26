@@ -527,10 +527,8 @@ mod tests {
     use super::*;
 
     /// Assert some invariants of the backstore
-    /// * self.cache_tier.is_some() && self.cache.is_some() XOR
-    ///   self.linear.is_some()).
-    /// * self.data_tier.block_mgr.avail_space() is always 0, because
-    ///   everything is allocated to the DM device.
+    /// * backstore.cache_tier.is_some() <=> backstore.cache.is_some() &&
+    ///   backstore.cache_tier.is_some() => backstore.linear.is_none()
     /// * backstore's data tier capacity is equal to the size of the cap device
     /// * backstore's next index is always less than the size of the cap
     ///   device
@@ -543,7 +541,6 @@ mod tests {
                     && backstore.cache.is_some()
                     && backstore.linear.is_none())
         );
-        assert_eq!(backstore.data_tier.block_mgr.avail_space(), Sectors(0));
         assert_eq!(
             backstore.data_tier.capacity(),
             match (&backstore.linear, &backstore.cache) {

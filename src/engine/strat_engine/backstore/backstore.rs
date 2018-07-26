@@ -16,15 +16,21 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
+use super::super::device::wipe_sectors;
 use super::super::dm::get_dm;
+use super::super::dmnames::{format_backstore_ids, CacheRole};
 use super::super::serde_structs::{BackstoreSave, Recordable};
 
 use super::blockdev::StratBlockDev;
-use super::blockdevmgr::BlockDevMgr;
+use super::blockdevmgr::{map_to_dm, BlockDevMgr};
 use super::cache_tier::CacheTier;
 use super::data_tier::DataTier;
 use super::metadata::MIN_MDA_SECTORS;
 use super::setup::get_blockdevs;
+
+/// Use a cache block size that the kernel docs indicate is the largest
+/// typical size.
+const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
 
 /// This structure can allocate additional space to the upper layer, but it
 /// cannot accept returned space. When it is extended to be able to accept
@@ -62,23 +68,51 @@ impl Backstore {
     ) -> StratisResult<Backstore> {
         let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
         let block_mgr = BlockDevMgr::new(datadevs, last_update_time);
-        let (data_tier, dm_device) =
-            DataTier::setup(pool_uuid, block_mgr, &backstore_save.data_segments)?;
+        let data_tier = DataTier::setup(block_mgr, &backstore_save.data_segments)?;
+        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
+        let origin = LinearDev::setup(
+            get_dm(),
+            &dm_name,
+            Some(&dm_uuid),
+            map_to_dm(&data_tier.segments),
+        )?;
 
-        let (cache_tier, cache, linear) = if !cachedevs.is_empty() {
+        let (cache_tier, cache, origin) = if !cachedevs.is_empty() {
             let block_mgr = BlockDevMgr::new(cachedevs, last_update_time);
             match (
                 &backstore_save.cache_segments,
                 &backstore_save.meta_segments,
             ) {
                 (&Some(ref cache_segments), &Some(ref meta_segments)) => {
-                    let (cache_tier, cache_device) = CacheTier::setup(
-                        pool_uuid,
-                        block_mgr,
-                        dm_device,
-                        cache_segments,
-                        meta_segments,
+                    let cache_tier = CacheTier::setup(block_mgr, cache_segments, meta_segments)?;
+
+                    let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
+                    let meta = LinearDev::setup(
+                        get_dm(),
+                        &dm_name,
+                        Some(&dm_uuid),
+                        map_to_dm(&cache_tier.meta_segments),
                     )?;
+
+                    let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);
+                    let cache = LinearDev::setup(
+                        get_dm(),
+                        &dm_name,
+                        Some(&dm_uuid),
+                        map_to_dm(&cache_tier.cache_segments),
+                    )?;
+
+                    let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
+                    let cache_device = CacheDev::setup(
+                        get_dm(),
+                        &dm_name,
+                        Some(&dm_uuid),
+                        meta,
+                        cache,
+                        origin,
+                        CACHE_BLOCK_SIZE,
+                    )?;
+
                     (Some(cache_tier), Some(cache_device), None)
                 }
                 _ => {
@@ -87,13 +121,13 @@ impl Backstore {
                 }
             }
         } else {
-            (None, None, Some(dm_device))
+            (None, None, Some(origin))
         };
 
         Ok(Backstore {
             data_tier,
             cache_tier,
-            linear,
+            linear: origin,
             cache,
             next,
         })
@@ -107,14 +141,20 @@ impl Backstore {
         mda_size: Sectors,
         force: bool,
     ) -> StratisResult<Backstore> {
-        let (data_tier, dm_device) = DataTier::new(
-            pool_uuid,
-            BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?,
+        let data_tier = DataTier::new(BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?);
+
+        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
+        let linear = LinearDev::setup(
+            get_dm(),
+            &dm_name,
+            Some(&dm_uuid),
+            map_to_dm(&data_tier.segments),
         )?;
+
         Ok(Backstore {
             data_tier,
             cache_tier: None,
-            linear: Some(dm_device),
+            linear: Some(linear),
             cache: None,
             next: Sectors(0),
         })
@@ -136,15 +176,51 @@ impl Backstore {
                 let mut cache_device = self.cache
                     .as_mut()
                     .expect("cache_tier.is_some() <=> self.cache.is_some()");
-                cache_tier.add(pool_uuid, &mut cache_device, paths, force)
+                let uuids = cache_tier.add(pool_uuid, paths, force);
+
+                let table = map_to_dm(&cache_tier.cache_segments);
+                cache_device.set_cache_table(get_dm(), table)?;
+                cache_device.resume(get_dm())?;
+                uuids
             }
             None => {
                 let bdm = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
 
+                let cache_tier = CacheTier::new(bdm);
+
                 let linear = self.linear
                     .take()
                     .expect("cache_tier.is_none() <=> self.linear.is_some()");
-                let (cache_tier, cache) = CacheTier::new(pool_uuid, bdm, linear)?;
+
+                let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
+                let meta = LinearDev::setup(
+                    get_dm(),
+                    &dm_name,
+                    Some(&dm_uuid),
+                    map_to_dm(&cache_tier.meta_segments),
+                )?;
+
+                // See comment in ThinPool::new() method
+                wipe_sectors(&meta.devnode(), Sectors(0), meta.size())?;
+
+                let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);
+                let cache = LinearDev::setup(
+                    get_dm(),
+                    &dm_name,
+                    Some(&dm_uuid),
+                    map_to_dm(&cache_tier.cache_segments),
+                )?;
+
+                let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
+                let cache = CacheDev::new(
+                    get_dm(),
+                    &dm_name,
+                    Some(&dm_uuid),
+                    meta,
+                    cache,
+                    linear,
+                    CACHE_BLOCK_SIZE,
+                )?;
                 self.cache = Some(cache);
 
                 let uuids = cache_tier
@@ -169,13 +245,23 @@ impl Backstore {
         paths: &[&Path],
         force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
-        self.data_tier.add(
-            pool_uuid,
-            self.cache.as_mut(),
-            self.linear.as_mut(),
-            paths,
-            force,
-        )
+        let uuids = self.data_tier.add(pool_uuid, paths, force)?;
+
+        let table = map_to_dm(&self.data_tier.segments);
+
+        match (self.cache.as_mut(), self.linear.as_mut()) {
+            (Some(cache), None) => {
+                cache.set_origin_table(get_dm(), table)?;
+                cache.resume(get_dm())
+            }
+            (None, Some(linear)) => {
+                linear.set_table(get_dm(), table)?;
+                linear.resume(get_dm())
+            }
+            _ => panic!("self.cache.is_some() XOR self.linear.is_some()"),
+        }?;
+
+        Ok(uuids)
     }
 
     /// Add the given paths to self. Return UUIDs of the new blockdevs

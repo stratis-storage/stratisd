@@ -55,6 +55,7 @@ impl Backstore {
         backstore_save: &BackstoreSave,
         devnodes: &HashMap<Device, PathBuf>,
         last_update_time: Option<DateTime<Utc>>,
+        next: Sectors,
     ) -> StratisResult<Backstore> {
         let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
         let block_mgr = BlockDevMgr::new(datadevs, last_update_time);
@@ -91,7 +92,7 @@ impl Backstore {
             cache_tier,
             linear,
             cache,
-            next: backstore_save.next,
+            next,
         })
     }
 
@@ -351,7 +352,6 @@ impl Recordable<BackstoreSave> for Backstore {
             data_devs: self.data_tier.block_mgr.record(),
             data_segments: self.data_tier.segments.record(),
             meta_segments: self.cache_tier.as_ref().map(|c| c.meta_segments.record()),
-            next: self.next,
         }
     }
 }
@@ -523,7 +523,8 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
-        let backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
+        let backstore =
+            Backstore::setup(pool_uuid, &backstore_save, &map, None, Sectors(0)).unwrap();
         invariant(&backstore);
 
         backstore.teardown().unwrap();
@@ -531,7 +532,8 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
-        let backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
+        let backstore =
+            Backstore::setup(pool_uuid, &backstore_save, &map, None, Sectors(0)).unwrap();
         invariant(&backstore);
 
         backstore.destroy().unwrap();

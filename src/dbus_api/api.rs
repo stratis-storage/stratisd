@@ -49,12 +49,11 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(pool_uuid) => {
-            let pool_object_path: dbus::Path =
-                create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
-
             let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-            pool.set_dbus_path(object_path.clone());
+            let pool_object_path: dbus::Path =
+                create_dbus_pool(dbus_context, object_path.clone(), pool_uuid, pool);
+
             let bd_object_paths = pool.blockdevs_mut()
                 .into_iter()
                 .map(|(uuid, bd)| {
@@ -199,8 +198,8 @@ fn register_pool_dbus(
     pool: &mut Pool,
     object_path: &dbus::Path<'static>,
 ) {
-    let pool_path = create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
-    pool.set_dbus_path(object_path.clone());
+    let pool_path = create_dbus_pool(dbus_context, object_path.clone(), pool_uuid, pool);
+
     for (_, fs_uuid, fs) in pool.filesystems_mut() {
         create_dbus_filesystem(dbus_context, pool_path.clone(), fs_uuid, fs);
     }

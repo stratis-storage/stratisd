@@ -337,6 +337,7 @@ pub fn create_dbus_pool<'a>(
     dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
     uuid: Uuid,
+    pool: &mut Pool,
 ) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
@@ -425,5 +426,6 @@ pub fn create_dbus_pool<'a>(
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
+    pool.set_dbus_path(path.clone());
     path
 }

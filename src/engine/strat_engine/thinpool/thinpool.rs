@@ -5,7 +5,6 @@
 // Code to handle management of a pool's thinpool device.
 
 use std::borrow::BorrowMut;
-use std::cmp;
 
 use uuid::Uuid;
 
@@ -169,7 +168,7 @@ impl ThinPool {
         data_block_size: Sectors,
         backstore: &mut Backstore,
     ) -> StratisResult<ThinPool> {
-        let mut segments_list = match backstore.alloc_space(&[
+        let mut segments_list = match backstore.alloc(&[
             thin_pool_size.meta_size(),
             thin_pool_size.meta_size(),
             thin_pool_size.data_size(),
@@ -353,6 +352,26 @@ impl ThinPool {
     /// metadata save has been made.
     pub fn check(&mut self, backstore: &mut Backstore) -> StratisResult<bool> {
         #![allow(match_same_arms)]
+
+        /// Calculate requested additional amount to allocate given total,
+        /// used, and low_water. Return None if there is no need to allocate
+        /// a new amount.
+        /// Postcondition: 2 * usage.used = usage.total - low_water AND
+        /// usage.total > low_water. In other words, usage can double before
+        /// it is necessary to expand again.
+        fn calculate_request(total: Sectors, used: Sectors, low_water: Sectors) -> Option<Sectors> {
+            if total >= low_water {
+                let excess = total - low_water;
+                if used >= excess {
+                    Some((used - excess) + used)
+                } else {
+                    None
+                }
+            } else {
+                Some((low_water - total) + 2usize * used)
+            }
+        }
+
         assert_eq!(backstore.device(), self.backstore_device);
 
         let mut should_save: bool = false;
@@ -373,35 +392,45 @@ impl ThinPool {
                     }
                 }
 
-                let usage = &status.usage;
-                if usage.used_meta > cmp::max(usage.total_meta, META_LOWATER) - META_LOWATER {
-                    // Request expansion of physical space allocated to the pool
-                    // meta device.
-                    // TODO: we just request that the space be doubled here.
-                    // A more sophisticated approach might be in order.
-                    let meta_extend_size = usage.total_meta;
-                    match self.extend_thinpool_meta(meta_extend_size, backstore) {
-                        #![allow(single_match)]
-                        Ok(_) => should_save = true,
-                        Err(_) => {} // TODO: Take pool offline?
-                    }
-                }
+                {
+                    let usage = &status.usage;
 
-                if usage.used_data > cmp::max(usage.total_data, DATA_LOWATER) - DATA_LOWATER {
-                    // Request expansion of physical space allocated to the pool
-                    // TODO: we request that the space be doubled or use the remaining space by
-                    // requesting the minimum total_data vs. available space.
-                    // A more sophisticated approach might be in order.
-                    match self.extend_thinpool(
-                        DataBlocks(cmp::min(
-                            *usage.total_data,
-                            backstore.available() / DATA_BLOCK_SIZE,
-                        )),
-                        backstore,
+                    if let Some(request) = calculate_request(
+                        usage.total_meta.sectors(),
+                        usage.used_meta.sectors(),
+                        META_LOWATER.sectors(),
                     ) {
-                        #![allow(single_match)]
-                        Ok(_) => should_save = true,
-                        Err(_) => {} // TODO: Take pool offline?
+                        match self.extend_thinpool(backstore, request, false) {
+                            Ok(actual) => {
+                                if request != actual {
+                                    // TODO: take an appropriate action in the
+                                    // case where actual amount allocated was
+                                    // less than the requested.
+                                }
+                                should_save = true;
+                            }
+                            // FIXME: Handle this error
+                            Err(_) => {}
+                        }
+                    }
+
+                    if let Some(request) = calculate_request(
+                        *usage.total_data * DATA_BLOCK_SIZE,
+                        *usage.used_data * DATA_BLOCK_SIZE,
+                        *DATA_LOWATER * DATA_BLOCK_SIZE,
+                    ) {
+                        match self.extend_thinpool(backstore, request, true) {
+                            Ok(actual) => {
+                                if request != actual {
+                                    // TODO: take an appropriate action in the
+                                    // case where actual amount allocated was
+                                    // less than the requested.
+                                }
+                                should_save = true;
+                            }
+                            // FIXME: Handle this error
+                            Err(_) => {}
+                        }
                     }
                 }
             }
@@ -441,74 +470,71 @@ impl ThinPool {
         Ok(())
     }
 
-    /// Expand the physical space allocated to a pool by extend_size.
-    /// Return the number of DataBlocks added.
-    // TODO: Refine this method. A hard fail if the request can not be
-    // satisfied may not be correct.
+    /// Extend the thinpool's data or meta devices. Attempt to allocate
+    /// extend_size, but if that fails, try smaller values until smallest
+    /// allocation chunk for meta or data device is reached.
+    /// Return the amount the device was extended by.
+    /// Always allocate sectors in increments of allocation chunk.
     fn extend_thinpool(
         &mut self,
-        extend_size: DataBlocks,
         backstore: &mut Backstore,
-    ) -> StratisResult<DataBlocks> {
+        extend_size: Sectors,
+        data: bool,
+    ) -> StratisResult<Sectors> {
+        /// Get the meta block size. It is stored internally in MetaBlocks as it
+        /// does not vary.
+        fn meta_block_size() -> Sectors {
+            Sectors(*INITIAL_META_SIZE.sectors() / *INITIAL_META_SIZE)
+        }
+
+        /// Extend the thinpool w/ a new data region if data is true, else a new
+        /// metadata region. There may be multiple segments, but they are all on
+        /// the same device. Returns an error if any of the devicemapper
+        /// operations fails.
+        fn extend(
+            thinpool: &mut ThinPool,
+            device: Device,
+            new_seg: (Sectors, Sectors),
+            data: bool,
+        ) -> StratisResult<()> {
+            thinpool.suspend()?;
+
+            if data {
+                let segments = coalesce_segs(&thinpool.data_segments, &[new_seg]);
+                thinpool
+                    .thin_pool
+                    .set_data_table(get_dm(), segs_to_table(device, &segments))?;
+                thinpool.thin_pool.resume(get_dm())?;
+                thinpool.data_segments = segments;
+            } else {
+                let segments = coalesce_segs(&thinpool.meta_segments, &[new_seg]);
+                thinpool
+                    .thin_pool
+                    .set_meta_table(get_dm(), segs_to_table(device, &segments))?;
+                thinpool.thin_pool.resume(get_dm())?;
+                thinpool.meta_segments = segments;
+            }
+
+            thinpool.resume()?;
+
+            Ok(())
+        }
+
         let backstore_device = self.backstore_device;
         assert_eq!(backstore.device(), backstore_device);
-        if let Some(mut regions) = backstore.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
-            self.suspend()?;
-            self.extend_data(backstore_device, regions.pop().expect("len(regions) == 1"))?;
-            self.resume()?;
+
+        let modulus = if data {
+            DATA_BLOCK_SIZE
         } else {
-            let err_msg = format!(
-                "Insufficient space to accommodate request for {}",
-                extend_size
-            );
-            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
-        }
-        Ok(extend_size)
-    }
-
-    /// Expand the physical space allocated to a pool meta by extend_size.
-    /// Return the number of MetaBlocks added.
-    fn extend_thinpool_meta(
-        &mut self,
-        extend_size: MetaBlocks,
-        backstore: &mut Backstore,
-    ) -> StratisResult<MetaBlocks> {
-        let backstore_device = self.backstore_device;
-        assert_eq!(backstore.device(), backstore_device);
-        if let Some(mut regions) = backstore.alloc_space(&[extend_size.sectors()]) {
-            self.suspend()?;
-            self.extend_meta(backstore_device, regions.pop().expect("len(regions) == 1"))?;
-            self.resume()?;
+            meta_block_size()
+        };
+        if let Some(region) = backstore.request(extend_size, modulus) {
+            extend(self, backstore_device, region, data)?;
+            Ok(region.1)
         } else {
-            let err_msg = format!(
-                "Insufficient space to accommodate request for {}",
-                extend_size
-            );
-            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
+            let err_msg = format!("Insufficient space to accommodate request for {}", modulus);
+            Err(StratisError::Engine(ErrorEnum::Error, err_msg))
         }
-        Ok(extend_size)
-    }
-
-    /// Extend the thinpool with a new data region.
-    fn extend_data(&mut self, device: Device, new_seg: (Sectors, Sectors)) -> StratisResult<()> {
-        let segments = coalesce_segs(&self.data_segments, &[new_seg]);
-        self.thin_pool
-            .set_data_table(get_dm(), segs_to_table(device, &segments))?;
-        self.thin_pool.resume(get_dm())?;
-        self.data_segments = segments;
-
-        Ok(())
-    }
-
-    /// Extend the thinpool meta device with an additional segment.
-    fn extend_meta(&mut self, device: Device, new_seg: (Sectors, Sectors)) -> StratisResult<()> {
-        let segments = coalesce_segs(&self.meta_segments, &[new_seg]);
-        self.thin_pool
-            .set_meta_table(get_dm(), segs_to_table(device, &segments))?;
-        self.thin_pool.resume(get_dm())?;
-        self.meta_segments = segments;
-
-        Ok(())
     }
 
     /// The number of physical sectors in use, that is, unavailable for storage
@@ -1034,7 +1060,7 @@ mod tests {
         // written above. If we attempt to update the UUID on the snapshot
         // without expanding the pool, the pool will go into out-of-data-space
         // (queue IO) mode, causing the test to fail.
-        pool.extend_thinpool(INITIAL_DATA_SIZE, &mut backstore)
+        pool.extend_thinpool(&mut backstore, *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE, true)
             .unwrap();
 
         let (_, snapshot_filesystem) =
@@ -1282,6 +1308,7 @@ mod tests {
             dm::ThinPoolStatus::Working(ref status) => {
                 let usage = &status.usage;
                 assert_eq!(usage.total_meta, small_meta_size);
+                assert!(usage.used_meta > MetaBlocks(0));
             }
             dm::ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
         }
@@ -1350,8 +1377,11 @@ mod tests {
                 // the amount of free space in pool has decreased to the
                 // DATA_LOWATER value.
                 if i == *(*(INITIAL_DATA_SIZE - DATA_LOWATER) * DATA_BLOCK_SIZE) {
-                    pool.extend_thinpool(INITIAL_DATA_SIZE, &mut backstore)
-                        .unwrap();
+                    pool.extend_thinpool(
+                        &mut backstore,
+                        *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE,
+                        true,
+                    ).unwrap();
                 }
             }
         }

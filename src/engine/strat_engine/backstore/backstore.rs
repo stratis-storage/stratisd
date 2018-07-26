@@ -202,6 +202,9 @@ impl Backstore {
     /// WARNING: All this must change when it becomes possible to return
     /// sectors to the store.
     /// WARNING: metadata changing event
+    /// Postcondition: forall i, sizes_i == result_i.1. The second value in each
+    /// pair in the returned vector is therefore redundant, but is retained
+    /// as a convenience to the caller.
     pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<(Sectors, Sectors)>> {
         if self.available() < sizes.iter().cloned().sum() {
             return None;
@@ -212,6 +215,17 @@ impl Backstore {
             chunks.push((self.next, *size));
             self.next += *size;
         }
+
+        // Assert that the postcondition holds.
+        assert_eq!(
+            sizes,
+            chunks
+                .iter()
+                .map(|x| x.1)
+                .collect::<Vec<Sectors>>()
+                .as_slice()
+        );
+
         Some(chunks)
     }
 

@@ -20,15 +20,38 @@ use super::super::types::{
 };
 
 use super::backstore::{Backstore, MIN_MDA_SECTORS};
-use super::serde_structs::{PoolSave, Recordable};
+use super::serde_structs::{FlexDevsSave, PoolSave, Recordable};
 use super::thinpool::{ThinPool, ThinPoolSizeParams};
 
 pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
 
+/// Get the index which indicates the start of unallocated space in the cap
+/// device.
+/// NOTE: Since segments are always allocated to each flex dev in order, the
+/// last segment for each is the highest. This allows avoiding sorting all the
+/// segments and just sorting the set consisting of the last segment from
+/// each list of segments.
+/// Precondition: This method is called only when setting up a pool, which
+/// ensures that the flex devs metadata lists are all non-empty.
+fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
+    let expect_msg = "Setting up rather than initializing a pool, so each flex dev must have been allocated at least some segments.";
+    [
+        flex_devs.meta_dev.last().expect(expect_msg),
+        flex_devs.thin_meta_dev.last().expect(expect_msg),
+        flex_devs.thin_data_dev.last().expect(expect_msg),
+        flex_devs.thin_meta_dev_spare.last().expect(expect_msg),
+    ].iter()
+        .max_by_key(|x| x.0)
+        .map(|(start, length)| *start + *length)
+        .expect("iterator is non-empty")
+}
+
 /// Check the metadata of an individual pool for consistency.
+/// Precondition: This method is called only when setting up a pool, which
+/// ensures that the flex devs metadata lists are all non-empty.
 pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
-    // If the amount allocated from the cache tier is not the same as that
-    // used by the thinpool, consider the situation an error.
+    // If the amount allocated from the cap device is not the same as that
+    // used by the flex devs, consider the situation an error.
     let flex_devs = &metadata.flex_devs;
     let total_allocated = flex_devs
         .meta_dev
@@ -38,10 +61,11 @@ pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
         .chain(flex_devs.thin_meta_dev_spare.iter())
         .map(|x| x.1)
         .sum::<Sectors>();
-    if total_allocated != metadata.backstore.next {
+    let next = next_index(&flex_devs);
+    if total_allocated != next {
         let err_msg = format!(
-            "{} used in thinpool, but {} given up by cache",
-            total_allocated, metadata.backstore.next
+            "{} used in thinpool, but {} given up by cache for pool {}",
+            total_allocated, next, metadata.name
         );
         Err(StratisError::Engine(ErrorEnum::Invalid, err_msg))
     } else {
@@ -104,7 +128,13 @@ impl StratPool {
         devnodes: &HashMap<Device, PathBuf>,
         metadata: &PoolSave,
     ) -> StratisResult<(Name, StratPool)> {
-        let backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, None)?;
+        let backstore = Backstore::setup(
+            uuid,
+            &metadata.backstore,
+            devnodes,
+            None,
+            next_index(&metadata.flex_devs),
+        )?;
         let thinpool = ThinPool::setup(
             uuid,
             metadata.thinpool_dev.data_block_size,

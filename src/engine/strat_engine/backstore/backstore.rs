@@ -42,6 +42,8 @@ pub struct Backstore {
     data_tier: DataTier,
     /// A linear DM device.
     linear: Option<LinearDev>,
+    /// Index for managing allocation of cap device
+    next: Sectors,
 }
 
 impl Backstore {
@@ -53,15 +55,12 @@ impl Backstore {
         backstore_save: &BackstoreSave,
         devnodes: &HashMap<Device, PathBuf>,
         last_update_time: Option<DateTime<Utc>>,
+        next: Sectors,
     ) -> StratisResult<Backstore> {
         let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
         let block_mgr = BlockDevMgr::new(datadevs, last_update_time);
-        let (data_tier, dm_device) = DataTier::setup(
-            pool_uuid,
-            block_mgr,
-            &backstore_save.data_segments,
-            backstore_save.next,
-        )?;
+        let (data_tier, dm_device) =
+            DataTier::setup(pool_uuid, block_mgr, &backstore_save.data_segments)?;
 
         let (cache_tier, cache, linear) = if !cachedevs.is_empty() {
             let block_mgr = BlockDevMgr::new(cachedevs, last_update_time);
@@ -93,6 +92,7 @@ impl Backstore {
             cache_tier,
             linear,
             cache,
+            next,
         })
     }
 
@@ -113,6 +113,7 @@ impl Backstore {
             cache_tier: None,
             linear: Some(dm_device),
             cache: None,
+            next: Sectors(0),
         })
     }
 
@@ -198,7 +199,16 @@ impl Backstore {
     /// sectors to the store.
     /// WARNING: metadata changing event
     pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<(Sectors, Sectors)>> {
-        self.data_tier.alloc_space(sizes)
+        if self.available() < sizes.iter().cloned().sum() {
+            return None;
+        }
+
+        let mut chunks = Vec::new();
+        for size in sizes {
+            chunks.push((self.next, *size));
+            self.next += *size;
+        }
+        Some(chunks)
     }
 
     /// Return a reference to all the blockdevs that this pool has ownership
@@ -221,9 +231,23 @@ impl Backstore {
         self.data_tier.current_capacity()
     }
 
+    /// The size of the cap device.
+    ///
+    /// The size of the cap device is obtained from the size of the component
+    /// DM devices. But the devicemapper library stores the data from which
+    /// the size of each DM device is calculated; the result is computed and
+    /// no ioctl is required.
+    fn size(&self) -> Sectors {
+        self.linear
+            .as_ref()
+            .map(|d| d.size())
+            .or_else(|| self.cache.as_ref().map(|d| d.size()))
+            .expect("either linear or cache must be Some")
+    }
+
     /// The available number of Sectors.
     pub fn available(&self) -> Sectors {
-        self.data_tier.available()
+        self.size() - self.next
     }
 
     /// Destroy the entire store.
@@ -328,7 +352,6 @@ impl Recordable<BackstoreSave> for Backstore {
             data_devs: self.data_tier.block_mgr.record(),
             data_segments: self.data_tier.segments.record(),
             meta_segments: self.cache_tier.as_ref().map(|c| c.meta_segments.record()),
-            next: self.data_tier.next,
         }
     }
 }
@@ -500,7 +523,8 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
-        let backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
+        let backstore =
+            Backstore::setup(pool_uuid, &backstore_save, &map, None, Sectors(0)).unwrap();
         invariant(&backstore);
 
         backstore.teardown().unwrap();
@@ -508,7 +532,8 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
-        let backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
+        let backstore =
+            Backstore::setup(pool_uuid, &backstore_save, &map, None, Sectors(0)).unwrap();
         invariant(&backstore);
 
         backstore.destroy().unwrap();

@@ -188,7 +188,9 @@ impl ThinPool {
         let spare_segments = segments_list.pop().expect("len(segments_list) == 2");
         let meta_segments = segments_list.pop().expect("len(segments_list) == 1");
 
-        let backstore_device = backstore.device();
+        let backstore_device = backstore.device().expect(
+            "Space has just been allocated from the backstore, so it must have a cap device",
+        );
 
         // When constructing a thin-pool, Stratis reserves the first N
         // sectors on a block device by creating a linear device with a
@@ -266,7 +268,7 @@ impl ThinPool {
         let data_segments = flex_devs.thin_data_dev.to_vec();
         let spare_segments = flex_devs.thin_meta_dev_spare.to_vec();
 
-        let backstore_device = backstore.device();
+        let backstore_device = backstore.device().expect("When stratisd was running previously, space was allocated from the backstore, so backstore must have a cap device");
 
         let (thinpool_name, thinpool_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
         let (meta_dev, meta_segments, spare_segments) = setup_metadev(
@@ -355,7 +357,12 @@ impl ThinPool {
     /// metadata save has been made.
     pub fn check(&mut self, backstore: &mut Backstore) -> StratisResult<bool> {
         #![allow(match_same_arms)]
-        assert_eq!(backstore.device(), self.backstore_device);
+        assert_eq!(
+            backstore.device().expect(
+                "thinpool exists and has been allocated to, so backstore must have a cap device"
+            ),
+            self.backstore_device
+        );
 
         let mut should_save: bool = false;
 
@@ -453,7 +460,12 @@ impl ThinPool {
         backstore: &mut Backstore,
     ) -> StratisResult<DataBlocks> {
         let backstore_device = self.backstore_device;
-        assert_eq!(backstore.device(), backstore_device);
+        assert_eq!(
+            backstore.device().expect(
+                "thinpool exists and has been allocated to, so backstore must have a cap device"
+            ),
+            backstore_device
+        );
         if let Some(mut regions) = backstore.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
             self.suspend()?;
             self.extend_data(backstore_device, regions.pop().expect("len(regions) == 1"))?;
@@ -476,7 +488,12 @@ impl ThinPool {
         backstore: &mut Backstore,
     ) -> StratisResult<MetaBlocks> {
         let backstore_device = self.backstore_device;
-        assert_eq!(backstore.device(), backstore_device);
+        assert_eq!(
+            backstore.device().expect(
+                "thinpool exists and has been allocated to, so backstore must have a cap device"
+            ),
+            backstore_device
+        );
         if let Some(mut regions) = backstore.alloc_space(&[extend_size.sectors()]) {
             self.suspend()?;
             self.extend_meta(backstore_device, regions.pop().expect("len(regions) == 1"))?;
@@ -1581,11 +1598,15 @@ mod tests {
         );
 
         pool.suspend().unwrap();
-        let old_device = backstore.device();
+        let old_device = backstore
+            .device()
+            .expect("Space already allocated from backstore, backstore must have device");
         backstore
             .add_blockdevs(pool_uuid, paths1, BlockDevTier::Cache, false)
             .unwrap();
-        let new_device = backstore.device();
+        let new_device = backstore
+            .device()
+            .expect("Space already allocated from backstore, backstore must have device");
         assert!(old_device != new_device);
         pool.set_device(new_device).unwrap();
         pool.resume().unwrap();

@@ -2,7 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use chrono::{DateTime, TimeZone, Utc};
 #[cfg(feature = "dbus_enabled")]
 use dbus;
 use uuid::Uuid;
@@ -10,6 +9,8 @@ use uuid::Uuid;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+
+use chrono::{DateTime, TimeZone, Utc};
 
 use devicemapper::{
     Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus, IEC,
@@ -45,6 +46,7 @@ pub struct StratFilesystem {
     created: DateTime<Utc>,
     #[cfg(feature = "dbus_enabled")]
     dbus_path: Option<dbus::Path<'static>>,
+    pub last_fstrim: DateTime<Utc>,
 }
 
 pub enum FilesystemStatus {
@@ -81,6 +83,7 @@ impl StratFilesystem {
                 created: Utc::now(),
                 #[cfg(feature = "dbus_enabled")]
                 dbus_path: None,
+                last_fstrim: Utc::now(),
             },
         ))
     }
@@ -105,6 +108,7 @@ impl StratFilesystem {
             created: Utc.timestamp(fssave.created as i64, 0),
             #[cfg(feature = "dbus_enabled")]
             dbus_path: None,
+            last_fstrim: Utc.timestamp(fssave.last_fstrim as i64, 0),
         })
     }
 
@@ -164,6 +168,7 @@ impl StratFilesystem {
                     created: Utc::now(),
                     #[cfg(feature = "dbus_enabled")]
                     dbus_path: None,
+                    last_fstrim: self.last_fstrim,
                 })
             }
             Err(e) => Err(StratisError::Engine(
@@ -230,6 +235,7 @@ impl StratFilesystem {
             thin_id: self.thin_dev.id(),
             size: self.thin_dev.size(),
             created: self.created.timestamp() as u64,
+            last_fstrim: self.last_fstrim.timestamp() as u64,
         }
     }
 

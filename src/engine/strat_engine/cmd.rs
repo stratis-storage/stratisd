@@ -42,6 +42,7 @@ const THIN_CHECK: &str = "thin_check";
 const THIN_REPAIR: &str = "thin_repair";
 const XFS_ADMIN: &str = "xfs_admin";
 const XFS_GROWFS: &str = "xfs_growfs";
+const FSTRIM: &str = "fstrim";
 
 lazy_static! {
     static ref BINARIES: HashMap<String, Option<PathBuf>> = [
@@ -50,6 +51,7 @@ lazy_static! {
         (THIN_REPAIR.to_string(), find_binary(THIN_REPAIR)),
         (XFS_ADMIN.to_string(), find_binary(XFS_ADMIN)),
         (XFS_GROWFS.to_string(), find_binary(XFS_GROWFS)),
+        (FSTRIM.to_string(), find_binary(FSTRIM)),
     ].iter()
         .cloned()
         .collect();
@@ -152,6 +154,11 @@ pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> StratisResult<()> {
             .arg("-o")
             .arg(new_meta_dev),
     )
+}
+
+/// Call fstrim on a mounted filesystem
+pub fn fstrim(mounted_fs: &Path) -> StratisResult<()> {
+    execute_cmd(Command::new(get_executable(FSTRIM).as_os_str()).arg(mounted_fs))
 }
 
 /// Call udevadm settle

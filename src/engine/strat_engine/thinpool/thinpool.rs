@@ -570,6 +570,13 @@ impl ThinPool {
             .collect()
     }
 
+    pub fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut Filesystem)> {
+        self.filesystems
+            .iter_mut()
+            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &mut Filesystem))
+            .collect()
+    }
+
     /// Create a filesystem within the thin pool. Given name must not
     /// already be in use.
     pub fn create_filesystem(
@@ -607,7 +614,7 @@ impl ThinPool {
         pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<FilesystemUuid> {
+    ) -> StratisResult<(FilesystemUuid, &mut Filesystem)> {
         let snapshot_fs_uuid = Uuid::new_v4();
         let (snapshot_dm_name, snapshot_dm_uuid) =
             format_thin_ids(pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));
@@ -635,7 +642,13 @@ impl ThinPool {
         devlinks::filesystem_added(pool_name, &new_fs_name, &new_filesystem.devnode())?;
         self.filesystems
             .insert(new_fs_name, snapshot_fs_uuid, new_filesystem);
-        Ok(snapshot_fs_uuid)
+        Ok((
+            snapshot_fs_uuid,
+            self.filesystems
+                .get_mut_by_uuid(snapshot_fs_uuid)
+                .expect("just inserted")
+                .1,
+        ))
     }
 
     /// Destroy a filesystem within the thin pool.
@@ -1032,7 +1045,7 @@ mod tests {
         pool.extend_thinpool(INITIAL_DATA_SIZE, &mut backstore)
             .unwrap();
 
-        let snapshot_uuid =
+        let (_, snapshot_filesystem) =
             pool.snapshot_filesystem(pool_uuid, pool_name, fs_uuid, "test_snapshot")
                 .unwrap();
         let mut read_buf = [0u8; SECTOR_SIZE];
@@ -1041,7 +1054,6 @@ mod tests {
             .tempdir()
             .unwrap();
         {
-            let (_, snapshot_filesystem) = pool.get_filesystem_by_uuid(snapshot_uuid).unwrap();
             mount(
                 Some(&snapshot_filesystem.devnode()),
                 snapshot_tmp_dir.path(),

@@ -300,7 +300,7 @@ impl Backstore {
     }
 
     /// Lookup a mutable blockdev by its Stratis UUID.
-    fn get_mut_blockdev_by_uuid(
+    pub fn get_mut_blockdev_by_uuid(
         &mut self,
         uuid: DevUuid,
     ) -> Option<(BlockDevTier, &mut StratBlockDev)> {

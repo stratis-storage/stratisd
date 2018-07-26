@@ -62,11 +62,20 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     );
 
     let msg = match result {
+        // TODO: fix create_filesystems() so that the infos returned include
+        // the filesystems just created.
         Ok(ref infos) => {
             let mut return_value = Vec::new();
             for &(name, uuid) in infos {
-                let fs_object_path: dbus::Path =
-                    create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
+                let fs_object_path: dbus::Path = create_dbus_filesystem(
+                    dbus_context,
+                    object_path.clone(),
+                    uuid,
+                    pool.get_mut_filesystem(uuid)
+                        .expect("just inserted by create_filesystems")
+                        .1,
+                );
+
                 return_value.push((fs_object_path, name));
             }
 
@@ -162,9 +171,10 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let msg = match pool.snapshot_filesystem(pool_uuid, &pool_name, fs_uuid, snapshot_name) {
-        Ok(uuid) => {
+        Ok((uuid, fs)) => {
             let fs_object_path: dbus::Path =
-                create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
+                create_dbus_filesystem(dbus_context, object_path.clone(), uuid, fs);
+
             return_message.append3(fs_object_path, msg_code_ok(), msg_string_ok())
         }
         Err(err) => {
@@ -331,6 +341,7 @@ pub fn create_dbus_pool<'a>(
     dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
     uuid: Uuid,
+    pool: &mut Pool,
 ) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
@@ -419,5 +430,6 @@ pub fn create_dbus_pool<'a>(
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
+    pool.set_dbus_path(path.clone());
     path
 }

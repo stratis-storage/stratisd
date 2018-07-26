@@ -49,15 +49,20 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(pool_uuid) => {
-            let pool_object_path: dbus::Path =
-                create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
-
             let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-            let bd_object_paths = pool.blockdevs()
+            let pool_object_path: dbus::Path =
+                create_dbus_pool(dbus_context, object_path.clone(), pool_uuid, pool);
+
+            let bd_object_paths = pool.blockdev_uuids()
                 .iter()
-                .map(|&(uuid, _)| {
-                    create_dbus_blockdev(dbus_context, pool_object_path.clone(), uuid)
+                .map(|&uuid| {
+                    let blockdev_object_path =
+                        create_dbus_blockdev(dbus_context, pool_object_path.clone(), uuid);
+                    if let Some(name_blockdev) = pool.get_mut_blockdev(uuid) {
+                        name_blockdev.1.set_dbus_path(blockdev_object_path.clone());
+                    }
+                    blockdev_object_path
                 })
                 .collect::<Vec<_>>();
 
@@ -193,15 +198,20 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
 fn register_pool_dbus(
     dbus_context: &DbusContext,
     pool_uuid: PoolUuid,
-    pool: &Pool,
+    pool: &mut Pool,
     object_path: &dbus::Path<'static>,
 ) {
-    let pool_path = create_dbus_pool(dbus_context, object_path.clone(), pool_uuid);
-    for (_, fs_uuid, _) in pool.filesystems() {
-        create_dbus_filesystem(dbus_context, pool_path.clone(), fs_uuid);
+    let pool_path = create_dbus_pool(dbus_context, object_path.clone(), pool_uuid, pool);
+
+    for (_, fs_uuid, fs) in pool.filesystems_mut() {
+        create_dbus_filesystem(dbus_context, pool_path.clone(), fs_uuid, fs);
     }
-    for (dev_uuid, _) in pool.blockdevs() {
-        create_dbus_blockdev(dbus_context, pool_path.clone(), dev_uuid);
+    for dev_uuid in pool.blockdev_uuids() {
+        let blockdev_object_path: dbus::Path =
+            create_dbus_blockdev(dbus_context, pool_path.clone(), dev_uuid);
+        if let Some(name_blockdev) = pool.get_mut_blockdev(dev_uuid) {
+            name_blockdev.1.set_dbus_path(blockdev_object_path);
+        }
     }
 }
 
@@ -232,10 +242,10 @@ pub fn register_pool(
     dbus_context: &DbusContext,
     tree: &mut Tree<MTFn<TData>, TData>,
     pool_uuid: Uuid,
-    pool: &Pool,
-    object_path: &dbus::Path<'static>,
+    pool: &mut Pool,
+    parent_object_path: &dbus::Path<'static>,
 ) -> Result<(), dbus::Error> {
-    register_pool_dbus(dbus_context, pool_uuid, pool, object_path);
+    register_pool_dbus(dbus_context, pool_uuid, pool, parent_object_path);
     process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut())
 }
 

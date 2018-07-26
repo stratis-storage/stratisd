@@ -2,6 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#[cfg(feature = "dbus_enabled")]
+use dbus;
+
 use std::cell::RefCell;
 use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
@@ -33,6 +36,8 @@ pub struct SimPool {
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
+    #[cfg(feature = "dbus_enabled")]
+    dbus_path: Option<dbus::Path<'static>>,
 }
 
 impl SimPool {
@@ -51,6 +56,8 @@ impl SimPool {
                 filesystems: Table::default(),
                 redundancy,
                 rdm: Rc::clone(rdm),
+                #[cfg(feature = "dbus_enabled")]
+                dbus_path: None,
             },
         )
     }
@@ -168,7 +175,7 @@ impl Pool for SimPool {
         _pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<FilesystemUuid> {
+    ) -> StratisResult<(FilesystemUuid, &mut Filesystem)> {
         let uuid = Uuid::new_v4();
         let snapshot = match self.get_filesystem(origin_uuid) {
             Some(_filesystem) => SimFilesystem::new(),
@@ -181,7 +188,13 @@ impl Pool for SimPool {
         };
         self.filesystems
             .insert(Name::new(snapshot_name.to_owned()), uuid, snapshot);
-        Ok(uuid)
+        Ok((
+            uuid,
+            self.filesystems
+                .get_mut_by_uuid(uuid)
+                .expect("just inserted")
+                .1,
+        ))
     }
 
     fn total_physical_size(&self) -> Sectors {
@@ -198,6 +211,13 @@ impl Pool for SimPool {
         self.filesystems
             .iter()
             .map(|(name, uuid, x)| (name.clone(), *uuid, x as &Filesystem))
+            .collect()
+    }
+
+    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut Filesystem)> {
+        self.filesystems
+            .iter_mut()
+            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &mut Filesystem))
             .collect()
     }
 
@@ -221,6 +241,13 @@ impl Pool for SimPool {
             .collect()
     }
 
+    fn blockdev_uuids(&self) -> Vec<DevUuid> {
+        self.block_devs
+            .iter()
+            .map(|(uuid, _)| uuid.clone())
+            .collect()
+    }
+
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
         self.block_devs
             .get(&uuid)
@@ -230,6 +257,18 @@ impl Pool for SimPool {
                     .get(&uuid)
                     .and_then(|bd| Some((BlockDevTier::Cache, bd as &BlockDev)))
             })
+    }
+
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)> {
+        if let Some(bd) = self.block_devs.get_mut(&uuid) {
+            Some((BlockDevTier::Data, bd))
+        } else {
+            if let Some(cd) = self.cache_devs.get_mut(&uuid) {
+                Some((BlockDevTier::Cache, cd))
+            } else {
+                None
+            }
+        }
     }
 
     fn set_blockdev_user_info(
@@ -247,6 +286,16 @@ impl Pool for SimPool {
             },
             |(_, b)| Ok(b.set_user_info(user_info)),
         )
+    }
+
+    #[cfg(feature = "dbus_enabled")]
+    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> () {
+        self.dbus_path = Some(path)
+    }
+
+    #[cfg(feature = "dbus_enabled")]
+    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>> {
+        &self.dbus_path
     }
 }
 

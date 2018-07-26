@@ -226,6 +226,17 @@ impl Backstore {
         }
     }
 
+    pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
+        match self.cache_tier {
+            Some(ref mut cache) => cache
+                .blockdevs_mut()
+                .into_iter()
+                .chain(self.data_tier.blockdevs_mut().into_iter())
+                .collect(),
+            None => self.data_tier.blockdevs_mut(),
+        }
+    }
+
     /// The current capacity of all the blockdevs in the data tier.
     pub fn datatier_current_capacity(&self) -> Sectors {
         self.data_tier.current_capacity()

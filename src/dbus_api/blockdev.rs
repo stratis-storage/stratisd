@@ -24,6 +24,7 @@ pub fn create_dbus_blockdev<'a>(
     dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
     uuid: Uuid,
+    blockdev: &mut BlockDev,
 ) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
@@ -104,6 +105,7 @@ pub fn create_dbus_blockdev<'a>(
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
+    blockdev.set_dbus_path(path.clone());
     path
 }
 

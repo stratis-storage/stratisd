@@ -20,7 +20,6 @@ use devicemapper::{
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{DevUuid, PoolUuid};
-
 use super::super::serde_structs::{BlockDevSave, Recordable};
 
 use super::blockdev::StratBlockDev;
@@ -302,6 +301,13 @@ impl BlockDevMgr {
     /// Get references to managed blockdevs.
     pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
         self.block_devs.iter().map(|bd| (bd.uuid(), bd)).collect()
+    }
+
+    pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
+        self.block_devs
+            .iter_mut()
+            .map(|bd| (bd.uuid(), bd as &mut StratBlockDev))
+            .collect()
     }
 
     pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<&StratBlockDev> {

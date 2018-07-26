@@ -57,9 +57,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let bd_object_paths = pool.blockdevs_mut()
                 .into_iter()
                 .map(|(uuid, bd)| {
-                    let blockdev_object_path =
-                        create_dbus_blockdev(dbus_context, pool_object_path.clone(), uuid, bd);
-                    blockdev_object_path
+                    create_dbus_blockdev(dbus_context, pool_object_path.clone(), uuid, bd)
                 })
                 .collect::<Vec<_>>();
 

@@ -32,6 +32,47 @@ use super::setup::get_blockdevs;
 /// typical size.
 const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
 
+/// Make a DM cache device. If the cache device is being made new,
+/// take extra steps to make it clean.
+fn make_cache(
+    pool_uuid: PoolUuid,
+    cache_tier: &CacheTier,
+    origin: LinearDev,
+    new: bool,
+) -> StratisResult<CacheDev> {
+    let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
+    let meta = LinearDev::setup(
+        get_dm(),
+        &dm_name,
+        Some(&dm_uuid),
+        map_to_dm(&cache_tier.meta_segments),
+    )?;
+
+    if new {
+        // See comment in ThinPool::new() method
+        wipe_sectors(&meta.devnode(), Sectors(0), meta.size())?;
+    }
+
+    let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);
+    let cache = LinearDev::setup(
+        get_dm(),
+        &dm_name,
+        Some(&dm_uuid),
+        map_to_dm(&cache_tier.cache_segments),
+    )?;
+
+    let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
+    Ok(CacheDev::setup(
+        get_dm(),
+        &dm_name,
+        Some(&dm_uuid),
+        meta,
+        cache,
+        origin,
+        CACHE_BLOCK_SIZE,
+    )?)
+}
+
 /// This structure can allocate additional space to the upper layer, but it
 /// cannot accept returned space. When it is extended to be able to accept
 /// returned space the allocation algorithm will have to be revised.
@@ -86,33 +127,7 @@ impl Backstore {
                 (&Some(ref cache_segments), &Some(ref meta_segments)) => {
                     let cache_tier = CacheTier::setup(block_mgr, cache_segments, meta_segments)?;
 
-                    let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
-                    let meta = LinearDev::setup(
-                        get_dm(),
-                        &dm_name,
-                        Some(&dm_uuid),
-                        map_to_dm(&cache_tier.meta_segments),
-                    )?;
-
-                    let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);
-                    let cache = LinearDev::setup(
-                        get_dm(),
-                        &dm_name,
-                        Some(&dm_uuid),
-                        map_to_dm(&cache_tier.cache_segments),
-                    )?;
-
-                    let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
-                    let cache_device = CacheDev::setup(
-                        get_dm(),
-                        &dm_name,
-                        Some(&dm_uuid),
-                        meta,
-                        cache,
-                        origin,
-                        CACHE_BLOCK_SIZE,
-                    )?;
-
+                    let cache_device = make_cache(pool_uuid, &cache_tier, origin, false)?;
                     (Some(cache_tier), Some(cache_device), None)
                 }
                 _ => {
@@ -192,35 +207,8 @@ impl Backstore {
                     .take()
                     .expect("cache_tier.is_none() <=> self.linear.is_some()");
 
-                let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
-                let meta = LinearDev::setup(
-                    get_dm(),
-                    &dm_name,
-                    Some(&dm_uuid),
-                    map_to_dm(&cache_tier.meta_segments),
-                )?;
+                let cache = make_cache(pool_uuid, &cache_tier, linear, true)?;
 
-                // See comment in ThinPool::new() method
-                wipe_sectors(&meta.devnode(), Sectors(0), meta.size())?;
-
-                let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);
-                let cache = LinearDev::setup(
-                    get_dm(),
-                    &dm_name,
-                    Some(&dm_uuid),
-                    map_to_dm(&cache_tier.cache_segments),
-                )?;
-
-                let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
-                let cache = CacheDev::new(
-                    get_dm(),
-                    &dm_name,
-                    Some(&dm_uuid),
-                    meta,
-                    cache,
-                    linear,
-                    CACHE_BLOCK_SIZE,
-                )?;
                 self.cache = Some(cache);
 
                 let uuids = cache_tier

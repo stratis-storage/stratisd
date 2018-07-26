@@ -63,18 +63,25 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(ref infos) => {
-            let mut return_value = Vec::new();
-            for &(name, uuid) in infos {
-                let fs_object_path: dbus::Path = create_dbus_filesystem(
-                    dbus_context,
-                    object_path.clone(),
-                    uuid,
-                    pool.get_mut_filesystem(uuid)
-                        .expect("just inserted by create_filesystems")
-                        .1,
-                );
-                return_value.push((fs_object_path, name));
-            }
+            let return_value = infos
+                .iter()
+                .map(|&(name, uuid)| {
+                    (
+                        // FIXME: To avoid this expect, modify create_filesystem
+                        // so that it returns a mutable reference to the
+                        // filesystem created.
+                        create_dbus_filesystem(
+                            dbus_context,
+                            object_path.clone(),
+                            uuid,
+                            pool.get_mut_filesystem(uuid)
+                                .expect("just inserted by create_filesystems")
+                                .1,
+                        ),
+                        name,
+                    )
+                })
+                .collect::<Vec<_>>();
 
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())
         }
@@ -206,10 +213,22 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> Meth
 
     let result = pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, tier, force);
     let msg = match result {
-        Ok(_uuids) => {
-            let return_value = pool.blockdevs_mut()
-                .into_iter()
-                .map(|(uuid, bd)| create_dbus_blockdev(dbus_context, object_path.clone(), uuid, bd))
+        Ok(uuids) => {
+            let return_value = uuids
+                .iter()
+                .map(|uuid| {
+                    // FIXME: To avoid this expect, modify add_blockdevs
+                    // so that it returns a mutable reference to each
+                    // blockdev created.
+                    create_dbus_blockdev(
+                        dbus_context,
+                        object_path.clone(),
+                        *uuid,
+                        pool.get_mut_blockdev(*uuid)
+                            .expect("just inserted by add_blockdevs")
+                            .1,
+                    )
+                })
                 .collect::<Vec<_>>();
 
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())

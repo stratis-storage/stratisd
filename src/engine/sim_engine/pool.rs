@@ -66,7 +66,7 @@ impl SimPool {
         !self.filesystems.is_empty()
     }
 
-    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut SimDev)> {
+    fn get_mut_blockdev_internal(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut SimDev)> {
         let cache_devs = &mut self.cache_devs;
         self.block_devs
             .get_mut(&uuid)
@@ -259,13 +259,18 @@ impl Pool for SimPool {
             })
     }
 
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)> {
+        self.get_mut_blockdev_internal(uuid)
+            .map(|(tier, bd)| (tier, bd as &mut BlockDev))
+    }
+
     fn set_blockdev_user_info(
         &mut self,
         _pool_name: &str,
         uuid: DevUuid,
         user_info: Option<&str>,
     ) -> StratisResult<bool> {
-        self.get_mut_blockdev(uuid).map_or_else(
+        self.get_mut_blockdev_internal(uuid).map_or_else(
             || {
                 Err(StratisError::Engine(
                     ErrorEnum::NotFound,

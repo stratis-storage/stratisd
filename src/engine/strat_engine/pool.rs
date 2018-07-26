@@ -321,6 +321,12 @@ impl Pool for StratPool {
             .map(|(t, b)| (t, b as &BlockDev))
     }
 
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)> {
+        self.backstore
+            .get_mut_blockdev_by_uuid(uuid)
+            .map(|(t, b)| (t, b as &mut BlockDev))
+    }
+
     fn set_blockdev_user_info(
         &mut self,
         pool_name: &str,

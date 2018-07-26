@@ -142,6 +142,12 @@ impl Default for ThinPoolSizeParams {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum PoolState {
+    Good,
+    Bad,
+}
+
 /// A ThinPool struct contains the thinpool itself, the spare
 /// segments for its metadata device, and the filesystems and filesystem
 /// metadata associated with it.
@@ -159,6 +165,7 @@ pub struct ThinPool {
     /// layer. All DM components obtain their storage from this layer.
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
+    pool_state: PoolState,
 }
 
 impl ThinPool {
@@ -243,6 +250,7 @@ impl ThinPool {
             filesystems: Table::default(),
             mdv,
             backstore_device,
+            pool_state: PoolState::Good,
         })
     }
 
@@ -345,6 +353,7 @@ impl ThinPool {
             filesystems: fs_table,
             mdv,
             backstore_device,
+            pool_state: PoolState::Good,
         })
     }
 
@@ -365,11 +374,15 @@ impl ThinPool {
                     ThinPoolStatusSummary::ReadOnly => {
                         // TODO: why is pool r/o and how do we get it
                         // rw again?
+                        error!("Thinpool readonly! -> BAD");
+                        self.pool_state = PoolState::Bad;
                     }
                     ThinPoolStatusSummary::OutOfSpace => {
                         // TODO: Add more space if possible, or
                         // prevent further usage
                         // Should never happen -- we should be extending first!
+                        error!("Thinpool out of space! -> BAD");
+                        self.pool_state = PoolState::Bad;
                     }
                 }
 
@@ -382,8 +395,14 @@ impl ThinPool {
                     let meta_extend_size = usage.total_meta;
                     match self.extend_thinpool_meta(meta_extend_size, backstore) {
                         #![allow(single_match)]
-                        Ok(_) => should_save = true,
-                        Err(_) => {} // TODO: Take pool offline?
+                        Ok(_) => {
+                            info!("Extended meta pool by {}", meta_extend_size);
+                            should_save = true
+                        }
+                        Err(_) => {
+                            error!("Thinpool meta extend failed! -> BAD");
+                            self.pool_state = PoolState::Bad;
+                        }
                     }
                 }
 
@@ -400,12 +419,20 @@ impl ThinPool {
                         backstore,
                     ) {
                         #![allow(single_match)]
-                        Ok(_) => should_save = true,
-                        Err(_) => {} // TODO: Take pool offline?
+                        Ok(_) => {
+                            info!("Extended data pool");
+                            should_save = true
+                        }
+                        Err(_) => {
+                            error!("Thinpool data extend failed! -> BAD");
+                            self.pool_state = PoolState::Bad;
+                        }
                     }
                 }
             }
             dm::ThinPoolStatus::Fail => {
+                error!("Thinpool status is `fail` -> BAD");
+                self.pool_state = PoolState::Bad;
                 // TODO: Take pool offline?
                 // TODO: Run thin_check
             }
@@ -422,6 +449,7 @@ impl ThinPool {
                 // TODO: filesystem failed, how to recover?
             }
         }
+
         Ok(should_save)
     }
 

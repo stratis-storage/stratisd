@@ -9,447 +9,21 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 
-use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors, IEC};
+use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
-use super::super::device::wipe_sectors;
 use super::super::dm::get_dm;
-use super::super::dmnames::{format_backstore_ids, CacheRole};
 use super::super::serde_structs::{BackstoreSave, Recordable};
 
 use super::blockdev::StratBlockDev;
-use super::blockdevmgr::{coalesce_blkdevsegs, map_to_dm, BlkDevSegment, BlockDevMgr, Segment};
+use super::blockdevmgr::BlockDevMgr;
+use super::cache_tier::CacheTier;
+use super::data_tier::DataTier;
 use super::metadata::MIN_MDA_SECTORS;
 use super::setup::get_blockdevs;
-
-/// Use a cache block size that the kernel docs indicate is the largest
-/// typical size.
-const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
-
-/// Handles the lowest level, base layer of this tier.
-/// The dm_device organizes all block devs into a single linear allocation
-/// pool. This structure can allocate additional space to the upper layer,
-/// but it cannot accept returned space. When it is extended to be able to
-/// accept returned space the allocation algorithm will have to be revised.
-/// All available sectors on blockdevs in the manager are allocated to
-/// the DM device.
-#[derive(Debug)]
-struct DataTier {
-    /// Manages the individual block devices
-    /// it is always the case block_mgr.avail_space() == 0.
-    block_mgr: BlockDevMgr,
-    /// The list of segments granted by block_mgr and used by dm_device
-    /// It is always the case that block_mgr.avail_space() == 0, i.e., all
-    /// available space in block_mgr is allocated to the DM device.
-    segments: Vec<BlkDevSegment>,
-}
-
-impl DataTier {
-    /// Setup a previously existing data layer from the block_mgr and
-    /// previously allocated segments.
-    ///
-    /// Returns the DataTier and the linear DM device that was created during
-    /// setup.
-    pub fn setup(
-        pool_uuid: PoolUuid,
-        block_mgr: BlockDevMgr,
-        segments: &[(DevUuid, Sectors, Sectors)],
-    ) -> StratisResult<(DataTier, LinearDev)> {
-        if block_mgr.avail_space() != Sectors(0) {
-            let err_msg = format!(
-                "{} unallocated to device; probable metadata corruption",
-                block_mgr.avail_space()
-            );
-            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
-        }
-
-        let uuid_to_devno = block_mgr.uuid_to_devno();
-        let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> StratisResult<BlkDevSegment> {
-            let device = uuid_to_devno(triple.0).ok_or_else(|| {
-                StratisError::Engine(
-                    ErrorEnum::NotFound,
-                    format!("missing device for UUUD {:?}", &triple.0),
-                )
-            })?;
-            Ok(BlkDevSegment::new(
-                triple.0,
-                Segment::new(device, triple.1, triple.2),
-            ))
-        };
-        let segments = segments
-            .iter()
-            .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()?;
-
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
-        let ld = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), map_to_dm(&segments))?;
-
-        Ok((
-            DataTier {
-                block_mgr,
-                segments,
-            },
-            ld,
-        ))
-    }
-
-    /// Setup a new DataTier struct from the block_mgr.
-    ///
-    /// Returns the DataTier and the linear device that was created.
-    ///
-    /// WARNING: metadata changing event
-    pub fn new(
-        pool_uuid: PoolUuid,
-        mut block_mgr: BlockDevMgr,
-    ) -> StratisResult<(DataTier, LinearDev)> {
-        let avail_space = block_mgr.avail_space();
-        let segments = block_mgr
-            .alloc_space(&[avail_space])
-            .expect("asked for exactly the space available, must get")
-            .iter()
-            .flat_map(|s| s.iter())
-            .cloned()
-            .collect::<Vec<_>>();
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
-        let ld = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), map_to_dm(&segments))?;
-        Ok((
-            DataTier {
-                block_mgr,
-                segments,
-            },
-            ld,
-        ))
-    }
-
-    /// Add the given paths to self. Return UUIDs of the new blockdevs
-    /// corresponding to the specified paths.
-    /// WARNING: metadata changing event
-    pub fn add(
-        &mut self,
-        pool_uuid: PoolUuid,
-        cache: Option<&mut CacheDev>,
-        linear: Option<&mut LinearDev>,
-        paths: &[&Path],
-        force: bool,
-    ) -> StratisResult<Vec<DevUuid>> {
-        // These are here so that if invariant is false, the method fails
-        // before allocating the segments from the block_mgr.
-        // These two statements combined are equivalent to
-        // cache.is_some() XOR linear.is_some(), but they may be clearer and
-        // Rust does not seem to have a boolean XOR operator, anyway.
-        assert!(!(cache.is_some() && linear.is_some()));
-        assert!(!(cache.is_none() && linear.is_none()));
-
-        let uuids = self.block_mgr.add(pool_uuid, paths, force)?;
-
-        let avail_space = self.block_mgr.avail_space();
-        let segments = self.block_mgr
-            .alloc_space(&[avail_space])
-            .expect("asked for exactly the space available, must get")
-            .iter()
-            .flat_map(|s| s.iter())
-            .cloned()
-            .collect::<Vec<_>>();
-        let coalesced = coalesce_blkdevsegs(&self.segments, &segments);
-        let table = map_to_dm(&coalesced);
-
-        match (cache, linear) {
-            (Some(cache), None) => {
-                cache.set_origin_table(get_dm(), table)?;
-                cache.resume(get_dm())
-            }
-            (None, Some(linear)) => {
-                linear.set_table(get_dm(), table)?;
-                linear.resume(get_dm())
-            }
-            _ => panic!("see assertions at top of method"),
-        }?;
-
-        self.segments = coalesced;
-
-        Ok(uuids)
-    }
-
-    /// All the sectors available to this device
-    pub fn capacity(&self) -> Sectors {
-        self.segments
-            .iter()
-            .map(|x| x.segment.length)
-            .sum::<Sectors>()
-    }
-
-    /// The total size of all the blockdevs combined
-    pub fn current_capacity(&self) -> Sectors {
-        let size = self.block_mgr.current_capacity();
-        assert_eq!(size - self.metadata_size(), self.capacity());
-        size
-    }
-
-    /// The number of sectors used for metadata by all the blockdevs
-    pub fn metadata_size(&self) -> Sectors {
-        self.block_mgr.metadata_size()
-    }
-
-    /// Destroy the store. Wipe its blockdevs.
-    pub fn destroy(self) -> StratisResult<()> {
-        self.block_mgr.destroy_all()
-    }
-
-    /// Save the given state to the devices. This action bypasses the DM
-    /// device entirely.
-    pub fn save_state(&mut self, metadata: &[u8]) -> StratisResult<()> {
-        self.block_mgr.save_state(metadata)
-    }
-
-    /// Lookup an immutable blockdev by its Stratis UUID.
-    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
-        self.block_mgr
-            .get_blockdev_by_uuid(uuid)
-            .and_then(|bd| Some((BlockDevTier::Data, bd)))
-    }
-
-    /// Lookup a mutable blockdev by its Stratis UUID.
-    pub fn get_mut_blockdev_by_uuid(
-        &mut self,
-        uuid: DevUuid,
-    ) -> Option<(BlockDevTier, &mut StratBlockDev)> {
-        self.block_mgr
-            .get_mut_blockdev_by_uuid(uuid)
-            .and_then(|bd| Some((BlockDevTier::Data, bd)))
-    }
-
-    /// Get the blockdevs belonging to this tier
-    pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
-        self.block_mgr.blockdevs()
-    }
-}
-
-/// Handles the cache devices.
-#[derive(Debug)]
-struct CacheTier {
-    /// Manages the individual block devices
-    block_mgr: BlockDevMgr,
-    /// The list of segments granted by block_mgr and used by the cache
-    /// device.
-    cache_segments: Vec<BlkDevSegment>,
-    /// The list of segments granted by block_mgr and used by the metadata
-    /// device.
-    meta_segments: Vec<BlkDevSegment>,
-}
-
-impl CacheTier {
-    /// Setup a previously existing cache layer from the block_mgr and
-    /// previously allocated segments.
-    ///
-    /// Returns the CacheTier and the cache DM device that was created during
-    /// setup.
-    pub fn setup(
-        pool_uuid: PoolUuid,
-        block_mgr: BlockDevMgr,
-        origin: LinearDev,
-        cache_segments: &[(DevUuid, Sectors, Sectors)],
-        meta_segments: &[(DevUuid, Sectors, Sectors)],
-    ) -> StratisResult<(CacheTier, CacheDev)> {
-        if block_mgr.avail_space() != Sectors(0) {
-            let err_msg = format!(
-                "{} unallocated to device; probable metadata corruption",
-                block_mgr.avail_space()
-            );
-            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
-        }
-
-        let uuid_to_devno = block_mgr.uuid_to_devno();
-        let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> StratisResult<BlkDevSegment> {
-            let device = uuid_to_devno(triple.0).ok_or_else(|| {
-                StratisError::Engine(
-                    ErrorEnum::NotFound,
-                    format!("missing device for UUUD {:?}", &triple.0),
-                )
-            })?;
-            Ok(BlkDevSegment::new(
-                triple.0,
-                Segment::new(device, triple.1, triple.2),
-            ))
-        };
-
-        let meta_segments = meta_segments
-            .iter()
-            .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()?;
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
-        let meta = LinearDev::setup(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            map_to_dm(&meta_segments),
-        )?;
-
-        let cache_segments = cache_segments
-            .iter()
-            .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()?;
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);
-        let cache = LinearDev::setup(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            map_to_dm(&cache_segments),
-        )?;
-
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
-        let cd = CacheDev::setup(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            meta,
-            cache,
-            origin,
-            CACHE_BLOCK_SIZE,
-        )?;
-
-        Ok((
-            CacheTier {
-                block_mgr,
-                meta_segments,
-                cache_segments,
-            },
-            cd,
-        ))
-    }
-
-    /// Add the given paths to self. Return UUIDs of the new blockdevs
-    /// corresponding to the specified paths.
-    /// Adds all additional space to cache sub-device.
-    /// WARNING: metadata changing event
-    // FIXME: That all segments on the newly added device are added to the
-    // cache sub-device and none to the meta sub-device could lead to failure.
-    // Presumably, the size required for the meta sub-device varies directly
-    // with the size of cache sub-device.
-    pub fn add(
-        &mut self,
-        pool_uuid: PoolUuid,
-        cache_device: &mut CacheDev,
-        paths: &[&Path],
-        force: bool,
-    ) -> StratisResult<Vec<DevUuid>> {
-        let uuids = self.block_mgr.add(pool_uuid, paths, force)?;
-
-        let avail_space = self.block_mgr.avail_space();
-        let segments = self.block_mgr
-            .alloc_space(&[avail_space])
-            .expect("asked for exactly the space available, must get")
-            .iter()
-            .flat_map(|s| s.iter())
-            .cloned()
-            .collect::<Vec<_>>();
-        let coalesced = coalesce_blkdevsegs(&self.cache_segments, &segments);
-        let table = map_to_dm(&coalesced);
-
-        cache_device.set_cache_table(get_dm(), table)?;
-        cache_device.resume(get_dm())?;
-
-        self.cache_segments = coalesced;
-
-        Ok(uuids)
-    }
-
-    /// Setup a new CacheTier struct from the block_mgr.
-    ///
-    /// Returns the CacheTier and the cache device that was created.
-    ///
-    /// WARNING: metadata changing event
-    pub fn new(
-        pool_uuid: PoolUuid,
-        mut block_mgr: BlockDevMgr,
-        origin: LinearDev,
-    ) -> StratisResult<(CacheTier, CacheDev)> {
-        let avail_space = block_mgr.avail_space();
-
-        // FIXME: Come up with a better way to choose metadata device size
-        let meta_space = Sectors(IEC::Mi);
-
-        assert!(
-            meta_space < avail_space,
-            "every block device must be at least one GiB"
-        );
-
-        let mut segments = block_mgr
-            .alloc_space(&[meta_space, avail_space - meta_space])
-            .expect("asked for exactly the space available, must get");
-
-        let cache_segments = segments.pop().expect("segments.len() == 2");
-        let meta_segments = segments.pop().expect("segments.len() == 1");
-
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
-        let meta = LinearDev::setup(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            map_to_dm(&meta_segments),
-        )?;
-
-        // See comment in ThinPool::new() method
-        wipe_sectors(&meta.devnode(), Sectors(0), meta.size())?;
-
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);
-        let cache = LinearDev::setup(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            map_to_dm(&cache_segments),
-        )?;
-
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
-        let cd = CacheDev::new(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            meta,
-            cache,
-            origin,
-            CACHE_BLOCK_SIZE,
-        )?;
-
-        Ok((
-            CacheTier {
-                block_mgr,
-                meta_segments,
-                cache_segments,
-            },
-            cd,
-        ))
-    }
-
-    /// Destroy the tier. Wipe its blockdevs.
-    pub fn destroy(self) -> StratisResult<()> {
-        self.block_mgr.destroy_all()
-    }
-
-    /// Get all the blockdevs belonging to this tier.
-    pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
-        self.block_mgr.blockdevs()
-    }
-
-    /// Lookup an immutable blockdev by its Stratis UUID.
-    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
-        self.block_mgr
-            .get_blockdev_by_uuid(uuid)
-            .and_then(|bd| Some((BlockDevTier::Cache, bd)))
-    }
-
-    /// Lookup a mutable blockdev by its Stratis UUID.
-    pub fn get_mut_blockdev_by_uuid(
-        &mut self,
-        uuid: DevUuid,
-    ) -> Option<(BlockDevTier, &mut StratBlockDev)> {
-        self.block_mgr
-            .get_mut_blockdev_by_uuid(uuid)
-            .and_then(|bd| Some((BlockDevTier::Cache, bd)))
-    }
-}
 
 /// This structure can allocate additional space to the upper layer, but it
 /// cannot accept returned space. When it is extended to be able to accept
@@ -468,7 +42,7 @@ pub struct Backstore {
     data_tier: DataTier,
     /// A linear DM device.
     linear: Option<LinearDev>,
-    /// Index for managing allocation from dm_device.
+    /// Index for managing allocation of cap device
     next: Sectors,
 }
 
@@ -481,6 +55,7 @@ impl Backstore {
         backstore_save: &BackstoreSave,
         devnodes: &HashMap<Device, PathBuf>,
         last_update_time: Option<DateTime<Utc>>,
+        next: Sectors,
     ) -> StratisResult<Backstore> {
         let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
         let block_mgr = BlockDevMgr::new(datadevs, last_update_time);
@@ -517,7 +92,7 @@ impl Backstore {
             cache_tier,
             linear,
             cache,
-            next: backstore_save.next,
+            next,
         })
     }
 
@@ -583,6 +158,23 @@ impl Backstore {
         }
     }
 
+    /// Add datadevs to the backstore. The data tier always exists if the
+    /// backstore exists at all, so there is no need to create it.
+    fn add_datadevs(
+        &mut self,
+        pool_uuid: PoolUuid,
+        paths: &[&Path],
+        force: bool,
+    ) -> StratisResult<Vec<DevUuid>> {
+        self.data_tier.add(
+            pool_uuid,
+            self.cache.as_mut(),
+            self.linear.as_mut(),
+            paths,
+            force,
+        )
+    }
+
     /// Add the given paths to self. Return UUIDs of the new blockdevs
     /// corresponding to the specified paths.
     /// WARNING: metadata changing event
@@ -595,13 +187,7 @@ impl Backstore {
     ) -> StratisResult<Vec<DevUuid>> {
         match tier {
             BlockDevTier::Cache => self.add_cachedevs(pool_uuid, paths, force),
-            BlockDevTier::Data => self.data_tier.add(
-                pool_uuid,
-                self.cache.as_mut(),
-                self.linear.as_mut(),
-                paths,
-                force,
-            ),
+            BlockDevTier::Data => self.add_datadevs(pool_uuid, paths, force),
         }
     }
 
@@ -612,14 +198,14 @@ impl Backstore {
     /// WARNING: All this must change when it becomes possible to return
     /// sectors to the store.
     /// WARNING: metadata changing event
-    pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<(Sectors, Sectors)>>> {
+    pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<(Sectors, Sectors)>> {
         if self.available() < sizes.iter().cloned().sum() {
             return None;
         }
 
         let mut chunks = Vec::new();
         for size in sizes {
-            chunks.push(vec![(self.next, *size)]);
+            chunks.push((self.next, *size));
             self.next += *size;
         }
         Some(chunks)
@@ -645,9 +231,23 @@ impl Backstore {
         self.data_tier.current_capacity()
     }
 
+    /// The size of the cap device.
+    ///
+    /// The size of the cap device is obtained from the size of the component
+    /// DM devices. But the devicemapper library stores the data from which
+    /// the size of each DM device is calculated; the result is computed and
+    /// no ioctl is required.
+    fn size(&self) -> Sectors {
+        self.linear
+            .as_ref()
+            .map(|d| d.size())
+            .or_else(|| self.cache.as_ref().map(|d| d.size()))
+            .expect("either linear or cache must be Some")
+    }
+
     /// The available number of Sectors.
     pub fn available(&self) -> Sectors {
-        self.data_tier.capacity() - self.next
+        self.size() - self.next
     }
 
     /// Destroy the entire store.
@@ -752,7 +352,6 @@ impl Recordable<BackstoreSave> for Backstore {
             data_devs: self.data_tier.block_mgr.record(),
             data_segments: self.data_tier.segments.record(),
             meta_segments: self.cache_tier.as_ref().map(|c| c.meta_segments.record()),
-            next: self.next,
         }
     }
 }
@@ -761,7 +360,7 @@ impl Recordable<BackstoreSave> for Backstore {
 mod tests {
     use uuid::Uuid;
 
-    use devicemapper::{CacheDevStatus, DataBlocks};
+    use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
     use super::super::super::cmd;
     use super::super::super::tests::{loopbacked, real};
@@ -926,7 +525,8 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
-        let backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
+        let backstore =
+            Backstore::setup(pool_uuid, &backstore_save, &map, None, Sectors(0)).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();
@@ -938,7 +538,8 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
-        let backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
+        let backstore =
+            Backstore::setup(pool_uuid, &backstore_save, &map, None, Sectors(0)).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();

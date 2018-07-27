@@ -69,7 +69,6 @@ pub struct BackstoreSave {
     pub data_segments: Vec<(Uuid, Sectors, Sectors)>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta_segments: Option<Vec<(Uuid, Sectors, Sectors)>>,
-    pub next: Sectors,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

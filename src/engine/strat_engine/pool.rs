@@ -166,7 +166,7 @@ impl StratPool {
         )?;
         let thinpool = ThinPool::setup(
             uuid,
-            metadata.thinpool_dev.data_block_size,
+            &metadata.thinpool_dev,
             &metadata.flex_devs,
             &backstore,
         )?;

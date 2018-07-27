@@ -7,17 +7,17 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs::OpenOptions;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde_json;
 
-use devicemapper::{devnode_to_devno, Device};
+use devicemapper::{devnode_to_devno, Device, Sectors};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::super::types::PoolUuid;
+use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
-use super::super::serde_structs::{BackstoreSave, PoolSave};
+use super::super::serde_structs::{BackstoreSave, BlockDevSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
 use super::device::{blkdev_size, is_stratis_device};
@@ -108,7 +108,8 @@ pub fn get_metadata(
 }
 
 /// Get all the blockdevs corresponding to this pool that can be obtained from
-/// the given devices.
+/// the given devices. Sort the blockdevs in the order in which they were
+/// recorded in the metadata.
 /// Returns an error if a BDA can not be read or can not be found on any
 /// blockdev in devnodes.
 /// Returns an error if the blockdevs obtained do not match the metadata.
@@ -122,18 +123,24 @@ pub fn get_blockdevs(
     backstore_save: &BackstoreSave,
     devnodes: &HashMap<Device, PathBuf>,
 ) -> StratisResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
-    let recorded_data_map: HashMap<_, _> = backstore_save
+    let recorded_data_map: HashMap<DevUuid, (usize, &BlockDevSave)> = backstore_save
         .data_devs
         .iter()
-        .map(|bds| (bds.uuid, bds))
+        .enumerate()
+        .map(|(i, bds)| (bds.uuid, (i, bds)))
         .collect();
 
-    let recorded_cache_map: HashMap<_, _> = match backstore_save.cache_devs {
-        Some(ref cache_devs) => cache_devs.iter().map(|bds| (bds.uuid, bds)).collect(),
-        None => HashMap::new(),
-    };
+    let recorded_cache_map: HashMap<DevUuid, (usize, &BlockDevSave)> =
+        match backstore_save.cache_devs {
+            Some(ref cache_devs) => cache_devs
+                .iter()
+                .enumerate()
+                .map(|(i, bds)| (bds.uuid, (i, bds)))
+                .collect(),
+            None => HashMap::new(),
+        };
 
-    let mut segment_table = HashMap::new();
+    let mut segment_table: HashMap<DevUuid, Vec<(Sectors, Sectors)>> = HashMap::new();
     for seg in &backstore_save.data_segments {
         segment_table
             .entry(seg.0)
@@ -157,7 +164,83 @@ pub fn get_blockdevs(
         }
     }
 
-    let (mut datadevs, mut cachedevs) = (vec![], vec![]);
+    // Construct a single StratBlockDev. Return the tier to which the
+    // blockdev has been found to belong. Returns an error if the block
+    // device has shrunk, no metadata can be found for the block device,
+    // or it is impossible to set up the device because the recorded
+    // allocation information is impossible.
+    fn get_blockdev(
+        device: Device,
+        devnode: &Path,
+        bda: BDA,
+        data_map: &HashMap<DevUuid, (usize, &BlockDevSave)>,
+        cache_map: &HashMap<DevUuid, (usize, &BlockDevSave)>,
+        segment_table: &HashMap<DevUuid, Vec<(Sectors, Sectors)>>,
+    ) -> StratisResult<(BlockDevTier, StratBlockDev)> {
+        // Return an error if apparent size of Stratis block device appears to
+        // have decreased since metadata was recorded or if size of block
+        // device could not be obtained.
+        blkdev_size(&OpenOptions::new().read(true).open(devnode)?).and_then(|actual_size| {
+            let actual_size_sectors = actual_size.sectors();
+            let recorded_size = bda.dev_size();
+            if actual_size_sectors < recorded_size {
+                let err_msg = format!(
+                    "Stratis device with device number {}, devnode {}, pool UUID {} and device UUID {} had recorded size ({}), but actual size is less at ({})",
+                    device,
+                    devnode.display(),
+                    bda.pool_uuid(),
+                    bda.dev_uuid(),
+                    recorded_size,
+                    actual_size
+                );
+                Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+            } else {
+                Ok(())
+            }
+        })?;
+
+        let dev_uuid = bda.dev_uuid();
+
+        // Locate the device in the metadata using its uuid. Return the device
+        // metadata and whether it was a cache or a datadev.
+        let (tier, (_, bd_save)) = data_map
+            .get(&dev_uuid)
+            .map(|bd_save| (BlockDevTier::Data, bd_save))
+            .or_else(|| {
+                cache_map
+                    .get(&dev_uuid)
+                    .map(|bd_save| (BlockDevTier::Cache, bd_save))
+            })
+            .ok_or_else(|| {
+                let err_msg = format!(
+                        "Stratis device with device number {}, devnode {}, pool UUID {} and device UUID {} had no record in pool metadata",
+                        device,
+                        devnode.display(),
+                        bda.pool_uuid(),
+                        bda.dev_uuid()
+                    );
+                StratisError::Engine(ErrorEnum::NotFound, err_msg)
+            })?;
+
+        // This should always succeed since the actual size is at
+        // least the recorded size, so all segments should be
+        // available to be allocated. If this fails, the most likely
+        // conclusion is metadata corruption.
+        let segments = segment_table.get(&dev_uuid);
+        Ok((
+            tier,
+            StratBlockDev::new(
+                device,
+                devnode.to_owned(),
+                bda,
+                segments.unwrap_or(&vec![]),
+                bd_save.user_info.clone(),
+                bd_save.hardware_info.clone(),
+            )?,
+        ))
+    }
+
+    let (mut datadevs, mut cachedevs): (Vec<StratBlockDev>, Vec<StratBlockDev>) = (vec![], vec![]);
     for (device, devnode) in devnodes {
         let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?.ok_or_else(|| {
             StratisError::Engine(ErrorEnum::NotFound,
@@ -167,71 +250,65 @@ pub fn get_blockdevs(
                                                  pool_uuid))
         })?;
 
-        let actual_size = blkdev_size(&OpenOptions::new().read(true).open(devnode)?)?.sectors();
+        get_blockdev(
+            *device,
+            devnode,
+            bda,
+            &recorded_data_map,
+            &recorded_cache_map,
+            &segment_table,
+        ).map(|(tier, blockdev)| {
+            match tier {
+                BlockDevTier::Data => &mut datadevs,
+                BlockDevTier::Cache => &mut cachedevs,
+            }.push(blockdev)
+        })?;
+    }
 
-        if actual_size < bda.dev_size() {
-            let err_msg = format!(
-                "actual blockdev size ({}) < recorded size ({})",
-                actual_size,
-                bda.dev_size()
-            );
-
-            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
+    // Verify that devices located are congruent with the metadata recorded
+    // and generally consistent with expectations. If all seems correct,
+    // sort the devices according to their order in the metadata.
+    fn check_and_sort_devs(
+        mut devs: Vec<StratBlockDev>,
+        dev_map: &HashMap<DevUuid, (usize, &BlockDevSave)>,
+    ) -> StratisResult<Vec<StratBlockDev>> {
+        let mut uuids = HashSet::new();
+        let mut duplicate_uuids = Vec::new();
+        for dev in &devs {
+            let dev_uuid = dev.uuid();
+            if !uuids.insert(dev_uuid) {
+                duplicate_uuids.push(dev_uuid);
+            }
         }
 
-        let dev_uuid = bda.dev_uuid();
+        if !duplicate_uuids.is_empty() {
+            let err_msg = format!(
+                "The following list of Stratis UUIDs were each claimed by more than one Stratis device: {:?}",
+                duplicate_uuids
+            );
+            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
+        }
 
-        let (dev_vec, bd_save) = match recorded_data_map.get(&dev_uuid) {
-            Some(bd_save) => (&mut datadevs, bd_save),
-            None => match recorded_cache_map.get(&dev_uuid) {
-                Some(bd_save) => (&mut cachedevs, bd_save),
-                None => {
-                    let err_msg = format!("Blockdev {} not found in metadata", bda.dev_uuid());
-                    return Err(StratisError::Engine(ErrorEnum::NotFound, err_msg));
-                }
-            },
-        };
+        let recorded_uuids: HashSet<_> = dev_map.keys().cloned().collect();
+        if uuids != recorded_uuids {
+            let err_msg = format!(
+                "UUIDs of devices found ({:?}) did not correspond with UUIDs specified in the metadata for this group of devices ({:?})",
+                uuids,
+                recorded_uuids
+            );
+            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
+        }
 
-        // This should always succeed since the actual size is at
-        // least the recorded size, so all segments should be
-        // available to be allocated. If this fails, the most likely
-        // conclusion is metadata corruption.
-        let segments = segment_table.get(&dev_uuid);
-        dev_vec.push(StratBlockDev::new(
-            *device,
-            devnode.to_owned(),
-            bda,
-            segments.unwrap_or(&vec![]),
-            bd_save.user_info.clone(),
-            bd_save.hardware_info.clone(),
-        )?);
+        // Sort the devices according to their original location in the
+        // metadata. Use a faster unstable sort, because the order of
+        // devs before the sort is arbitrary and does not need to be
+        // preserved.
+        devs.sort_unstable_by_key(|dev| dev_map[&dev.uuid()].0);
+        Ok(devs)
     }
 
-    // Verify that datadevs found match datadevs recorded.
-    let current_data_uuids: HashSet<_> = datadevs.iter().map(|b| b.uuid()).collect();
-    let recorded_data_uuids: HashSet<_> = recorded_data_map.keys().cloned().collect();
-    if current_data_uuids != recorded_data_uuids {
-        let err_msg = "Recorded data dev UUIDs != discovered datadev UUIDs";
-        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
-    }
-
-    if datadevs.len() != current_data_uuids.len() {
-        let err_msg = "Duplicate data devices found in environment";
-        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
-    }
-
-    // Verify that cachedevs found match cachedevs recorded.
-    let current_cache_uuids: HashSet<_> = cachedevs.iter().map(|b| b.uuid()).collect();
-    let recorded_cache_uuids: HashSet<_> = recorded_cache_map.keys().cloned().collect();
-    if current_cache_uuids != recorded_cache_uuids {
-        let err_msg = "Recorded cache dev UUIDs != discovered cachedev UUIDs";
-        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
-    }
-
-    if cachedevs.len() != current_cache_uuids.len() {
-        let err_msg = "Duplicate cache devices found in environment";
-        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
-    }
+    let datadevs = check_and_sort_devs(datadevs, &recorded_data_map)?;
+    let cachedevs = check_and_sort_devs(cachedevs, &recorded_cache_map)?;
 
     Ok((datadevs, cachedevs))
 }

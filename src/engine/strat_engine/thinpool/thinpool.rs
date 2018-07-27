@@ -255,7 +255,7 @@ impl ThinPool {
     /// error.
     pub fn setup(
         pool_uuid: PoolUuid,
-        data_block_size: Sectors,
+        thin_pool_save: &ThinPoolDevSave,
         flex_devs: &FlexDevsSave,
         backstore: &Backstore,
     ) -> StratisResult<ThinPool> {
@@ -289,7 +289,7 @@ impl ThinPool {
             Some(&thinpool_uuid),
             meta_dev,
             data_dev,
-            data_block_size,
+            thin_pool_save.data_block_size,
             DATA_LOWATER,
         )?;
 
@@ -1105,9 +1105,10 @@ mod tests {
         let action = pool.rename_filesystem(pool_name, fs_uuid, name2).unwrap();
         assert_eq!(action, RenameAction::Renamed);
         let flexdevs: FlexDevsSave = pool.record();
+        let thinpoolsave: ThinPoolDevSave = pool.record();
         pool.teardown().unwrap();
 
-        let pool = ThinPool::setup(pool_uuid, DATA_BLOCK_SIZE, &flexdevs, &backstore).unwrap();
+        let pool = ThinPool::setup(pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
 
         assert_eq!(&*pool.get_filesystem_by_uuid(fs_uuid).unwrap().0, name2);
     }
@@ -1171,9 +1172,10 @@ mod tests {
                 "data"
             ).unwrap();
         }
+        let thinpooldevsave: ThinPoolDevSave = pool.record();
 
         let new_pool =
-            ThinPool::setup(pool_uuid, DATA_BLOCK_SIZE, &pool.record(), &backstore).unwrap();
+            ThinPool::setup(pool_uuid, &thinpooldevsave, &pool.record(), &backstore).unwrap();
 
         assert!(new_pool.get_filesystem_by_uuid(fs_uuid).is_some());
     }
@@ -1229,12 +1231,13 @@ mod tests {
         );
         assert!(thindev.is_err());
         let flexdevs: FlexDevsSave = pool.record();
+        let thinpooldevsave: ThinPoolDevSave = pool.record();
         pool.teardown().unwrap();
 
         // Check that destroyed fs is not present in MDV. If the record
         // had been left on the MDV that didn't match a thin_id in the
         // thinpool, ::setup() will fail.
-        let pool = ThinPool::setup(pool_uuid, DATA_BLOCK_SIZE, &flexdevs, &backstore).unwrap();
+        let pool = ThinPool::setup(pool_uuid, &thinpooldevsave, &flexdevs, &backstore).unwrap();
 
         assert!(pool.get_filesystem_by_uuid(fs_uuid).is_none());
     }

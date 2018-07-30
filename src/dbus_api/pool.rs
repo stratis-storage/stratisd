@@ -63,12 +63,25 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(ref infos) => {
-            let mut return_value = Vec::new();
-            for &(name, uuid) in infos {
-                let fs_object_path: dbus::Path =
-                    create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
-                return_value.push((fs_object_path, name));
-            }
+            let return_value = infos
+                .iter()
+                .map(|&(name, uuid)| {
+                    (
+                        // FIXME: To avoid this expect, modify create_filesystem
+                        // so that it returns a mutable reference to the
+                        // filesystem created.
+                        create_dbus_filesystem(
+                            dbus_context,
+                            object_path.clone(),
+                            uuid,
+                            pool.get_mut_filesystem(uuid)
+                                .expect("just inserted by create_filesystems")
+                                .1,
+                        ),
+                        name,
+                    )
+                })
+                .collect::<Vec<_>>();
 
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())
         }
@@ -162,9 +175,9 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let msg = match pool.snapshot_filesystem(pool_uuid, &pool_name, fs_uuid, snapshot_name) {
-        Ok(uuid) => {
+        Ok((uuid, fs)) => {
             let fs_object_path: dbus::Path =
-                create_dbus_filesystem(dbus_context, object_path.clone(), uuid);
+                create_dbus_filesystem(dbus_context, object_path.clone(), uuid, fs);
             return_message.append3(fs_object_path, msg_code_ok(), msg_string_ok())
         }
         Err(err) => {
@@ -203,7 +216,19 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> Meth
         Ok(uuids) => {
             let return_value = uuids
                 .iter()
-                .map(|uuid| create_dbus_blockdev(dbus_context, object_path.clone(), *uuid))
+                .map(|uuid| {
+                    // FIXME: To avoid this expect, modify add_blockdevs
+                    // so that it returns a mutable reference to each
+                    // blockdev created.
+                    create_dbus_blockdev(
+                        dbus_context,
+                        object_path.clone(),
+                        *uuid,
+                        pool.get_mut_blockdev(*uuid)
+                            .expect("just inserted by add_blockdevs")
+                            .1,
+                    )
+                })
                 .collect::<Vec<_>>();
 
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())
@@ -331,6 +356,7 @@ pub fn create_dbus_pool<'a>(
     dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
     uuid: Uuid,
+    pool: &mut Pool,
 ) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
@@ -419,5 +445,6 @@ pub fn create_dbus_pool<'a>(
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
+    pool.set_dbus_path(path.clone());
     path
 }

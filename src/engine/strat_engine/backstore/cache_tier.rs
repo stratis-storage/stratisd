@@ -229,6 +229,10 @@ impl CacheTier {
         self.block_mgr.blockdevs()
     }
 
+    pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
+        self.block_mgr.blockdevs_mut()
+    }
+
     /// Lookup an immutable blockdev by its Stratis UUID.
     pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
         self.block_mgr

@@ -2,6 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#[cfg(feature = "dbus_enabled")]
+use dbus;
+
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -32,6 +35,8 @@ pub const FILESYSTEM_LOWATER: Sectors = Sectors(256 * IEC::Mi / (SECTOR_SIZE as 
 #[derive(Debug)]
 pub struct StratFilesystem {
     thin_dev: ThinDev,
+    #[cfg(feature = "dbus_enabled")]
+    dbus_path: Option<dbus::Path<'static>>,
 }
 
 pub enum FilesystemStatus {
@@ -52,7 +57,11 @@ impl StratFilesystem {
 
     /// Build a StratFilesystem that includes the ThinDev and related info.
     pub fn setup(thin_dev: ThinDev) -> StratFilesystem {
-        StratFilesystem { thin_dev }
+        StratFilesystem {
+            thin_dev,
+            #[cfg(feature = "dbus_enabled")]
+            dbus_path: None,
+        }
     }
 
     /// Create a snapshot of the filesystem. Return the resulting filesystem/ThinDev
@@ -220,6 +229,16 @@ impl StratFilesystem {
 impl Filesystem for StratFilesystem {
     fn devnode(&self) -> PathBuf {
         self.thin_dev.devnode()
+    }
+
+    #[cfg(feature = "dbus_enabled")]
+    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> () {
+        self.dbus_path = Some(path)
+    }
+
+    #[cfg(feature = "dbus_enabled")]
+    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>> {
+        &self.dbus_path
     }
 }
 

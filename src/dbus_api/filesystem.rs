@@ -24,6 +24,7 @@ pub fn create_dbus_filesystem<'a>(
     dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
     uuid: Uuid,
+    filesystem: &mut Filesystem,
 ) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
@@ -74,6 +75,7 @@ pub fn create_dbus_filesystem<'a>(
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
+    filesystem.set_dbus_path(path.clone());
     path
 }
 

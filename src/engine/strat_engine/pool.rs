@@ -78,6 +78,8 @@ pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
 
     // If the amount allocated to the cap device is less than the amount
     // allocated to the flex devices, consider the situation an error.
+    // Consider it an error if the amount allocated to the cap device is 0.
+    // If this is the case, then the thin pool can not exist.
     {
         let total_allocated = metadata
             .backstore
@@ -85,6 +87,14 @@ pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
             .iter()
             .map(|x| x.2)
             .sum::<Sectors>();
+
+        if total_allocated == Sectors(0) {
+            let err_msg = format!(
+                "no segments allocated to the cap device for pool {}",
+                metadata.name
+            );
+            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+        }
 
         if next > total_allocated {
             let err_msg = format!(

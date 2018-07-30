@@ -50,27 +50,49 @@ fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
 /// Precondition: This method is called only when setting up a pool, which
 /// ensures that the flex devs metadata lists are all non-empty.
 pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
+    let flex_devs = &metadata.flex_devs;
+    let next = next_index(&flex_devs);
+
     // If the amount allocated from the cap device is not the same as that
     // used by the flex devs, consider the situation an error.
-    let flex_devs = &metadata.flex_devs;
-    let total_allocated = flex_devs
-        .meta_dev
-        .iter()
-        .chain(flex_devs.thin_meta_dev.iter())
-        .chain(flex_devs.thin_data_dev.iter())
-        .chain(flex_devs.thin_meta_dev_spare.iter())
-        .map(|x| x.1)
-        .sum::<Sectors>();
-    let next = next_index(&flex_devs);
-    if total_allocated != next {
-        let err_msg = format!(
-            "{} used in thinpool, but {} given up by cache for pool {}",
-            total_allocated, next, metadata.name
-        );
-        Err(StratisError::Engine(ErrorEnum::Invalid, err_msg))
-    } else {
-        Ok(())
+    {
+        let total_allocated = flex_devs
+            .meta_dev
+            .iter()
+            .chain(flex_devs.thin_meta_dev.iter())
+            .chain(flex_devs.thin_data_dev.iter())
+            .chain(flex_devs.thin_meta_dev_spare.iter())
+            .map(|x| x.1)
+            .sum::<Sectors>();
+        if total_allocated != next {
+            let err_msg = format!(
+                "{} used in thinpool, but {} given up by cache for pool {}",
+                total_allocated, next, metadata.name
+            );
+            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+        }
     }
+
+    // If the amount allocated to the cap device is less than the amount
+    // allocated to the flex devices, consider the situation an error.
+    {
+        let total_allocated = metadata
+            .backstore
+            .data_segments
+            .iter()
+            .map(|x| x.2)
+            .sum::<Sectors>();
+
+        if next > total_allocated {
+            let err_msg = format!(
+                "{} allocated to cap device, but {} allocated to flex devs",
+                next, total_allocated
+            );
+            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -123,6 +145,7 @@ impl StratPool {
     /// Setup a StratPool using its UUID and the list of devnodes it has.
     /// Precondition: every device in devnodes has already been determined
     /// to belong to the pool with the specified uuid.
+    /// Precondition: A metadata verification step has already been run.
     pub fn setup(
         uuid: PoolUuid,
         devnodes: &HashMap<Device, PathBuf>,

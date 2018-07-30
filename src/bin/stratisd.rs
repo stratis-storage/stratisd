@@ -260,7 +260,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         libstratis::dbus_api::connect(Rc::clone(&engine))?;
 
     #[cfg(feature = "dbus_enabled")]
-    for (_, pool_uuid, pool) in engine.borrow().pools() {
+    for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
         libstratis::dbus_api::register_pool(
             &dbus_conn,
             &dbus_context,
@@ -298,8 +298,8 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                                 &mut tree,
                                 pool_uuid,
                                 engine
-                                    .borrow()
-                                    .get_pool(pool_uuid)
+                                    .borrow_mut()
+                                    .get_mut_pool(pool_uuid)
                                     .expect(
                                         "block_evaluate() returned a pool UUID, pool must be available",
                                     )

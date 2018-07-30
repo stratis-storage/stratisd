@@ -304,6 +304,13 @@ impl BlockDevMgr {
         self.block_devs.iter().map(|bd| (bd.uuid(), bd)).collect()
     }
 
+    pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
+        self.block_devs
+            .iter_mut()
+            .map(|bd| (bd.uuid(), bd as &mut StratBlockDev))
+            .collect()
+    }
+
     pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<&StratBlockDev> {
         self.block_devs.iter().find(|bd| bd.uuid() == uuid)
     }

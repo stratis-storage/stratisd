@@ -2,6 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#[cfg(feature = "dbus_enabled")]
+use dbus;
+
 use std::fmt::Debug;
 use std::os::unix::io::RawFd;
 use std::path::{Path, PathBuf};
@@ -19,6 +22,14 @@ use stratis::StratisResult;
 pub trait Filesystem: Debug {
     /// path of the device node
     fn devnode(&self) -> PathBuf;
+
+    /// Set dbus path associated with the Pool.
+    #[cfg(feature = "dbus_enabled")]
+    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> ();
+
+    /// Get dbus path associated with the Pool.
+    #[cfg(feature = "dbus_enabled")]
+    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>>;
 }
 
 pub trait BlockDev: Debug {
@@ -40,6 +51,14 @@ pub trait BlockDev: Debug {
 
     /// The current state of the blockdev.
     fn state(&self) -> BlockDevState;
+
+    /// Set dbus path associated with the BlockDev.
+    #[cfg(feature = "dbus_enabled")]
+    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> ();
+
+    /// Get dbus path associated with the BlockDev.
+    #[cfg(feature = "dbus_enabled")]
+    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>>;
 }
 
 pub trait Pool: Debug {
@@ -103,7 +122,7 @@ pub trait Pool: Debug {
         pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<FilesystemUuid>;
+    ) -> StratisResult<(FilesystemUuid, &mut Filesystem)>;
 
     /// The total number of Sectors belonging to this pool.
     /// There are no exclusions, so this number includes overhead sectors
@@ -121,6 +140,9 @@ pub trait Pool: Debug {
     /// Get all the filesystems belonging to this pool.
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)>;
 
+    /// Get all the filesystems belonging to this pool as mutable references.
+    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut Filesystem)>;
+
     /// Get the filesystem in this pool with this UUID.
     fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &Filesystem)>;
 
@@ -131,8 +153,14 @@ pub trait Pool: Debug {
     /// All really means all. For example, it does not exclude cache blockdevs.
     fn blockdevs(&self) -> Vec<(Uuid, &BlockDev)>;
 
+    /// Get all the blockdevs belonging to this pool as mutable references.
+    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut BlockDev)>;
+
     /// Get the blockdev in this pool with this UUID.
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)>;
+
+    /// Get a mutable reference to the blockdev in this pool with this UUID.
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)>;
 
     /// Set the user-settable string associated with the blockdev specfied
     /// by the uuid.
@@ -142,6 +170,14 @@ pub trait Pool: Debug {
         uuid: DevUuid,
         user_info: Option<&str>,
     ) -> StratisResult<bool>;
+
+    /// Set dbus path associated with the Pool.
+    #[cfg(feature = "dbus_enabled")]
+    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> ();
+
+    /// Get dbus path associated with the Pool.
+    #[cfg(feature = "dbus_enabled")]
+    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>>;
 }
 
 pub trait Engine: Debug {
@@ -189,6 +225,9 @@ pub trait Engine: Debug {
 
     /// Get all pools belonging to this engine.
     fn pools(&self) -> Vec<(Name, PoolUuid, &Pool)>;
+
+    /// Get mutable references to all pools belonging to this engine.
+    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut Pool)>;
 
     /// If the engine would like to include an event in the message loop, it
     /// may return an Eventable from this method.

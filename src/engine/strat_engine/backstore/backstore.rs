@@ -50,6 +50,8 @@ impl Backstore {
     /// Make a Backstore object from blockdevs that already belong to Stratis.
     /// Precondition: every device in devnodes has already been determined to
     /// belong to the pool with the specified pool_uuid.
+    /// Precondition: next <= the sum of the lengths of the segments allocated
+    /// to the data tier cap device.
     pub fn setup(
         pool_uuid: PoolUuid,
         backstore_save: &BackstoreSave,
@@ -195,6 +197,8 @@ impl Backstore {
     /// Returns None if it is not possible to satisfy the request.
     /// Each segment allocated is contiguous with its neighbors in the return
     /// vector.
+    /// Precondition: self.next <= self.size()
+    /// Postcondition: self.next <= self.size()
     /// WARNING: All this must change when it becomes possible to return
     /// sectors to the store.
     /// WARNING: metadata changing event
@@ -258,7 +262,18 @@ impl Backstore {
 
     /// The available number of Sectors.
     pub fn available(&self) -> Sectors {
-        self.size() - self.next
+        let size = self.size();
+        // It is absolutely essential for correct operation that the assertion
+        // be true. If it is false, the result will be incorrect, and space
+        // will be allocated incorrectly from the cap device.
+        assert!(
+            self.next <= size,
+            format!(
+                "next index, {}, is greater than the total size available {}",
+                self.next, size
+            )
+        );
+        size - self.next
     }
 
     /// Destroy the entire store.
@@ -385,6 +400,9 @@ mod tests {
     ///   self.linear.is_some()).
     /// * self.data_tier.block_mgr.avail_space() is always 0, because
     ///   everything is allocated to the DM device.
+    /// * backstore's data tier capacity is equal to the size of the cap device
+    /// * backstore's next index is always less than the size of the cap
+    ///   device
     fn invariant(backstore: &Backstore) -> () {
         assert!(
             (backstore.cache_tier.is_none()
@@ -402,7 +420,8 @@ mod tests {
                 (&Some(ref linear), &None) => linear.size(),
                 _ => panic!("impossible; see first assertion"),
             }
-        )
+        );
+        assert!(backstore.next <= backstore.size())
     }
 
     /// Test adding cachedevs to the backstore.

@@ -170,12 +170,15 @@ impl ThinPool {
         low_water_mark: DataBlocks,
         backstore: &mut Backstore,
     ) -> StratisResult<ThinPool> {
-        let mut segments_list = match backstore.alloc_space(&[
-            thin_pool_size.meta_size(),
-            thin_pool_size.meta_size(),
-            thin_pool_size.data_size(),
-            thin_pool_size.mdv_size(),
-        ]) {
+        let mut segments_list = match backstore.alloc_space(
+            pool_uuid,
+            &[
+                thin_pool_size.meta_size(),
+                thin_pool_size.meta_size(),
+                thin_pool_size.data_size(),
+                thin_pool_size.mdv_size(),
+            ],
+        )? {
             Some(sl) => sl,
             None => {
                 let err_msg = "Could not allocate sufficient space for thinpool devices.";
@@ -355,7 +358,7 @@ impl ThinPool {
     /// Run status checks and take actions on the thinpool and its components.
     /// Returns a bool communicating if a configuration change requiring a
     /// metadata save has been made.
-    pub fn check(&mut self, backstore: &mut Backstore) -> StratisResult<bool> {
+    pub fn check(&mut self, pool_uuid: PoolUuid, backstore: &mut Backstore) -> StratisResult<bool> {
         #![allow(match_same_arms)]
         assert_eq!(
             backstore.device().expect(
@@ -389,7 +392,7 @@ impl ThinPool {
                     // TODO: we just request that the space be doubled here.
                     // A more sophisticated approach might be in order.
                     let meta_extend_size = usage.total_meta;
-                    match self.extend_thinpool_meta(meta_extend_size, backstore) {
+                    match self.extend_thinpool_meta(pool_uuid, meta_extend_size, backstore) {
                         #![allow(single_match)]
                         Ok(_) => should_save = true,
                         Err(_) => {} // TODO: Take pool offline?
@@ -402,6 +405,7 @@ impl ThinPool {
                     // requesting the minimum total_data vs. available space.
                     // A more sophisticated approach might be in order.
                     match self.extend_thinpool(
+                        pool_uuid,
                         DataBlocks(cmp::min(
                             *usage.total_data,
                             backstore.available() / DATA_BLOCK_SIZE,
@@ -456,6 +460,7 @@ impl ThinPool {
     // satisfied may not be correct.
     fn extend_thinpool(
         &mut self,
+        pool_uuid: PoolUuid,
         extend_size: DataBlocks,
         backstore: &mut Backstore,
     ) -> StratisResult<DataBlocks> {
@@ -466,7 +471,9 @@ impl ThinPool {
             ),
             backstore_device
         );
-        if let Some(mut regions) = backstore.alloc_space(&[*extend_size * DATA_BLOCK_SIZE]) {
+        if let Some(mut regions) =
+            backstore.alloc_space(pool_uuid, &[*extend_size * DATA_BLOCK_SIZE])?
+        {
             self.suspend()?;
             self.extend_data(backstore_device, regions.pop().expect("len(regions) == 1"))?;
             self.resume()?;
@@ -484,6 +491,7 @@ impl ThinPool {
     /// Return the number of MetaBlocks added.
     fn extend_thinpool_meta(
         &mut self,
+        pool_uuid: PoolUuid,
         extend_size: MetaBlocks,
         backstore: &mut Backstore,
     ) -> StratisResult<MetaBlocks> {
@@ -494,7 +502,7 @@ impl ThinPool {
             ),
             backstore_device
         );
-        if let Some(mut regions) = backstore.alloc_space(&[extend_size.sectors()]) {
+        if let Some(mut regions) = backstore.alloc_space(pool_uuid, &[extend_size.sectors()])? {
             self.suspend()?;
             self.extend_meta(backstore_device, regions.pop().expect("len(regions) == 1"))?;
             self.resume()?;
@@ -973,7 +981,7 @@ mod tests {
         backstore
             .add_blockdevs(pool_uuid, &remaining_paths, BlockDevTier::Data, true)
             .unwrap();
-        pool.check(&mut backstore).unwrap();
+        pool.check(pool_uuid, &mut backstore).unwrap();
         // Verify the pool is back in a Good state
         match pool.thin_pool.status(get_dm()).unwrap() {
             dm::ThinPoolStatus::Working(ref status) => {
@@ -1059,7 +1067,7 @@ mod tests {
         // written above. If we attempt to update the UUID on the snapshot
         // without expanding the pool, the pool will go into out-of-data-space
         // (queue IO) mode, causing the test to fail.
-        pool.extend_thinpool(INITIAL_DATA_SIZE, &mut backstore)
+        pool.extend_thinpool(pool_uuid, INITIAL_DATA_SIZE, &mut backstore)
             .unwrap();
 
         let (_, snapshot_filesystem) =
@@ -1330,7 +1338,7 @@ mod tests {
         }
         // The meta device is smaller than META_LOWATER, so it should be expanded
         // in the thin_pool.check() call.
-        thin_pool.check(&mut backstore).unwrap();
+        thin_pool.check(pool_uuid, &mut backstore).unwrap();
         match thin_pool.thin_pool.status(get_dm()).unwrap() {
             dm::ThinPoolStatus::Working(ref status) => {
                 let usage = &status.usage;
@@ -1394,7 +1402,7 @@ mod tests {
                 // the amount of free space in pool has decreased to the
                 // DATA_LOWATER value.
                 if i == *(*(INITIAL_DATA_SIZE - DATA_LOWATER) * DATA_BLOCK_SIZE) {
-                    pool.extend_thinpool(INITIAL_DATA_SIZE, &mut backstore)
+                    pool.extend_thinpool(pool_uuid, INITIAL_DATA_SIZE, &mut backstore)
                         .unwrap();
                 }
             }

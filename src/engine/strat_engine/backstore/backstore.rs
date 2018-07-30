@@ -248,31 +248,13 @@ impl Backstore {
 
     /// Add datadevs to the backstore. The data tier always exists if the
     /// backstore exists at all, so there is no need to create it.
-    /// Precondition: Must be invoked only after some space has been allocated
-    /// from the backstore. This ensures that there is certainly a cap device.
     fn add_datadevs(
         &mut self,
         pool_uuid: PoolUuid,
         paths: &[&Path],
         force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
-        let uuids = self.data_tier.add(pool_uuid, paths, force)?;
-
-        let table = map_to_dm(&self.data_tier.segments);
-
-        match (self.cache.as_mut(), self.linear.as_mut()) {
-            (Some(cache), None) => {
-                cache.set_origin_table(get_dm(), table)?;
-                cache.resume(get_dm())
-            }
-            (None, Some(linear)) => {
-                linear.set_table(get_dm(), table)?;
-                linear.resume(get_dm())
-            }
-            _ => panic!("some space has already been allocated from the backstore => (self.cache.is_some() XOR self.linear.is_some())"),
-        }?;
-
-        Ok(uuids)
+        self.data_tier.add(pool_uuid, paths, force)
     }
 
     /// Add the given paths to self. Return UUIDs of the new blockdevs
@@ -303,9 +285,40 @@ impl Backstore {
     /// Postcondition: forall i, sizes_i == result_i.1. The second value in each
     /// pair in the returned vector is therefore redundant, but is retained
     /// as a convenience to the caller.
-    pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<(Sectors, Sectors)>> {
-        if self.available() < sizes.iter().cloned().sum() {
-            return None;
+    pub fn alloc_space(
+        &mut self,
+        pool_uuid: PoolUuid,
+        sizes: &[Sectors],
+    ) -> StratisResult<Option<Vec<(Sectors, Sectors)>>> {
+        let total_required = sizes.iter().cloned().sum();
+        let available = self.available();
+        if available < total_required {
+            if self.data_tier.alloc_segments(total_required - available) {
+                let create = match (self.cache.as_mut(), self.linear.as_mut()) {
+                    (None, None) => true,
+                    (Some(cache), None) => {
+                        let table = map_to_dm(&self.data_tier.segments);
+                        cache.set_origin_table(get_dm(), table)?;
+                        cache.resume(get_dm())?;
+                        false
+                    }
+                    (None, Some(linear)) => {
+                        let table = map_to_dm(&self.data_tier.segments);
+                        linear.set_table(get_dm(), table)?;
+                        linear.resume(get_dm())?;
+                        false
+                    }
+                    _ => panic!("self.cache().is_some() XOR self.linear.is_some()"),
+                };
+                if create {
+                    let table = map_to_dm(&self.data_tier.segments);
+                    let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
+                    let origin = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), table)?;
+                    self.linear = Some(origin);
+                }
+            } else {
+                return Ok(None);
+            }
         }
 
         let mut chunks = Vec::new();
@@ -313,7 +326,7 @@ impl Backstore {
             chunks.push((self.next, *size));
             self.next += *size;
         }
-        Some(chunks)
+        Ok(Some(chunks))
     }
 
     /// Return a reference to all the blockdevs that this pool has ownership

@@ -175,12 +175,24 @@ impl Backstore {
                 let mut cache_device = self.cache
                     .as_mut()
                     .expect("cache_tier.is_some() <=> self.cache.is_some()");
-                let uuids = cache_tier.add(pool_uuid, paths, force);
+                let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, paths, force)?;
 
-                let table = map_to_dm(&cache_tier.cache_segments);
-                cache_device.set_cache_table(get_dm(), table)?;
-                cache_device.resume(get_dm())?;
-                uuids
+                if cache_change {
+                    let table = map_to_dm(&cache_tier.cache_segments);
+                    cache_device.set_cache_table(get_dm(), table)?;
+                    cache_device.resume(get_dm())?;
+                }
+
+                if meta_change {
+                    // TODO: Set cache device's meta tier. Currently, this
+                    // functionality is unimplemented in devicemapper-rs.
+                    assert!(
+                        false,
+                        "cache meta sub-device segments are never updated by the add method, so meta_change is always false"
+                    );
+                }
+
+                Ok(uuids)
             }
             None => {
                 let bdm = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;

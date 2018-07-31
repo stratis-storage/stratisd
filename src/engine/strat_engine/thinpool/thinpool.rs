@@ -702,9 +702,7 @@ impl ThinPool {
 
     /// Suspend the thinpool
     pub fn suspend(&mut self) -> StratisResult<()> {
-        for (_, _, fs) in &mut self.filesystems {
-            fs.suspend(false)?;
-        }
+        // thindevs automatically suspended when thinpool is suspended
         self.thin_pool.suspend(get_dm(), true)?;
         self.mdv.suspend()?;
         Ok(())
@@ -713,10 +711,8 @@ impl ThinPool {
     /// Resume the thinpool
     pub fn resume(&mut self) -> StratisResult<()> {
         self.mdv.resume()?;
+        // thindevs automatically resumed here
         self.thin_pool.resume(get_dm())?;
-        for (_, _, fs) in &mut self.filesystems {
-            fs.resume()?;
-        }
         Ok(())
     }
 

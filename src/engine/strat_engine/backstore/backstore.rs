@@ -191,12 +191,24 @@ impl Backstore {
                 let mut cache_device = self.cache
                     .as_mut()
                     .expect("cache_tier.is_some() <=> self.cache.is_some()");
-                let uuids = cache_tier.add(pool_uuid, paths, force);
+                let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, paths, force)?;
 
-                let table = map_to_dm(&cache_tier.cache_segments);
-                cache_device.set_cache_table(get_dm(), table)?;
-                cache_device.resume(get_dm())?;
-                uuids
+                if cache_change {
+                    let table = map_to_dm(&cache_tier.cache_segments);
+                    cache_device.set_cache_table(get_dm(), table)?;
+                    cache_device.resume(get_dm())?;
+                }
+
+                // NOTE: currently CacheTier::add() does not ever update the
+                // meta segments. That means that this code is dead. But,
+                // when CacheTier::add() is fixed, this code will become live.
+                if meta_change {
+                    let table = map_to_dm(&cache_tier.meta_segments);
+                    cache_device.set_meta_table(get_dm(), table)?;
+                    cache_device.resume(get_dm())?;
+                }
+
+                Ok(uuids)
             }
             None => {
                 let bdm = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;

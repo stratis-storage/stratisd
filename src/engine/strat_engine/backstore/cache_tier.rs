@@ -76,7 +76,9 @@ impl CacheTier {
     }
 
     /// Add the given paths to self. Return UUIDs of the new blockdevs
-    /// corresponding to the specified paths.
+    /// corresponding to the specified paths and a pair of Boolean values.
+    /// The first is true if the cache sub-device's segments were changed,
+    /// the second is true if the meta sub-device's segments were changed.
     /// Adds all additional space to cache sub-device.
     /// WARNING: metadata changing event
     // FIXME: That all segments on the newly added device are added to the
@@ -88,7 +90,7 @@ impl CacheTier {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         force: bool,
-    ) -> StratisResult<Vec<DevUuid>> {
+    ) -> StratisResult<(Vec<DevUuid>, (bool, bool))> {
         let uuids = self.block_mgr.add(pool_uuid, paths, force)?;
 
         let avail_space = self.block_mgr.avail_space();
@@ -101,7 +103,7 @@ impl CacheTier {
             .collect::<Vec<_>>();
         self.cache_segments = coalesce_blkdevsegs(&self.cache_segments, &segments);
 
-        Ok(uuids)
+        Ok((uuids, (true, false)))
     }
 
     /// Setup a new CacheTier struct from the block_mgr.

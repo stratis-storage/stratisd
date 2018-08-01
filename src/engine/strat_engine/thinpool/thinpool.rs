@@ -400,6 +400,7 @@ impl ThinPool {
                 }
 
                 if usage.used_data > cmp::max(usage.total_data, DATA_LOWATER) - DATA_LOWATER {
+                    assert!(backstore.available() != Sectors(0));
                     // Request expansion of physical space allocated to the pool
                     // TODO: we request that the space be doubled or use the remaining space by
                     // requesting the minimum total_data vs. available space.

@@ -933,9 +933,9 @@ mod tests {
             loop {
                 let status: dm::ThinPoolStatus = pool.thin_pool.status(get_dm()).unwrap();
                 match status {
-                    dm::ThinPoolStatus::Working(ref _status) => {
+                    dm::ThinPoolStatus::Working(_) => {
                         f.write_all(write_buf).unwrap();
-                        if let Err(_e) = f.sync_data() {
+                        if f.sync_data().is_err() {
                             break;
                         }
                     }

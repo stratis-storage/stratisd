@@ -165,6 +165,11 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     // Ensure that the debug log is output when we leave this function.
     let _guard = buff_log.to_guard();
 
+    // Even if dbus is enabled at compile time, it may not be available at all times depending
+    // on the environment we are running in.
+    #[cfg(feature = "dbus_enabled")]
+    let mut dbus_handle: Option<libstratis::dbus_api::DbusConnectionData> = None;
+
     // Setup a udev listener before initializing the engine. A device may
     // appear after the engine has read the /dev directory but before it has
     // completed initialization. Unless the udev event has been recorded, the
@@ -236,16 +241,12 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
 
     let eventable = engine.borrow().get_eventable();
 
-    let poll_timeout = match eventable {
-        Some(ref evt) => {
-            fds.push(libc::pollfd {
-                fd: evt.get_pollable_fd(),
-                revents: 0,
-                events: libc::POLLIN,
-            });
-            -1
-        }
-        None => 10000,
+    if let Some(ref evt) = eventable {
+        fds.push(libc::pollfd {
+            fd: evt.get_pollable_fd(),
+            revents: 0,
+            events: libc::POLLIN,
+        });
     };
 
     #[cfg(feature = "dbus_enabled")]
@@ -254,22 +255,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     } else {
         FD_INDEX_ENGINE
     };
-
-    #[cfg(feature = "dbus_enabled")]
-    let (dbus_conn, mut tree, base_object_path, dbus_context) =
-        libstratis::dbus_api::connect(Rc::clone(&engine))?;
-
-    #[cfg(feature = "dbus_enabled")]
-    for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
-        libstratis::dbus_api::register_pool(
-            &dbus_conn,
-            &dbus_context,
-            &mut tree,
-            pool_uuid,
-            pool,
-            &base_object_path,
-        )?;
-    }
 
     log_engine_state(&*engine.borrow());
     alarm(STRATISD_ALARM_SECONDS);
@@ -291,21 +276,23 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                             .block_evaluate(device, devnode)
                             .unwrap_or(None);
 
-                        if let Some(pool_uuid) = pool_uuid {
-                            libstratis::dbus_api::register_pool(
-                                &dbus_conn,
-                                &dbus_context,
-                                &mut tree,
-                                pool_uuid,
-                                engine
-                                    .borrow_mut()
-                                    .get_mut_pool(pool_uuid)
-                                    .expect(
-                                        "block_evaluate() returned a pool UUID, pool must be available",
-                                    )
-                                    .1,
-                                &base_object_path,
-                            )?;
+                        if let Some(ref mut handle) = dbus_handle {
+                            if let Some(pool_uuid) = pool_uuid {
+                                libstratis::dbus_api::register_pool(
+                                    &handle.connection,
+                                    &handle.context,
+                                    &mut handle.tree,
+                                    pool_uuid,
+                                    engine
+                                        .borrow_mut()
+                                        .get_mut_pool(pool_uuid)
+                                        .expect(
+                                            "block_evaluate() returned a pool UUID, pool must be available",
+                                        )
+                                        .1,
+                                    &handle.path,
+                                )?;
+                            }
                         }
                     }
                 }
@@ -349,45 +336,73 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         }
 
         // Handle engine events, if the engine is eventable
-        match eventable {
-            Some(ref evt) => {
-                if fds[FD_INDEX_ENGINE].revents != 0 {
-                    evt.clear_event()?;
-                    engine.borrow_mut().evented()?;
-                }
-            }
-            None => {
-                // Unconditionally call evented() if engine has no eventable.
-                // This looks like a bad idea, but the only engine that has
-                // no eventable is the sim engine, and for that engine,
-                // evented() is essentially a no-op.
+        if let Some(ref evt) = eventable {
+            if fds[FD_INDEX_ENGINE].revents != 0 {
+                evt.clear_event()?;
                 engine.borrow_mut().evented()?;
             }
         }
 
-        // Iterate through D-Bus file descriptors (if enabled)
+        // Iterate through D-Bus file descriptors (if enabled) and dbus is actually available,
+        // otherwise attempt to bring up the dbus interface.
         #[cfg(feature = "dbus_enabled")]
         {
-            for pfd in fds[dbus_client_index_start..]
-                .iter()
-                .filter(|pfd| pfd.revents != 0)
-            {
-                for item in dbus_conn.watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents)) {
-                    if let Err(r) =
-                        libstratis::dbus_api::handle(&dbus_conn, &item, &mut tree, &dbus_context)
+            if let Some(ref mut handle) = dbus_handle {
+                for pfd in fds[dbus_client_index_start..]
+                    .iter()
+                    .filter(|pfd| pfd.revents != 0)
+                {
+                    for item in handle
+                        .connection
+                        .watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents))
                     {
-                        log_engine_state(&*engine.borrow());
-                        print_err(&From::from(r));
+                        if let Err(r) = libstratis::dbus_api::handle(
+                            &handle.connection,
+                            &item,
+                            &mut handle.tree,
+                            &handle.context,
+                        ) {
+                            log_engine_state(&*engine.borrow());
+                            print_err(&From::from(r));
+                        }
                     }
                 }
+
+                // Refresh list of dbus fds to poll for. This can change as
+                // D-Bus clients come and go.
+                fds.truncate(dbus_client_index_start);
+                fds.extend(handle.connection.watch_fds().iter().map(|w| w.to_pollfd()));
+            } else {
+                // See if we can bring up dbus.
+                if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
+                    info!("DBUS API is now available");
+
+                    // Register all the pools with dbus
+                    for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
+                        libstratis::dbus_api::register_pool(
+                            &handle.connection,
+                            &handle.context,
+                            &mut handle.tree,
+                            pool_uuid,
+                            pool,
+                            &handle.path,
+                        )?;
+                    }
+
+                    // Add dbus FD to fds as dbus is now available.
+                    fds.extend(handle.connection.watch_fds().iter().map(|w| w.to_pollfd()));
+                    dbus_handle = Some(handle);
+                }
             }
-
-            // Refresh list of dbus fds to poll for every time. This can change as
-            // D-Bus clients come and go.
-            fds.truncate(dbus_client_index_start);
-
-            fds.extend(dbus_conn.watch_fds().iter().map(|w| w.to_pollfd()));
         }
+
+        // If dbus support is compiled in and dbus isn't available we will set timeout to
+        // 1 second so that we periodically check to see if we can bring it up.
+        #[cfg(feature = "dbus_enabled")]
+        let poll_timeout = dbus_handle.as_ref().map_or(-1, |_| 1000);
+        // Default timeout is infinite
+        #[cfg(not(feature = "dbus_enabled"))]
+        let poll_timeout = -1;
 
         let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, poll_timeout) };
 

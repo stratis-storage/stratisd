@@ -205,25 +205,27 @@ fn register_pool_dbus(
     }
 }
 
+/// Returned data from when you connect a stratis engine to dbus.
+pub struct DbusConnectionData<'a> {
+    pub connection: Connection,
+    pub tree: Tree<MTFn<TData>, TData>,
+    pub path: dbus::Path<'a>,
+    pub context: DbusContext,
+}
+
 /// Connect a stratis engine to dbus.
-#[allow(type_complexity)]
-pub fn connect<'a>(
-    engine: Rc<RefCell<Engine>>,
-) -> Result<
-    (
-        Connection,
-        Tree<MTFn<TData>, TData>,
-        dbus::Path<'a>,
-        DbusContext,
-    ),
-    dbus::Error,
-> {
+pub fn connect<'a>(engine: Rc<RefCell<Engine>>) -> Result<DbusConnectionData<'a>, dbus::Error> {
     let c = Connection::get_private(BusType::System)?;
     let (tree, object_path) = get_base_tree(DbusContext::new(engine));
     let dbus_context = tree.get_data().clone();
     tree.set_registered(&c, true)?;
     c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32)?;
-    Ok((c, tree, object_path, dbus_context))
+    Ok(DbusConnectionData {
+        connection: c,
+        tree,
+        path: object_path,
+        context: dbus_context,
+    })
 }
 
 /// Given the UUID of a pool, register all the pertinent information with dbus.

@@ -157,6 +157,18 @@ fn trylock_pid_file() -> StratisResult<File> {
     }
 }
 
+#[derive(Debug)]
+struct EventHandler {
+    dbus_conn: Rc<RefCell<Connection>>,
+}
+
+impl EventHandler {
+    pub fn new(dbus_conn: Rc<RefCell<Connection>>) -> EventHandler {
+        EventHandler {
+            dbus_conn: dbus_conn,
+        }
+    }
+}
 /// Set up all sorts of signal and event handling mechanisms.
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered. Dump log entries on specified signal

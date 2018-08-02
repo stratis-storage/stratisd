@@ -10,7 +10,7 @@ use devicemapper::{Device, DmNameBuf};
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::devlinks;
-use super::super::engine::{Engine, Eventable, Pool};
+use super::super::engine::{Engine, EngineEvent, EngineListener, Eventable, Pool};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
@@ -95,6 +95,9 @@ pub struct StratEngine {
     // Maps name of DM devices we are watching to the most recent event number
     // we've handled for each
     watched_dev_last_event_nrs: HashMap<DmNameBuf, u32>,
+
+    /// A list of synchronous weak refs to listeners
+    listeners: Vec<Box<EngineListener>>,
 }
 
 impl StratEngine {
@@ -141,6 +144,7 @@ impl StratEngine {
             pools: table,
             incomplete_pools,
             watched_dev_last_event_nrs: HashMap::new(),
+            listeners: Vec::new(),
         };
 
         devlinks::setup_devlinks(engine.pools().iter())?;
@@ -314,6 +318,16 @@ impl Engine for StratEngine {
         self.watched_dev_last_event_nrs = device_list;
 
         Ok(())
+    }
+
+    fn register_listener(&mut self, listener: Box<EngineListener>) {
+        self.listeners.push(listener);
+    }
+
+    fn notify_listeners(&self, event: &EngineEvent) {
+        for listener in &self.listeners {
+            listener.notify(&event);
+        }
     }
 }
 

@@ -14,12 +14,20 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, Device, Sectors};
 
-use super::types::{
-    BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, RenameAction,
-};
+use super::types::{BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid,
+                   RenameAction};
 use stratis::StratisResult;
 
 pub const DEV_PATH: &str = "/dev/stratis";
+
+#[cfg(feature = "dbus_enabled")]
+#[derive(Debug, Clone)]
+pub enum EngineEvent {
+}
+
+pub trait EngineListener: Debug {
+    fn notify(&self, event: &EngineEvent);
+}
 
 pub trait Filesystem: Debug {
     /// path of the device node
@@ -246,6 +254,12 @@ pub trait Engine: Debug {
 
     /// Notify the engine that an event has occurred on the Eventable.
     fn evented(&mut self) -> StratisResult<()>;
+
+    /// Register a listener for EngineEvent notification
+    fn register_listener(&mut self, listener: Box<EngineListener>);
+
+    /// Notify listeners of EventEvents
+    fn notify_listeners(&self, ev: &EngineEvent);
 }
 
 /// Allows an Engine to include a fd in the event loop. See

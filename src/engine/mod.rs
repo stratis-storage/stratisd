@@ -10,6 +10,8 @@ pub use self::engine::BlockDev;
 pub use self::engine::Engine;
 pub use self::engine::Filesystem;
 pub use self::engine::Pool;
+#[cfg(feature = "dbus_enabled")]
+pub use self::engine::{EngineEvent, EngineListener};
 
 pub use self::sim_engine::SimEngine;
 pub use self::strat_engine::StratEngine;

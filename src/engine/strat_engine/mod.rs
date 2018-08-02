@@ -14,8 +14,10 @@ mod engine;
 mod pool;
 mod serde_structs;
 mod thinpool;
+mod throttle;
 
 pub use self::engine::StratEngine;
+pub use self::throttle::set_write_throttling;
 
 #[cfg(test)]
 mod tests;

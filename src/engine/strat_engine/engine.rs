@@ -10,7 +10,9 @@ use devicemapper::{Device, DmNameBuf};
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::devlinks;
-use super::super::engine::{Engine, EngineEvent, EngineListener, Eventable, Pool};
+use super::super::engine::{Engine, Eventable, Pool};
+#[cfg(feature = "dbus_enabled")]
+use super::super::engine::{EngineEvent, EngineListener};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
@@ -97,6 +99,7 @@ pub struct StratEngine {
     watched_dev_last_event_nrs: HashMap<DmNameBuf, u32>,
 
     /// A list of synchronous weak refs to listeners
+    #[cfg(feature = "dbus_enabled")]
     listeners: Vec<Box<EngineListener>>,
 }
 
@@ -144,6 +147,7 @@ impl StratEngine {
             pools: table,
             incomplete_pools,
             watched_dev_last_event_nrs: HashMap::new(),
+            #[cfg(feature = "dbus_enabled")]
             listeners: Vec::new(),
         };
 
@@ -259,6 +263,16 @@ impl Engine for StratEngine {
             self.pools.insert(old_name, uuid, pool);
             Err(err)
         } else {
+            #[cfg(feature = "dbus_enabled")]
+            {
+                if let Some(dbus_object_path) = pool.get_dbus_path() {
+                    self.notify_listeners(&EngineEvent::PoolRenamed {
+                        dbus_path: dbus_object_path.clone(),
+                        from: old_name.to_string(),
+                        to: new_name.to_string(),
+                    });
+                }
+            }
             self.pools.insert(new_name.clone(), uuid, pool);
             devlinks::pool_renamed(&old_name, &new_name)?;
             Ok(RenameAction::Renamed)
@@ -320,10 +334,12 @@ impl Engine for StratEngine {
         Ok(())
     }
 
+    #[cfg(feature = "dbus_enabled")]
     fn register_listener(&mut self, listener: Box<EngineListener>) {
         self.listeners.push(listener);
     }
 
+    #[cfg(feature = "dbus_enabled")]
     fn notify_listeners(&self, event: &EngineEvent) {
         for listener in &self.listeners {
             listener.notify(&event);

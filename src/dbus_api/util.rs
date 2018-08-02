@@ -2,11 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::cell::RefCell;
 use std::error::Error;
+use std::rc::Rc;
 
 use dbus;
+use dbus::arg::Variant;
 use dbus::arg::{ArgType, Iter, IterAppend};
+use dbus::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
 use dbus::tree::{MTFn, MethodErr, PropInfo};
+use dbus::Connection;
+use dbus::SignalArgs;
 
 use super::super::stratis::{ErrorEnum, StratisError};
 
@@ -97,5 +103,26 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Resul
         .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
     i.append(data.parent.clone());
+    Ok(())
+}
+
+/// Construct a signal that a property has changed.
+// Currently only handles returning string properties, since that's all that's
+// needed right now
+pub fn prop_changed_dispatch(
+    conn: &Rc<RefCell<Connection>>,
+    prop_name: &str,
+    new_value: &str,
+    path: &dbus::Path,
+) -> Result<(), ()> {
+    let mut prop_changed: PropertiesPropertiesChanged = Default::default();
+    prop_changed
+        .changed_properties
+        .insert(prop_name.into(), Variant(Box::new(new_value.to_owned())));
+
+    conn.borrow()
+        .send(prop_changed.to_emit_message(path))
+        .map_err(|_| ())?;
+
     Ok(())
 }

@@ -38,11 +38,14 @@ use nix::sys::signalfd::{SfdFlags, SignalFd};
 use nix::unistd::getpid;
 
 #[cfg(feature = "dbus_enabled")]
-use dbus::WatchEvent;
+use dbus::{Connection, WatchEvent};
 
 use devicemapper::Device;
-
+#[cfg(feature = "dbus_enabled")]
+use libstratis::dbus_api::{consts, prop_changed_dispatch};
 use libstratis::engine::{Engine, SimEngine, StratEngine};
+#[cfg(feature = "dbus_enabled")]
+use libstratis::engine::{EngineEvent, EngineListener};
 use libstratis::stratis::{alarm, buff_log};
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
 
@@ -157,11 +160,13 @@ fn trylock_pid_file() -> StratisResult<File> {
     }
 }
 
+#[cfg(feature = "dbus_enabled")]
 #[derive(Debug)]
 struct EventHandler {
     dbus_conn: Rc<RefCell<Connection>>,
 }
 
+#[cfg(feature = "dbus_enabled")]
 impl EventHandler {
     pub fn new(dbus_conn: Rc<RefCell<Connection>>) -> EventHandler {
         EventHandler {
@@ -169,6 +174,29 @@ impl EventHandler {
         }
     }
 }
+
+#[cfg(feature = "dbus_enabled")]
+impl EngineListener for EventHandler {
+    fn notify(&self, event: &EngineEvent) {
+        match event {
+            EngineEvent::PoolRenamed {
+                dbus_path,
+                from,
+                to,
+            } => {
+                if let Err(_) =
+                    prop_changed_dispatch(&self.dbus_conn, consts::POOL_NAME_PROP, to, dbus_path)
+                {
+                    error!(
+                        "PoolRenamed: {} from: {} to: {} failed to send dbus update.",
+                        dbus_path, from, to,
+                    );
+                }
+            }
+        }
+    }
+}
+
 /// Set up all sorts of signal and event handling mechanisms.
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered. Dump log entries on specified signal
@@ -396,7 +424,8 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 // See if we can bring up dbus.
                 if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
                     info!("DBUS API is now available");
-
+                    let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
+                    engine.borrow_mut().register_listener(event_handler);
                     // Register all the pools with dbus
                     for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
                         libstratis::dbus_api::register_pool(

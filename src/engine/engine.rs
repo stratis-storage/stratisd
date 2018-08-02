@@ -23,8 +23,14 @@ pub const DEV_PATH: &str = "/dev/stratis";
 #[cfg(feature = "dbus_enabled")]
 #[derive(Debug, Clone)]
 pub enum EngineEvent {
+    PoolRenamed {
+        dbus_path: dbus::Path<'static>,
+        from: String,
+        to: String,
+    },
 }
 
+#[cfg(feature = "dbus_enabled")]
 pub trait EngineListener: Debug {
     fn notify(&self, event: &EngineEvent);
 }
@@ -256,9 +262,11 @@ pub trait Engine: Debug {
     fn evented(&mut self) -> StratisResult<()>;
 
     /// Register a listener for EngineEvent notification
+    #[cfg(feature = "dbus_enabled")]
     fn register_listener(&mut self, listener: Box<EngineListener>);
 
     /// Notify listeners of EventEvents
+    #[cfg(feature = "dbus_enabled")]
     fn notify_listeners(&self, ev: &EngineEvent);
 }
 

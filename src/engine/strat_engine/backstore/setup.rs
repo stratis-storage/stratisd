@@ -203,7 +203,7 @@ pub fn get_blockdevs(
 
         // Locate the device in the metadata using its uuid. Return the device
         // metadata and whether it was a cache or a datadev.
-        let (tier, (_, bd_save)) = data_map
+        let (tier, &(_, bd_save)) = data_map
             .get(&dev_uuid)
             .map(|bd_save| (BlockDevTier::Data, bd_save))
             .or_else(|| {

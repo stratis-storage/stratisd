@@ -22,11 +22,11 @@ pub const DEV_PATH: &str = "/dev/stratis";
 
 #[cfg(feature = "dbus_enabled")]
 #[derive(Debug, Clone)]
-pub enum EngineEvent {
+pub enum EngineEvent<'a> {
     PoolRenamed {
-        dbus_path: dbus::Path<'static>,
-        from: String,
-        to: String,
+        dbus_path: &'a Option<dbus::Path<'static>>,
+        from: &'a str,
+        to: &'a str,
     },
 }
 

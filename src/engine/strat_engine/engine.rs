@@ -264,15 +264,12 @@ impl Engine for StratEngine {
             Err(err)
         } else {
             #[cfg(feature = "dbus_enabled")]
-            {
-                if let Some(dbus_object_path) = pool.get_dbus_path() {
-                    self.notify_listeners(&EngineEvent::PoolRenamed {
-                        dbus_path: dbus_object_path.clone(),
-                        from: old_name.to_string(),
-                        to: new_name.to_string(),
-                    });
-                }
-            }
+            self.notify_listeners(&EngineEvent::PoolRenamed {
+                dbus_path: pool.get_dbus_path(),
+                from: &*old_name,
+                to: &*new_name,
+            });
+
             self.pools.insert(new_name.clone(), uuid, pool);
             devlinks::pool_renamed(&old_name, &new_name)?;
             Ok(RenameAction::Renamed)

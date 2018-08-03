@@ -184,13 +184,18 @@ impl EngineListener for EventHandler {
                 from,
                 to,
             } => {
-                if let Err(_) =
-                    prop_changed_dispatch(&self.dbus_conn, consts::POOL_NAME_PROP, to, dbus_path)
-                {
-                    error!(
-                        "PoolRenamed: {} from: {} to: {} failed to send dbus update.",
-                        dbus_path, from, to,
-                    );
+                if let &Some(dbus_path) = dbus_path {
+                    if let Err(_) = prop_changed_dispatch(
+                        &self.dbus_conn,
+                        consts::POOL_NAME_PROP,
+                        to,
+                        dbus_path,
+                    ) {
+                        error!(
+                            "PoolRenamed: {} from: {} to: {} failed to send dbus update.",
+                            dbus_path, from, to,
+                        );
+                    }
                 }
             }
         }

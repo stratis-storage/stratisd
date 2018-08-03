@@ -16,8 +16,7 @@ use devicemapper::Device;
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::engine::{Engine, Eventable, Pool};
-#[cfg(feature = "dbus_enabled")]
-use super::super::engine::{EngineEvent, EngineListener};
+use super::super::engine::{EngineEvent, EngineListener, EngineListenerList};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
@@ -28,9 +27,7 @@ use super::randomization::Randomizer;
 pub struct SimEngine {
     pools: Table<SimPool>,
     rdm: Rc<RefCell<Randomizer>>,
-    /// A list of synchronous weak refs to listeners
-    #[cfg(feature = "dbus_enabled")]
-    listeners: Vec<Box<EngineListener>>,
+    listeners: EngineListenerList,
 }
 
 impl SimEngine {}
@@ -140,15 +137,13 @@ impl Engine for SimEngine {
     fn evented(&mut self) -> StratisResult<()> {
         Ok(())
     }
-    #[cfg(feature = "dbus_enabled")]
+
     fn register_listener(&mut self, listener: Box<EngineListener>) {
-        self.listeners.push(listener);
+        self.listeners.register_listener(listener);
     }
-    #[cfg(feature = "dbus_enabled")]
+
     fn notify_listeners(&self, event: &EngineEvent) {
-        for listener in &self.listeners {
-            listener.notify(&event);
-        }
+        self.listeners.notify(&event)
     }
 }
 

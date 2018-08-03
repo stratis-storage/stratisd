@@ -11,8 +11,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::devlinks;
 use super::super::engine::{Engine, Eventable, Pool};
-#[cfg(feature = "dbus_enabled")]
-use super::super::engine::{EngineEvent, EngineListener};
+use super::super::engine::{EngineEvent, EngineListener, EngineListenerList};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
@@ -98,9 +97,7 @@ pub struct StratEngine {
     // we've handled for each
     watched_dev_last_event_nrs: HashMap<DmNameBuf, u32>,
 
-    /// A list of synchronous weak refs to listeners
-    #[cfg(feature = "dbus_enabled")]
-    listeners: Vec<Box<EngineListener>>,
+    listeners: EngineListenerList,
 }
 
 impl StratEngine {
@@ -147,8 +144,7 @@ impl StratEngine {
             pools: table,
             incomplete_pools,
             watched_dev_last_event_nrs: HashMap::new(),
-            #[cfg(feature = "dbus_enabled")]
-            listeners: Vec::new(),
+            listeners: EngineListenerList::new(),
         };
 
         devlinks::setup_devlinks(engine.pools().iter())?;
@@ -263,8 +259,8 @@ impl Engine for StratEngine {
             self.pools.insert(old_name, uuid, pool);
             Err(err)
         } else {
-            #[cfg(feature = "dbus_enabled")]
-            self.notify_listeners(&EngineEvent::PoolRenamed {
+            self.listeners.notify(&EngineEvent::PoolRenamed {
+                #[cfg(feature = "dbus_enabled")]
                 dbus_path: pool.get_dbus_path(),
                 from: &*old_name,
                 to: &*new_name,
@@ -331,16 +327,12 @@ impl Engine for StratEngine {
         Ok(())
     }
 
-    #[cfg(feature = "dbus_enabled")]
     fn register_listener(&mut self, listener: Box<EngineListener>) {
-        self.listeners.push(listener);
+        self.listeners.register_listener(listener);
     }
 
-    #[cfg(feature = "dbus_enabled")]
     fn notify_listeners(&self, event: &EngineEvent) {
-        for listener in &self.listeners {
-            listener.notify(&event);
-        }
+        self.listeners.notify(&event)
     }
 }
 

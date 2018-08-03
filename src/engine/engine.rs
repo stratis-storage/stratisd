@@ -24,15 +24,47 @@ pub const DEV_PATH: &str = "/dev/stratis";
 #[derive(Debug, Clone)]
 pub enum EngineEvent<'a> {
     PoolRenamed {
+        #[cfg(feature = "dbus_enabled")]
         dbus_path: &'a Option<dbus::Path<'static>>,
         from: &'a str,
         to: &'a str,
     },
 }
 
-#[cfg(feature = "dbus_enabled")]
 pub trait EngineListener: Debug {
     fn notify(&self, event: &EngineEvent);
+}
+
+#[derive(Debug)]
+pub struct EngineListenerList {
+    listeners: Vec<Box<EngineListener>>,
+}
+
+impl EngineListenerList {
+    /// Create a new EngineListenerList.
+    pub fn new() -> EngineListenerList {
+        EngineListenerList {
+            listeners: Vec::new(),
+        }
+    }
+
+    /// Add a listener.
+    pub fn register_listener(&mut self, listener: Box<EngineListener>) {
+        self.listeners.push(listener);
+    }
+
+    /// Notify a listener.
+    pub fn notify(&self, event: &EngineEvent) {
+        for listener in &self.listeners {
+            listener.notify(&event);
+        }
+    }
+}
+
+impl Default for EngineListenerList {
+    fn default() -> EngineListenerList {
+        EngineListenerList::new()
+    }
 }
 
 pub trait Filesystem: Debug {
@@ -262,11 +294,9 @@ pub trait Engine: Debug {
     fn evented(&mut self) -> StratisResult<()>;
 
     /// Register a listener for EngineEvent notification
-    #[cfg(feature = "dbus_enabled")]
     fn register_listener(&mut self, listener: Box<EngineListener>);
 
     /// Notify listeners of EventEvents
-    #[cfg(feature = "dbus_enabled")]
     fn notify_listeners(&self, ev: &EngineEvent);
 }
 

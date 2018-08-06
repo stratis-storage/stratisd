@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::vec::Vec;
+
 use dbus;
 use dbus::arg::IterAppend;
 use dbus::tree::{
@@ -54,6 +56,11 @@ pub fn create_dbus_filesystem<'a>(
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid);
 
+    let mounts = f.property::<&Vec<String>, _>("Mounts", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_filesystem_mounts);
+
     let object_name = format!(
         "{}/{}",
         STRATIS_BASE_PATH,
@@ -70,7 +77,8 @@ pub fn create_dbus_filesystem<'a>(
                 .add_p(devnode_property)
                 .add_p(name_property)
                 .add_p(pool_property)
-                .add_p(uuid_property),
+                .add_p(uuid_property)
+                .add_p(mounts),
         );
 
     let path = object_path.get_name().to_owned();
@@ -188,4 +196,17 @@ fn get_filesystem_name(
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
     get_filesystem_property(i, p, |(name, _)| Ok(name.to_owned()))
+}
+
+fn get_filesystem_mounts(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_filesystem_property(i, p, |(_, fs)| match fs.get_mount_points() {
+        Ok(mounts) => Ok(mounts),
+        Err(e) => Err(MethodErr::failed(&format!(
+            "Failed to retrieve mount points {:?}",
+            e
+        ))),
+    })
 }

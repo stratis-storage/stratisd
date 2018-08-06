@@ -46,6 +46,12 @@ pub enum FilesystemStatus {
     Failed,
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+enum MountPointSearch {
+    ReturnFirstOrLastError,
+    ReturnAllorFirstError,
+}
+
 impl StratFilesystem {
     /// Create a StratFilesystem on top of the given ThinDev.
     pub fn initialize(fs_id: FilesystemUuid, thin_dev: ThinDev) -> StratisResult<StratFilesystem> {
@@ -166,10 +172,12 @@ impl StratFilesystem {
         current_size
     }
 
-    /// Get one (non-deterministic in the presence of errors) of the mount_point(s) for the file
-    /// system that is contained on the block device referred to as self.devnode(), i.e. the device
-    /// node, while ignoring parse errors as long as at least one mount point is found.
-    pub fn get_mount_point(&self) -> StratisResult<Option<PathBuf>> {
+    /// Return one or more mount points based on the behavior.  If we pass ReturnFirstOrLastError,
+    /// then we will keep searching for at least one mount point while encountering errors.  If we
+    /// find none, we will return last encountered error.  If we pass ReturnAllorFirstError, we will
+    /// return the first encountered error, else zero or more mount points found.
+    fn mount_points(&self, behavior :MountPointSearch) -> StratisResult<Vec<String>> {
+        let mut mount_points: Vec<String> = Vec::new();
         let major = u64::from(self.thin_dev.device().major);
         let minor = u64::from(self.thin_dev.device().minor);
 
@@ -182,16 +190,51 @@ impl StratFilesystem {
             match mp {
                 Ok(mount) => {
                     if mount.major as u64 == major && mount.minor as u64 == minor {
-                        return Ok(Some(PathBuf::from(mount.mount_point.into_owned())));
+                        mount_points.push(
+                            mount
+                                .mount_point
+                                .into_owned()
+                                .into_string()
+                                .expect("Linux is utf"),
+                        );
+
+                        if behavior == MountPointSearch::ReturnFirstOrLastError {
+                            return Ok(mount_points);
+                        }
                     }
                 }
                 Err(e) => {
                     last_error = Some(format!("Error during parsing {:?} {:?}", *self, e));
+                    if behavior == MountPointSearch::ReturnAllorFirstError {
+                        break;
+                    }
                 }
             }
         }
 
-        last_error.map_or(Ok(None), |e| Err(StratisError::Engine(ErrorEnum::Error, e)))
+        last_error.map_or(Ok(mount_points), |e| {
+            Err(StratisError::Engine(ErrorEnum::Error, e))
+        })
+    }
+
+    /// Get one (non-deterministic in the presence of errors) of the mount_point(s) for the file
+    /// system that is contained on the block device referred to as self.devnode(), i.e. the device
+    /// node, while ignoring parse errors until at least one mount point is found.
+    pub fn get_mount_point(&self) -> StratisResult<Option<PathBuf>> {
+        let result = self.mount_points(MountPointSearch::ReturnFirstOrLastError)?;
+
+        if result.len() > 0 {
+            Ok(Some(PathBuf::from(result[0].clone())))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Retrieve all the mounts mounts for this filesystem.  If we encounter errors, we will
+    /// immediately stop searching and return the first encountered error.
+    #[cfg(feature = "dbus_enabled")]
+    pub fn get_mount_points(&self) -> StratisResult<Vec<String>> {
+        self.mount_points(MountPointSearch::ReturnAllorFirstError)
     }
 
     /// Tear down the filesystem.
@@ -241,6 +284,11 @@ impl Filesystem for StratFilesystem {
     #[cfg(feature = "dbus_enabled")]
     fn get_dbus_path(&self) -> &Option<dbus::Path<'static>> {
         &self.dbus_path
+    }
+
+    #[cfg(feature = "dbus_enabled")]
+    fn get_mount_points(&self) -> StratisResult<Vec<String>> {
+        self.get_mount_points()
     }
 }
 

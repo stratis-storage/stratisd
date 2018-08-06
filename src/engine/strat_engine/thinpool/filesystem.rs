@@ -140,7 +140,7 @@ impl StratFilesystem {
                 //
                 // If the source is unmounted the XFS log will be clean so
                 // we can skip the mount/unmount.
-                if self.get_mount_point()?.is_some() {
+                if !self.mount_points()?.is_empty() {
                     let tmp_dir = tempfile::Builder::new().prefix("stratis_mp_").tempdir()?;
                     // Mount the snapshot with the "nouuid" option. mount
                     // will fail due to duplicate UUID otherwise.
@@ -177,7 +177,7 @@ impl StratFilesystem {
     pub fn check(&mut self) -> StratisResult<FilesystemStatus> {
         match self.thin_dev.status(get_dm())? {
             ThinStatus::Working(_) => {
-                if let Some(mount_point) = self.get_mount_point()? {
+                if let Some(mount_point) = self.mount_points()?.first() {
                     let (fs_total_bytes, fs_total_used_bytes) = fs_usage(&mount_point)?;
                     let free_bytes = fs_total_bytes - fs_total_used_bytes;
                     if free_bytes.sectors() < FILESYSTEM_LOWATER {
@@ -207,10 +207,9 @@ impl StratFilesystem {
         current_size
     }
 
-    /// Get one (non-deterministic in the presence of errors) of the mount_point(s) for the file
-    /// system that is contained on the block device referred to as self.devnode(), i.e. the device
-    /// node, while ignoring parse errors as long as at least one mount point is found.
-    pub fn get_mount_point(&self) -> StratisResult<Option<PathBuf>> {
+    /// Get the mount_point(s) for the file system that is contained on the
+    /// ThinDev. Match on major:minor values.
+    pub fn mount_points(&self) -> StratisResult<Vec<PathBuf>> {
         let major = u64::from(self.thin_dev.device().major);
         let minor = u64::from(self.thin_dev.device().minor);
 
@@ -218,21 +217,22 @@ impl StratFilesystem {
         File::open("/proc/self/mountinfo")?.read_to_string(&mut mount_data)?;
         let parser = libmount::mountinfo::Parser::new(mount_data.as_bytes());
 
-        let mut last_error: Option<String> = None;
+        let mut ret_vec = Vec::new();
         for mp in parser {
             match mp {
                 Ok(mount) => {
                     if mount.major as u64 == major && mount.minor as u64 == minor {
-                        return Ok(Some(PathBuf::from(mount.mount_point.into_owned())));
+                        ret_vec.push(PathBuf::from(&mount.mount_point));
                     }
                 }
                 Err(e) => {
-                    last_error = Some(format!("Error during parsing {:?} {:?}", *self, e));
+                    let error_msg = format!("Error during parsing {:?}: {:?}", *self, e);
+                    return Err(StratisError::Engine(ErrorEnum::Error, error_msg));
                 }
             }
         }
 
-        last_error.map_or(Ok(None), |e| Err(StratisError::Engine(ErrorEnum::Error, e)))
+        Ok(ret_vec)
     }
 
     /// Tear down the filesystem.

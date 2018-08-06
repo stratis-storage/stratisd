@@ -4,6 +4,7 @@
 
 #[cfg(feature = "dbus_enabled")]
 use dbus;
+use uuid::Uuid;
 
 use std::fs::File;
 use std::io::Read;
@@ -22,11 +23,14 @@ use tempfile;
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::engine::Filesystem;
-use super::super::super::types::{FilesystemUuid, Name};
+use super::super::super::types::{FilesystemUuid, Name, PoolUuid};
 
 use super::super::cmd::{create_fs, set_uuid, xfs_growfs};
 use super::super::dm::get_dm;
+use super::super::dmnames::{format_thin_ids, ThinRole};
 use super::super::serde_structs::FilesystemSave;
+
+const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
 /// TODO: confirm that 256 MiB leaves enough time for stratisd to respond and extend before
 /// the filesystem is out of space.
@@ -48,20 +52,54 @@ pub enum FilesystemStatus {
 
 impl StratFilesystem {
     /// Create a StratFilesystem on top of the given ThinDev.
-    pub fn initialize(fs_id: FilesystemUuid, thin_dev: ThinDev) -> StratisResult<StratFilesystem> {
-        let fs = StratFilesystem::setup(thin_dev);
+    pub fn initialize(
+        pool_uuid: PoolUuid,
+        thinpool_dev: &ThinPoolDev,
+        size: Option<Sectors>,
+        id: ThinDevId,
+    ) -> StratisResult<(FilesystemUuid, StratFilesystem)> {
+        let fs_uuid = Uuid::new_v4();
+        let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
+        let thin_dev = ThinDev::new(
+            get_dm(),
+            &dm_name,
+            Some(&dm_uuid),
+            size.unwrap_or(DEFAULT_THIN_DEV_SIZE),
+            thinpool_dev,
+            id,
+        )?;
 
-        create_fs(&fs.devnode(), fs_id)?;
-        Ok(fs)
+        create_fs(&thin_dev.devnode(), fs_uuid)?;
+        Ok((
+            fs_uuid,
+            StratFilesystem {
+                thin_dev,
+                #[cfg(feature = "dbus_enabled")]
+                dbus_path: None,
+            },
+        ))
     }
 
     /// Build a StratFilesystem that includes the ThinDev and related info.
-    pub fn setup(thin_dev: ThinDev) -> StratFilesystem {
-        StratFilesystem {
+    pub fn setup(
+        pool_uuid: PoolUuid,
+        thinpool_dev: &ThinPoolDev,
+        fssave: &FilesystemSave,
+    ) -> StratisResult<StratFilesystem> {
+        let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fssave.uuid));
+        let thin_dev = ThinDev::setup(
+            get_dm(),
+            &dm_name,
+            Some(&dm_uuid),
+            fssave.size,
+            &thinpool_dev,
+            fssave.thin_id,
+        )?;
+        Ok(StratFilesystem {
             thin_dev,
             #[cfg(feature = "dbus_enabled")]
             dbus_path: None,
-        }
+        })
     }
 
     /// Create a snapshot of the filesystem. Return the resulting filesystem/ThinDev
@@ -113,7 +151,11 @@ impl StratFilesystem {
                 }
 
                 set_uuid(&thin_dev.devnode(), snapshot_fs_uuid)?;
-                Ok(StratFilesystem::setup(thin_dev))
+                Ok(StratFilesystem {
+                    thin_dev,
+                    #[cfg(feature = "dbus_enabled")]
+                    dbus_path: None,
+                })
             }
             Err(e) => Err(StratisError::Engine(
                 ErrorEnum::Error,
@@ -151,12 +193,6 @@ impl StratFilesystem {
             ThinStatus::Fail => return Ok(FilesystemStatus::Failed),
         }
         Ok(FilesystemStatus::Good)
-    }
-
-    /// The thin id for the thin device that backs this filesystem.
-    #[cfg(test)]
-    pub fn thin_id(&self) -> ThinDevId {
-        self.thin_dev.id()
     }
 
     /// Return an extend size for the thindev under the filesystem

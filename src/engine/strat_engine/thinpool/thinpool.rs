@@ -12,7 +12,7 @@ use uuid::Uuid;
 use devicemapper as dm;
 use devicemapper::{
     device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams, LinearDev,
-    LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine, ThinDev, ThinDevId,
+    LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine, ThinDevId,
     ThinPoolDev, ThinPoolStatusSummary, IEC,
 };
 
@@ -39,8 +39,6 @@ use super::thinids::ThinDevIdPool;
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
 const META_LOWATER: MetaBlocks = MetaBlocks(512);
-
-const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
 const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
 pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
@@ -309,21 +307,8 @@ impl ThinPool {
         let filesystems = filesystem_metadatas
             .iter()
             .map(|fssave| {
-                let (dm_name, dm_uuid) =
-                    format_thin_ids(pool_uuid, ThinRole::Filesystem(fssave.uuid));
-                let thin_dev = ThinDev::setup(
-                    get_dm(),
-                    &dm_name,
-                    Some(&dm_uuid),
-                    fssave.size,
-                    &thinpool_dev,
-                    fssave.thin_id,
-                )?;
-                Ok((
-                    Name::new(fssave.name.to_owned()),
-                    fssave.uuid,
-                    StratFilesystem::setup(thin_dev),
-                ))
+                StratFilesystem::setup(pool_uuid, &thinpool_dev, fssave)
+                    .map(|fs| (Name::new(fssave.name.to_owned()), fssave.uuid, fs))
             })
             .collect::<StratisResult<Vec<_>>>()?;
 
@@ -586,18 +571,8 @@ impl ThinPool {
         name: &str,
         size: Option<Sectors>,
     ) -> StratisResult<FilesystemUuid> {
-        let fs_uuid = Uuid::new_v4();
-        let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
-        let thin_dev = ThinDev::new(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            size.unwrap_or(DEFAULT_THIN_DEV_SIZE),
-            &self.thin_pool,
-            self.id_gen.new_id()?,
-        )?;
-
-        let new_filesystem = StratFilesystem::initialize(fs_uuid, thin_dev)?;
+        let (fs_uuid, new_filesystem) =
+            StratFilesystem::initialize(pool_uuid, &self.thin_pool, size, self.id_gen.new_id()?)?;
         let name = Name::new(name.to_owned());
         self.mdv.save_fs(&name, fs_uuid, &new_filesystem)?;
         devlinks::filesystem_added(pool_name, &name, &new_filesystem.devnode())?;
@@ -1224,28 +1199,7 @@ mod tests {
         let fs_name = "stratis_test_filesystem";
         let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, &fs_name, None)
             .unwrap();
-        let thin_id = pool.get_filesystem_by_uuid(fs_uuid).unwrap().1.thin_id();
-        let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
-        let thindev = ThinDev::setup(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            DEFAULT_THIN_DEV_SIZE,
-            &pool.thin_pool,
-            thin_id,
-        );
-        assert!(thindev.is_ok());
         pool.destroy_filesystem(pool_name, fs_uuid).unwrap();
-
-        let thindev = ThinDev::setup(
-            get_dm(),
-            &dm_name,
-            None,
-            DEFAULT_THIN_DEV_SIZE,
-            &pool.thin_pool,
-            thin_id,
-        );
-        assert!(thindev.is_err());
         let flexdevs: FlexDevsSave = pool.record();
         pool.teardown().unwrap();
 

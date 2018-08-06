@@ -240,6 +240,26 @@ impl StratFilesystem {
         self.created
     }
 
+    /// The amount of data stored on the filesystem, including overhead.
+    pub fn used(&self) -> StratisResult<Bytes> {
+        match self.mount_points()?.first() {
+            Some(mount_pt) => Ok(fs_usage(mount_pt)?.1),
+            None => {
+                let tmp_dir = tempfile::Builder::new().prefix("stratis_mp_").tempdir()?;
+                mount(
+                    Some(&self.devnode()),
+                    tmp_dir.path(),
+                    Some("xfs"),
+                    MsFlags::empty(),
+                    Some("nouuid"),
+                )?;
+                let used_result = fs_usage(tmp_dir.path());
+                umount(tmp_dir.path())?;
+                Ok(used_result?.1)
+            }
+        }
+    }
+
     /// Tear down the filesystem.
     pub fn teardown(self) -> StratisResult<()> {
         self.thin_dev.teardown(get_dm())?;

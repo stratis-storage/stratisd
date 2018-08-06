@@ -6,6 +6,7 @@
 
 use std::borrow::BorrowMut;
 
+use either::Either;
 use uuid::Uuid;
 
 use devicemapper as dm;
@@ -168,12 +169,16 @@ impl ThinPool {
         data_block_size: Sectors,
         backstore: &mut Backstore,
     ) -> StratisResult<ThinPool> {
-        let mut segments_list = match backstore.alloc_space(&[
-            thin_pool_size.meta_size(),
-            thin_pool_size.meta_size(),
-            thin_pool_size.data_size(),
-            thin_pool_size.mdv_size(),
-        ]) {
+        let mut segments_list = match backstore
+            .alloc_space(Either::Right(&[
+                thin_pool_size.meta_size(),
+                thin_pool_size.meta_size(),
+                thin_pool_size.data_size(),
+                thin_pool_size.mdv_size(),
+            ]))
+            .right()
+            .expect("argument in Right means return in Right")
+        {
             Some(sl) => sl,
             None => {
                 let err_msg = "Could not allocate sufficient space for thinpool devices.";
@@ -487,29 +492,6 @@ impl ThinPool {
             Sectors(*INITIAL_META_SIZE.sectors() / *INITIAL_META_SIZE)
         }
 
-        /// Try to allocate request amount from the backstore. If initiali
-        /// request fails, divide by 2 and continue trying until a request
-        /// succeeds or the requested amount is 0. Only allocate amounts
-        /// divisible by modulus.
-        /// Precondition: modulus != 0
-        /// Postcondition: result is None OR modulus <= result.1 <= request
-        /// Postcondition: result.1 is divisible by modulus
-        fn try_to_allocate(
-            backstore: &mut Backstore,
-            request: Sectors,
-            modulus: Sectors,
-        ) -> Option<(Sectors, Sectors)> {
-            assert!(modulus != Sectors(0));
-            let (mut internal_request, mut result) = ((request / modulus) * modulus, None);
-            while result.is_none() && internal_request != Sectors(0) {
-                result = backstore.alloc_space(&[internal_request]);
-                let new_request = internal_request / 2usize;
-                internal_request = (new_request / modulus) * modulus;
-            }
-
-            result.map(|l| l.first().cloned().expect("must have exactly one entry"))
-        }
-
         /// Extend the thinpool w/ a new data region if data is true, else a new
         /// metadata region. There may be multiple segments, but they are all on
         /// the same device. Returns an error if any of the devicemapper
@@ -551,7 +533,11 @@ impl ThinPool {
         } else {
             meta_block_size()
         };
-        if let Some(region) = try_to_allocate(backstore, extend_size, modulus) {
+        if let Some(region) = backstore
+            .alloc_space(Either::Left((extend_size, modulus)))
+            .left()
+            .expect("argument in Left means result in Left")
+        {
             extend(self, backstore_device, region, data)?;
             Ok(region.1)
         } else {

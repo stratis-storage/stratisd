@@ -78,6 +78,8 @@ pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
 
     // If the amount allocated to the cap device is less than the amount
     // allocated to the flex devices, consider the situation an error.
+    // Consider it an error if the amount allocated to the cap device is 0.
+    // If this is the case, then the thin pool can not exist.
     {
         let total_allocated = metadata
             .backstore
@@ -85,6 +87,14 @@ pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
             .iter()
             .map(|x| x.2)
             .sum::<Sectors>();
+
+        if total_allocated == Sectors(0) {
+            let err_msg = format!(
+                "no segments allocated to the cap device for pool {}",
+                metadata.name
+            );
+            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+        }
 
         if next > total_allocated {
             let err_msg = format!(
@@ -222,10 +232,26 @@ impl StratPool {
                 .iter()
                 .any(|x| dm_name == &**x)
         );
-        if self.thin_pool.check(&mut self.backstore)? {
+        if self.thin_pool.check(pool_uuid, &mut self.backstore)? {
             self.write_metadata(pool_name)?;
         }
         Ok(())
+    }
+
+    /// Add cachedevs to the pool, this requires that the pool be suspended
+    /// and resumed, in order to allow manipulation of the cache.
+    fn add_cachedevs(
+        &mut self,
+        pool_uuid: PoolUuid,
+        paths: &[&Path],
+        force: bool,
+    ) -> StratisResult<Vec<DevUuid>> {
+        self.thin_pool.suspend()?;
+        let result = self.backstore
+            .add_blockdevs(pool_uuid, paths, BlockDevTier::Cache, force)?;
+        self.thin_pool.set_device(self.backstore.device().expect("Since thin pool exists, space must have been allocated from the backstore, so backstore must have a cap device"))?;
+        self.thin_pool.resume()?;
+        Ok(result)
     }
 
     pub fn record(&self, name: &str) -> PoolSave {
@@ -274,10 +300,16 @@ impl Pool for StratPool {
         tier: BlockDevTier,
         force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
-        self.thin_pool.suspend()?;
-        let bdev_info = self.backstore.add_blockdevs(pool_uuid, paths, tier, force)?;
-        self.thin_pool.set_device(self.backstore.device())?;
-        self.thin_pool.resume()?;
+        let bdev_info = if tier == BlockDevTier::Cache {
+            // If adding cache devices, must suspend the pool, since the cache
+            // must be augmented with the new devices.
+            self.add_cachedevs(pool_uuid, paths, force)
+        } else {
+            // If just adding data devices, no need to suspend the pool.
+            // No action will be taken on the DM devices.
+            self.backstore
+                .add_blockdevs(pool_uuid, paths, BlockDevTier::Data, force)
+        }?;
         self.write_metadata(pool_name)?;
         Ok(bdev_info)
     }

@@ -6,55 +6,31 @@
 
 use std::path::Path;
 
-use devicemapper::{CacheDev, DmDevice, LinearDev, Sectors};
+use devicemapper::Sectors;
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
-use super::super::dm::get_dm;
-use super::super::dmnames::{format_backstore_ids, CacheRole};
-
 use super::blockdev::StratBlockDev;
-use super::blockdevmgr::{coalesce_blkdevsegs, map_to_dm, BlkDevSegment, BlockDevMgr, Segment};
+use super::blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment};
 
 /// Handles the lowest level, base layer of this tier.
-/// The dm_device organizes all block devs into a single linear allocation
-/// pool. This structure can allocate additional space to the upper layer,
-/// but it cannot accept returned space. When it is extended to be able to
-/// accept returned space the allocation algorithm will have to be revised.
-/// All available sectors on blockdevs in the manager are allocated to
-/// the DM device.
 #[derive(Debug)]
 pub struct DataTier {
     /// Manages the individual block devices
-    /// it is always the case block_mgr.avail_space() == 0.
     pub block_mgr: BlockDevMgr,
     /// The list of segments granted by block_mgr and used by dm_device
-    /// It is always the case that block_mgr.avail_space() == 0, i.e., all
-    /// available space in block_mgr is allocated to the DM device.
     pub segments: Vec<BlkDevSegment>,
 }
 
 impl DataTier {
     /// Setup a previously existing data layer from the block_mgr and
     /// previously allocated segments.
-    ///
-    /// Returns the DataTier and the linear DM device that was created during
-    /// setup.
     pub fn setup(
-        pool_uuid: PoolUuid,
         block_mgr: BlockDevMgr,
         segments: &[(DevUuid, Sectors, Sectors)],
-    ) -> StratisResult<(DataTier, LinearDev)> {
-        if block_mgr.avail_space() != Sectors(0) {
-            let err_msg = format!(
-                "{} unallocated to device; probable metadata corruption",
-                block_mgr.avail_space()
-            );
-            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
-        }
-
+    ) -> StratisResult<DataTier> {
         let uuid_to_devno = block_mgr.uuid_to_devno();
         let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> StratisResult<BlkDevSegment> {
             let device = uuid_to_devno(triple.0).ok_or_else(|| {
@@ -73,44 +49,18 @@ impl DataTier {
             .map(&mapper)
             .collect::<StratisResult<Vec<_>>>()?;
 
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
-        let ld = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), map_to_dm(&segments))?;
-
-        Ok((
-            DataTier {
-                block_mgr,
-                segments,
-            },
-            ld,
-        ))
+        Ok(DataTier {
+            block_mgr,
+            segments,
+        })
     }
 
     /// Setup a new DataTier struct from the block_mgr.
-    ///
-    /// Returns the DataTier and the linear device that was created.
-    ///
-    /// WARNING: metadata changing event
-    pub fn new(
-        pool_uuid: PoolUuid,
-        mut block_mgr: BlockDevMgr,
-    ) -> StratisResult<(DataTier, LinearDev)> {
-        let avail_space = block_mgr.avail_space();
-        let segments = block_mgr
-            .alloc_space(&[avail_space])
-            .expect("asked for exactly the space available, must get")
-            .iter()
-            .flat_map(|s| s.iter())
-            .cloned()
-            .collect::<Vec<_>>();
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
-        let ld = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), map_to_dm(&segments))?;
-        Ok((
-            DataTier {
-                block_mgr,
-                segments,
-            },
-            ld,
-        ))
+    pub fn new(block_mgr: BlockDevMgr) -> DataTier {
+        DataTier {
+            block_mgr,
+            segments: vec![],
+        }
     }
 
     /// Add the given paths to self. Return UUIDs of the new blockdevs
@@ -119,50 +69,33 @@ impl DataTier {
     pub fn add(
         &mut self,
         pool_uuid: PoolUuid,
-        cache: Option<&mut CacheDev>,
-        linear: Option<&mut LinearDev>,
         paths: &[&Path],
         force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
-        // These are here so that if invariant is false, the method fails
-        // before allocating the segments from the block_mgr.
-        // These two statements combined are equivalent to
-        // cache.is_some() XOR linear.is_some(), but they may be clearer and
-        // Rust does not seem to have a boolean XOR operator, anyway.
-        assert!(!(cache.is_some() && linear.is_some()));
-        assert!(!(cache.is_none() && linear.is_none()));
-
-        let uuids = self.block_mgr.add(pool_uuid, paths, force)?;
-
-        let avail_space = self.block_mgr.avail_space();
-        let segments = self.block_mgr
-            .alloc_space(&[avail_space])
-            .expect("asked for exactly the space available, must get")
-            .iter()
-            .flat_map(|s| s.iter())
-            .cloned()
-            .collect::<Vec<_>>();
-        let coalesced = coalesce_blkdevsegs(&self.segments, &segments);
-        let table = map_to_dm(&coalesced);
-
-        match (cache, linear) {
-            (Some(cache), None) => {
-                cache.set_origin_table(get_dm(), table)?;
-                cache.resume(get_dm())
-            }
-            (None, Some(linear)) => {
-                linear.set_table(get_dm(), table)?;
-                linear.resume(get_dm())
-            }
-            _ => panic!("see assertions at top of method"),
-        }?;
-
-        self.segments = coalesced;
-
-        Ok(uuids)
+        self.block_mgr.add(pool_uuid, paths, force)
     }
 
-    /// All the sectors available to this device
+    /// Allocate at least request sectors from unallocated segments in
+    /// block devices belonging to the data tier. Return true if requested
+    /// amount or more was allocated, otherwise, false.
+    pub fn alloc_segments(&mut self, request: Sectors) -> bool {
+        match self.block_mgr.alloc_space(&[request]) {
+            Some(segments) => {
+                self.segments = coalesce_blkdevsegs(
+                    &self.segments,
+                    &segments
+                        .iter()
+                        .flat_map(|s| s.iter())
+                        .cloned()
+                        .collect::<Vec<_>>(),
+                );
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// All the blockdev sectors that have been mapped to an upper device.
     pub fn capacity(&self) -> Sectors {
         self.segments
             .iter()

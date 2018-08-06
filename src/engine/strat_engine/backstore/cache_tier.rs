@@ -6,22 +6,14 @@
 
 use std::path::Path;
 
-use devicemapper::{CacheDev, DmDevice, LinearDev, Sectors, IEC};
+use devicemapper::{Sectors, IEC};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
-use super::super::device::wipe_sectors;
-use super::super::dm::get_dm;
-use super::super::dmnames::{format_backstore_ids, CacheRole};
-
 use super::blockdev::StratBlockDev;
-use super::blockdevmgr::{coalesce_blkdevsegs, map_to_dm, BlkDevSegment, BlockDevMgr, Segment};
-
-/// Use a cache block size that the kernel docs indicate is the largest
-/// typical size.
-const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
+use super::blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment};
 
 /// Handles the cache devices.
 #[derive(Debug)]
@@ -39,16 +31,11 @@ pub struct CacheTier {
 impl CacheTier {
     /// Setup a previously existing cache layer from the block_mgr and
     /// previously allocated segments.
-    ///
-    /// Returns the CacheTier and the cache DM device that was created during
-    /// setup.
     pub fn setup(
-        pool_uuid: PoolUuid,
         block_mgr: BlockDevMgr,
-        origin: LinearDev,
         cache_segments: &[(DevUuid, Sectors, Sectors)],
         meta_segments: &[(DevUuid, Sectors, Sectors)],
-    ) -> StratisResult<(CacheTier, CacheDev)> {
+    ) -> StratisResult<CacheTier> {
         if block_mgr.avail_space() != Sectors(0) {
             let err_msg = format!(
                 "{} unallocated to device; probable metadata corruption",
@@ -75,49 +62,23 @@ impl CacheTier {
             .iter()
             .map(&mapper)
             .collect::<StratisResult<Vec<_>>>()?;
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
-        let meta = LinearDev::setup(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            map_to_dm(&meta_segments),
-        )?;
 
         let cache_segments = cache_segments
             .iter()
             .map(&mapper)
             .collect::<StratisResult<Vec<_>>>()?;
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);
-        let cache = LinearDev::setup(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            map_to_dm(&cache_segments),
-        )?;
 
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
-        let cd = CacheDev::setup(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            meta,
-            cache,
-            origin,
-            CACHE_BLOCK_SIZE,
-        )?;
-
-        Ok((
-            CacheTier {
-                block_mgr,
-                meta_segments,
-                cache_segments,
-            },
-            cd,
-        ))
+        Ok(CacheTier {
+            block_mgr,
+            meta_segments,
+            cache_segments,
+        })
     }
 
     /// Add the given paths to self. Return UUIDs of the new blockdevs
-    /// corresponding to the specified paths.
+    /// corresponding to the specified paths and a pair of Boolean values.
+    /// The first is true if the cache sub-device's segments were changed,
+    /// the second is true if the meta sub-device's segments were changed.
     /// Adds all additional space to cache sub-device.
     /// WARNING: metadata changing event
     // FIXME: That all segments on the newly added device are added to the
@@ -127,10 +88,9 @@ impl CacheTier {
     pub fn add(
         &mut self,
         pool_uuid: PoolUuid,
-        cache_device: &mut CacheDev,
         paths: &[&Path],
         force: bool,
-    ) -> StratisResult<Vec<DevUuid>> {
+    ) -> StratisResult<(Vec<DevUuid>, (bool, bool))> {
         let uuids = self.block_mgr.add(pool_uuid, paths, force)?;
 
         let avail_space = self.block_mgr.avail_space();
@@ -141,27 +101,15 @@ impl CacheTier {
             .flat_map(|s| s.iter())
             .cloned()
             .collect::<Vec<_>>();
-        let coalesced = coalesce_blkdevsegs(&self.cache_segments, &segments);
-        let table = map_to_dm(&coalesced);
+        self.cache_segments = coalesce_blkdevsegs(&self.cache_segments, &segments);
 
-        cache_device.set_cache_table(get_dm(), table)?;
-        cache_device.resume(get_dm())?;
-
-        self.cache_segments = coalesced;
-
-        Ok(uuids)
+        Ok((uuids, (true, false)))
     }
 
     /// Setup a new CacheTier struct from the block_mgr.
     ///
-    /// Returns the CacheTier and the cache device that was created.
-    ///
     /// WARNING: metadata changing event
-    pub fn new(
-        pool_uuid: PoolUuid,
-        mut block_mgr: BlockDevMgr,
-        origin: LinearDev,
-    ) -> StratisResult<(CacheTier, CacheDev)> {
+    pub fn new(mut block_mgr: BlockDevMgr) -> CacheTier {
         let avail_space = block_mgr.avail_space();
 
         // FIXME: Come up with a better way to choose metadata device size
@@ -179,44 +127,11 @@ impl CacheTier {
         let cache_segments = segments.pop().expect("segments.len() == 2");
         let meta_segments = segments.pop().expect("segments.len() == 1");
 
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
-        let meta = LinearDev::setup(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            map_to_dm(&meta_segments),
-        )?;
-
-        // See comment in ThinPool::new() method
-        wipe_sectors(&meta.devnode(), Sectors(0), meta.size())?;
-
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);
-        let cache = LinearDev::setup(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            map_to_dm(&cache_segments),
-        )?;
-
-        let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
-        let cd = CacheDev::new(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            meta,
-            cache,
-            origin,
-            CACHE_BLOCK_SIZE,
-        )?;
-
-        Ok((
-            CacheTier {
-                block_mgr,
-                meta_segments,
-                cache_segments,
-            },
-            cd,
-        ))
+        CacheTier {
+            block_mgr,
+            meta_segments,
+            cache_segments,
+        }
     }
 
     /// Destroy the tier. Wipe its blockdevs.

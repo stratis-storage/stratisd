@@ -37,7 +37,7 @@ use super::mdv::MetadataVol;
 use super::thinids::ThinDevIdPool;
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
-pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
+const DATA_LOWATER: DataBlocks = DataBlocks(512);
 const META_LOWATER: MetaBlocks = MetaBlocks(512);
 
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
@@ -167,7 +167,6 @@ impl ThinPool {
         pool_uuid: PoolUuid,
         thin_pool_size: &ThinPoolSizeParams,
         data_block_size: Sectors,
-        low_water_mark: DataBlocks,
         backstore: &mut Backstore,
     ) -> StratisResult<ThinPool> {
         let mut segments_list = match backstore.alloc_space(&[
@@ -232,7 +231,7 @@ impl ThinPool {
             meta_dev,
             data_dev,
             data_block_size,
-            low_water_mark,
+            DATA_LOWATER,
         )?;
         Ok(ThinPool {
             thin_pool: thinpool_dev,
@@ -256,8 +255,7 @@ impl ThinPool {
     /// error.
     pub fn setup(
         pool_uuid: PoolUuid,
-        data_block_size: Sectors,
-        low_water_mark: DataBlocks,
+        thin_pool_save: &ThinPoolDevSave,
         flex_devs: &FlexDevsSave,
         backstore: &Backstore,
     ) -> StratisResult<ThinPool> {
@@ -291,8 +289,8 @@ impl ThinPool {
             Some(&thinpool_uuid),
             meta_dev,
             data_dev,
-            data_block_size,
-            low_water_mark,
+            thin_pool_save.data_block_size,
+            DATA_LOWATER,
         )?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);
@@ -896,7 +894,6 @@ mod tests {
             pool_uuid,
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
-            DATA_LOWATER,
             &mut backstore,
         ).unwrap();
 
@@ -995,7 +992,6 @@ mod tests {
             pool_uuid,
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
-            DATA_LOWATER,
             &mut backstore,
         ).unwrap();
 
@@ -1098,7 +1094,6 @@ mod tests {
             pool_uuid,
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
-            DATA_LOWATER,
             &mut backstore,
         ).unwrap();
 
@@ -1110,15 +1105,10 @@ mod tests {
         let action = pool.rename_filesystem(pool_name, fs_uuid, name2).unwrap();
         assert_eq!(action, RenameAction::Renamed);
         let flexdevs: FlexDevsSave = pool.record();
+        let thinpoolsave: ThinPoolDevSave = pool.record();
         pool.teardown().unwrap();
 
-        let pool = ThinPool::setup(
-            pool_uuid,
-            DATA_BLOCK_SIZE,
-            DATA_LOWATER,
-            &flexdevs,
-            &backstore,
-        ).unwrap();
+        let pool = ThinPool::setup(pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
 
         assert_eq!(&*pool.get_filesystem_by_uuid(fs_uuid).unwrap().0, name2);
     }
@@ -1151,7 +1141,6 @@ mod tests {
             pool_uuid,
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
-            DATA_LOWATER,
             &mut backstore,
         ).unwrap();
 
@@ -1183,14 +1172,10 @@ mod tests {
                 "data"
             ).unwrap();
         }
+        let thinpooldevsave: ThinPoolDevSave = pool.record();
 
-        let new_pool = ThinPool::setup(
-            pool_uuid,
-            DATA_BLOCK_SIZE,
-            DATA_LOWATER,
-            &pool.record(),
-            &backstore,
-        ).unwrap();
+        let new_pool =
+            ThinPool::setup(pool_uuid, &thinpooldevsave, &pool.record(), &backstore).unwrap();
 
         assert!(new_pool.get_filesystem_by_uuid(fs_uuid).is_some());
     }
@@ -1216,7 +1201,6 @@ mod tests {
             pool_uuid,
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
-            DATA_LOWATER,
             &mut backstore,
         ).unwrap();
         let pool_name = "stratis_test_pool";
@@ -1247,18 +1231,13 @@ mod tests {
         );
         assert!(thindev.is_err());
         let flexdevs: FlexDevsSave = pool.record();
+        let thinpooldevsave: ThinPoolDevSave = pool.record();
         pool.teardown().unwrap();
 
         // Check that destroyed fs is not present in MDV. If the record
         // had been left on the MDV that didn't match a thin_id in the
         // thinpool, ::setup() will fail.
-        let pool = ThinPool::setup(
-            pool_uuid,
-            DATA_BLOCK_SIZE,
-            DATA_LOWATER,
-            &flexdevs,
-            &backstore,
-        ).unwrap();
+        let pool = ThinPool::setup(pool_uuid, &thinpooldevsave, &flexdevs, &backstore).unwrap();
 
         assert!(pool.get_filesystem_by_uuid(fs_uuid).is_none());
     }
@@ -1296,7 +1275,6 @@ mod tests {
                 ..Default::default()
             },
             DATA_BLOCK_SIZE,
-            DATA_LOWATER,
             &mut backstore,
         ).unwrap();
 
@@ -1351,7 +1329,6 @@ mod tests {
             pool_uuid,
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
-            DATA_LOWATER,
             &mut backstore,
         ).unwrap();
         let pool_name = "stratis_test_pool";
@@ -1411,7 +1388,6 @@ mod tests {
             pool_uuid,
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
-            DATA_LOWATER,
             &mut backstore,
         ).unwrap();
 
@@ -1486,7 +1462,6 @@ mod tests {
             pool_uuid,
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
-            DATA_LOWATER,
             &mut backstore,
         ).unwrap();
 
@@ -1534,7 +1509,6 @@ mod tests {
             pool_uuid,
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
-            DATA_LOWATER,
             &mut backstore,
         ).unwrap();
 

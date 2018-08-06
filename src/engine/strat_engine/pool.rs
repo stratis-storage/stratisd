@@ -26,7 +26,7 @@ use super::backstore::{Backstore, MIN_MDA_SECTORS};
 use super::serde_structs::{FlexDevsSave, PoolSave, Recordable};
 use super::thinpool::{ThinPool, ThinPoolSizeParams};
 
-pub use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER, INITIAL_DATA_SIZE};
+pub use super::thinpool::{DATA_BLOCK_SIZE, INITIAL_DATA_SIZE};
 
 /// Get the index which indicates the start of unallocated space in the cap
 /// device.
@@ -125,7 +125,6 @@ impl StratPool {
             pool_uuid,
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
-            DATA_LOWATER,
             &mut backstore,
         );
         let thinpool = match thinpool {
@@ -167,8 +166,7 @@ impl StratPool {
         )?;
         let thinpool = ThinPool::setup(
             uuid,
-            metadata.thinpool_dev.data_block_size,
-            DATA_LOWATER,
+            &metadata.thinpool_dev,
             &metadata.flex_devs,
             &backstore,
         )?;

@@ -353,44 +353,22 @@ impl ThinPool {
     pub fn check(&mut self, backstore: &mut Backstore) -> StratisResult<bool> {
         #![allow(match_same_arms)]
 
-        /// Check whether data device, if data is true, or meta device if data
-        /// is false needs to be extended. If it does need to be extended,
-        /// extend it. If it does not need to be extended, return None. If
-        /// it needs to be extended return a tuple of the requested amount
-        /// and the actual or an error.
-        /// Requested size is a function of the current size and the low
-        /// water mark.
-        /// Postcondition: let usage = meta or data device usage. Then
-        /// (usage.used <= usage.total - low_water AND usage.total >= low_water)
-        /// OR
-        /// it was not possible to extend to the necessary amount calculated.
-        fn check_extend(
-            thinpool: &mut ThinPool,
-            backstore: &mut Backstore,
-            total: Sectors,
-            used: Sectors,
-            low_water: Sectors,
-            data: bool,
-        ) -> Option<StratisResult<(Sectors, Sectors)>> {
-            if let Some(request) = if total >= low_water {
-                if used >= total - low_water {
-                    Some(total)
+        /// Calculate requested additional amount to allocate given total,
+        /// used, and low_water. Return None if there is no need to allocate
+        /// a new amount.
+        /// Postcondition: 2 * usage.used = usage.total - low_water AND
+        /// usage.total > low_water. In other words, usage can double before
+        /// it is necessary to expand again.
+        fn calculate_request(total: Sectors, used: Sectors, low_water: Sectors) -> Option<Sectors> {
+            if total >= low_water {
+                let excess = total - low_water;
+                if used >= excess {
+                    Some((used - excess) + used)
                 } else {
                     None
                 }
             } else {
-                // low_water - total is the amount that needs to be made up
-                // just to get to having total size equal to low water.
-                // used is added to the sum so that post-condition is met.
-                Some((low_water - total) + used)
-            } {
-                Some(
-                    thinpool
-                        .extend_thinpool(backstore, request, data)
-                        .map(|actual| (request, actual)),
-                )
-            } else {
-                None
+                Some((low_water - total) + 2usize * used)
             }
         }
 
@@ -417,48 +395,42 @@ impl ThinPool {
                 {
                     let usage = &status.usage;
 
-                    match check_extend(
-                        self,
-                        backstore,
+                    if let Some(request) = calculate_request(
                         usage.total_meta.sectors(),
                         usage.used_meta.sectors(),
                         META_LOWATER.sectors(),
-                        false,
                     ) {
-                        Some(Ok((request, actual))) => {
-                            if request != actual {
-                                // TODO: take an appropriate action in the
-                                // case where actual amount allocated was
-                                // less than the requested.
+                        match self.extend_thinpool(backstore, request, false) {
+                            Ok(actual) => {
+                                if request != actual {
+                                    // TODO: take an appropriate action in the
+                                    // case where actual amount allocated was
+                                    // less than the requested.
+                                }
+                                should_save = true;
                             }
-                            should_save = true;
+                            // FIXME: Handle this error
+                            Err(_) => {}
                         }
-                        // FIXME: handle this error
-                        Some(Err(_)) => {}
-                        // Nothing needed to be allocated, no action necessary
-                        None => {}
                     }
 
-                    match check_extend(
-                        self,
-                        backstore,
+                    if let Some(request) = calculate_request(
                         *usage.total_data * DATA_BLOCK_SIZE,
                         *usage.used_data * DATA_BLOCK_SIZE,
                         *DATA_LOWATER * DATA_BLOCK_SIZE,
-                        true,
                     ) {
-                        Some(Ok((request, actual))) => {
-                            if request != actual {
-                                // TODO: take an appropriate action in the
-                                // case where actual amount allocated was
-                                // less than the requested.
+                        match self.extend_thinpool(backstore, request, true) {
+                            Ok(actual) => {
+                                if request != actual {
+                                    // TODO: take an appropriate action in the
+                                    // case where actual amount allocated was
+                                    // less than the requested.
+                                }
+                                should_save = true;
                             }
-                            should_save = true;
+                            // FIXME: Handle this error
+                            Err(_) => {}
                         }
-                        // FIXME: handle this error
-                        Some(Err(_)) => {}
-                        // Nothing needed to be allocated, no action necessary
-                        None => {}
                     }
                 }
             }

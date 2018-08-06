@@ -1264,19 +1264,19 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_meta_expand() {
+    pub fn loop_test_thindev_destroy() {
         // This test requires more than 1 GiB.
         loopbacked::test_with_spec(
             loopbacked::DeviceLimits::Range(2, 3, None),
-            test_meta_expand,
+            test_thindev_destroy,
         );
     }
 
     #[test]
-    pub fn real_test_meta_expand() {
+    pub fn real_test_thindev_destroy() {
         real::test_with_spec(
-            real::DeviceLimits::Range(2, 3, None, None),
-            test_meta_expand,
+            real::DeviceLimits::AtLeast(1, None, None),
+            test_thindev_destroy,
         );
     }
 
@@ -1321,19 +1321,19 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_thindev_destroy() {
+    pub fn loop_test_meta_expand() {
         // This test requires more than 1 GiB.
         loopbacked::test_with_spec(
             loopbacked::DeviceLimits::Range(2, 3, None),
-            test_thindev_destroy,
+            test_meta_expand,
         );
     }
 
     #[test]
-    pub fn real_test_thindev_destroy() {
+    pub fn real_test_meta_expand() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(1, None, None),
-            test_thindev_destroy,
+            real::DeviceLimits::Range(2, 3, None, None),
+            test_meta_expand,
         );
     }
 

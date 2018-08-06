@@ -45,7 +45,7 @@ fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
         flex_devs.thin_meta_dev_spare.last().expect(expect_msg),
     ].iter()
         .max_by_key(|x| x.0)
-        .map(|(start, length)| *start + *length)
+        .map(|&&(start, length)| start + length)
         .expect("iterator is non-empty")
 }
 

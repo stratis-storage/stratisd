@@ -59,7 +59,7 @@ lazy_static! {
 /// path. Return an error if any are missing. Required to be called on engine
 /// initialization.
 pub fn verify_binaries() -> StratisResult<()> {
-    match BINARIES.iter().find(|(_, ref path)| path.is_none()) {
+    match BINARIES.iter().find(|&(_, ref path)| path.is_none()) {
         None => Ok(()),
         Some((ref name, _)) => Err(StratisError::Error(format!(
             "Unable to find absolute path for \"{}\"",

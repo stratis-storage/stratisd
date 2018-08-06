@@ -940,7 +940,7 @@ mod tests {
             dm::ThinPoolStatus::Working(ref status) => {
                 assert!(
                     status.summary == ThinPoolStatusSummary::OutOfSpace,
-                    "Expected full pool",
+                    "Expected full pool"
                 );
             }
             dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working/full."),
@@ -955,7 +955,7 @@ mod tests {
             dm::ThinPoolStatus::Working(ref status) => {
                 assert!(
                     status.summary == ThinPoolStatusSummary::Good,
-                    "Expected pool to be restored to good state",
+                    "Expected pool to be restored to good state"
                 );
             }
             dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail.  Expected working/good."),

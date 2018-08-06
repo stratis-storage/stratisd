@@ -127,7 +127,7 @@ impl<L: Log> Log for Logger<L> {
 
             // Drop entries that are older than hold time
             if let Some(hold_time) = shared.hold_time {
-                v.retain(|(time, _)| *time + hold_time >= now);
+                v.retain(|&(time, _)| time + hold_time >= now);
             }
         }
     }

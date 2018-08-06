@@ -30,6 +30,10 @@ pub trait Filesystem: Debug {
     /// Get dbus path associated with the Pool.
     #[cfg(feature = "dbus_enabled")]
     fn get_dbus_path(&self) -> &Option<dbus::Path<'static>>;
+
+    /// Get the filesystem mount points
+    #[cfg(feature = "dbus_enabled")]
+    fn get_mount_points(&self) -> StratisResult<Vec<String>>;
 }
 
 pub trait BlockDev: Debug {

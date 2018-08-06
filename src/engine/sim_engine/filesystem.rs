@@ -9,6 +9,9 @@ use rand;
 
 use std::path::PathBuf;
 
+#[cfg(feature = "dbus_enabled")]
+use stratis::StratisResult;
+
 use super::super::engine::Filesystem;
 
 #[derive(Debug)]
@@ -43,5 +46,11 @@ impl Filesystem for SimFilesystem {
     #[cfg(feature = "dbus_enabled")]
     fn get_dbus_path(&self) -> &Option<dbus::Path<'static>> {
         &self.dbus_path
+    }
+
+    #[cfg(feature = "dbus_enabled")]
+    fn get_mount_points(&self) -> StratisResult<Vec<String>> {
+        let rc: Vec<String> = Vec::new();
+        Ok(rc)
     }
 }

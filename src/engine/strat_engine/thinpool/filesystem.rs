@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use chrono::{DateTime, TimeZone, Utc};
 #[cfg(feature = "dbus_enabled")]
 use dbus;
 use uuid::Uuid;
@@ -39,6 +40,7 @@ pub const FILESYSTEM_LOWATER: Sectors = Sectors(256 * IEC::Mi / (SECTOR_SIZE as 
 #[derive(Debug)]
 pub struct StratFilesystem {
     thin_dev: ThinDev,
+    created: DateTime<Utc>,
     #[cfg(feature = "dbus_enabled")]
     dbus_path: Option<dbus::Path<'static>>,
 }
@@ -74,6 +76,7 @@ impl StratFilesystem {
             fs_uuid,
             StratFilesystem {
                 thin_dev,
+                created: Utc::now(),
                 #[cfg(feature = "dbus_enabled")]
                 dbus_path: None,
             },
@@ -97,6 +100,7 @@ impl StratFilesystem {
         )?;
         Ok(StratFilesystem {
             thin_dev,
+            created: Utc.timestamp(fssave.created as i64, 0),
             #[cfg(feature = "dbus_enabled")]
             dbus_path: None,
         })
@@ -153,6 +157,7 @@ impl StratFilesystem {
                 set_uuid(&thin_dev.devnode(), snapshot_fs_uuid)?;
                 Ok(StratFilesystem {
                     thin_dev,
+                    created: Utc::now(),
                     #[cfg(feature = "dbus_enabled")]
                     dbus_path: None,
                 })
@@ -230,6 +235,11 @@ impl StratFilesystem {
         last_error.map_or(Ok(None), |e| Err(StratisError::Engine(ErrorEnum::Error, e)))
     }
 
+    /// When the filesystem was created.
+    pub fn created(&self) -> DateTime<Utc> {
+        self.created
+    }
+
     /// Tear down the filesystem.
     pub fn teardown(self) -> StratisResult<()> {
         self.thin_dev.teardown(get_dm())?;
@@ -248,6 +258,7 @@ impl StratFilesystem {
             uuid,
             thin_id: self.thin_dev.id(),
             size: self.thin_dev.size(),
+            created: self.created.timestamp() as u64,
         }
     }
 

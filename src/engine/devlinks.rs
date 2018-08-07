@@ -11,7 +11,7 @@ use std::{fs, str};
 use stratis::StratisResult;
 
 use super::super::engine::Pool;
-use super::super::types::{Name, PoolUuid};
+use super::types::{Name, PoolUuid};
 
 use super::engine::DEV_PATH;
 

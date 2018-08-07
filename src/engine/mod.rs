@@ -24,6 +24,7 @@ pub use self::types::RenameAction;
 #[macro_use]
 mod macros;
 
+mod devlinks;
 #[allow(module_inception)]
 mod engine;
 mod sim_engine;

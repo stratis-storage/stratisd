@@ -569,6 +569,52 @@ mod tests {
         );
     }
 
+    /// Create a backstore.
+    /// Request a amount that can not be allocated because the modulus is
+    /// bigger than the reqested amount.
+    /// Request an impossibly large amount.
+    /// Verify that the backstore is now all used up.
+    fn test_request(paths: &[&Path]) -> () {
+        assert!(paths.len() > 0);
+
+        let mut backstore =
+            Backstore::initialize(Uuid::new_v4(), paths, MIN_MDA_SECTORS, false).unwrap();
+
+        assert!(
+            backstore
+                .request(Sectors(IEC::Ki), Sectors(IEC::Mi))
+                .is_none()
+        );
+
+        let request = Sectors(IEC::Ei);
+        let modulus = Sectors(IEC::Ki);
+        let old_next = backstore.next;
+        let (start, length) = backstore.request(request, modulus).unwrap();
+        assert!(length < request);
+        // FIXME: change to Sector operation once implemented in devicemapper
+        assert_eq!(*length % *modulus, 0);
+        assert_eq!(backstore.next, old_next + length);
+        assert_eq!(start, old_next);
+
+        assert!(backstore.request(request, Sectors(IEC::Ki)).is_none());
+        backstore.destroy().unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_request() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_request);
+    }
+
+    #[test]
+    pub fn real_test_request() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_request);
+    }
+
+    #[test]
+    pub fn travis_test_request() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_request);
+    }
+
     /// Create a backstore with a cache.
     /// Setup the same backstore, should succeed.
     /// Verify that blockdev metadatas are the same for the backstores.

@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use chrono::SecondsFormat;
 use dbus;
 use dbus::arg::IterAppend;
 use dbus::tree::{
@@ -54,6 +55,16 @@ pub fn create_dbus_filesystem<'a>(
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid);
 
+    let created_property = f.property::<&str, _>("Created", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_filesystem_created);
+
+    let used_property = f.property::<&str, _>("Used", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::False)
+        .on_get(get_filesystem_used);
+
     let object_name = format!(
         "{}/{}",
         STRATIS_BASE_PATH,
@@ -70,7 +81,9 @@ pub fn create_dbus_filesystem<'a>(
                 .add_p(devnode_property)
                 .add_p(name_property)
                 .add_p(pool_property)
-                .add_p(uuid_property),
+                .add_p(uuid_property)
+                .add_p(created_property)
+                .add_p(used_property),
         );
 
     let path = object_path.get_name().to_owned();
@@ -188,4 +201,25 @@ fn get_filesystem_name(
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
     get_filesystem_property(i, p, |(name, _)| Ok(name.to_owned()))
+}
+
+/// Get the creation date and time in rfc3339 format.
+fn get_filesystem_created(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_filesystem_property(i, p, |(_, fs)| {
+        Ok(fs.created().to_rfc3339_opts(SecondsFormat::Secs, true))
+    })
+}
+
+fn get_filesystem_used(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_filesystem_property(i, p, |(_, fs)| {
+        fs.used()
+            .map(|v| format!("{}", *v))
+            .map_err(|_| MethodErr::failed(&"fs used() engine call failed".to_owned()))
+    })
 }

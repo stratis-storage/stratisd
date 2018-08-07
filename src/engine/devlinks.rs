@@ -116,3 +116,7 @@ pub fn filesystem_renamed(pool_name: &str, old_name: &str, new_name: &str) -> St
     fs::rename(&old, &new)?;
     Ok(())
 }
+
+pub fn devpath_from_names(pool_name: &Name, fs_name: &Name) -> PathBuf {
+    vec![DEV_PATH, pool_name, fs_name].iter().collect()
+}

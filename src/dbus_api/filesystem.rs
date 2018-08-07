@@ -12,7 +12,7 @@ use dbus::Message;
 
 use uuid::Uuid;
 
-use super::super::engine::{Filesystem, Name, RenameAction};
+use super::super::engine::{devpath_from_names, Filesystem, Name, RenameAction};
 
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
@@ -199,7 +199,47 @@ fn get_filesystem_devnode(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_filesystem_property(i, p, |(_, fs)| Ok(format!("{}", fs.devnode().display())))
+    let dbus_context = p.tree.get_data();
+    let object_path = p.path.get_name();
+
+    let filesystem_path = p.tree
+        .get(object_path)
+        .expect("tree must contain implicit argument");
+
+    let filesystem_data = filesystem_path
+        .get_data()
+        .as_ref()
+        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
+
+    let pool_path = p.tree.get(&filesystem_data.parent).ok_or_else(|| {
+        MethodErr::failed(&format!(
+            "no path for parent object path {}",
+            &filesystem_data.parent
+        ))
+    })?;
+
+    let pool_uuid = pool_path
+        .get_data()
+        .as_ref()
+        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?
+        .uuid;
+
+    let engine = dbus_context.engine.borrow();
+    let (pool_name, pool) = engine.get_pool(pool_uuid).ok_or_else(|| {
+        MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))
+    })?;
+    let filesystem_uuid = filesystem_data.uuid;
+    let (fs_name, _) = pool.get_filesystem(filesystem_uuid).ok_or_else(|| {
+        MethodErr::failed(&format!(
+            "no name for filesystem with uuid {}",
+            &filesystem_uuid
+        ))
+    })?;
+    i.append(format!(
+        "{}",
+        devpath_from_names(&pool_name, &fs_name).display()
+    ));
+    Ok(())
 }
 
 fn get_filesystem_name(

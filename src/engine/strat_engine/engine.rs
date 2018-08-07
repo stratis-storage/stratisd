@@ -330,10 +330,6 @@ impl Engine for StratEngine {
     fn register_listener(&mut self, listener: Box<EngineListener>) {
         self.listeners.register_listener(listener);
     }
-
-    fn notify_listeners(&self, event: &EngineEvent) {
-        self.listeners.notify(&event)
-    }
 }
 
 #[cfg(test)]

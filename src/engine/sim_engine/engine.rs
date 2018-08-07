@@ -16,7 +16,7 @@ use devicemapper::Device;
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::engine::{Engine, Eventable, Pool};
-use super::super::engine::{EngineEvent, EngineListener, EngineListenerList};
+use super::super::engine::{EngineListener, EngineListenerList};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
@@ -140,10 +140,6 @@ impl Engine for SimEngine {
 
     fn register_listener(&mut self, listener: Box<EngineListener>) {
         self.listeners.register_listener(listener);
-    }
-
-    fn notify_listeners(&self, event: &EngineEvent) {
-        self.listeners.notify(&event)
     }
 }
 

@@ -295,9 +295,6 @@ pub trait Engine: Debug {
 
     /// Register a listener for EngineEvent notification
     fn register_listener(&mut self, listener: Box<EngineListener>);
-
-    /// Notify listeners of EventEvents
-    fn notify_listeners(&self, ev: &EngineEvent);
 }
 
 /// Allows an Engine to include a fd in the event loop. See

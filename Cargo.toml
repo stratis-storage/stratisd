@@ -24,7 +24,6 @@ libmount = "0.1.10"
 error-chain = "0.12"
 libudev = "0.2.0"
 lazy_static = "1.0.0"
-either = "1.1.0"
 
 [dependencies.uuid]
 version = "0.6"
@@ -33,6 +32,7 @@ features = ["serde", "v4"]
 [dev-dependencies]
 quickcheck = "0.6"
 loopdev = "0.2"
+either = "1.1.0"
 
 [features]
 default = ["dbus_enabled"]

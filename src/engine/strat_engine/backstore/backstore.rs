@@ -9,7 +9,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
-use either::Either;
 
 use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
 
@@ -195,91 +194,76 @@ impl Backstore {
         }
     }
 
-    /// Allocate requested chunks from device.
-    /// Returns None if it is not possible to satisfy the request.
-    /// Left argument is a tuple of a Sector request and a modulus. If the
-    /// request can not be satisfied, then a smaller amount may be returned.
-    /// Right argument is a Vec of Sectors. Each individual argument must
-    /// be satisfied exactly.
+    /// Satisfy a request for multiple segments. This request must
+    /// always be satisfied exactly, None is returned if this can not
+    /// be done.
     ///
     /// Precondition: self.next <= self.size()
     /// Postcondition: self.next <= self.size()
     ///
-    /// WARNING: All this must change when it becomes possible to return
-    /// sectors to the store.
-    /// WARNING: metadata changing event
-    ///
-    /// Right Postcondition: forall i, sizes_i == result_i.1. The second value
+    /// Postcondition: forall i, sizes_i == result_i.1. The second value
     /// in each pair in the returned vector is therefore redundant, but is
     /// retained as a convenience to the caller.
-    /// Right Postcondition:
-    /// forall i, result_i = result_(i - 1).0 + result_(i - 1).1
+    /// Postcondition:
+    /// forall i, result_i.0 = result_(i - 1).0 + result_(i - 1).1
     ///
-    /// Left Poscondition: result.1 % argument.1 == 0
-    /// Left Postcondition: result.1 <= argument.0
-    pub fn alloc_space(
+    /// WARNING: metadata changing event
+    pub fn alloc_multiple_segments_exactly(
         &mut self,
-        request: Either<(Sectors, Sectors), &[Sectors]>,
-    ) -> Either<Option<(Sectors, Sectors)>, Option<Vec<(Sectors, Sectors)>>> {
-        /// Satisfy a request for multiple segments. This request must
-        /// always be satisfied exactly, None is returned if this can not
-        /// be done.
-        fn alloc_multiple_segments(
-            backstore: &mut Backstore,
-            sizes: &[Sectors],
-        ) -> Option<Vec<(Sectors, Sectors)>> {
-            if backstore.available() < sizes.iter().cloned().sum() {
-                return None;
-            }
-
-            let mut chunks = Vec::new();
-            for size in sizes {
-                chunks.push((backstore.next, *size));
-                backstore.next += *size;
-            }
-
-            // Assert that the postcondition holds.
-            assert_eq!(
-                sizes,
-                chunks
-                    .iter()
-                    .map(|x| x.1)
-                    .collect::<Vec<Sectors>>()
-                    .as_slice()
-            );
-
-            Some(chunks)
+        sizes: &[Sectors],
+    ) -> Option<Vec<(Sectors, Sectors)>> {
+        if self.available() < sizes.iter().cloned().sum() {
+            return None;
         }
 
-        /// Allocate a single segment from the backstore.
-        /// If it is impossible to allocate the requested amount, try
-        /// something smaller.
-        ///
-        /// Postcondition: result.1 % modulus == 0
-        fn alloc_single_segment(
-            backstore: &mut Backstore,
-            request: Sectors,
-            modulus: Sectors,
-        ) -> Option<(Sectors, Sectors)> {
-            assert!(modulus != Sectors(0));
-
-            let internal_request = cmp::min(request, backstore.available());
-            let internal_request = (internal_request / modulus) * modulus;
-
-            if internal_request != Sectors(0) {
-                let result = (backstore.next, internal_request);
-                backstore.next += internal_request;
-                Some(result)
-            } else {
-                None
-            }
+        let mut chunks = Vec::new();
+        for size in sizes {
+            chunks.push((self.next, *size));
+            self.next += *size;
         }
 
-        match request {
-            Either::Left((request, modulus)) => {
-                Either::Left(alloc_single_segment(self, request, modulus))
-            }
-            Either::Right(sizes) => Either::Right(alloc_multiple_segments(self, sizes)),
+        // Assert that the postcondition holds.
+        assert_eq!(
+            sizes,
+            chunks
+                .iter()
+                .map(|x| x.1)
+                .collect::<Vec<Sectors>>()
+                .as_slice()
+        );
+
+        Some(chunks)
+    }
+
+    /// Allocate a single segment from the backstore.
+    /// If it is impossible to allocate the requested amount, try
+    /// something smaller. If it is impossible to allocate any amount
+    /// greater than 0, return None. Only allocate amounts that are divisible
+    /// by modulus.
+    ///
+    /// Precondition: self.next <= self.size()
+    /// Postcondition: self.next <= self.size()
+    ///
+    /// Postcondition: result.1 % modulus == 0
+    /// Postcondition: result.1 <= request
+    ///
+    /// WARNING: metadata changing event
+    pub fn alloc_single_segment_max(
+        &mut self,
+        request: Sectors,
+        modulus: Sectors,
+    ) -> Option<(Sectors, Sectors)> {
+        assert!(modulus != Sectors(0));
+
+        let internal_request = cmp::min(request, self.available());
+        let internal_request = (internal_request / modulus) * modulus;
+
+        if internal_request != Sectors(0) {
+            let result = (self.next, internal_request);
+            self.next += internal_request;
+            Some(result)
+        } else {
+            None
         }
     }
 

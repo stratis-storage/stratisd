@@ -6,7 +6,6 @@
 
 use std::borrow::BorrowMut;
 
-use either::Either;
 use uuid::Uuid;
 
 use devicemapper as dm;
@@ -169,16 +168,12 @@ impl ThinPool {
         data_block_size: Sectors,
         backstore: &mut Backstore,
     ) -> StratisResult<ThinPool> {
-        let mut segments_list = match backstore
-            .alloc_space(Either::Right(&[
-                thin_pool_size.meta_size(),
-                thin_pool_size.meta_size(),
-                thin_pool_size.data_size(),
-                thin_pool_size.mdv_size(),
-            ]))
-            .right()
-            .expect("argument in Right means return in Right")
-        {
+        let mut segments_list = match backstore.alloc_multiple_segments_exactly(&[
+            thin_pool_size.meta_size(),
+            thin_pool_size.meta_size(),
+            thin_pool_size.data_size(),
+            thin_pool_size.mdv_size(),
+        ]) {
             Some(sl) => sl,
             None => {
                 let err_msg = "Could not allocate sufficient space for thinpool devices.";
@@ -533,11 +528,7 @@ impl ThinPool {
         } else {
             meta_block_size()
         };
-        if let Some(region) = backstore
-            .alloc_space(Either::Left((extend_size, modulus)))
-            .left()
-            .expect("argument in Left means result in Left")
-        {
+        if let Some(region) = backstore.alloc_single_segment_max(extend_size, modulus) {
             extend(self, backstore_device, region, data)?;
             Ok(region.1)
         } else {

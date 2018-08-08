@@ -208,10 +208,7 @@ impl Backstore {
     /// forall i, result_i.0 = result_(i - 1).0 + result_(i - 1).1
     ///
     /// WARNING: metadata changing event
-    pub fn alloc_multiple_segments_exactly(
-        &mut self,
-        sizes: &[Sectors],
-    ) -> Option<Vec<(Sectors, Sectors)>> {
+    pub fn alloc(&mut self, sizes: &[Sectors]) -> Option<Vec<(Sectors, Sectors)>> {
         if self.available() < sizes.iter().cloned().sum() {
             return None;
         }
@@ -248,11 +245,7 @@ impl Backstore {
     /// Postcondition: result.1 <= request
     ///
     /// WARNING: metadata changing event
-    pub fn alloc_single_segment_max(
-        &mut self,
-        request: Sectors,
-        modulus: Sectors,
-    ) -> Option<(Sectors, Sectors)> {
+    pub fn request(&mut self, request: Sectors, modulus: Sectors) -> Option<(Sectors, Sectors)> {
         assert!(modulus != Sectors(0));
 
         let internal_request = cmp::min(request, self.available());
@@ -581,7 +574,7 @@ mod tests {
     /// bigger than the reqested amount.
     /// Request an impossibly large amount.
     /// Verify that the backstore is now all used up.
-    fn test_alloc_single_segment(paths: &[&Path]) -> () {
+    fn test_request(paths: &[&Path]) -> () {
         assert!(paths.len() > 0);
 
         let mut backstore =
@@ -589,52 +582,37 @@ mod tests {
 
         assert!(
             backstore
-                .alloc_single_segment_max(Sectors(IEC::Ki), Sectors(IEC::Mi))
+                .request(Sectors(IEC::Ki), Sectors(IEC::Mi))
                 .is_none()
         );
 
         let request = Sectors(IEC::Ei);
         let modulus = Sectors(IEC::Ki);
         let old_next = backstore.next;
-        let (start, length) = backstore
-            .alloc_single_segment_max(request, modulus)
-            .unwrap();
+        let (start, length) = backstore.request(request, modulus).unwrap();
         assert!(length < request);
         // FIXME: change to Sector operation once implemented in devicemapper
         assert_eq!(*length % *modulus, 0);
         assert_eq!(backstore.next, old_next + length);
         assert_eq!(start, old_next);
 
-        assert!(
-            backstore
-                .alloc_single_segment_max(request, Sectors(IEC::Ki))
-                .is_none()
-        );
+        assert!(backstore.request(request, Sectors(IEC::Ki)).is_none());
         backstore.destroy().unwrap();
     }
 
     #[test]
-    pub fn loop_test_alloc_single_segment() {
-        loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3, None),
-            test_alloc_single_segment,
-        );
+    pub fn loop_test_request() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_request);
     }
 
     #[test]
-    pub fn real_test_alloc_single_segment() {
-        real::test_with_spec(
-            real::DeviceLimits::AtLeast(1, None, None),
-            test_alloc_single_segment,
-        );
+    pub fn real_test_request() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_request);
     }
 
     #[test]
-    pub fn travis_test_alloc_single_segment() {
-        loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3, None),
-            test_alloc_single_segment,
-        );
+    pub fn travis_test_request() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_request);
     }
 
     /// Create a backstore with a cache.

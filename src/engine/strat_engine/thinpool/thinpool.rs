@@ -168,7 +168,7 @@ impl ThinPool {
         data_block_size: Sectors,
         backstore: &mut Backstore,
     ) -> StratisResult<ThinPool> {
-        let mut segments_list = match backstore.alloc_multiple_segments_exactly(&[
+        let mut segments_list = match backstore.alloc(&[
             thin_pool_size.meta_size(),
             thin_pool_size.meta_size(),
             thin_pool_size.data_size(),
@@ -528,7 +528,7 @@ impl ThinPool {
         } else {
             meta_block_size()
         };
-        if let Some(region) = backstore.alloc_single_segment_max(extend_size, modulus) {
+        if let Some(region) = backstore.request(extend_size, modulus) {
             extend(self, backstore_device, region, data)?;
             Ok(region.1)
         } else {

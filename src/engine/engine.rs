@@ -14,58 +14,12 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, Device, Sectors};
 
-use super::types::{BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid,
-                   RenameAction};
+use super::types::{
+    BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, RenameAction,
+};
 use stratis::StratisResult;
 
 pub const DEV_PATH: &str = "/dev/stratis";
-
-#[cfg(feature = "dbus_enabled")]
-#[derive(Debug, Clone)]
-pub enum EngineEvent<'a> {
-    PoolRenamed {
-        #[cfg(feature = "dbus_enabled")]
-        dbus_path: &'a Option<dbus::Path<'static>>,
-        from: &'a str,
-        to: &'a str,
-    },
-}
-
-pub trait EngineListener: Debug {
-    fn notify(&self, event: &EngineEvent);
-}
-
-#[derive(Debug)]
-pub struct EngineListenerList {
-    listeners: Vec<Box<EngineListener>>,
-}
-
-impl EngineListenerList {
-    /// Create a new EngineListenerList.
-    pub fn new() -> EngineListenerList {
-        EngineListenerList {
-            listeners: Vec::new(),
-        }
-    }
-
-    /// Add a listener.
-    pub fn register_listener(&mut self, listener: Box<EngineListener>) {
-        self.listeners.push(listener);
-    }
-
-    /// Notify a listener.
-    pub fn notify(&self, event: &EngineEvent) {
-        for listener in &self.listeners {
-            listener.notify(&event);
-        }
-    }
-}
-
-impl Default for EngineListenerList {
-    fn default() -> EngineListenerList {
-        EngineListenerList::new()
-    }
-}
 
 pub trait Filesystem: Debug {
     /// path of the device node

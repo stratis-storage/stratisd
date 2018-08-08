@@ -11,7 +11,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::devlinks;
 use super::super::engine::{Engine, Eventable, Pool};
-use super::super::engine::{EngineEvent, EngineListener, EngineListenerList};
+use super::super::event::{EngineEvent, EngineListener, EngineListenerList};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 

@@ -16,7 +16,7 @@ use devicemapper::Device;
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::engine::{Engine, Eventable, Pool};
-use super::super::engine::{EngineListener, EngineListenerList};
+use super::super::event::{EngineListener, EngineListenerList};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 

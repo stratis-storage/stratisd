@@ -120,9 +120,7 @@ pub fn prop_changed_dispatch(
         .changed_properties
         .insert(prop_name.into(), Variant(Box::new(new_value.to_owned())));
 
-    conn.borrow()
-        .send(prop_changed.to_emit_message(path))
-        .map_err(|_| ())?;
+    conn.borrow().send(prop_changed.to_emit_message(path))?;
 
     Ok(())
 }

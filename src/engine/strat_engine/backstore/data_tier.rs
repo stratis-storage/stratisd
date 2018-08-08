@@ -57,19 +57,13 @@ impl DataTier {
 
     /// Setup a new DataTier struct from the block_mgr.
     ///
+    /// Initially 0 segments are allocated.
+    ///
     /// WARNING: metadata changing event
-    pub fn new(mut block_mgr: BlockDevMgr) -> DataTier {
-        let avail_space = block_mgr.avail_space();
-        let segments = block_mgr
-            .alloc_space(&[avail_space])
-            .expect("asked for exactly the space available, must get")
-            .iter()
-            .flat_map(|s| s.iter())
-            .cloned()
-            .collect::<Vec<_>>();
+    pub fn new(block_mgr: BlockDevMgr) -> DataTier {
         DataTier {
             block_mgr,
-            segments,
+            segments: vec![],
         }
     }
 
@@ -82,22 +76,31 @@ impl DataTier {
         paths: &[&Path],
         force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
-        let uuids = self.block_mgr.add(pool_uuid, paths, force)?;
-
-        let avail_space = self.block_mgr.avail_space();
-        let segments = self.block_mgr
-            .alloc_space(&[avail_space])
-            .expect("asked for exactly the space available, must get")
-            .iter()
-            .flat_map(|s| s.iter())
-            .cloned()
-            .collect::<Vec<_>>();
-        self.segments = coalesce_blkdevsegs(&self.segments, &segments);
-
-        Ok(uuids)
+        self.block_mgr.add(pool_uuid, paths, force)
     }
 
-    /// All the sectors available to this device
+    /// Allocate at least request sectors from unallocated segments in
+    /// block devices belonging to the data tier. Return true if requested
+    /// amount or more was allocated, otherwise, false.
+    pub fn alloc(&mut self, request: Sectors) -> bool {
+        match self.block_mgr.alloc_space(&[request]) {
+            Some(segments) => {
+                self.segments = coalesce_blkdevsegs(
+                    &self.segments,
+                    &segments
+                        .iter()
+                        .flat_map(|s| s.iter())
+                        .cloned()
+                        .collect::<Vec<_>>(),
+                );
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// The sum of the lengths of all the sectors that have been mapped to an
+    /// upper device.
     pub fn capacity(&self) -> Sectors {
         self.segments
             .iter()

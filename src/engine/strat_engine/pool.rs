@@ -230,7 +230,7 @@ impl StratPool {
                 .iter()
                 .any(|x| dm_name == &**x)
         );
-        if self.thin_pool.check(&mut self.backstore)? {
+        if self.thin_pool.check(pool_uuid, &mut self.backstore)? {
             self.write_metadata(pool_name)?;
         }
         Ok(())
@@ -282,12 +282,22 @@ impl Pool for StratPool {
         tier: BlockDevTier,
         force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
-        self.thin_pool.suspend()?;
-        let bdev_info = self.backstore.add_blockdevs(pool_uuid, paths, tier, force)?;
-        self.thin_pool.set_device(self.backstore.device().expect("Since thin pool exists, space must have been allocated from the backstore, so backstore must have a cap device"))?;
-        self.thin_pool.resume()?;
+        let bdev_info = if tier == BlockDevTier::Cache {
+            // If adding cache devices, must suspend the pool, since the cache
+            // must be augmeneted with the new devices.
+            self.thin_pool.suspend()?;
+            let bdev_info = self.backstore.add_blockdevs(pool_uuid, paths, tier, force)?;
+            self.thin_pool.set_device(self.backstore.device().expect("Since thin pool exists, space must have been allocated from the backstore, so backstore must have a cap device"))?;
+            self.thin_pool.resume()?;
+            Ok(bdev_info)
+        } else {
+            // If just adding data devices, no need to suspend the pool.
+            // No action will be taken on the DM devices.
+            self.backstore
+                .add_blockdevs(pool_uuid, paths, BlockDevTier::Data, force)
+        };
         self.write_metadata(pool_name)?;
-        Ok(bdev_info)
+        bdev_info
     }
 
     fn destroy(self) -> StratisResult<()> {

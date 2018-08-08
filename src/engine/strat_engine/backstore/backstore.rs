@@ -152,6 +152,10 @@ impl Backstore {
     }
 
     /// Initialize a Backstore object, by initializing the specified devs.
+    ///
+    /// Immediately after initialization a backstore has no cap device, since
+    /// no segments are allocated in the data tier.
+    ///
     /// WARNING: metadata changing event
     pub fn initialize(
         pool_uuid: PoolUuid,
@@ -161,22 +165,10 @@ impl Backstore {
     ) -> StratisResult<Backstore> {
         let data_tier = DataTier::new(BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?);
 
-        let linear = if !data_tier.segments.is_empty() {
-            let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
-            Some(LinearDev::setup(
-                get_dm(),
-                &dm_name,
-                Some(&dm_uuid),
-                map_to_dm(&data_tier.segments),
-            )?)
-        } else {
-            None
-        };
-
         Ok(Backstore {
             data_tier,
             cache_tier: None,
-            linear,
+            linear: None,
             cache: None,
             next: Sectors(0),
         })
@@ -249,31 +241,13 @@ impl Backstore {
 
     /// Add datadevs to the backstore. The data tier always exists if the
     /// backstore exists at all, so there is no need to create it.
-    /// Precondition: Must be invoked only after some space has been allocated
-    /// from the backstore. This ensures that there is certainly a cap device.
     fn add_datadevs(
         &mut self,
         pool_uuid: PoolUuid,
         paths: &[&Path],
         force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
-        let uuids = self.data_tier.add(pool_uuid, paths, force)?;
-
-        let table = map_to_dm(&self.data_tier.segments);
-
-        match (self.cache.as_mut(), self.linear.as_mut()) {
-            (Some(cache), None) => {
-                cache.set_origin_table(get_dm(), table)?;
-                cache.resume(get_dm())
-            }
-            (None, Some(linear)) => {
-                linear.set_table(get_dm(), table)?;
-                linear.resume(get_dm())
-            }
-            _ => panic!("some space has already been allocated from the backstore => (self.cache.is_some() XOR self.linear.is_some())"),
-        }?;
-
-        Ok(uuids)
+        self.data_tier.add(pool_uuid, paths, force)
     }
 
     /// Add the given paths to self. Return UUIDs of the new blockdevs
@@ -292,6 +266,37 @@ impl Backstore {
         }
     }
 
+    /// Extend the cap device whether it is a cache or not. Create the DM
+    /// device if it does not already exist. Return an error if DM
+    /// operations fail. Use all segments currently allocated in the data tier.
+    fn extend_cap_device(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        let create = match (self.cache.as_mut(), self.linear.as_mut()) {
+            (None, None) => true,
+            (Some(cache), None) => {
+                let table = map_to_dm(&self.data_tier.segments);
+                cache.set_origin_table(get_dm(), table)?;
+                cache.resume(get_dm())?;
+                false
+            }
+            (None, Some(linear)) => {
+                let table = map_to_dm(&self.data_tier.segments);
+                linear.set_table(get_dm(), table)?;
+                linear.resume(get_dm())?;
+                false
+            }
+            _ => panic!("NOT (self.cache().is_some() AND self.linear.is_some())"),
+        };
+
+        if create {
+            let table = map_to_dm(&self.data_tier.segments);
+            let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
+            let origin = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), table)?;
+            self.linear = Some(origin);
+        }
+
+        Ok(())
+    }
+
     /// Satisfy a request for multiple segments. This request must
     /// always be satisfied exactly, None is returned if this can not
     /// be done.
@@ -306,9 +311,19 @@ impl Backstore {
     /// forall i, result_i.0 = result_(i - 1).0 + result_(i - 1).1
     ///
     /// WARNING: metadata changing event
-    pub fn alloc(&mut self, sizes: &[Sectors]) -> Option<Vec<(Sectors, Sectors)>> {
-        if self.available() < sizes.iter().cloned().sum() {
-            return None;
+    pub fn alloc(
+        &mut self,
+        pool_uuid: PoolUuid,
+        sizes: &[Sectors],
+    ) -> StratisResult<Option<Vec<(Sectors, Sectors)>>> {
+        let total_required = sizes.iter().cloned().sum();
+        let available = self.available();
+        if available < total_required {
+            if self.data_tier.alloc(total_required - available) {
+                self.extend_cap_device(pool_uuid)?;
+            } else {
+                return Ok(None);
+            }
         }
 
         let mut chunks = Vec::new();
@@ -327,7 +342,7 @@ impl Backstore {
                 .as_slice()
         );
 
-        Some(chunks)
+        Ok(Some(chunks))
     }
 
     /// Allocate a single segment from the backstore.
@@ -341,20 +356,44 @@ impl Backstore {
     ///
     /// Postcondition: result.1 % modulus == 0
     /// Postcondition: result.1 <= request
+    /// Postcondition: result.1 != 0
     ///
     /// WARNING: metadata changing event
-    pub fn request(&mut self, request: Sectors, modulus: Sectors) -> Option<(Sectors, Sectors)> {
+    pub fn request(
+        &mut self,
+        pool_uuid: PoolUuid,
+        request: Sectors,
+        modulus: Sectors,
+    ) -> StratisResult<Option<(Sectors, Sectors)>> {
         assert!(modulus != Sectors(0));
 
-        let internal_request = cmp::min(request, self.available());
-        let internal_request = (internal_request / modulus) * modulus;
+        let mut internal_request = (request / modulus) * modulus;
 
-        if internal_request != Sectors(0) {
-            let result = (self.next, internal_request);
-            self.next += internal_request;
-            Some(result)
+        if internal_request == Sectors(0) {
+            return Ok(None);
+        }
+
+        let available = self.available();
+        if available < internal_request {
+            let mut allocated = false;
+            while !allocated && internal_request != Sectors(0) {
+                allocated = self.data_tier.alloc(internal_request - available);
+                let temp = internal_request / 2usize;
+                internal_request = (temp / modulus) * modulus;
+            }
+            if allocated {
+                self.extend_cap_device(pool_uuid)?;
+
+                let return_amt = cmp::min(request, self.available());
+                let return_amt = (return_amt / modulus) * modulus;
+                self.next += return_amt;
+                Ok(Some((self.next - return_amt, return_amt)))
+            } else {
+                Ok(None)
+            }
         } else {
-            None
+            self.next += internal_request;
+            Ok(Some((self.next - internal_request, internal_request)))
         }
     }
 
@@ -586,7 +625,7 @@ mod tests {
         invariant(&backstore);
 
         // Allocate space from the backstore so that the cap device is made.
-        backstore.alloc(&[Sectors(1)]).unwrap();
+        backstore.alloc(pool_uuid, &[Sectors(1)]).unwrap();
 
         let cache_uuids = backstore
             .add_blockdevs(pool_uuid, initcachepaths, BlockDevTier::Cache, false)
@@ -676,26 +715,39 @@ mod tests {
     fn test_request(paths: &[&Path]) -> () {
         assert!(paths.len() > 0);
 
+        let pool_uuid = Uuid::new_v4();
         let mut backstore =
-            Backstore::initialize(Uuid::new_v4(), paths, MIN_MDA_SECTORS, false).unwrap();
+            Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
 
         assert!(
             backstore
-                .request(Sectors(IEC::Ki), Sectors(IEC::Mi))
+                .request(pool_uuid, Sectors(IEC::Ki), Sectors(IEC::Mi))
+                .unwrap()
                 .is_none()
         );
 
         let request = Sectors(IEC::Ei);
         let modulus = Sectors(IEC::Ki);
         let old_next = backstore.next;
-        let (start, length) = backstore.request(request, modulus).unwrap();
+        let (start, length) = backstore
+            .request(pool_uuid, request, modulus)
+            .unwrap()
+            .unwrap();
         assert!(length < request);
         // FIXME: change to Sector operation once implemented in devicemapper
         assert_eq!(*length % *modulus, 0);
         assert_eq!(backstore.next, old_next + length);
         assert_eq!(start, old_next);
 
-        assert!(backstore.request(request, Sectors(IEC::Ki)).is_none());
+        let new_request = backstore
+            .request(pool_uuid, request, Sectors(IEC::Ki))
+            .unwrap();
+
+        // Either there is nothing left to allocate or there is some, but it
+        // is less than length.  If what is allocated now is more than length
+        // then the amount available to be allocated was greater than
+        // length * 2. In that case, length * 2 would have been allocated.
+        assert!(new_request.is_none() || new_request.expect("!is_none()").1 < length);
         backstore.destroy().unwrap();
     }
 
@@ -733,7 +785,7 @@ mod tests {
         invariant(&backstore);
 
         // Allocate space from the backstore so that the cap device is made.
-        backstore.alloc(&[Sectors(1)]).unwrap();
+        backstore.alloc(pool_uuid, &[Sectors(1)]).unwrap();
 
         let old_device = backstore.device();
 

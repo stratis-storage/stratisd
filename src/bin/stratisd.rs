@@ -185,17 +185,17 @@ impl EngineListener for EventHandler {
                 to,
             } => {
                 if let &Some(ref dbus_path) = dbus_path {
-                    if let Err(_) = prop_changed_dispatch(
+                    prop_changed_dispatch(
                         &self.dbus_conn,
                         consts::POOL_NAME_PROP,
-                        to,
+                        to.to_owned(),
                         &dbus_path,
-                    ) {
+                    ).unwrap_or_else(|()| {
                         error!(
                             "PoolRenamed: {} from: {} to: {} failed to send dbus update.",
                             dbus_path, from, to,
                         );
-                    }
+                    });
                 }
             }
         }

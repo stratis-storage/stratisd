@@ -7,8 +7,8 @@ use std::error::Error;
 use std::rc::Rc;
 
 use dbus;
-use dbus::arg::Variant;
 use dbus::arg::{ArgType, Iter, IterAppend};
+use dbus::arg::{RefArg, Variant};
 use dbus::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
 use dbus::tree::{MTFn, MethodErr, PropInfo};
 use dbus::Connection;
@@ -107,18 +107,19 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Resul
 }
 
 /// Construct a signal that a property has changed.
-// Currently only handles returning string properties, since that's all that's
-// needed right now
-pub fn prop_changed_dispatch(
+pub fn prop_changed_dispatch<T: 'static>(
     conn: &Rc<RefCell<Connection>>,
     prop_name: &str,
-    new_value: &str,
+    new_value: T,
     path: &dbus::Path,
-) -> Result<(), ()> {
+) -> Result<(), ()>
+where
+    T: RefArg,
+{
     let mut prop_changed: PropertiesPropertiesChanged = Default::default();
     prop_changed
         .changed_properties
-        .insert(prop_name.into(), Variant(Box::new(new_value.to_owned())));
+        .insert(prop_name.into(), Variant(Box::new(new_value)));
 
     conn.borrow().send(prop_changed.to_emit_message(path))?;
 

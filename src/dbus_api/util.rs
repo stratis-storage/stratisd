@@ -2,9 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::cell::RefCell;
 use std::error::Error;
-use std::rc::Rc;
 
 use dbus;
 use dbus::arg::{ArgType, Iter, IterAppend};
@@ -108,7 +106,7 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Resul
 
 /// Place a property changed signal on the D-Bus.
 pub fn prop_changed_dispatch<T: 'static>(
-    conn: &Rc<RefCell<Connection>>,
+    conn: &Connection,
     prop_name: &str,
     new_value: T,
     path: &dbus::Path,
@@ -121,7 +119,7 @@ where
         .changed_properties
         .insert(prop_name.into(), Variant(Box::new(new_value)));
 
-    conn.borrow().send(prop_changed.to_emit_message(path))?;
+    conn.send(prop_changed.to_emit_message(path))?;
 
     Ok(())
 }

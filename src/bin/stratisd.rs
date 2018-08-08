@@ -186,7 +186,7 @@ impl EngineListener for EventHandler {
             } => {
                 if let &Some(ref dbus_path) = dbus_path {
                     prop_changed_dispatch(
-                        &self.dbus_conn,
+                        &self.dbus_conn.borrow(),
                         consts::POOL_NAME_PROP,
                         to.to_owned(),
                         &dbus_path,
@@ -324,7 +324,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                         if let Some(ref mut handle) = dbus_handle {
                             if let Some(pool_uuid) = pool_uuid {
                                 libstratis::dbus_api::register_pool(
-                                    Rc::clone(&handle.connection),
+                                    &handle.connection.borrow(),
                                     &handle.context,
                                     &mut handle.tree,
                                     pool_uuid,
@@ -434,7 +434,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                     // Register all the pools with dbus
                     for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
                         libstratis::dbus_api::register_pool(
-                            Rc::clone(&handle.connection),
+                            &handle.connection.borrow(),
                             &handle.context,
                             &mut handle.tree,
                             pool_uuid,

@@ -230,7 +230,7 @@ pub fn connect<'a>(engine: Rc<RefCell<Engine>>) -> Result<DbusConnectionData<'a>
 
 /// Given the UUID of a pool, register all the pertinent information with dbus.
 pub fn register_pool(
-    c: Rc<RefCell<Connection>>,
+    c: &Connection,
     dbus_context: &DbusContext,
     tree: &mut Tree<MTFn<TData>, TData>,
     pool_uuid: Uuid,
@@ -238,7 +238,7 @@ pub fn register_pool(
     object_path: &dbus::Path<'static>,
 ) -> Result<(), dbus::Error> {
     register_pool_dbus(dbus_context, pool_uuid, pool, object_path);
-    process_deferred_actions(&c.borrow(), tree, &mut dbus_context.actions.borrow_mut())
+    process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut())
 }
 
 /// Update the dbus tree with deferred adds and removes.

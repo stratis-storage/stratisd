@@ -4,6 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
+use std::cmp;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -193,16 +194,21 @@ impl Backstore {
         }
     }
 
-    /// Allocate requested chunks from device.
-    /// Returns None if it is not possible to satisfy the request.
-    /// Each segment allocated is contiguous with its neighbors in the return
-    /// vector.
+    /// Satisfy a request for multiple segments. This request must
+    /// always be satisfied exactly, None is returned if this can not
+    /// be done.
+    ///
     /// Precondition: self.next <= self.size()
     /// Postcondition: self.next <= self.size()
-    /// WARNING: All this must change when it becomes possible to return
-    /// sectors to the store.
+    ///
+    /// Postcondition: forall i, sizes_i == result_i.1. The second value
+    /// in each pair in the returned vector is therefore redundant, but is
+    /// retained as a convenience to the caller.
+    /// Postcondition:
+    /// forall i, result_i.0 = result_(i - 1).0 + result_(i - 1).1
+    ///
     /// WARNING: metadata changing event
-    pub fn alloc_space(&mut self, sizes: &[Sectors]) -> Option<Vec<(Sectors, Sectors)>> {
+    pub fn alloc(&mut self, sizes: &[Sectors]) -> Option<Vec<(Sectors, Sectors)>> {
         if self.available() < sizes.iter().cloned().sum() {
             return None;
         }
@@ -212,7 +218,46 @@ impl Backstore {
             chunks.push((self.next, *size));
             self.next += *size;
         }
+
+        // Assert that the postcondition holds.
+        assert_eq!(
+            sizes,
+            chunks
+                .iter()
+                .map(|x| x.1)
+                .collect::<Vec<Sectors>>()
+                .as_slice()
+        );
+
         Some(chunks)
+    }
+
+    /// Allocate a single segment from the backstore.
+    /// If it is impossible to allocate the requested amount, try
+    /// something smaller. If it is impossible to allocate any amount
+    /// greater than 0, return None. Only allocate amounts that are divisible
+    /// by modulus.
+    ///
+    /// Precondition: self.next <= self.size()
+    /// Postcondition: self.next <= self.size()
+    ///
+    /// Postcondition: result.1 % modulus == 0
+    /// Postcondition: result.1 <= request
+    ///
+    /// WARNING: metadata changing event
+    pub fn request(&mut self, request: Sectors, modulus: Sectors) -> Option<(Sectors, Sectors)> {
+        assert!(modulus != Sectors(0));
+
+        let internal_request = cmp::min(request, self.available());
+        let internal_request = (internal_request / modulus) * modulus;
+
+        if internal_request != Sectors(0) {
+            let result = (self.next, internal_request);
+            self.next += internal_request;
+            Some(result)
+        } else {
+            None
+        }
     }
 
     /// Return a reference to all the blockdevs that this pool has ownership
@@ -522,6 +567,52 @@ mod tests {
             loopbacked::DeviceLimits::Range(4, 5, None),
             test_add_cache_devs,
         );
+    }
+
+    /// Create a backstore.
+    /// Request a amount that can not be allocated because the modulus is
+    /// bigger than the reqested amount.
+    /// Request an impossibly large amount.
+    /// Verify that the backstore is now all used up.
+    fn test_request(paths: &[&Path]) -> () {
+        assert!(paths.len() > 0);
+
+        let mut backstore =
+            Backstore::initialize(Uuid::new_v4(), paths, MIN_MDA_SECTORS, false).unwrap();
+
+        assert!(
+            backstore
+                .request(Sectors(IEC::Ki), Sectors(IEC::Mi))
+                .is_none()
+        );
+
+        let request = Sectors(IEC::Ei);
+        let modulus = Sectors(IEC::Ki);
+        let old_next = backstore.next;
+        let (start, length) = backstore.request(request, modulus).unwrap();
+        assert!(length < request);
+        // FIXME: change to Sector operation once implemented in devicemapper
+        assert_eq!(*length % *modulus, 0);
+        assert_eq!(backstore.next, old_next + length);
+        assert_eq!(start, old_next);
+
+        assert!(backstore.request(request, Sectors(IEC::Ki)).is_none());
+        backstore.destroy().unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_request() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_request);
+    }
+
+    #[test]
+    pub fn real_test_request() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_request);
+    }
+
+    #[test]
+    pub fn travis_test_request() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_request);
     }
 
     /// Create a backstore with a cache.

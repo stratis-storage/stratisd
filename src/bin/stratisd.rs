@@ -179,19 +179,23 @@ impl EventHandler {
 impl EngineListener for EventHandler {
     fn notify(&self, event: &EngineEvent) {
         match event {
-            EngineEvent::PoolRenamed {
+            &EngineEvent::PoolRenamed {
                 dbus_path,
                 from,
                 to,
             } => {
                 if let &Some(ref dbus_path) = dbus_path {
-                    prop_changed_dispatch(&self.dbus_conn, consts::POOL_NAME_PROP, to, &dbus_path)
-                        .unwrap_or_else(|()| {
-                            error!(
-                                "PoolRenamed: {} from: {} to: {} failed to send dbus update.",
-                                dbus_path, from, to,
-                            );
-                        });
+                    if let Err(_) = prop_changed_dispatch(
+                        &self.dbus_conn,
+                        consts::POOL_NAME_PROP,
+                        to,
+                        &dbus_path,
+                    ) {
+                        error!(
+                            "PoolRenamed: {} from: {} to: {} failed to send dbus update.",
+                            dbus_path, from, to,
+                        );
+                    }
                 }
             }
         }

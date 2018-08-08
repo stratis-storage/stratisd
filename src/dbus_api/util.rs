@@ -106,7 +106,7 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Resul
     Ok(())
 }
 
-/// Construct a signal that a property has changed.
+/// Place a property changed signal on the D-Bus.
 pub fn prop_changed_dispatch<T: 'static>(
     conn: &Rc<RefCell<Connection>>,
     prop_name: &str,

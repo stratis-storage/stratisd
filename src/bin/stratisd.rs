@@ -399,7 +399,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         // If dbus support is compiled in and dbus isn't available we will set timeout to
         // 1 second so that we periodically check to see if we can bring it up.
         #[cfg(feature = "dbus_enabled")]
-        let poll_timeout = dbus_handle.as_ref().map_or(-1, |_| 1000);
+        let poll_timeout = dbus_handle.as_ref().map_or(1000, |_| -1);
         // Default timeout is infinite
         #[cfg(not(feature = "dbus_enabled"))]
         let poll_timeout = -1;

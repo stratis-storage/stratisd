@@ -117,6 +117,10 @@ pub fn filesystem_renamed(pool_name: &str, old_name: &str, new_name: &str) -> St
     Ok(())
 }
 
+/// Given a pool name and a filesystem name, return the path it should be
+/// available as a device for mounting.
 pub fn devpath_from_names<T: AsRef<str>>(pool_name: T, fs_name: T) -> PathBuf {
-    vec![DEV_PATH, pool_name.as_ref(), fs_name.as_ref()].iter().collect()
+    vec![DEV_PATH, pool_name.as_ref(), fs_name.as_ref()]
+        .iter()
+        .collect()
 }

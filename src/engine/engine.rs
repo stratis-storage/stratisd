@@ -12,16 +12,27 @@ use std::path::{Path, PathBuf};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use devicemapper::{Device, Sectors};
+use devicemapper::{Bytes, Device, Sectors};
 
 use super::types::{
     BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, RenameAction,
 };
 use stratis::StratisResult;
 
+pub const DEV_PATH: &str = "/dev/stratis";
+
 pub trait Filesystem: Debug {
     /// path of the device node
     fn devnode(&self) -> PathBuf;
+
+    /// When the filesystem was created.
+    fn created(&self) -> DateTime<Utc>;
+
+    /// The amount of data stored on the filesystem, including overhead.
+    fn used(&self) -> StratisResult<Bytes>;
+
+    /// Get the mount_point(s) for the file system.
+    fn mount_points(&self) -> StratisResult<Vec<PathBuf>>;
 
     /// Set dbus path associated with the Pool.
     #[cfg(feature = "dbus_enabled")]

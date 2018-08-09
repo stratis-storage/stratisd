@@ -11,7 +11,7 @@ use std::{fs, str};
 use stratis::StratisResult;
 
 use super::super::engine::Pool;
-use super::super::types::{Name, PoolUuid};
+use super::types::{Name, PoolUuid};
 
 use super::engine::DEV_PATH;
 
@@ -94,7 +94,7 @@ pub fn pool_renamed(old_name: &str, new_name: &str) -> StratisResult<()> {
 /// Create a symlink to the new filesystem's block device within its pool's
 /// directory.
 pub fn filesystem_added(pool_name: &str, fs_name: &str, devnode: &Path) -> StratisResult<()> {
-    let p: PathBuf = vec![DEV_PATH, pool_name, fs_name].iter().collect();
+    let p = devpath_from_names(pool_name, fs_name);
 
     // Remove existing and recreate to ensure it points to the correct devnode
     let _ = fs::remove_file(&p);
@@ -104,15 +104,19 @@ pub fn filesystem_added(pool_name: &str, fs_name: &str, devnode: &Path) -> Strat
 
 /// Remove the symlink when the filesystem is destroyed.
 pub fn filesystem_removed(pool_name: &str, fs_name: &str) -> StratisResult<()> {
-    let p: PathBuf = vec![DEV_PATH, pool_name, fs_name].iter().collect();
+    let p = devpath_from_names(pool_name, fs_name);
     fs::remove_file(&p)?;
     Ok(())
 }
 
 /// Rename the symlink to track the filesystem's new name.
 pub fn filesystem_renamed(pool_name: &str, old_name: &str, new_name: &str) -> StratisResult<()> {
-    let old: PathBuf = vec![DEV_PATH, pool_name, old_name].iter().collect();
-    let new: PathBuf = vec![DEV_PATH, pool_name, new_name].iter().collect();
+    let old = devpath_from_names(pool_name, old_name);
+    let new = devpath_from_names(pool_name, new_name);
     fs::rename(&old, &new)?;
     Ok(())
+}
+
+pub fn devpath_from_names<T: AsRef<str>>(pool_name: T, fs_name: T) -> PathBuf {
+    vec![DEV_PATH, pool_name.as_ref(), fs_name.as_ref()].iter().collect()
 }

@@ -412,11 +412,11 @@ mod tests {
     use nix::mount::{mount, umount, MsFlags};
     use tempfile;
 
+    use super::super::super::devlinks;
     use super::super::super::types::Redundancy;
 
     use super::super::backstore::{find_all, get_metadata};
     use super::super::cmd;
-    use super::super::devlinks;
     use super::super::tests::{loopbacked, real};
 
     use super::*;

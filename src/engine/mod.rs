@@ -4,6 +4,8 @@
 
 pub use devicemapper::{IEC, SECTOR_SIZE};
 
+pub use self::devlinks::devpath_from_names;
+
 pub use self::engine::BlockDev;
 pub use self::engine::Engine;
 pub use self::engine::Filesystem;
@@ -24,6 +26,7 @@ pub use self::types::RenameAction;
 #[macro_use]
 mod macros;
 
+mod devlinks;
 #[allow(module_inception)]
 mod engine;
 mod sim_engine;

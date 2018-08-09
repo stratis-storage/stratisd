@@ -49,6 +49,7 @@ pub struct FilesystemSave {
     pub uuid: FilesystemUuid,
     pub thin_id: ThinDevId,
     pub size: Sectors,
+    pub created: u64, // Unix timestamp
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use chrono::SecondsFormat;
 use dbus;
 use dbus::arg::IterAppend;
 use dbus::tree::{
@@ -11,7 +12,7 @@ use dbus::Message;
 
 use uuid::Uuid;
 
-use super::super::engine::{Filesystem, Name, RenameAction};
+use super::super::engine::{devpath_from_names, Filesystem, Name, RenameAction};
 
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
@@ -54,6 +55,21 @@ pub fn create_dbus_filesystem<'a>(
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid);
 
+    let created_property = f.property::<&str, _>("Created", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_filesystem_created);
+
+    let used_property = f.property::<&str, _>("Used", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::False)
+        .on_get(get_filesystem_used);
+
+    let mount_points_property = f.property::<&Vec<String>, _>("MountPoints", ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::False)
+        .on_get(get_filesystem_mount_points);
+
     let object_name = format!(
         "{}/{}",
         STRATIS_BASE_PATH,
@@ -70,7 +86,10 @@ pub fn create_dbus_filesystem<'a>(
                 .add_p(devnode_property)
                 .add_p(name_property)
                 .add_p(pool_property)
-                .add_p(uuid_property),
+                .add_p(uuid_property)
+                .add_p(created_property)
+                .add_p(used_property)
+                .add_p(mount_points_property),
         );
 
     let path = object_path.get_name().to_owned();
@@ -132,7 +151,7 @@ fn get_filesystem_property<F, R>(
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn((Name, &Filesystem)) -> Result<R, MethodErr>,
+    F: Fn((Name, Name, &Filesystem)) -> Result<R, MethodErr>,
     R: dbus::arg::Append,
 {
     let dbus_context = p.tree.get_data();
@@ -161,17 +180,17 @@ where
         .uuid;
 
     let engine = dbus_context.engine.borrow();
-    let (_, pool) = engine.get_pool(pool_uuid).ok_or_else(|| {
+    let (pool_name, pool) = engine.get_pool(pool_uuid).ok_or_else(|| {
         MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))
     })?;
     let filesystem_uuid = filesystem_data.uuid;
-    let context = pool.get_filesystem(filesystem_uuid).ok_or_else(|| {
+    let (fs_name, fs) = pool.get_filesystem(filesystem_uuid).ok_or_else(|| {
         MethodErr::failed(&format!(
             "no name for filesystem with uuid {}",
             &filesystem_uuid
         ))
     })?;
-    i.append(getter(context)?);
+    i.append(getter((pool_name, fs_name, fs))?);
     Ok(())
 }
 
@@ -180,12 +199,53 @@ fn get_filesystem_devnode(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_filesystem_property(i, p, |(_, fs)| Ok(format!("{}", fs.devnode().display())))
+    get_filesystem_property(i, p, |(pool_name, fs_name, _)| {
+        Ok(format!(
+            "{}",
+            devpath_from_names(&pool_name, &fs_name).display()
+        ))
+    })
 }
 
 fn get_filesystem_name(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_filesystem_property(i, p, |(name, _)| Ok(name.to_owned()))
+    get_filesystem_property(i, p, |(_, fs_name, _)| Ok(fs_name.to_owned()))
+}
+
+/// Get the creation date and time in rfc3339 format.
+fn get_filesystem_created(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_filesystem_property(i, p, |(_, _, fs)| {
+        Ok(fs.created().to_rfc3339_opts(SecondsFormat::Secs, true))
+    })
+}
+
+fn get_filesystem_used(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_filesystem_property(i, p, |(_, _, fs)| {
+        fs.used()
+            .map(|v| format!("{}", *v))
+            .map_err(|_| MethodErr::failed(&"fs used() engine call failed".to_owned()))
+    })
+}
+
+fn get_filesystem_mount_points(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_filesystem_property(i, p, |(_, _, fs)| {
+        fs.mount_points()
+            .map(|vec| {
+                vec.iter()
+                    .map(|elem| format!("{}", elem.display()))
+                    .collect::<Vec<_>>()
+            })
+            .map_err(|_| MethodErr::failed(&"mount_points() engine call failed".to_owned()))
+    })
 }

@@ -202,7 +202,7 @@ fn get_filesystem_devnode(
     get_filesystem_property(i, p, |(pool_name, fs_name, _)| {
         Ok(format!(
             "{}",
-            devpath_from_names(&pool_name, &fs_name).display()
+            devpath_from_names(pool_name, fs_name).display()
         ))
     })
 }

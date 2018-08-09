@@ -908,6 +908,108 @@ mod tests {
 
     const BYTES_PER_WRITE: usize = 2 * IEC::Ki as usize * SECTOR_SIZE as usize;
 
+    /// Create a pool with a single sector meta dev.
+    fn test_full_meta(paths: &[&Path]) {
+        let pool_uuid = Uuid::new_v4();
+        devlinks::setup_dev_path().unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        let mut size_params = ThinPoolSizeParams::default();
+        size_params.meta_size = MetaBlocks(16);
+
+        let (first_path, remaining_paths) = paths.split_at(1);
+        let mut backstore =
+            Backstore::initialize(pool_uuid, &first_path, MIN_MDA_SECTORS, false).unwrap();
+        debug!("Backstore::initialize completed");
+        let mut pool =
+            ThinPool::new(pool_uuid, &size_params, DATA_BLOCK_SIZE, &mut backstore).unwrap();
+        debug!("pool created");
+        let pool_name = "stratis_test_pool";
+        devlinks::pool_added(&pool_name).unwrap();
+        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
+            .unwrap();
+        debug!("filesystem created");
+        let write_buf = &[8u8; BYTES_PER_WRITE];
+        let source_tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
+        {
+            // to allow mutable borrow of pool
+            let (_, filesystem) = pool.get_filesystem_by_uuid(fs_uuid).unwrap();
+            mount(
+                Some(&filesystem.devnode()),
+                source_tmp_dir.path(),
+                Some("xfs"),
+                MsFlags::empty(),
+                None as Option<&str>,
+            ).unwrap();
+            let file_path = source_tmp_dir.path().join("stratis_test.txt");
+            let mut f: File = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(file_path)
+                .unwrap();
+            debug!("filesystem opened");
+            // Write the write_buf until the pool is full
+            loop {
+                let status: dm::ThinPoolStatus = pool.thin_pool.status(get_dm()).unwrap();
+                match status {
+                    dm::ThinPoolStatus::Working(_) => {
+                        debug!("writing sector");
+                        f.write_all(write_buf).unwrap();
+                        if f.sync_data().is_err() {
+                            break;
+                        }
+                    }
+                    dm::ThinPoolStatus::Fail => debug!("ThinPoolStatus::Fail."),
+                }
+            }
+        }
+        debug!("writing completed");
+        match pool.thin_pool.status(get_dm()).unwrap() {
+            dm::ThinPoolStatus::Working(ref status) => {
+                debug!("status.summary = {:?}", status.summary);
+            }
+            dm::ThinPoolStatus::Fail => debug!("ThinPoolStatus::Fail  Expected working/full."),
+        };
+
+        // Add block devices to the pool and run check() to extend
+        backstore
+            .add_blockdevs(pool_uuid, &remaining_paths, BlockDevTier::Data, true)
+            .unwrap();
+        pool.check(&mut backstore).unwrap();
+        // Verify the pool is back in a Good state
+        match pool.thin_pool.status(get_dm()).unwrap() {
+            dm::ThinPoolStatus::Working(ref status) => {
+                assert!(
+                    status.summary == ThinPoolStatusSummary::Good,
+                    "Expected pool to be restored to good state"
+                );
+            }
+            dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail.  Expected working/good."),
+        };
+    }
+
+    #[test]
+    pub fn loop_test_full_meta() {
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Exactly(2, Some(Bytes(IEC::Gi).sectors())),
+            test_full_meta,
+        );
+    }
+
+    #[test]
+    pub fn real_test_full_meta() {
+        real::test_with_spec(
+            real::DeviceLimits::Exactly(
+                2,
+                Some(Bytes(IEC::Gi).sectors()),
+                Some(Bytes(IEC::Gi * 4).sectors()),
+            ),
+            test_full_meta,
+        );
+    }
+
     /// Verify that a full pool extends properly when additional space is added.
     fn test_full_pool(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();

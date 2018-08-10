@@ -230,7 +230,7 @@ fn get_filesystem_used(
 ) -> Result<(), MethodErr> {
     get_filesystem_property(i, p, |(_, _, fs)| {
         fs.used()
-            .map(|v| format!("{}", *v))
+            .map(|v| v.to_string())
             .map_err(|_| MethodErr::failed(&"fs used() engine call failed".to_owned()))
     })
 }

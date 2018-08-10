@@ -33,6 +33,8 @@ use super::super::serde_structs::FilesystemSave;
 
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
+const TEMP_MNT_POINT_PREFIX: &str = "stratis_mp_";
+
 /// TODO: confirm that 256 MiB leaves enough time for stratisd to respond and extend before
 /// the filesystem is out of space.
 pub const FILESYSTEM_LOWATER: Sectors = Sectors(256 * IEC::Mi / (SECTOR_SIZE as u64)); // = 256 MiB
@@ -141,7 +143,9 @@ impl StratFilesystem {
                 // If the source is unmounted the XFS log will be clean so
                 // we can skip the mount/unmount.
                 if !self.mount_points()?.is_empty() {
-                    let tmp_dir = tempfile::Builder::new().prefix("stratis_mp_").tempdir()?;
+                    let tmp_dir = tempfile::Builder::new()
+                        .prefix(TEMP_MNT_POINT_PREFIX)
+                        .tempdir()?;
                     // Mount the snapshot with the "nouuid" option. mount
                     // will fail due to duplicate UUID otherwise.
                     mount(
@@ -255,7 +259,9 @@ impl Filesystem for StratFilesystem {
         match self.mount_points()?.first() {
             Some(mount_pt) => Ok(fs_usage(mount_pt)?.1),
             None => {
-                let tmp_dir = tempfile::Builder::new().prefix("stratis_mp_").tempdir()?;
+                let tmp_dir = tempfile::Builder::new()
+                    .prefix(TEMP_MNT_POINT_PREFIX)
+                    .tempdir()?;
                 mount(
                     Some(&self.devnode()),
                     tmp_dir.path(),

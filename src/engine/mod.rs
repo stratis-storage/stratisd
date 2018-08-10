@@ -4,7 +4,7 @@
 
 pub use devicemapper::{IEC, SECTOR_SIZE};
 
-pub use self::devlinks::devpath_from_names;
+pub use self::devlinks::filesystem_mount_path;
 
 pub use self::engine::BlockDev;
 pub use self::engine::Engine;

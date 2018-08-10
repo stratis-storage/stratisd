@@ -12,7 +12,7 @@ use dbus::Message;
 
 use uuid::Uuid;
 
-use super::super::engine::{devpath_from_names, Filesystem, Name, RenameAction};
+use super::super::engine::{filesystem_mount_path, Filesystem, Name, RenameAction};
 
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
@@ -202,7 +202,7 @@ fn get_filesystem_devnode(
     get_filesystem_property(i, p, |(pool_name, fs_name, _)| {
         Ok(format!(
             "{}",
-            devpath_from_names(pool_name, fs_name).display()
+            filesystem_mount_path(pool_name, fs_name).display()
         ))
     })
 }

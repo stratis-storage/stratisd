@@ -224,6 +224,7 @@ fn get_filesystem_created(
     })
 }
 
+/// Get the number of bytes used for any purpose on the filesystem
 fn get_filesystem_used(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
@@ -235,6 +236,7 @@ fn get_filesystem_used(
     })
 }
 
+/// Get all filesystem mount points
 fn get_filesystem_mount_points(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,

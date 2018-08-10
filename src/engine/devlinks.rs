@@ -44,7 +44,7 @@ pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>(
             pool_added(pool_name)?;
         }
 
-        let pool_path: PathBuf = vec![DEV_PATH, pool_name].iter().collect();
+        let pool_path = pool_directory(pool_name);
 
         let mut existing_files = fs::read_dir(pool_path)?
             .map(|dir_e| {
@@ -71,22 +71,22 @@ pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>(
 
 /// Create a directory when a pool is added.
 pub fn pool_added(pool: &str) -> StratisResult<()> {
-    let p: PathBuf = vec![DEV_PATH, pool].iter().collect();
+    let p = pool_directory(pool);
     fs::create_dir(&p)?;
     Ok(())
 }
 
 /// Remove the directory and its contents when the pool is removed.
 pub fn pool_removed(pool: &str) -> StratisResult<()> {
-    let p: PathBuf = vec![DEV_PATH, pool].iter().collect();
+    let p = pool_directory(pool);
     fs::remove_dir_all(&p)?;
     Ok(())
 }
 
 /// Rename the directory to match the pool's new name.
 pub fn pool_renamed(old_name: &str, new_name: &str) -> StratisResult<()> {
-    let old: PathBuf = vec![DEV_PATH, old_name].iter().collect();
-    let new: PathBuf = vec![DEV_PATH, new_name].iter().collect();
+    let old = pool_directory(old_name);
+    let new = pool_directory(new_name);
     fs::rename(&old, &new)?;
     Ok(())
 }
@@ -115,6 +115,12 @@ pub fn filesystem_renamed(pool_name: &str, old_name: &str, new_name: &str) -> St
     let new = filesystem_mount_path(pool_name, new_name);
     fs::rename(&old, &new)?;
     Ok(())
+}
+
+/// Given a pool name, synthesize a pool directory name for storing filesystem
+/// mount paths.
+fn pool_directory<T: AsRef<str>>(pool_name: T) -> PathBuf {
+    vec![DEV_PATH, pool_name.as_ref()].iter().collect()
 }
 
 /// Given a pool name and a filesystem name, return the path it should be

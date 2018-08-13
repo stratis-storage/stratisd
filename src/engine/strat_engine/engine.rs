@@ -2,8 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::cell::RefCell;
+use std::clone::Clone;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use devicemapper::{Device, DmNameBuf};
 
@@ -173,10 +176,13 @@ impl Engine for StratEngine {
             return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
-        let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy, force)?;
+        let (uuid, mut pool) = StratPool::initialize(name, blockdev_paths, redundancy, force)?;
 
         let name = Name::new(name.to_owned());
         devlinks::pool_added(&name)?;
+        for listener in self.listeners.listeners() {
+            pool.register_listener(listener.clone());
+        }
         self.pools.insert(name, uuid, pool);
         Ok(uuid)
     }
@@ -327,8 +333,13 @@ impl Engine for StratEngine {
         Ok(())
     }
 
-    fn register_listener(&mut self, listener: Box<EngineListener>) {
+    fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>) {
         self.listeners.register_listener(listener);
+        for (_pool_name, _pool_uuid, pool) in &mut self.pools {
+            for listener in self.listeners.listeners() {
+                pool.register_listener(listener.clone());
+            }
+        }
     }
 }
 

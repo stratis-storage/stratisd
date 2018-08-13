@@ -138,7 +138,7 @@ impl Engine for SimEngine {
         Ok(())
     }
 
-    fn register_listener(&mut self, listener: Box<EngineListener>) {
+    fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>) {
         self.listeners.register_listener(listener);
     }
 }

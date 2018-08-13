@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 use super::super::engine::{filesystem_mount_path, Filesystem, Name, RenameAction};
 
+use super::consts;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
 use super::util::{
@@ -40,9 +41,9 @@ pub fn create_dbus_filesystem<'a>(
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_filesystem_devnode);
 
-    let name_property = f.property::<&str, _>("Name", ())
+    let name_property = f.property::<&str, _>(consts::FILESYSTEM_NAME_PROP, ())
         .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
+        .emits_changed(EmitsChangedSignal::True)
         .on_get(get_filesystem_name);
 
     let pool_property = f.property::<&dbus::Path, _>("Pool", ())

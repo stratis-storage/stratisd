@@ -5,11 +5,19 @@
 #[cfg(feature = "dbus_enabled")]
 use dbus;
 
+use std::cell::RefCell;
 use std::fmt::Debug;
+use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub enum EngineEvent<'a> {
     PoolRenamed {
+        #[cfg(feature = "dbus_enabled")]
+        dbus_path: &'a Option<dbus::Path<'static>>,
+        from: &'a str,
+        to: &'a str,
+    },
+    FilesystemRenamed {
         #[cfg(feature = "dbus_enabled")]
         dbus_path: &'a Option<dbus::Path<'static>>,
         from: &'a str,
@@ -23,7 +31,7 @@ pub trait EngineListener: Debug {
 
 #[derive(Debug)]
 pub struct EngineListenerList {
-    listeners: Vec<Box<EngineListener>>,
+    listeners: Vec<Rc<RefCell<EngineListener>>>,
 }
 
 impl EngineListenerList {
@@ -35,15 +43,19 @@ impl EngineListenerList {
     }
 
     /// Add a listener.
-    pub fn register_listener(&mut self, listener: Box<EngineListener>) {
+    pub fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>) {
         self.listeners.push(listener);
     }
 
     /// Notify a listener.
     pub fn notify(&self, event: &EngineEvent) {
         for listener in &self.listeners {
-            listener.notify(&event);
+            listener.borrow().notify(&event);
         }
+    }
+
+    pub fn listeners(&self) -> &Vec<Rc<RefCell<EngineListener>>> {
+        &self.listeners
     }
 }
 

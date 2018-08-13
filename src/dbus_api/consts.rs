@@ -4,3 +4,6 @@
 
 // Pool Properties
 pub const POOL_NAME_PROP: &str = "Name";
+
+// Filesystem Properties
+pub const FILESYSTEM_NAME_PROP: &str = "Name";

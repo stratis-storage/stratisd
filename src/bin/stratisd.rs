@@ -198,6 +198,25 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
+            &EngineEvent::FilesystemRenamed {
+                dbus_path,
+                from,
+                to,
+            } => {
+                if let &Some(ref dbus_path) = dbus_path {
+                    prop_changed_dispatch(
+                        &self.dbus_conn.borrow(),
+                        consts::FILESYSTEM_NAME_PROP,
+                        to.to_owned(),
+                        &dbus_path,
+                    ).unwrap_or_else(|()| {
+                        error!(
+                            "FilesystemRenamed: {} from: {} to: {} failed to send dbus update.",
+                            dbus_path, from, to,
+                        );
+                    });
+                }
+            }
         }
     }
 }
@@ -429,7 +448,9 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 // See if we can bring up dbus.
                 if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
                     info!("DBUS API is now available");
-                    let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
+                    let event_handler = Rc::new(RefCell::new(EventHandler::new(Rc::clone(
+                        &handle.connection,
+                    ))));
                     engine.borrow_mut().register_listener(event_handler);
                     // Register all the pools with dbus
                     for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {

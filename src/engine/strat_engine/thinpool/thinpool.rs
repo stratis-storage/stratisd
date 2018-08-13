@@ -5,6 +5,8 @@
 // Code to handle management of a pool's thinpool device.
 
 use std::borrow::BorrowMut;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use uuid::Uuid;
 
@@ -19,6 +21,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::devlinks;
 use super::super::super::engine::Filesystem;
+use super::super::super::event::{EngineEvent, EngineListener, EngineListenerList};
 use super::super::super::structures::Table;
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid, RenameAction};
 
@@ -156,6 +159,7 @@ pub struct ThinPool {
     /// layer. All DM components obtain their storage from this layer.
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
+    listeners: EngineListenerList,
 }
 
 impl ThinPool {
@@ -240,6 +244,7 @@ impl ThinPool {
             filesystems: Table::default(),
             mdv,
             backstore_device,
+            listeners: EngineListenerList::new(),
         })
     }
 
@@ -329,6 +334,7 @@ impl ThinPool {
             filesystems: fs_table,
             mdv,
             backstore_device,
+            listeners: EngineListenerList::new(),
         })
     }
 
@@ -683,6 +689,12 @@ impl ThinPool {
             self.filesystems.insert(old_name, uuid, filesystem);
             Err(err)
         } else {
+            self.listeners.notify(&EngineEvent::FilesystemRenamed {
+                #[cfg(feature = "dbus_enabled")]
+                dbus_path: filesystem.get_dbus_path(),
+                from: &*old_name,
+                to: &*new_name,
+            });
             self.filesystems.insert(new_name.clone(), uuid, filesystem);
             devlinks::filesystem_renamed(pool_name, &old_name, &new_name)?;
             Ok(RenameAction::Renamed)
@@ -776,6 +788,10 @@ impl ThinPool {
         self.backstore_device = backstore_device;
 
         Ok(true)
+    }
+
+    pub fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>) {
+        self.listeners.register_listener(listener);
     }
 }
 

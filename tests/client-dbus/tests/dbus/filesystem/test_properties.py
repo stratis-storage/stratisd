@@ -19,10 +19,7 @@ import unittest
 
 from stratisd_client_dbus import Filesystem
 from stratisd_client_dbus import Manager
-from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import Pool
-from stratisd_client_dbus import StratisdErrors
-from stratisd_client_dbus import filesystems
 from stratisd_client_dbus import get_object
 
 from stratisd_client_dbus._constants import TOP_OBJECT
@@ -100,4 +97,3 @@ class SetNameTestCase(unittest.TestCase):
         devnode = Filesystem.Properties.Devnode.Get(filesystem)
 
         self.assertEqual(devnode, "/dev/stratis/deadpool/fs")
-

@@ -9,6 +9,7 @@ use devicemapper::{Device, DmNameBuf};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
+use super::super::devlinks;
 use super::super::engine::{Engine, Eventable, Pool};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
@@ -18,11 +19,9 @@ use super::backstore::{find_all, get_metadata};
 #[cfg(test)]
 use super::cleanup::teardown_pools;
 use super::cmd::verify_binaries;
-use super::devlinks;
 use super::dm::{get_dm, get_dm_init};
 use super::pool::{check_metadata, StratPool};
 
-pub const DEV_PATH: &str = "/dev/stratis";
 const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 
 /// Setup a pool from constituent devices in the context of some already
@@ -321,6 +320,8 @@ impl Engine for StratEngine {
 #[cfg(test)]
 mod test {
     use std::fs::remove_dir_all;
+
+    use engine::engine::DEV_PATH;
 
     use super::super::tests::{loopbacked, real};
 

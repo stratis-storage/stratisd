@@ -19,6 +19,8 @@ use super::types::{
 };
 use stratis::StratisResult;
 
+pub const DEV_PATH: &str = "/dev/stratis";
+
 pub trait Filesystem: Debug {
     /// path of the device node
     fn devnode(&self) -> PathBuf;

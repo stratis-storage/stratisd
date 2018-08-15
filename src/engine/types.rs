@@ -68,6 +68,12 @@ impl Name {
     }
 }
 
+impl AsRef<str> for Name {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 impl Deref for Name {
     type Target = str;
 

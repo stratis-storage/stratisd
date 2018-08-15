@@ -2,8 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use chrono::{DateTime, TimeZone, Utc};
 #[cfg(feature = "dbus_enabled")]
 use dbus;
+use uuid::Uuid;
 
 use std::fs::File;
 use std::io::Read;
@@ -22,11 +24,16 @@ use tempfile;
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::engine::Filesystem;
-use super::super::super::types::{FilesystemUuid, Name};
+use super::super::super::types::{FilesystemUuid, Name, PoolUuid};
 
 use super::super::cmd::{create_fs, set_uuid, xfs_growfs};
 use super::super::dm::get_dm;
+use super::super::dmnames::{format_thin_ids, ThinRole};
 use super::super::serde_structs::FilesystemSave;
+
+const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
+
+const TEMP_MNT_POINT_PREFIX: &str = "stratis_mp_";
 
 /// TODO: confirm that 256 MiB leaves enough time for stratisd to respond and extend before
 /// the filesystem is out of space.
@@ -35,6 +42,7 @@ pub const FILESYSTEM_LOWATER: Sectors = Sectors(256 * IEC::Mi / (SECTOR_SIZE as 
 #[derive(Debug)]
 pub struct StratFilesystem {
     thin_dev: ThinDev,
+    created: DateTime<Utc>,
     #[cfg(feature = "dbus_enabled")]
     dbus_path: Option<dbus::Path<'static>>,
 }
@@ -48,20 +56,56 @@ pub enum FilesystemStatus {
 
 impl StratFilesystem {
     /// Create a StratFilesystem on top of the given ThinDev.
-    pub fn initialize(fs_id: FilesystemUuid, thin_dev: ThinDev) -> StratisResult<StratFilesystem> {
-        let fs = StratFilesystem::setup(thin_dev);
+    pub fn initialize(
+        pool_uuid: PoolUuid,
+        thinpool_dev: &ThinPoolDev,
+        size: Option<Sectors>,
+        id: ThinDevId,
+    ) -> StratisResult<(FilesystemUuid, StratFilesystem)> {
+        let fs_uuid = Uuid::new_v4();
+        let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
+        let thin_dev = ThinDev::new(
+            get_dm(),
+            &dm_name,
+            Some(&dm_uuid),
+            size.unwrap_or(DEFAULT_THIN_DEV_SIZE),
+            thinpool_dev,
+            id,
+        )?;
 
-        create_fs(&fs.devnode(), fs_id)?;
-        Ok(fs)
+        create_fs(&thin_dev.devnode(), fs_uuid)?;
+        Ok((
+            fs_uuid,
+            StratFilesystem {
+                thin_dev,
+                created: Utc::now(),
+                #[cfg(feature = "dbus_enabled")]
+                dbus_path: None,
+            },
+        ))
     }
 
     /// Build a StratFilesystem that includes the ThinDev and related info.
-    pub fn setup(thin_dev: ThinDev) -> StratFilesystem {
-        StratFilesystem {
+    pub fn setup(
+        pool_uuid: PoolUuid,
+        thinpool_dev: &ThinPoolDev,
+        fssave: &FilesystemSave,
+    ) -> StratisResult<StratFilesystem> {
+        let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fssave.uuid));
+        let thin_dev = ThinDev::setup(
+            get_dm(),
+            &dm_name,
+            Some(&dm_uuid),
+            fssave.size,
+            &thinpool_dev,
+            fssave.thin_id,
+        )?;
+        Ok(StratFilesystem {
             thin_dev,
+            created: Utc.timestamp(fssave.created as i64, 0),
             #[cfg(feature = "dbus_enabled")]
             dbus_path: None,
-        }
+        })
     }
 
     /// Create a snapshot of the filesystem. Return the resulting filesystem/ThinDev
@@ -98,8 +142,10 @@ impl StratFilesystem {
                 //
                 // If the source is unmounted the XFS log will be clean so
                 // we can skip the mount/unmount.
-                if self.get_mount_point()?.is_some() {
-                    let tmp_dir = tempfile::Builder::new().prefix("stratis_mp_").tempdir()?;
+                if !self.mount_points()?.is_empty() {
+                    let tmp_dir = tempfile::Builder::new()
+                        .prefix(TEMP_MNT_POINT_PREFIX)
+                        .tempdir()?;
                     // Mount the snapshot with the "nouuid" option. mount
                     // will fail due to duplicate UUID otherwise.
                     mount(
@@ -113,7 +159,12 @@ impl StratFilesystem {
                 }
 
                 set_uuid(&thin_dev.devnode(), snapshot_fs_uuid)?;
-                Ok(StratFilesystem::setup(thin_dev))
+                Ok(StratFilesystem {
+                    thin_dev,
+                    created: Utc::now(),
+                    #[cfg(feature = "dbus_enabled")]
+                    dbus_path: None,
+                })
             }
             Err(e) => Err(StratisError::Engine(
                 ErrorEnum::Error,
@@ -130,7 +181,7 @@ impl StratFilesystem {
     pub fn check(&mut self) -> StratisResult<FilesystemStatus> {
         match self.thin_dev.status(get_dm())? {
             ThinStatus::Working(_) => {
-                if let Some(mount_point) = self.get_mount_point()? {
+                if let Some(mount_point) = self.mount_points()?.first() {
                     let (fs_total_bytes, fs_total_used_bytes) = fs_usage(&mount_point)?;
                     let free_bytes = fs_total_bytes - fs_total_used_bytes;
                     if free_bytes.sectors() < FILESYSTEM_LOWATER {
@@ -153,45 +204,11 @@ impl StratFilesystem {
         Ok(FilesystemStatus::Good)
     }
 
-    /// The thin id for the thin device that backs this filesystem.
-    #[cfg(test)]
-    pub fn thin_id(&self) -> ThinDevId {
-        self.thin_dev.id()
-    }
-
     /// Return an extend size for the thindev under the filesystem
     /// TODO: returning the current size will double the space provisioned to
     /// the thin device.  We should determine if this is a reasonable value.
     fn extend_size(&self, current_size: Sectors) -> Sectors {
         current_size
-    }
-
-    /// Get one (non-deterministic in the presence of errors) of the mount_point(s) for the file
-    /// system that is contained on the block device referred to as self.devnode(), i.e. the device
-    /// node, while ignoring parse errors as long as at least one mount point is found.
-    pub fn get_mount_point(&self) -> StratisResult<Option<PathBuf>> {
-        let major = u64::from(self.thin_dev.device().major);
-        let minor = u64::from(self.thin_dev.device().minor);
-
-        let mut mount_data = String::new();
-        File::open("/proc/self/mountinfo")?.read_to_string(&mut mount_data)?;
-        let parser = libmount::mountinfo::Parser::new(mount_data.as_bytes());
-
-        let mut last_error: Option<String> = None;
-        for mp in parser {
-            match mp {
-                Ok(mount) => {
-                    if mount.major as u64 == major && mount.minor as u64 == minor {
-                        return Ok(Some(PathBuf::from(mount.mount_point.into_owned())));
-                    }
-                }
-                Err(e) => {
-                    last_error = Some(format!("Error during parsing {:?} {:?}", *self, e));
-                }
-            }
-        }
-
-        last_error.map_or(Ok(None), |e| Err(StratisError::Engine(ErrorEnum::Error, e)))
     }
 
     /// Tear down the filesystem.
@@ -212,6 +229,7 @@ impl StratFilesystem {
             uuid,
             thin_id: self.thin_dev.id(),
             size: self.thin_dev.size(),
+            created: self.created.timestamp() as u64,
         }
     }
 
@@ -231,6 +249,58 @@ impl StratFilesystem {
 impl Filesystem for StratFilesystem {
     fn devnode(&self) -> PathBuf {
         self.thin_dev.devnode()
+    }
+
+    fn created(&self) -> DateTime<Utc> {
+        self.created
+    }
+
+    fn used(&self) -> StratisResult<Bytes> {
+        match self.mount_points()?.first() {
+            Some(mount_pt) => Ok(fs_usage(mount_pt)?.1),
+            None => {
+                let tmp_dir = tempfile::Builder::new()
+                    .prefix(TEMP_MNT_POINT_PREFIX)
+                    .tempdir()?;
+                mount(
+                    Some(&self.devnode()),
+                    tmp_dir.path(),
+                    Some("xfs"),
+                    MsFlags::empty(),
+                    Some("nouuid"),
+                )?;
+                let used_result = fs_usage(tmp_dir.path());
+                umount(tmp_dir.path())?;
+                Ok(used_result?.1)
+            }
+        }
+    }
+
+    fn mount_points(&self) -> StratisResult<Vec<PathBuf>> {
+        // Use major:minor values to find mounts for this filesystem
+        let major = u64::from(self.thin_dev.device().major);
+        let minor = u64::from(self.thin_dev.device().minor);
+
+        let mut mount_data = String::new();
+        File::open("/proc/self/mountinfo")?.read_to_string(&mut mount_data)?;
+        let parser = libmount::mountinfo::Parser::new(mount_data.as_bytes());
+
+        let mut ret_vec = Vec::new();
+        for mp in parser {
+            match mp {
+                Ok(mount) => {
+                    if mount.major as u64 == major && mount.minor as u64 == minor {
+                        ret_vec.push(PathBuf::from(&mount.mount_point));
+                    }
+                }
+                Err(e) => {
+                    let error_msg = format!("Error during parsing {:?}: {:?}", *self, e);
+                    return Err(StratisError::Engine(ErrorEnum::Error, error_msg));
+                }
+            }
+        }
+
+        Ok(ret_vec)
     }
 
     #[cfg(feature = "dbus_enabled")]

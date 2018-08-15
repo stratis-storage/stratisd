@@ -56,7 +56,7 @@ pub fn get_udev_property<T: AsRef<OsStr>>(
 /// created in the method itself.
 pub fn udev_block_device_apply<F, U>(devnode: &Path, f: F) -> StratisResult<Option<U>>
 where
-    F: FnOnce(&libudev::Device<'_>) -> U,
+    F: FnOnce(&libudev::Device) -> U,
 {
     #![allow(let_and_return)]
     let context = get_udev();

@@ -5,8 +5,6 @@ Before=local-fs-pre.target
 DefaultDependencies=no
 
 [Service]
-Type=dbus
-BusName=org.storage.stratis1
 ExecStart=/usr/libexec/stratisd --debug
 KillSignal=SIGINT
 Restart=on-abort

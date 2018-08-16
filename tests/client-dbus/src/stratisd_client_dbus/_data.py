@@ -117,14 +117,23 @@ SPECS = {
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
 </method>
+<property name="Created" type="s" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
+</property>
 <property name="Devnode" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
+</property>
+<property name="MountPoints" type="as" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
 </property>
 <property name="Name" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
 </property>
 <property name="Pool" type="o" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
+</property>
+<property name="Used" type="s" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
 </property>
 <property name="Uuid" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>

@@ -425,18 +425,17 @@ impl Pool for StratPool {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
     use std::fs::OpenOptions;
     use std::io::{Read, Write};
 
     use nix::mount::{mount, umount, MsFlags};
     use tempfile;
 
+    use super::super::super::devlinks;
     use super::super::super::types::Redundancy;
 
     use super::super::backstore::{find_all, get_metadata};
     use super::super::cmd;
-    use super::super::devlinks;
     use super::super::tests::{loopbacked, real};
 
     use super::*;
@@ -616,39 +615,7 @@ mod tests {
 
         let metadata3 = pool.record(&name);
 
-        // FIXME: A simple test of equality between metadata2 and metadata3
-        // should be all that is required once blockdevs maintain a consistent
-        // order across teardown/setup operations.
-        assert!(metadata3.backstore.cache_devs.is_some());
-        assert!(metadata3.backstore.cache_segments.is_some());
-        assert!(metadata3.backstore.meta_segments.is_some());
-
-        assert_eq!(
-            metadata3
-                .backstore
-                .cache_devs
-                .as_ref()
-                .map(|bds| bds.iter().map(|bd| bd.uuid).collect::<HashSet<_>>()),
-            metadata2
-                .backstore
-                .cache_devs
-                .as_ref()
-                .map(|bds| bds.iter().map(|bd| bd.uuid).collect::<HashSet<_>>())
-        );
-        assert_eq!(
-            metadata3
-                .backstore
-                .data_devs
-                .iter()
-                .map(|bd| bd.uuid)
-                .collect::<HashSet<_>>(),
-            metadata2
-                .backstore
-                .data_devs
-                .iter()
-                .map(|bd| bd.uuid)
-                .collect::<HashSet<_>>()
-        );
+        assert_eq!(metadata2, metadata3);
 
         let mut buf = [0u8; 10];
         {

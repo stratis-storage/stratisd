@@ -5,8 +5,7 @@
 use std::error::Error;
 
 use dbus;
-use dbus::arg::{ArgType, Iter, IterAppend};
-use dbus::arg::{RefArg, Variant};
+use dbus::arg::{ArgType, Iter, IterAppend, RefArg, Variant};
 use dbus::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
 use dbus::tree::{MTFn, MethodErr, PropInfo};
 use dbus::Connection;

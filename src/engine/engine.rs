@@ -185,8 +185,6 @@ pub trait Pool: Debug {
         user_info: Option<&str>,
     ) -> StratisResult<bool>;
 
-    fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>);
-
     /// Set dbus path associated with the Pool.
     #[cfg(feature = "dbus_enabled")]
     fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> ();

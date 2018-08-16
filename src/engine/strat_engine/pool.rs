@@ -239,6 +239,11 @@ impl StratPool {
             thinpool_dev: self.thin_pool.record(),
         }
     }
+
+    pub fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>) {
+        self.thin_pool.register_listener(Rc::clone(&listener));
+        self.listeners.register_listener(listener);
+    }
 }
 
 impl Pool for StratPool {
@@ -395,11 +400,6 @@ impl Pool for StratPool {
         } else {
             Ok(false)
         }
-    }
-
-    fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>) {
-        self.thin_pool.register_listener(Rc::clone(&listener));
-        self.listeners.register_listener(listener);
     }
 
     #[cfg(feature = "dbus_enabled")]

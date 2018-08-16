@@ -181,7 +181,7 @@ impl Engine for StratEngine {
         let name = Name::new(name.to_owned());
         devlinks::pool_added(&name)?;
         for listener in self.listeners.listeners() {
-            pool.register_listener(listener.clone());
+            pool.register_listener(Rc::clone(listener));
         }
         self.pools.insert(name, uuid, pool);
         Ok(uuid)

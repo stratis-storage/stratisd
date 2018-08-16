@@ -334,12 +334,10 @@ impl Engine for StratEngine {
     }
 
     fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>) {
-        self.listeners.register_listener(listener);
         for (_pool_name, _pool_uuid, pool) in &mut self.pools {
-            for listener in self.listeners.listeners() {
-                pool.register_listener(listener.clone());
-            }
+            pool.register_listener(Rc::clone(&listener));
         }
+        self.listeners.register_listener(listener);
     }
 }
 

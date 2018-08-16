@@ -54,7 +54,7 @@ impl EngineListenerList {
         }
     }
 
-    pub fn listeners(&self) -> &Vec<Rc<RefCell<EngineListener>>> {
+    pub fn listeners(&self) -> &[Rc<RefCell<EngineListener>>] {
         &self.listeners
     }
 }

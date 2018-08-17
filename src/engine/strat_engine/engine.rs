@@ -215,7 +215,10 @@ impl Engine for StratEngine {
                     .expect("We just retrieved or created a HashMap");
                 devices.insert(device, dev_node);
                 match setup_pool(pool_uuid, &devices, &self.pools) {
-                    Ok((pool_name, pool)) => {
+                    Ok((pool_name, mut pool)) => {
+                        for listener in self.listeners.listeners() {
+                            pool.register_listener(listener.clone());
+                        }
                         self.pools.insert(pool_name, pool_uuid, pool);
                         Some(pool_uuid)
                     }

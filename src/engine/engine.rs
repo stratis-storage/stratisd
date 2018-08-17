@@ -5,11 +5,9 @@
 #[cfg(feature = "dbus_enabled")]
 use dbus;
 
-use std::cell::RefCell;
 use std::fmt::Debug;
 use std::os::unix::io::RawFd;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -185,8 +183,6 @@ pub trait Pool: Debug {
         user_info: Option<&str>,
     ) -> StratisResult<bool>;
 
-    fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>);
-
     /// Set dbus path associated with the Pool.
     #[cfg(feature = "dbus_enabled")]
     fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> ();
@@ -253,7 +249,7 @@ pub trait Engine: Debug {
     fn evented(&mut self) -> StratisResult<()>;
 
     /// Register a listener for EngineEvent notification
-    fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>);
+    fn register_listener(&mut self, listener: Box<EngineListener>);
 }
 
 /// Allows an Engine to include a fd in the event loop. See

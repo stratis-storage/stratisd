@@ -5,11 +5,9 @@
 #[cfg(feature = "dbus_enabled")]
 use dbus;
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 use std::vec::Vec;
 
 use serde_json;
@@ -18,7 +16,7 @@ use uuid::Uuid;
 use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
-use super::super::event::{EngineListener, EngineListenerList};
+use super::super::event::EngineListenerList;
 use super::super::types::{
     BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction,
 };
@@ -119,6 +117,7 @@ impl StratPool {
         paths: &[&Path],
         redundancy: Redundancy,
         force: bool,
+        listeners: EngineListenerList,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
@@ -129,6 +128,7 @@ impl StratPool {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
+            listeners.clone(),
         );
         let thinpool = match thinpool {
             Ok(thinpool) => thinpool,
@@ -142,7 +142,7 @@ impl StratPool {
             backstore,
             redundancy,
             thin_pool: thinpool,
-            listeners: EngineListenerList::new(),
+            listeners,
             #[cfg(feature = "dbus_enabled")]
             dbus_path: None,
         };
@@ -160,6 +160,7 @@ impl StratPool {
         uuid: PoolUuid,
         devnodes: &HashMap<Device, PathBuf>,
         metadata: &PoolSave,
+        listeners: EngineListenerList,
     ) -> StratisResult<(Name, StratPool)> {
         let backstore = Backstore::setup(
             uuid,
@@ -173,6 +174,7 @@ impl StratPool {
             &metadata.thinpool_dev,
             &metadata.flex_devs,
             &backstore,
+            listeners.clone(),
         )?;
 
         Ok((
@@ -181,7 +183,7 @@ impl StratPool {
                 backstore,
                 redundancy: Redundancy::NONE,
                 thin_pool: thinpool,
-                listeners: EngineListenerList::new(),
+                listeners,
                 #[cfg(feature = "dbus_enabled")]
                 dbus_path: None,
             },
@@ -397,11 +399,6 @@ impl Pool for StratPool {
         }
     }
 
-    fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>) {
-        self.thin_pool.register_listener(Rc::clone(&listener));
-        self.listeners.register_listener(listener);
-    }
-
     #[cfg(feature = "dbus_enabled")]
     fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> () {
         self.dbus_path = Some(path)
@@ -447,15 +444,25 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let name1 = "name1";
-        let (uuid1, pool1) =
-            StratPool::initialize(&name1, paths1, Redundancy::NONE, false).unwrap();
+        let (uuid1, pool1) = StratPool::initialize(
+            &name1,
+            paths1,
+            Redundancy::NONE,
+            false,
+            EngineListenerList::new(),
+        ).unwrap();
         invariant(&pool1, &name1);
 
         let metadata1 = pool1.record(name1);
 
         let name2 = "name2";
-        let (uuid2, pool2) =
-            StratPool::initialize(&name2, paths2, Redundancy::NONE, false).unwrap();
+        let (uuid2, pool2) = StratPool::initialize(
+            &name2,
+            paths2,
+            Redundancy::NONE,
+            false,
+            EngineListenerList::new(),
+        ).unwrap();
         invariant(&pool2, &name2);
 
         let metadata2 = pool2.record(name2);
@@ -504,7 +511,15 @@ mod tests {
     /// space required.
     fn test_empty_pool(paths: &[&Path]) -> () {
         assert_eq!(paths.len(), 0);
-        assert!(StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE, true).is_err());
+        assert!(
+            StratPool::initialize(
+                "stratis_test_pool",
+                paths,
+                Redundancy::NONE,
+                true,
+                EngineListenerList::new()
+            ).is_err()
+        );
     }
 
     #[test]
@@ -528,8 +543,13 @@ mod tests {
 
         let name = "stratis-test-pool";
         devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
-        let (uuid, mut pool) =
-            StratPool::initialize(&name, paths2, Redundancy::NONE, false).unwrap();
+        let (uuid, mut pool) = StratPool::initialize(
+            &name,
+            paths2,
+            Redundancy::NONE,
+            false,
+            EngineListenerList::new(),
+        ).unwrap();
         devlinks::pool_added(&name).unwrap();
         invariant(&pool, &name);
 
@@ -600,6 +620,7 @@ mod tests {
             uuid,
             &devices,
             &get_metadata(uuid, &devices).unwrap().unwrap(),
+            EngineListenerList::new(),
         ).unwrap();
         invariant(&pool, &name);
 

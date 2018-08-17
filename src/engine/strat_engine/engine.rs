@@ -2,11 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::cell::RefCell;
 use std::clone::Clone;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 use devicemapper::{Device, DmNameBuf};
 
@@ -37,6 +35,7 @@ pub fn setup_pool(
     pool_uuid: PoolUuid,
     devices: &HashMap<Device, PathBuf>,
     pools: &Table<StratPool>,
+    listeners: EngineListenerList,
 ) -> StratisResult<(Name, StratPool)> {
     // FIXME: In this method, various errors are assembled from various
     // sources and combined into strings, so that they
@@ -77,7 +76,7 @@ pub fn setup_pool(
             Err(StratisError::Engine(ErrorEnum::Error, err_msg))
         })
         .and_then(|_| {
-            StratPool::setup(pool_uuid, devices, &metadata).or_else(|e| {
+            StratPool::setup(pool_uuid, devices, &metadata, listeners).or_else(|e| {
                 let err_msg = format!(
                     "failed to set up pool for {}: reason: {:?}",
                     info_string(),
@@ -129,10 +128,12 @@ impl StratEngine {
 
         let pools = find_all()?;
 
+        let listeners = EngineListenerList::new();
+
         let mut table = Table::default();
         let mut incomplete_pools = HashMap::new();
         for (pool_uuid, devices) in pools {
-            match setup_pool(pool_uuid, &devices, &table) {
+            match setup_pool(pool_uuid, &devices, &table, listeners.clone()) {
                 Ok((pool_name, pool)) => {
                     table.insert(pool_name, pool_uuid, pool);
                 }
@@ -147,7 +148,7 @@ impl StratEngine {
             pools: table,
             incomplete_pools,
             watched_dev_last_event_nrs: HashMap::new(),
-            listeners: EngineListenerList::new(),
+            listeners,
         };
 
         devlinks::setup_devlinks(engine.pools().iter())?;
@@ -176,13 +177,16 @@ impl Engine for StratEngine {
             return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
-        let (uuid, mut pool) = StratPool::initialize(name, blockdev_paths, redundancy, force)?;
+        let (uuid, pool) = StratPool::initialize(
+            name,
+            blockdev_paths,
+            redundancy,
+            force,
+            self.listeners.clone(),
+        )?;
 
         let name = Name::new(name.to_owned());
         devlinks::pool_added(&name)?;
-        for listener in self.listeners.listeners() {
-            pool.register_listener(listener.clone());
-        }
         self.pools.insert(name, uuid, pool);
         Ok(uuid)
     }
@@ -214,11 +218,8 @@ impl Engine for StratEngine {
                     .or_else(|| Some(HashMap::new()))
                     .expect("We just retrieved or created a HashMap");
                 devices.insert(device, dev_node);
-                match setup_pool(pool_uuid, &devices, &self.pools) {
+                match setup_pool(pool_uuid, &devices, &self.pools, self.listeners.clone()) {
                     Ok((pool_name, mut pool)) => {
-                        for listener in self.listeners.listeners() {
-                            pool.register_listener(listener.clone());
-                        }
                         self.pools.insert(pool_name, pool_uuid, pool);
                         Some(pool_uuid)
                     }
@@ -336,13 +337,8 @@ impl Engine for StratEngine {
         Ok(())
     }
 
-    fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>) {
+    fn register_listener(&mut self, listener: Box<EngineListener>) {
         self.listeners.register_listener(listener);
-        for (_pool_name, _pool_uuid, pool) in &mut self.pools {
-            for listener in self.listeners.listeners() {
-                pool.register_listener(listener.clone());
-            }
-        }
     }
 }
 

@@ -29,33 +29,29 @@ pub trait EngineListener: Debug {
     fn notify(&self, event: &EngineEvent);
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EngineListenerList {
-    listeners: Vec<Rc<RefCell<EngineListener>>>,
+    listeners: Rc<RefCell<Vec<Box<EngineListener>>>>,
 }
 
 impl EngineListenerList {
     /// Create a new EngineListenerList.
     pub fn new() -> EngineListenerList {
         EngineListenerList {
-            listeners: Vec::new(),
+            listeners: Rc::new(RefCell::new(Vec::new())),
         }
     }
 
     /// Add a listener.
-    pub fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>) {
-        self.listeners.push(listener);
+    pub fn register_listener(&mut self, listener: Box<EngineListener>) {
+        self.listeners.borrow_mut().push(listener);
     }
 
     /// Notify a listener.
     pub fn notify(&self, event: &EngineEvent) {
-        for listener in &self.listeners {
-            listener.borrow().notify(&event);
+        for listener in self.listeners.borrow().iter() {
+            listener.notify(&event);
         }
-    }
-
-    pub fn listeners(&self) -> &Vec<Rc<RefCell<EngineListener>>> {
-        &self.listeners
     }
 }
 

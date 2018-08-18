@@ -16,16 +16,11 @@ use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment};
 
 /// Handles the lowest level, base layer of this tier.
-/// All available sectors on blockdevs in the manager are allocated to
-/// the DM device.
 #[derive(Debug)]
 pub struct DataTier {
     /// Manages the individual block devices
-    /// it is always the case block_mgr.avail_space() == 0.
     pub block_mgr: BlockDevMgr,
     /// The list of segments granted by block_mgr and used by dm_device
-    /// It is always the case that block_mgr.avail_space() == 0, i.e., all
-    /// available space in block_mgr is allocated to the DM device.
     pub segments: Vec<BlkDevSegment>,
 }
 
@@ -36,14 +31,6 @@ impl DataTier {
         block_mgr: BlockDevMgr,
         segments: &[(DevUuid, Sectors, Sectors)],
     ) -> StratisResult<DataTier> {
-        if block_mgr.avail_space() != Sectors(0) {
-            let err_msg = format!(
-                "{} unallocated to device; probable metadata corruption",
-                block_mgr.avail_space()
-            );
-            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
-        }
-
         let uuid_to_devno = block_mgr.uuid_to_devno();
         let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> StratisResult<BlkDevSegment> {
             let device = uuid_to_devno(triple.0).ok_or_else(|| {
@@ -70,19 +57,13 @@ impl DataTier {
 
     /// Setup a new DataTier struct from the block_mgr.
     ///
+    /// Initially 0 segments are allocated.
+    ///
     /// WARNING: metadata changing event
-    pub fn new(mut block_mgr: BlockDevMgr) -> DataTier {
-        let avail_space = block_mgr.avail_space();
-        let segments = block_mgr
-            .alloc_space(&[avail_space])
-            .expect("asked for exactly the space available, must get")
-            .iter()
-            .flat_map(|s| s.iter())
-            .cloned()
-            .collect::<Vec<_>>();
+    pub fn new(block_mgr: BlockDevMgr) -> DataTier {
         DataTier {
             block_mgr,
-            segments,
+            segments: vec![],
         }
     }
 
@@ -95,22 +76,32 @@ impl DataTier {
         paths: &[&Path],
         force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
-        let uuids = self.block_mgr.add(pool_uuid, paths, force)?;
-
-        let avail_space = self.block_mgr.avail_space();
-        let segments = self.block_mgr
-            .alloc_space(&[avail_space])
-            .expect("asked for exactly the space available, must get")
-            .iter()
-            .flat_map(|s| s.iter())
-            .cloned()
-            .collect::<Vec<_>>();
-        self.segments = coalesce_blkdevsegs(&self.segments, &segments);
-
-        Ok(uuids)
+        self.block_mgr.add(pool_uuid, paths, force)
     }
 
-    /// All the sectors available to this device
+    /// Allocate at least request sectors from unallocated segments in
+    /// block devices belonging to the data tier. Return true if requested
+    /// amount or more was allocated, otherwise, false.
+    pub fn alloc(&mut self, request: Sectors) -> bool {
+        match self.block_mgr.alloc_space(&[request]) {
+            Some(segments) => {
+                self.segments = coalesce_blkdevsegs(
+                    &self.segments,
+                    &segments
+                        .iter()
+                        .flat_map(|s| s.iter())
+                        .cloned()
+                        .collect::<Vec<_>>(),
+                );
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// The sum of the lengths of all the sectors that have been mapped to an
+    /// upper device.
+    #[cfg(test)]
     pub fn capacity(&self) -> Sectors {
         self.segments
             .iter()
@@ -164,13 +155,89 @@ impl DataTier {
     pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
         self.block_mgr.blockdevs_mut()
     }
+}
 
-    /// Assert things that should always hold true of a DataTier
-    #[allow(dead_code)]
-    fn invariant(&self) -> () {
-        assert_eq!(
-            self.block_mgr.current_capacity() - self.metadata_size(),
-            self.capacity()
-        )
+#[cfg(test)]
+mod tests {
+
+    use uuid::Uuid;
+
+    use super::super::super::tests::{loopbacked, real};
+
+    use super::super::metadata::MIN_MDA_SECTORS;
+
+    use super::*;
+
+    /// Put the data tier through some paces. Make it, alloc a small amount,
+    /// add some more blockdevs, allocate enough that the newly added blockdevs
+    /// must be allocated from for success.
+    fn test_add_and_alloc(paths: &[&Path]) -> () {
+        assert!(paths.len() > 1);
+        let (paths1, paths2) = paths.split_at(paths.len() / 2);
+
+        let pool_uuid = Uuid::new_v4();
+
+        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MIN_MDA_SECTORS, false).unwrap();
+
+        let mut data_tier = DataTier::new(mgr);
+
+        // A data_tier w/ some devices but nothing allocated
+        let mut current_capacity = data_tier.current_capacity();
+        let mut capacity = data_tier.capacity();
+        assert_eq!(capacity, Sectors(0));
+        assert!(current_capacity != Sectors(0));
+        assert_eq!(paths1.len(), data_tier.blockdevs().len());
+
+        let last_request_amount = current_capacity;
+
+        let request_amount = data_tier.block_mgr.avail_space() / 2usize;
+        assert!(request_amount != Sectors(0));
+
+        assert!(data_tier.alloc(request_amount));
+
+        // A data tier w/ some amount allocated
+        assert!(data_tier.capacity() >= request_amount);
+        assert_eq!(data_tier.current_capacity(), current_capacity);
+        capacity = data_tier.capacity();
+
+        data_tier.add(pool_uuid, paths2, false).unwrap();
+
+        // A data tier w/ additional blockdevs added
+        assert!(data_tier.current_capacity() > current_capacity);
+        assert_eq!(data_tier.capacity(), capacity);
+        assert_eq!(paths1.len() + paths2.len(), data_tier.blockdevs().len());
+        current_capacity = data_tier.current_capacity();
+
+        // Allocate enough to get into the newly added block devices
+        assert!(data_tier.alloc(last_request_amount));
+
+        assert!(data_tier.capacity() >= request_amount + last_request_amount);
+        assert_eq!(data_tier.current_capacity(), current_capacity);
+
+        data_tier.destroy().unwrap();
+    }
+
+    #[test]
+    pub fn loop_test_add_and_alloc() {
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(2, 3, None),
+            test_add_and_alloc,
+        );
+    }
+
+    #[test]
+    pub fn real_test_add_and_alloc() {
+        real::test_with_spec(
+            real::DeviceLimits::AtLeast(2, None, None),
+            test_add_and_alloc,
+        );
+    }
+
+    #[test]
+    pub fn travis_test_add_and_alloc() {
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(2, 3, None),
+            test_add_and_alloc,
+        );
     }
 }

@@ -166,12 +166,15 @@ impl ThinPool {
         data_block_size: Sectors,
         backstore: &mut Backstore,
     ) -> StratisResult<ThinPool> {
-        let mut segments_list = match backstore.alloc(&[
-            thin_pool_size.meta_size(),
-            thin_pool_size.meta_size(),
-            thin_pool_size.data_size(),
-            thin_pool_size.mdv_size(),
-        ]) {
+        let mut segments_list = match backstore.alloc(
+            pool_uuid,
+            &[
+                thin_pool_size.meta_size(),
+                thin_pool_size.meta_size(),
+                thin_pool_size.data_size(),
+                thin_pool_size.mdv_size(),
+            ],
+        )? {
             Some(sl) => sl,
             None => {
                 let err_msg = "Could not allocate sufficient space for thinpool devices.";
@@ -184,7 +187,9 @@ impl ThinPool {
         let spare_segments = segments_list.pop().expect("len(segments_list) == 2");
         let meta_segments = segments_list.pop().expect("len(segments_list) == 1");
 
-        let backstore_device = backstore.device();
+        let backstore_device = backstore.device().expect(
+            "Space has just been allocated from the backstore, so it must have a cap device",
+        );
 
         // When constructing a thin-pool, Stratis reserves the first N
         // sectors on a block device by creating a linear device with a
@@ -261,7 +266,7 @@ impl ThinPool {
         let data_segments = flex_devs.thin_data_dev.to_vec();
         let spare_segments = flex_devs.thin_meta_dev_spare.to_vec();
 
-        let backstore_device = backstore.device();
+        let backstore_device = backstore.device().expect("When stratisd was running previously, space was allocated from the backstore, so backstore must have a cap device");
 
         let (thinpool_name, thinpool_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
         let (meta_dev, meta_segments, spare_segments) = setup_metadev(
@@ -335,7 +340,7 @@ impl ThinPool {
     /// Run status checks and take actions on the thinpool and its components.
     /// Returns a bool communicating if a configuration change requiring a
     /// metadata save has been made.
-    pub fn check(&mut self, backstore: &mut Backstore) -> StratisResult<bool> {
+    pub fn check(&mut self, pool_uuid: PoolUuid, backstore: &mut Backstore) -> StratisResult<bool> {
         #![allow(match_same_arms)]
 
         /// Calculate requested additional amount to allocate given total,
@@ -357,7 +362,12 @@ impl ThinPool {
             }
         }
 
-        assert_eq!(backstore.device(), self.backstore_device);
+        assert_eq!(
+            backstore.device().expect(
+                "thinpool exists and has been allocated to, so backstore must have a cap device"
+            ),
+            self.backstore_device
+        );
 
         let mut should_save: bool = false;
 
@@ -385,7 +395,7 @@ impl ThinPool {
                         usage.used_meta.sectors(),
                         META_LOWATER.sectors(),
                     ) {
-                        match self.extend_thinpool(backstore, request, false) {
+                        match self.extend_thinpool(pool_uuid, backstore, request, false) {
                             Ok(actual) => {
                                 if request != actual {
                                     // TODO: take an appropriate action in the
@@ -404,7 +414,7 @@ impl ThinPool {
                         *usage.used_data * DATA_BLOCK_SIZE,
                         *DATA_LOWATER * DATA_BLOCK_SIZE,
                     ) {
-                        match self.extend_thinpool(backstore, request, true) {
+                        match self.extend_thinpool(pool_uuid, backstore, request, true) {
                             Ok(actual) => {
                                 if request != actual {
                                     // TODO: take an appropriate action in the
@@ -462,6 +472,7 @@ impl ThinPool {
     /// Always allocate sectors in increments of allocation chunk.
     fn extend_thinpool(
         &mut self,
+        pool_uuid: PoolUuid,
         backstore: &mut Backstore,
         extend_size: Sectors,
         data: bool,
@@ -506,14 +517,14 @@ impl ThinPool {
         }
 
         let backstore_device = self.backstore_device;
-        assert_eq!(backstore.device(), backstore_device);
+        assert_eq!(backstore.device().expect("thinpool exists, data must have been allocated from backstore, so backstore must have cap device."), backstore_device);
 
         let modulus = if data {
             DATA_BLOCK_SIZE
         } else {
             meta_block_size()
         };
-        if let Some(region) = backstore.request(extend_size, modulus) {
+        if let Some(region) = backstore.request(pool_uuid, extend_size, modulus)? {
             extend(self, backstore_device, region, data)?;
             Ok(region.1)
         } else {
@@ -950,7 +961,7 @@ mod tests {
         backstore
             .add_blockdevs(pool_uuid, &remaining_paths, BlockDevTier::Data, true)
             .unwrap();
-        pool.check(&mut backstore).unwrap();
+        pool.check(pool_uuid, &mut backstore).unwrap();
         // Verify the pool is back in a Good state
         match pool.thin_pool.status(get_dm()).unwrap() {
             dm::ThinPoolStatus::Working(ref status) => {
@@ -1035,8 +1046,12 @@ mod tests {
         // written above. If we attempt to update the UUID on the snapshot
         // without expanding the pool, the pool will go into out-of-data-space
         // (queue IO) mode, causing the test to fail.
-        pool.extend_thinpool(&mut backstore, *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE, true)
-            .unwrap();
+        pool.extend_thinpool(
+            pool_uuid,
+            &mut backstore,
+            *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE,
+            true,
+        ).unwrap();
 
         let (_, snapshot_filesystem) =
             pool.snapshot_filesystem(pool_uuid, pool_name, fs_uuid, "test_snapshot")
@@ -1268,7 +1283,7 @@ mod tests {
         }
         // The meta device is smaller than META_LOWATER, so it should be expanded
         // in the thin_pool.check() call.
-        thin_pool.check(&mut backstore).unwrap();
+        thin_pool.check(pool_uuid, &mut backstore).unwrap();
         match thin_pool.thin_pool.status(get_dm()).unwrap() {
             dm::ThinPoolStatus::Working(ref status) => {
                 let usage = &status.usage;
@@ -1332,6 +1347,7 @@ mod tests {
                 // DATA_LOWATER value.
                 if i == *(*(INITIAL_DATA_SIZE - DATA_LOWATER) * DATA_BLOCK_SIZE) {
                     pool.extend_thinpool(
+                        pool_uuid,
                         &mut backstore,
                         *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE,
                         true,
@@ -1535,11 +1551,15 @@ mod tests {
         );
 
         pool.suspend().unwrap();
-        let old_device = backstore.device();
+        let old_device = backstore
+            .device()
+            .expect("Space already allocated from backstore, backstore must have device");
         backstore
             .add_blockdevs(pool_uuid, paths1, BlockDevTier::Cache, false)
             .unwrap();
-        let new_device = backstore.device();
+        let new_device = backstore
+            .device()
+            .expect("Space already allocated from backstore, backstore must have device");
         assert!(old_device != new_device);
         pool.set_device(new_device).unwrap();
         pool.resume().unwrap();

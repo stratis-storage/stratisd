@@ -76,7 +76,9 @@ impl CacheTier {
     }
 
     /// Add the given paths to self. Return UUIDs of the new blockdevs
-    /// corresponding to the specified paths.
+    /// corresponding to the specified paths and a pair of Boolean values.
+    /// The first is true if the cache sub-device's segments were changed,
+    /// the second is true if the meta sub-device's segments were changed.
     /// Adds all additional space to cache sub-device.
     /// WARNING: metadata changing event
     // FIXME: That all segments on the newly added device are added to the
@@ -88,7 +90,7 @@ impl CacheTier {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         force: bool,
-    ) -> StratisResult<Vec<DevUuid>> {
+    ) -> StratisResult<(Vec<DevUuid>, (bool, bool))> {
         let uuids = self.block_mgr.add(pool_uuid, paths, force)?;
 
         let avail_space = self.block_mgr.avail_space();
@@ -101,7 +103,7 @@ impl CacheTier {
             .collect::<Vec<_>>();
         self.cache_segments = coalesce_blkdevsegs(&self.cache_segments, &segments);
 
-        Ok(uuids)
+        Ok((uuids, (true, false)))
     }
 
     /// Setup a new CacheTier struct from the block_mgr.
@@ -161,5 +163,92 @@ impl CacheTier {
         self.block_mgr
             .get_mut_blockdev_by_uuid(uuid)
             .and_then(|bd| Some((BlockDevTier::Cache, bd)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use uuid::Uuid;
+
+    use super::super::super::tests::{loopbacked, real};
+
+    use super::super::metadata::MIN_MDA_SECTORS;
+
+    use super::*;
+
+    /// Do basic testing of the cache. Make a new cache and test some
+    /// expected properties, then add some additional blockdevs and test
+    /// some more properties.
+    fn cache_test_add(paths: &[&Path]) -> () {
+        assert!(paths.len() > 1);
+
+        let (paths1, paths2) = paths.split_at(paths.len() / 2);
+
+        let pool_uuid = Uuid::new_v4();
+
+        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MIN_MDA_SECTORS, false).unwrap();
+
+        let mut cache_tier = CacheTier::new(mgr);
+
+        // A cache tier w/ some devices and everything promptly allocated to
+        // the tier.
+        let cache_metadata_size = cache_tier
+            .meta_segments
+            .iter()
+            .map(|x| x.segment.length)
+            .sum::<Sectors>();
+
+        let mut metadata_size = cache_tier.block_mgr.metadata_size();
+        let mut current_capacity = cache_tier.block_mgr.current_capacity();
+        let mut capacity = cache_tier
+            .cache_segments
+            .iter()
+            .map(|x| x.segment.length)
+            .sum::<Sectors>();
+
+        assert_eq!(cache_tier.block_mgr.avail_space(), Sectors(0));
+        assert_eq!(
+            current_capacity - metadata_size,
+            capacity + cache_metadata_size
+        );
+
+        let (_, (cache, meta)) = cache_tier.add(pool_uuid, paths2, false).unwrap();
+        // TODO: Ultimately, it should be the case that meta can be true.
+        assert!(cache);
+        assert!(!meta);
+
+        assert_eq!(cache_tier.block_mgr.avail_space(), Sectors(0));
+        assert!(cache_tier.block_mgr.current_capacity() > current_capacity);
+        assert!(cache_tier.block_mgr.metadata_size() > metadata_size);
+
+        metadata_size = cache_tier.block_mgr.metadata_size();
+        current_capacity = cache_tier.block_mgr.current_capacity();
+        capacity = cache_tier
+            .cache_segments
+            .iter()
+            .map(|x| x.segment.length)
+            .sum::<Sectors>();
+        assert_eq!(
+            current_capacity - metadata_size,
+            capacity + cache_metadata_size
+        );
+
+        cache_tier.destroy().unwrap();
+    }
+
+    #[test]
+    pub fn loop_cache_test_add() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), cache_test_add);
+    }
+
+    #[test]
+    pub fn real_cache_test_add() {
+        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None), cache_test_add);
+    }
+
+    #[test]
+    pub fn travis_cache_test_add() {
+        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), cache_test_add);
     }
 }

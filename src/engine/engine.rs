@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, Device, Sectors};
 
+use super::event::EngineListener;
 use super::types::{
     BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, RenameAction,
 };
@@ -246,6 +247,9 @@ pub trait Engine: Debug {
 
     /// Notify the engine that an event has occurred on the Eventable.
     fn evented(&mut self) -> StratisResult<()>;
+
+    /// Register a listener for EngineEvent notification
+    fn register_listener(&mut self, listener: Box<EngineListener>);
 }
 
 /// Allows an Engine to include a fd in the event loop. See

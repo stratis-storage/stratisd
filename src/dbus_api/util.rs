@@ -6,7 +6,11 @@ use std::error::Error;
 
 use dbus;
 use dbus::arg::{ArgType, Iter, IterAppend};
+use dbus::arg::{RefArg, Variant};
+use dbus::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
 use dbus::tree::{MTFn, MethodErr, PropInfo};
+use dbus::Connection;
+use dbus::SignalArgs;
 
 use super::super::stratis::{ErrorEnum, StratisError};
 
@@ -97,5 +101,25 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Resul
         .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
     i.append(data.parent.clone());
+    Ok(())
+}
+
+/// Place a property changed signal on the D-Bus.
+pub fn prop_changed_dispatch<T: 'static>(
+    conn: &Connection,
+    prop_name: &str,
+    new_value: T,
+    path: &dbus::Path,
+) -> Result<(), ()>
+where
+    T: RefArg,
+{
+    let mut prop_changed: PropertiesPropertiesChanged = Default::default();
+    prop_changed
+        .changed_properties
+        .insert(prop_name.into(), Variant(Box::new(new_value)));
+
+    conn.send(prop_changed.to_emit_message(path))?;
+
     Ok(())
 }

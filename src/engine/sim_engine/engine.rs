@@ -16,6 +16,7 @@ use devicemapper::Device;
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::engine::{Engine, Eventable, Pool};
+use super::super::event::{EngineListener, EngineListenerList};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
@@ -26,6 +27,7 @@ use super::randomization::Randomizer;
 pub struct SimEngine {
     pools: Table<SimPool>,
     rdm: Rc<RefCell<Randomizer>>,
+    listeners: EngineListenerList,
 }
 
 impl SimEngine {}
@@ -47,7 +49,12 @@ impl Engine for SimEngine {
         let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
         let devices = device_set.into_iter().map(|x| *x).collect::<Vec<&Path>>();
 
-        let (pool_uuid, pool) = SimPool::new(&Rc::clone(&self.rdm), &devices, redundancy);
+        let (pool_uuid, pool) = SimPool::new(
+            &Rc::clone(&self.rdm),
+            &devices,
+            redundancy,
+            self.listeners.clone(),
+        );
 
         if self.rdm.borrow_mut().throw_die() {
             return Err(StratisError::Engine(ErrorEnum::Error, "X".into()));
@@ -134,6 +141,10 @@ impl Engine for SimEngine {
 
     fn evented(&mut self) -> StratisResult<()> {
         Ok(())
+    }
+
+    fn register_listener(&mut self, listener: Box<EngineListener>) {
+        self.listeners.register_listener(listener);
     }
 }
 

@@ -11,13 +11,13 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub enum EngineEvent<'a> {
-    PoolRenamed {
+    FilesystemRenamed {
         #[cfg(feature = "dbus_enabled")]
         dbus_path: &'a Option<dbus::Path<'static>>,
         from: &'a str,
         to: &'a str,
     },
-    FilesystemRenamed {
+    PoolRenamed {
         #[cfg(feature = "dbus_enabled")]
         dbus_path: &'a Option<dbus::Path<'static>>,
         from: &'a str,

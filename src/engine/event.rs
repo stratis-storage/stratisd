@@ -5,10 +5,7 @@
 #[cfg(feature = "dbus_enabled")]
 use dbus;
 
-use std::cell::RefCell;
 use std::fmt::Debug;
-use std::rc::Rc;
-
 use std::sync::{Once, ONCE_INIT};
 
 static INIT: Once = ONCE_INIT;
@@ -34,16 +31,16 @@ pub trait EngineListener: Debug {
     fn notify(&self, event: &EngineEvent);
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct EngineListenerList {
-    listeners: Rc<RefCell<Vec<Box<EngineListener>>>>,
+    listeners: Vec<Box<EngineListener>>,
 }
 
 impl EngineListenerList {
     /// Create a new EngineListenerList.
     pub fn new() -> EngineListenerList {
         EngineListenerList {
-            listeners: Rc::new(RefCell::new(Vec::new())),
+            listeners: Vec::new(),
         }
     }
 
@@ -51,12 +48,12 @@ impl EngineListenerList {
     // This code is marked dead because it is called only by bin/stratisd.rs
     #[allow(dead_code)]
     pub fn register_listener(&mut self, listener: Box<EngineListener>) {
-        self.listeners.borrow_mut().push(listener);
+        self.listeners.push(listener);
     }
 
     /// Notify a listener.
     pub fn notify(&self, event: &EngineEvent) {
-        for listener in self.listeners.borrow().iter() {
+        for listener in self.listeners.iter() {
             listener.notify(&event);
         }
     }

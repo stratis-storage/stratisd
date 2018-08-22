@@ -40,8 +40,8 @@ pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
 const DATA_LOWATER: DataBlocks = DataBlocks(512);
 const META_LOWATER: MetaBlocks = MetaBlocks(512);
 
-const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki); // 16 MiB
-pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768); // 768 MiB
+const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
+pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
 const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 
 const SPACE_WARN_PCT: u8 = 90;

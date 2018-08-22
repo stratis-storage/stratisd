@@ -5,6 +5,8 @@
 #[cfg(feature = "dbus_enabled")]
 use dbus;
 
+use devicemapper::Bytes;
+
 use std::fmt::Debug;
 use std::sync::{Once, ONCE_INIT};
 
@@ -24,6 +26,11 @@ pub enum EngineEvent<'a> {
         dbus_path: &'a Option<dbus::Path<'static>>,
         from: &'a str,
         to: &'a str,
+    },
+    FilesystemUsedChanged {
+        #[cfg(feature = "dbus_enabled")]
+        dbus_path: &'a Option<dbus::Path<'static>>,
+        used: Bytes,
     },
 }
 

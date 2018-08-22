@@ -24,6 +24,7 @@ use tempfile;
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::engine::Filesystem;
+use super::super::super::event::{get_engine_listener_list, EngineEvent};
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid};
 
 use super::super::cmd::{create_fs, set_uuid, xfs_growfs};
@@ -195,6 +196,11 @@ impl StratFilesystem {
                             return Ok(FilesystemStatus::XfsGrowFailed);
                         }
                     }
+                    get_engine_listener_list().notify(&EngineEvent::FilesystemUsedChanged {
+                        #[cfg(feature = "dbus_enabled")]
+                        dbus_path: self.get_dbus_path(),
+                        used: fs_total_used_bytes,
+                    });
                 }
                 // TODO: do anything when filesystem is not mounted?
                 // TODO: periodically kick off fstrim?

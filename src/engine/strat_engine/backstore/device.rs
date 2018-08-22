@@ -78,7 +78,9 @@ fn signature(device: &HashMap<String, String>) -> String {
 /// Determine what a block device is used for.
 pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
     if let Some(device) = get_udev_block_device(devnode)? {
-        if empty(&device) {
+        if device.contains_key("DM_MULTIPATH_DEVICE_PATH") {
+            Ok(DevOwnership::Theirs(String::from("multipath path")))
+        } else if empty(&device) {
             // The device is either really empty or we are running on a distribution that hasn't
             // picked up the latest libblkid, lets read down to the device and find out for sure.
             // TODO: At some point in the future we can remove this and just return Unowned.

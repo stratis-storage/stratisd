@@ -12,7 +12,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::devlinks;
 use super::super::engine::{Engine, Eventable, Pool};
-use super::super::event::{EngineEvent, EngineListener, EngineListenerList};
+use super::super::event::{get_engine_listener_list, EngineEvent};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
@@ -35,7 +35,6 @@ pub fn setup_pool(
     pool_uuid: PoolUuid,
     devices: &HashMap<Device, PathBuf>,
     pools: &Table<StratPool>,
-    listeners: EngineListenerList,
 ) -> StratisResult<(Name, StratPool)> {
     // FIXME: In this method, various errors are assembled from various
     // sources and combined into strings, so that they
@@ -76,7 +75,7 @@ pub fn setup_pool(
             Err(StratisError::Engine(ErrorEnum::Error, err_msg))
         })
         .and_then(|_| {
-            StratPool::setup(pool_uuid, devices, &metadata, listeners).or_else(|e| {
+            StratPool::setup(pool_uuid, devices, &metadata).or_else(|e| {
                 let err_msg = format!(
                     "failed to set up pool for {}: reason: {:?}",
                     info_string(),
@@ -98,8 +97,6 @@ pub struct StratEngine {
     // Maps name of DM devices we are watching to the most recent event number
     // we've handled for each
     watched_dev_last_event_nrs: HashMap<DmNameBuf, u32>,
-
-    listeners: EngineListenerList,
 }
 
 impl StratEngine {
@@ -128,12 +125,10 @@ impl StratEngine {
 
         let pools = find_all()?;
 
-        let listeners = EngineListenerList::new();
-
         let mut table = Table::default();
         let mut incomplete_pools = HashMap::new();
         for (pool_uuid, devices) in pools {
-            match setup_pool(pool_uuid, &devices, &table, listeners.clone()) {
+            match setup_pool(pool_uuid, &devices, &table) {
                 Ok((pool_name, pool)) => {
                     table.insert(pool_name, pool_uuid, pool);
                 }
@@ -148,7 +143,6 @@ impl StratEngine {
             pools: table,
             incomplete_pools,
             watched_dev_last_event_nrs: HashMap::new(),
-            listeners,
         };
 
         devlinks::setup_devlinks(engine.pools().iter())?;
@@ -177,13 +171,7 @@ impl Engine for StratEngine {
             return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
-        let (uuid, pool) = StratPool::initialize(
-            name,
-            blockdev_paths,
-            redundancy,
-            force,
-            self.listeners.clone(),
-        )?;
+        let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy, force)?;
 
         let name = Name::new(name.to_owned());
         devlinks::pool_added(&name)?;
@@ -218,7 +206,7 @@ impl Engine for StratEngine {
                     .or_else(|| Some(HashMap::new()))
                     .expect("We just retrieved or created a HashMap");
                 devices.insert(device, dev_node);
-                match setup_pool(pool_uuid, &devices, &self.pools, self.listeners.clone()) {
+                match setup_pool(pool_uuid, &devices, &self.pools) {
                     Ok((pool_name, pool)) => {
                         self.pools.insert(pool_name, pool_uuid, pool);
                         Some(pool_uuid)
@@ -269,7 +257,7 @@ impl Engine for StratEngine {
             self.pools.insert(old_name, uuid, pool);
             Err(err)
         } else {
-            self.listeners.notify(&EngineEvent::PoolRenamed {
+            get_engine_listener_list().notify(&EngineEvent::PoolRenamed {
                 #[cfg(feature = "dbus_enabled")]
                 dbus_path: pool.get_dbus_path(),
                 from: &*old_name,
@@ -335,10 +323,6 @@ impl Engine for StratEngine {
         self.watched_dev_last_event_nrs = device_list;
 
         Ok(())
-    }
-
-    fn register_listener(&mut self, listener: Box<EngineListener>) {
-        self.listeners.register_listener(listener);
     }
 }
 

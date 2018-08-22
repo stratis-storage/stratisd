@@ -19,7 +19,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::devlinks;
 use super::super::super::engine::Filesystem;
-use super::super::super::event::{EngineEvent, EngineListenerList};
+use super::super::super::event::{get_engine_listener_list, EngineEvent};
 use super::super::super::structures::Table;
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid, RenameAction};
 
@@ -157,7 +157,6 @@ pub struct ThinPool {
     /// layer. All DM components obtain their storage from this layer.
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
-    listeners: EngineListenerList,
 }
 
 impl ThinPool {
@@ -167,7 +166,6 @@ impl ThinPool {
         thin_pool_size: &ThinPoolSizeParams,
         data_block_size: Sectors,
         backstore: &mut Backstore,
-        listeners: EngineListenerList,
     ) -> StratisResult<ThinPool> {
         let mut segments_list = match backstore.alloc(
             pool_uuid,
@@ -248,7 +246,6 @@ impl ThinPool {
             filesystems: Table::default(),
             mdv,
             backstore_device,
-            listeners,
         })
     }
 
@@ -264,7 +261,6 @@ impl ThinPool {
         thin_pool_save: &ThinPoolDevSave,
         flex_devs: &FlexDevsSave,
         backstore: &Backstore,
-        listeners: EngineListenerList,
     ) -> StratisResult<ThinPool> {
         let mdv_segments = flex_devs.meta_dev.to_vec();
         let meta_segments = flex_devs.thin_meta_dev.to_vec();
@@ -339,7 +335,6 @@ impl ThinPool {
             filesystems: fs_table,
             mdv,
             backstore_device,
-            listeners,
         })
     }
 
@@ -700,7 +695,7 @@ impl ThinPool {
             self.filesystems.insert(old_name, uuid, filesystem);
             Err(err)
         } else {
-            self.listeners.notify(&EngineEvent::FilesystemRenamed {
+            get_engine_listener_list().notify(&EngineEvent::FilesystemRenamed {
                 #[cfg(feature = "dbus_enabled")]
                 dbus_path: filesystem.get_dbus_path(),
                 from: &*old_name,
@@ -919,7 +914,6 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-            EngineListenerList::new(),
         ).unwrap();
 
         let pool_name = "stratis_test_pool";
@@ -1018,7 +1012,6 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-            EngineListenerList::new(),
         ).unwrap();
 
         let pool_name = "stratis_test_pool";
@@ -1125,7 +1118,6 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-            EngineListenerList::new(),
         ).unwrap();
 
         let pool_name = "stratis_test_pool";
@@ -1139,13 +1131,7 @@ mod tests {
         let thinpoolsave: ThinPoolDevSave = pool.record();
         pool.teardown().unwrap();
 
-        let pool = ThinPool::setup(
-            pool_uuid,
-            &thinpoolsave,
-            &flexdevs,
-            &backstore,
-            EngineListenerList::new(),
-        ).unwrap();
+        let pool = ThinPool::setup(pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
 
         assert_eq!(&*pool.get_filesystem_by_uuid(fs_uuid).unwrap().0, name2);
     }
@@ -1179,7 +1165,6 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-            EngineListenerList::new(),
         ).unwrap();
 
         let pool_name = "stratis_test_pool";
@@ -1212,13 +1197,8 @@ mod tests {
         }
         let thinpooldevsave: ThinPoolDevSave = pool.record();
 
-        let new_pool = ThinPool::setup(
-            pool_uuid,
-            &thinpooldevsave,
-            &pool.record(),
-            &backstore,
-            EngineListenerList::new(),
-        ).unwrap();
+        let new_pool =
+            ThinPool::setup(pool_uuid, &thinpooldevsave, &pool.record(), &backstore).unwrap();
 
         assert!(new_pool.get_filesystem_by_uuid(fs_uuid).is_some());
     }
@@ -1245,7 +1225,6 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-            EngineListenerList::new(),
         ).unwrap();
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name).unwrap();
@@ -1260,13 +1239,7 @@ mod tests {
         // Check that destroyed fs is not present in MDV. If the record
         // had been left on the MDV that didn't match a thin_id in the
         // thinpool, ::setup() will fail.
-        let pool = ThinPool::setup(
-            pool_uuid,
-            &thinpooldevsave,
-            &flexdevs,
-            &backstore,
-            EngineListenerList::new(),
-        ).unwrap();
+        let pool = ThinPool::setup(pool_uuid, &thinpooldevsave, &flexdevs, &backstore).unwrap();
 
         assert!(pool.get_filesystem_by_uuid(fs_uuid).is_none());
     }
@@ -1305,7 +1278,6 @@ mod tests {
             },
             DATA_BLOCK_SIZE,
             &mut backstore,
-            EngineListenerList::new(),
         ).unwrap();
 
         match thin_pool.thin_pool.status(get_dm()).unwrap() {
@@ -1361,7 +1333,6 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-            EngineListenerList::new(),
         ).unwrap();
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name).unwrap();
@@ -1425,7 +1396,6 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-            EngineListenerList::new(),
         ).unwrap();
 
         // Create a filesystem as small as possible.  Allocate 1 MiB bigger than
@@ -1500,7 +1470,6 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-            EngineListenerList::new(),
         ).unwrap();
 
         let pool_name = "stratis_test_pool";
@@ -1548,7 +1517,6 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-            EngineListenerList::new(),
         ).unwrap();
 
         let pool_name = "stratis_test_pool";

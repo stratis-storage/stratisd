@@ -9,6 +9,11 @@ use std::cell::RefCell;
 use std::fmt::Debug;
 use std::rc::Rc;
 
+use std::sync::{Once, ONCE_INIT};
+
+static INIT: Once = ONCE_INIT;
+static mut ENGINE_LISTENER_LIST: Option<EngineListenerList> = None;
+
 #[derive(Debug, Clone)]
 pub enum EngineEvent<'a> {
     FilesystemRenamed {
@@ -43,6 +48,8 @@ impl EngineListenerList {
     }
 
     /// Add a listener.
+    // This code is marked dead because it is called only by bin/stratisd.rs
+    #[allow(dead_code)]
     pub fn register_listener(&mut self, listener: Box<EngineListener>) {
         self.listeners.borrow_mut().push(listener);
     }
@@ -58,5 +65,15 @@ impl EngineListenerList {
 impl Default for EngineListenerList {
     fn default() -> EngineListenerList {
         EngineListenerList::new()
+    }
+}
+
+pub fn get_engine_listener_list() -> &'static mut EngineListenerList {
+    unsafe {
+        INIT.call_once(|| ENGINE_LISTENER_LIST = Some(EngineListenerList::new()));
+        match ENGINE_LISTENER_LIST {
+            Some(ref mut ell) => ell,
+            _ => panic!("ENGINE_LISTENER_LIST.is_some()"),
+        }
     }
 }

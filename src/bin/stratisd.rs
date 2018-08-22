@@ -43,9 +43,9 @@ use dbus::{Connection, WatchEvent};
 use devicemapper::Device;
 #[cfg(feature = "dbus_enabled")]
 use libstratis::dbus_api::{consts, prop_changed_dispatch};
-use libstratis::engine::{Engine, SimEngine, StratEngine};
 #[cfg(feature = "dbus_enabled")]
-use libstratis::engine::{EngineEvent, EngineListener};
+use libstratis::engine::{get_engine_listener_list, EngineEvent, EngineListener};
+use libstratis::engine::{Engine, SimEngine, StratEngine};
 use libstratis::stratis::{alarm, buff_log};
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
 
@@ -449,7 +449,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
                     info!("DBUS API is now available");
                     let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
-                    engine.borrow_mut().register_listener(event_handler);
+                    get_engine_listener_list().register_listener(event_handler);
                     // Register all the pools with dbus
                     for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
                         libstratis::dbus_api::register_pool(

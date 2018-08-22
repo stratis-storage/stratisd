@@ -11,7 +11,7 @@ pub use self::engine::Engine;
 pub use self::engine::Filesystem;
 pub use self::engine::Pool;
 
-pub use self::event::{get_engine_listener_list, EngineEvent, EngineListener};
+pub use self::event::{get_engine_listener_list_mut, EngineEvent, EngineListener};
 
 pub use self::sim_engine::SimEngine;
 pub use self::strat_engine::StratEngine;

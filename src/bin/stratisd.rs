@@ -232,6 +232,22 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
+            &EngineEvent::BlockdevStateChanged { dbus_path, state } => {
+                if let &Some(ref dbus_path) = dbus_path {
+                    prop_changed_dispatch(
+                        &self.dbus_conn.borrow(),
+                        consts::BLOCKDEV_STATE_PROP,
+                        state.to_dbus_value(),
+                        &dbus_path,
+                    ).unwrap_or_else(|()| {
+                        error!(
+                            "BlockdevStateChanged: {} state: {} failed to send dbus update.",
+                            dbus_path,
+                            state.to_dbus_value(),
+                        );
+                    });
+                }
+            }
         }
     }
 }

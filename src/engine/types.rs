@@ -21,13 +21,25 @@ pub enum RenameAction {
 }
 
 /// See Design Doc section 10.2.1 for more details.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BlockDevState {
     Missing,
     Bad,
     Spare,
     NotInUse,
     InUse,
+}
+
+impl BlockDevState {
+    pub fn to_dbus_value(&self) -> u16 {
+        match self {
+            BlockDevState::Missing => 0,
+            BlockDevState::Bad => 1,
+            BlockDevState::Spare => 2,
+            BlockDevState::NotInUse => 3,
+            BlockDevState::InUse => 4,
+        }
+    }
 }
 
 /// Blockdev tier. Used to distinguish between blockdevs used for

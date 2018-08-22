@@ -11,8 +11,9 @@ use dbus::Message;
 
 use uuid::Uuid;
 
-use super::super::engine::{BlockDev, BlockDevState, BlockDevTier};
+use super::super::engine::{BlockDev, BlockDevTier};
 
+use super::consts;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
 use super::util::{
@@ -59,7 +60,7 @@ pub fn create_dbus_blockdev<'a>(
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_physical_size);
 
-    let state_property = f.property::<u16, _>("State", ())
+    let state_property = f.property::<u16, _>(consts::BLOCKDEV_STATE_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_state);
@@ -236,14 +237,7 @@ fn get_blockdev_state(
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
     fn get_state(_: BlockDevTier, blockdev: &BlockDev) -> Result<u16, MethodErr> {
-        let state: u16 = match blockdev.state() {
-            BlockDevState::Missing => 0,
-            BlockDevState::Bad => 1,
-            BlockDevState::Spare => 2,
-            BlockDevState::NotInUse => 3,
-            BlockDevState::InUse => 4,
-        };
-        Ok(state)
+        Ok(blockdev.state().to_dbus_value())
     }
 
     get_blockdev_property(i, p, get_state)

@@ -10,11 +10,18 @@ use devicemapper::Bytes;
 use std::fmt::Debug;
 use std::sync::{Once, ONCE_INIT};
 
+use super::types::BlockDevState;
+
 static INIT: Once = ONCE_INIT;
 static mut ENGINE_LISTENER_LIST: Option<EngineListenerList> = None;
 
 #[derive(Debug, Clone)]
 pub enum EngineEvent<'a> {
+    BlockdevStateChanged {
+        #[cfg(feature = "dbus_enabled")]
+        dbus_path: &'a Option<dbus::Path<'static>>,
+        state: BlockDevState,
+    },
     FilesystemRenamed {
         #[cfg(feature = "dbus_enabled")]
         dbus_path: &'a Option<dbus::Path<'static>>,

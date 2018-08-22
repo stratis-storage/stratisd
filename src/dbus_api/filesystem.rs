@@ -61,7 +61,7 @@ pub fn create_dbus_filesystem<'a>(
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_filesystem_created);
 
-    let used_property = f.property::<&str, _>("Used", ())
+    let used_property = f.property::<&str, _>(consts::FILESYSTEM_USED_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_filesystem_used);

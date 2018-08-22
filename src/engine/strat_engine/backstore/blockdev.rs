@@ -175,8 +175,12 @@ impl BlockDev for StratBlockDev {
     }
 
     fn state(&self) -> BlockDevState {
-        // TODO: Implement states for blockdevs
-        BlockDevState::InUse
+        // TODO: Implement support for other BlockDevStates
+        if self.used.used() > self.bda.size() {
+            BlockDevState::InUse
+        } else {
+            BlockDevState::NotInUse
+        }
     }
 
     #[cfg(feature = "dbus_enabled")]

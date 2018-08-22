@@ -31,9 +31,6 @@ pub trait Filesystem: Debug {
     /// The amount of data stored on the filesystem, including overhead.
     fn used(&self) -> StratisResult<Bytes>;
 
-    /// Get the mount_point(s) for the file system.
-    fn mount_points(&self) -> StratisResult<Vec<PathBuf>>;
-
     /// Set dbus path associated with the Pool.
     #[cfg(feature = "dbus_enabled")]
     fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> ();

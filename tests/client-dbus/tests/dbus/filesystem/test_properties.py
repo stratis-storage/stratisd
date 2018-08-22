@@ -78,11 +78,6 @@ class SetNameTestCase(unittest.TestCase):
         # must be a 32 character string
         self.assertEqual(32, len(uuid))
 
-        mount_points = Filesystem.Properties.MountPoints.Get(filesystem)
-
-        # we haven't mounted so it should be an empty array
-        self.assertEqual(list(), mount_points)
-
         created = Filesystem.Properties.Created.Get(filesystem)
 
         # Should be a UTC rfc3339 string, which should end in Z

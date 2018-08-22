@@ -65,7 +65,17 @@ impl Default for EngineListenerList {
     }
 }
 
-pub fn get_engine_listener_list() -> &'static mut EngineListenerList {
+pub fn get_engine_listener_list() -> &'static EngineListenerList {
+    unsafe {
+        INIT.call_once(|| ENGINE_LISTENER_LIST = Some(EngineListenerList::new()));
+        match ENGINE_LISTENER_LIST {
+            Some(ref mut ell) => ell,
+            _ => panic!("ENGINE_LISTENER_LIST.is_some()"),
+        }
+    }
+}
+
+pub fn get_engine_listener_list_mut() -> &'static mut EngineListenerList {
     unsafe {
         INIT.call_once(|| ENGINE_LISTENER_LIST = Some(EngineListenerList::new()));
         match ENGINE_LISTENER_LIST {

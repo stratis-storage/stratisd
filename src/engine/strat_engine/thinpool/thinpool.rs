@@ -570,6 +570,15 @@ impl ThinPool {
 
         let new_state = select_state(overall_used_pct);
 
+        if self.free_space_state != new_state {
+            info!(
+                "Prev space state: {:?} New space state: {:?}",
+                self.free_space_state, new_state
+            );
+
+            // TODO: Dbus signal
+        }
+
         match (self.free_space_state, new_state) {
             (FreeSpaceState::Good, FreeSpaceState::Warn) => {
                 // TODO: other steps to regain space: schedule fstrims?
@@ -628,15 +637,6 @@ impl ThinPool {
             // These all represent no change in the state, so nothing is done.
             (old, new) => assert_eq!(old, new),
         };
-
-        if self.free_space_state != new_state {
-            info!(
-                "Prev space state: {:?} New space state: {:?}",
-                self.free_space_state, new_state
-            );
-
-            // TODO: Dbus signal
-        }
 
         Ok(new_state)
     }

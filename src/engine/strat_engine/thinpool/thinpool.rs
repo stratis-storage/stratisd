@@ -401,6 +401,22 @@ impl ThinPool {
     pub fn check(&mut self, pool_uuid: PoolUuid, backstore: &mut Backstore) -> StratisResult<bool> {
         #![allow(match_same_arms)]
 
+        // Calculate amount to request for metadata device.
+        // Return None if metadata device does not need to be expanded.
+        // Returned request, if it exists, is always INITIAL_META_SIZE.
+        fn calculate_meta_request(
+            total: Sectors,
+            used: Sectors,
+            low_water: Sectors,
+        ) -> Option<Sectors> {
+            let remaining = total - used;
+            if remaining <= low_water {
+                Some(INITIAL_META_SIZE.sectors())
+            } else {
+                None
+            }
+        }
+
         assert_eq!(
             backstore.device().expect(
                 "thinpool exists and has been allocated to, so backstore must have a cap device"
@@ -436,10 +452,12 @@ impl ThinPool {
                 // against kernel-set meta lowater, and only extend if the
                 // lowater is crossed. There's a kernel patch pending to tell
                 // us this value. For now, assume it is META_LOWATER.
-                let meta_remaining = usage.total_meta - usage.used_meta;
-                if meta_remaining <= META_LOWATER {
-                    // Extend by INITIAL_META_SIZE (16MiB)
-                    match self.extend_thin_meta(pool_uuid, backstore, INITIAL_META_SIZE.sectors()) {
+                if let Some(request) = calculate_meta_request(
+                    usage.total_meta.sectors(),
+                    usage.used_meta.sectors(),
+                    META_LOWATER.sectors(),
+                ) {
+                    match self.extend_thin_meta(pool_uuid, backstore, request) {
                         Ok(extend_size) => {
                             info!("Extended thin meta device by {}", extend_size);
 

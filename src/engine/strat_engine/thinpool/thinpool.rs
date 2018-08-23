@@ -51,11 +51,11 @@ const SPACE_CRIT_PCT: u8 = 95;
 const SPACE_WARN_THROTTLE_BLOCKS_PER_SEC: DataBlocks = DataBlocks(10);
 
 fn sectors_to_datablocks(sectors: Sectors) -> DataBlocks {
-    DataBlocks(*sectors / *DATA_BLOCK_SIZE)
+    DataBlocks(sectors / DATA_BLOCK_SIZE)
 }
 
 fn datablocks_to_sectors(data_blocks: DataBlocks) -> Sectors {
-    Sectors(*data_blocks * *DATA_BLOCK_SIZE)
+    *data_blocks * DATA_BLOCK_SIZE
 }
 
 /// Transform a list of segments belonging to a single device into a

@@ -634,8 +634,8 @@ impl ThinPool {
     fn calc_lowater(&mut self, data_dev_size: DataBlocks, available: DataBlocks) -> DataBlocks {
         let total = data_dev_size + available;
         info!(
-            "total {} data_dev_size {} available {}",
-            total, data_dev_size, available
+            "data device size reported by DM {} unused sectors available in cap device {} sum {}",
+            data_dev_size, available, total
         );
 
         // warn/crit points as if pool was fully extended

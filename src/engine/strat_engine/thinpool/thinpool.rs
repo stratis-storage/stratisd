@@ -278,7 +278,6 @@ impl ThinPool {
         let mdv = MetadataVol::initialize(pool_uuid, mdv_dev)?;
 
         let (dm_name, dm_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
-        let data_excess = DATA_LOWATER;
         let thinpool_dev = ThinPoolDev::new(
             get_dm(),
             &dm_name,
@@ -286,8 +285,12 @@ impl ThinPool {
             meta_dev,
             data_dev,
             data_block_size,
-            data_excess,
+            DATA_LOWATER,
         )?;
+
+
+        let data_excess = sectors_to_datablocks(thinpool_dev.size()) - DATA_LOWATER;
+
         Ok(ThinPool {
             thin_pool: thinpool_dev,
             meta_segments: vec![meta_segments],
@@ -341,7 +344,6 @@ impl ThinPool {
             segs_to_table(backstore_device, &data_segments),
         )?;
 
-        let data_excess = DATA_LOWATER;
         let thinpool_dev = ThinPoolDev::setup(
             get_dm(),
             &thinpool_name,
@@ -349,7 +351,7 @@ impl ThinPool {
             meta_dev,
             data_dev,
             thin_pool_save.data_block_size,
-            data_excess,
+            DATA_LOWATER,
         )?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);
@@ -381,6 +383,7 @@ impl ThinPool {
         }
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
+        let data_excess = sectors_to_datablocks(thinpool_dev.size()) - DATA_LOWATER;
         Ok(ThinPool {
             thin_pool: thinpool_dev,
             meta_segments,

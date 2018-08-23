@@ -556,17 +556,25 @@ impl ThinPool {
         used: DataBlocks,
         available: DataBlocks,
     ) -> StratisResult<FreeSpaceState> {
+        // Select the new state based on the overall_used_pct quantity.
+        fn select_state(overall_used_pct: u8) -> FreeSpaceState {
+            match overall_used_pct {
+                0...SPACE_WARN_PCT => FreeSpaceState::Good,
+                SPACE_WARN_PCT...SPACE_CRIT_PCT => FreeSpaceState::Warn,
+                _ => FreeSpaceState::Crit,
+            }
+        }
+
         let overall_used_pct = used_pct(*used, *used + *available);
         info!("Data tier percent used: {}", overall_used_pct);
 
-        let prev_state = self.free_space_state;
+        let new_state = select_state(overall_used_pct);
 
-        let new_state = match (prev_state, overall_used_pct) {
-            (FreeSpaceState::Good, 0...SPACE_WARN_PCT) => FreeSpaceState::Good,
-            (FreeSpaceState::Good, SPACE_WARN_PCT...SPACE_CRIT_PCT) => {
+        match (self.free_space_state, new_state) {
+            (FreeSpaceState::Good, FreeSpaceState::Warn) => {
                 // TODO: other steps to regain space: schedule fstrims?
 
-                // good->warn. Throttle.
+                // Throttle.
                 set_write_throttling(
                     self.thin_pool.data_dev().device(),
                     Some(*datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()),
@@ -575,11 +583,9 @@ impl ThinPool {
                     "throttling to {} bytes/sec",
                     *datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()
                 );
-
-                FreeSpaceState::Warn
             }
-            (FreeSpaceState::Good, _) => {
-                // good->warn->crit. Both throttle and suspend.
+            (FreeSpaceState::Good, FreeSpaceState::Crit) => {
+                // Throttle and suspend.
                 set_write_throttling(
                     self.thin_pool.data_dev().device(),
                     Some(*datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()),
@@ -592,50 +598,41 @@ impl ThinPool {
                 for (_, _, fs) in &mut self.filesystems {
                     fs.suspend(true)?;
                 }
-
-                FreeSpaceState::Crit
             }
-            (FreeSpaceState::Warn, 0...SPACE_WARN_PCT) => {
-                // warn->good.
+            (FreeSpaceState::Warn, FreeSpaceState::Good) => {
+                // Unthrottle.
                 set_write_throttling(self.thin_pool.data_dev().device(), None)?;
                 info!("throttling disabled");
-                FreeSpaceState::Good
             }
-            (FreeSpaceState::Warn, SPACE_WARN_PCT...SPACE_CRIT_PCT) => FreeSpaceState::Warn,
-            (FreeSpaceState::Warn, _) => {
-                // warn->crit. Suspend.
+            (FreeSpaceState::Warn, FreeSpaceState::Crit) => {
+                // Suspend.
                 for (_, _, fs) in &mut self.filesystems {
                     fs.suspend(true)?;
                 }
-
-                FreeSpaceState::Crit
             }
-            (FreeSpaceState::Crit, 0...SPACE_WARN_PCT) => {
-                // crit->warn->good. Unthrottle and unsuspend.
+            (FreeSpaceState::Crit, FreeSpaceState::Good) => {
+                // Unthrottle and unsuspend.
 
                 for (_, _, fs) in &mut self.filesystems {
                     fs.resume()?;
                 }
                 set_write_throttling(self.thin_pool.data_dev().device(), None)?;
                 info!("throttling disabled");
-
-                FreeSpaceState::Good
             }
-            (FreeSpaceState::Crit, SPACE_WARN_PCT...SPACE_CRIT_PCT) => {
-                // crit->warn. Unsuspend.
+            (FreeSpaceState::Crit, FreeSpaceState::Warn) => {
+                // Unsuspend.
                 for (_, _, fs) in &mut self.filesystems {
                     fs.resume()?;
                 }
-
-                FreeSpaceState::Warn
             }
-            (FreeSpaceState::Crit, _) => FreeSpaceState::Crit,
+            // These all represent no change in the state, so nothing is done.
+            (old, new) => assert_eq!(old, new),
         };
 
-        if prev_state != new_state {
+        if self.free_space_state != new_state {
             info!(
                 "Prev space state: {:?} New space state: {:?}",
-                prev_state, new_state
+                self.free_space_state, new_state
             );
 
             // TODO: Dbus signal

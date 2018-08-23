@@ -638,18 +638,11 @@ impl ThinPool {
             data_dev_size, available, total
         );
 
-        // warn/crit points as if pool was fully extended
-        let warn_lowat_for_total = calc_data_lowater(SPACE_WARN_PCT, total);
-        let crit_lowat_for_total = calc_data_lowater(SPACE_CRIT_PCT, total);
-        info!(
-            "warn_lowat_for_total {} crit_lowat_for_total {}",
-            warn_lowat_for_total, crit_lowat_for_total
-        );
-
         // Make it be the higher of point for next extension event and point
         // for FreeSpaceState change
         match self.free_space_state {
             FreeSpaceState::Good => {
+                let warn_lowat_for_total = calc_data_lowater(SPACE_WARN_PCT, total);
                 // DATA_LOWATER relative to end of data_dev_size, so add
                 // 'available' for correct comparison
                 if DATA_LOWATER + available > warn_lowat_for_total {
@@ -659,6 +652,7 @@ impl ThinPool {
                 }
             }
             _ => {
+                let crit_lowat_for_total = calc_data_lowater(SPACE_CRIT_PCT, total);
                 // We're throttled, so can set a tighter event and still get
                 // called before out of space
                 if THROTTLE_BLOCKS_PER_SEC + available > crit_lowat_for_total {

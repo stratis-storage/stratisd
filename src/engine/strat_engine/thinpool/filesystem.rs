@@ -244,6 +244,34 @@ impl StratFilesystem {
         self.thin_dev.resume(get_dm())?;
         Ok(())
     }
+
+    /// Find places where this filesystem is mounted.
+    fn mount_points(&self) -> StratisResult<Vec<PathBuf>> {
+        // Use major:minor values to find mounts for this filesystem
+        let major = u64::from(self.thin_dev.device().major);
+        let minor = u64::from(self.thin_dev.device().minor);
+
+        let mut mount_data = String::new();
+        File::open("/proc/self/mountinfo")?.read_to_string(&mut mount_data)?;
+        let parser = libmount::mountinfo::Parser::new(mount_data.as_bytes());
+
+        let mut ret_vec = Vec::new();
+        for mp in parser {
+            match mp {
+                Ok(mount) => {
+                    if mount.major as u64 == major && mount.minor as u64 == minor {
+                        ret_vec.push(PathBuf::from(&mount.mount_point));
+                    }
+                }
+                Err(e) => {
+                    let error_msg = format!("Error during parsing {:?}: {:?}", *self, e);
+                    return Err(StratisError::Engine(ErrorEnum::Error, error_msg));
+                }
+            }
+        }
+
+        Ok(ret_vec)
+    }
 }
 
 impl Filesystem for StratFilesystem {
@@ -274,33 +302,6 @@ impl Filesystem for StratFilesystem {
                 Ok(used_result?.1)
             }
         }
-    }
-
-    fn mount_points(&self) -> StratisResult<Vec<PathBuf>> {
-        // Use major:minor values to find mounts for this filesystem
-        let major = u64::from(self.thin_dev.device().major);
-        let minor = u64::from(self.thin_dev.device().minor);
-
-        let mut mount_data = String::new();
-        File::open("/proc/self/mountinfo")?.read_to_string(&mut mount_data)?;
-        let parser = libmount::mountinfo::Parser::new(mount_data.as_bytes());
-
-        let mut ret_vec = Vec::new();
-        for mp in parser {
-            match mp {
-                Ok(mount) => {
-                    if mount.major as u64 == major && mount.minor as u64 == minor {
-                        ret_vec.push(PathBuf::from(&mount.mount_point));
-                    }
-                }
-                Err(e) => {
-                    let error_msg = format!("Error during parsing {:?}: {:?}", *self, e);
-                    return Err(StratisError::Engine(ErrorEnum::Error, error_msg));
-                }
-            }
-        }
-
-        Ok(ret_vec)
     }
 
     #[cfg(feature = "dbus_enabled")]

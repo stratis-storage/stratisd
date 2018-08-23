@@ -205,7 +205,9 @@ pub struct ThinPool {
     backstore_device: Device,
     pool_state: PoolState,
     free_space_state: FreeSpaceState,
-    next_event_point: DataBlocks,
+    /// The amount of space on the data device above the low water mark the
+    /// last time the size of data device was checked.
+    data_excess: DataBlocks,
 }
 
 impl ThinPool {
@@ -276,7 +278,7 @@ impl ThinPool {
         let mdv = MetadataVol::initialize(pool_uuid, mdv_dev)?;
 
         let (dm_name, dm_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
-        let next_event_point = DATA_LOWATER;
+        let data_excess = DATA_LOWATER;
         let thinpool_dev = ThinPoolDev::new(
             get_dm(),
             &dm_name,
@@ -284,7 +286,7 @@ impl ThinPool {
             meta_dev,
             data_dev,
             data_block_size,
-            next_event_point,
+            data_excess,
         )?;
         Ok(ThinPool {
             thin_pool: thinpool_dev,
@@ -298,7 +300,7 @@ impl ThinPool {
             backstore_device,
             pool_state: PoolState::Good,
             free_space_state: FreeSpaceState::Good,
-            next_event_point,
+            data_excess,
         })
     }
 
@@ -339,7 +341,7 @@ impl ThinPool {
             segs_to_table(backstore_device, &data_segments),
         )?;
 
-        let next_event_point = DATA_LOWATER;
+        let data_excess = DATA_LOWATER;
         let thinpool_dev = ThinPoolDev::setup(
             get_dm(),
             &thinpool_name,
@@ -347,7 +349,7 @@ impl ThinPool {
             meta_dev,
             data_dev,
             thin_pool_save.data_block_size,
-            next_event_point,
+            data_excess,
         )?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);
@@ -391,7 +393,7 @@ impl ThinPool {
             backstore_device,
             pool_state: PoolState::Good,
             free_space_state: FreeSpaceState::Good,
-            next_event_point,
+            data_excess,
         })
     }
 
@@ -420,8 +422,8 @@ impl ThinPool {
         // Calculate amount to request for data device.
         // Return None if data device does not need to be extended.
         // Return request, if it exists, is always 1 GiB.
-        fn calculate_data_request(used: Sectors, next_event_point: Sectors) -> Option<Sectors> {
-            if used >= next_event_point {
+        fn calculate_data_request(used: Sectors, data_excess: Sectors) -> Option<Sectors> {
+            if used >= data_excess {
                 Some(Bytes(IEC::Gi).sectors())
             } else {
                 None
@@ -483,7 +485,7 @@ impl ThinPool {
 
                 if let Some(request) = calculate_data_request(
                     datablocks_to_sectors(usage.used_data),
-                    datablocks_to_sectors(self.next_event_point),
+                    datablocks_to_sectors(self.data_excess),
                 ) {
                     info!("Requesting extending data device by {}", request,);
 
@@ -526,7 +528,7 @@ impl ThinPool {
                         data_dev_size,
                         sectors_to_datablocks(backstore.available()),
                     );
-                    self.next_event_point = data_dev_size - lowater;
+                    self.data_excess = data_dev_size - lowater;
                     self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
                     self.resume()?;
                 }

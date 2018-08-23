@@ -521,10 +521,14 @@ impl ThinPool {
                     )?;
 
                     // Trigger next event depending on pool space state
-                    self.next_event_point = self.set_next_event_point(
-                        usage.total_data + extend_size,
+                    let data_dev_size = usage.total_data + extend_size;
+                    let lowater = self.calc_lowater(
+                        data_dev_size,
                         sectors_to_datablocks(backstore.available()),
-                    )?;
+                    );
+                    self.next_event_point = data_dev_size - lowater;
+                    self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
+                    self.resume()?;
                 }
             }
             dm::ThinPoolStatus::Fail => {
@@ -631,14 +635,9 @@ impl ThinPool {
         Ok(new_state)
     }
 
-    /// Set next event point, based on pool space state and if we also want
-    /// events to extend the pool, or not.
-    /// Returns the usage.used value that will trigger this event point.
-    fn set_next_event_point(
-        &mut self,
-        data_dev_size: DataBlocks,
-        available: DataBlocks,
-    ) -> StratisResult<DataBlocks> {
+    /// Calculate new low water based on the current thinpool data device size
+    /// and the amount of unused sectors available in the cap device.
+    fn calc_lowater(&mut self, data_dev_size: DataBlocks, available: DataBlocks) -> DataBlocks {
         let total = data_dev_size + available;
         info!(
             "total {} data_dev_size {} available {}",
@@ -655,7 +654,7 @@ impl ThinPool {
 
         // Make it be the higher of point for next extension event and point
         // for FreeSpaceState change
-        let lowater = match self.free_space_state {
+        match self.free_space_state {
             FreeSpaceState::Good => {
                 // DATA_LOWATER relative to end of data_dev_size, so add
                 // 'available' for correct comparison
@@ -674,17 +673,7 @@ impl ThinPool {
                     crit_lowat_for_total - available
                 }
             }
-        };
-
-        let next_event_point = data_dev_size - lowater;
-        info!(
-            "setting lowater to {}, next event point to {}",
-            lowater, next_event_point
-        );
-
-        self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
-        self.resume()?;
-        Ok(next_event_point)
+        }
     }
 
     /// Tear down the components managed here: filesystems, the MDV,

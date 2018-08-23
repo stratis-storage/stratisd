@@ -154,13 +154,13 @@ impl Default for ThinPoolSizeParams {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum PoolState {
     Good,
     Bad,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum FreeSpaceState {
     Good,
     Warn,

@@ -5,7 +5,7 @@
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 
-use devicemapper::Device;
+use devicemapper::{Bytes, Device};
 
 use stratis::StratisResult;
 
@@ -18,9 +18,9 @@ const THROTTLE_BPS_PATH: &str = "blkio.throttle.write_bps_device";
 // doesn't work on all configs. What we're doing for the moment is setting the
 // throttle in *all* cgroups if they are present, but if not, then trying to
 // do it at the root level.
-pub fn set_write_throttling(device: Device, bytes_per_sec: Option<u64>) -> StratisResult<()> {
+pub fn set_write_throttling(device: Device, bytes_per_sec: Option<Bytes>) -> StratisResult<()> {
     // Setting to u64::max_value() removes throttling.
-    let value = bytes_per_sec.unwrap_or_else(|| u64::max_value());
+    let value = bytes_per_sec.unwrap_or_else(|| Bytes(u64::max_value()));
 
     // Find all cgroup subdirectories
     let mut cg_dirs = fs::read_dir(CGROUP_PATH)?
@@ -40,7 +40,7 @@ pub fn set_write_throttling(device: Device, bytes_per_sec: Option<u64>) -> Strat
         OpenOptions::new()
             .write(true)
             .open(cg_dir)
-            .and_then(|mut f| f.write_all(format!("{} {}", device, value).as_bytes()))?;
+            .and_then(|mut f| f.write_all(format!("{} {}", device, *value).as_bytes()))?;
     }
 
     Ok(())
@@ -59,7 +59,7 @@ mod tests {
 
     use chrono::{Duration, Utc};
 
-    use devicemapper::{Bytes, Device, Sectors, IEC};
+    use devicemapper::{Device, Sectors, IEC};
 
     use stratis::StratisResult;
 
@@ -117,7 +117,7 @@ mod tests {
         );
 
         // Limit writes to 1MiB/sec
-        set_write_throttling(d, Some(*Bytes(IEC::Mi))).unwrap();
+        set_write_throttling(d, Some(Bytes(IEC::Mi))).unwrap();
 
         // Check that throttled writes are indeed slower
         let start = Utc::now();

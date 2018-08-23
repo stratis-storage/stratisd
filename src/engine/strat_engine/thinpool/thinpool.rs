@@ -586,7 +586,7 @@ impl ThinPool {
                 // Throttle.
                 set_write_throttling(
                     self.thin_pool.data_dev().device(),
-                    Some(*datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()),
+                    Some(datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()),
                 )?;
                 info!(
                     "throttling to {} bytes/sec",
@@ -597,7 +597,7 @@ impl ThinPool {
                 // Throttle and suspend.
                 set_write_throttling(
                     self.thin_pool.data_dev().device(),
-                    Some(*datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()),
+                    Some(datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()),
                 )?;
                 info!(
                     "throttling to {} bytes/sec",

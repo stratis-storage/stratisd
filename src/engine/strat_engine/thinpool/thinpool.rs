@@ -588,10 +588,6 @@ impl ThinPool {
                     self.thin_pool.data_dev().device(),
                     Some(datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()),
                 )?;
-                info!(
-                    "throttling to {} bytes/sec",
-                    *datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()
-                );
             }
             (FreeSpaceState::Good, FreeSpaceState::Crit) => {
                 // Throttle and suspend.
@@ -599,10 +595,6 @@ impl ThinPool {
                     self.thin_pool.data_dev().device(),
                     Some(datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()),
                 )?;
-                info!(
-                    "throttling to {} bytes/sec",
-                    *datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()
-                );
 
                 for (_, _, fs) in &mut self.filesystems {
                     fs.suspend(true)?;
@@ -611,7 +603,6 @@ impl ThinPool {
             (FreeSpaceState::Warn, FreeSpaceState::Good) => {
                 // Unthrottle.
                 set_write_throttling(self.thin_pool.data_dev().device(), None)?;
-                info!("throttling disabled");
             }
             (FreeSpaceState::Warn, FreeSpaceState::Crit) => {
                 // Suspend.
@@ -626,7 +617,6 @@ impl ThinPool {
                     fs.resume()?;
                 }
                 set_write_throttling(self.thin_pool.data_dev().device(), None)?;
-                info!("throttling disabled");
             }
             (FreeSpaceState::Crit, FreeSpaceState::Warn) => {
                 // Unsuspend.

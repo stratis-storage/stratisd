@@ -43,6 +43,11 @@ pub fn set_write_throttling(device: Device, bytes_per_sec: Option<Bytes>) -> Str
             .and_then(|mut f| f.write_all(format!("{} {}", device, *value).as_bytes()))?;
     }
 
+    match bytes_per_sec {
+        None => info!("Throttling disabled for device {}", device),
+        Some(amt) => info!("Throttled device {} to {} bytes/sec", device, *amt),
+    }
+
     Ok(())
 }
 

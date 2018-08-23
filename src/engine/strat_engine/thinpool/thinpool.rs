@@ -47,8 +47,8 @@ const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 const SPACE_WARN_PCT: u8 = 90;
 const SPACE_CRIT_PCT: u8 = 95;
 
-// This is kind of low, maybe.
-const SPACE_WARN_THROTTLE_BLOCKS_PER_SEC: DataBlocks = DataBlocks(10);
+/// When Stratis initiates throttling, this is the value it always specifies.
+const THROTTLE_BLOCKS_PER_SEC: DataBlocks = DataBlocks(10);
 
 fn sectors_to_datablocks(sectors: Sectors) -> DataBlocks {
     DataBlocks(sectors / DATA_BLOCK_SIZE)
@@ -588,13 +588,13 @@ impl ThinPool {
                 // TODO: other steps to regain space: schedule fstrims?
                 set_write_throttling(
                     self.thin_pool.data_dev().device(),
-                    Some(datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()),
+                    Some(datablocks_to_sectors(THROTTLE_BLOCKS_PER_SEC).bytes()),
                 )?;
             }
             (FreeSpaceState::Good, FreeSpaceState::Crit) => {
                 set_write_throttling(
                     self.thin_pool.data_dev().device(),
-                    Some(datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()),
+                    Some(datablocks_to_sectors(THROTTLE_BLOCKS_PER_SEC).bytes()),
                 )?;
 
                 for (_, _, fs) in &mut self.filesystems {
@@ -659,8 +659,8 @@ impl ThinPool {
             _ => {
                 // We're throttled, so can set a tighter event and still get
                 // called before out of space
-                if SPACE_WARN_THROTTLE_BLOCKS_PER_SEC + available > crit_lowat_for_total {
-                    SPACE_WARN_THROTTLE_BLOCKS_PER_SEC
+                if THROTTLE_BLOCKS_PER_SEC + available > crit_lowat_for_total {
+                    THROTTLE_BLOCKS_PER_SEC
                 } else {
                     crit_lowat_for_total - available
                 }

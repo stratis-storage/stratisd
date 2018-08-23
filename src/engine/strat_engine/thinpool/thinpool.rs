@@ -183,7 +183,7 @@ fn used_pct(used: u64, total: u64) -> u8 {
 // device is used"
 fn calc_data_lowater(percent_used: u8, total: DataBlocks) -> DataBlocks {
     assert!(percent_used <= 100);
-    DataBlocks(*total - ((*total * percent_used as u64) / 100))
+    total - ((total * percent_used) / 100u8)
 }
 
 /// A ThinPool struct contains the thinpool itself, the spare

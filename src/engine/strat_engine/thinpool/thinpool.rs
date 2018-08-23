@@ -417,6 +417,17 @@ impl ThinPool {
             }
         }
 
+        // Calculate amount to request for data device.
+        // Return None if data device does not need to be extended.
+        // Return request, if it exists, is always 1 GiB.
+        fn calculate_data_request(used: Sectors, next_event_point: Sectors) -> Option<Sectors> {
+            if used >= next_event_point {
+                Some(Bytes(IEC::Gi).sectors())
+            } else {
+                None
+            }
+        }
+
         assert_eq!(
             backstore.device().expect(
                 "thinpool exists and has been allocated to, so backstore must have a cap device"
@@ -470,9 +481,10 @@ impl ThinPool {
                     }
                 }
 
-                if usage.used_data >= self.next_event_point {
-                    // Let's ask for 1 GiB.
-                    let request = Bytes(IEC::Gi).sectors();
+                if let Some(request) = calculate_data_request(
+                    datablocks_to_sectors(usage.used_data),
+                    datablocks_to_sectors(self.next_event_point),
+                ) {
                     info!("Requesting extending data device by {}", request,);
 
                     let extend_size = match self.extend_thin_data(pool_uuid, backstore, request) {

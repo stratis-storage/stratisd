@@ -586,15 +586,12 @@ impl ThinPool {
         match (self.free_space_state, new_state) {
             (FreeSpaceState::Good, FreeSpaceState::Warn) => {
                 // TODO: other steps to regain space: schedule fstrims?
-
-                // Throttle.
                 set_write_throttling(
                     self.thin_pool.data_dev().device(),
                     Some(datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()),
                 )?;
             }
             (FreeSpaceState::Good, FreeSpaceState::Crit) => {
-                // Throttle and suspend.
                 set_write_throttling(
                     self.thin_pool.data_dev().device(),
                     Some(datablocks_to_sectors(SPACE_WARN_THROTTLE_BLOCKS_PER_SEC).bytes()),
@@ -605,25 +602,20 @@ impl ThinPool {
                 }
             }
             (FreeSpaceState::Warn, FreeSpaceState::Good) => {
-                // Unthrottle.
                 set_write_throttling(self.thin_pool.data_dev().device(), None)?;
             }
             (FreeSpaceState::Warn, FreeSpaceState::Crit) => {
-                // Suspend.
                 for (_, _, fs) in &mut self.filesystems {
                     fs.suspend(true)?;
                 }
             }
             (FreeSpaceState::Crit, FreeSpaceState::Good) => {
-                // Unthrottle and unsuspend.
-
                 for (_, _, fs) in &mut self.filesystems {
                     fs.resume()?;
                 }
                 set_write_throttling(self.thin_pool.data_dev().device(), None)?;
             }
             (FreeSpaceState::Crit, FreeSpaceState::Warn) => {
-                // Unsuspend.
                 for (_, _, fs) in &mut self.filesystems {
                     fs.resume()?;
                 }

@@ -2,9 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#[cfg(feature = "dbus_enabled")]
-use dbus;
-
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
@@ -17,7 +14,7 @@ use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::types::{
-    BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction,
+    BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction,
 };
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -112,8 +109,7 @@ pub struct StratPool {
     backstore: Backstore,
     redundancy: Redundancy,
     thin_pool: ThinPool,
-    #[cfg(feature = "dbus_enabled")]
-    dbus_path: Option<dbus::Path<'static>>,
+    dbus_path: MaybeDbusPath,
 }
 
 impl StratPool {
@@ -148,8 +144,7 @@ impl StratPool {
             backstore,
             redundancy,
             thin_pool: thinpool,
-            #[cfg(feature = "dbus_enabled")]
-            dbus_path: None,
+            dbus_path: MaybeDbusPath(None),
         };
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
@@ -186,8 +181,7 @@ impl StratPool {
                 backstore,
                 redundancy: Redundancy::NONE,
                 thin_pool: thinpool,
-                #[cfg(feature = "dbus_enabled")]
-                dbus_path: None,
+                dbus_path: MaybeDbusPath(None),
             },
         ))
     }
@@ -411,13 +405,11 @@ impl Pool for StratPool {
         }
     }
 
-    #[cfg(feature = "dbus_enabled")]
-    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> () {
-        self.dbus_path = Some(path)
+    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
+        self.dbus_path = path
     }
 
-    #[cfg(feature = "dbus_enabled")]
-    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>> {
+    fn get_dbus_path(&self) -> &MaybeDbusPath {
         &self.dbus_path
     }
 }

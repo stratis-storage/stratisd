@@ -258,7 +258,6 @@ impl Engine for StratEngine {
             Err(err)
         } else {
             get_engine_listener_list().notify(&EngineEvent::PoolRenamed {
-                #[cfg(feature = "dbus_enabled")]
                 dbus_path: pool.get_dbus_path(),
                 from: &*old_name,
                 to: &*new_name,

@@ -20,6 +20,7 @@ pub use self::types::BlockDevState;
 pub use self::types::BlockDevTier;
 pub use self::types::DevUuid;
 pub use self::types::FilesystemUuid;
+pub use self::types::MaybeDbusPath;
 pub use self::types::Name;
 pub use self::types::PoolUuid;
 pub use self::types::Redundancy;

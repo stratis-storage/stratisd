@@ -2,15 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#[cfg(feature = "dbus_enabled")]
-use dbus;
-
 use devicemapper::Bytes;
 
 use std::fmt::Debug;
 use std::sync::{Once, ONCE_INIT};
 
-use super::types::BlockDevState;
+use super::types::{BlockDevState, MaybeDbusPath};
 
 static INIT: Once = ONCE_INIT;
 static mut ENGINE_LISTENER_LIST: Option<EngineListenerList> = None;
@@ -18,24 +15,20 @@ static mut ENGINE_LISTENER_LIST: Option<EngineListenerList> = None;
 #[derive(Debug, Clone)]
 pub enum EngineEvent<'a> {
     BlockdevStateChanged {
-        #[cfg(feature = "dbus_enabled")]
-        dbus_path: &'a Option<dbus::Path<'static>>,
+        dbus_path: &'a MaybeDbusPath,
         state: BlockDevState,
     },
     FilesystemRenamed {
-        #[cfg(feature = "dbus_enabled")]
-        dbus_path: &'a Option<dbus::Path<'static>>,
+        dbus_path: &'a MaybeDbusPath,
         from: &'a str,
         to: &'a str,
     },
     FilesystemUsedChanged {
-        #[cfg(feature = "dbus_enabled")]
-        dbus_path: &'a Option<dbus::Path<'static>>,
+        dbus_path: &'a MaybeDbusPath,
         used: Bytes,
     },
     PoolRenamed {
-        #[cfg(feature = "dbus_enabled")]
-        dbus_path: &'a Option<dbus::Path<'static>>,
+        dbus_path: &'a MaybeDbusPath,
         from: &'a str,
         to: &'a str,
     },

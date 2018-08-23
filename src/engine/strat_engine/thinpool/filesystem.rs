@@ -3,8 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use chrono::{DateTime, TimeZone, Utc};
-#[cfg(feature = "dbus_enabled")]
-use dbus;
 use uuid::Uuid;
 
 use std::fs::File;
@@ -25,7 +23,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::engine::Filesystem;
 use super::super::super::event::{get_engine_listener_list, EngineEvent};
-use super::super::super::types::{FilesystemUuid, Name, PoolUuid};
+use super::super::super::types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid};
 
 use super::super::cmd::{create_fs, set_uuid, xfs_growfs};
 use super::super::dm::get_dm;
@@ -44,8 +42,7 @@ pub const FILESYSTEM_LOWATER: Sectors = Sectors(256 * IEC::Mi / (SECTOR_SIZE as 
 pub struct StratFilesystem {
     thin_dev: ThinDev,
     created: DateTime<Utc>,
-    #[cfg(feature = "dbus_enabled")]
-    dbus_path: Option<dbus::Path<'static>>,
+    dbus_path: MaybeDbusPath,
 }
 
 pub enum FilesystemStatus {
@@ -80,8 +77,7 @@ impl StratFilesystem {
             StratFilesystem {
                 thin_dev,
                 created: Utc::now(),
-                #[cfg(feature = "dbus_enabled")]
-                dbus_path: None,
+                dbus_path: MaybeDbusPath(None),
             },
         ))
     }
@@ -104,8 +100,7 @@ impl StratFilesystem {
         Ok(StratFilesystem {
             thin_dev,
             created: Utc.timestamp(fssave.created as i64, 0),
-            #[cfg(feature = "dbus_enabled")]
-            dbus_path: None,
+            dbus_path: MaybeDbusPath(None),
         })
     }
 
@@ -163,8 +158,7 @@ impl StratFilesystem {
                 Ok(StratFilesystem {
                     thin_dev,
                     created: Utc::now(),
-                    #[cfg(feature = "dbus_enabled")]
-                    dbus_path: None,
+                    dbus_path: MaybeDbusPath(None),
                 })
             }
             Err(e) => Err(StratisError::Engine(
@@ -197,7 +191,6 @@ impl StratFilesystem {
                         }
                     }
                     get_engine_listener_list().notify(&EngineEvent::FilesystemUsedChanged {
-                        #[cfg(feature = "dbus_enabled")]
                         dbus_path: self.get_dbus_path(),
                         used: fs_total_used_bytes,
                     });
@@ -309,13 +302,11 @@ impl Filesystem for StratFilesystem {
         Ok(ret_vec)
     }
 
-    #[cfg(feature = "dbus_enabled")]
-    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> () {
-        self.dbus_path = Some(path)
+    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
+        self.dbus_path = path
     }
 
-    #[cfg(feature = "dbus_enabled")]
-    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>> {
+    fn get_dbus_path(&self) -> &MaybeDbusPath {
         &self.dbus_path
     }
 }

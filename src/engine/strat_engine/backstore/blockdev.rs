@@ -4,9 +4,6 @@
 
 // Code to handle a single block device.
 
-#[cfg(feature = "dbus_enabled")]
-use dbus;
-
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 
@@ -17,7 +14,7 @@ use devicemapper::{Device, Sectors};
 use stratis::StratisResult;
 
 use super::super::super::engine::BlockDev;
-use super::super::super::types::{BlockDevState, DevUuid, PoolUuid};
+use super::super::super::types::{BlockDevState, DevUuid, MaybeDbusPath, PoolUuid};
 
 use super::super::serde_structs::{BlockDevSave, Recordable};
 
@@ -32,8 +29,7 @@ pub struct StratBlockDev {
     used: RangeAllocator,
     user_info: Option<String>,
     hardware_info: Option<String>,
-    #[cfg(feature = "dbus_enabled")]
-    dbus_path: Option<dbus::Path<'static>>,
+    dbus_path: MaybeDbusPath,
 }
 
 impl StratBlockDev {
@@ -71,8 +67,7 @@ impl StratBlockDev {
             used: allocator,
             user_info,
             hardware_info,
-            #[cfg(feature = "dbus_enabled")]
-            dbus_path: None,
+            dbus_path: MaybeDbusPath(None),
         })
     }
 
@@ -183,13 +178,11 @@ impl BlockDev for StratBlockDev {
         }
     }
 
-    #[cfg(feature = "dbus_enabled")]
-    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> () {
-        self.dbus_path = Some(path)
+    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
+        self.dbus_path = path
     }
 
-    #[cfg(feature = "dbus_enabled")]
-    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>> {
+    fn get_dbus_path(&self) -> &MaybeDbusPath {
         &self.dbus_path
     }
 }

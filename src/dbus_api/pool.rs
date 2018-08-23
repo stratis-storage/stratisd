@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 use devicemapper::Sectors;
 
-use super::super::engine::{BlockDevTier, Name, Pool, RenameAction};
+use super::super::engine::{BlockDevTier, MaybeDbusPath, Name, Pool, RenameAction};
 
 use super::blockdev::create_dbus_blockdev;
 use super::consts;
@@ -446,6 +446,6 @@ pub fn create_dbus_pool<'a>(
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
-    pool.set_dbus_path(path.clone());
+    pool.set_dbus_path(MaybeDbusPath(Some(path.clone())));
     path
 }

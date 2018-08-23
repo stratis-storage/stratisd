@@ -44,7 +44,9 @@ use devicemapper::Device;
 #[cfg(feature = "dbus_enabled")]
 use libstratis::dbus_api::{consts, prop_changed_dispatch};
 #[cfg(feature = "dbus_enabled")]
-use libstratis::engine::{get_engine_listener_list_mut, EngineEvent, EngineListener};
+use libstratis::engine::{
+    get_engine_listener_list_mut, EngineEvent, EngineListener, MaybeDbusPath,
+};
 use libstratis::engine::{Engine, SimEngine, StratEngine};
 use libstratis::stratis::{alarm, buff_log};
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
@@ -184,7 +186,7 @@ impl EngineListener for EventHandler {
                 from,
                 to,
             } => {
-                if let &Some(ref dbus_path) = dbus_path {
+                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::FILESYSTEM_NAME_PROP,
@@ -203,7 +205,7 @@ impl EngineListener for EventHandler {
                 from,
                 to,
             } => {
-                if let &Some(ref dbus_path) = dbus_path {
+                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::POOL_NAME_PROP,
@@ -218,7 +220,7 @@ impl EngineListener for EventHandler {
                 }
             }
             &EngineEvent::FilesystemUsedChanged { dbus_path, used } => {
-                if let &Some(ref dbus_path) = dbus_path {
+                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::FILESYSTEM_USED_PROP,
@@ -233,7 +235,7 @@ impl EngineListener for EventHandler {
                 }
             }
             &EngineEvent::BlockdevStateChanged { dbus_path, state } => {
-                if let &Some(ref dbus_path) = dbus_path {
+                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::BLOCKDEV_STATE_PROP,

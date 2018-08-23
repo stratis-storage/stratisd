@@ -3,8 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use chrono::{DateTime, Utc};
-#[cfg(feature = "dbus_enabled")]
-use dbus;
 
 use rand;
 
@@ -13,6 +11,7 @@ use std::path::PathBuf;
 use devicemapper::Bytes;
 
 use super::super::engine::Filesystem;
+use super::super::types::MaybeDbusPath;
 
 use stratis::StratisResult;
 
@@ -20,8 +19,7 @@ use stratis::StratisResult;
 pub struct SimFilesystem {
     rand: u32,
     created: DateTime<Utc>,
-    #[cfg(feature = "dbus_enabled")]
-    dbus_path: Option<dbus::Path<'static>>,
+    dbus_path: MaybeDbusPath,
 }
 
 impl SimFilesystem {
@@ -29,8 +27,7 @@ impl SimFilesystem {
         SimFilesystem {
             rand: rand::random::<u32>(),
             created: Utc::now(),
-            #[cfg(feature = "dbus_enabled")]
-            dbus_path: None,
+            dbus_path: MaybeDbusPath(None),
         }
     }
 }
@@ -54,13 +51,11 @@ impl Filesystem for SimFilesystem {
         Ok(Vec::new())
     }
 
-    #[cfg(feature = "dbus_enabled")]
-    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> () {
-        self.dbus_path = Some(path)
+    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
+        self.dbus_path = path
     }
 
-    #[cfg(feature = "dbus_enabled")]
-    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>> {
+    fn get_dbus_path(&self) -> &MaybeDbusPath {
         &self.dbus_path
     }
 }

@@ -696,7 +696,6 @@ impl ThinPool {
             Err(err)
         } else {
             get_engine_listener_list().notify(&EngineEvent::FilesystemRenamed {
-                #[cfg(feature = "dbus_enabled")]
                 dbus_path: filesystem.get_dbus_path(),
                 from: &*old_name,
                 to: &*new_name,

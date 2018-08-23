@@ -12,7 +12,7 @@ use dbus::Message;
 
 use uuid::Uuid;
 
-use super::super::engine::{filesystem_mount_path, Filesystem, Name, RenameAction};
+use super::super::engine::{filesystem_mount_path, Filesystem, MaybeDbusPath, Name, RenameAction};
 
 use super::consts;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
@@ -95,7 +95,7 @@ pub fn create_dbus_filesystem<'a>(
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
-    filesystem.set_dbus_path(path.clone());
+    filesystem.set_dbus_path(MaybeDbusPath(Some(path.clone())));
     path
 }
 

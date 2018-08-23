@@ -250,7 +250,6 @@ impl BlockDevMgr {
                 let (gotten, r_segs) = bd.request_space(needed - alloc);
                 if gotten > Sectors(0) && prev_state != BlockDevState::InUse {
                     get_engine_listener_list().notify(&EngineEvent::BlockdevStateChanged {
-                        #[cfg(feature = "dbus_enabled")]
                         dbus_path: bd.get_dbus_path(),
                         state: BlockDevState::InUse,
                     });

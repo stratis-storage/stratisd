@@ -11,7 +11,7 @@ use dbus::Message;
 
 use uuid::Uuid;
 
-use super::super::engine::{BlockDev, BlockDevTier};
+use super::super::engine::{BlockDev, BlockDevTier, MaybeDbusPath};
 
 use super::consts;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
@@ -106,7 +106,7 @@ pub fn create_dbus_blockdev<'a>(
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
-    blockdev.set_dbus_path(path.clone());
+    blockdev.set_dbus_path(MaybeDbusPath(Some(path.clone())));
     path
 }
 

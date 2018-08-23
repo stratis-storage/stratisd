@@ -136,7 +136,7 @@ impl ThinPoolSizeParams {
     }
     /// The number of Sectors in the DataBlocks.
     pub fn data_size(&self) -> Sectors {
-        *self.data_size * DATA_BLOCK_SIZE
+        datablocks_to_sectors(self.data_size)
     }
     /// MDV size
     pub fn mdv_size(&self) -> Sectors {
@@ -757,7 +757,9 @@ impl ThinPool {
     // in use on the data device.
     pub fn total_physical_used(&self) -> StratisResult<Sectors> {
         let data_dev_used = match self.thin_pool.status(get_dm())? {
-            dm::ThinPoolStatus::Working(ref status) => *status.usage.used_data * DATA_BLOCK_SIZE,
+            dm::ThinPoolStatus::Working(ref status) => {
+                datablocks_to_sectors(status.usage.used_data)
+            }
             _ => {
                 let err_msg = "thin pool failed, could not obtain usage";
                 return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
@@ -1266,7 +1268,7 @@ mod tests {
         pool.extend_thin_data(
             pool_uuid,
             &mut backstore,
-            *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE,
+            datablocks_to_sectors(INITIAL_DATA_SIZE),
         ).unwrap();
 
         let (_, snapshot_filesystem) =
@@ -1554,18 +1556,18 @@ mod tests {
         {
             let mut f = OpenOptions::new().write(true).open(devnode).unwrap();
             // Write 1 more sector than is initially allocated to a pool
-            let write_size = *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE + Sectors(1);
+            let write_size = datablocks_to_sectors(INITIAL_DATA_SIZE) + Sectors(1);
             let buf = &[1u8; SECTOR_SIZE];
             for i in 0..*write_size {
                 f.write_all(buf).unwrap();
                 // Simulate handling a DM event by extending the pool when
                 // the amount of free space in pool has decreased to the
                 // DATA_LOWATER value.
-                if i == *(*(INITIAL_DATA_SIZE - DATA_LOWATER) * DATA_BLOCK_SIZE) {
+                if i == *(datablocks_to_sectors(INITIAL_DATA_SIZE - DATA_LOWATER)) {
                     pool.extend_thin_data(
                         pool_uuid,
                         &mut backstore,
-                        *INITIAL_DATA_SIZE * DATA_BLOCK_SIZE,
+                        datablocks_to_sectors(INITIAL_DATA_SIZE),
                     ).unwrap();
                 }
             }

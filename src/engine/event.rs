@@ -77,7 +77,7 @@ pub fn get_engine_listener_list() -> &'static EngineListenerList {
         INIT.call_once(|| ENGINE_LISTENER_LIST = Some(EngineListenerList::new()));
         match ENGINE_LISTENER_LIST {
             Some(ref mut ell) => ell,
-            _ => panic!("ENGINE_LISTENER_LIST.is_some()"),
+            _ => panic!("ENGINE_LISTENER_LIST is None"),
         }
     }
 }
@@ -87,7 +87,7 @@ pub fn get_engine_listener_list_mut() -> &'static mut EngineListenerList {
         INIT.call_once(|| ENGINE_LISTENER_LIST = Some(EngineListenerList::new()));
         match ENGINE_LISTENER_LIST {
             Some(ref mut ell) => ell,
-            _ => panic!("ENGINE_LISTENER_LIST.is_some()"),
+            _ => panic!("ENGINE_LISTENER_LIST is None"),
         }
     }
 }

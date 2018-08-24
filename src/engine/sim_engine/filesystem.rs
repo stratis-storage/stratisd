@@ -47,10 +47,6 @@ impl Filesystem for SimFilesystem {
         Ok(Bytes(12345678))
     }
 
-    fn mount_points(&self) -> StratisResult<Vec<PathBuf>> {
-        Ok(Vec::new())
-    }
-
     fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
         self.dbus_path = path
     }

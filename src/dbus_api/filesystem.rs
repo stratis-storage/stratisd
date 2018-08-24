@@ -66,11 +66,6 @@ pub fn create_dbus_filesystem<'a>(
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_filesystem_used);
 
-    let mount_points_property = f.property::<&Vec<String>, _>("MountPoints", ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
-        .on_get(get_filesystem_mount_points);
-
     let object_name = format!(
         "{}/{}",
         STRATIS_BASE_PATH,
@@ -89,8 +84,7 @@ pub fn create_dbus_filesystem<'a>(
                 .add_p(pool_property)
                 .add_p(uuid_property)
                 .add_p(created_property)
-                .add_p(used_property)
-                .add_p(mount_points_property),
+                .add_p(used_property),
         );
 
     let path = object_path.get_name().to_owned();
@@ -234,21 +228,5 @@ fn get_filesystem_used(
         fs.used()
             .map(|v| (*v).to_string())
             .map_err(|_| MethodErr::failed(&"fs used() engine call failed".to_owned()))
-    })
-}
-
-/// Get all filesystem mount points
-fn get_filesystem_mount_points(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-) -> Result<(), MethodErr> {
-    get_filesystem_property(i, p, |(_, _, fs)| {
-        fs.mount_points()
-            .map(|vec| {
-                vec.iter()
-                    .map(|elem| format!("{}", elem.display()))
-                    .collect::<Vec<_>>()
-            })
-            .map_err(|_| MethodErr::failed(&"mount_points() engine call failed".to_owned()))
     })
 }

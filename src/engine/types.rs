@@ -34,7 +34,7 @@ pub enum BlockDevState {
 
 impl BlockDevState {
     pub fn to_dbus_value(&self) -> u16 {
-        match self {
+        match *self {
             BlockDevState::Missing => 0,
             BlockDevState::Bad => 1,
             BlockDevState::Spare => 2,

@@ -14,8 +14,7 @@ use super::super::engine::{Engine, Eventable, Pool};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
-use super::backstore::device::is_stratis_device;
-use super::backstore::{find_all, get_metadata};
+use super::backstore::{find_all, get_metadata, identify, DevOwnership};
 #[cfg(test)]
 use super::cleanup::teardown_pools;
 use super::cmd::verify_binaries;
@@ -189,7 +188,10 @@ impl Engine for StratEngine {
         device: Device,
         dev_node: PathBuf,
     ) -> StratisResult<Option<PoolUuid>> {
-        let pool_uuid = if let Some(pool_uuid) = is_stratis_device(&dev_node)? {
+        let pool_uuid = if let Some(pool_uuid) = match identify(&dev_node)? {
+            DevOwnership::Ours(pool_uuid, _) => Some(pool_uuid),
+            _ => None,
+        } {
             if self.pools.contains_uuid(pool_uuid) {
                 // TODO: Handle the case where we have found a device for an already active pool
                 // ref. https://github.com/stratis-storage/stratisd/issues/748

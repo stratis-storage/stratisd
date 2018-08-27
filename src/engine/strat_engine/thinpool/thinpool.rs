@@ -205,9 +205,8 @@ pub struct ThinPool {
     backstore_device: Device,
     pool_state: PoolState,
     free_space_state: FreeSpaceState,
-    /// The amount of space on the data device above the low water mark the
-    /// last time the size of data device was checked.
-    data_excess: DataBlocks,
+    /// The current value of the low water mark
+    data_low_water: DataBlocks,
 }
 
 impl ThinPool {
@@ -288,9 +287,6 @@ impl ThinPool {
             DATA_LOWATER,
         )?;
 
-
-        let data_excess = sectors_to_datablocks(thinpool_dev.size()) - DATA_LOWATER;
-
         Ok(ThinPool {
             thin_pool: thinpool_dev,
             meta_segments: vec![meta_segments],
@@ -303,7 +299,7 @@ impl ThinPool {
             backstore_device,
             pool_state: PoolState::Good,
             free_space_state: FreeSpaceState::Good,
-            data_excess,
+            data_low_water: DATA_LOWATER,
         })
     }
 
@@ -383,7 +379,6 @@ impl ThinPool {
         }
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
-        let data_excess = sectors_to_datablocks(thinpool_dev.size()) - DATA_LOWATER;
         Ok(ThinPool {
             thin_pool: thinpool_dev,
             meta_segments,
@@ -396,7 +391,7 @@ impl ThinPool {
             backstore_device,
             pool_state: PoolState::Good,
             free_space_state: FreeSpaceState::Good,
-            data_excess,
+            data_low_water: DATA_LOWATER,
         })
     }
 
@@ -488,7 +483,7 @@ impl ThinPool {
 
                 if let Some(request) = calculate_data_request(
                     datablocks_to_sectors(usage.used_data),
-                    datablocks_to_sectors(self.data_excess),
+                    datablocks_to_sectors(usage.total_data - self.data_low_water),
                 ) {
                     info!("Requesting extending data device by {}", request,);
 
@@ -531,7 +526,7 @@ impl ThinPool {
                         data_dev_size,
                         sectors_to_datablocks(backstore.available()),
                     );
-                    self.data_excess = data_dev_size - lowater;
+                    self.data_low_water = lowater;
                     self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
                     self.resume()?;
                 }

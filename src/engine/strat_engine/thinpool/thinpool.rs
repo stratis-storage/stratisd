@@ -168,18 +168,6 @@ enum FreeSpaceState {
     Crit,
 }
 
-/// Return a value from 0 to 100 that is the percentage that "used" makes up
-/// in "total".
-fn used_pct(used: u64, total: u64) -> u8 {
-    assert!(total >= used);
-    let mut val = (used * 100) / total;
-    if (used * 100) % total != 0 {
-        val += 1; // round up
-    }
-    assert!(val <= 100);
-    val as u8
-}
-
 /// A ThinPool struct contains the thinpool itself, the spare
 /// segments for its metadata device, and the filesystems and filesystem
 /// metadata associated with it.
@@ -560,6 +548,18 @@ impl ThinPool {
         used: DataBlocks,
         available: DataBlocks,
     ) -> StratisResult<FreeSpaceState> {
+        // Return a value from 0 to 100 that is the percentage that "used"
+        // makes up in "total".
+        fn used_pct(used: u64, total: u64) -> u8 {
+            assert!(total >= used);
+            let mut val = (used * 100) / total;
+            if (used * 100) % total != 0 {
+                val += 1; // round up
+            }
+            assert!(val <= 100);
+            val as u8
+        }
+
         // Select the new state based on the overall_used_pct quantity.
         fn select_state(overall_used_pct: u8) -> FreeSpaceState {
             match overall_used_pct {

@@ -14,6 +14,7 @@ use devicemapper::{Device, Sectors};
 use stratis::StratisResult;
 
 use super::super::super::engine::BlockDev;
+use super::super::super::event::{get_engine_listener_list, EngineEvent};
 use super::super::super::types::{BlockDevState, DevUuid, MaybeDbusPath, PoolUuid};
 
 use super::super::serde_structs::{BlockDevSave, Recordable};
@@ -107,7 +108,15 @@ impl StratBlockDev {
     /// sectors are needed than our capacity, return partial results.
     /// If all sectors are desired, use available() method to get all.
     pub fn request_space(&mut self, size: Sectors) -> (Sectors, Vec<(Sectors, Sectors)>) {
-        self.used.request(size)
+        let prev_state = self.state();
+        let result = self.used.request(size);
+        if result.0 > Sectors(0) && prev_state != BlockDevState::InUse {
+            get_engine_listener_list().notify(&EngineEvent::BlockdevStateChanged {
+                dbus_path: self.get_dbus_path(),
+                state: BlockDevState::InUse,
+            });
+        }
+        result
     }
 
     // ALL SIZE METHODS

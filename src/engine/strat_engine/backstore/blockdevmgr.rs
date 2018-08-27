@@ -19,9 +19,7 @@ use devicemapper::{
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::super::engine::BlockDev;
-use super::super::super::event::{get_engine_listener_list, EngineEvent};
-use super::super::super::types::{BlockDevState, DevUuid, PoolUuid};
+use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::serde_structs::{BlockDevSave, Recordable};
 
@@ -246,14 +244,7 @@ impl BlockDevMgr {
                     break;
                 }
 
-                let prev_state = bd.state();
                 let (gotten, r_segs) = bd.request_space(needed - alloc);
-                if gotten > Sectors(0) && prev_state != BlockDevState::InUse {
-                    get_engine_listener_list().notify(&EngineEvent::BlockdevStateChanged {
-                        dbus_path: bd.get_dbus_path(),
-                        state: BlockDevState::InUse,
-                    });
-                }
                 let blkdev_segs = r_segs.into_iter().map(|(start, length)| {
                     BlkDevSegment::new(bd.uuid(), Segment::new(*bd.device(), start, length))
                 });

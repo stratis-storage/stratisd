@@ -5,9 +5,11 @@
 #[cfg(feature = "dbus_enabled")]
 use dbus;
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::vec::Vec;
 
 use serde_json;
@@ -15,12 +17,12 @@ use uuid::Uuid;
 
 use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
-
 use super::super::engine::{BlockDev, Filesystem, Pool};
+use super::super::event::{EngineListener, EngineListenerList};
 use super::super::types::{
     BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction,
 };
+use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::backstore::{Backstore, MIN_MDA_SECTORS};
 use super::serde_structs::{FlexDevsSave, PoolSave, Recordable};
@@ -115,6 +117,7 @@ pub struct StratPool {
     thin_pool: ThinPool,
     #[cfg(feature = "dbus_enabled")]
     dbus_path: Option<dbus::Path<'static>>,
+    listeners: EngineListenerList,
 }
 
 impl StratPool {
@@ -149,6 +152,7 @@ impl StratPool {
             backstore,
             redundancy,
             thin_pool: thinpool,
+            listeners: EngineListenerList::new(),
             #[cfg(feature = "dbus_enabled")]
             dbus_path: None,
         };
@@ -187,6 +191,7 @@ impl StratPool {
                 backstore,
                 redundancy: Redundancy::NONE,
                 thin_pool: thinpool,
+                listeners: EngineListenerList::new(),
                 #[cfg(feature = "dbus_enabled")]
                 dbus_path: None,
             },
@@ -410,6 +415,11 @@ impl Pool for StratPool {
         } else {
             Ok(false)
         }
+    }
+
+    fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>) {
+        self.thin_pool.register_listener(Rc::clone(&listener));
+        self.listeners.register_listener(listener);
     }
 
     #[cfg(feature = "dbus_enabled")]

@@ -20,6 +20,7 @@ use devicemapper::{Sectors, IEC};
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
+use super::super::event::{EngineListener, EngineListenerList};
 use super::super::structures::Table;
 use super::super::types::{
     BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction,
@@ -36,6 +37,7 @@ pub struct SimPool {
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
+    listeners: EngineListenerList,
     #[cfg(feature = "dbus_enabled")]
     dbus_path: Option<dbus::Path<'static>>,
 }
@@ -56,6 +58,7 @@ impl SimPool {
                 filesystems: Table::default(),
                 redundancy,
                 rdm: Rc::clone(rdm),
+                listeners: EngineListenerList::new(),
                 #[cfg(feature = "dbus_enabled")]
                 dbus_path: None,
             },
@@ -280,6 +283,10 @@ impl Pool for SimPool {
             },
             |(_, b)| Ok(b.set_user_info(user_info)),
         )
+    }
+
+    fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>) {
+        self.listeners.register_listener(listener);
     }
 
     #[cfg(feature = "dbus_enabled")]

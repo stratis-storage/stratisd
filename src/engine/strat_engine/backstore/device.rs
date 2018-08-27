@@ -54,11 +54,13 @@ pub enum DevOwnership {
     Theirs(String), // String is something useful to give back to end user about what's on device
 }
 
-/// Returns true if a device has no signature, yes this is a bit convoluted.  Logic gleaned from
-/// blivet library.
+/// Returns true if a device has no signature and is not one of the paths of a multipath device,
+/// yes this is a bit convoluted.  Logic gleaned from blivet library.
 fn empty(device: &HashMap<String, String>) -> bool {
-    !((device.contains_key("ID_PART_TABLE_TYPE") && !device.contains_key("ID_PART_ENTRY_DISK"))
-        || device.contains_key("ID_FS_USAGE"))
+    !device.contains_key("DM_MULTIPATH_DEVICE_PATH")
+        && !((device.contains_key("ID_PART_TABLE_TYPE")
+            && !device.contains_key("ID_PART_ENTRY_DISK"))
+            || device.contains_key("ID_FS_USAGE"))
 }
 
 /// Generate some kind of human readable text about what's on a device.
@@ -78,9 +80,7 @@ fn signature(device: &HashMap<String, String>) -> String {
 /// Determine what a block device is used for.
 pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
     if let Some(device) = get_udev_block_device(devnode)? {
-        if device.contains_key("DM_MULTIPATH_DEVICE_PATH") {
-            Ok(DevOwnership::Theirs(String::from("multipath path")))
-        } else if empty(&device) {
+        if empty(&device) {
             // The device is either really empty or we are running on a distribution that hasn't
             // picked up the latest libblkid, lets read down to the device and find out for sure.
             // TODO: At some point in the future we can remove this and just return Unowned.
@@ -91,6 +91,8 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
             } else {
                 Ok(DevOwnership::Unowned)
             }
+        } else if device.contains_key("DM_MULTIPATH_DEVICE_PATH") {
+            Ok(DevOwnership::Theirs(String::from("multipath path")))
         } else if device.contains_key("ID_FS_TYPE") && device["ID_FS_TYPE"] == "stratis" {
             // Device is ours, but we don't get everything we need from udev db, lets go to disk.
             if let Some((pool_uuid, device_uuid)) = StaticHeader::device_identifiers(

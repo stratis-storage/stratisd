@@ -420,8 +420,13 @@ impl ThinPool {
         // Calculate amount to request for data device.
         // Return None if data device does not need to be extended.
         // Return request, if it exists, is always 1 GiB.
-        fn calculate_data_request(used: Sectors, data_excess: Sectors) -> Option<Sectors> {
-            if used >= data_excess {
+        fn calculate_data_request(
+            total: Sectors,
+            used: Sectors,
+            low_water: Sectors,
+        ) -> Option<Sectors> {
+            let remaining = total - used;
+            if remaining <= low_water {
                 Some(Bytes(IEC::Gi).sectors())
             } else {
                 None
@@ -482,8 +487,9 @@ impl ThinPool {
                 }
 
                 if let Some(request) = calculate_data_request(
+                    datablocks_to_sectors(usage.total_data),
                     datablocks_to_sectors(usage.used_data),
-                    datablocks_to_sectors(usage.total_data - self.data_low_water),
+                    datablocks_to_sectors(self.data_low_water),
                 ) {
                     info!("Requesting extending data device by {}", request,);
 

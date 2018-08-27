@@ -505,9 +505,8 @@ impl ThinPool {
                     )?;
 
                     // Trigger next event depending on pool space state
-                    let data_dev_size = usage.total_data + extend_size;
                     let lowater = self.calc_lowater(
-                        data_dev_size,
+                        usage.total_data + extend_size,
                         sectors_to_datablocks(backstore.available()),
                     );
                     self.thin_pool.set_low_water_mark(get_dm(), lowater)?;

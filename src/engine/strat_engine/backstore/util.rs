@@ -59,7 +59,7 @@ fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
                 && dev.property_value("ID_PART_ENTRY_DISK").is_none())
                 || dev.property_value("ID_FS_USAGE").is_some())
         })
-        .map(|i| i.devnode().expect("block devices have devnode").into())
+        .filter_map(|i| i.devnode().map(|d| d.into()))
         .collect())
 }
 
@@ -72,7 +72,7 @@ pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
 
     let devices: Vec<PathBuf> = enumerator
         .scan_devices()?
-        .map(|x| x.devnode().expect("block devices have devnode").into())
+        .filter_map(|i| i.devnode().map(|d| d.into()))
         .collect();
 
     if devices.is_empty() {

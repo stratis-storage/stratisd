@@ -181,6 +181,22 @@ impl EventHandler {
 impl EngineListener for EventHandler {
     fn notify(&self, event: &EngineEvent) {
         match event {
+            &EngineEvent::BlockdevStateChanged { dbus_path, state } => {
+                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+                    prop_changed_dispatch(
+                        &self.dbus_conn.borrow(),
+                        consts::BLOCKDEV_STATE_PROP,
+                        state.to_dbus_value(),
+                        &dbus_path,
+                    ).unwrap_or_else(|()| {
+                        error!(
+                            "BlockdevStateChanged: {} state: {} failed to send dbus update.",
+                            dbus_path,
+                            state.to_dbus_value(),
+                        );
+                    });
+                }
+            }
             &EngineEvent::FilesystemRenamed {
                 dbus_path,
                 from,
@@ -195,25 +211,6 @@ impl EngineListener for EventHandler {
                     ).unwrap_or_else(|()| {
                         error!(
                             "FilesystemRenamed: {} from: {} to: {} failed to send dbus update.",
-                            dbus_path, from, to,
-                        );
-                    });
-                }
-            }
-            &EngineEvent::PoolRenamed {
-                dbus_path,
-                from,
-                to,
-            } => {
-                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
-                        consts::POOL_NAME_PROP,
-                        to.to_owned(),
-                        &dbus_path,
-                    ).unwrap_or_else(|()| {
-                        error!(
-                            "PoolRenamed: {} from: {} to: {} failed to send dbus update.",
                             dbus_path, from, to,
                         );
                     });
@@ -234,18 +231,21 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
-            &EngineEvent::BlockdevStateChanged { dbus_path, state } => {
+            &EngineEvent::PoolRenamed {
+                dbus_path,
+                from,
+                to,
+            } => {
                 if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
-                        consts::BLOCKDEV_STATE_PROP,
-                        state.to_dbus_value(),
+                        consts::POOL_NAME_PROP,
+                        to.to_owned(),
                         &dbus_path,
                     ).unwrap_or_else(|()| {
                         error!(
-                            "BlockdevStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path,
-                            state.to_dbus_value(),
+                            "PoolRenamed: {} from: {} to: {} failed to send dbus update.",
+                            dbus_path, from, to,
                         );
                     });
                 }

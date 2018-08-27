@@ -4,6 +4,7 @@
 
 // Code to handle management of a pool's thinpool device.
 
+use std;
 use std::borrow::BorrowMut;
 
 use uuid::Uuid;
@@ -635,6 +636,14 @@ impl ThinPool {
 
     /// Calculate new low water based on the current thinpool data device size
     /// and the amount of unused sectors available in the cap device.
+    /// Postcondition:
+    /// result == max(M * (data_dev_size + available) - available, L)
+    /// equivalently:
+    /// result == max(M * data_dev_size - (1 - M) * available, L)
+    /// where M <= (100 - SPACE_WARN_PCT)/100 if self.free_space_state == Good
+    ///            (100 - SPACE_CRIT_PCT)/100  if self.free_space_state != Good
+    ///       L = DATA_LOWATER if self.free_space_state == Good
+    ///           throttle rate if self.free_space_sate != Good
     fn calc_lowater(&mut self, data_dev_size: DataBlocks, available: DataBlocks) -> DataBlocks {
         let total = data_dev_size + available;
         info!(
@@ -642,26 +651,29 @@ impl ThinPool {
             data_dev_size, available, total
         );
 
-        // Make it be the higher of point for next extension event and point
-        // for FreeSpaceState change
         match self.free_space_state {
             FreeSpaceState::Good => {
                 let warn_lowat_for_total = calc_data_lowater(SPACE_WARN_PCT, total);
-                // DATA_LOWATER relative to end of data_dev_size, so add
-                // 'available' for correct comparison
+                assert!(DataBlocks(std::u64::MAX) - available >= DATA_LOWATER);
+
+                // WARNING: Do not alter this if-expression to a max-expression.
+                // Doing so would invalidate the assertion below.
                 if DATA_LOWATER + available > warn_lowat_for_total {
                     DATA_LOWATER
                 } else {
+                    assert!(warn_lowat_for_total >= available);
                     warn_lowat_for_total - available
                 }
             }
             _ => {
                 let crit_lowat_for_total = calc_data_lowater(SPACE_CRIT_PCT, total);
-                // We're throttled, so can set a tighter event and still get
-                // called before out of space
+                assert!(DataBlocks(std::u64::MAX) - available >= THROTTLE_BLOCKS_PER_SEC);
+                // WARNING: Do not alter this if-expression to a max-expression.
+                // Doing so would invalidate the assertion below.
                 if THROTTLE_BLOCKS_PER_SEC + available > crit_lowat_for_total {
                     THROTTLE_BLOCKS_PER_SEC
                 } else {
+                    assert!(crit_lowat_for_total >= available);
                     crit_lowat_for_total - available
                 }
             }

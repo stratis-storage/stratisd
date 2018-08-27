@@ -187,8 +187,6 @@ pub struct ThinPool {
     backstore_device: Device,
     pool_state: PoolState,
     free_space_state: FreeSpaceState,
-    /// The current value of the low water mark
-    data_low_water: DataBlocks,
 }
 
 impl ThinPool {
@@ -281,7 +279,6 @@ impl ThinPool {
             backstore_device,
             pool_state: PoolState::Good,
             free_space_state: FreeSpaceState::Good,
-            data_low_water: DATA_LOWATER,
         })
     }
 
@@ -373,7 +370,6 @@ impl ThinPool {
             backstore_device,
             pool_state: PoolState::Good,
             free_space_state: FreeSpaceState::Good,
-            data_low_water: DATA_LOWATER,
         })
     }
 
@@ -471,7 +467,7 @@ impl ThinPool {
                 if let Some(request) = calculate_data_request(
                     datablocks_to_sectors(usage.total_data),
                     datablocks_to_sectors(usage.used_data),
-                    datablocks_to_sectors(self.data_low_water),
+                    datablocks_to_sectors(self.thin_pool.table().table.params.low_water_mark),
                 ) {
                     info!("Requesting extending data device by {}", request,);
 
@@ -514,7 +510,6 @@ impl ThinPool {
                         data_dev_size,
                         sectors_to_datablocks(backstore.available()),
                     );
-                    self.data_low_water = lowater;
                     self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
                     self.resume()?;
                 }

@@ -124,6 +124,62 @@ fn coalesce_segs(
     segments
 }
 
+/// Calculate new low water based on the current thinpool data device size
+/// and the amount of unused sectors available in the cap device.
+/// Postcondition:
+/// result == max(M * (data_dev_size + available) - available, L)
+/// equivalently:
+/// result == max(M * data_dev_size - (1 - M) * available, L)
+/// where M <= (100 - SPACE_WARN_PCT)/100 if self.free_space_state == Good
+///            (100 - SPACE_CRIT_PCT)/100  if self.free_space_state != Good
+///       L = DATA_LOWATER if self.free_space_state == Good
+///           throttle rate if self.free_space_state != Good
+fn calc_lowater(
+    data_dev_size: DataBlocks,
+    available: DataBlocks,
+    free_space_state: FreeSpaceState,
+) -> DataBlocks {
+    // Calculate what to set lowater to, to achieve
+    // "event when XX% of the data device is used"
+    fn calc_data_lowater(percent_used: u8, total: DataBlocks) -> DataBlocks {
+        assert!(percent_used <= 100);
+        total - ((total * percent_used) / 100u8)
+    }
+
+    let total = data_dev_size + available;
+    info!(
+        "data device size reported by DM {} unused sectors available in cap device {} sum {}",
+        data_dev_size, available, total
+    );
+
+    match free_space_state {
+        FreeSpaceState::Good => {
+            let warn_lowat_for_total = calc_data_lowater(SPACE_WARN_PCT, total);
+            assert!(DataBlocks(std::u64::MAX) - available >= DATA_LOWATER);
+
+            // WARNING: Do not alter this if-expression to a max-expression.
+            // Doing so would invalidate the assertion below.
+            if DATA_LOWATER + available > warn_lowat_for_total {
+                DATA_LOWATER
+            } else {
+                assert!(warn_lowat_for_total >= available);
+                warn_lowat_for_total - available
+            }
+        }
+        _ => {
+            let crit_lowat_for_total = calc_data_lowater(SPACE_CRIT_PCT, total);
+            assert!(DataBlocks(std::u64::MAX) - available >= THROTTLE_BLOCKS_PER_SEC);
+            // WARNING: Do not alter this if-expression to a max-expression.
+            // Doing so would invalidate the assertion below.
+            if THROTTLE_BLOCKS_PER_SEC + available > crit_lowat_for_total {
+                THROTTLE_BLOCKS_PER_SEC
+            } else {
+                assert!(crit_lowat_for_total >= available);
+                crit_lowat_for_total - available
+            }
+        }
+    }
+}
 pub struct ThinPoolSizeParams {
     meta_size: MetaBlocks,
     data_size: DataBlocks,
@@ -257,6 +313,8 @@ impl ThinPool {
         let mdv = MetadataVol::initialize(pool_uuid, mdv_dev)?;
 
         let (dm_name, dm_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
+
+        let (free_space_state, data_dev_size) = (FreeSpaceState::Good, data_dev.size());
         let thinpool_dev = ThinPoolDev::new(
             get_dm(),
             &dm_name,
@@ -264,7 +322,11 @@ impl ThinPool {
             meta_dev,
             data_dev,
             data_block_size,
-            DATA_LOWATER,
+            calc_lowater(
+                sectors_to_datablocks(data_dev_size),
+                sectors_to_datablocks(backstore.available()),
+                free_space_state,
+            ),
         )?;
 
         Ok(ThinPool {
@@ -278,7 +340,7 @@ impl ThinPool {
             mdv,
             backstore_device,
             pool_state: PoolState::Good,
-            free_space_state: FreeSpaceState::Good,
+            free_space_state,
         })
     }
 
@@ -319,6 +381,7 @@ impl ThinPool {
             segs_to_table(backstore_device, &data_segments),
         )?;
 
+        let (free_space_state, data_dev_size) = (FreeSpaceState::Good, data_dev.size());
         let thinpool_dev = ThinPoolDev::setup(
             get_dm(),
             &thinpool_name,
@@ -326,7 +389,11 @@ impl ThinPool {
             meta_dev,
             data_dev,
             thin_pool_save.data_block_size,
-            DATA_LOWATER,
+            calc_lowater(
+                sectors_to_datablocks(data_dev_size),
+                sectors_to_datablocks(backstore.available()),
+                free_space_state,
+            ),
         )?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);
@@ -369,7 +436,7 @@ impl ThinPool {
             mdv,
             backstore_device,
             pool_state: PoolState::Good,
-            free_space_state: FreeSpaceState::Good,
+            free_space_state,
         })
     }
 
@@ -505,9 +572,10 @@ impl ThinPool {
                     )?;
 
                     // Trigger next event depending on pool space state
-                    let lowater = self.calc_lowater(
+                    let lowater = calc_lowater(
                         usage.total_data + extend_size,
                         sectors_to_datablocks(backstore.available()),
+                        self.free_space_state,
                     );
                     self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
                     self.resume()?;
@@ -619,59 +687,6 @@ impl ThinPool {
         };
 
         Ok(new_state)
-    }
-
-    /// Calculate new low water based on the current thinpool data device size
-    /// and the amount of unused sectors available in the cap device.
-    /// Postcondition:
-    /// result == max(M * (data_dev_size + available) - available, L)
-    /// equivalently:
-    /// result == max(M * data_dev_size - (1 - M) * available, L)
-    /// where M <= (100 - SPACE_WARN_PCT)/100 if self.free_space_state == Good
-    ///            (100 - SPACE_CRIT_PCT)/100  if self.free_space_state != Good
-    ///       L = DATA_LOWATER if self.free_space_state == Good
-    ///           throttle rate if self.free_space_sate != Good
-    fn calc_lowater(&mut self, data_dev_size: DataBlocks, available: DataBlocks) -> DataBlocks {
-        // Calculate what to set lowater to, to achieve
-        // "event when XX% of the data device is used"
-        fn calc_data_lowater(percent_used: u8, total: DataBlocks) -> DataBlocks {
-            assert!(percent_used <= 100);
-            total - ((total * percent_used) / 100u8)
-        }
-
-        let total = data_dev_size + available;
-        info!(
-            "data device size reported by DM {} unused sectors available in cap device {} sum {}",
-            data_dev_size, available, total
-        );
-
-        match self.free_space_state {
-            FreeSpaceState::Good => {
-                let warn_lowat_for_total = calc_data_lowater(SPACE_WARN_PCT, total);
-                assert!(DataBlocks(std::u64::MAX) - available >= DATA_LOWATER);
-
-                // WARNING: Do not alter this if-expression to a max-expression.
-                // Doing so would invalidate the assertion below.
-                if DATA_LOWATER + available > warn_lowat_for_total {
-                    DATA_LOWATER
-                } else {
-                    assert!(warn_lowat_for_total >= available);
-                    warn_lowat_for_total - available
-                }
-            }
-            _ => {
-                let crit_lowat_for_total = calc_data_lowater(SPACE_CRIT_PCT, total);
-                assert!(DataBlocks(std::u64::MAX) - available >= THROTTLE_BLOCKS_PER_SEC);
-                // WARNING: Do not alter this if-expression to a max-expression.
-                // Doing so would invalidate the assertion below.
-                if THROTTLE_BLOCKS_PER_SEC + available > crit_lowat_for_total {
-                    THROTTLE_BLOCKS_PER_SEC
-                } else {
-                    assert!(crit_lowat_for_total >= available);
-                    crit_lowat_for_total - available
-                }
-            }
-        }
     }
 
     /// Tear down the components managed here: filesystems, the MDV,

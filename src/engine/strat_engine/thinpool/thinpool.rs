@@ -180,13 +180,6 @@ fn used_pct(used: u64, total: u64) -> u8 {
     val as u8
 }
 
-// Calculate what to set lowater to, to achieve "event when XX% of the data
-// device is used"
-fn calc_data_lowater(percent_used: u8, total: DataBlocks) -> DataBlocks {
-    assert!(percent_used <= 100);
-    total - ((total * percent_used) / 100u8)
-}
-
 /// A ThinPool struct contains the thinpool itself, the spare
 /// segments for its metadata device, and the filesystems and filesystem
 /// metadata associated with it.
@@ -645,6 +638,13 @@ impl ThinPool {
     ///       L = DATA_LOWATER if self.free_space_state == Good
     ///           throttle rate if self.free_space_sate != Good
     fn calc_lowater(&mut self, data_dev_size: DataBlocks, available: DataBlocks) -> DataBlocks {
+        // Calculate what to set lowater to, to achieve
+        // "event when XX% of the data device is used"
+        fn calc_data_lowater(percent_used: u8, total: DataBlocks) -> DataBlocks {
+            assert!(percent_used <= 100);
+            total - ((total * percent_used) / 100u8)
+        }
+
         let total = data_dev_size + available;
         info!(
             "data device size reported by DM {} unused sectors available in cap device {} sum {}",

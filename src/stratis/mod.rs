@@ -4,10 +4,8 @@
 
 pub use self::errors::{ErrorEnum, StratisError, StratisResult};
 pub use self::stratis::VERSION;
-pub use self::util::alarm;
 
 pub mod buff_log;
 mod errors;
 #[allow(module_inception)]
 mod stratis;
-mod util;

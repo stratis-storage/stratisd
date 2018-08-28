@@ -147,11 +147,6 @@ fn calc_lowater(
     }
 
     let total = data_dev_size + available;
-    info!(
-        "data device size reported by DM {} unused sectors available in cap device {} sum {}",
-        data_dev_size, available, total
-    );
-
     match free_space_state {
         FreeSpaceState::Good => {
             let warn_lowat_for_total = calc_data_lowater(SPACE_WARN_PCT, total);

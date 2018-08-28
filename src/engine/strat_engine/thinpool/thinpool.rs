@@ -539,14 +539,6 @@ impl ThinPool {
                             }
                         };
 
-                    info!(
-                        "used data {} total data {} extend size {} available {}",
-                        usage.used_data,
-                        usage.total_data,
-                        extend_size,
-                        sectors_to_datablocks(backstore.available())
-                    );
-
                     // Update pool space state
                     self.free_space_state = self.free_space_check(
                         usage.used_data,

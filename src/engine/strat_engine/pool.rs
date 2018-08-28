@@ -137,13 +137,16 @@ impl StratPool {
             DATA_BLOCK_SIZE,
             &mut backstore,
         );
-        let thinpool = match thinpool {
+
+        let mut thinpool = match thinpool {
             Ok(thinpool) => thinpool,
             Err(err) => {
                 let _ = backstore.destroy();
                 return Err(err);
             }
         };
+
+        thinpool.check(pool_uuid, &mut backstore)?;
 
         let mut pool = StratPool {
             backstore,
@@ -174,23 +177,30 @@ impl StratPool {
             None,
             next_index(&metadata.flex_devs),
         )?;
-        let thinpool = ThinPool::setup(
+        let mut thinpool = ThinPool::setup(
             uuid,
             &metadata.thinpool_dev,
             &metadata.flex_devs,
-            &mut backstore,
+            &backstore,
         )?;
 
-        Ok((
-            Name::new(metadata.name.to_owned()),
-            StratPool {
-                backstore,
-                redundancy: Redundancy::NONE,
-                thin_pool: thinpool,
-                #[cfg(feature = "dbus_enabled")]
-                dbus_path: None,
-            },
-        ))
+        let changed = thinpool.check(uuid, &mut backstore)?;
+
+        let mut pool = StratPool {
+            backstore,
+            redundancy: Redundancy::NONE,
+            thin_pool: thinpool,
+            #[cfg(feature = "dbus_enabled")]
+            dbus_path: None,
+        };
+
+        let pool_name = &metadata.name;
+
+        if changed {
+            pool.write_metadata(pool_name)?;
+        }
+
+        Ok((Name::new(pool_name.to_owned()), pool))
     }
 
     /// Write current metadata to pool members.

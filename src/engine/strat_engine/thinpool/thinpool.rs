@@ -520,47 +520,52 @@ impl ThinPool {
                     }
                 }
 
-                if let Some(request) = calculate_extension_request(
-                    datablocks_to_sectors(usage.total_data),
-                    datablocks_to_sectors(usage.used_data),
-                    datablocks_to_sectors(self.thin_pool.table().table.params.low_water_mark),
-                    true,
-                ) {
-                    let extend_size =
-                        match self.extend_thin_data_device(pool_uuid, backstore, request) {
-                            Ok(Sectors(0)) => {
-                                info!("data device fully extended, cannot extend further");
-                                DataBlocks(0)
+                let extend_size = {
+                    match calculate_extension_request(
+                        datablocks_to_sectors(usage.total_data),
+                        datablocks_to_sectors(usage.used_data),
+                        datablocks_to_sectors(self.thin_pool.table().table.params.low_water_mark),
+                        true,
+                    ) {
+                        None => DataBlocks(0),
+                        Some(request) => {
+                            match self.extend_thin_data_device(pool_uuid, backstore, request) {
+                                Ok(Sectors(0)) => {
+                                    info!("data device fully extended, cannot extend further");
+                                    DataBlocks(0)
+                                }
+                                Ok(extend_size) => {
+                                    info!("Extended thin data device by {}", extend_size);
+                                    should_save = true;
+                                    sectors_to_datablocks(extend_size)
+                                }
+                                Err(_) => {
+                                    error!("Thinpool data extend failed! -> BAD");
+                                    self.pool_state = PoolState::Bad;
+                                    DataBlocks(0)
+                                }
                             }
-                            Ok(extend_size) => {
-                                info!("Extended thin data device by {}", extend_size);
-                                should_save = true;
-                                sectors_to_datablocks(extend_size)
-                            }
-                            Err(_) => {
-                                error!("Thinpool data extend failed! -> BAD");
-                                self.pool_state = PoolState::Bad;
-                                DataBlocks(0)
-                            }
-                        };
+                        }
+                    }
+                };
 
-                    // Update pool space state
-                    self.free_space_state = self.free_space_check(
-                        usage.used_data,
-                        usage.total_data - usage.used_data
-                            + extend_size
-                            + sectors_to_datablocks(backstore.available()),
-                    )?;
+                // Update pool space state
+                self.free_space_state = self.free_space_check(
+                    usage.used_data,
+                    usage.total_data - usage.used_data
+                        + extend_size
+                        + sectors_to_datablocks(backstore.available()),
+                )?;
 
-                    // Trigger next event depending on pool space state
-                    let lowater = calc_lowater(
-                        usage.total_data + extend_size,
-                        sectors_to_datablocks(backstore.available()),
-                        self.free_space_state,
-                    );
-                    self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
-                    self.resume()?;
-                }
+                // Trigger next event depending on pool space state
+                let lowater = calc_lowater(
+                    usage.total_data + extend_size,
+                    sectors_to_datablocks(backstore.available()),
+                    self.free_space_state,
+                );
+
+                self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
+                self.resume()?;
             }
             dm::ThinPoolStatus::Fail => {
                 error!("Thinpool status is `fail` -> BAD");

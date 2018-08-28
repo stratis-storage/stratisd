@@ -5,15 +5,18 @@
 #[cfg(feature = "dbus_enabled")]
 use dbus;
 
+use std::cell::RefCell;
 use std::fmt::Debug;
 use std::os::unix::io::RawFd;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Device, Sectors};
 
+use super::event::EngineListener;
 use super::types::{
     BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, RenameAction,
 };
@@ -243,6 +246,9 @@ pub trait Engine: Debug {
 
     /// Notify the engine that an event has occurred on the Eventable.
     fn evented(&mut self) -> StratisResult<()>;
+
+    /// Register a listener for EngineEvent notification
+    fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>);
 }
 
 /// Allows an Engine to include a fd in the event loop. See

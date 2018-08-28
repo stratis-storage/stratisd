@@ -2,8 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::cell::RefCell;
+use std::clone::Clone;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use devicemapper::{Device, DmNameBuf};
 
@@ -11,6 +14,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::devlinks;
 use super::super::engine::{Engine, Eventable, Pool};
+use super::super::event::{EngineEvent, EngineListener, EngineListenerList};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
@@ -95,6 +99,8 @@ pub struct StratEngine {
     // Maps name of DM devices we are watching to the most recent event number
     // we've handled for each
     watched_dev_last_event_nrs: HashMap<DmNameBuf, u32>,
+
+    listeners: EngineListenerList,
 }
 
 impl StratEngine {
@@ -141,6 +147,7 @@ impl StratEngine {
             pools: table,
             incomplete_pools,
             watched_dev_last_event_nrs: HashMap::new(),
+            listeners: EngineListenerList::new(),
         };
 
         devlinks::setup_devlinks(engine.pools().iter())?;
@@ -169,10 +176,13 @@ impl Engine for StratEngine {
             return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
-        let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy, force)?;
+        let (uuid, mut pool) = StratPool::initialize(name, blockdev_paths, redundancy, force)?;
 
         let name = Name::new(name.to_owned());
         devlinks::pool_added(&name)?;
+        for listener in self.listeners.listeners() {
+            pool.register_listener(Rc::clone(listener));
+        }
         self.pools.insert(name, uuid, pool);
         Ok(uuid)
     }
@@ -255,6 +265,13 @@ impl Engine for StratEngine {
             self.pools.insert(old_name, uuid, pool);
             Err(err)
         } else {
+            self.listeners.notify(&EngineEvent::PoolRenamed {
+                #[cfg(feature = "dbus_enabled")]
+                dbus_path: pool.get_dbus_path(),
+                from: &*old_name,
+                to: &*new_name,
+            });
+
             self.pools.insert(new_name.clone(), uuid, pool);
             devlinks::pool_renamed(&old_name, &new_name)?;
             Ok(RenameAction::Renamed)
@@ -314,6 +331,13 @@ impl Engine for StratEngine {
         self.watched_dev_last_event_nrs = device_list;
 
         Ok(())
+    }
+
+    fn register_listener(&mut self, listener: Rc<RefCell<EngineListener>>) {
+        for (_pool_name, _pool_uuid, pool) in &mut self.pools {
+            pool.register_listener(Rc::clone(&listener));
+        }
+        self.listeners.register_listener(listener);
     }
 }
 

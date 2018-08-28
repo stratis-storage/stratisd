@@ -518,7 +518,7 @@ impl ThinPool {
                     usage.used_meta.sectors(),
                     META_LOWATER.sectors(),
                 ) {
-                    match self.extend_thin_meta(pool_uuid, backstore, request) {
+                    match self.extend_thin_sub_device(pool_uuid, backstore, request, false) {
                         Ok(extend_size) => {
                             info!("Extended thin meta device by {}", extend_size);
 
@@ -538,22 +538,23 @@ impl ThinPool {
                 ) {
                     info!("Requesting extending data device by {}", request,);
 
-                    let extend_size = match self.extend_thin_data(pool_uuid, backstore, request) {
-                        Ok(Sectors(0)) => {
-                            info!("data device fully extended, cannot extend further");
-                            DataBlocks(0)
-                        }
-                        Ok(extend_size) => {
-                            info!("Extended thin data device by {}", extend_size);
-                            should_save = true;
-                            sectors_to_datablocks(extend_size)
-                        }
-                        Err(_) => {
-                            error!("Thinpool data extend failed! -> BAD");
-                            self.pool_state = PoolState::Bad;
-                            DataBlocks(0)
-                        }
-                    };
+                    let extend_size =
+                        match self.extend_thin_sub_device(pool_uuid, backstore, request, true) {
+                            Ok(Sectors(0)) => {
+                                info!("data device fully extended, cannot extend further");
+                                DataBlocks(0)
+                            }
+                            Ok(extend_size) => {
+                                info!("Extended thin data device by {}", extend_size);
+                                should_save = true;
+                                sectors_to_datablocks(extend_size)
+                            }
+                            Err(_) => {
+                                error!("Thinpool data extend failed! -> BAD");
+                                self.pool_state = PoolState::Bad;
+                                DataBlocks(0)
+                            }
+                        };
 
                     info!(
                         "used data {} total data {} extend size {} available {}",
@@ -700,67 +701,68 @@ impl ThinPool {
         Ok(())
     }
 
-    /// Extend the thinpool's meta device by amount requested, or a smaller
-    /// amount if requested amount is not available.
-    /// Return the amount the device was extended by.
-    /// Always allocate sectors in increments of meta block size.
-    fn extend_thin_meta(
+    /// Extend the thinpool's data or meta devices. The result is the value
+    /// by which the device is extended which may be less than the requested
+    /// amount. It is guaranteed that the returned amount is a multiple of the
+    /// data block size, for a request for the data device, or the metablock
+    /// size for a request for the meta device.
+    fn extend_thin_sub_device(
         &mut self,
         pool_uuid: PoolUuid,
         backstore: &mut Backstore,
         extend_size: Sectors,
+        data: bool,
     ) -> StratisResult<Sectors> {
-        let backstore_device = self.backstore_device;
-        let min_size = MetaBlocks(1).sectors();
-        if let Some(region) = backstore.request(pool_uuid, extend_size, min_size)? {
-            self.suspend()?;
+        // Extend the thinpool device w/ a new data region if data is true,
+        // else a new metadata region. There may be multiple segments, but they
+        // are all on the same device. Returns an error if any of the
+        // devicemapper operations fails.
+        fn extend(
+            thinpool: &mut ThinPool,
+            device: Device,
+            new_seg: (Sectors, Sectors),
+            data: bool,
+        ) -> StratisResult<()> {
+            thinpool.suspend()?;
 
-            let segments = coalesce_segs(&self.meta_segments, &[region]);
-            self.thin_pool
-                .set_meta_table(get_dm(), segs_to_table(backstore_device, &segments))?;
-            self.thin_pool.resume(get_dm())?;
-            self.meta_segments = segments;
-            self.resume()?;
-            Ok(region.1)
-        } else {
-            info!(
-                "Insufficient space to accommodate metadev request for at least {}",
-                min_size
-            );
-            Ok(Sectors(0))
+            if data {
+                let segments = coalesce_segs(&thinpool.data_segments, &[new_seg]);
+                thinpool
+                    .thin_pool
+                    .set_data_table(get_dm(), segs_to_table(device, &segments))?;
+                thinpool.thin_pool.resume(get_dm())?;
+                thinpool.data_segments = segments;
+            } else {
+                let segments = coalesce_segs(&thinpool.meta_segments, &[new_seg]);
+                thinpool
+                    .thin_pool
+                    .set_meta_table(get_dm(), segs_to_table(device, &segments))?;
+                thinpool.thin_pool.resume(get_dm())?;
+                thinpool.meta_segments = segments;
+            }
+
+            thinpool.resume()?;
+            Ok(())
         }
-    }
 
-    /// Extend the thinpool's data device by amount requested, or a smaller
-    /// amount if requested amount is not available.
-    /// Return the amount the device was extended by.
-    /// Always allocate sectors in increments of DATA_BLOCK_SIZE.
-    fn extend_thin_data(
-        &mut self,
-        pool_uuid: PoolUuid,
-        backstore: &mut Backstore,
-        extend_size: Sectors,
-    ) -> StratisResult<Sectors> {
         let backstore_device = self.backstore_device;
         assert_eq!(backstore.device().expect("thinpool exists, data must have been allocated from backstore, so backstore must have cap device."), backstore_device);
 
-        if let Some(region) = backstore.request(pool_uuid, extend_size, DATA_BLOCK_SIZE)? {
-            self.suspend()?;
+        let modulus = if data {
+            DATA_BLOCK_SIZE
+        } else {
+            MetaBlocks(1).sectors()
+        };
 
-            let segments = coalesce_segs(&self.data_segments, &[region]);
-            self.thin_pool
-                .set_data_table(get_dm(), segs_to_table(backstore_device, &segments))?;
-            self.thin_pool.resume(get_dm())?;
-            self.data_segments = segments;
-
-            self.resume()?;
+        if let Some(region) = backstore.request(pool_uuid, extend_size, modulus)? {
+            extend(self, backstore_device, region, data)?;
             Ok(region.1)
         } else {
-            info!(
-                "Insufficient space to accommodate datadev request for at least {}",
-                DATA_BLOCK_SIZE
+            let err_msg = format!(
+                "Insufficient space to accomodate request for at least {}",
+                modulus
             );
-            Ok(Sectors(0))
+            Err(StratisError::Engine(ErrorEnum::Error, err_msg))
         }
     }
 
@@ -1279,10 +1281,11 @@ mod tests {
         // written above. If we attempt to update the UUID on the snapshot
         // without expanding the pool, the pool will go into out-of-data-space
         // (queue IO) mode, causing the test to fail.
-        pool.extend_thin_data(
+        pool.extend_thin_sub_device(
             pool_uuid,
             &mut backstore,
             datablocks_to_sectors(INITIAL_DATA_SIZE),
+            true,
         ).unwrap();
 
         let (_, snapshot_filesystem) =
@@ -1578,10 +1581,11 @@ mod tests {
                 // the amount of free space in pool has decreased to the
                 // DATA_LOWATER value.
                 if i == *(datablocks_to_sectors(INITIAL_DATA_SIZE - DATA_LOWATER)) {
-                    pool.extend_thin_data(
+                    pool.extend_thin_sub_device(
                         pool_uuid,
                         &mut backstore,
                         datablocks_to_sectors(INITIAL_DATA_SIZE),
+                        true,
                     ).unwrap();
                 }
             }

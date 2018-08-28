@@ -725,8 +725,8 @@ impl ThinPool {
     /// Extend the thinpool's data or meta devices. The result is the value
     /// by which the device is extended which may be less than the requested
     /// amount. It is guaranteed that the returned amount is a multiple of the
-    /// data block size, for a request for the data device, or the metablock
-    /// size for a request for the meta device.
+    /// modulus value. Sets existing_segs to the new value that specifies the
+    /// arrangement of segments on the extended device.
     fn extend_thin_sub_device(
         pool_uuid: PoolUuid,
         thinpooldev: &mut ThinPoolDev,

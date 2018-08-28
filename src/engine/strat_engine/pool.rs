@@ -623,10 +623,6 @@ mod tests {
         ).unwrap();
         invariant(&pool, &name);
 
-        let metadata3 = pool.record(&name);
-
-        assert_eq!(metadata2, metadata3);
-
         let mut buf = [0u8; 10];
         {
             let (_, fs) = pool.get_filesystem(fs_uuid).unwrap();

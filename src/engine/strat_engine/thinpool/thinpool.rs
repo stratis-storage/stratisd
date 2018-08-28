@@ -446,8 +446,6 @@ impl ThinPool {
     /// Returns a bool communicating if a configuration change requiring a
     /// metadata save has been made.
     pub fn check(&mut self, pool_uuid: PoolUuid, backstore: &mut Backstore) -> StratisResult<bool> {
-        #![allow(match_same_arms)]
-
         // Calculate amount to request for data- or meta- device.
         // Return None if device does not need to be expanded.
         // Returned request, if it exists, is always INITIAL_META_SIZE

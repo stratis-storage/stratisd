@@ -167,7 +167,7 @@ impl StratPool {
         devnodes: &HashMap<Device, PathBuf>,
         metadata: &PoolSave,
     ) -> StratisResult<(Name, StratPool)> {
-        let mut backstore = Backstore::setup(
+        let backstore = Backstore::setup(
             uuid,
             &metadata.backstore,
             devnodes,
@@ -178,7 +178,7 @@ impl StratPool {
             uuid,
             &metadata.thinpool_dev,
             &metadata.flex_devs,
-            &mut backstore,
+            &backstore,
         )?;
 
         Ok((

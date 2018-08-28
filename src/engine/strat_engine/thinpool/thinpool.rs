@@ -483,15 +483,10 @@ impl ThinPool {
                 match status.summary {
                     ThinPoolStatusSummary::Good => {}
                     ThinPoolStatusSummary::ReadOnly => {
-                        // TODO: why is pool r/o and how do we get it
-                        // rw again?
                         error!("Thinpool readonly! -> BAD");
                         self.pool_state = PoolState::Bad;
                     }
                     ThinPoolStatusSummary::OutOfSpace => {
-                        // TODO: Add more space if possible, or
-                        // prevent further usage
-                        // Should never happen -- we should be extending first!
                         error!("Thinpool out of space! -> BAD");
                         self.pool_state = PoolState::Bad;
                     }

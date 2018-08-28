@@ -507,8 +507,8 @@ impl ThinPool {
 
                             should_save = true;
                         }
-                        Err(_) => {
-                            error!("Thinpool meta extend failed! -> BAD");
+                        Err(err) => {
+                            error!("Thinpool meta extend failed! -> BAD: reason {:?}", err);
                             self.pool_state = PoolState::Bad;
                         }
                     }
@@ -522,24 +522,24 @@ impl ThinPool {
                         true,
                     ) {
                         None => DataBlocks(0),
-                        Some(request) => {
-                            match self.extend_thin_data_device(pool_uuid, backstore, request) {
-                                Ok(Sectors(0)) => {
-                                    info!("data device fully extended, cannot extend further");
-                                    DataBlocks(0)
-                                }
-                                Ok(extend_size) => {
-                                    info!("Extended thin data device by {}", extend_size);
-                                    should_save = true;
-                                    sectors_to_datablocks(extend_size)
-                                }
-                                Err(_) => {
-                                    error!("Thinpool data extend failed! -> BAD");
-                                    self.pool_state = PoolState::Bad;
-                                    DataBlocks(0)
-                                }
+                        Some(request) => match self.extend_thin_data_device(
+                            pool_uuid, backstore, request,
+                        ) {
+                            Ok(Sectors(0)) => {
+                                info!("data device fully extended, cannot extend further");
+                                DataBlocks(0)
                             }
-                        }
+                            Ok(extend_size) => {
+                                info!("Extended thin data device by {}", extend_size);
+                                should_save = true;
+                                sectors_to_datablocks(extend_size)
+                            }
+                            Err(err) => {
+                                error!("Thinpool data extend failed! -> BAD: reason: {:?}", err);
+                                self.pool_state = PoolState::Bad;
+                                DataBlocks(0)
+                            }
+                        },
                     }
                 };
 

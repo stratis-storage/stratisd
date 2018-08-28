@@ -444,7 +444,10 @@ impl ThinPool {
         // Return None if device does not need to be expanded.
         // Returned request, if it exists, is always INITIAL_META_SIZE
         // for meta device, 1 Gi for data device.
-        fn calculate_request(
+        // Since one event can have many potential causes (meta extension,
+        // data extension OR space state check), check remaining against
+        // low_water to see if our condition was even the cause of the event.
+        fn calculate_extension_request(
             total: Sectors,
             used: Sectors,
             low_water: Sectors,
@@ -492,7 +495,7 @@ impl ThinPool {
                 // against kernel-set meta lowater, and only extend if the
                 // lowater is crossed. There's a kernel patch pending to tell
                 // us this value. For now, assume it is META_LOWATER.
-                if let Some(request) = calculate_request(
+                if let Some(request) = calculate_extension_request(
                     usage.total_meta.sectors(),
                     usage.used_meta.sectors(),
                     META_LOWATER.sectors(),
@@ -511,7 +514,7 @@ impl ThinPool {
                     }
                 }
 
-                if let Some(request) = calculate_request(
+                if let Some(request) = calculate_extension_request(
                     datablocks_to_sectors(usage.total_data),
                     datablocks_to_sectors(usage.used_data),
                     datablocks_to_sectors(self.thin_pool.table().table.params.low_water_mark),

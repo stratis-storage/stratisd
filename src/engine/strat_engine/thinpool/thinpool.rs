@@ -680,27 +680,47 @@ impl ThinPool {
         Ok(())
     }
 
+    /// Extend thinpool's data dev. See extend_thin_sub_device for more info.
     fn extend_thin_data_device(
         &mut self,
         pool_uuid: PoolUuid,
         backstore: &mut Backstore,
         extend_size: Sectors,
     ) -> StratisResult<Sectors> {
-        self.extend_thin_sub_device(pool_uuid, backstore, extend_size, true, DATA_BLOCK_SIZE)
+        info!(
+            "Attempting to extend thinpool data device belonging to pool {} by {}",
+            pool_uuid, extend_size,
+        );
+
+        ThinPool::extend_thin_sub_device(
+            pool_uuid,
+            &mut self.thin_pool,
+            backstore,
+            extend_size,
+            DATA_BLOCK_SIZE,
+            &mut self.data_segments,
+        )
     }
 
+    /// Extend thinpool's meta dev. See extend_thin_sub_device for more info.
     fn extend_thin_meta_device(
         &mut self,
         pool_uuid: PoolUuid,
         backstore: &mut Backstore,
         extend_size: Sectors,
     ) -> StratisResult<Sectors> {
-        self.extend_thin_sub_device(
+        info!(
+            "Attempting to extend thinpool meta device belonging to pool {} by {}",
+            pool_uuid, extend_size,
+        );
+
+        ThinPool::extend_thin_sub_device(
             pool_uuid,
+            &mut self.thin_pool,
             backstore,
             extend_size,
-            false,
             MetaBlocks(1).sectors(),
+            &mut self.meta_segments,
         )
     }
 
@@ -710,57 +730,26 @@ impl ThinPool {
     /// data block size, for a request for the data device, or the metablock
     /// size for a request for the meta device.
     fn extend_thin_sub_device(
-        &mut self,
         pool_uuid: PoolUuid,
+        thinpooldev: &mut ThinPoolDev,
         backstore: &mut Backstore,
         extend_size: Sectors,
-        data: bool,
         modulus: Sectors,
+        existing_segs: &mut Vec<(Sectors, Sectors)>,
     ) -> StratisResult<Sectors> {
-        // Extend the thinpool device w/ a new data region if data is true,
-        // else a new metadata region. There may be multiple segments, but they
-        // are all on the same device. Returns an error if any of the
-        // devicemapper operations fails.
-        fn extend(
-            thinpool: &mut ThinPool,
-            device: Device,
-            new_seg: (Sectors, Sectors),
-            data: bool,
-        ) -> StratisResult<()> {
-            thinpool.suspend()?;
-
-            if data {
-                let segments = coalesce_segs(&thinpool.data_segments, &[new_seg]);
-                thinpool
-                    .thin_pool
-                    .set_data_table(get_dm(), segs_to_table(device, &segments))?;
-                thinpool.thin_pool.resume(get_dm())?;
-                thinpool.data_segments = segments;
-            } else {
-                let segments = coalesce_segs(&thinpool.meta_segments, &[new_seg]);
-                thinpool
-                    .thin_pool
-                    .set_meta_table(get_dm(), segs_to_table(device, &segments))?;
-                thinpool.thin_pool.resume(get_dm())?;
-                thinpool.meta_segments = segments;
-            }
-
-            thinpool.resume()?;
-            Ok(())
-        }
-
-        let backstore_device = self.backstore_device;
-        assert_eq!(backstore.device().expect("thinpool exists, data must have been allocated from backstore, so backstore must have cap device."), backstore_device);
-
-        info!(
-            "Attempting to extend thinpool {} device belonging to pool {} by {}",
-            if data { "data" } else { "meta" },
-            pool_uuid,
-            extend_size,
-        );
-
         if let Some(region) = backstore.request(pool_uuid, extend_size, modulus)? {
-            extend(self, backstore_device, region, data)?;
+            let device = backstore
+                .device()
+                .expect("If request succeeded, backstore must have cap device.");
+            thinpooldev.suspend(get_dm(), true)?;
+
+            let mut segments = coalesce_segs(existing_segs, &[region]);
+            thinpooldev.set_data_table(get_dm(), segs_to_table(device, &segments))?;
+
+            thinpooldev.resume(get_dm())?;
+            existing_segs.clear();
+            existing_segs.append(&mut segments);
+
             Ok(region.1)
         } else {
             let err_msg = format!(

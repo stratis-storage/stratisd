@@ -446,33 +446,23 @@ impl ThinPool {
     pub fn check(&mut self, pool_uuid: PoolUuid, backstore: &mut Backstore) -> StratisResult<bool> {
         #![allow(match_same_arms)]
 
-        // Calculate amount to request for metadata device.
-        // Return None if metadata device does not need to be expanded.
-        // Returned request, if it exists, is always INITIAL_META_SIZE.
-        fn calculate_meta_request(
+        // Calculate amount to request for data- or meta- device.
+        // Return None if device does not need to be expanded.
+        // Returned request, if it exists, is always INITIAL_META_SIZE
+        // for meta device, 1 Gi for data device.
+        fn calculate_request(
             total: Sectors,
             used: Sectors,
             low_water: Sectors,
+            data: bool,
         ) -> Option<Sectors> {
             let remaining = total - used;
             if remaining <= low_water {
-                Some(INITIAL_META_SIZE.sectors())
-            } else {
-                None
-            }
-        }
-
-        // Calculate amount to request for data device.
-        // Return None if data device does not need to be extended.
-        // Return request, if it exists, is always 1 GiB.
-        fn calculate_data_request(
-            total: Sectors,
-            used: Sectors,
-            low_water: Sectors,
-        ) -> Option<Sectors> {
-            let remaining = total - used;
-            if remaining <= low_water {
-                Some(Bytes(IEC::Gi).sectors())
+                Some(if data {
+                    Bytes(IEC::Gi).sectors()
+                } else {
+                    INITIAL_META_SIZE.sectors()
+                })
             } else {
                 None
             }
@@ -513,10 +503,11 @@ impl ThinPool {
                 // against kernel-set meta lowater, and only extend if the
                 // lowater is crossed. There's a kernel patch pending to tell
                 // us this value. For now, assume it is META_LOWATER.
-                if let Some(request) = calculate_meta_request(
+                if let Some(request) = calculate_request(
                     usage.total_meta.sectors(),
                     usage.used_meta.sectors(),
                     META_LOWATER.sectors(),
+                    false,
                 ) {
                     match self.extend_thin_sub_device(pool_uuid, backstore, request, false) {
                         Ok(extend_size) => {
@@ -531,10 +522,11 @@ impl ThinPool {
                     }
                 }
 
-                if let Some(request) = calculate_data_request(
+                if let Some(request) = calculate_request(
                     datablocks_to_sectors(usage.total_data),
                     datablocks_to_sectors(usage.used_data),
                     datablocks_to_sectors(self.thin_pool.table().table.params.low_water_mark),
+                    true,
                 ) {
                     info!("Requesting extending data device by {}", request,);
 

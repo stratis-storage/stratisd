@@ -519,8 +519,6 @@ impl ThinPool {
                     datablocks_to_sectors(self.thin_pool.table().table.params.low_water_mark),
                     true,
                 ) {
-                    info!("Requesting extending data device by {}", request,);
-
                     let extend_size =
                         match self.extend_thin_sub_device(pool_uuid, backstore, request, true) {
                             Ok(Sectors(0)) => {
@@ -728,6 +726,13 @@ impl ThinPool {
         } else {
             MetaBlocks(1).sectors()
         };
+
+        info!(
+            "Attempting to extend thinpool {} device belonging to pool {} by {}",
+            if data { "data" } else { "meta" },
+            pool_uuid,
+            extend_size,
+        );
 
         if let Some(region) = backstore.request(pool_uuid, extend_size, modulus)? {
             extend(self, backstore_device, region, data)?;

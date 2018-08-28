@@ -622,19 +622,14 @@ impl ThinPool {
             val as u8
         }
 
-        // Select the new state based on the overall_used_pct quantity.
-        fn select_state(overall_used_pct: u8) -> FreeSpaceState {
-            match overall_used_pct {
-                0...SPACE_WARN_PCT => FreeSpaceState::Good,
-                SPACE_WARN_PCT...SPACE_CRIT_PCT => FreeSpaceState::Warn,
-                _ => FreeSpaceState::Crit,
-            }
-        }
-
         let overall_used_pct = used_pct(*used, *used + *available);
         info!("Data tier percent used: {}", overall_used_pct);
 
-        let new_state = select_state(overall_used_pct);
+        let new_state = match overall_used_pct {
+            0...SPACE_WARN_PCT => FreeSpaceState::Good,
+            SPACE_WARN_PCT...SPACE_CRIT_PCT => FreeSpaceState::Warn,
+            _ => FreeSpaceState::Crit,
+        };
 
         if self.free_space_state != new_state {
             info!(

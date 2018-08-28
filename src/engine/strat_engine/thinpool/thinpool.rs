@@ -134,6 +134,7 @@ fn coalesce_segs(
 ///            (100 - SPACE_CRIT_PCT)/100  if self.free_space_state != Good
 ///       L = DATA_LOWATER if self.free_space_state == Good
 ///           throttle rate if self.free_space_state != Good
+// TODO: Use proptest to verify the behavior of this method.
 fn calc_lowater(
     data_dev_size: DataBlocks,
     available: DataBlocks,

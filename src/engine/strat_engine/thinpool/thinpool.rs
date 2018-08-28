@@ -506,7 +506,7 @@ impl ThinPool {
                     META_LOWATER.sectors(),
                     false,
                 ) {
-                    match self.extend_thin_sub_device(pool_uuid, backstore, request, false) {
+                    match self.extend_thin_meta_device(pool_uuid, backstore, request) {
                         Ok(extend_size) => {
                             info!("Extended thin meta device by {}", extend_size);
 
@@ -526,7 +526,7 @@ impl ThinPool {
                     true,
                 ) {
                     let extend_size =
-                        match self.extend_thin_sub_device(pool_uuid, backstore, request, true) {
+                        match self.extend_thin_data_device(pool_uuid, backstore, request) {
                             Ok(Sectors(0)) => {
                                 info!("data device fully extended, cannot extend further");
                                 DataBlocks(0)
@@ -680,6 +680,30 @@ impl ThinPool {
         Ok(())
     }
 
+    fn extend_thin_data_device(
+        &mut self,
+        pool_uuid: PoolUuid,
+        backstore: &mut Backstore,
+        extend_size: Sectors,
+    ) -> StratisResult<Sectors> {
+        self.extend_thin_sub_device(pool_uuid, backstore, extend_size, true, DATA_BLOCK_SIZE)
+    }
+
+    fn extend_thin_meta_device(
+        &mut self,
+        pool_uuid: PoolUuid,
+        backstore: &mut Backstore,
+        extend_size: Sectors,
+    ) -> StratisResult<Sectors> {
+        self.extend_thin_sub_device(
+            pool_uuid,
+            backstore,
+            extend_size,
+            false,
+            MetaBlocks(1).sectors(),
+        )
+    }
+
     /// Extend the thinpool's data or meta devices. The result is the value
     /// by which the device is extended which may be less than the requested
     /// amount. It is guaranteed that the returned amount is a multiple of the
@@ -691,6 +715,7 @@ impl ThinPool {
         backstore: &mut Backstore,
         extend_size: Sectors,
         data: bool,
+        modulus: Sectors,
     ) -> StratisResult<Sectors> {
         // Extend the thinpool device w/ a new data region if data is true,
         // else a new metadata region. There may be multiple segments, but they
@@ -726,12 +751,6 @@ impl ThinPool {
 
         let backstore_device = self.backstore_device;
         assert_eq!(backstore.device().expect("thinpool exists, data must have been allocated from backstore, so backstore must have cap device."), backstore_device);
-
-        let modulus = if data {
-            DATA_BLOCK_SIZE
-        } else {
-            MetaBlocks(1).sectors()
-        };
 
         info!(
             "Attempting to extend thinpool {} device belonging to pool {} by {}",
@@ -1267,11 +1286,10 @@ mod tests {
         // written above. If we attempt to update the UUID on the snapshot
         // without expanding the pool, the pool will go into out-of-data-space
         // (queue IO) mode, causing the test to fail.
-        pool.extend_thin_sub_device(
+        pool.extend_thin_data_device(
             pool_uuid,
             &mut backstore,
             datablocks_to_sectors(INITIAL_DATA_SIZE),
-            true,
         ).unwrap();
 
         let (_, snapshot_filesystem) =
@@ -1567,11 +1585,10 @@ mod tests {
                 // the amount of free space in pool has decreased to the
                 // DATA_LOWATER value.
                 if i == *(datablocks_to_sectors(INITIAL_DATA_SIZE - DATA_LOWATER)) {
-                    pool.extend_thin_sub_device(
+                    pool.extend_thin_data_device(
                         pool_uuid,
                         &mut backstore,
                         datablocks_to_sectors(INITIAL_DATA_SIZE),
-                        true,
                     ).unwrap();
                 }
             }

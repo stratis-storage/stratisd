@@ -7,6 +7,7 @@
 use std;
 use std::borrow::BorrowMut;
 
+use chrono::{Duration, Utc};
 use uuid::Uuid;
 
 use devicemapper as dm;
@@ -47,6 +48,8 @@ const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 
 const SPACE_WARN_PCT: u8 = 90;
 const SPACE_CRIT_PCT: u8 = 95;
+
+const FSTRIM_INTERVAL_DAYS: i64 = 7;
 
 /// When Stratis initiates throttling, this is the value it always specifies.
 const THROTTLE_BLOCKS_PER_SEC: DataBlocks = DataBlocks(10);
@@ -662,6 +665,31 @@ impl ThinPool {
         };
 
         Ok(new_state)
+    }
+
+    pub fn fstrim(&mut self, pool_name: &Name) -> StratisResult<()> {
+        let now = Utc::now();
+        for (fs_name, fs_uuid, fs) in &mut self.filesystems {
+            if fs.last_fstrim + Duration::days(FSTRIM_INTERVAL_DAYS) < now {
+                let fstrim_start = Utc::now();
+                match fs.fstrim() {
+                    Ok(true) => {
+                        let fstrim_end = Utc::now();
+                        fs.last_fstrim = fstrim_end;
+                        info!(
+                            "fstrim on {}/{} complete. Duration: {}",
+                            pool_name,
+                            fs_name,
+                            fstrim_end - fstrim_start,
+                        );
+                        self.mdv.save_fs(fs_name, *fs_uuid, fs)?
+                    }
+                    Ok(false) => info!("fstrim on {}/{} not performed", pool_name, fs_name),
+                    Err(e) => error!("fstrim on {}/{} failed: {}", pool_name, fs_name, e),
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Tear down the components managed here: filesystems, the MDV,

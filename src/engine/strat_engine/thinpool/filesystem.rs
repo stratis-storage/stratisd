@@ -27,7 +27,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 use super::super::super::engine::Filesystem;
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid};
 
-use super::super::cmd::{create_fs, set_uuid, xfs_growfs};
+use super::super::cmd::{create_fs, fstrim, set_uuid, xfs_growfs};
 use super::super::dm::get_dm;
 use super::super::dmnames::{format_thin_ids, ThinRole};
 use super::super::serde_structs::FilesystemSave;
@@ -201,12 +201,22 @@ impl StratFilesystem {
                         }
                     }
                 }
-                // TODO: do anything when filesystem is not mounted?
-                // TODO: periodically kick off fstrim?
             }
             ThinStatus::Fail => return Ok(FilesystemStatus::Failed),
         }
         Ok(FilesystemStatus::Good)
+    }
+
+    /// Execute an fstrim on the filesystem, if it is mounted. Returns a bool
+    /// that indicates if the fstrim was performed.
+    pub fn fstrim(&mut self) -> StratisResult<bool> {
+        if let Some(mount_point) = self.mount_points()?.first() {
+            // May fail if fs is unmounted between these steps
+            fstrim(&mount_point)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Return an extend size for the thindev under the filesystem

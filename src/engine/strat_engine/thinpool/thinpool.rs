@@ -741,8 +741,6 @@ impl ThinPool {
             let device = backstore
                 .device()
                 .expect("If request succeeded, backstore must have cap device.");
-            thinpooldev.suspend(get_dm(), true)?;
-
             let mut segments = coalesce_segs(existing_segs, &[region]);
             thinpooldev.set_data_table(get_dm(), segs_to_table(device, &segments))?;
 

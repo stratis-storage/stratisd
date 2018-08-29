@@ -17,6 +17,7 @@ extern crate env_logger;
 extern crate libc;
 extern crate libudev;
 extern crate nix;
+extern crate timerfd;
 
 use std::cell::RefCell;
 use std::env;
@@ -36,6 +37,7 @@ use nix::fcntl::{flock, FlockArg};
 use nix::sys::signal::{self, SigSet};
 use nix::sys::signalfd::{SfdFlags, SignalFd};
 use nix::unistd::getpid;
+use timerfd::{SetTimeFlags, TimerFd, TimerState};
 
 #[cfg(feature = "dbus_enabled")]
 use dbus::WatchEvent;
@@ -43,13 +45,13 @@ use dbus::WatchEvent;
 use devicemapper::Device;
 
 use libstratis::engine::{Engine, SimEngine, StratEngine};
-use libstratis::stratis::{alarm, buff_log};
+use libstratis::stratis::buff_log;
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
 
 const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
 
-/// Interval at which to have stratisd perform periodic tasks.
-const STRATISD_ALARM_SECONDS: u32 = 600;
+/// Interval at which to have stratisd dump its state
+const DEFAULT_STATE_DUMP_MINUTES: i64 = 10;
 
 /// Number of minutes to buffer log entries.
 const DEFAULT_LOG_HOLD_MINUTES: i64 = 30;
@@ -195,14 +197,16 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
 
     0   == Always udev fd index
     1   == SIGNAL FD index
+    2   == TIMER FD for periodic dump index
     2   == engine index if eventable
-    2/3 == Start of dbus client file descriptor(s)
-            * 2 if engine is not eventable
-            * else 3
+    3/4 == Start of dbus client file descriptor(s)
+            * 3 if engine is not eventable
+            * else 4
     */
     const FD_INDEX_UDEV: usize = 0;
     const FD_INDEX_SIGNALFD: usize = 1;
-    const FD_INDEX_ENGINE: usize = 2;
+    const FD_INDEX_DUMP_TIMERFD: usize = 2;
+    const FD_INDEX_ENGINE: usize = 3;
 
     /*
     fds is a Vec of libc::pollfd structs. Ideally, it would be possible
@@ -227,7 +231,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     let mut sfd = {
         let mut mask = SigSet::empty();
         mask.add(signal::SIGINT);
-        mask.add(signal::SIGALRM);
         mask.add(signal::SIGUSR1);
         mask.thread_block()?;
         SignalFd::with_flags(&mask, SfdFlags::SFD_NONBLOCK)?
@@ -235,6 +238,24 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
 
     fds.push(libc::pollfd {
         fd: sfd.as_raw_fd(),
+        revents: 0,
+        events: libc::POLLIN,
+    });
+
+    let mut tfd = TimerFd::new()?;
+    let interval = Duration::minutes(DEFAULT_STATE_DUMP_MINUTES)
+        .to_std()
+        .expect("std::Duration can represent positive values");
+    tfd.set_state(
+        TimerState::Periodic {
+            current: interval,
+            interval: interval,
+        },
+        SetTimeFlags::Default,
+    );
+
+    fds.push(libc::pollfd {
+        fd: tfd.as_raw_fd(),
         revents: 0,
         events: libc::POLLIN,
     });
@@ -257,7 +278,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     };
 
     log_engine_state(&*engine.borrow());
-    alarm(STRATISD_ALARM_SECONDS);
 
     loop {
         // Process any udev block events
@@ -307,11 +327,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 // virtually impossible, will not match any of the masked
                 // values, and stratisd will panic and exit.
                 Ok(Some(sig)) => match sig.ssi_signo as i32 {
-                    nix::libc::SIGALRM => {
-                        info!("SIGALRM received, performing periodic tasks");
-                        log_engine_state(&*engine.borrow());
-                        alarm(STRATISD_ALARM_SECONDS);
-                    }
                     nix::libc::SIGUSR1 => {
                         info!(
                             "SIGUSR1 received, dumping {} buffered log entries",
@@ -333,6 +348,13 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 // Pessimistically exit on an error reading the signal.
                 Err(err) => return Err(err.into()),
             }
+        }
+
+        // Process timerfd expiry
+        if fds[FD_INDEX_DUMP_TIMERFD].revents != 0 {
+            tfd.read(); // clear the event
+            info!("Dump timer expired, dumping state");
+            log_engine_state(&*engine.borrow());
         }
 
         // Handle engine events, if the engine is eventable

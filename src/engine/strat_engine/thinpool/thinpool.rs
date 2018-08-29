@@ -699,6 +699,7 @@ impl ThinPool {
             extend_size,
             DATA_BLOCK_SIZE,
             &mut self.data_segments,
+            true,
         )
     }
 
@@ -721,6 +722,7 @@ impl ThinPool {
             extend_size,
             MetaBlocks(1).sectors(),
             &mut self.meta_segments,
+            false,
         )
     }
 
@@ -728,7 +730,9 @@ impl ThinPool {
     /// by which the device is extended which may be less than the requested
     /// amount. It is guaranteed that the returned amount is a multiple of the
     /// modulus value. Sets existing_segs to the new value that specifies the
-    /// arrangement of segments on the extended device.
+    /// arrangement of segments on the extended device. The data parameter is
+    /// true if the method should extend the data device, false if the
+    /// method should extend the meta device.
     fn extend_thin_sub_device(
         pool_uuid: PoolUuid,
         thinpooldev: &mut ThinPoolDev,
@@ -736,13 +740,18 @@ impl ThinPool {
         extend_size: Sectors,
         modulus: Sectors,
         existing_segs: &mut Vec<(Sectors, Sectors)>,
+        data: bool,
     ) -> StratisResult<Sectors> {
         if let Some(region) = backstore.request(pool_uuid, extend_size, modulus)? {
             let device = backstore
                 .device()
                 .expect("If request succeeded, backstore must have cap device.");
             let mut segments = coalesce_segs(existing_segs, &[region]);
-            thinpooldev.set_data_table(get_dm(), segs_to_table(device, &segments))?;
+            if data {
+                thinpooldev.set_data_table(get_dm(), segs_to_table(device, &segments))?;
+            } else {
+                thinpooldev.set_meta_table(get_dm(), segs_to_table(device, &segments))?;
+            }
 
             thinpooldev.resume(get_dm())?;
             existing_segs.clear();

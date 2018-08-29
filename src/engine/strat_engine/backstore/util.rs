@@ -4,7 +4,6 @@
 
 // Utilities to support Stratis.
 use std::collections::HashMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use libudev;
@@ -34,12 +33,9 @@ pub fn get_udev_block_device(
     let mut enumerator = libudev::Enumerator::new(&context)?;
     enumerator.match_subsystem("block")?;
 
-    // Get canonical form to ensure we do correct lookup in udev db
-    let canonical = fs::canonicalize(dev_node_search)?;
-
     let result = enumerator
         .scan_devices()?
-        .find(|x| x.devnode().map_or(false, |d| canonical == d))
+        .find(|x| x.devnode().map_or(false, |d| dev_node_search == d))
         .and_then(|dev| Some(device_as_map(&dev)));
     Ok(result)
 }
@@ -50,8 +46,7 @@ pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<String>> {
     Ok(dev.and_then(|dev| dev.get("ID_WWN").and_then(|i| Some(i.clone()))))
 }
 
-/// Collect paths for all the block devices which are not individual multipath paths and which
-/// appear to be empty from a udev perspective.
+/// Collect paths for all the devices that appear to be empty from a udev db perspective.
 fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
     let context = libudev::Context::new()?;
     let mut enumerator = libudev::Enumerator::new(&context)?;
@@ -60,10 +55,9 @@ fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
     Ok(enumerator
         .scan_devices()?
         .filter(|dev| {
-            dev.property_value("DM_MULTIPATH_DEVICE_PATH").is_none()
-                && !((dev.property_value("ID_PART_TABLE_TYPE").is_some()
-                    && dev.property_value("ID_PART_ENTRY_DISK").is_none())
-                    || dev.property_value("ID_FS_USAGE").is_some())
+            !((dev.property_value("ID_PART_TABLE_TYPE").is_some()
+                && dev.property_value("ID_PART_ENTRY_DISK").is_none())
+                || dev.property_value("ID_FS_USAGE").is_some())
         })
         .filter_map(|i| i.devnode().map(|d| d.into()))
         .collect())
@@ -78,7 +72,6 @@ pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
 
     let devices: Vec<PathBuf> = enumerator
         .scan_devices()?
-        .filter(|dev| dev.property_value("DM_MULTIPATH_DEVICE_PATH").is_none())
         .filter_map(|i| i.devnode().map(|d| d.into()))
         .collect();
 

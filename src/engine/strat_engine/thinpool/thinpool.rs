@@ -526,7 +526,7 @@ impl ThinPool {
                             pool_uuid, backstore, request,
                         ) {
                             Ok(Sectors(0)) => {
-                                info!("data device fully extended, cannot extend further");
+                                warn!("data device fully extended, cannot extend further");
                                 DataBlocks(0)
                             }
                             Ok(extend_size) => {

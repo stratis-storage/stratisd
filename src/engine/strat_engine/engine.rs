@@ -194,7 +194,7 @@ impl Engine for StratEngine {
                 // TODO: Handle the case where we have found a device for an already active pool
                 // ref. https://github.com/stratis-storage/stratisd/issues/748
                 warn!(
-                    "udev add: pool {} is already known, ignoring device {:?}!",
+                    "pool {} is already known, ignoring device {:?}!",
                     pool_uuid, dev_node
                 );
                 None
@@ -210,7 +210,7 @@ impl Engine for StratEngine {
                         Some(pool_uuid)
                     }
                     Err(err) => {
-                        warn!("udev add: no pool set up, reason: {:?}", err);
+                        warn!("no pool set up, reason: {:?}", err);
                         self.incomplete_pools.insert(pool_uuid, devices);
                         None
                     }

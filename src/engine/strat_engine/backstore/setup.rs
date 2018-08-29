@@ -145,24 +145,24 @@ pub fn get_blockdevs(
     let mut segment_table: HashMap<DevUuid, Vec<(Sectors, Sectors)>> = HashMap::new();
     for seg in &backstore_save.data_segments {
         segment_table
-            .entry(seg.0)
+            .entry(seg.parent)
             .or_insert_with(Vec::default)
-            .push((seg.1, seg.2))
+            .push((seg.start, seg.length))
     }
     if let Some(ref segs) = backstore_save.cache_segments {
         for seg in segs {
             segment_table
-                .entry(seg.0)
+                .entry(seg.parent)
                 .or_insert_with(Vec::default)
-                .push((seg.1, seg.2))
+                .push((seg.start, seg.length))
         }
     }
     if let Some(ref segs) = backstore_save.meta_segments {
         for seg in segs {
             segment_table
-                .entry(seg.0)
+                .entry(seg.parent)
                 .or_insert_with(Vec::default)
-                .push((seg.1, seg.2))
+                .push((seg.start, seg.length))
         }
     }
 

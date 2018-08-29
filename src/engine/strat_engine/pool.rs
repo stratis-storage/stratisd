@@ -80,7 +80,7 @@ pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
             .backstore
             .data_segments
             .iter()
-            .map(|x| x.2)
+            .map(|x| x.length)
             .sum::<Sectors>();
 
         if total_allocated == Sectors(0) {

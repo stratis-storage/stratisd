@@ -22,7 +22,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 use super::super::super::engine::BlockDev;
 use super::super::super::types::{DevUuid, PoolUuid};
 
-use super::super::serde_structs::{BlockDevSave, Recordable};
+use super::super::serde_structs::{BlockDevSave, LayeredDev, Recordable};
 
 use super::blockdev::StratBlockDev;
 use super::cleanup::wipe_blockdevs;
@@ -80,10 +80,14 @@ impl fmt::Debug for BlkDevSegment {
     }
 }
 
-impl Recordable<Vec<(Uuid, Sectors, Sectors)>> for Vec<BlkDevSegment> {
-    fn record(&self) -> Vec<(Uuid, Sectors, Sectors)> {
+impl Recordable<Vec<LayeredDev>> for Vec<BlkDevSegment> {
+    fn record(&self) -> Vec<LayeredDev> {
         self.iter()
-            .map(|bseg| (bseg.uuid, bseg.segment.start, bseg.segment.length))
+            .map(|bseg| LayeredDev {
+                parent: bseg.uuid,
+                start: bseg.segment.start,
+                length: bseg.segment.length,
+            })
             .collect::<Vec<_>>()
     }
 }

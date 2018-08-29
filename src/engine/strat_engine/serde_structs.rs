@@ -13,7 +13,6 @@
 // restoring state from saved metadata.
 
 use serde::Serialize;
-use uuid::Uuid;
 
 use devicemapper::{Sectors, ThinDevId};
 
@@ -24,6 +23,13 @@ use super::super::types::{DevUuid, FilesystemUuid};
 /// saved struct in all its essentials.
 pub trait Recordable<T: Serialize> {
     fn record(&self) -> T;
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct LayeredDev {
+    pub parent: DevUuid,
+    pub start: Sectors,
+    pub length: Sectors,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -65,11 +71,11 @@ pub struct BackstoreSave {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_devs: Option<Vec<BlockDevSave>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub cache_segments: Option<Vec<(Uuid, Sectors, Sectors)>>,
+    pub cache_segments: Option<Vec<LayeredDev>>,
     pub data_devs: Vec<BlockDevSave>,
-    pub data_segments: Vec<(Uuid, Sectors, Sectors)>,
+    pub data_segments: Vec<LayeredDev>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub meta_segments: Option<Vec<(Uuid, Sectors, Sectors)>>,
+    pub meta_segments: Option<Vec<LayeredDev>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

@@ -56,6 +56,8 @@ pub fn resolve_devices<'a>(paths: &'a [&Path]) -> StratisResult<HashMap<Device, 
 pub enum DevOwnership {
     /// Udev thinks the device belongs to Stratis, but Stratis does not
     Contradiction,
+    /// Udev believes that the device is owned by multipath
+    Multipath,
     /// Udev and Stratis agree that the device belongs to Stratis, these
     /// are the device's pool and device UUID.
     Ours(PoolUuid, DevUuid),
@@ -99,7 +101,9 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
 
     match udev_block_device_apply(devnode, udev_info)? {
         Some(Some(properties)) => {
-            if properties.get("ID_FS_TYPE") == Some(&"stratis".to_string()) {
+            if properties.get("DM_MULTIPATH_DEVICE_PATH").is_some() {
+                Ok(DevOwnership::Multipath)
+            } else if properties.get("ID_FS_TYPE") == Some(&"stratis".to_string()) {
                 if let Some((pool_uuid, device_uuid)) =
                     device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
                 {

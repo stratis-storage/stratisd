@@ -405,6 +405,13 @@ fn initialize(
                         );
                         return Err(StratisError::Engine(ErrorEnum::Invalid, err_str));
                 }
+                DevOwnership::Multipath => {
+                        let err_msg = format!(
+                            "Device {} appears to udev to be a multipath member device",
+                            devnode.display()
+                        );
+                        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
+                }
                 DevOwnership::Ours(uuid, dev_uuid) => {
                     if pool_uuid == uuid {
                         if !owned_devs.contains(&dev_uuid) {

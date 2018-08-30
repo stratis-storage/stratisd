@@ -135,6 +135,10 @@ impl Engine for SimEngine {
     fn evented(&mut self) -> StratisResult<()> {
         Ok(())
     }
+
+    fn maintenance(&mut self) -> StratisResult<()> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]

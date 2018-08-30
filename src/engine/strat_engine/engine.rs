@@ -315,6 +315,13 @@ impl Engine for StratEngine {
 
         Ok(())
     }
+
+    fn maintenance(&mut self) -> StratisResult<()> {
+        for (pool_name, pool_uuid, pool) in &mut self.pools {
+            pool.maintenance(pool_name, *pool_uuid)?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

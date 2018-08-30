@@ -243,6 +243,9 @@ pub trait Engine: Debug {
 
     /// Notify the engine that an event has occurred on the Eventable.
     fn evented(&mut self) -> StratisResult<()>;
+
+    /// Notify the engine to perform any periodic maintenance tasks.
+    fn maintenance(&mut self) -> StratisResult<()>;
 }
 
 /// Allows an Engine to include a fd in the event loop. See

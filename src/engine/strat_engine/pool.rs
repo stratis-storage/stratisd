@@ -246,6 +246,10 @@ impl StratPool {
         Ok(())
     }
 
+    pub fn maintenance(&mut self, pool_name: &Name, _pool_uuid: PoolUuid) -> StratisResult<()> {
+        self.thin_pool.fstrim(pool_name)
+    }
+
     pub fn record(&self, name: &str) -> PoolSave {
         PoolSave {
             name: name.to_owned(),

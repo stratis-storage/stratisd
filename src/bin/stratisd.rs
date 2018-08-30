@@ -53,6 +53,9 @@ const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
 /// Interval at which to have stratisd dump its state
 const DEFAULT_STATE_DUMP_MINUTES: i64 = 10;
 
+/// Interval at which to have stratisd do maintenance
+const DEFAULT_MAINT_HOURS: i64 = 24;
+
 /// Number of minutes to buffer log entries.
 const DEFAULT_LOG_HOLD_MINUTES: i64 = 30;
 
@@ -198,15 +201,17 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     0   == Always udev fd index
     1   == SIGNAL FD index
     2   == TIMER FD for periodic dump index
-    2   == engine index if eventable
-    3/4 == Start of dbus client file descriptor(s)
-            * 3 if engine is not eventable
-            * else 4
+    3   == TIMER FD for daily maintenance index
+    4   == engine index if eventable
+    4/5 == Start of dbus client file descriptor(s)
+            * 4 if engine is not eventable
+            * else 5
     */
     const FD_INDEX_UDEV: usize = 0;
     const FD_INDEX_SIGNALFD: usize = 1;
     const FD_INDEX_DUMP_TIMERFD: usize = 2;
-    const FD_INDEX_ENGINE: usize = 3;
+    const FD_INDEX_MAINT_TIMERFD: usize = 3;
+    const FD_INDEX_ENGINE: usize = 4;
 
     /*
     fds is a Vec of libc::pollfd structs. Ideally, it would be possible
@@ -242,11 +247,11 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         events: libc::POLLIN,
     });
 
-    let mut tfd = TimerFd::new()?;
+    let mut tfd_dump = TimerFd::new()?;
     let interval = Duration::minutes(DEFAULT_STATE_DUMP_MINUTES)
         .to_std()
         .expect("std::Duration can represent positive values");
-    tfd.set_state(
+    tfd_dump.set_state(
         TimerState::Periodic {
             current: interval,
             interval: interval,
@@ -255,7 +260,25 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     );
 
     fds.push(libc::pollfd {
-        fd: tfd.as_raw_fd(),
+        fd: tfd_dump.as_raw_fd(),
+        revents: 0,
+        events: libc::POLLIN,
+    });
+
+    let mut tfd_maint = TimerFd::new()?;
+    let interval = Duration::hours(DEFAULT_MAINT_HOURS)
+        .to_std()
+        .expect("std::Duration can represent positive values");
+    tfd_maint.set_state(
+        TimerState::Periodic {
+            current: interval,
+            interval: interval,
+        },
+        SetTimeFlags::Default,
+    );
+
+    fds.push(libc::pollfd {
+        fd: tfd_maint.as_raw_fd(),
         revents: 0,
         events: libc::POLLIN,
     });
@@ -350,11 +373,19 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
             }
         }
 
-        // Process timerfd expiry
+        // Process timerfd expiry to dump state
         if fds[FD_INDEX_DUMP_TIMERFD].revents != 0 {
-            tfd.read(); // clear the event
+            tfd_dump.read(); // clear the event
             info!("Dump timer expired, dumping state");
             log_engine_state(&*engine.borrow());
+        }
+
+        // Process timerfd expiry to run maintenance tasks
+        if fds[FD_INDEX_MAINT_TIMERFD].revents != 0 {
+            tfd_maint.read(); // clear the event
+            info!("Starting maintenance tasks");
+            engine.borrow_mut().maintenance()?;
+            info!("Ending maintenance tasks");
         }
 
         // Handle engine events, if the engine is eventable

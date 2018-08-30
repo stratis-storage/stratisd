@@ -2,9 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#[cfg(feature = "dbus_enabled")]
-use dbus;
-
 use std::fmt::Debug;
 use std::os::unix::io::RawFd;
 use std::path::{Path, PathBuf};
@@ -15,7 +12,8 @@ use uuid::Uuid;
 use devicemapper::{Bytes, Device, Sectors};
 
 use super::types::{
-    BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, RenameAction,
+    BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolUuid,
+    RenameAction,
 };
 use stratis::StratisResult;
 
@@ -32,12 +30,10 @@ pub trait Filesystem: Debug {
     fn used(&self) -> StratisResult<Bytes>;
 
     /// Set dbus path associated with the Pool.
-    #[cfg(feature = "dbus_enabled")]
-    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> ();
+    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> ();
 
     /// Get dbus path associated with the Pool.
-    #[cfg(feature = "dbus_enabled")]
-    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>>;
+    fn get_dbus_path(&self) -> &MaybeDbusPath;
 }
 
 pub trait BlockDev: Debug {
@@ -61,12 +57,10 @@ pub trait BlockDev: Debug {
     fn state(&self) -> BlockDevState;
 
     /// Set dbus path associated with the BlockDev.
-    #[cfg(feature = "dbus_enabled")]
-    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> ();
+    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> ();
 
     /// Get dbus path associated with the BlockDev.
-    #[cfg(feature = "dbus_enabled")]
-    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>>;
+    fn get_dbus_path(&self) -> &MaybeDbusPath;
 }
 
 pub trait Pool: Debug {
@@ -180,12 +174,10 @@ pub trait Pool: Debug {
     ) -> StratisResult<bool>;
 
     /// Set dbus path associated with the Pool.
-    #[cfg(feature = "dbus_enabled")]
-    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> ();
+    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> ();
 
     /// Get dbus path associated with the Pool.
-    #[cfg(feature = "dbus_enabled")]
-    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>>;
+    fn get_dbus_path(&self) -> &MaybeDbusPath;
 }
 
 pub trait Engine: Debug {

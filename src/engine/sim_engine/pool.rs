@@ -2,9 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#[cfg(feature = "dbus_enabled")]
-use dbus;
-
 use std::cell::RefCell;
 use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
@@ -22,7 +19,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::structures::Table;
 use super::super::types::{
-    BlockDevTier, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction,
+    BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction,
 };
 
 use super::blockdev::SimDev;
@@ -36,8 +33,7 @@ pub struct SimPool {
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
-    #[cfg(feature = "dbus_enabled")]
-    dbus_path: Option<dbus::Path<'static>>,
+    dbus_path: MaybeDbusPath,
 }
 
 impl SimPool {
@@ -56,8 +52,7 @@ impl SimPool {
                 filesystems: Table::default(),
                 redundancy,
                 rdm: Rc::clone(rdm),
-                #[cfg(feature = "dbus_enabled")]
-                dbus_path: None,
+                dbus_path: MaybeDbusPath(None),
             },
         )
     }
@@ -282,13 +277,11 @@ impl Pool for SimPool {
         )
     }
 
-    #[cfg(feature = "dbus_enabled")]
-    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> () {
-        self.dbus_path = Some(path)
+    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
+        self.dbus_path = path
     }
 
-    #[cfg(feature = "dbus_enabled")]
-    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>> {
+    fn get_dbus_path(&self) -> &MaybeDbusPath {
         &self.dbus_path
     }
 }

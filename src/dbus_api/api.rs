@@ -207,7 +207,7 @@ fn register_pool_dbus(
 
 /// Returned data from when you connect a stratis engine to dbus.
 pub struct DbusConnectionData<'a> {
-    pub connection: Connection,
+    pub connection: Rc<RefCell<Connection>>,
     pub tree: Tree<MTFn<TData>, TData>,
     pub path: dbus::Path<'a>,
     pub context: DbusContext,
@@ -221,7 +221,7 @@ pub fn connect<'a>(engine: Rc<RefCell<Engine>>) -> Result<DbusConnectionData<'a>
     tree.set_registered(&c, true)?;
     c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32)?;
     Ok(DbusConnectionData {
-        connection: c,
+        connection: Rc::new(RefCell::new(c)),
         tree,
         path: object_path,
         context: dbus_context,

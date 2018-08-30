@@ -19,6 +19,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::devlinks;
 use super::super::super::engine::Filesystem;
+use super::super::super::event::{get_engine_listener_list, EngineEvent};
 use super::super::super::structures::Table;
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid, RenameAction};
 
@@ -694,6 +695,11 @@ impl ThinPool {
             self.filesystems.insert(old_name, uuid, filesystem);
             Err(err)
         } else {
+            get_engine_listener_list().notify(&EngineEvent::FilesystemRenamed {
+                dbus_path: filesystem.get_dbus_path(),
+                from: &*old_name,
+                to: &*new_name,
+            });
             self.filesystems.insert(new_name.clone(), uuid, filesystem);
             devlinks::filesystem_renamed(pool_name, &old_name, &new_name)?;
             Ok(RenameAction::Renamed)

@@ -39,7 +39,7 @@ use super::thinids::ThinDevIdPool;
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
 const DATA_LOWATER: DataBlocks = DataBlocks(512);
-const META_LOWATER: MetaBlocks = MetaBlocks(512);
+const META_LOWATER_FALLBACK: MetaBlocks = MetaBlocks(512);
 
 const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
 pub const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
@@ -491,14 +491,16 @@ impl ThinPool {
 
                 let usage = &status.usage;
 
-                // TODO: This is not right. We need to compare metadata usage
-                // against kernel-set meta lowater, and only extend if the
-                // lowater is crossed. There's a kernel patch pending to tell
-                // us this value. For now, assume it is META_LOWATER.
+                // Kernel 4.19+ includes the kernel-set meta lowater value in
+                // thinpool status. For older kernels, use a default value.
+                let meta_lowater = status
+                    .meta_low_water
+                    .map(MetaBlocks)
+                    .unwrap_or(META_LOWATER_FALLBACK);
                 if let Some(request) = calculate_extension_request(
                     usage.total_meta.sectors(),
                     usage.used_meta.sectors(),
-                    META_LOWATER.sectors(),
+                    meta_lowater.sectors(),
                     false,
                 ) {
                     match self.extend_thin_meta_device(pool_uuid, backstore, request) {
@@ -1490,8 +1492,9 @@ mod tests {
     }
 
     /// Verify that the meta device backing a ThinPool is expanded when meta
-    /// utilization exceeds the META_LOWATER mark, by creating a ThinPool with
-    /// a meta device smaller than the META_LOWATER.
+    /// utilization exceeds the kernel-set meta lowater mark, by creating a
+    /// ThinPool with a meta device of such a small size that we've determined
+    /// it will definitely be smaller than the meta lowater value.
     fn test_meta_expand(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
         let small_meta_size = MetaBlocks(16);
@@ -1516,7 +1519,7 @@ mod tests {
             }
             dm::ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
         }
-        // The meta device is smaller than META_LOWATER, so it should be expanded
+        // The meta device is smaller than meta lowater, so it should be expanded
         // in the thin_pool.check() call.
         thin_pool.check(pool_uuid, &mut backstore).unwrap();
         match thin_pool.thin_pool.status(get_dm()).unwrap() {

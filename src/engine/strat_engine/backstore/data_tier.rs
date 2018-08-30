@@ -12,7 +12,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
-use super::super::serde_structs::{Cap, DataTierSave, LayeredDev, Recordable};
+use super::super::serde_structs::{BlockDev, Cap, DataTierSave, LayeredDev, Recordable};
 
 use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment};
@@ -165,6 +165,9 @@ impl DataTier {
 impl Recordable<DataTierSave> for DataTier {
     fn record(&self) -> DataTierSave {
         DataTierSave {
+            blockdev: BlockDev {
+                devs: self.block_mgr.record(),
+            },
             cap: Cap {
                 allocs: self.segments.record(),
             },

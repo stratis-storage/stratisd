@@ -567,7 +567,6 @@ impl Recordable<BackstoreSave> for Backstore {
         BackstoreSave {
             cache_devs: self.cache_tier.as_ref().map(|c| c.block_mgr.record()),
             cache_segments: self.cache_tier.as_ref().map(|c| c.cache_segments.record()),
-            data_devs: self.data_tier.block_mgr.record(),
             data_tier: self.data_tier.record(),
             meta_segments: self.cache_tier.as_ref().map(|c| c.meta_segments.record()),
         }
@@ -814,7 +813,10 @@ mod tests {
 
         let backstore_save2 = backstore.record();
         assert_eq!(backstore_save.cache_devs, backstore_save2.cache_devs);
-        assert_eq!(backstore_save.data_devs, backstore_save2.data_devs);
+        assert_eq!(
+            backstore_save.data_tier.blockdev.devs,
+            backstore_save2.data_tier.blockdev.devs
+        );
 
         backstore.teardown().unwrap();
 
@@ -827,7 +829,10 @@ mod tests {
 
         let backstore_save2 = backstore.record();
         assert_eq!(backstore_save.cache_devs, backstore_save2.cache_devs);
-        assert_eq!(backstore_save.data_devs, backstore_save2.data_devs);
+        assert_eq!(
+            backstore_save.data_tier.blockdev.devs,
+            backstore_save2.data_tier.blockdev.devs
+        );
 
         backstore.destroy().unwrap();
     }

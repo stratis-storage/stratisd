@@ -126,7 +126,9 @@ pub fn get_blockdevs(
     devnodes: &HashMap<Device, PathBuf>,
 ) -> StratisResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
     let recorded_data_map: HashMap<DevUuid, (usize, &BlockDevSave)> = backstore_save
-        .data_devs
+        .data_tier
+        .blockdev
+        .devs
         .iter()
         .enumerate()
         .map(|(i, bds)| (bds.uuid, (i, bds)))

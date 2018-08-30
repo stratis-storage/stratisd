@@ -26,12 +26,18 @@ pub trait Recordable<T: Serialize> {
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BlockDev {
+    pub devs: Vec<BlockDevSave>,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Cap {
     pub allocs: Vec<LayeredDev>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DataTierSave {
+    pub blockdev: BlockDev,
     pub cap: Cap,
 }
 
@@ -83,7 +89,6 @@ pub struct BackstoreSave {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_segments: Option<Vec<LayeredDev>>,
     pub data_tier: DataTierSave,
-    pub data_devs: Vec<BlockDevSave>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta_segments: Option<Vec<LayeredDev>>,
 }

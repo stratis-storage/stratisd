@@ -12,8 +12,9 @@ use dbus::Message;
 
 use uuid::Uuid;
 
-use super::super::engine::{filesystem_mount_path, Filesystem, Name, RenameAction};
+use super::super::engine::{filesystem_mount_path, Filesystem, MaybeDbusPath, Name, RenameAction};
 
+use super::consts;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
 use super::util::{
@@ -40,9 +41,9 @@ pub fn create_dbus_filesystem<'a>(
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_filesystem_devnode);
 
-    let name_property = f.property::<&str, _>("Name", ())
+    let name_property = f.property::<&str, _>(consts::FILESYSTEM_NAME_PROP, ())
         .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
+        .emits_changed(EmitsChangedSignal::True)
         .on_get(get_filesystem_name);
 
     let pool_property = f.property::<&dbus::Path, _>("Pool", ())
@@ -60,9 +61,9 @@ pub fn create_dbus_filesystem<'a>(
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_filesystem_created);
 
-    let used_property = f.property::<&str, _>("Used", ())
+    let used_property = f.property::<&str, _>(consts::FILESYSTEM_USED_PROP, ())
         .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
+        .emits_changed(EmitsChangedSignal::True)
         .on_get(get_filesystem_used);
 
     let object_name = format!(
@@ -88,7 +89,7 @@ pub fn create_dbus_filesystem<'a>(
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
-    filesystem.set_dbus_path(path.clone());
+    filesystem.set_dbus_path(MaybeDbusPath(Some(path.clone())));
     path
 }
 

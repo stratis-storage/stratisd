@@ -166,11 +166,10 @@ impl Recordable<DataTierSave> for DataTier {
     fn record(&self) -> DataTierSave {
         DataTierSave {
             blockdev: BlockDev {
+                allocs: self.segments.record(),
                 devs: self.block_mgr.record(),
             },
-            cap: Cap {
-                allocs: self.segments.record(),
-            },
+            cap: Cap {},
         }
     }
 }

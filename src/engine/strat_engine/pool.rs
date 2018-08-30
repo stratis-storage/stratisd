@@ -79,7 +79,7 @@ pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
         let total_allocated = metadata
             .backstore
             .data_tier
-            .cap
+            .blockdev
             .allocs
             .iter()
             .map(|x| x.length)

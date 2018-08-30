@@ -27,13 +27,12 @@ pub trait Recordable<T: Serialize> {
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockDev {
+    pub allocs: Vec<LayeredDev>,
     pub devs: Vec<BlockDevSave>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct Cap {
-    pub allocs: Vec<LayeredDev>,
-}
+pub struct Cap {}
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DataTierSave {

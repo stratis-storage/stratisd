@@ -19,7 +19,7 @@ use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 use super::super::device::wipe_sectors;
 use super::super::dm::get_dm;
 use super::super::dmnames::{format_backstore_ids, CacheRole};
-use super::super::serde_structs::{BackstoreSave, Cap, Recordable};
+use super::super::serde_structs::{BackstoreSave, Cap, DataTierSave, Recordable};
 
 use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{map_to_dm, BlockDevMgr};
@@ -112,7 +112,7 @@ impl Backstore {
     ) -> StratisResult<Backstore> {
         let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
         let block_mgr = BlockDevMgr::new(datadevs, last_update_time);
-        let data_tier = DataTier::setup(block_mgr, &backstore_save.cap.allocs)?;
+        let data_tier = DataTier::setup(block_mgr, &backstore_save.data_tier.cap.allocs)?;
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
         let origin = LinearDev::setup(
             get_dm(),
@@ -565,12 +565,14 @@ impl Backstore {
 impl Recordable<BackstoreSave> for Backstore {
     fn record(&self) -> BackstoreSave {
         BackstoreSave {
-            cap: Cap {
-                allocs: self.data_tier.segments.record(),
-            },
             cache_devs: self.cache_tier.as_ref().map(|c| c.block_mgr.record()),
             cache_segments: self.cache_tier.as_ref().map(|c| c.cache_segments.record()),
             data_devs: self.data_tier.block_mgr.record(),
+            data_tier: DataTierSave {
+                cap: Cap {
+                    allocs: self.data_tier.segments.record(),
+                },
+            },
             meta_segments: self.cache_tier.as_ref().map(|c| c.meta_segments.record()),
         }
     }

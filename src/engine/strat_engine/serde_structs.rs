@@ -31,6 +31,11 @@ pub struct Cap {
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DataTierSave {
+    pub cap: Cap,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct LayeredDev {
     pub parent: DevUuid,
     pub start: Sectors,
@@ -77,7 +82,7 @@ pub struct BackstoreSave {
     pub cache_devs: Option<Vec<BlockDevSave>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_segments: Option<Vec<LayeredDev>>,
-    pub cap: Cap,
+    pub data_tier: DataTierSave,
     pub data_devs: Vec<BlockDevSave>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta_segments: Option<Vec<LayeredDev>>,

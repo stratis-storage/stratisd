@@ -143,7 +143,7 @@ pub fn get_blockdevs(
         };
 
     let mut segment_table: HashMap<DevUuid, Vec<(Sectors, Sectors)>> = HashMap::new();
-    for seg in &backstore_save.cap.allocs {
+    for seg in &backstore_save.data_tier.cap.allocs {
         segment_table
             .entry(seg.parent)
             .or_insert_with(Vec::default)

@@ -395,7 +395,9 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
             while let Some(event) = udev.receive_event() {
-                if event.event_type() == libudev::EventType::Add {
+                let event_type = event.event_type();
+                if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change
+                {
                     // Skip any device that does not have a device number and
                     // a device node.
                     if let Some((device, devnode)) = get_device_devnode(event.device()) {

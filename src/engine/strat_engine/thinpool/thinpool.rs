@@ -141,42 +141,36 @@ fn calc_lowater(
     available: DataBlocks,
     free_space_state: FreeSpaceState,
 ) -> DataBlocks {
-    // Calculate what to set lowater to, to achieve
-    // "event when XX% of the data device is used"
-    fn calc_data_lowater(percent_used: u8, total: DataBlocks) -> DataBlocks {
-        assert!(percent_used <= 100);
-        total - ((total * percent_used) / 100u8)
-    }
+    // Calculate the low water. dev_low_water and action_pct are the device
+    // low water and the percent used at which an action should be taken for
+    // a particular free space state.
+    //
+    // Postcondition:
+    // result == max(M * data_dev_size - (1 - M) * available, dev_low_water)
+    // where M <= (100 - action_pct)/100
+    let calc_lowater_internal = |dev_low_water: DataBlocks, action_pct: u8| -> DataBlocks {
+        let total = data_dev_size + available;
 
-    let total = data_dev_size + available;
+        assert!(action_pct <= 100);
+        let low_water = total - ((total * action_pct) / 100u8);
+        assert!(DataBlocks(std::u64::MAX) - available >= dev_low_water);
+
+        // WARNING: Do not alter this if-expression to a max-expression.
+        // Doing so would invalidate the assertion below.
+        if dev_low_water + available > low_water {
+            dev_low_water
+        } else {
+            assert!(low_water >= available);
+            low_water - available
+        }
+    };
+
     match free_space_state {
-        FreeSpaceState::Good => {
-            let warn_lowat_for_total = calc_data_lowater(SPACE_WARN_PCT, total);
-            assert!(DataBlocks(std::u64::MAX) - available >= DATA_LOWATER);
-
-            // WARNING: Do not alter this if-expression to a max-expression.
-            // Doing so would invalidate the assertion below.
-            if DATA_LOWATER + available > warn_lowat_for_total {
-                DATA_LOWATER
-            } else {
-                assert!(warn_lowat_for_total >= available);
-                warn_lowat_for_total - available
-            }
-        }
-        _ => {
-            let crit_lowat_for_total = calc_data_lowater(SPACE_CRIT_PCT, total);
-            assert!(DataBlocks(std::u64::MAX) - available >= THROTTLE_BLOCKS_PER_SEC);
-            // WARNING: Do not alter this if-expression to a max-expression.
-            // Doing so would invalidate the assertion below.
-            if THROTTLE_BLOCKS_PER_SEC + available > crit_lowat_for_total {
-                THROTTLE_BLOCKS_PER_SEC
-            } else {
-                assert!(crit_lowat_for_total >= available);
-                crit_lowat_for_total - available
-            }
-        }
+        FreeSpaceState::Good => calc_lowater_internal(DATA_LOWATER, SPACE_WARN_PCT),
+        _ => calc_lowater_internal(THROTTLE_BLOCKS_PER_SEC, SPACE_CRIT_PCT),
     }
 }
+
 pub struct ThinPoolSizeParams {
     meta_size: MetaBlocks,
     data_size: DataBlocks,

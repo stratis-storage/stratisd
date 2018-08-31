@@ -271,7 +271,7 @@ dependencies = [
 
 [[package]]
 name = "libstratis"
-version = "0.5.5"
+version = "0.9.0"
 dependencies = [
  "byteorder 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",

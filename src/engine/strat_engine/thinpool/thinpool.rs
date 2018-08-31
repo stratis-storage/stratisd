@@ -540,17 +540,17 @@ impl ThinPool {
                     }
                 };
 
+                let current_total = usage.total_data + extend_size;
+
                 // Update pool space state
                 self.free_space_state = self.free_space_check(
                     usage.used_data,
-                    usage.total_data - usage.used_data
-                        + extend_size
-                        + sectors_to_datablocks(backstore.available()),
+                    current_total + sectors_to_datablocks(backstore.available()) - usage.used_data,
                 )?;
 
                 // Trigger next event depending on pool space state
                 let lowater = calc_lowater(
-                    usage.total_data + extend_size,
+                    current_total,
                     sectors_to_datablocks(backstore.available()),
                     self.free_space_state,
                 );

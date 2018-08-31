@@ -7,9 +7,11 @@ mod macros;
 
 mod api;
 mod blockdev;
+pub mod consts;
 mod filesystem;
 mod pool;
 mod types;
 mod util;
 
 pub use self::api::{connect, handle, register_pool, DbusConnectionData};
+pub use self::util::prop_changed_dispatch;

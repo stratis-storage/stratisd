@@ -2,9 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#[cfg(feature = "dbus_enabled")]
-use dbus;
-
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -15,7 +12,7 @@ use uuid::Uuid;
 use devicemapper::{Bytes, Sectors, IEC};
 
 use super::super::engine::BlockDev;
-use super::super::types::BlockDevState;
+use super::super::types::{BlockDevState, MaybeDbusPath};
 
 use super::randomization::Randomizer;
 
@@ -27,8 +24,7 @@ pub struct SimDev {
     user_info: Option<String>,
     hardware_info: Option<String>,
     initialization_time: u64,
-    #[cfg(feature = "dbus_enabled")]
-    dbus_path: Option<dbus::Path<'static>>,
+    dbus_path: MaybeDbusPath,
 }
 
 impl BlockDev for SimDev {
@@ -56,13 +52,11 @@ impl BlockDev for SimDev {
         BlockDevState::InUse
     }
 
-    #[cfg(feature = "dbus_enabled")]
-    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> () {
-        self.dbus_path = Some(path)
+    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
+        self.dbus_path = path
     }
 
-    #[cfg(feature = "dbus_enabled")]
-    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>> {
+    fn get_dbus_path(&self) -> &MaybeDbusPath {
         &self.dbus_path
     }
 }
@@ -78,8 +72,7 @@ impl SimDev {
                 user_info: None,
                 hardware_info: None,
                 initialization_time: Utc::now().timestamp() as u64,
-                #[cfg(feature = "dbus_enabled")]
-                dbus_path: None,
+                dbus_path: MaybeDbusPath(None),
             },
         )
     }

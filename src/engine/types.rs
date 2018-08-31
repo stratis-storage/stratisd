@@ -7,6 +7,8 @@ use std::fmt;
 use std::ops::Deref;
 use std::rc::Rc;
 
+#[cfg(feature = "dbus_enabled")]
+use dbus;
 use uuid::Uuid;
 
 pub type DevUuid = Uuid;
@@ -21,7 +23,7 @@ pub enum RenameAction {
 }
 
 /// See Design Doc section 10.2.1 for more details.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BlockDevState {
     Missing,
     Bad,
@@ -29,6 +31,27 @@ pub enum BlockDevState {
     NotInUse,
     InUse,
 }
+
+impl BlockDevState {
+    pub fn to_dbus_value(&self) -> u16 {
+        match *self {
+            BlockDevState::Missing => 0,
+            BlockDevState::Bad => 1,
+            BlockDevState::Spare => 2,
+            BlockDevState::NotInUse => 3,
+            BlockDevState::InUse => 4,
+        }
+    }
+}
+
+/// A struct that may contain a dbus::Path, or may not, and most certainly
+/// doesn't if dbus is compiled out. This avoids littering engine code with
+/// conditional code.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MaybeDbusPath(
+    #[cfg(feature = "dbus_enabled")] pub Option<dbus::Path<'static>>,
+    #[cfg(not(feature = "dbus_enabled"))] pub Option<()>,
+);
 
 /// Blockdev tier. Used to distinguish between blockdevs used for
 /// data and blockdevs used for a cache.

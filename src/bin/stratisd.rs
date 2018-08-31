@@ -40,10 +40,15 @@ use nix::unistd::getpid;
 use timerfd::{SetTimeFlags, TimerFd, TimerState};
 
 #[cfg(feature = "dbus_enabled")]
-use dbus::WatchEvent;
+use dbus::{Connection, WatchEvent};
 
 use devicemapper::Device;
-
+#[cfg(feature = "dbus_enabled")]
+use libstratis::dbus_api::{consts, prop_changed_dispatch};
+#[cfg(feature = "dbus_enabled")]
+use libstratis::engine::{
+    get_engine_listener_list_mut, EngineEvent, EngineListener, MaybeDbusPath,
+};
 use libstratis::engine::{Engine, SimEngine, StratEngine};
 use libstratis::stratis::buff_log;
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
@@ -157,6 +162,98 @@ fn trylock_pid_file() -> StratisResult<File> {
                 "Daemon already running with pid: {}",
                 pid_str
             )))
+        }
+    }
+}
+
+#[cfg(feature = "dbus_enabled")]
+#[derive(Debug)]
+struct EventHandler {
+    dbus_conn: Rc<RefCell<Connection>>,
+}
+
+#[cfg(feature = "dbus_enabled")]
+impl EventHandler {
+    pub fn new(dbus_conn: Rc<RefCell<Connection>>) -> EventHandler {
+        EventHandler {
+            dbus_conn: dbus_conn,
+        }
+    }
+}
+
+#[cfg(feature = "dbus_enabled")]
+impl EngineListener for EventHandler {
+    fn notify(&self, event: &EngineEvent) {
+        match event {
+            &EngineEvent::BlockdevStateChanged { dbus_path, state } => {
+                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+                    prop_changed_dispatch(
+                        &self.dbus_conn.borrow(),
+                        consts::BLOCKDEV_STATE_PROP,
+                        state.to_dbus_value(),
+                        &dbus_path,
+                    ).unwrap_or_else(|()| {
+                        error!(
+                            "BlockdevStateChanged: {} state: {} failed to send dbus update.",
+                            dbus_path,
+                            state.to_dbus_value(),
+                        );
+                    });
+                }
+            }
+            &EngineEvent::FilesystemRenamed {
+                dbus_path,
+                from,
+                to,
+            } => {
+                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+                    prop_changed_dispatch(
+                        &self.dbus_conn.borrow(),
+                        consts::FILESYSTEM_NAME_PROP,
+                        to.to_owned(),
+                        &dbus_path,
+                    ).unwrap_or_else(|()| {
+                        error!(
+                            "FilesystemRenamed: {} from: {} to: {} failed to send dbus update.",
+                            dbus_path, from, to,
+                        );
+                    });
+                }
+            }
+            &EngineEvent::FilesystemUsedChanged { dbus_path, used } => {
+                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+                    prop_changed_dispatch(
+                        &self.dbus_conn.borrow(),
+                        consts::FILESYSTEM_USED_PROP,
+                        *used,
+                        &dbus_path,
+                    ).unwrap_or_else(|()| {
+                        error!(
+                            "FilesystemUsedChanged: {} used: {} failed to send dbus update.",
+                            dbus_path, used,
+                        );
+                    });
+                }
+            }
+            &EngineEvent::PoolRenamed {
+                dbus_path,
+                from,
+                to,
+            } => {
+                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+                    prop_changed_dispatch(
+                        &self.dbus_conn.borrow(),
+                        consts::POOL_NAME_PROP,
+                        to.to_owned(),
+                        &dbus_path,
+                    ).unwrap_or_else(|()| {
+                        error!(
+                            "PoolRenamed: {} from: {} to: {} failed to send dbus update.",
+                            dbus_path, from, to,
+                        );
+                    });
+                }
+            }
         }
     }
 }
@@ -301,7 +398,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                         if let Some(ref mut handle) = dbus_handle {
                             if let Some(pool_uuid) = pool_uuid {
                                 libstratis::dbus_api::register_pool(
-                                    &handle.connection,
+                                    &handle.connection.borrow(),
                                     &handle.context,
                                     &mut handle.tree,
                                     pool_uuid,
@@ -378,10 +475,11 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 {
                     for item in handle
                         .connection
+                        .borrow()
                         .watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents))
                     {
                         if let Err(r) = libstratis::dbus_api::handle(
-                            &handle.connection,
+                            &handle.connection.borrow(),
                             &item,
                             &mut handle.tree,
                             &handle.context,
@@ -395,16 +493,24 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 // Refresh list of dbus fds to poll for. This can change as
                 // D-Bus clients come and go.
                 fds.truncate(dbus_client_index_start);
-                fds.extend(handle.connection.watch_fds().iter().map(|w| w.to_pollfd()));
+                fds.extend(
+                    handle
+                        .connection
+                        .borrow()
+                        .watch_fds()
+                        .iter()
+                        .map(|w| w.to_pollfd()),
+                );
             } else {
                 // See if we can bring up dbus.
                 if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
                     info!("DBUS API is now available");
-
+                    let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
+                    get_engine_listener_list_mut().register_listener(event_handler);
                     // Register all the pools with dbus
                     for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
                         libstratis::dbus_api::register_pool(
-                            &handle.connection,
+                            &handle.connection.borrow(),
                             &handle.context,
                             &mut handle.tree,
                             pool_uuid,
@@ -414,7 +520,14 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                     }
 
                     // Add dbus FD to fds as dbus is now available.
-                    fds.extend(handle.connection.watch_fds().iter().map(|w| w.to_pollfd()));
+                    fds.extend(
+                        handle
+                            .connection
+                            .borrow()
+                            .watch_fds()
+                            .iter()
+                            .map(|w| w.to_pollfd()),
+                    );
                     dbus_handle = Some(handle);
                 }
             }

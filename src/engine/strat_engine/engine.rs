@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::clone::Clone;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -11,6 +12,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::devlinks;
 use super::super::engine::{Engine, Eventable, Pool};
+use super::super::event::{get_engine_listener_list, EngineEvent};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
@@ -255,6 +257,12 @@ impl Engine for StratEngine {
             self.pools.insert(old_name, uuid, pool);
             Err(err)
         } else {
+            get_engine_listener_list().notify(&EngineEvent::PoolRenamed {
+                dbus_path: pool.get_dbus_path(),
+                from: &*old_name,
+                to: &*new_name,
+            });
+
             self.pools.insert(new_name.clone(), uuid, pool);
             devlinks::pool_renamed(&old_name, &new_name)?;
             Ok(RenameAction::Renamed)

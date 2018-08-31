@@ -1,6 +1,6 @@
 [package]
 name = "libstratis"
-version = "0.5.5"
+version = "0.9.0"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.com>"]
 
 [dependencies]

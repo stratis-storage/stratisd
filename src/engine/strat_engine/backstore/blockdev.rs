@@ -4,9 +4,6 @@
 
 // Code to handle a single block device.
 
-#[cfg(feature = "dbus_enabled")]
-use dbus;
-
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 
@@ -17,7 +14,8 @@ use devicemapper::{Device, Sectors};
 use stratis::StratisResult;
 
 use super::super::super::engine::BlockDev;
-use super::super::super::types::{BlockDevState, DevUuid, PoolUuid};
+use super::super::super::event::{get_engine_listener_list, EngineEvent};
+use super::super::super::types::{BlockDevState, DevUuid, MaybeDbusPath, PoolUuid};
 
 use super::super::serde_structs::{BlockDevSave, Recordable};
 
@@ -32,8 +30,7 @@ pub struct StratBlockDev {
     used: RangeAllocator,
     user_info: Option<String>,
     hardware_info: Option<String>,
-    #[cfg(feature = "dbus_enabled")]
-    dbus_path: Option<dbus::Path<'static>>,
+    dbus_path: MaybeDbusPath,
 }
 
 impl StratBlockDev {
@@ -71,8 +68,7 @@ impl StratBlockDev {
             used: allocator,
             user_info,
             hardware_info,
-            #[cfg(feature = "dbus_enabled")]
-            dbus_path: None,
+            dbus_path: MaybeDbusPath(None),
         })
     }
 
@@ -112,7 +108,15 @@ impl StratBlockDev {
     /// sectors are needed than our capacity, return partial results.
     /// If all sectors are desired, use available() method to get all.
     pub fn request_space(&mut self, size: Sectors) -> (Sectors, Vec<(Sectors, Sectors)>) {
-        self.used.request(size)
+        let prev_state = self.state();
+        let result = self.used.request(size);
+        if result.0 > Sectors(0) && prev_state != BlockDevState::InUse {
+            get_engine_listener_list().notify(&EngineEvent::BlockdevStateChanged {
+                dbus_path: self.get_dbus_path(),
+                state: BlockDevState::InUse,
+            });
+        }
+        result
     }
 
     // ALL SIZE METHODS
@@ -175,17 +179,19 @@ impl BlockDev for StratBlockDev {
     }
 
     fn state(&self) -> BlockDevState {
-        // TODO: Implement states for blockdevs
-        BlockDevState::InUse
+        // TODO: Implement support for other BlockDevStates
+        if self.used.used() > self.bda.size() {
+            BlockDevState::InUse
+        } else {
+            BlockDevState::NotInUse
+        }
     }
 
-    #[cfg(feature = "dbus_enabled")]
-    fn set_dbus_path(&mut self, path: dbus::Path<'static>) -> () {
-        self.dbus_path = Some(path)
+    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
+        self.dbus_path = path
     }
 
-    #[cfg(feature = "dbus_enabled")]
-    fn get_dbus_path(&self) -> &Option<dbus::Path<'static>> {
+    fn get_dbus_path(&self) -> &MaybeDbusPath {
         &self.dbus_path
     }
 }

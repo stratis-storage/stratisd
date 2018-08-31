@@ -17,9 +17,10 @@ use uuid::Uuid;
 
 use devicemapper::Sectors;
 
-use super::super::engine::{BlockDevTier, Name, Pool, RenameAction};
+use super::super::engine::{BlockDevTier, MaybeDbusPath, Name, Pool, RenameAction};
 
 use super::blockdev::create_dbus_blockdev;
+use super::consts;
 use super::filesystem::create_dbus_filesystem;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
@@ -399,9 +400,9 @@ pub fn create_dbus_pool<'a>(
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let name_property = f.property::<&str, _>("Name", ())
+    let name_property = f.property::<&str, _>(consts::POOL_NAME_PROP, ())
         .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
+        .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_name);
 
     let total_physical_size_property = f.property::<&str, _>("TotalPhysicalSize", ())
@@ -445,6 +446,6 @@ pub fn create_dbus_pool<'a>(
 
     let path = object_path.get_name().to_owned();
     dbus_context.actions.borrow_mut().push_add(object_path);
-    pool.set_dbus_path(path.clone());
+    pool.set_dbus_path(MaybeDbusPath(Some(path.clone())));
     path
 }

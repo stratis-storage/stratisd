@@ -108,12 +108,10 @@ fn initialize_log(debug: bool) -> buff_log::Handle<env_logger::Logger> {
     }
 }
 
-/// Given a udev event check to see if it's an add or change and if it is return the device node
-/// and devicemapper::Device.
-fn handle_udev_event(event: &libudev::Event) -> Option<(Device, PathBuf)> {
-    if event.event_type() == libudev::EventType::Add
-        || event.event_type() == libudev::EventType::Change
-    {
+/// Given a udev event check to see if it's an add and if it is return the device node and
+/// devicemapper::Device.
+fn handle_udev_add(event: &libudev::Event) -> Option<(Device, PathBuf)> {
+    if event.event_type() == libudev::EventType::Add {
         let device = event.device();
         return device.devnode().and_then(|devnode| {
             device
@@ -413,7 +411,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
             while let Some(event) = udev.receive_event() {
-                if let Some((device, devnode)) = handle_udev_event(&event) {
+                if let Some((device, devnode)) = handle_udev_add(&event) {
                     // If block evaluate returns an error we are going to ignore it as
                     // there is nothing we can do for a device we are getting errors with.
                     #[cfg(not(feature = "dbus_enabled"))]

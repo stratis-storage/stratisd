@@ -31,7 +31,7 @@ version = "0.6"
 features = ["serde", "v4"]
 
 [dev-dependencies]
-quickcheck = "0.6"
+quickcheck = "0.7"
 loopdev = "0.2"
 either = "1.1.0"
 

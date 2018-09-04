@@ -19,36 +19,29 @@ use super::super::super::udev::get_udev;
 /// should be correct. The expression is equivalent to that used in PR:
 /// https://github.com/stratis-storage/stratisd/pull/936.
 pub fn unclaimed(device: &libudev::Device) -> bool {
-    get_udev_property(device, "DM_MULTIPATH_DEVICE_PATH")
-        .map(|v| v.is_none())
-        .unwrap_or(false)
-        && (get_udev_property(device, "ID_PART_TABLE_TYPE")
-            .map(|v| v.is_none())
-            .unwrap_or(false)
-            || get_udev_property(device, "ID_PART_ENTRY_DISK")
-                .map(|v| v.is_some())
-                .unwrap_or(true))
-        && get_udev_property(device, "ID_FS_USAGE")
-            .map(|v| v.is_none())
-            .unwrap_or(false)
+    get_udev_property(device, "DM_MULTIPATH_DEVICE_PATH").is_none()
+        && (get_udev_property(device, "ID_PART_TABLE_TYPE").is_none()
+            || get_udev_property(device, "ID_PART_ENTRY_DISK").is_some())
+        && get_udev_property(device, "ID_FS_USAGE").is_none()
 }
 
 /// Get a udev property with the given name for the given device.
+/// Returns None if no udev property found for the given property name.
 /// Returns an error if the value of the property can not be converted
 /// to a String using the standard conversion for this OS.
 pub fn get_udev_property<T: AsRef<OsStr>>(
     device: &libudev::Device,
     property_name: T,
-) -> StratisResult<Option<String>> {
+) -> Option<StratisResult<String>> {
     match device.property_value(property_name) {
         Some(value) => match value.to_str() {
-            Some(value) => Ok(Some(value.into())),
-            None => Err(StratisError::Error(format!(
+            Some(value) => Some(Ok(value.into())),
+            None => Some(Err(StratisError::Error(format!(
                 "Unable to convert {:?} to str",
                 value
-            ))),
+            )))),
         },
-        None => Ok(None),
+        None => None,
     }
 }
 

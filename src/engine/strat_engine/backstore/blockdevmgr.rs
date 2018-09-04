@@ -454,7 +454,7 @@ fn initialize(
         if let Ok(bda) = bda {
             let hw_id =
                 match udev_block_device_apply(devnode, |dev| get_udev_property(dev, "ID_WWN")) {
-                    Ok(Some(Ok(Some(id)))) => Some(id),
+                    Ok(Some(Some(Ok(id)))) => Some(id),
                     _ => None, // TODO: Log this failure so that it can be addressed.
                 };
 

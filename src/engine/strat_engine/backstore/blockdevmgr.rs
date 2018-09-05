@@ -213,7 +213,7 @@ impl BlockDevMgr {
         Ok(bdev_uuids)
     }
 
-    pub fn destroy_all(self) -> StratisResult<()> {
+    pub fn destroy_all(&mut self) -> StratisResult<()> {
         wipe_blockdevs(&self.block_devs)
     }
 
@@ -727,7 +727,7 @@ mod tests {
     /// them releases all.
     fn test_ownership(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
-        let bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
 
         cmd::udev_settle().unwrap();
 

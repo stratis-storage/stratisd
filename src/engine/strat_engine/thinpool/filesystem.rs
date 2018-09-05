@@ -211,13 +211,13 @@ impl StratFilesystem {
     }
 
     /// Tear down the filesystem.
-    pub fn teardown(self) -> StratisResult<()> {
+    pub fn teardown(&mut self) -> StratisResult<()> {
         self.thin_dev.teardown(get_dm())?;
         Ok(())
     }
 
     /// Destroy the filesystem.
-    pub fn destroy(self, thin_pool: &ThinPoolDev) -> StratisResult<()> {
+    pub fn destroy(&mut self, thin_pool: &ThinPoolDev) -> StratisResult<()> {
         self.thin_dev.destroy(get_dm(), thin_pool)?;
         Ok(())
     }

@@ -127,7 +127,7 @@ impl Pool for SimPool {
         Ok(ret_uuids)
     }
 
-    fn destroy(self) -> StratisResult<()> {
+    fn destroy(&mut self) -> StratisResult<()> {
         // Nothing to do here.
         Ok(())
     }

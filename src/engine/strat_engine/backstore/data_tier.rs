@@ -169,7 +169,7 @@ impl Recordable<DataTierSave> for DataTier {
                 allocs: self.segments.record(),
                 devs: self.block_mgr.record(),
             },
-            cap: Cap {},
+            cap: Cap { allocs: vec![] },
         }
     }
 }

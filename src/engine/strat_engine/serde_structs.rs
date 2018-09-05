@@ -32,7 +32,9 @@ pub struct BlockDev {
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct Cap {}
+pub struct Cap {
+    pub allocs: Vec<LayeredDev>,
+}
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DataTierSave {

@@ -669,10 +669,10 @@ impl ThinPool {
 
     /// Tear down the components managed here: filesystems, the MDV,
     /// and the actual thinpool device itself.
-    pub fn teardown(self) -> StratisResult<()> {
+    pub fn teardown(&mut self) -> StratisResult<()> {
         // Must succeed in tearing down all filesystems before the
         // thinpool..
-        for (_, _, fs) in self.filesystems {
+        for (_, _, ref mut fs) in &mut self.filesystems {
             fs.teardown()?;
         }
         self.thin_pool.teardown(get_dm())?;
@@ -906,7 +906,7 @@ impl ThinPool {
         pool_name: &str,
         uuid: FilesystemUuid,
     ) -> StratisResult<()> {
-        if let Some((fs_name, fs)) = self.filesystems.remove_by_uuid(uuid) {
+        if let Some((fs_name, mut fs)) = self.filesystems.remove_by_uuid(uuid) {
             fs.destroy(&self.thin_pool)?;
             self.mdv.rm_fs(uuid)?;
             devlinks::filesystem_removed(pool_name, &fs_name)?;
@@ -1094,7 +1094,7 @@ fn setup_metadev(
 /// and return the new meta device.
 fn attempt_thin_repair(
     pool_uuid: PoolUuid,
-    meta_dev: LinearDev,
+    mut meta_dev: LinearDev,
     device: Device,
     spare_segments: &[(Sectors, Sectors)],
 ) -> StratisResult<LinearDev> {

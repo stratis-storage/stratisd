@@ -92,7 +92,7 @@ pub trait Pool: Debug {
     /// Destroy the pool.
     /// Precondition: All filesystems belonging to this pool must be
     /// unmounted.
-    fn destroy(self) -> StratisResult<()>;
+    fn destroy(&mut self) -> StratisResult<()>;
 
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.

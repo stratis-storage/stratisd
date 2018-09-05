@@ -135,7 +135,7 @@ impl CacheTier {
     }
 
     /// Destroy the tier. Wipe its blockdevs.
-    pub fn destroy(self) -> StratisResult<()> {
+    pub fn destroy(&mut self) -> StratisResult<()> {
         self.block_mgr.destroy_all()
     }
 

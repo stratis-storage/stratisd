@@ -20,8 +20,8 @@ use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 use super::super::serde_structs::{BackstoreSave, BlockDevSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
-use super::device::{blkdev_size, is_stratis_device};
-use super::metadata::BDA;
+use super::device::blkdev_size;
+use super::metadata::{StaticHeader, BDA};
 use super::util::get_stratis_block_devices;
 
 /// Find all Stratis devices.
@@ -34,12 +34,14 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
         match devnode_to_devno(&devnode)? {
             None => continue,
             Some(devno) => {
-                is_stratis_device(&devnode)?.and_then(|pool_uuid| {
+                if let Some((pool_uuid, _)) = StaticHeader::device_identifiers(
+                    &mut OpenOptions::new().read(true).open(&devnode)?,
+                )? {
                     pool_map
                         .entry(pool_uuid)
                         .or_insert_with(HashMap::new)
-                        .insert(Device::from(devno), devnode)
-                });
+                        .insert(Device::from(devno), devnode);
+                }
             }
         }
     }

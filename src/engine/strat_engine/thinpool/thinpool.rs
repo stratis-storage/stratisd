@@ -894,18 +894,40 @@ impl ThinPool {
         ))
     }
 
-    /// Destroy a filesystem within the thin pool.
+    /// Destroy a filesystem within the thin pool. Destroy metadata and
+    /// devlinks information associated with the thinpool. If there is a
+    /// failure to destroy the filesystem, retain it, and return an error.
     pub fn destroy_filesystem(
         &mut self,
         pool_name: &str,
         uuid: FilesystemUuid,
     ) -> StratisResult<()> {
-        if let Some((fs_name, mut fs)) = self.filesystems.remove_by_uuid(uuid) {
-            fs.destroy(&self.thin_pool)?;
-            self.mdv.rm_fs(uuid)?;
-            devlinks::filesystem_removed(pool_name, &fs_name)?;
+        match self.filesystems.remove_by_uuid(uuid) {
+            Some((fs_name, mut fs)) => match fs.destroy(&self.thin_pool) {
+                Ok(_) => {
+                    if let Err(err) = self.mdv.rm_fs(uuid) {
+                        error!("Could not remove metadata for fs with UUID {} and name {} belonging to pool {}, reason: {:?}",
+                               uuid,
+                               fs_name,
+                               pool_name,
+                               err);
+                    }
+                    if let Err(err) = devlinks::filesystem_removed(pool_name, &fs_name) {
+                        error!("Could not remove devlinks for fs with UUID {} and name {} belonging to pool {}, reason: {:?}",
+                               uuid,
+                               fs_name,
+                               pool_name,
+                               err);
+                    }
+                    Ok(())
+                }
+                Err(err) => {
+                    self.filesystems.insert(fs_name, uuid, fs);
+                    Err(err)
+                }
+            },
+            None => Ok(()),
         }
-        Ok(())
     }
 
     /// Rename a filesystem within the thin pool.

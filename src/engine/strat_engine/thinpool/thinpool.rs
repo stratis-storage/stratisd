@@ -909,8 +909,13 @@ impl ThinPool {
         if let Some((ref fs_name, ref mut fs)) = self.filesystems.get_mut_by_uuid(uuid) {
             match fs.destroy(&self.thin_pool) {
                 Ok(_) => {
-                    self.mdv.rm_fs(uuid)?;
-                    devlinks::filesystem_removed(pool_name, &fs_name)?;
+                    // The filesystem is GONE, so failing now isn't really an option
+                    if let Err(_) = self.mdv.rm_fs(uuid) {
+                        error!("Could not remove fs metadata");
+                    }
+                    if let Err(_) = devlinks::filesystem_removed(pool_name, &fs_name) {
+                        error!("Could not remove fs devlinks");
+                    }
                 }
                 // Maybe it was still mounted?
                 Err(e) => return Err(e),

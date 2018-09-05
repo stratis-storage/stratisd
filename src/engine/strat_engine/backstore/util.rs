@@ -39,6 +39,7 @@ pub fn get_udev_block_device(
 
     let result = enumerator
         .scan_devices()?
+        .filter(|dev| dev.is_initialized())
         .find(|x| x.devnode().map_or(false, |d| canonical == d))
         .and_then(|dev| Some(device_as_map(&dev)));
     Ok(result)
@@ -59,6 +60,7 @@ fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
 
     Ok(enumerator
         .scan_devices()?
+        .filter(|dev| dev.is_initialized())
         .filter(|dev| {
             dev.property_value("DM_MULTIPATH_DEVICE_PATH").is_none()
                 && !((dev.property_value("ID_PART_TABLE_TYPE").is_some()
@@ -78,6 +80,7 @@ pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
 
     let devices: Vec<PathBuf> = enumerator
         .scan_devices()?
+        .filter(|dev| dev.is_initialized())
         .filter(|dev| dev.property_value("DM_MULTIPATH_DEVICE_PATH").is_none())
         .filter_map(|i| i.devnode().map(|d| d.into()))
         .collect();

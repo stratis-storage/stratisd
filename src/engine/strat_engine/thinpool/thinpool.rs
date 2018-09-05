@@ -397,14 +397,22 @@ impl ThinPool {
         let mdv = MetadataVol::setup(pool_uuid, mdv_dev)?;
         let filesystem_metadatas = mdv.filesystems()?;
 
-        // TODO: not fail completely if one filesystem setup fails?
         let filesystems = filesystem_metadatas
             .iter()
-            .map(|fssave| {
-                StratFilesystem::setup(pool_uuid, &thinpool_dev, fssave)
-                    .map(|fs| (Name::new(fssave.name.to_owned()), fssave.uuid, fs))
-            })
-            .collect::<StratisResult<Vec<_>>>()?;
+            .filter_map(
+                |fssave| match StratFilesystem::setup(pool_uuid, &thinpool_dev, fssave) {
+                    Ok(fs) => Some((Name::new(fssave.name.to_owned()), fssave.uuid, fs)),
+                    Err(err) => {
+                        warn!(
+                            "Filesystem specified by metadata {:?} could not be setup, reason: {:?}",
+                            fssave,
+                            err
+                        );
+                        None
+                    }
+                },
+            )
+            .collect::<Vec<_>>();
 
         let mut fs_table = Table::default();
         for (name, uuid, fs) in filesystems {

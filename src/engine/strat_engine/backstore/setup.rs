@@ -24,7 +24,7 @@ use super::super::serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave};
 use super::blockdev::StratBlockDev;
 use super::device::blkdev_size;
 use super::metadata::{device_identifiers, BDA};
-use super::udev::unclaimed;
+use super::udev::{must_ignore, unclaimed};
 
 /// Find all Stratis devices.
 ///
@@ -39,6 +39,7 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
     // Skip any block devices w/out a devnode and a device number.
     let devices: Vec<(Device, PathBuf)> = enumerator
         .scan_devices()?
+        .filter(|x| !must_ignore(x))
         .filter_map(|x| get_device_devnode(&x))
         .collect();
 
@@ -46,7 +47,8 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
     // not less than that required to identify Stratis devices, this block
     // can be removed.
     let (devices, only_stratis) = if devices.is_empty() {
-        // There are no Stratis devices OR libblkid is an early version that
+        // There are no Stratis devices or the only Stratis devices are
+        // multipath members OR libblkid is an early version that
         // doesn't support identifying Stratis devices. Fall back to using
         // udev to get all devices that are lacking any signature which
         // identifies them as belonging to some other system or application.
@@ -57,7 +59,7 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
         (
             enumerator
                 .scan_devices()?
-                .filter(|d| unclaimed(d))
+                .filter(|d| unclaimed(d) && !must_ignore(d))
                 .filter_map(|x| get_device_devnode(&x))
                 .collect(),
             false,
@@ -68,7 +70,8 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
 
     let mut pool_map = HashMap::new();
     if only_stratis {
-        // If these are devices that udev has identified as Stratis:
+        // If these are devices that udev has identified as Stratis but not
+        // multipath members:
         // 1. Assume that not being able to open the device is an error.
         // 2. Return an error if the device has no Stratis header.
         for (device, devnode) in devices {
@@ -86,7 +89,8 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
             }
         }
     } else {
-        // If these are only unclaimed devices (a fallback when libblkid is
+        // If these are only unclaimed devices or devices that are "certainly"
+        // not multipath member devices (a fallback when libblkid is
         // not a recent version that can identify Stratis devices):
         // 1. Assume that failure to open the device is not an error.
         // 2. Do not treat failure to find the Stratis header as an error.

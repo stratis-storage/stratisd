@@ -13,15 +13,25 @@ use stratis::{StratisError, StratisResult};
 
 use super::super::super::udev::get_udev;
 
+/// Devices that _must_ be ignored. Such a device may have Stratis metadata
+/// on, but must _not_  be incorporated into stratisd hierarchy. The only
+/// example of such a thing right now is a metadata member device.
+/// WARNING: This method can be relied on only if DM_MULTIPATH* udev
+/// properties have been properly set by the time this property is read.
+pub fn must_ignore(device: &libudev::Device) -> bool {
+    get_udev_property(device, "DM_MULTIPATH_DEVICE_PATH").is_some()
+}
+
 /// If the expression is true, then it seems that no other system is
 /// known to udev to claim this device.
 /// Note from mulhern: I have no idea myself why this particular expression
 /// should be correct. The expression is equivalent to that used in PR:
 /// https://github.com/stratis-storage/stratisd/pull/936.
+/// WARNING: This method can be relied on only if ID_* udev
+/// properties have been properly set by the time they are read.
 pub fn unclaimed(device: &libudev::Device) -> bool {
-    get_udev_property(device, "DM_MULTIPATH_DEVICE_PATH").is_none()
-        && (get_udev_property(device, "ID_PART_TABLE_TYPE").is_none()
-            || get_udev_property(device, "ID_PART_ENTRY_DISK").is_some())
+    (get_udev_property(device, "ID_PART_TABLE_TYPE").is_none()
+        || get_udev_property(device, "ID_PART_ENTRY_DISK").is_some())
         && get_udev_property(device, "ID_FS_USAGE").is_none()
 }
 

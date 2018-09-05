@@ -906,11 +906,18 @@ impl ThinPool {
         pool_name: &str,
         uuid: FilesystemUuid,
     ) -> StratisResult<()> {
-        if let Some((fs_name, mut fs)) = self.filesystems.remove_by_uuid(uuid) {
-            fs.destroy(&self.thin_pool)?;
-            self.mdv.rm_fs(uuid)?;
-            devlinks::filesystem_removed(pool_name, &fs_name)?;
+        if let Some((ref fs_name, ref mut fs)) = self.filesystems.get_mut_by_uuid(uuid) {
+            match fs.destroy(&self.thin_pool) {
+                Ok(_) => {
+                    self.mdv.rm_fs(uuid)?;
+                    devlinks::filesystem_removed(pool_name, &fs_name)?;
+                }
+                // Maybe it was still mounted?
+                Err(e) => return Err(e),
+            }
         }
+        self.filesystems.remove_by_uuid(uuid);
+
         Ok(())
     }
 

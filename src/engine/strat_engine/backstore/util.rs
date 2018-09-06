@@ -39,6 +39,7 @@ pub fn get_udev_block_device(
 
     let result = enumerator
         .scan_devices()?
+        .filter(|dev| dev.is_initialized())
         .find(|x| x.devnode().map_or(false, |d| canonical == d))
         .and_then(|dev| Some(device_as_map(&dev)));
     Ok(result)
@@ -59,6 +60,7 @@ fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
 
     Ok(enumerator
         .scan_devices()?
+        .filter(|dev| dev.is_initialized())
         .filter(|dev| {
             dev.property_value("DM_MULTIPATH_DEVICE_PATH").is_none()
                 && !((dev.property_value("ID_PART_TABLE_TYPE").is_some()
@@ -78,14 +80,20 @@ pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
 
     let devices: Vec<PathBuf> = enumerator
         .scan_devices()?
+        .filter(|dev| dev.is_initialized())
         .filter(|dev| dev.property_value("DM_MULTIPATH_DEVICE_PATH").is_none())
         .filter_map(|i| i.devnode().map(|d| d.into()))
         .collect();
 
     if devices.is_empty() {
-        // Either we don't have any stratis devices or we are using a distribution that doesn't
-        // have a version of libblkid that supports stratis, lets make sure.
-        // TODO: At some point in the future we can remove this and just return the devices.
+        // We have found no Stratis devices, possible reasons are:
+        // 1. We really don't have any
+        // 2. We have some, but libblkid is too old to support Stratis, thus we appear empty
+        // 3. We ran this code at early boot before we have any udev db entries which are complete
+        //    or are complete but fall into reasons 1 & 2 above
+        //
+        // In this case we will get all the block devices which have complete udev db block device
+        // entries and appear "empty" and go out to disk and check them!
 
         Ok(get_all_empty_devices()?
             .into_iter()

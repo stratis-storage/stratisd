@@ -915,30 +915,40 @@ impl ThinPool {
         ))
     }
 
-    /// Destroy a filesystem within the thin pool.
+    /// Destroy a filesystem within the thin pool. Destroy metadata and
+    /// devlinks information associated with the thinpool. If there is a
+    /// failure to destroy the filesystem, retain it, and return an error.
     pub fn destroy_filesystem(
         &mut self,
         pool_name: &str,
         uuid: FilesystemUuid,
     ) -> StratisResult<()> {
-        if let Some((ref fs_name, ref mut fs)) = self.filesystems.get_mut_by_uuid(uuid) {
-            match fs.destroy(&self.thin_pool) {
+        match self.filesystems.remove_by_uuid(uuid) {
+            Some((fs_name, mut fs)) => match fs.destroy(&self.thin_pool) {
                 Ok(_) => {
-                    // The filesystem is GONE, so failing now isn't really an option
-                    if let Err(_) = self.mdv.rm_fs(uuid) {
-                        error!("Could not remove fs metadata");
+                    if let Err(err) = self.mdv.rm_fs(uuid) {
+                        error!("Could not remove metadata for fs with UUID {} and name {} belonging to pool {}, reason: {:?}",
+                               uuid,
+                               fs_name,
+                               pool_name,
+                               err);
                     }
-                    if let Err(_) = devlinks::filesystem_removed(pool_name, &fs_name) {
-                        error!("Could not remove fs devlinks");
+                    if let Err(err) = devlinks::filesystem_removed(pool_name, &fs_name) {
+                        error!("Could not remove devlinks for fs with UUID {} and name {} belonging to pool {}, reason: {:?}",
+                               uuid,
+                               fs_name,
+                               pool_name,
+                               err);
                     }
+                    Ok(())
                 }
-                // Maybe it was still mounted?
-                Err(e) => return Err(e),
-            }
+                Err(err) => {
+                    self.filesystems.insert(fs_name, uuid, fs);
+                    Err(err)
+                }
+            },
+            None => Ok(()),
         }
-        self.filesystems.remove_by_uuid(uuid);
-
-        Ok(())
     }
 
     /// Rename a filesystem within the thin pool.

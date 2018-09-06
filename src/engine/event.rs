@@ -7,7 +7,7 @@ use devicemapper::Bytes;
 use std::fmt::Debug;
 use std::sync::{Once, ONCE_INIT};
 
-use super::types::{BlockDevState, MaybeDbusPath};
+use super::types::{BlockDevState, MaybeDbusPath, PoolState};
 
 static INIT: Once = ONCE_INIT;
 static mut ENGINE_LISTENER_LIST: Option<EngineListenerList> = None;
@@ -31,6 +31,10 @@ pub enum EngineEvent<'a> {
         dbus_path: &'a MaybeDbusPath,
         from: &'a str,
         to: &'a str,
+    },
+    PoolStateChanged {
+        dbus_path: &'a MaybeDbusPath,
+        state: PoolState,
     },
 }
 

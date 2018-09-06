@@ -23,7 +23,7 @@ use super::super::super::engine::Filesystem;
 use super::super::super::event::{get_engine_listener_list, EngineEvent};
 use super::super::super::structures::Table;
 use super::super::super::types::{
-    FilesystemUuid, FreeSpaceState, Name, PoolState, PoolUuid, RenameAction,
+    FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolState, PoolUuid, RenameAction,
 };
 
 use super::super::backstore::Backstore;
@@ -223,6 +223,7 @@ pub struct ThinPool {
     backstore_device: Device,
     pool_state: PoolState,
     free_space_state: FreeSpaceState,
+    dbus_path: MaybeDbusPath,
 }
 
 impl ThinPool {
@@ -321,6 +322,7 @@ impl ThinPool {
             backstore_device,
             pool_state: PoolState::Good,
             free_space_state,
+            dbus_path: MaybeDbusPath(None),
         })
     }
 
@@ -427,6 +429,7 @@ impl ThinPool {
             backstore_device,
             pool_state: PoolState::Good,
             free_space_state,
+            dbus_path: MaybeDbusPath(None),
         })
     }
 
@@ -475,11 +478,11 @@ impl ThinPool {
                     ThinPoolStatusSummary::Good => {}
                     ThinPoolStatusSummary::ReadOnly => {
                         error!("Thinpool readonly! -> BAD");
-                        self.pool_state = PoolState::Bad;
+                        self.set_state(PoolState::Bad);
                     }
                     ThinPoolStatusSummary::OutOfSpace => {
                         error!("Thinpool out of space! -> BAD");
-                        self.pool_state = PoolState::Bad;
+                        self.set_state(PoolState::Bad);
                     }
                 }
 
@@ -505,7 +508,7 @@ impl ThinPool {
                         }
                         Err(err) => {
                             error!("Thinpool meta extend failed! -> BAD: reason {:?}", err);
-                            self.pool_state = PoolState::Bad;
+                            self.set_state(PoolState::Bad);
                         }
                     }
                 }
@@ -532,7 +535,7 @@ impl ThinPool {
                             }
                             Err(err) => {
                                 error!("Thinpool data extend failed! -> BAD: reason: {:?}", err);
-                                self.pool_state = PoolState::Bad;
+                                self.set_state(PoolState::Bad);
                                 DataBlocks(0)
                             }
                         },
@@ -559,7 +562,7 @@ impl ThinPool {
             }
             dm::ThinPoolStatus::Fail => {
                 error!("Thinpool status is `fail` -> BAD");
-                self.pool_state = PoolState::Bad;
+                self.set_state(PoolState::Bad);
                 // TODO: Take pool offline?
                 // TODO: Run thin_check
             }
@@ -577,6 +580,16 @@ impl ThinPool {
             }
         }
         Ok(should_save)
+    }
+
+    fn set_state(&mut self, new_state: PoolState) {
+        if self.state() != new_state {
+            self.pool_state = new_state;
+            get_engine_listener_list().notify(&EngineEvent::PoolStateChanged {
+                dbus_path: self.get_dbus_path(),
+                state: new_state,
+            });
+        }
     }
 
     /// Possibly transition to a new FreeSpaceState based on usage, and invoke
@@ -1050,6 +1063,14 @@ impl ThinPool {
         self.backstore_device = backstore_device;
 
         Ok(true)
+    }
+
+    pub fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
+        self.dbus_path = path
+    }
+
+    fn get_dbus_path(&self) -> &MaybeDbusPath {
+        &self.dbus_path
     }
 }
 

@@ -403,17 +403,6 @@ impl ThinPool {
         let mdv = MetadataVol::setup(pool_uuid, mdv_dev)?;
         let filesystem_metadatas = mdv.filesystems()?;
 
-        // If a filesystem can not be set up from the filesystem data,
-        // presume that the filesystem was destroyed previously, but its
-        // metadata was not removed succesfully. If that is the case, then
-        // it is safe to ignore the filesystem and reasonable to try to
-        // remove the metadata at this juncture.
-        //
-        // FIXME: Unfortunately, there are many reasons for file system
-        // creation to fail, of which having previously been destroyed is
-        // just one. If the filesystem actually does exist, but there was
-        // some other cause of setup failure, then destroying the filesystem
-        // metadata is probably unwise.
         let filesystems = filesystem_metadatas
             .iter()
             .filter_map(
@@ -425,13 +414,6 @@ impl ThinPool {
                             fssave,
                             err
                         );
-                        mdv.rm_fs(fssave.uuid).unwrap_or_else(|err| {
-                            error!(
-                                "Could not remove filesystem metadata {:?} for non-existent filesystem, reason: {:?}",
-                                fssave,
-                                err
-                            )
-                        });
                         None
                     }
                 },

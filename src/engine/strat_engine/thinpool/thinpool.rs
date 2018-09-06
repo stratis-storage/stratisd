@@ -22,7 +22,9 @@ use super::super::super::devlinks;
 use super::super::super::engine::Filesystem;
 use super::super::super::event::{get_engine_listener_list, EngineEvent};
 use super::super::super::structures::Table;
-use super::super::super::types::{FilesystemUuid, Name, PoolUuid, RenameAction};
+use super::super::super::types::{
+    FilesystemUuid, FreeSpaceState, Name, PoolState, PoolUuid, RenameAction,
+};
 
 use super::super::backstore::Backstore;
 use super::super::cmd::{thin_check, thin_repair};
@@ -200,19 +202,6 @@ impl Default for ThinPoolSizeParams {
             mdv_size: INITIAL_MDV_SIZE,
         }
     }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum PoolState {
-    Good,
-    Bad,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum FreeSpaceState {
-    Good,
-    Warn,
-    Crit,
 }
 
 /// A ThinPool struct contains the thinpool itself, the spare
@@ -938,6 +927,10 @@ impl ThinPool {
             },
             None => Ok(()),
         }
+    }
+
+    pub fn state(&self) -> PoolState {
+        self.pool_state
     }
 
     /// Rename a filesystem within the thin pool.

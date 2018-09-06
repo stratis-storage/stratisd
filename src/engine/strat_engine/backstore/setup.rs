@@ -37,9 +37,11 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
     enumerator.match_property("ID_FS_TYPE", "stratis")?;
 
     // Skip any block devices w/out a devnode and a device number.
+    // Also skip block devices that that are definitely multipath members.
+    // If the device is not yet initialized, skip it.
     let devices: Vec<(Device, PathBuf)> = enumerator
         .scan_devices()?
-        .filter(|x| !must_ignore(x))
+        .filter(|x| x.is_initialized() && !must_ignore(x))
         .filter_map(|x| get_device_devnode(&x))
         .collect();
 
@@ -49,9 +51,11 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
     let (devices, only_stratis) = if devices.is_empty() {
         // There are no Stratis devices or the only Stratis devices are
         // multipath members OR libblkid is an early version that
-        // doesn't support identifying Stratis devices. Fall back to using
+        // doesn't support identifying Stratis devices OR this code is being
+        // run so early that devices are not initialized. Fall back to using
         // udev to get all devices that are lacking any signature which
-        // identifies them as belonging to some other system or application.
+        // identifies them as belonging to some other system or application
+        // but which are initialized.
 
         let mut enumerator = libudev::Enumerator::new(context)?;
         enumerator.match_subsystem("block")?;
@@ -59,7 +63,7 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
         (
             enumerator
                 .scan_devices()?
-                .filter(|d| unclaimed(d) && !must_ignore(d))
+                .filter(|d| d.is_initialized() && unclaimed(d) && !must_ignore(d))
                 .filter_map(|x| get_device_devnode(&x))
                 .collect(),
             false,

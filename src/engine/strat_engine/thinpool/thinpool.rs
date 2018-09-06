@@ -397,19 +397,47 @@ impl ThinPool {
         let mdv = MetadataVol::setup(pool_uuid, mdv_dev)?;
         let filesystem_metadatas = mdv.filesystems()?;
 
-        // TODO: not fail completely if one filesystem setup fails?
+        // If a filesystem can not be set up from the filesystem data,
+        // presume that the filesystem was destroyed previously, but its
+        // metadata was not removed succesfully. If that is the case, then
+        // it is safe to ignore the filesystem and reasonable to try to
+        // remove the metadata at this juncture.
+        //
+        // FIXME: Unfortunately, there are many reasons for file system
+        // creation to fail, of which having previously been destroyed is
+        // just one. If the filesystem actually does exist, but there was
+        // some other cause of setup failure, then destroying the filesystem
+        // metadata is probably unwise.
         let filesystems = filesystem_metadatas
             .iter()
-            .map(|fssave| {
-                StratFilesystem::setup(pool_uuid, &thinpool_dev, fssave)
-                    .map(|fs| (Name::new(fssave.name.to_owned()), fssave.uuid, fs))
-            })
-            .collect::<StratisResult<Vec<_>>>()?;
+            .filter_map(
+                |fssave| match StratFilesystem::setup(pool_uuid, &thinpool_dev, fssave) {
+                    Ok(fs) => Some((Name::new(fssave.name.to_owned()), fssave.uuid, fs)),
+                    Err(err) => {
+                        warn!(
+                            "Filesystem specified by metadata {:?} could not be setup, reason: {:?}",
+                            fssave,
+                            err
+                        );
+                        mdv.rm_fs(fssave.uuid).unwrap_or_else(|err| {
+                            error!(
+                                "Could not remove filesystem metadata {:?} for non-existent filesystem, reason: {:?}",
+                                fssave,
+                                err
+                            )
+                        });
+                        None
+                    }
+                },
+            )
+            .collect::<Vec<_>>();
 
         let mut fs_table = Table::default();
         for (name, uuid, fs) in filesystems {
             let evicted = fs_table.insert(name, uuid, fs);
             if evicted.is_some() {
+                // TODO: Recover here. Failing the entire pool setup because
+                // of this is too harsh.
                 let err_msg = "filesystems with duplicate UUID or name specified in metadata";
                 return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
             }
@@ -663,10 +691,10 @@ impl ThinPool {
 
     /// Tear down the components managed here: filesystems, the MDV,
     /// and the actual thinpool device itself.
-    pub fn teardown(self) -> StratisResult<()> {
+    pub fn teardown(&mut self) -> StratisResult<()> {
         // Must succeed in tearing down all filesystems before the
         // thinpool..
-        for (_, _, fs) in self.filesystems {
+        for (_, _, ref mut fs) in &mut self.filesystems {
             fs.teardown()?;
         }
         self.thin_pool.teardown(get_dm())?;
@@ -894,18 +922,40 @@ impl ThinPool {
         ))
     }
 
-    /// Destroy a filesystem within the thin pool.
+    /// Destroy a filesystem within the thin pool. Destroy metadata and
+    /// devlinks information associated with the thinpool. If there is a
+    /// failure to destroy the filesystem, retain it, and return an error.
     pub fn destroy_filesystem(
         &mut self,
         pool_name: &str,
         uuid: FilesystemUuid,
     ) -> StratisResult<()> {
-        if let Some((fs_name, fs)) = self.filesystems.remove_by_uuid(uuid) {
-            fs.destroy(&self.thin_pool)?;
-            self.mdv.rm_fs(uuid)?;
-            devlinks::filesystem_removed(pool_name, &fs_name)?;
+        match self.filesystems.remove_by_uuid(uuid) {
+            Some((fs_name, mut fs)) => match fs.destroy(&self.thin_pool) {
+                Ok(_) => {
+                    if let Err(err) = self.mdv.rm_fs(uuid) {
+                        error!("Could not remove metadata for fs with UUID {} and name {} belonging to pool {}, reason: {:?}",
+                               uuid,
+                               fs_name,
+                               pool_name,
+                               err);
+                    }
+                    if let Err(err) = devlinks::filesystem_removed(pool_name, &fs_name) {
+                        error!("Could not remove devlinks for fs with UUID {} and name {} belonging to pool {}, reason: {:?}",
+                               uuid,
+                               fs_name,
+                               pool_name,
+                               err);
+                    }
+                    Ok(())
+                }
+                Err(err) => {
+                    self.filesystems.insert(fs_name, uuid, fs);
+                    Err(err)
+                }
+            },
+            None => Ok(()),
         }
-        Ok(())
     }
 
     /// Rename a filesystem within the thin pool.
@@ -1088,7 +1138,7 @@ fn setup_metadev(
 /// and return the new meta device.
 fn attempt_thin_repair(
     pool_uuid: PoolUuid,
-    meta_dev: LinearDev,
+    mut meta_dev: LinearDev,
     device: Device,
     spare_segments: &[(Sectors, Sectors)],
 ) -> StratisResult<LinearDev> {

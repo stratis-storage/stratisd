@@ -197,7 +197,7 @@ impl MetadataVol {
     }
 
     /// Tear down a Metadata Volume.
-    pub fn teardown(self) -> StratisResult<()> {
+    pub fn teardown(&mut self) -> StratisResult<()> {
         self.dev.teardown(get_dm())?;
 
         Ok(())

@@ -164,7 +164,7 @@ pub trait Pool: Debug {
     /// Get a mutable reference to the blockdev in this pool with this UUID.
     fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)>;
 
-    /// Set the user-settable string associated with the blockdev specfied
+    /// Set the user-settable string associated with the blockdev specified
     /// by the uuid.
     fn set_blockdev_user_info(
         &mut self,

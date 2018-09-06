@@ -22,6 +22,28 @@ pub enum RenameAction {
     Renamed,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PoolState {
+    Good,
+    Bad,
+}
+
+impl PoolState {
+    pub fn to_dbus_value(&self) -> u16 {
+        match *self {
+            PoolState::Good => 0,
+            PoolState::Bad => 1,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FreeSpaceState {
+    Good,
+    Warn,
+    Crit,
+}
+
 /// See Design Doc section 10.2.1 for more details.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BlockDevState {

@@ -236,7 +236,7 @@ impl Engine for StratEngine {
             return Ok(false);
         }
 
-        let (pool_name, pool) = self.pools
+        let (pool_name, mut pool) = self.pools
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 

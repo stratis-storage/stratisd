@@ -82,7 +82,7 @@ impl DataTier {
     /// Allocate at least request sectors from unallocated segments in
     /// block devices belonging to the data tier. Return true if requested
     /// amount or more was allocated, otherwise, false.
-    pub fn alloc(&mut self, request: Sectors) -> bool {
+    pub fn alloc_at_least(&mut self, request: Sectors) -> bool {
         match self.block_mgr.alloc_space(&[request]) {
             Some(segments) => {
                 self.segments = coalesce_blkdevsegs(
@@ -210,7 +210,7 @@ mod tests {
         let request_amount = data_tier.block_mgr.avail_space() / 2usize;
         assert!(request_amount != Sectors(0));
 
-        assert!(data_tier.alloc(request_amount));
+        assert!(data_tier.alloc_at_least(request_amount));
 
         // A data tier w/ some amount allocated
         assert!(data_tier.allocated() >= request_amount);
@@ -226,7 +226,7 @@ mod tests {
         size = data_tier.size();
 
         // Allocate enough to get into the newly added block devices
-        assert!(data_tier.alloc(last_request_amount));
+        assert!(data_tier.alloc_at_least(last_request_amount));
 
         assert!(data_tier.allocated() >= request_amount + last_request_amount);
         assert_eq!(data_tier.size(), size);

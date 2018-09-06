@@ -319,7 +319,7 @@ impl Backstore {
         let total_required = sizes.iter().cloned().sum();
         let available = self.available_in_cap();
         if available < total_required {
-            if self.data_tier.alloc(total_required - available) {
+            if self.data_tier.alloc_at_least(total_required - available) {
                 self.extend_cap_device(pool_uuid)?;
             } else {
                 return Ok(None);
@@ -377,7 +377,7 @@ impl Backstore {
         if available < internal_request {
             let mut allocated = false;
             while !allocated && internal_request != Sectors(0) {
-                allocated = self.data_tier.alloc(internal_request - available);
+                allocated = self.data_tier.alloc_at_least(internal_request - available);
                 let temp = internal_request / 2usize;
                 internal_request = (temp / modulus) * modulus;
             }

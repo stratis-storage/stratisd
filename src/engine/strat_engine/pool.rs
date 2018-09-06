@@ -424,6 +424,7 @@ impl Pool for StratPool {
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
+        self.thin_pool.set_dbus_path(path.clone());
         self.dbus_path = path
     }
 

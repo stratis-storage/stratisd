@@ -204,7 +204,7 @@ impl StratPool {
 
     /// Teardown a pool.
     #[cfg(test)]
-    pub fn teardown(self) -> StratisResult<()> {
+    pub fn teardown(&mut self) -> StratisResult<()> {
         self.thin_pool.teardown()?;
         self.backstore.teardown()
     }
@@ -303,7 +303,7 @@ impl Pool for StratPool {
         bdev_info
     }
 
-    fn destroy(self) -> StratisResult<()> {
+    fn destroy(&mut self) -> StratisResult<()> {
         self.thin_pool.teardown()?;
         self.backstore.destroy()?;
         Ok(())
@@ -458,14 +458,14 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let name1 = "name1";
-        let (uuid1, pool1) =
+        let (uuid1, mut pool1) =
             StratPool::initialize(&name1, paths1, Redundancy::NONE, false).unwrap();
         invariant(&pool1, &name1);
 
         let metadata1 = pool1.record(name1);
 
         let name2 = "name2";
-        let (uuid2, pool2) =
+        let (uuid2, mut pool2) =
             StratPool::initialize(&name2, paths2, Redundancy::NONE, false).unwrap();
         invariant(&pool2, &name2);
 

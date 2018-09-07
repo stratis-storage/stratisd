@@ -13,7 +13,7 @@ use super::pool::StratPool;
 /// Teardown pools.
 pub fn teardown_pools(pools: Table<StratPool>) -> StratisResult<()> {
     let mut untorndown_pools = Vec::new();
-    for (_, uuid, pool) in pools {
+    for (_, uuid, mut pool) in pools {
         pool.teardown()
             .unwrap_or_else(|_| untorndown_pools.push(uuid));
     }

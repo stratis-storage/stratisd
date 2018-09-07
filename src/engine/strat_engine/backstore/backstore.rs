@@ -459,16 +459,17 @@ impl Backstore {
     }
 
     /// Destroy the entire store.
-    pub fn destroy(self) -> StratisResult<()> {
+    pub fn destroy(&mut self) -> StratisResult<()> {
         match self.cache {
-            Some(cache) => {
+            Some(ref mut cache) => {
                 cache.teardown(get_dm())?;
                 self.cache_tier
+                    .as_mut()
                     .expect("if dm_device is cache, cache tier exists")
                     .destroy()?;
             }
             None => {
-                if let Some(linear) = self.linear {
+                if let Some(ref mut linear) = self.linear {
                     linear.teardown(get_dm())?;
                 }
             }
@@ -478,10 +479,10 @@ impl Backstore {
 
     /// Teardown the DM devices in the backstore.
     #[cfg(test)]
-    pub fn teardown(self) -> StratisResult<()> {
+    pub fn teardown(&mut self) -> StratisResult<()> {
         match self.cache {
-            Some(cache) => cache.teardown(get_dm()),
-            None => if let Some(linear) = self.linear {
+            Some(ref mut cache) => cache.teardown(get_dm()),
+            None => if let Some(ref mut linear) = self.linear {
                 linear.teardown(get_dm())
             } else {
                 Ok(())
@@ -800,7 +801,7 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
-        let backstore =
+        let mut backstore =
             Backstore::setup(pool_uuid, &backstore_save, &map, None, Sectors(0)).unwrap();
         invariant(&backstore);
 
@@ -813,7 +814,7 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
-        let backstore =
+        let mut backstore =
             Backstore::setup(pool_uuid, &backstore_save, &map, None, Sectors(0)).unwrap();
         invariant(&backstore);
 

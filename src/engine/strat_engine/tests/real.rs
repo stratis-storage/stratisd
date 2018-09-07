@@ -45,7 +45,7 @@ impl RealTestDev {
     /// Teardown a real test dev
     fn teardown(self) -> () {
         wipe_sectors(&self.as_path(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
-        if let Some(ld) = self.dev.right() {
+        if let Some(mut ld) = self.dev.right() {
             ld.teardown(get_dm()).unwrap();
         }
     }

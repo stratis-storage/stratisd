@@ -97,7 +97,7 @@ pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
 
         Ok(get_all_empty_devices()?
             .into_iter()
-            .filter(|x| is_stratis_device(&x).unwrap_or(None).is_some())
+            .filter(|x| is_stratis_device(&x).ok().is_some())
             .collect())
     } else {
         Ok(devices)

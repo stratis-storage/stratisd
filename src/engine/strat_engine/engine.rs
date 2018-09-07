@@ -201,11 +201,7 @@ impl Engine for StratEngine {
                 // ref. https://github.com/stratis-storage/stratisd/issues/748
 
                 if let Some((name, pool)) = self.pools.get_by_uuid(pool_uuid) {
-                    if !pool.blockdevs()
-                        .iter()
-                        .find(|blkdev_info| blkdev_info.0 == device_uuid)
-                        .is_some()
-                    {
+                    if pool.get_blockdev(device_uuid).is_none() {
                         error!(
                             "we have a block device {:?} with pool {}, uuid = {} device uuid = {} \
                              which believes it belongs in this pool, but existing active pool has \

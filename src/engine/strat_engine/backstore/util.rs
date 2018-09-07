@@ -18,8 +18,8 @@ fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
         .properties()
         .map(|i| {
             (
-                String::from(i.name().to_string_lossy()),
-                String::from(i.value().to_string_lossy()),
+                String::from(i.name().to_str().expect("Unix is utf-8")),
+                String::from(i.value().to_str().expect("Unix is utf-8")),
             )
         })
         .collect();

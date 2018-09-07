@@ -203,7 +203,7 @@ impl Engine for StratEngine {
                 if let Some((name, pool)) = self.pools.get_by_uuid(pool_uuid) {
                     if !pool.blockdevs()
                         .iter()
-                        .find(|(block_uuid, _)| *block_uuid == device_uuid)
+                        .find(|blkdev_info| blkdev_info.0 == device_uuid)
                         .is_some()
                     {
                         error!(

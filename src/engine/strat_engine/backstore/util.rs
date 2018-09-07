@@ -18,8 +18,8 @@ fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
         .properties()
         .map(|i| {
             (
-                String::from(i.name().to_str().expect("Unix is utf-8")),
-                String::from(i.value().to_str().expect("Unix is utf-8")),
+                String::from(i.name().to_string_lossy()),
+                String::from(i.value().to_string_lossy()),
             )
         })
         .collect();
@@ -97,7 +97,7 @@ pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
 
         Ok(get_all_empty_devices()?
             .into_iter()
-            .filter(|x| is_stratis_device(&x).ok().is_some())
+            .filter(|x| is_stratis_device(&x).unwrap_or(None).is_some())
             .collect())
     } else {
         Ok(devices)

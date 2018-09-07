@@ -735,8 +735,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(length < request);
-        // FIXME: change to Sector operation once implemented in devicemapper
-        assert_eq!(*length % *modulus, 0);
+        assert_eq!(length % modulus, Sectors(0));
         assert_eq!(backstore.next, old_next + length);
         assert_eq!(start, old_next);
 

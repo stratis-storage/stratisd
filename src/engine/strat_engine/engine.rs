@@ -6,7 +6,7 @@ use std::clone::Clone;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use devicemapper::{devnode_to_devno, Device, DmNameBuf};
+use devicemapper::{Device, DmNameBuf};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -204,7 +204,7 @@ impl Engine for StratEngine {
                     .get_by_uuid(pool_uuid)
                     .expect("pools.contains_uuid(pool_uuid)");
 
-                match pool.get_blockdev(device_uuid) {
+                match pool.get_strat_blockdev(device_uuid) {
                     None => {
                         error!(
                             "we have a block device {:?} with pool {}, uuid = {} device uuid = {} \
@@ -216,29 +216,12 @@ impl Engine for StratEngine {
                     Some((_tier, block_dev)) => {
                         // Make sure that this block device and existing block device refer to the
                         // same physical device that's already in the pool
-                        let existing_device_node = block_dev.devnode();
-
-                        if let Ok(Some(devnumber)) = devnode_to_devno(&existing_device_node) {
-                            let eval_device = Device::from(devnumber);
-                            if device != eval_device {
-                                error!(
-                                    "we have a block device which by all accounts is already in \
-                                     the pool, but it has a different major and minor number, \
-                                     current {:?} {:?} != evaluating {:?}{:?}",
-                                    existing_device_node, device, dev_node, eval_device
-                                );
-                            }
-                        } else {
-                            // Unable to get the device number, lets compare device paths ...
-                            if existing_device_node != dev_node {
-                                error!(
-                                    "we have a block device which by all accounts is already in \
-                                     the pool, but it has a different device path, current {:?} != \
-                                     evaluating {:?}, we were unable to compare major/minor \
-                                     numbers",
-                                    existing_device_node, dev_node
-                                );
-                            }
+                        if device != *block_dev.device() {
+                            error!(
+                                "we have a block device with the same uuid as one already in the pool, but the one in the pool has device number {:}, while the one just found has device number {:}",
+                                device,
+                                block_dev.device()
+                            );
                         }
                     }
                 }

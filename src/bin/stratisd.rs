@@ -220,21 +220,6 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
-            &EngineEvent::FilesystemUsedChanged { dbus_path, used } => {
-                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
-                        consts::FILESYSTEM_USED_PROP,
-                        *used,
-                        &dbus_path,
-                    ).unwrap_or_else(|()| {
-                        error!(
-                            "FilesystemUsedChanged: {} used: {} failed to send dbus update.",
-                            dbus_path, used,
-                        );
-                    });
-                }
-            }
             &EngineEvent::PoolRenamed {
                 dbus_path,
                 from,

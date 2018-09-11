@@ -16,6 +16,7 @@ mod setup;
 mod util;
 
 pub use self::backstore::Backstore;
+pub use self::blockdev::StratBlockDev;
 pub use self::device::blkdev_size;
 pub use self::device::is_stratis_device;
 pub use self::metadata::MIN_MDA_SECTORS;

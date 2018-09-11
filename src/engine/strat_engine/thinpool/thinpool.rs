@@ -315,7 +315,7 @@ impl ThinPool {
             data_block_size,
             calc_lowater(
                 sectors_to_datablocks(data_dev_size),
-                sectors_to_datablocks(backstore.available_in_cap()),
+                sectors_to_datablocks(backstore.available()),
                 free_space_state,
             ),
         )?;
@@ -382,7 +382,7 @@ impl ThinPool {
             thin_pool_save.data_block_size,
             calc_lowater(
                 sectors_to_datablocks(data_dev_size),
-                sectors_to_datablocks(backstore.available_in_cap()),
+                sectors_to_datablocks(backstore.available()),
                 free_space_state,
             ),
         )?;
@@ -555,14 +555,13 @@ impl ThinPool {
                 // Update pool space state
                 self.free_space_state = self.free_space_check(
                     usage.used_data,
-                    current_total + sectors_to_datablocks(backstore.available_in_cap())
-                        - usage.used_data,
+                    current_total - usage.used_data + sectors_to_datablocks(backstore.available()),
                 )?;
 
                 // Trigger next event depending on pool space state
                 let lowater = calc_lowater(
                     current_total,
-                    sectors_to_datablocks(backstore.available_in_cap()),
+                    sectors_to_datablocks(backstore.available()),
                     self.free_space_state,
                 );
 

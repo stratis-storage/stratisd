@@ -458,6 +458,10 @@ impl Backstore {
         size - self.next
     }
 
+    pub fn available(&self) -> Sectors {
+        self.datatier_current_capacity() - self.next
+    }
+
     /// Destroy the entire store.
     pub fn destroy(&mut self) -> StratisResult<()> {
         match self.cache {

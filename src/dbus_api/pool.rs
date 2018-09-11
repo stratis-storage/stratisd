@@ -296,7 +296,7 @@ fn get_pool_property<F, R>(
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn((Name, Uuid, &Pool)) -> Result<R, MethodErr>,
+    F: Fn((Name, Uuid, &mut Pool)) -> Result<R, MethodErr>,
     R: dbus::arg::Append,
 {
     let dbus_context = p.tree.get_data();
@@ -311,8 +311,8 @@ where
         .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?
         .uuid;
 
-    let engine = dbus_context.engine.borrow();
-    let (pool_name, pool) = engine.get_pool(pool_uuid).ok_or_else(|| {
+    let mut engine = dbus_context.engine.borrow_mut();
+    let (pool_name, pool) = engine.get_mut_pool(pool_uuid).ok_or_else(|| {
         MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))
     })?;
 
@@ -328,20 +328,9 @@ fn get_pool_total_physical_used(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    fn get_used((_, uuid, pool): (Name, Uuid, &Pool)) -> Result<String, MethodErr> {
-        let err_func = |_| {
-            MethodErr::failed(&format!(
-                "no total physical size computed for pool with uuid {}",
-                uuid
-            ))
-        };
-
-        pool.total_physical_used()
-            .map(|u| Ok(format!("{}", *u)))
-            .map_err(err_func)?
-    }
-
-    get_pool_property(i, p, get_used)
+    get_pool_property(i, p, |(_, _, pool)| {
+        Ok(format!("{}", *pool.total_physical_used()))
+    })
 }
 
 fn get_pool_total_physical_size(

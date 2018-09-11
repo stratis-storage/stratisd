@@ -18,7 +18,7 @@ use super::super::types::{
 };
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::backstore::{Backstore, MIN_MDA_SECTORS};
+use super::backstore::{Backstore, StratBlockDev, MIN_MDA_SECTORS};
 use super::serde_structs::{FlexDevsSave, PoolSave, Recordable};
 use super::thinpool::{ThinPool, ThinPoolSizeParams};
 
@@ -247,6 +247,10 @@ impl StratPool {
             thinpool_dev: self.thin_pool.record(),
         }
     }
+
+    pub fn get_strat_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
+        self.backstore.get_blockdev_by_uuid(uuid)
+    }
 }
 
 impl Pool for StratPool {
@@ -390,8 +394,7 @@ impl Pool for StratPool {
     }
 
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
-        self.backstore
-            .get_blockdev_by_uuid(uuid)
+        self.get_strat_blockdev(uuid)
             .map(|(t, b)| (t, b as &BlockDev))
     }
 

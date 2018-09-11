@@ -2,8 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use devicemapper::Bytes;
-
 use std::fmt::Debug;
 use std::sync::{Once, ONCE_INIT};
 
@@ -22,10 +20,6 @@ pub enum EngineEvent<'a> {
         dbus_path: &'a MaybeDbusPath,
         from: &'a str,
         to: &'a str,
-    },
-    FilesystemUsedChanged {
-        dbus_path: &'a MaybeDbusPath,
-        used: Bytes,
     },
     PoolRenamed {
         dbus_path: &'a MaybeDbusPath,

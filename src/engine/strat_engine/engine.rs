@@ -6,7 +6,7 @@ use std::clone::Clone;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use devicemapper::{Device, DmNameBuf};
+use devicemapper::{devnode_to_devno, Device, DmNameBuf};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -191,14 +191,57 @@ impl Engine for StratEngine {
         device: Device,
         dev_node: PathBuf,
     ) -> StratisResult<Option<PoolUuid>> {
-        let pool_uuid = if let Some(pool_uuid) = is_stratis_device(&dev_node)? {
+        let pool_uuid = if let Some((pool_uuid, device_uuid)) = is_stratis_device(&dev_node)? {
             if self.pools.contains_uuid(pool_uuid) {
+                // We can get udev events for devices that are already in the pool.  Lets check
+                // to see if this block device is already in this existing pool.  If it is, then all
+                // is well.  If it's not then we have what is documented below.
+                //
                 // TODO: Handle the case where we have found a device for an already active pool
                 // ref. https://github.com/stratis-storage/stratisd/issues/748
-                warn!(
-                    "pool {} is already known, ignoring device {:?}!",
-                    pool_uuid, dev_node
-                );
+
+                let (name, pool) = self.pools
+                    .get_by_uuid(pool_uuid)
+                    .expect("pools.contains_uuid(pool_uuid)");
+
+                match pool.get_blockdev(device_uuid) {
+                    None => {
+                        error!(
+                            "we have a block device {:?} with pool {}, uuid = {} device uuid = {} \
+                             which believes it belongs in this pool, but existing active pool has \
+                             no knowledge of it",
+                            dev_node, name, pool_uuid, device_uuid
+                        );
+                    }
+                    Some((_tier, block_dev)) => {
+                        // Make sure that this block device and existing block device refer to the
+                        // same physical device that's already in the pool
+                        let existing_device_node = block_dev.devnode();
+
+                        if let Ok(Some(devnumber)) = devnode_to_devno(&existing_device_node) {
+                            let eval_device = Device::from(devnumber);
+                            if device != eval_device {
+                                error!(
+                                    "we have a block device which by all accounts is already in \
+                                     the pool, but it has a different major and minor number, \
+                                     current {:?} {:?} != evaluating {:?}{:?}",
+                                    existing_device_node, device, dev_node, eval_device
+                                );
+                            }
+                        } else {
+                            // Unable to get the device number, lets compare device paths ...
+                            if existing_device_node != dev_node {
+                                error!(
+                                    "we have a block device which by all accounts is already in \
+                                     the pool, but it has a different device path, current {:?} != \
+                                     evaluating {:?}, we were unable to compare major/minor \
+                                     numbers",
+                                    existing_device_node, dev_node
+                                );
+                            }
+                        }
+                    }
+                }
                 None
             } else {
                 let mut devices = self.incomplete_pools

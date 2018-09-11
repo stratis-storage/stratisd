@@ -123,9 +123,9 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
 
 /// Determine if devnode is a Stratis device. Return the device's Stratis
 /// pool UUID if it belongs to Stratis.
-pub fn is_stratis_device(devnode: &Path) -> StratisResult<Option<PoolUuid>> {
+pub fn is_stratis_device(devnode: &Path) -> StratisResult<Option<(PoolUuid, DevUuid)>> {
     match identify(devnode)? {
-        DevOwnership::Ours(pool_uuid, _) => Ok(Some(pool_uuid)),
+        DevOwnership::Ours(pool_uuid, dev_uuid) => Ok(Some((pool_uuid, dev_uuid))),
         _ => Ok(None),
     }
 }

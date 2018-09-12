@@ -125,8 +125,14 @@ fn coalesce_segs(
     segments
 }
 
+/// Use the lowater event for two purposes: extending the data dev and also
+/// getting an event when a FreeSpaceState threshold is crossed.
+/// Most of the time, this results in just DATA_LOWATER. The two times it
+/// doesn't is 1) right before a FreeSpaceState threshold (but the threshold
+/// is still above DATA_LOWATER) and 2) If the data dev is already extended
+/// far beyond its current usage -- past the next freespace threshold.
 /// Calculate new low water based on the current thinpool data device size
-/// and the amount of unused sectors available in the cap device.
+/// and the amount of unused sectors available for further extension.
 /// Postcondition:
 /// result == max(M * (data_dev_size + available) - available, L)
 /// equivalently:

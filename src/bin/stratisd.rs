@@ -166,6 +166,30 @@ fn trylock_pid_file() -> StratisResult<File> {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RunState {
+    Starting,
+    Running,
+    Exiting,
+}
+
+struct DaemonState {
+    run_state: RunState,
+}
+
+impl DaemonState {
+    fn new(initial_state: RunState) -> DaemonState {
+        DaemonState {
+            run_state: initial_state,
+        }
+    }
+    fn set_state(&mut self, new_state: RunState) {
+        if new_state != self.run_state {
+            self.run_state = new_state;
+        }
+    }
+}
+
 #[cfg(feature = "dbus_enabled")]
 #[derive(Debug)]
 struct EventHandler {
@@ -247,7 +271,11 @@ impl EngineListener for EventHandler {
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered. Dump log entries on specified signal
 /// via buff_log.
-fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) -> StratisResult<()> {
+fn run(
+    matches: &ArgMatches,
+    buff_log: &buff_log::Handle<env_logger::Logger>,
+    daemon_state: &mut DaemonState,
+) -> StratisResult<()> {
     // Ensure that the debug log is output when we leave this function.
     let _guard = buff_log.to_guard();
 
@@ -362,7 +390,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     };
 
     log_engine_state(&*engine.borrow());
-
+    daemon_state.set_state(RunState::Running);
     loop {
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
@@ -402,7 +430,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 }
             }
         }
-
         // Process any signals off signalfd
         if fds[FD_INDEX_SIGNALFD].revents != 0 {
             match sfd.read_signal() {
@@ -420,6 +447,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                     }
                     nix::libc::SIGINT => {
                         info!("SIGINT received, exiting");
+                        daemon_state.set_state(RunState::Exiting);
                         return Ok(());
                     }
                     signo => {
@@ -430,7 +458,10 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 Ok(None) => (),
 
                 // Pessimistically exit on an error reading the signal.
-                Err(err) => return Err(err.into()),
+                Err(err) => {
+                    daemon_state.set_state(RunState::Exiting);
+                    return Err(err.into());
+                }
             }
         }
 
@@ -542,6 +573,8 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
 }
 
 fn main() {
+    let mut daemon_state = DaemonState::new(RunState::Starting);
+
     let matches = App::new("stratis")
         .version(VERSION)
         .about("Stratis storage management")
@@ -566,7 +599,7 @@ fn main() {
             Err(err) => Err(err),
             Ok(_) => {
                 let log_handle = initialize_log(matches.is_present("debug"));
-                run(&matches, &log_handle)
+                run(&matches, &log_handle, &mut daemon_state)
             }
         }
     };

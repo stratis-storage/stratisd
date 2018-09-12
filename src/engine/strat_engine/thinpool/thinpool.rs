@@ -555,7 +555,8 @@ impl ThinPool {
                 // Update pool space state
                 self.free_space_state = self.free_space_check(
                     usage.used_data,
-                    current_total - usage.used_data + sectors_to_datablocks(backstore.available()),
+                    (current_total - usage.used_data)
+                        + sectors_to_datablocks(backstore.available()),
                 )?;
 
                 // Trigger next event depending on pool space state

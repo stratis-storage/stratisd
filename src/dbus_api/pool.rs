@@ -353,6 +353,10 @@ fn get_pool_total_physical_size(
     })
 }
 
+fn get_pool_state(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+    get_pool_property(i, p, |(_, _, pool)| Ok(pool.state().to_dbus_value()))
+}
+
 pub fn create_dbus_pool<'a>(
     dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
@@ -420,6 +424,11 @@ pub fn create_dbus_pool<'a>(
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid);
 
+    let state_property = f.property::<u16, _>(consts::BLOCKDEV_STATE_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_pool_state);
+
     let object_name = format!(
         "{}/{}",
         STRATIS_BASE_PATH,
@@ -441,7 +450,8 @@ pub fn create_dbus_pool<'a>(
                 .add_p(name_property)
                 .add_p(total_physical_size_property)
                 .add_p(total_physical_used_property)
-                .add_p(uuid_property),
+                .add_p(uuid_property)
+                .add_p(state_property),
         );
 
     let path = object_path.get_name().to_owned();

@@ -189,17 +189,34 @@ impl Engine for StratEngine {
         device: Device,
         dev_node: PathBuf,
     ) -> StratisResult<Option<PoolUuid>> {
-        let pool_uuid = if let Some(pool_uuid) = match identify(&dev_node)? {
-            DevOwnership::Ours(pool_uuid, _) => Some(pool_uuid),
+        let pool_uuid = if let Some((pool_uuid, device_uuid)) = match identify(&dev_node)? {
+            DevOwnership::Ours(pool_uuid, device_uuid) => Some((pool_uuid, device_uuid)),
             _ => None,
         } {
             if self.pools.contains_uuid(pool_uuid) {
-                // TODO: Handle the case where we have found a device for an already active pool
+                // TODO: Handle the case where we have found a device for an
+                // already active pool.
                 // ref. https://github.com/stratis-storage/stratisd/issues/748
-                warn!(
-                    "pool {} is already known, ignoring device {:?}!",
-                    pool_uuid, dev_node
-                );
+                let (name, pool) = self.pools
+                    .get_by_uuid(pool_uuid)
+                    .expect("pools.contains_uuid(pool_uuid)");
+                match pool.get_strat_blockdev(device_uuid) {
+                    None => {
+                        error!(
+                            "we have a block device {:?} with pool {}, uuid = {} device uuid = {} which believes it belongs in this pool, but existing active pool has no knowledge of it",
+                            dev_node, name, pool_uuid, device_uuid
+                        );
+                    }
+                    Some((_tier, block_dev)) => {
+                        if device != *block_dev.device() {
+                            error!(
+                                "we have a block device with the same uuid as one already in the pool, but the one in the pool has device number {:}, while the one just found has device number {:}",
+                                block_dev.device(),
+                                device
+                            );
+                        }
+                    }
+                }
                 None
             } else {
                 let mut devices = self.incomplete_pools

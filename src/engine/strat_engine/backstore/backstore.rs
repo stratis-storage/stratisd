@@ -458,6 +458,9 @@ impl Backstore {
         size - self.next
     }
 
+    /// The available number of Sectors in the Backstore. (Note: future
+    /// changes may change the semantics of this value, or may make it
+    /// impossible to calculate.)
     pub fn available(&self) -> Sectors {
         self.datatier_current_capacity() - self.next
     }

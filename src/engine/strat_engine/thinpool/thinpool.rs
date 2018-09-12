@@ -147,24 +147,23 @@ fn calc_lowater(
     available: DataBlocks,
     free_space_state: FreeSpaceState,
 ) -> DataBlocks {
-    // Calculate the low water. dev_low_water and action_pct are the device
-    // low water and the percent used at which an action should be taken for
-    // a particular free space state.
+    // Calculate the low water. action_pct is the the percent used at which an
+    // action should be taken for a particular free space state.
     //
     // Postcondition:
-    // result == max(M * data_dev_size - (1 - M) * available, dev_low_water)
+    // result == max(M * data_dev_size - (1 - M) * available, DATA_LOWATER)
     // where M <= (100 - action_pct)/100
-    let calc_lowater_internal = |dev_low_water: DataBlocks, action_pct: u8| -> DataBlocks {
+    let calc_lowater_internal = |action_pct: u8| -> DataBlocks {
         let total = data_dev_size + available;
 
         assert!(action_pct <= 100);
         let low_water = total - ((total * action_pct) / 100u8);
-        assert!(DataBlocks(std::u64::MAX) - available >= dev_low_water);
+        assert!(DataBlocks(std::u64::MAX) - available >= DATA_LOWATER);
 
         // WARNING: Do not alter this if-expression to a max-expression.
         // Doing so would invalidate the assertion below.
-        if dev_low_water + available > low_water {
-            dev_low_water
+        if DATA_LOWATER + available > low_water {
+            DATA_LOWATER
         } else {
             assert!(low_water >= available);
             low_water - available
@@ -172,8 +171,8 @@ fn calc_lowater(
     };
 
     match free_space_state {
-        FreeSpaceState::Good => calc_lowater_internal(DATA_LOWATER, SPACE_WARN_PCT),
-        _ => calc_lowater_internal(THROTTLE_BLOCKS_PER_SEC, SPACE_CRIT_PCT),
+        FreeSpaceState::Good => calc_lowater_internal(SPACE_WARN_PCT),
+        _ => calc_lowater_internal(SPACE_CRIT_PCT),
     }
 }
 

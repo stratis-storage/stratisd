@@ -354,11 +354,7 @@ fn get_pool_total_physical_size(
 }
 
 fn get_pool_state(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
-    fn get_state((_, _, pool): (Name, Uuid, &Pool)) -> Result<u16, MethodErr> {
-        Ok(pool.state().to_dbus_value())
-    }
-
-    get_pool_property(i, p, get_state)
+    get_pool_property(i, p, |(_, _, pool)| Ok(pool.state().to_dbus_value()))
 }
 
 pub fn create_dbus_pool<'a>(

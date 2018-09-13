@@ -428,12 +428,6 @@ impl Backstore {
         self.data_tier.size()
     }
 
-    /// The current size of all the usable space in blockdevs in the data
-    /// tier.
-    fn datatier_data_size(&self) -> Sectors {
-        self.data_tier.size() - self.data_tier.metadata_size()
-    }
-
     /// The size of the cap device.
     ///
     /// The size of the cap device is obtained from the size of the component
@@ -448,10 +442,11 @@ impl Backstore {
             .unwrap_or(Sectors(0))
     }
 
-    /// The total number of unallocated sectors in the backstore. Includes
-    /// both in the cap but unallocated as well as not yet added to cap.
+    /// The total number of unallocated usable sectors in the
+    /// backstore. Includes both in the cap but unallocated as well as not yet
+    /// added to cap.
     pub fn available_in_backstore(&self) -> Sectors {
-        self.datatier_data_size() - self.next
+        self.data_tier.usable_size() - self.next
     }
 
     /// The available number of Sectors.

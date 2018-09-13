@@ -119,6 +119,11 @@ impl DataTier {
         self.block_mgr.metadata_size()
     }
 
+    /// The total usable size of all the blockdevs combined
+    pub fn usable_size(&self) -> Sectors {
+        self.size() - self.metadata_size()
+    }
+
     /// Destroy the store. Wipe its blockdevs.
     pub fn destroy(&mut self) -> StratisResult<()> {
         self.block_mgr.destroy_all()

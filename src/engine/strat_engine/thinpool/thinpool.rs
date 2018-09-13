@@ -134,13 +134,11 @@ fn coalesce_segs(
 /// Calculate new low water based on the current thinpool data device size
 /// and the amount of unused sectors available for further extension.
 /// Postcondition:
-/// result == max(M * (data_dev_size + available) - available, L)
+/// result == max(M * (data_dev_size + available) - available, DATA_LOWATER)
 /// equivalently:
-/// result == max(M * data_dev_size - (1 - M) * available, L)
+/// result == max(M * data_dev_size - (1 - M) * available, DATA_LOWATER)
 /// where M <= (100 - SPACE_WARN_PCT)/100 if self.free_space_state == Good
 ///            (100 - SPACE_CRIT_PCT)/100  if self.free_space_state != Good
-///       L = DATA_LOWATER if self.free_space_state == Good
-///           throttle rate if self.free_space_state != Good
 // TODO: Use proptest to verify the behavior of this method.
 fn calc_lowater(
     data_dev_size: DataBlocks,

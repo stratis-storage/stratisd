@@ -12,7 +12,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
-use super::super::serde_structs::{BlockDev, DataTierSave, LayeredDev, Recordable};
+use super::super::serde_structs::{BaseDev, BlockDev, DataTierSave, Recordable};
 
 use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment};
@@ -29,9 +29,9 @@ pub struct DataTier {
 impl DataTier {
     /// Setup a previously existing data layer from the block_mgr and
     /// previously allocated segments.
-    pub fn setup(block_mgr: BlockDevMgr, segments: &[LayeredDev]) -> StratisResult<DataTier> {
+    pub fn setup(block_mgr: BlockDevMgr, segments: &[BaseDev]) -> StratisResult<DataTier> {
         let uuid_to_devno = block_mgr.uuid_to_devno();
-        let mapper = |ld: &LayeredDev| -> StratisResult<BlkDevSegment> {
+        let mapper = |ld: &BaseDev| -> StratisResult<BlkDevSegment> {
             let parent = ld.parent;
             let device = uuid_to_devno(parent).ok_or_else(|| {
                 StratisError::Engine(

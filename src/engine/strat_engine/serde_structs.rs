@@ -26,8 +26,15 @@ pub trait Recordable<T: Serialize> {
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BaseDev {
+    pub parent: DevUuid,
+    pub start: Sectors,
+    pub length: Sectors,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockDev {
-    pub allocs: Vec<Vec<LayeredDev>>,
+    pub allocs: Vec<Vec<BaseDev>>,
     pub devs: Vec<BlockDevSave>,
 }
 
@@ -38,19 +45,12 @@ pub struct CacheTierSave {
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Cap {
-    pub allocs: Vec<LayeredDev>,
+    pub allocs: Vec<BaseDev>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DataTierSave {
     pub blockdev: BlockDev,
-}
-
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct LayeredDev {
-    pub parent: DevUuid,
-    pub start: Sectors,
-    pub length: Sectors,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

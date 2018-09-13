@@ -95,7 +95,8 @@ impl Backstore {
     /// Make a Backstore object from blockdevs that already belong to Stratis.
     /// Precondition: every device in devnodes has already been determined to
     /// belong to the pool with the specified pool_uuid.
-    /// Precondition: next <= the sum of the lengths of the segments allocated
+    /// Precondition: backstore_save.cap.allocs[0].length <=
+    ///       the sum of the lengths of the segments allocated
     /// to the data tier cap device.
     /// Precondition: backstore_save.data_segments is not empty. This is a
     /// consequence of the fact that metadata is saved by the pool, and if
@@ -108,7 +109,6 @@ impl Backstore {
         backstore_save: &BackstoreSave,
         devnodes: &HashMap<Device, PathBuf>,
         last_update_time: Option<DateTime<Utc>>,
-        next: Sectors,
     ) -> StratisResult<Backstore> {
         let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
         let block_mgr = BlockDevMgr::new(datadevs, last_update_time);
@@ -148,7 +148,7 @@ impl Backstore {
             cache_tier,
             linear: origin,
             cache,
-            next,
+            next: backstore_save.cap.allocs[0].length,
         })
     }
 
@@ -812,8 +812,7 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
-        let mut backstore =
-            Backstore::setup(pool_uuid, &backstore_save, &map, None, Sectors(0)).unwrap();
+        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();
@@ -825,8 +824,7 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
-        let mut backstore =
-            Backstore::setup(pool_uuid, &backstore_save, &map, None, Sectors(0)).unwrap();
+        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();

@@ -27,6 +27,46 @@ pub fn setup_dev_path() -> StratisResult<()> {
     Ok(())
 }
 
+/// Setup the pool directory and the symlinks in /dev/stratis for the specified pool and filesystems
+/// it contains.
+// Don't just remove and recreate everything in case there are processes
+// (e.g. user shells) with the current working directory within the tree.
+pub fn setup_pool_devlinks(pool_name: &str, pool: &Pool) -> () {
+    match || -> StratisResult<()> {
+        let pool_path = pool_directory(pool_name);
+
+        if !pool_path.exists() {
+            pool_added(pool_name);
+        }
+
+        let mut existing_files = fs::read_dir(pool_path)?
+            .map(|dir_e| {
+                dir_e.and_then(|d| Ok(d.file_name().into_string().expect("Unix is utf-8")))
+            })
+            .collect::<Result<HashSet<_>, _>>()?;
+
+        for (fs_name, _, fs) in pool.filesystems() {
+            filesystem_added(pool_name, &fs_name, &fs.devnode());
+            existing_files.remove(&fs_name.to_owned());
+        }
+
+        for leftover in existing_files {
+            filesystem_removed(pool_name, &leftover);
+        }
+
+        Ok(())
+    }() {
+        Err(e) => {
+            warn!(
+                "setup_pool_devlinks failed for /dev/stratis/{}, reason {:?}",
+                pool_name, e
+            );
+            ()
+        }
+        Ok(_) => (),
+    };
+}
+
 /// Set up directories and symlinks under /dev/stratis based on current
 /// config. Clear out any directory or file that doesn't correspond to a pool
 /// or filesystem.
@@ -41,26 +81,8 @@ pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>(po
             .collect::<Result<HashSet<_>, _>>()?;
 
         for &(ref pool_name, _, pool) in pools {
-            if !existing_dirs.remove(&pool_name.to_owned()) {
-                pool_added(pool_name);
-            }
-
-            let pool_path = pool_directory(pool_name);
-
-            let mut existing_files = fs::read_dir(pool_path)?
-                .map(|dir_e| {
-                    dir_e.and_then(|d| Ok(d.file_name().into_string().expect("Unix is utf-8")))
-                })
-                .collect::<Result<HashSet<_>, _>>()?;
-
-            for (fs_name, _, fs) in pool.filesystems() {
-                filesystem_added(pool_name, &fs_name, &fs.devnode());
-                existing_files.remove(&fs_name.to_owned());
-            }
-
-            for leftover in existing_files {
-                filesystem_removed(pool_name, &leftover);
-            }
+            existing_dirs.remove(&pool_name.to_owned());
+            setup_pool_devlinks(&pool_name, pool);
         }
 
         for leftover in existing_dirs {

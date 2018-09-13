@@ -236,6 +236,7 @@ impl Engine for StratEngine {
                 devices.insert(device, dev_node);
                 match setup_pool(pool_uuid, &devices, &self.pools) {
                     Ok((pool_name, pool)) => {
+                        devlinks::setup_pool_devlinks(&pool_name, &pool);
                         self.pools.insert(pool_name, pool_uuid, pool);
                         Some(pool_uuid)
                     }

@@ -50,9 +50,18 @@ fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
 pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
     let flex_devs = &metadata.flex_devs;
     let next = next_index(&flex_devs);
+    let allocated_from_cap = metadata.backstore.cap.allocs[0].length;
 
-    // If the amount allocated from the cap device is not the same as that
-    // used by the flex devs, consider the situation an error.
+    if allocated_from_cap != next {
+        let err_msg = format!(
+            "{} used in thinpool, but {} allocated from backstore cap device",
+            next, allocated_from_cap
+        );
+        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+    }
+
+    // If the total length of the allocations in the flex devs, does not
+    // equal next, consider the situation an error.
     {
         let total_allocated = flex_devs
             .meta_dev

@@ -229,7 +229,7 @@ fn get_blockdev_physical_size(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_blockdev_property(i, p, |_, p| Ok(format!("{}", *p.total_size())))
+    get_blockdev_property(i, p, |_, p| Ok(format!("{}", *p.size())))
 }
 
 fn get_blockdev_state(

@@ -171,7 +171,7 @@ impl BlockDev for StratBlockDev {
         Utc.timestamp(self.bda.initialization_time() as i64, 0)
     }
 
-    fn total_size(&self) -> Sectors {
+    fn size(&self) -> Sectors {
         let start = self.metadata_size();
         let size = self.size();
         assert!(start <= size);

@@ -50,8 +50,8 @@ pub trait BlockDev: Debug {
     /// to the nearest second.
     fn initialization_time(&self) -> DateTime<Utc>;
 
-    /// The usable size of the device, not counting Stratis overhead.
-    fn total_size(&self) -> Sectors;
+    /// The total size of the device, including space not usable for data.
+    fn size(&self) -> Sectors;
 
     /// The current state of the blockdev.
     fn state(&self) -> BlockDevState;

@@ -552,9 +552,7 @@ mod tests {
         invariant(&pool, &name);
 
         let metadata1 = pool.record(name);
-        assert!(metadata1.backstore.cache_devs.is_none());
-        assert!(metadata1.backstore.cache_segments.is_none());
-        assert!(metadata1.backstore.meta_segments.is_none());
+        assert!(metadata1.backstore.cache_tier.is_none());
 
         let (_, fs_uuid) = pool.create_filesystems(uuid, &name, &[("stratis-filesystem", None)])
             .unwrap()
@@ -591,9 +589,7 @@ mod tests {
         invariant(&pool, &name);
 
         let metadata2 = pool.record(name);
-        assert!(metadata2.backstore.cache_devs.is_some());
-        assert!(metadata2.backstore.cache_segments.is_some());
-        assert!(metadata2.backstore.meta_segments.is_some());
+        assert!(metadata2.backstore.cache_tier.is_some());
 
         let mut buf = [0u8; 10];
         {

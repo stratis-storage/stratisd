@@ -123,18 +123,19 @@ impl Backstore {
 
         let (cache_tier, cache, origin) = if !cachedevs.is_empty() {
             let block_mgr = BlockDevMgr::new(cachedevs, last_update_time);
-            match (
-                &backstore_save.cache_segments,
-                &backstore_save.meta_segments,
-            ) {
-                (&Some(ref cache_segments), &Some(ref meta_segments)) => {
-                    let cache_tier = CacheTier::setup(block_mgr, cache_segments, meta_segments)?;
+            match &backstore_save.cache_tier {
+                &Some(ref cache_tier_save) => {
+                    let cache_tier = CacheTier::setup(
+                        block_mgr,
+                        &cache_tier_save.blockdev.allocs[0],
+                        &cache_tier_save.blockdev.allocs[1],
+                    )?;
 
                     let cache_device = make_cache(pool_uuid, &cache_tier, origin, false)?;
                     (Some(cache_tier), Some(cache_device), None)
                 }
-                _ => {
-                    let err_msg = "Cachedevs exist, but meta or cache segments are not allocated";
+                &None => {
+                    let err_msg = "Cachedevs exist, but cache metdata does not exist";
                     return Err(StratisError::Engine(ErrorEnum::Error, err_msg.into()));
                 }
             }
@@ -565,11 +566,9 @@ impl Backstore {
 impl Recordable<BackstoreSave> for Backstore {
     fn record(&self) -> BackstoreSave {
         BackstoreSave {
-            cache_devs: self.cache_tier.as_ref().map(|c| c.block_mgr.record()),
-            cache_segments: self.cache_tier.as_ref().map(|c| c.cache_segments.record()),
+            cache_tier: self.cache_tier.as_ref().map(|c| c.record()),
             cap: Cap { allocs: vec![] },
             data_tier: self.data_tier.record(),
-            meta_segments: self.cache_tier.as_ref().map(|c| c.meta_segments.record()),
         }
     }
 }
@@ -813,11 +812,8 @@ mod tests {
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();
-        assert_eq!(backstore_save.cache_devs, backstore_save2.cache_devs);
-        assert_eq!(
-            backstore_save.data_tier.blockdev.devs,
-            backstore_save2.data_tier.blockdev.devs
-        );
+        assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
+        assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
 
         backstore.teardown().unwrap();
 
@@ -829,11 +825,8 @@ mod tests {
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();
-        assert_eq!(backstore_save.cache_devs, backstore_save2.cache_devs);
-        assert_eq!(
-            backstore_save.data_tier.blockdev.devs,
-            backstore_save2.data_tier.blockdev.devs
-        );
+        assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
+        assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
 
         backstore.destroy().unwrap();
     }

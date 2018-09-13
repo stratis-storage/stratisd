@@ -135,8 +135,10 @@ pub fn get_blockdevs(
         .collect();
 
     let recorded_cache_map: HashMap<DevUuid, (usize, &BlockDevSave)> =
-        match backstore_save.cache_devs {
-            Some(ref cache_devs) => cache_devs
+        match backstore_save.cache_tier {
+            Some(ref cache_tier) => cache_tier
+                .blockdev
+                .devs
                 .iter()
                 .enumerate()
                 .map(|(i, bds)| (bds.uuid, (i, bds)))
@@ -151,16 +153,9 @@ pub fn get_blockdevs(
             .or_insert_with(Vec::default)
             .push((seg.start, seg.length))
     }
-    if let Some(ref segs) = backstore_save.cache_segments {
-        for seg in segs {
-            segment_table
-                .entry(seg.parent)
-                .or_insert_with(Vec::default)
-                .push((seg.start, seg.length))
-        }
-    }
-    if let Some(ref segs) = backstore_save.meta_segments {
-        for seg in segs {
+
+    if let Some(ref cache_tier) = backstore_save.cache_tier {
+        for seg in cache_tier.blockdev.allocs.iter().flat_map(|i| i.iter()) {
             segment_table
                 .entry(seg.parent)
                 .or_insert_with(Vec::default)

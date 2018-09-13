@@ -32,6 +32,11 @@ pub struct BlockDev {
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct CacheTierSave {
+    pub blockdev: BlockDev,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Cap {
     pub allocs: Vec<LayeredDev>,
 }
@@ -85,13 +90,9 @@ pub struct FlexDevsSave {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BackstoreSave {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub cache_devs: Option<Vec<BlockDevSave>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cache_segments: Option<Vec<LayeredDev>>,
+    pub cache_tier: Option<CacheTierSave>,
     pub cap: Cap,
     pub data_tier: DataTierSave,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub meta_segments: Option<Vec<LayeredDev>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

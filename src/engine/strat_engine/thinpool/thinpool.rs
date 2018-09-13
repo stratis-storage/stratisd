@@ -127,40 +127,43 @@ fn coalesce_segs(
     segments
 }
 
+/// Use the lowater event for two purposes: extending the data dev and also
+/// getting an event when a FreeSpaceState threshold is crossed.
+/// Most of the time, this results in just DATA_LOWATER. The two times it
+/// doesn't is 1) right before a FreeSpaceState threshold (but the threshold
+/// is still above DATA_LOWATER) and 2) If the data dev is already extended
+/// far beyond its current usage -- past the next freespace threshold.
 /// Calculate new low water based on the current thinpool data device size
-/// and the amount of unused sectors available in the cap device.
+/// and the amount of unused sectors available for further extension.
 /// Postcondition:
-/// result == max(M * (data_dev_size + available) - available, L)
+/// result == max(M * (data_dev_size + available) - available, DATA_LOWATER)
 /// equivalently:
-/// result == max(M * data_dev_size - (1 - M) * available, L)
+/// result == max(M * data_dev_size - (1 - M) * available, DATA_LOWATER)
 /// where M <= (100 - SPACE_WARN_PCT)/100 if self.free_space_state == Good
 ///            (100 - SPACE_CRIT_PCT)/100  if self.free_space_state != Good
-///       L = DATA_LOWATER if self.free_space_state == Good
-///           throttle rate if self.free_space_state != Good
 // TODO: Use proptest to verify the behavior of this method.
 fn calc_lowater(
     data_dev_size: DataBlocks,
     available: DataBlocks,
     free_space_state: FreeSpaceState,
 ) -> DataBlocks {
-    // Calculate the low water. dev_low_water and action_pct are the device
-    // low water and the percent used at which an action should be taken for
-    // a particular free space state.
+    // Calculate the low water. action_pct is the the percent used at which an
+    // action should be taken for a particular free space state.
     //
     // Postcondition:
-    // result == max(M * data_dev_size - (1 - M) * available, dev_low_water)
+    // result == max(M * data_dev_size - (1 - M) * available, DATA_LOWATER)
     // where M <= (100 - action_pct)/100
-    let calc_lowater_internal = |dev_low_water: DataBlocks, action_pct: u8| -> DataBlocks {
+    let calc_lowater_internal = |action_pct: u8| -> DataBlocks {
         let total = data_dev_size + available;
 
         assert!(action_pct <= 100);
         let low_water = total - ((total * action_pct) / 100u8);
-        assert!(DataBlocks(std::u64::MAX) - available >= dev_low_water);
+        assert!(DataBlocks(std::u64::MAX) - available >= DATA_LOWATER);
 
         // WARNING: Do not alter this if-expression to a max-expression.
         // Doing so would invalidate the assertion below.
-        if dev_low_water + available > low_water {
-            dev_low_water
+        if DATA_LOWATER + available > low_water {
+            DATA_LOWATER
         } else {
             assert!(low_water >= available);
             low_water - available
@@ -168,8 +171,8 @@ fn calc_lowater(
     };
 
     match free_space_state {
-        FreeSpaceState::Good => calc_lowater_internal(DATA_LOWATER, SPACE_WARN_PCT),
-        _ => calc_lowater_internal(THROTTLE_BLOCKS_PER_SEC, SPACE_CRIT_PCT),
+        FreeSpaceState::Good => calc_lowater_internal(SPACE_WARN_PCT),
+        _ => calc_lowater_internal(SPACE_CRIT_PCT),
     }
 }
 
@@ -547,7 +550,8 @@ impl ThinPool {
                 // Update pool space state
                 self.free_space_state = self.free_space_check(
                     usage.used_data,
-                    current_total + sectors_to_datablocks(backstore.available()) - usage.used_data,
+                    (current_total - usage.used_data)
+                        + sectors_to_datablocks(backstore.available()),
                 )?;
 
                 // Trigger next event depending on pool space state

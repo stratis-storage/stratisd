@@ -317,7 +317,7 @@ impl Backstore {
         sizes: &[Sectors],
     ) -> StratisResult<Option<Vec<(Sectors, Sectors)>>> {
         let total_required = sizes.iter().cloned().sum();
-        let available = self.available();
+        let available = self.available_in_cap();
         if available < total_required {
             if self.data_tier.alloc(total_required - available) {
                 self.extend_cap_device(pool_uuid)?;
@@ -373,7 +373,7 @@ impl Backstore {
             return Ok(None);
         }
 
-        let available = self.available();
+        let available = self.available_in_cap();
         if available < internal_request {
             let mut allocated = false;
             while !allocated && internal_request != Sectors(0) {
@@ -384,7 +384,7 @@ impl Backstore {
             if allocated {
                 self.extend_cap_device(pool_uuid)?;
 
-                let return_amt = cmp::min(request, self.available());
+                let return_amt = cmp::min(request, self.available_in_cap());
                 let return_amt = (return_amt / modulus) * modulus;
                 self.next += return_amt;
                 Ok(Some((self.next - return_amt, return_amt)))
@@ -442,8 +442,8 @@ impl Backstore {
             .unwrap_or(Sectors(0))
     }
 
-    /// The available number of Sectors.
-    pub fn available(&self) -> Sectors {
+    /// The available number of Sectors in the cap device.
+    pub fn available_in_cap(&self) -> Sectors {
         let size = self.size();
         // It is absolutely essential for correct operation that the assertion
         // be true. If it is false, the result will be incorrect, and space
@@ -456,6 +456,13 @@ impl Backstore {
             )
         );
         size - self.next
+    }
+
+    /// The available number of Sectors in the Backstore. (Note: future
+    /// changes may change the semantics of this value, or may make it
+    /// impossible to calculate.)
+    pub fn available(&self) -> Sectors {
+        self.datatier_current_capacity() - self.next
     }
 
     /// Destroy the entire store.

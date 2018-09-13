@@ -112,7 +112,7 @@ impl Backstore {
     ) -> StratisResult<Backstore> {
         let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
         let block_mgr = BlockDevMgr::new(datadevs, last_update_time);
-        let data_tier = DataTier::setup(block_mgr, &backstore_save.data_tier.blockdev.allocs)?;
+        let data_tier = DataTier::setup(block_mgr, &backstore_save.data_tier.blockdev.allocs[0])?;
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
         let origin = LinearDev::setup(
             get_dm(),

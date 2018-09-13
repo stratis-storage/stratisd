@@ -76,11 +76,7 @@ pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
     // Consider it an error if the amount allocated to the cap device is 0.
     // If this is the case, then the thin pool can not exist.
     {
-        let total_allocated = metadata
-            .backstore
-            .data_tier
-            .blockdev
-            .allocs
+        let total_allocated = metadata.backstore.data_tier.blockdev.allocs[0]
             .iter()
             .map(|x| x.length)
             .sum::<Sectors>();

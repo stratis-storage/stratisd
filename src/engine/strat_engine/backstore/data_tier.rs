@@ -166,7 +166,7 @@ impl Recordable<DataTierSave> for DataTier {
     fn record(&self) -> DataTierSave {
         DataTierSave {
             blockdev: BlockDev {
-                allocs: self.segments.record(),
+                allocs: vec![self.segments.record()],
                 devs: self.block_mgr.record(),
             },
         }

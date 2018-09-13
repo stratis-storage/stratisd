@@ -6,7 +6,7 @@
 
 use std;
 use std::borrow::BorrowMut;
-use std::cmp::min;
+use std::cmp::{max, min};
 use uuid::Uuid;
 
 use devicemapper::{
@@ -130,48 +130,38 @@ fn coalesce_segs(
 /// the number of free sectors in the backstore (free in data tier; or
 /// allocated *to* the backstore cap device, but not yet allocated *from* the
 /// cap device.)
-/// Postcondition:
-/// result == max(M * (data_dev_size + available) - available, L)
-/// equivalently:
-/// result == max(M * data_dev_size - (1 - M) * available, L)
-/// where M <= (100 - SPACE_WARN_PCT)/100 if self.free_space_state == Good
-///            (100 - SPACE_CRIT_PCT)/100  if self.free_space_state != Good
-///       L = DATA_LOWATER if self.free_space_state == Good
-///           throttle rate if self.free_space_state != Good
-// TODO: Use proptest to verify the behavior of this method.
-fn calc_lowater(
-    data_dev_size: DataBlocks,
-    available: DataBlocks,
-    free_space_state: FreeSpaceState,
-) -> DataBlocks {
-    // Calculate the low water. dev_low_water and action_pct are the device
-    // low water and the percent used at which an action should be taken for
-    // a particular free space state.
-    //
-    // Postcondition:
-    // result == max(M * data_dev_size - (1 - M) * available, dev_low_water)
-    // where M <= (100 - action_pct)/100
-    let calc_lowater_internal = |dev_low_water: DataBlocks, action_pct: u8| -> DataBlocks {
-        let total = data_dev_size + available;
+/// Lowater needed for three things:
+/// 1. Extend data device (currently not applicable due to greedy allocation)
+/// 2. Get an event when pool exceeds SPACE_CRIT_PCT
+/// 3. Get an event when usage has increased enough that we might need to
+///    extend a filesystem
+fn calc_lowater(used: DataBlocks, data_dev_size: DataBlocks, available: DataBlocks) -> DataBlocks {
+    let total = data_dev_size + available;
 
-        assert!(action_pct <= 100);
-        let low_water = total - ((total * action_pct) / 100u8);
-        assert!(DataBlocks(std::u64::MAX) - available >= dev_low_water);
+    // Calculate #2. Calculated against total size.
+    assert!(SPACE_CRIT_PCT <= 100);
+    let low_water_for_crit = total - ((total * SPACE_CRIT_PCT) / 100u8);
+    assert!(DataBlocks(std::u64::MAX) - available >= DATA_LOWATER);
 
-        // WARNING: Do not alter this if-expression to a max-expression.
-        // Doing so would invalidate the assertion below.
-        if dev_low_water + available > low_water {
-            dev_low_water
-        } else {
-            assert!(low_water >= available);
-            low_water - available
-        }
+    // Compare values of #1 and #2 above to get which one is higher
+    // WARNING: Do not alter this if-expression to a max-expression.
+    // Doing so would invalidate the assertion below.
+    // Need to add available to LOWATER to make it apples-to-apples with
+    // low_water_for_crit.
+    let prelim_max = if DATA_LOWATER + available > low_water_for_crit {
+        DATA_LOWATER
+    } else {
+        assert!(low_water_for_crit >= available);
+        // Adjust for against end of data dev instead of total
+        low_water_for_crit - available
     };
 
-    match free_space_state {
-        FreeSpaceState::Good => calc_lowater_internal(DATA_LOWATER, SPACE_WARN_PCT),
-        _ => calc_lowater_internal(THROTTLE_BLOCKS_PER_SEC, SPACE_CRIT_PCT),
-    }
+    // Calculate #3. This is not the same as #1 because pool might be fully
+    // extended, but we still need events to extend filesystems
+    let fs_event_lowater = DataBlocks((*(data_dev_size - used)).saturating_sub(*DATA_LOWATER));
+
+    // Get the highest of the three values
+    max(prelim_max, fs_event_lowater)
 }
 
 /// Segment lists that the ThinPool keeps track of.
@@ -320,9 +310,9 @@ impl ThinPool {
             data_dev,
             data_block_size,
             calc_lowater(
+                DataBlocks(0),
                 sectors_to_datablocks(data_dev_size),
                 sectors_to_datablocks(backstore.available_in_backstore()),
-                free_space_state,
             ),
         )?;
 
@@ -391,9 +381,11 @@ impl ThinPool {
             data_dev,
             thin_pool_save.data_block_size,
             calc_lowater(
+                // This is smaller than the actual amount used. This value
+                // is updated when the thinpool's check method is invoked.
+                DataBlocks(0),
                 sectors_to_datablocks(data_dev_size),
                 sectors_to_datablocks(backstore.available_in_backstore()),
-                free_space_state,
             ),
         )?;
 
@@ -538,11 +530,10 @@ impl ThinPool {
                         - usage.used_data,
                 )?;
 
-                // Trigger next event depending on pool space state
                 let lowater = calc_lowater(
+                    usage.used_data,
                     current_total,
                     sectors_to_datablocks(backstore.available_in_backstore()),
-                    self.free_space_state,
                 );
 
                 self.thin_pool.set_low_water_mark(get_dm(), lowater)?;

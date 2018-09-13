@@ -187,7 +187,7 @@ impl StratPool {
             uuid,
             &metadata.thinpool_dev,
             &metadata.flex_devs,
-            &backstore,
+            &mut backstore,
         )?;
 
         let changed = thinpool.check(uuid, &mut backstore)?;

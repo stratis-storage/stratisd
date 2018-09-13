@@ -121,7 +121,7 @@ impl StratBlockDev {
 
     // ALL SIZE METHODS
     /// The actual size of the device now.
-    pub fn current_capacity(&self) -> Sectors {
+    pub fn size(&self) -> Sectors {
         let size = self.used.capacity();
         assert_eq!(self.bda.dev_size(), size);
         size
@@ -133,7 +133,7 @@ impl StratBlockDev {
     }
 
     /// The number of Sectors on this device not allocated for any purpose.
-    /// self.current_capacity() - self.metadata_size() >= self.available()
+    /// self.size() - self.metadata_size() >= self.available()
     pub fn available(&self) -> Sectors {
         self.used.available()
     }
@@ -173,7 +173,7 @@ impl BlockDev for StratBlockDev {
 
     fn total_size(&self) -> Sectors {
         let start = self.metadata_size();
-        let size = self.current_capacity();
+        let size = self.size();
         assert!(start <= size);
         size - start
     }

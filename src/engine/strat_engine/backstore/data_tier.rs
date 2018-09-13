@@ -110,8 +110,8 @@ impl DataTier {
     }
 
     /// The total size of all the blockdevs combined
-    pub fn current_capacity(&self) -> Sectors {
-        self.block_mgr.current_capacity()
+    pub fn size(&self) -> Sectors {
+        self.block_mgr.size()
     }
 
     /// The number of sectors used for metadata by all the blockdevs
@@ -182,13 +182,13 @@ mod tests {
         let mut data_tier = DataTier::new(mgr);
 
         // A data_tier w/ some devices but nothing allocated
-        let mut current_capacity = data_tier.current_capacity();
+        let mut size = data_tier.size();
         let mut capacity = data_tier.capacity();
         assert_eq!(capacity, Sectors(0));
-        assert!(current_capacity != Sectors(0));
+        assert!(size != Sectors(0));
         assert_eq!(paths1.len(), data_tier.blockdevs().len());
 
-        let last_request_amount = current_capacity;
+        let last_request_amount = size;
 
         let request_amount = data_tier.block_mgr.avail_space() / 2usize;
         assert!(request_amount != Sectors(0));
@@ -197,22 +197,22 @@ mod tests {
 
         // A data tier w/ some amount allocated
         assert!(data_tier.capacity() >= request_amount);
-        assert_eq!(data_tier.current_capacity(), current_capacity);
+        assert_eq!(data_tier.size(), size);
         capacity = data_tier.capacity();
 
         data_tier.add(pool_uuid, paths2, false).unwrap();
 
         // A data tier w/ additional blockdevs added
-        assert!(data_tier.current_capacity() > current_capacity);
+        assert!(data_tier.size() > size);
         assert_eq!(data_tier.capacity(), capacity);
         assert_eq!(paths1.len() + paths2.len(), data_tier.blockdevs().len());
-        current_capacity = data_tier.current_capacity();
+        size = data_tier.size();
 
         // Allocate enough to get into the newly added block devices
         assert!(data_tier.alloc(last_request_amount));
 
         assert!(data_tier.capacity() >= request_amount + last_request_amount);
-        assert_eq!(data_tier.current_capacity(), current_capacity);
+        assert_eq!(data_tier.size(), size);
 
         data_tier.destroy().unwrap();
     }

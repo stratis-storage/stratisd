@@ -424,8 +424,8 @@ impl Backstore {
     }
 
     /// The current capacity of all the blockdevs in the data tier.
-    pub fn datatier_current_capacity(&self) -> Sectors {
-        self.data_tier.current_capacity()
+    pub fn datatier_size(&self) -> Sectors {
+        self.data_tier.size()
     }
 
     /// The size of the cap device.

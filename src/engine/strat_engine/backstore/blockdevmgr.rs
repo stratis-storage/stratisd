@@ -326,15 +326,15 @@ impl BlockDevMgr {
         self.block_devs.iter().map(|bd| bd.available()).sum()
     }
 
-    /// The current capacity of all the blockdevs.
-    /// self.current_capacity() > self.avail_space() because some sectors
-    /// are certainly allocated for Stratis metadata
-    pub fn current_capacity(&self) -> Sectors {
-        self.block_devs.iter().map(|b| b.current_capacity()).sum()
+    /// The current size of all the blockdevs.
+    /// self.size() > self.avail_space() because some sectors are certainly
+    /// allocated for Stratis metadata
+    pub fn size(&self) -> Sectors {
+        self.block_devs.iter().map(|b| b.size()).sum()
     }
 
     /// The number of sectors given over to Stratis metadata
-    /// self.current_capacity() - self.metadata_size() >= self.avail_space()
+    /// self.size() - self.metadata_size() >= self.avail_space()
     pub fn metadata_size(&self) -> Sectors {
         self.block_devs.iter().map(|bd| bd.metadata_size()).sum()
     }
@@ -502,22 +502,19 @@ mod tests {
     }
 
     /// Verify that initially,
-    /// current_capacity() - metadata_size() = avail_space().
+    /// size() - metadata_size() = avail_space().
     /// After 2 Sectors have been allocated, that amount must also be included
     /// in balance.
     fn test_blockdevmgr_used(paths: &[&Path]) -> () {
         let mut mgr =
             BlockDevMgr::initialize(Uuid::new_v4(), paths, MIN_MDA_SECTORS, false).unwrap();
-        assert_eq!(
-            mgr.avail_space() + mgr.metadata_size(),
-            mgr.current_capacity()
-        );
+        assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
         let allocated = Sectors(2);
         mgr.alloc_space(&[allocated]).unwrap();
         assert_eq!(
             mgr.avail_space() + allocated + mgr.metadata_size(),
-            mgr.current_capacity()
+            mgr.size()
         );
     }
 

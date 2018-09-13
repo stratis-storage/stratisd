@@ -22,13 +22,11 @@ pub fn set_write_throttling(device: Device, bytes_per_sec: Option<Bytes>) -> Str
     // Setting to u64::max_value() removes throttling.
     let value = bytes_per_sec.unwrap_or_else(|| Bytes(u64::max_value()));
 
-    let walker = WalkDir::new(CGROUP_PATH).into_iter();
-    let cg_entries = walker
+    for mut cg_entry in WalkDir::new(CGROUP_PATH)
+        .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_name().to_str() == Some(THROTTLE_BPS_PATH))
-        .collect::<Vec<_>>();
-
-    for mut cg_entry in cg_entries {
+    {
         OpenOptions::new()
             .write(true)
             .open(cg_entry.path())

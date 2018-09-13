@@ -105,7 +105,7 @@ impl StratBlockDev {
     }
 
     /// Find some sector ranges that could be allocated. If more
-    /// sectors are needed than our capacity, return partial results.
+    /// sectors are needed than are available, return partial results.
     /// If all sectors are desired, use available() method to get all.
     pub fn request_space(&mut self, size: Sectors) -> (Sectors, Vec<(Sectors, Sectors)>) {
         let prev_state = self.state();
@@ -122,7 +122,7 @@ impl StratBlockDev {
     // ALL SIZE METHODS
     /// The actual size of the device now.
     pub fn size(&self) -> Sectors {
-        let size = self.used.capacity();
+        let size = self.used.size();
         assert_eq!(self.bda.dev_size(), size);
         size
     }

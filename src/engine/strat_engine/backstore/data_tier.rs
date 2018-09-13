@@ -102,7 +102,7 @@ impl DataTier {
     /// The sum of the lengths of all the sectors that have been mapped to an
     /// upper device.
     #[cfg(test)]
-    pub fn capacity(&self) -> Sectors {
+    pub fn allocated(&self) -> Sectors {
         self.segments
             .iter()
             .map(|x| x.segment.length)
@@ -183,8 +183,8 @@ mod tests {
 
         // A data_tier w/ some devices but nothing allocated
         let mut size = data_tier.size();
-        let mut capacity = data_tier.capacity();
-        assert_eq!(capacity, Sectors(0));
+        let mut allocated = data_tier.allocated();
+        assert_eq!(allocated, Sectors(0));
         assert!(size != Sectors(0));
         assert_eq!(paths1.len(), data_tier.blockdevs().len());
 
@@ -196,22 +196,22 @@ mod tests {
         assert!(data_tier.alloc(request_amount));
 
         // A data tier w/ some amount allocated
-        assert!(data_tier.capacity() >= request_amount);
+        assert!(data_tier.allocated() >= request_amount);
         assert_eq!(data_tier.size(), size);
-        capacity = data_tier.capacity();
+        allocated = data_tier.allocated();
 
         data_tier.add(pool_uuid, paths2, false).unwrap();
 
         // A data tier w/ additional blockdevs added
         assert!(data_tier.size() > size);
-        assert_eq!(data_tier.capacity(), capacity);
+        assert_eq!(data_tier.allocated(), allocated);
         assert_eq!(paths1.len() + paths2.len(), data_tier.blockdevs().len());
         size = data_tier.size();
 
         // Allocate enough to get into the newly added block devices
         assert!(data_tier.alloc(last_request_amount));
 
-        assert!(data_tier.capacity() >= request_amount + last_request_amount);
+        assert!(data_tier.allocated() >= request_amount + last_request_amount);
         assert_eq!(data_tier.size(), size);
 
         data_tier.destroy().unwrap();

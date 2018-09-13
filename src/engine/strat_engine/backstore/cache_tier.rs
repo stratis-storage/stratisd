@@ -201,14 +201,14 @@ mod tests {
 
         let mut metadata_size = cache_tier.block_mgr.metadata_size();
         let mut size = cache_tier.block_mgr.size();
-        let mut capacity = cache_tier
+        let mut allocated = cache_tier
             .cache_segments
             .iter()
             .map(|x| x.segment.length)
             .sum::<Sectors>();
 
         assert_eq!(cache_tier.block_mgr.avail_space(), Sectors(0));
-        assert_eq!(size - metadata_size, capacity + cache_metadata_size);
+        assert_eq!(size - metadata_size, allocated + cache_metadata_size);
 
         let (_, (cache, meta)) = cache_tier.add(pool_uuid, paths2, false).unwrap();
         // TODO: Ultimately, it should be the case that meta can be true.
@@ -221,12 +221,12 @@ mod tests {
 
         metadata_size = cache_tier.block_mgr.metadata_size();
         size = cache_tier.block_mgr.size();
-        capacity = cache_tier
+        allocated = cache_tier
             .cache_segments
             .iter()
             .map(|x| x.segment.length)
             .sum::<Sectors>();
-        assert_eq!(size - metadata_size, capacity + cache_metadata_size);
+        assert_eq!(size - metadata_size, allocated + cache_metadata_size);
 
         cache_tier.destroy().unwrap();
     }

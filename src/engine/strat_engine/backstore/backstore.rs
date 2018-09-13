@@ -423,7 +423,7 @@ impl Backstore {
         }
     }
 
-    /// The current capacity of all the blockdevs in the data tier.
+    /// The current size of all the blockdevs in the data tier.
     pub fn datatier_size(&self) -> Sectors {
         self.data_tier.size()
     }
@@ -583,7 +583,7 @@ mod tests {
     /// Assert some invariants of the backstore
     /// * backstore.cache_tier.is_some() <=> backstore.cache.is_some() &&
     ///   backstore.cache_tier.is_some() => backstore.linear.is_none()
-    /// * backstore's data tier capacity is equal to the size of the cap device
+    /// * backstore's data tier allocated is equal to the size of the cap device
     /// * backstore's next index is always less than the size of the cap
     ///   device
     fn invariant(backstore: &Backstore) -> () {
@@ -594,7 +594,7 @@ mod tests {
                     && backstore.linear.is_none())
         );
         assert_eq!(
-            backstore.data_tier.capacity(),
+            backstore.data_tier.allocated(),
             match (&backstore.linear, &backstore.cache) {
                 (None, None) => Sectors(0),
                 (&None, &Some(ref cache)) => cache.size(),

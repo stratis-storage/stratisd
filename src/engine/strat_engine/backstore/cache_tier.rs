@@ -200,7 +200,7 @@ mod tests {
             .sum::<Sectors>();
 
         let mut metadata_size = cache_tier.block_mgr.metadata_size();
-        let mut current_capacity = cache_tier.block_mgr.current_capacity();
+        let mut size = cache_tier.block_mgr.size();
         let mut capacity = cache_tier
             .cache_segments
             .iter()
@@ -208,10 +208,7 @@ mod tests {
             .sum::<Sectors>();
 
         assert_eq!(cache_tier.block_mgr.avail_space(), Sectors(0));
-        assert_eq!(
-            current_capacity - metadata_size,
-            capacity + cache_metadata_size
-        );
+        assert_eq!(size - metadata_size, capacity + cache_metadata_size);
 
         let (_, (cache, meta)) = cache_tier.add(pool_uuid, paths2, false).unwrap();
         // TODO: Ultimately, it should be the case that meta can be true.
@@ -219,20 +216,17 @@ mod tests {
         assert!(!meta);
 
         assert_eq!(cache_tier.block_mgr.avail_space(), Sectors(0));
-        assert!(cache_tier.block_mgr.current_capacity() > current_capacity);
+        assert!(cache_tier.block_mgr.size() > size);
         assert!(cache_tier.block_mgr.metadata_size() > metadata_size);
 
         metadata_size = cache_tier.block_mgr.metadata_size();
-        current_capacity = cache_tier.block_mgr.current_capacity();
+        size = cache_tier.block_mgr.size();
         capacity = cache_tier
             .cache_segments
             .iter()
             .map(|x| x.segment.length)
             .sum::<Sectors>();
-        assert_eq!(
-            current_capacity - metadata_size,
-            capacity + cache_metadata_size
-        );
+        assert_eq!(size - metadata_size, capacity + cache_metadata_size);
 
         cache_tier.destroy().unwrap();
     }

@@ -45,12 +45,18 @@ pub struct CacheTierSave {
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Cap {
-    pub allocs: Vec<BaseDev>,
+    pub allocs: Vec<LayeredDev>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DataTierSave {
     pub blockdev: BlockDev,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct LayeredDev {
+    pub start: Sectors,
+    pub length: Sectors,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

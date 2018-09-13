@@ -858,7 +858,7 @@ impl ThinPool {
             StratFilesystem::initialize(pool_uuid, &self.thin_pool, size, self.id_gen.new_id()?)?;
         let name = Name::new(name.to_owned());
         self.mdv.save_fs(&name, fs_uuid, &new_filesystem)?;
-        devlinks::filesystem_added(pool_name, &name, &new_filesystem.devnode())?;
+        devlinks::filesystem_added(pool_name, &name, &new_filesystem.devnode());
         self.filesystems.insert(name, fs_uuid, new_filesystem);
 
         Ok(fs_uuid)
@@ -897,7 +897,7 @@ impl ThinPool {
         let new_fs_name = Name::new(snapshot_name.to_owned());
         self.mdv
             .save_fs(&new_fs_name, snapshot_fs_uuid, &new_filesystem)?;
-        devlinks::filesystem_added(pool_name, &new_fs_name, &new_filesystem.devnode())?;
+        devlinks::filesystem_added(pool_name, &new_fs_name, &new_filesystem.devnode());
         self.filesystems
             .insert(new_fs_name, snapshot_fs_uuid, new_filesystem);
         Ok((
@@ -927,13 +927,7 @@ impl ThinPool {
                                pool_name,
                                err);
                     }
-                    if let Err(err) = devlinks::filesystem_removed(pool_name, &fs_name) {
-                        error!("Could not remove devlinks for fs with UUID {} and name {} belonging to pool {}, reason: {:?}",
-                               uuid,
-                               fs_name,
-                               pool_name,
-                               err);
-                    }
+                    devlinks::filesystem_removed(pool_name, &fs_name);
                     Ok(())
                 }
                 Err(err) => {
@@ -974,7 +968,7 @@ impl ThinPool {
                 to: &*new_name,
             });
             self.filesystems.insert(new_name.clone(), uuid, filesystem);
-            devlinks::filesystem_renamed(pool_name, &old_name, &new_name)?;
+            devlinks::filesystem_renamed(pool_name, &old_name, &new_name);
             Ok(RenameAction::Renamed)
         }
     }
@@ -1185,7 +1179,7 @@ mod tests {
     fn test_full_pool(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         devlinks::setup_dev_path().unwrap();
-        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter());
         let (first_path, remaining_paths) = paths.split_at(1);
         let mut backstore =
             Backstore::initialize(pool_uuid, &first_path, MIN_MDA_SECTORS, false).unwrap();
@@ -1197,7 +1191,7 @@ mod tests {
         ).unwrap();
 
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name).unwrap();
+        devlinks::pool_added(&pool_name);
         let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
             .unwrap();
         let write_buf = &[8u8; BYTES_PER_WRITE];
@@ -1284,7 +1278,7 @@ mod tests {
     /// Verify a snapshot has the same files and same contents as the origin.
     fn test_filesystem_snapshot(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter());
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(
@@ -1295,7 +1289,7 @@ mod tests {
         ).unwrap();
 
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name).unwrap();
+        devlinks::pool_added(&pool_name);
         let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
             .unwrap();
 
@@ -1389,7 +1383,7 @@ mod tests {
         let name2 = "name2";
 
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter());
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(
@@ -1400,7 +1394,7 @@ mod tests {
         ).unwrap();
 
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name).unwrap();
+        devlinks::pool_added(&pool_name);
         let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, &name1, None)
             .unwrap();
 
@@ -1436,7 +1430,7 @@ mod tests {
     /// some data on it.
     fn test_pool_setup(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter());
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(
@@ -1447,7 +1441,7 @@ mod tests {
         ).unwrap();
 
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name).unwrap();
+        devlinks::pool_added(&pool_name);
         let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, "fsname", None)
             .unwrap();
 
@@ -1496,7 +1490,7 @@ mod tests {
     /// same thin id and verifying that it fails.
     fn test_thindev_destroy(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter());
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(
@@ -1506,7 +1500,7 @@ mod tests {
             &mut backstore,
         ).unwrap();
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name).unwrap();
+        devlinks::pool_added(&pool_name);
         let fs_name = "stratis_test_filesystem";
         let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, &fs_name, None)
             .unwrap();
@@ -1605,7 +1599,7 @@ mod tests {
     /// have been expanded.
     fn test_thinpool_expand(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter());
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(
@@ -1615,7 +1609,7 @@ mod tests {
             &mut backstore,
         ).unwrap();
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name).unwrap();
+        devlinks::pool_added(&pool_name);
         let fs_name = "stratis_test_filesystem";
         let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, fs_name, None)
             .unwrap();
@@ -1667,7 +1661,7 @@ mod tests {
     /// compared to the original size.
     fn test_xfs_expand(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter());
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(
@@ -1682,7 +1676,7 @@ mod tests {
         let fs_size = FILESYSTEM_LOWATER + Bytes(IEC::Mi).sectors();
 
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name).unwrap();
+        devlinks::pool_added(&pool_name);
         let fs_name = "stratis_test_filesystem";
         let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, fs_name, Some(fs_size))
             .unwrap();
@@ -1741,7 +1735,7 @@ mod tests {
     /// to check idempotency.
     fn test_suspend_resume(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter());
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(
@@ -1752,7 +1746,7 @@ mod tests {
         ).unwrap();
 
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name).unwrap();
+        devlinks::pool_added(&pool_name);
         pool.create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
             .unwrap();
 
@@ -1788,7 +1782,7 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter());
         let mut backstore =
             Backstore::initialize(pool_uuid, paths2, MIN_MDA_SECTORS, false).unwrap();
         let mut pool = ThinPool::new(
@@ -1799,7 +1793,7 @@ mod tests {
         ).unwrap();
 
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name).unwrap();
+        devlinks::pool_added(&pool_name);
         let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
             .unwrap();
 

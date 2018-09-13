@@ -2,10 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::fs::{self, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::Write;
 
 use devicemapper::{Bytes, Device};
+use walkdir::WalkDir;
 
 use stratis::StratisResult;
 
@@ -16,30 +17,21 @@ const THROTTLE_BPS_PATH: &str = "blkio.throttle.write_bps_device";
 /// throttling by passing `None` for `bytes_per_sec`.
 // The underlying APIs here are... in flux. Hierarchical blkio throttling
 // doesn't work on all configs. What we're doing for the moment is setting the
-// throttle in *all* cgroups if they are present, but if not, then trying to
-// do it at the root level.
+// throttle in *all* cgroups that are present.
 pub fn set_write_throttling(device: Device, bytes_per_sec: Option<Bytes>) -> StratisResult<()> {
     // Setting to u64::max_value() removes throttling.
     let value = bytes_per_sec.unwrap_or_else(|| Bytes(u64::max_value()));
 
-    // Find all cgroup subdirectories
-    let mut cg_dirs = fs::read_dir(CGROUP_PATH)?
-        .into_iter()
-        .filter_map(|entry| entry.ok())
-        .map(|entry| entry.path())
-        .filter(|path| path.is_dir())
+    let walker = WalkDir::new(CGROUP_PATH).into_iter();
+    let cg_entries = walker
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_name().to_str() == Some(THROTTLE_BPS_PATH))
         .collect::<Vec<_>>();
 
-    // If there are no subdirs, get the root cgroup
-    if cg_dirs.is_empty() {
-        cg_dirs.push(CGROUP_PATH.into());
-    }
-
-    for mut cg_dir in cg_dirs {
-        cg_dir.push(THROTTLE_BPS_PATH);
+    for mut cg_entry in cg_entries {
         OpenOptions::new()
             .write(true)
-            .open(cg_dir)
+            .open(cg_entry.path())
             .and_then(|mut f| f.write_all(format!("{} {}", device, *value).as_bytes()))?;
     }
 
@@ -56,7 +48,7 @@ mod tests {
 
     use super::*;
 
-    use std::fs::OpenOptions;
+    use std::fs::{self, OpenOptions};
     use std::io::Read;
     use std::os::unix::fs::MetadataExt;
     use std::path::Path;

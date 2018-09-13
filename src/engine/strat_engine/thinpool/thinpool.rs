@@ -43,11 +43,11 @@ use super::mdv::MetadataVol;
 use super::thinids::ThinDevIdPool;
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
-const DATA_LOWATER: DataBlocks = DataBlocks(512);
+const DATA_LOWATER: DataBlocks = DataBlocks(1024);
 const META_LOWATER_FALLBACK: MetaBlocks = MetaBlocks(512);
 
 const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
-const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
+const DEFAULT_INITIAL_DATA_SIZE: DataBlocks = DataBlocks(1792);
 const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 
 const SPACE_WARN_PCT: u8 = 90;
@@ -202,7 +202,7 @@ impl Default for ThinPoolSizeParams {
     fn default() -> ThinPoolSizeParams {
         ThinPoolSizeParams {
             meta_size: INITIAL_META_SIZE,
-            data_size: INITIAL_DATA_SIZE,
+            data_size: DEFAULT_INITIAL_DATA_SIZE,
             mdv_size: INITIAL_MDV_SIZE,
         }
     }
@@ -244,7 +244,6 @@ impl ThinPool {
             &[
                 thin_pool_size.meta_size(),
                 thin_pool_size.meta_size(),
-                thin_pool_size.data_size(),
                 thin_pool_size.mdv_size(),
             ],
         )? {
@@ -255,10 +254,15 @@ impl ThinPool {
             }
         };
 
-        let mdv_segments = segments_list.pop().expect("len(segments_list) == 4");
-        let data_segments = segments_list.pop().expect("len(segments_list) == 3");
+        let mdv_segments = segments_list.pop().expect("len(segments_list) == 3");
         let spare_segments = segments_list.pop().expect("len(segments_list) == 2");
         let meta_segments = segments_list.pop().expect("len(segments_list) == 1");
+
+        // Allow data segs to be less than DEFAULT_INITIAL_DATA_SIZE if space
+        // is tight
+        let data_segments = backstore
+            .request(pool_uuid, thin_pool_size.data_size(), DATA_BLOCK_SIZE)?
+            .expect("Must be some blocks in pool, unless MIN_DEV_SIZE is too low");
 
         let backstore_device = backstore.device().expect(
             "Space has just been allocated from the backstore, so it must have a cap device",
@@ -1390,7 +1394,7 @@ mod tests {
         pool.extend_thin_data_device(
             pool_uuid,
             &mut backstore,
-            datablocks_to_sectors(INITIAL_DATA_SIZE),
+            datablocks_to_sectors(DEFAULT_INITIAL_DATA_SIZE),
         ).unwrap();
 
         let (_, snapshot_filesystem) =
@@ -1674,18 +1678,24 @@ mod tests {
         {
             let mut f = OpenOptions::new().write(true).open(devnode).unwrap();
             // Write 1 more sector than is initially allocated to a pool
-            let write_size = datablocks_to_sectors(INITIAL_DATA_SIZE) + Sectors(1);
+            let write_size = datablocks_to_sectors(DEFAULT_INITIAL_DATA_SIZE) + Sectors(1);
             let buf = &[1u8; SECTOR_SIZE];
             for i in 0..*write_size {
                 f.write_all(buf).unwrap();
                 // Simulate handling a DM event by extending the pool when
                 // the amount of free space in pool has decreased to the
                 // DATA_LOWATER value.
-                if i == *(datablocks_to_sectors(INITIAL_DATA_SIZE - DATA_LOWATER)) {
+                let pool_increase_when = if DEFAULT_INITIAL_DATA_SIZE > DATA_LOWATER {
+                    DEFAULT_INITIAL_DATA_SIZE - DATA_LOWATER
+                } else {
+                    // Extend immediately
+                    DataBlocks(0)
+                };
+                if i == *(datablocks_to_sectors(pool_increase_when)) {
                     pool.extend_thin_data_device(
                         pool_uuid,
                         &mut backstore,
-                        datablocks_to_sectors(INITIAL_DATA_SIZE),
+                        datablocks_to_sectors(DEFAULT_INITIAL_DATA_SIZE),
                     ).unwrap();
                 }
             }

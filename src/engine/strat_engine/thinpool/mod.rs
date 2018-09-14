@@ -8,4 +8,4 @@ mod thinids;
 #[allow(module_inception)]
 mod thinpool;
 
-pub use self::thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE, INITIAL_DATA_SIZE};
+pub use self::thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE};

@@ -19,6 +19,7 @@ use devicemapper::{
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
+use super::super::super::engine::BlockDev;
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::super::serde_structs::{BlockDevSave, Recordable};

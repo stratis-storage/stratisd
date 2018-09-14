@@ -119,14 +119,7 @@ impl StratBlockDev {
         result
     }
 
-    // ALL SIZE METHODS
-    /// The actual size of the device now.
-    pub fn size(&self) -> Sectors {
-        let size = self.used.size();
-        assert_eq!(self.bda.dev_size(), size);
-        size
-    }
-
+    // ALL SIZE METHODS (except size(), which is in BlockDev impl.)
     /// The number of Sectors on this device used by Stratis for metadata
     pub fn metadata_size(&self) -> Sectors {
         self.bda.size()
@@ -172,10 +165,9 @@ impl BlockDev for StratBlockDev {
     }
 
     fn size(&self) -> Sectors {
-        let start = self.metadata_size();
-        let size = self.size();
-        assert!(start <= size);
-        size - start
+        let size = self.used.size();
+        assert_eq!(self.bda.dev_size(), size);
+        size
     }
 
     fn state(&self) -> BlockDevState {

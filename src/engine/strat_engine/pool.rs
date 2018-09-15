@@ -21,9 +21,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::backstore::{Backstore, StratBlockDev, MIN_MDA_SECTORS};
 use super::serde_structs::{FlexDevsSave, PoolSave, Recordable};
-use super::thinpool::{ThinPool, ThinPoolSizeParams};
-
-pub use super::thinpool::{DATA_BLOCK_SIZE, INITIAL_DATA_SIZE};
+use super::thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE};
 
 /// Get the index which indicates the start of unallocated space in the cap
 /// device.

@@ -1,4 +1,4 @@
-# stratisd
+# stratisd CI test
 
 A daemon that manages a pool of block devices to create flexible filesystems.
 

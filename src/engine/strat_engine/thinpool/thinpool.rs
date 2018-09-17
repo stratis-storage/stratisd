@@ -127,8 +127,10 @@ fn coalesce_segs(
     segments
 }
 
-/// Calculate new low water based on the current thinpool data device size
-/// and the amount of unused sectors available in the cap device.
+/// Calculate new low water based on the current thinpool data device size and
+/// the number of free sectors in the backstore (free in data tier; or
+/// allocated *to* the backstore cap device, but not yet allocated *from* the
+/// cap device.)
 /// Postcondition:
 /// result == max(M * (data_dev_size + available) - available, L)
 /// equivalently:

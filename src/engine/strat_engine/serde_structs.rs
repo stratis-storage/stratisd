@@ -35,7 +35,7 @@ pub struct BaseDev {
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockDev {
     pub allocs: Vec<Vec<BaseDev>>,
-    pub devs: Vec<BlockDevSave>,
+    pub devs: Vec<BaseBlockDevSave>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -68,7 +68,7 @@ pub struct PoolSave {
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BlockDevSave {
+pub struct BaseBlockDevSave {
     pub uuid: DevUuid,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_info: Option<String>,

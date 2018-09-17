@@ -322,7 +322,7 @@ impl ThinPool {
             filesystems: Table::default(),
             mdv,
             backstore_device,
-            pool_state: PoolState::Good,
+            pool_state: PoolState::Initializing,
             free_space_state,
             dbus_path: MaybeDbusPath(None),
         })
@@ -429,7 +429,7 @@ impl ThinPool {
             filesystems: fs_table,
             mdv,
             backstore_device,
-            pool_state: PoolState::Good,
+            pool_state: PoolState::Initializing,
             free_space_state,
             dbus_path: MaybeDbusPath(None),
         })
@@ -477,14 +477,18 @@ impl ThinPool {
         match thinpool {
             dm::ThinPoolStatus::Working(ref status) => {
                 match status.summary {
-                    ThinPoolStatusSummary::Good => {}
+                    ThinPoolStatusSummary::Good => {
+                        self.set_state(PoolState::Running);
+                    }
+                    // If a pool is in ReadOnly mode it is due to either meta data full or
+                    // the pool requires repair.
                     ThinPoolStatusSummary::ReadOnly => {
-                        error!("Thinpool readonly! -> BAD");
-                        self.set_state(PoolState::Bad);
+                        error!("Thinpool read only! -> ReadOnly");
+                        self.set_state(PoolState::ReadOnly);
                     }
                     ThinPoolStatusSummary::OutOfSpace => {
-                        error!("Thinpool out of space! -> BAD");
-                        self.set_state(PoolState::Bad);
+                        error!("Thinpool out of space! -> OutOfSpace");
+                        self.set_state(PoolState::OutOfDataSpace);
                     }
                 }
 
@@ -509,8 +513,7 @@ impl ThinPool {
                             should_save = true;
                         }
                         Err(err) => {
-                            error!("Thinpool meta extend failed! -> BAD: reason {:?}", err);
-                            self.set_state(PoolState::Bad);
+                            error!("Thinpool meta extend failed! -> reason {:?}", err);
                         }
                     }
                 }
@@ -523,24 +526,26 @@ impl ThinPool {
                         true,
                     ) {
                         None => DataBlocks(0),
-                        Some(request) => match self.extend_thin_data_device(
-                            pool_uuid, backstore, request,
-                        ) {
-                            Ok(Sectors(0)) => {
-                                warn!("data device fully extended, cannot extend further");
-                                DataBlocks(0)
+                        Some(request) => {
+                            match self.extend_thin_data_device(pool_uuid, backstore, request) {
+                                Ok(Sectors(0)) => {
+                                    warn!("data device fully extended, cannot extend further");
+                                    DataBlocks(0)
+                                }
+                                Ok(extend_size) => {
+                                    info!("Extended thin data device by {}", extend_size);
+                                    should_save = true;
+                                    sectors_to_datablocks(extend_size)
+                                }
+                                Err(err) => {
+                                    error!(
+                                        "Thinpool data extend failed! -> Warning: reason: {:?}",
+                                        err
+                                    );
+                                    DataBlocks(0)
+                                }
                             }
-                            Ok(extend_size) => {
-                                info!("Extended thin data device by {}", extend_size);
-                                should_save = true;
-                                sectors_to_datablocks(extend_size)
-                            }
-                            Err(err) => {
-                                error!("Thinpool data extend failed! -> BAD: reason: {:?}", err);
-                                self.set_state(PoolState::Bad);
-                                DataBlocks(0)
-                            }
-                        },
+                        }
                     }
                 };
 
@@ -564,8 +569,8 @@ impl ThinPool {
                 self.resume()?;
             }
             dm::ThinPoolStatus::Fail => {
-                error!("Thinpool status is `fail` -> BAD");
-                self.set_state(PoolState::Bad);
+                error!("Thinpool status is fail -> Failed");
+                self.set_state(PoolState::Failed);
                 // TODO: Take pool offline?
                 // TODO: Run thin_check
             }
@@ -679,6 +684,7 @@ impl ThinPool {
     /// Tear down the components managed here: filesystems, the MDV,
     /// and the actual thinpool device itself.
     pub fn teardown(&mut self) -> StratisResult<()> {
+        self.set_state(PoolState::Stopping);
         // Must succeed in tearing down all filesystems before the
         // thinpool..
         for (_, _, ref mut fs) in &mut self.filesystems {

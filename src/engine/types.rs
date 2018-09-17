@@ -22,17 +22,33 @@ pub enum RenameAction {
     Renamed,
 }
 
+/// A DM pool operates in 4 modes.  See drivers/md/dm-thin.c (enum pool_mode).
+/// The 4 modes map to Running, OutOfDataSpace, ReadOnly and Failed - in degrading
+/// order.  Stratis adds 2 additional modes - Initializing and Stopping.  The Stratis
+/// specific modes are used to represent the state when Stratis is either constructing
+/// the pool components or tearing them down.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PoolState {
-    Good,
-    Bad,
+    Initializing,   // Startup in progress
+    Running,        // PM_WRITE - pool ok
+    OutOfDataSpace, // Meta
+    ReadOnly,       // The kernel reports PM_OUT_OF_META_SPACE or PM_READ_ONLY as the
+    // same state. PM_OUT_OF_META_SPACE may switch back to PM_WRITE when
+    // the meta data device is expanded.  PM_READ_ONLY requires user
+    // intervention to switch back to PM_WRITE mode.
+    Failed,   // All I/O fails
+    Stopping, // Teardown in progress
 }
 
 impl PoolState {
     pub fn to_dbus_value(&self) -> u16 {
         match *self {
-            PoolState::Good => 0,
-            PoolState::Bad => 1,
+            PoolState::Initializing => 1,
+            PoolState::Running => 2,
+            PoolState::ReadOnly => 3,
+            PoolState::OutOfDataSpace => 4,
+            PoolState::Failed => 5,
+            PoolState::Stopping => 6,
         }
     }
 }

@@ -54,7 +54,7 @@ impl SimPool {
                 filesystems: Table::default(),
                 redundancy,
                 rdm: Rc::clone(rdm),
-                pool_state: PoolState::Good,
+                pool_state: PoolState::Initializing,
                 dbus_path: MaybeDbusPath(None),
             },
         )

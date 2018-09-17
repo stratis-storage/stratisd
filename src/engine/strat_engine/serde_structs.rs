@@ -26,7 +26,7 @@ pub trait Recordable<T: Serialize> {
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct BaseDev {
+pub struct BaseDevSave {
     pub parent: DevUuid,
     pub start: Sectors,
     pub length: Sectors,
@@ -34,7 +34,7 @@ pub struct BaseDev {
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockDevSave {
-    pub allocs: Vec<Vec<BaseDev>>,
+    pub allocs: Vec<Vec<BaseDevSave>>,
     pub devs: Vec<BaseBlockDevSave>,
 }
 

@@ -12,7 +12,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
-use super::super::serde_structs::{BaseDev, BlockDevSave, CacheTierSave, Recordable};
+use super::super::serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Recordable};
 
 use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment};
@@ -35,8 +35,8 @@ impl CacheTier {
     /// previously allocated segments.
     pub fn setup(
         block_mgr: BlockDevMgr,
-        cache_segments: &[BaseDev],
-        meta_segments: &[BaseDev],
+        cache_segments: &[BaseDevSave],
+        meta_segments: &[BaseDevSave],
     ) -> StratisResult<CacheTier> {
         if block_mgr.avail_space() != Sectors(0) {
             let err_msg = format!(
@@ -47,7 +47,7 @@ impl CacheTier {
         }
 
         let uuid_to_devno = block_mgr.uuid_to_devno();
-        let mapper = |ld: &BaseDev| -> StratisResult<BlkDevSegment> {
+        let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
             let parent = ld.parent;
             let device = uuid_to_devno(parent).ok_or_else(|| {
                 StratisError::Engine(

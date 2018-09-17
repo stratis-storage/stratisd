@@ -44,7 +44,7 @@ pub struct CacheTierSave {
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct Cap {
+pub struct CapSave {
     pub allocs: Vec<LayeredDev>,
 }
 
@@ -97,7 +97,7 @@ pub struct FlexDevsSave {
 pub struct BackstoreSave {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_tier: Option<CacheTierSave>,
-    pub cap: Cap,
+    pub cap: CapSave,
     pub data_tier: DataTierSave,
 }
 

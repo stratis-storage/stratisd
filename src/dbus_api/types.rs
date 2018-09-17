@@ -25,7 +25,6 @@ macro_attr! {
         BUSY,
         IO_ERROR,
         INTERNAL_ERROR,
-        NIX_ERROR,
         NOTFOUND,
     }
 }
@@ -46,7 +45,6 @@ impl DbusErrorEnum {
             DbusErrorEnum::BUSY => "Operation can not be performed at this time",
             DbusErrorEnum::INTERNAL_ERROR => "Internal error",
             DbusErrorEnum::IO_ERROR => "IO error during operation",
-            DbusErrorEnum::NIX_ERROR => "System error during operation",
             DbusErrorEnum::NOTFOUND => "Not found",
         }
     }

@@ -347,7 +347,7 @@ impl Pool for StratPool {
     }
 
     fn total_physical_size(&self) -> Sectors {
-        self.backstore.datatier_current_capacity()
+        self.backstore.datatier_size()
     }
 
     fn total_physical_used(&self) -> StratisResult<Sectors> {

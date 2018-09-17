@@ -105,7 +105,7 @@ impl StratBlockDev {
     }
 
     /// Find some sector ranges that could be allocated. If more
-    /// sectors are needed than our capacity, return partial results.
+    /// sectors are needed than are available, return partial results.
     /// If all sectors are desired, use available() method to get all.
     pub fn request_space(&mut self, size: Sectors) -> (Sectors, Vec<(Sectors, Sectors)>) {
         let prev_state = self.state();
@@ -119,21 +119,14 @@ impl StratBlockDev {
         result
     }
 
-    // ALL SIZE METHODS
-    /// The actual size of the device now.
-    pub fn current_capacity(&self) -> Sectors {
-        let size = self.used.capacity();
-        assert_eq!(self.bda.dev_size(), size);
-        size
-    }
-
+    // ALL SIZE METHODS (except size(), which is in BlockDev impl.)
     /// The number of Sectors on this device used by Stratis for metadata
     pub fn metadata_size(&self) -> Sectors {
         self.bda.size()
     }
 
     /// The number of Sectors on this device not allocated for any purpose.
-    /// self.current_capacity() - self.metadata_size() >= self.available()
+    /// self.size() - self.metadata_size() >= self.available()
     pub fn available(&self) -> Sectors {
         self.used.available()
     }
@@ -171,11 +164,10 @@ impl BlockDev for StratBlockDev {
         Utc.timestamp(self.bda.initialization_time() as i64, 0)
     }
 
-    fn total_size(&self) -> Sectors {
-        let start = self.metadata_size();
-        let size = self.current_capacity();
-        assert!(start <= size);
-        size - start
+    fn size(&self) -> Sectors {
+        let size = self.used.size();
+        assert_eq!(self.bda.dev_size(), size);
+        size
     }
 
     fn state(&self) -> BlockDevState {

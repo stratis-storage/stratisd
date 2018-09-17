@@ -44,7 +44,7 @@ impl BlockDev for SimDev {
         Utc.timestamp(self.initialization_time as i64, 0)
     }
 
-    fn total_size(&self) -> Sectors {
+    fn size(&self) -> Sectors {
         Bytes(IEC::Gi).sectors()
     }
 

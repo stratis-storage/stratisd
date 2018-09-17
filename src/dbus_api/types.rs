@@ -24,7 +24,6 @@ macro_attr! {
         ALREADY_EXISTS,
         BUSY,
         IO_ERROR,
-        NIX_ERROR,
         NOTFOUND,
     }
 }
@@ -44,7 +43,6 @@ impl DbusErrorEnum {
             DbusErrorEnum::ALREADY_EXISTS => "Already exists",
             DbusErrorEnum::BUSY => "Operation can not be performed at this time",
             DbusErrorEnum::IO_ERROR => "IO error during operation",
-            DbusErrorEnum::NIX_ERROR => "System error during operation",
             DbusErrorEnum::NOTFOUND => "Not found",
         }
     }

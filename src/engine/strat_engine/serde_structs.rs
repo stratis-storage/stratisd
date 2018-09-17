@@ -33,14 +33,14 @@ pub struct BaseDev {
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct BlockDev {
+pub struct BlockDevSave {
     pub allocs: Vec<Vec<BaseDev>>,
     pub devs: Vec<BaseBlockDevSave>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CacheTierSave {
-    pub blockdev: BlockDev,
+    pub blockdev: BlockDevSave,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -50,7 +50,7 @@ pub struct Cap {
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DataTierSave {
-    pub blockdev: BlockDev,
+    pub blockdev: BlockDevSave,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]

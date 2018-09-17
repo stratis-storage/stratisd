@@ -12,7 +12,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
-use super::super::serde_structs::{BaseDev, BlockDev, CacheTierSave, Recordable};
+use super::super::serde_structs::{BaseDev, BlockDevSave, CacheTierSave, Recordable};
 
 use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment};
@@ -172,7 +172,7 @@ impl CacheTier {
 impl Recordable<CacheTierSave> for CacheTier {
     fn record(&self) -> CacheTierSave {
         CacheTierSave {
-            blockdev: BlockDev {
+            blockdev: BlockDevSave {
                 allocs: vec![self.cache_segments.record(), self.meta_segments.record()],
                 devs: self.block_mgr.record(),
             },

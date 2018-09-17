@@ -7,7 +7,7 @@ authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.com>"]
 dbus = {version = "0.6.1", optional = true}
 clap = "2"
 nix = "0.11"
-devicemapper = { git = "https://github.com/mulkieran/devicemapper-rs", branch = "master-no-chain" }
+devicemapper = { git = "https://github.com/stratis-storage/devicemapper-rs", branch = "master" }
 crc = "1"
 byteorder = "1"
 chrono = "0.4"

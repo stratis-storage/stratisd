@@ -45,7 +45,7 @@ pub struct CacheTierSave {
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CapSave {
-    pub allocs: Vec<LayeredDev>,
+    pub allocs: Vec<LayeredDevSave>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -54,7 +54,7 @@ pub struct DataTierSave {
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct LayeredDev {
+pub struct LayeredDevSave {
     pub start: Sectors,
     pub length: Sectors,
 }

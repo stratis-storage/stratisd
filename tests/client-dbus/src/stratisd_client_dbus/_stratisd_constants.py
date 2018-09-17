@@ -28,6 +28,4 @@ class StratisdErrors(IntEnum):
     ALREADY_EXISTS = 2
     BUSY = 3
     IO_ERROR = 4
-    INTERNAL_ERROR = 5
-    NIX_ERROR = 6
-    NOT_FOUND = 7
+    NOT_FOUND = 5

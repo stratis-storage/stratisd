@@ -11,6 +11,8 @@ use dbus::tree::{MTFn, MethodErr, PropInfo};
 use dbus::Connection;
 use dbus::SignalArgs;
 
+use devicemapper::DmError;
+
 use super::super::stratis::{ErrorEnum, StratisError};
 
 use super::types::{DbusErrorEnum, TData};
@@ -43,7 +45,7 @@ where
 /// D-Bus methods return.
 pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
     let error = match *err {
-        StratisError::Error(_) => DbusErrorEnum::INTERNAL_ERROR,
+        StratisError::Error(_) => DbusErrorEnum::ERROR,
         StratisError::Engine(ref e, _) => match *e {
             ErrorEnum::Error => DbusErrorEnum::ERROR,
             ErrorEnum::AlreadyExists => DbusErrorEnum::ALREADY_EXISTS,
@@ -52,15 +54,19 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
             ErrorEnum::NotFound => DbusErrorEnum::NOTFOUND,
         },
         StratisError::Io(_) => DbusErrorEnum::IO_ERROR,
-        StratisError::Nix(_) => DbusErrorEnum::NIX_ERROR,
+        StratisError::Nix(_) => DbusErrorEnum::IO_ERROR,
         StratisError::Uuid(_)
         | StratisError::Utf8(_)
         | StratisError::Serde(_)
         | StratisError::DM(_)
         | StratisError::Dbus(_)
-        | StratisError::Udev(_) => DbusErrorEnum::INTERNAL_ERROR,
+        | StratisError::Udev(_) => DbusErrorEnum::ERROR,
     };
-    (error.into(), err.description().to_owned())
+    let description = match *err {
+        StratisError::DM(DmError::Core(ref err)) => err.to_string(),
+        ref err => err.description().to_owned(),
+    };
+    (error.into(), description)
 }
 
 /// Convenience function to get the error value for "OK"

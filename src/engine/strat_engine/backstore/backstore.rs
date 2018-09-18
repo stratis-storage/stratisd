@@ -19,7 +19,7 @@ use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 use super::super::device::wipe_sectors;
 use super::super::dm::get_dm;
 use super::super::dmnames::{format_backstore_ids, CacheRole};
-use super::super::serde_structs::{BackstoreSave, Recordable};
+use super::super::serde_structs::{BackstoreSave, CapSave, Recordable};
 
 use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{map_to_dm, BlockDevMgr};
@@ -95,7 +95,8 @@ impl Backstore {
     /// Make a Backstore object from blockdevs that already belong to Stratis.
     /// Precondition: every device in devnodes has already been determined to
     /// belong to the pool with the specified pool_uuid.
-    /// Precondition: next <= the sum of the lengths of the segments allocated
+    /// Precondition: backstore_save.cap.allocs[0].length <=
+    ///       the sum of the lengths of the segments allocated
     /// to the data tier cap device.
     /// Precondition: backstore_save.data_segments is not empty. This is a
     /// consequence of the fact that metadata is saved by the pool, and if
@@ -108,11 +109,10 @@ impl Backstore {
         backstore_save: &BackstoreSave,
         devnodes: &HashMap<Device, PathBuf>,
         last_update_time: Option<DateTime<Utc>>,
-        next: Sectors,
     ) -> StratisResult<Backstore> {
         let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
         let block_mgr = BlockDevMgr::new(datadevs, last_update_time);
-        let data_tier = DataTier::setup(block_mgr, &backstore_save.data_segments)?;
+        let data_tier = DataTier::setup(block_mgr, &backstore_save.data_tier)?;
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
         let origin = LinearDev::setup(
             get_dm(),
@@ -123,18 +123,15 @@ impl Backstore {
 
         let (cache_tier, cache, origin) = if !cachedevs.is_empty() {
             let block_mgr = BlockDevMgr::new(cachedevs, last_update_time);
-            match (
-                &backstore_save.cache_segments,
-                &backstore_save.meta_segments,
-            ) {
-                (&Some(ref cache_segments), &Some(ref meta_segments)) => {
-                    let cache_tier = CacheTier::setup(block_mgr, cache_segments, meta_segments)?;
+            match &backstore_save.cache_tier {
+                &Some(ref cache_tier_save) => {
+                    let cache_tier = CacheTier::setup(block_mgr, &cache_tier_save)?;
 
                     let cache_device = make_cache(pool_uuid, &cache_tier, origin, false)?;
                     (Some(cache_tier), Some(cache_device), None)
                 }
-                _ => {
-                    let err_msg = "Cachedevs exist, but meta or cache segments are not allocated";
+                &None => {
+                    let err_msg = "Cachedevs exist, but cache metdata does not exist";
                     return Err(StratisError::Engine(ErrorEnum::Error, err_msg.into()));
                 }
             }
@@ -147,7 +144,7 @@ impl Backstore {
             cache_tier,
             linear: origin,
             cache,
-            next,
+            next: backstore_save.cap.allocs[0].1,
         })
     }
 
@@ -319,7 +316,7 @@ impl Backstore {
         let total_required = sizes.iter().cloned().sum();
         let available = self.available_in_cap();
         if available < total_required {
-            if self.data_tier.alloc(total_required - available) {
+            if self.data_tier.alloc_at_least(total_required - available) {
                 self.extend_cap_device(pool_uuid)?;
             } else {
                 return Ok(None);
@@ -377,7 +374,7 @@ impl Backstore {
         if available < internal_request {
             let mut allocated = false;
             while !allocated && internal_request != Sectors(0) {
-                allocated = self.data_tier.alloc(internal_request - available);
+                allocated = self.data_tier.alloc_at_least(internal_request - available);
                 let temp = internal_request / 2usize;
                 internal_request = (temp / modulus) * modulus;
             }
@@ -565,11 +562,11 @@ impl Backstore {
 impl Recordable<BackstoreSave> for Backstore {
     fn record(&self) -> BackstoreSave {
         BackstoreSave {
-            cache_devs: self.cache_tier.as_ref().map(|c| c.block_mgr.record()),
-            cache_segments: self.cache_tier.as_ref().map(|c| c.cache_segments.record()),
-            data_devs: self.data_tier.block_mgr.record(),
-            data_segments: self.data_tier.segments.record(),
-            meta_segments: self.cache_tier.as_ref().map(|c| c.meta_segments.record()),
+            cache_tier: self.cache_tier.as_ref().map(|c| c.record()),
+            cap: CapSave {
+                allocs: vec![(Sectors(0), self.next)],
+            },
+            data_tier: self.data_tier.record(),
         }
     }
 }
@@ -808,26 +805,24 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
-        let mut backstore =
-            Backstore::setup(pool_uuid, &backstore_save, &map, None, Sectors(0)).unwrap();
+        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();
-        assert_eq!(backstore_save.cache_devs, backstore_save2.cache_devs);
-        assert_eq!(backstore_save.data_devs, backstore_save2.data_devs);
+        assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
+        assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
 
         backstore.teardown().unwrap();
 
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = map.get(&pool_uuid).unwrap();
-        let mut backstore =
-            Backstore::setup(pool_uuid, &backstore_save, &map, None, Sectors(0)).unwrap();
+        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();
-        assert_eq!(backstore_save.cache_devs, backstore_save2.cache_devs);
-        assert_eq!(backstore_save.data_devs, backstore_save2.data_devs);
+        assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
+        assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
 
         backstore.destroy().unwrap();
     }

@@ -12,6 +12,8 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
+use super::super::serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable};
+
 use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment};
 
@@ -27,24 +29,22 @@ pub struct DataTier {
 impl DataTier {
     /// Setup a previously existing data layer from the block_mgr and
     /// previously allocated segments.
-    pub fn setup(
-        block_mgr: BlockDevMgr,
-        segments: &[(DevUuid, Sectors, Sectors)],
-    ) -> StratisResult<DataTier> {
+    pub fn setup(block_mgr: BlockDevMgr, data_tier_save: &DataTierSave) -> StratisResult<DataTier> {
         let uuid_to_devno = block_mgr.uuid_to_devno();
-        let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> StratisResult<BlkDevSegment> {
-            let device = uuid_to_devno(triple.0).ok_or_else(|| {
+        let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
+            let parent = ld.parent;
+            let device = uuid_to_devno(parent).ok_or_else(|| {
                 StratisError::Engine(
                     ErrorEnum::NotFound,
-                    format!("missing device for UUUD {:?}", &triple.0),
+                    format!("missing device for UUUD {:?}", &parent),
                 )
             })?;
             Ok(BlkDevSegment::new(
-                triple.0,
-                Segment::new(device, triple.1, triple.2),
+                parent,
+                Segment::new(device, ld.start, ld.length),
             ))
         };
-        let segments = segments
+        let segments = data_tier_save.blockdev.allocs[0]
             .iter()
             .map(&mapper)
             .collect::<StratisResult<Vec<_>>>()?;
@@ -82,7 +82,7 @@ impl DataTier {
     /// Allocate at least request sectors from unallocated segments in
     /// block devices belonging to the data tier. Return true if requested
     /// amount or more was allocated, otherwise, false.
-    pub fn alloc(&mut self, request: Sectors) -> bool {
+    pub fn alloc_at_least(&mut self, request: Sectors) -> bool {
         match self.block_mgr.alloc_space(&[request]) {
             Some(segments) => {
                 self.segments = coalesce_blkdevsegs(
@@ -162,6 +162,17 @@ impl DataTier {
     }
 }
 
+impl Recordable<DataTierSave> for DataTier {
+    fn record(&self) -> DataTierSave {
+        DataTierSave {
+            blockdev: BlockDevSave {
+                allocs: vec![self.segments.record()],
+                devs: self.block_mgr.record(),
+            },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -198,7 +209,7 @@ mod tests {
         let request_amount = data_tier.block_mgr.avail_space() / 2usize;
         assert!(request_amount != Sectors(0));
 
-        assert!(data_tier.alloc(request_amount));
+        assert!(data_tier.alloc_at_least(request_amount));
 
         // A data tier w/ some amount allocated
         assert!(data_tier.allocated() >= request_amount);
@@ -214,7 +225,7 @@ mod tests {
         size = data_tier.size();
 
         // Allocate enough to get into the newly added block devices
-        assert!(data_tier.alloc(last_request_amount));
+        assert!(data_tier.alloc_at_least(last_request_amount));
 
         assert!(data_tier.allocated() >= request_amount + last_request_amount);
         assert_eq!(data_tier.size(), size);

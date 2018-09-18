@@ -7,13 +7,13 @@
 use std;
 use std::borrow::BorrowMut;
 
+use nix::errno::Errno;
 use uuid::Uuid;
 
-use devicemapper as dm;
 use devicemapper::{
-    device_exists, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams,
-    LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine,
-    ThinDevId, ThinPoolDev, ThinPoolStatusSummary, IEC,
+    self as dm, device_exists, Bytes, DataBlocks, Device, DmDevice, DmError, DmName, DmNameBuf,
+    FlakeyTargetParams, LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors,
+    TargetLine, ThinDevId, ThinPoolDev, ThinPoolStatusSummary, IEC,
 };
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
@@ -938,7 +938,15 @@ impl ThinPool {
                 }
                 Err(err) => {
                     self.filesystems.insert(fs_name, uuid, fs);
-                    Err(err)
+
+                    // Catch EBUSY and return a nicer error
+                    match err {
+                        StratisError::DM(DmError::Core(dm::errors::Error(
+                            dm::errors::ErrorKind::IoctlError(_, Some(Errno::EBUSY)),
+                            _,
+                        ))) => Err(StratisError::Error("Filesystem is in use".into())),
+                        _ => Err(err),
+                    }
                 }
             },
             None => Ok(()),

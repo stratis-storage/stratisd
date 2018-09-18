@@ -29,7 +29,7 @@ pub struct DataTier {
 impl DataTier {
     /// Setup a previously existing data layer from the block_mgr and
     /// previously allocated segments.
-    pub fn setup(block_mgr: BlockDevMgr, segments: &[BaseDevSave]) -> StratisResult<DataTier> {
+    pub fn setup(block_mgr: BlockDevMgr, data_tier_save: &DataTierSave) -> StratisResult<DataTier> {
         let uuid_to_devno = block_mgr.uuid_to_devno();
         let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
             let parent = ld.parent;
@@ -44,7 +44,7 @@ impl DataTier {
                 Segment::new(device, ld.start, ld.length),
             ))
         };
-        let segments = segments
+        let segments = data_tier_save.blockdev.allocs[0]
             .iter()
             .map(&mapper)
             .collect::<StratisResult<Vec<_>>>()?;

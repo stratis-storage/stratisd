@@ -85,6 +85,10 @@ pub fn setup_pool(
                 Err(StratisError::Engine(ErrorEnum::Error, err_msg))
             })
         })
+        .and_then(|(pool_name, pool)| {
+            devlinks::setup_pool_devlinks(&pool_name, &pool);
+            Ok((pool_name, pool))
+        })
 }
 
 #[derive(Debug)]
@@ -131,7 +135,6 @@ impl StratEngine {
         for (pool_uuid, devices) in pools {
             match setup_pool(pool_uuid, &devices, &table) {
                 Ok((pool_name, pool)) => {
-                    devlinks::setup_pool_devlinks(&pool_name, &pool);
                     table.insert(pool_name, pool_uuid, pool);
                 }
                 Err(err) => {
@@ -239,7 +242,6 @@ impl Engine for StratEngine {
                 devices.insert(device, dev_node);
                 match setup_pool(pool_uuid, &devices, &self.pools) {
                     Ok((pool_name, pool)) => {
-                        devlinks::setup_pool_devlinks(&pool_name, &pool);
                         self.pools.insert(pool_name, pool_uuid, pool);
                         Some(pool_uuid)
                     }

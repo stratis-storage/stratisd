@@ -139,6 +139,7 @@ pub fn thin_check(devnode: &Path) -> StratisResult<()> {
     execute_cmd(
         Command::new(get_executable(THIN_CHECK).as_os_str())
             .arg("-q")
+            .arg("--clear-needs-check-flag")
             .arg(devnode),
     )
 }

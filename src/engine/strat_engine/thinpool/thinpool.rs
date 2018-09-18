@@ -434,6 +434,42 @@ impl ThinPool {
             dbus_path: MaybeDbusPath(None),
         })
     }
+    pub fn check_pool_state(&mut self, pool_uuid: &PoolUuid) -> StratisResult<dm::ThinPoolStatus> {
+        let thinpool: dm::ThinPoolStatus = self.thin_pool.status(get_dm())?;
+
+        match thinpool {
+            dm::ThinPoolStatus::Working(ref status) => {
+                if status.needs_check == true {
+                    self.suspend();
+                    if thin_check(&self.thin_pool.meta_dev().devnode()).is_err() {
+                        warn!(
+                            "thin_check on meta data failed for {}",
+                            self.thin_pool.name()
+                        );
+                        let new_meta_dev = attempt_thin_repair(
+                            *pool_uuid,
+                            self.thin_pool.meta_dev(),
+                            self.backstore_device,
+                            &self.meta_spare_segments,
+                        )?;
+
+                        // TODO: How to update the meta table?
+                        self.thin_pool
+                            .set_meta_table(get_dm(), new_meta_dev.table().to_raw_table());
+                    }
+                    self.resume();
+                    return Ok(self.thin_pool.status(get_dm())?);
+                }
+            }
+            dm::ThinPoolStatus::Fail => {
+                error!("Thinpool status is `fail` -> BAD");
+                self.set_state(PoolState::Bad);
+                // TODO: Take pool offline?
+                // TODO: Run thin_check
+            }
+        }
+        Ok(thinpool)
+    }
 
     /// Run status checks and take actions on the thinpool and its components.
     /// Returns a bool communicating if a configuration change requiring a
@@ -473,15 +509,14 @@ impl ThinPool {
 
         let mut should_save: bool = false;
 
-        let thinpool: dm::ThinPoolStatus = self.thin_pool.status(get_dm())?;
+        let thinpool: dm::ThinPoolStatus = self.check_pool_state(&pool_uuid)?;
+
         match thinpool {
             dm::ThinPoolStatus::Working(ref status) => {
+                if status.needs_check == true {}
                 match status.summary {
                     ThinPoolStatusSummary::Good => {}
-                    ThinPoolStatusSummary::ReadOnly => {
-                        error!("Thinpool readonly! -> BAD");
-                        self.set_state(PoolState::Bad);
-                    }
+                    ThinPoolStatusSummary::ReadOnly => {}
                     ThinPoolStatusSummary::OutOfSpace => {
                         error!("Thinpool out of space! -> BAD");
                         self.set_state(PoolState::Bad);
@@ -1118,7 +1153,7 @@ fn setup_metadev(
         // If, e.g., thin_check is unavailable, that doesn't necessarily
         // mean that data is corrupted.
         if thin_check(&meta_dev.devnode()).is_err() {
-            meta_dev = attempt_thin_repair(pool_uuid, meta_dev, device, &spare_segments)?;
+            meta_dev = attempt_thin_repair(pool_uuid, &meta_dev, device, &spare_segments)?;
             return Ok((meta_dev, spare_segments, meta_segments));
         }
     }
@@ -1131,7 +1166,7 @@ fn setup_metadev(
 /// and return the new meta device.
 fn attempt_thin_repair(
     pool_uuid: PoolUuid,
-    mut meta_dev: LinearDev,
+    mut meta_dev: &LinearDev,
     device: Device,
     spare_segments: &[(Sectors, Sectors)],
 ) -> StratisResult<LinearDev> {

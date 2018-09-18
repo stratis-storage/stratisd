@@ -547,10 +547,10 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let name = "stratis-test-pool";
-        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter());
         let (uuid, mut pool) =
             StratPool::initialize(&name, paths2, Redundancy::NONE, false).unwrap();
-        devlinks::pool_added(&name).unwrap();
+        devlinks::pool_added(&name);
         invariant(&pool, &name);
 
         let metadata1 = pool.record(name);

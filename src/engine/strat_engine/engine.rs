@@ -145,7 +145,7 @@ impl StratEngine {
             watched_dev_last_event_nrs: HashMap::new(),
         };
 
-        devlinks::setup_devlinks(engine.pools().iter())?;
+        devlinks::setup_devlinks(engine.pools().iter());
 
         Ok(engine)
     }
@@ -174,7 +174,7 @@ impl Engine for StratEngine {
         let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy, force)?;
 
         let name = Name::new(name.to_owned());
-        devlinks::pool_added(&name)?;
+        devlinks::pool_added(&name);
         self.pools.insert(name, uuid, pool);
         Ok(uuid)
     }
@@ -236,6 +236,7 @@ impl Engine for StratEngine {
                 devices.insert(device, dev_node);
                 match setup_pool(pool_uuid, &devices, &self.pools) {
                     Ok((pool_name, pool)) => {
+                        devlinks::setup_pool_devlinks(&pool_name, &pool);
                         self.pools.insert(pool_name, pool_uuid, pool);
                         Some(pool_uuid)
                     }
@@ -269,7 +270,7 @@ impl Engine for StratEngine {
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
         pool.destroy()?;
-        devlinks::pool_removed(&pool_name)?;
+        devlinks::pool_removed(&pool_name);
         Ok(true)
     }
 
@@ -292,7 +293,7 @@ impl Engine for StratEngine {
             });
 
             self.pools.insert(new_name.clone(), uuid, pool);
-            devlinks::pool_renamed(&old_name, &new_name)?;
+            devlinks::pool_renamed(&old_name, &new_name);
             Ok(RenameAction::Renamed)
         }
     }

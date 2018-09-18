@@ -50,7 +50,7 @@ fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
 pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
     let flex_devs = &metadata.flex_devs;
     let next = next_index(&flex_devs);
-    let allocated_from_cap = metadata.backstore.cap.allocs[0].length;
+    let allocated_from_cap = metadata.backstore.cap.allocs[0].1;
 
     if allocated_from_cap != next {
         let err_msg = format!(

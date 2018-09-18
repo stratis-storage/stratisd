@@ -74,13 +74,7 @@ pub struct BaseBlockDevSave {
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CapSave {
-    pub allocs: Vec<LayeredDevSave>,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct LayeredDevSave {
-    pub start: Sectors,
-    pub length: Sectors,
+    pub allocs: Vec<(Sectors, Sectors)>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]

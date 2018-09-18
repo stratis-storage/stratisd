@@ -19,7 +19,7 @@ use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 use super::super::device::wipe_sectors;
 use super::super::dm::get_dm;
 use super::super::dmnames::{format_backstore_ids, CacheRole};
-use super::super::serde_structs::{BackstoreSave, CapSave, LayeredDevSave, Recordable};
+use super::super::serde_structs::{BackstoreSave, CapSave, Recordable};
 
 use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{map_to_dm, BlockDevMgr};
@@ -144,7 +144,7 @@ impl Backstore {
             cache_tier,
             linear: origin,
             cache,
-            next: backstore_save.cap.allocs[0].length,
+            next: backstore_save.cap.allocs[0].1,
         })
     }
 
@@ -564,10 +564,7 @@ impl Recordable<BackstoreSave> for Backstore {
         BackstoreSave {
             cache_tier: self.cache_tier.as_ref().map(|c| c.record()),
             cap: CapSave {
-                allocs: vec![LayeredDevSave {
-                    start: Sectors(0),
-                    length: self.next,
-                }],
+                allocs: vec![(Sectors(0), self.next)],
             },
             data_tier: self.data_tier.record(),
         }

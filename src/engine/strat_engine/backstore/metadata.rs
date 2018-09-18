@@ -847,9 +847,15 @@ mod mda {
         use super::*;
 
         #[test]
-        /// Verify that default MDAHeader is all 0s except for CRC.
+        /// Verify that default MDAHeader is all 0s except for CRC and versions.
         fn test_default_mda_header() {
-            assert!(MDAHeader::default().to_buf()[4..].iter().all(|x| *x == 0u8));
+            let buf = MDAHeader::default().to_buf();
+
+            // First 4 bytes is CRC. Then:
+            assert!(buf[4..28].iter().all(|x| *x == 0u8));
+            assert_eq!(buf[28], STRAT_REGION_HDR_VERSION);
+            assert_eq!(buf[29], STRAT_METADATA_VERSION);
+            assert!(buf[30..].iter().all(|x| *x == 0u8));
         }
 
         #[test]

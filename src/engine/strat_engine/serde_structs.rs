@@ -77,7 +77,7 @@ pub struct CapSave {
     pub allocs: Vec<LayeredDevSave>,
 }
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct LayeredDevSave {
     pub start: Sectors,
     pub length: Sectors,

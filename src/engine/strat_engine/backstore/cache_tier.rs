@@ -35,8 +35,7 @@ impl CacheTier {
     /// previously allocated segments.
     pub fn setup(
         block_mgr: BlockDevMgr,
-        cache_segments: &[BaseDevSave],
-        meta_segments: &[BaseDevSave],
+        cache_tier_save: &CacheTierSave,
     ) -> StratisResult<CacheTier> {
         if block_mgr.avail_space() != Sectors(0) {
             let err_msg = format!(
@@ -61,12 +60,12 @@ impl CacheTier {
             ))
         };
 
-        let meta_segments = meta_segments
+        let meta_segments = cache_tier_save.blockdev.allocs[1]
             .iter()
             .map(&mapper)
             .collect::<StratisResult<Vec<_>>>()?;
 
-        let cache_segments = cache_segments
+        let cache_segments = cache_tier_save.blockdev.allocs[0]
             .iter()
             .map(&mapper)
             .collect::<StratisResult<Vec<_>>>()?;

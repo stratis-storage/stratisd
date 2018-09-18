@@ -125,11 +125,7 @@ impl Backstore {
             let block_mgr = BlockDevMgr::new(cachedevs, last_update_time);
             match &backstore_save.cache_tier {
                 &Some(ref cache_tier_save) => {
-                    let cache_tier = CacheTier::setup(
-                        block_mgr,
-                        &cache_tier_save.blockdev.allocs[0],
-                        &cache_tier_save.blockdev.allocs[1],
-                    )?;
+                    let cache_tier = CacheTier::setup(block_mgr, &cache_tier_save)?;
 
                     let cache_device = make_cache(pool_uuid, &cache_tier, origin, false)?;
                     (Some(cache_tier), Some(cache_device), None)

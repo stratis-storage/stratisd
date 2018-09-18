@@ -131,6 +131,7 @@ impl StratEngine {
         for (pool_uuid, devices) in pools {
             match setup_pool(pool_uuid, &devices, &table) {
                 Ok((pool_name, pool)) => {
+                    devlinks::setup_pool_devlinks(&pool_name, &pool);
                     table.insert(pool_name, pool_uuid, pool);
                 }
                 Err(err) => {
@@ -146,7 +147,7 @@ impl StratEngine {
             watched_dev_last_event_nrs: HashMap::new(),
         };
 
-        devlinks::setup_devlinks(engine.pools().iter());
+        devlinks::cleanup_devlinks(engine.pools().iter());
 
         Ok(engine)
     }

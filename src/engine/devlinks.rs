@@ -63,12 +63,11 @@ pub fn setup_pool_devlinks(pool_name: &str, pool: &Pool) -> () {
     };
 }
 
-/// Set up directories and symlinks under /stratis based on current
-/// config. Clear out any directory or file that doesn't correspond to a pool
-/// or filesystem.
-// Don't just remove and recreate everything in case there are processes
+/// Clean up directories and symlinks under /stratis based on current
+/// config. Clear out any directory or file that doesn't correspond to a pool.
+// Don't just remove everything in case there are processes
 // (e.g. user shells) with the current working directory within the tree.
-pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>(pools: I) -> () {
+pub fn cleanup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>(pools: I) -> () {
     if let Err(err) = || -> StratisResult<()> {
         let mut existing_dirs = fs::read_dir(DEV_PATH)?
             .map(|dir_e| {
@@ -76,9 +75,8 @@ pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>(po
             })
             .collect::<Result<HashSet<_>, _>>()?;
 
-        for &(ref pool_name, _, pool) in pools {
+        for &(ref pool_name, _, _) in pools {
             existing_dirs.remove(&pool_name.to_owned());
-            setup_pool_devlinks(&pool_name, pool);
         }
 
         for leftover in existing_dirs {
@@ -87,7 +85,7 @@ pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>(po
 
         Ok(())
     }() {
-        warn!("setup_devlinks failed, reason {:?}", err);
+        warn!("cleanup_devlinks failed, reason {:?}", err);
     }
 }
 

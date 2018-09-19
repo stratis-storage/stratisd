@@ -77,7 +77,7 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
     /// A helper function. None if the device is unclaimed, a HashMap of udev
     /// properties otherwise. Omits all udev properties that can not be
     /// converted to Strings.
-    fn udev_info(device: &libudev::Device) -> Option<HashMap<String, String>> {
+    fn udev_info(device: &libudev::Device) -> Option<HashMap<String, Option<String>>> {
         if unclaimed(device) {
             None
         } else {
@@ -91,7 +91,7 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
                         )
                     })
                     .filter_map(|(n, v)| match (n, v) {
-                        (Some(n), Some(v)) => Some((n, v)),
+                        (Some(n), v) => Some((n, v)),
                         _ => None,
                     })
                     .collect(),
@@ -103,10 +103,13 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
         Some(Some(properties)) => {
             if properties
                 .get("DM_MULTIPATH_DEVICE_PATH")
-                .map_or(false, |v| v == "1")
+                .map_or(false, |v| v.as_ref().map_or(false, |v| v == "1"))
             {
                 Ok(DevOwnership::Multipath)
-            } else if properties.get("ID_FS_TYPE") == Some(&"stratis".to_string()) {
+            } else if properties
+                .get("ID_FS_TYPE")
+                .map_or(false, |v| v.as_ref().map_or(false, |v| v == "stratis"))
+            {
                 if let Some((pool_uuid, device_uuid)) =
                     device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
                 {
@@ -119,7 +122,13 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
                     properties
                         .iter()
                         .filter(|&(k, _)| k.contains("ID_FS_") || k.contains("ID_PART_TABLE_"))
-                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                        .map(|(k, v)| {
+                            (
+                                k.to_string(),
+                                v.as_ref()
+                                    .map_or("<unknown value>".into(), |v| v.to_string()),
+                            )
+                        })
                         .collect(),
                 ))
             }

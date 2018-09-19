@@ -11,6 +11,8 @@ use dbus::tree::{MTFn, MethodErr, PropInfo};
 use dbus::Connection;
 use dbus::SignalArgs;
 
+use devicemapper::DmError;
+
 use super::super::stratis::{ErrorEnum, StratisError};
 
 use super::types::{DbusErrorEnum, TData};
@@ -60,7 +62,11 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
         | StratisError::Dbus(_)
         | StratisError::Udev(_) => DbusErrorEnum::INTERNAL_ERROR,
     };
-    (error.into(), err.description().to_owned())
+    let description = match *err {
+        StratisError::DM(DmError::Core(ref err)) => err.to_string(),
+        ref err => err.description().to_owned(),
+    };
+    (error.into(), description)
 }
 
 /// Convenience function to get the error value for "OK"

@@ -21,9 +21,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::backstore::{Backstore, StratBlockDev, MIN_MDA_SECTORS};
 use super::serde_structs::{FlexDevsSave, PoolSave, Recordable};
-use super::thinpool::{ThinPool, ThinPoolSizeParams};
-
-pub use super::thinpool::{DATA_BLOCK_SIZE, INITIAL_DATA_SIZE};
+use super::thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE};
 
 /// Get the index which indicates the start of unallocated space in the cap
 /// device.
@@ -349,7 +347,7 @@ impl Pool for StratPool {
     }
 
     fn total_physical_size(&self) -> Sectors {
-        self.backstore.datatier_current_capacity()
+        self.backstore.datatier_size()
     }
 
     fn total_physical_used(&self) -> StratisResult<Sectors> {
@@ -549,10 +547,10 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let name = "stratis-test-pool";
-        devlinks::setup_devlinks(Vec::new().into_iter()).unwrap();
+        devlinks::setup_devlinks(Vec::new().into_iter());
         let (uuid, mut pool) =
             StratPool::initialize(&name, paths2, Redundancy::NONE, false).unwrap();
-        devlinks::pool_added(&name).unwrap();
+        devlinks::pool_added(&name);
         invariant(&pool, &name);
 
         let metadata1 = pool.record(name);

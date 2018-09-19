@@ -31,8 +31,8 @@ impl RangeAllocator {
         Ok(allocator)
     }
 
-    /// The capacity of this manager
-    pub fn capacity(&self) -> Sectors {
+    /// The maximum allocation from this manager
+    pub fn size(&self) -> Sectors {
         self.limit
     }
 

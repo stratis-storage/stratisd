@@ -22,6 +22,7 @@ extern crate serde_json;
 #[macro_use]
 extern crate log;
 extern crate libudev;
+extern crate walkdir;
 
 #[cfg(test)]
 #[macro_use]

@@ -12,8 +12,8 @@ use uuid::Uuid;
 use devicemapper::{Bytes, Device, Sectors};
 
 use super::types::{
-    BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolState, PoolUuid,
-    RenameAction,
+    BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolExtendState,
+    PoolState, PoolUuid, RenameAction,
 };
 use stratis::StratisResult;
 
@@ -175,6 +175,9 @@ pub trait Pool: Debug {
 
     /// The current state of the Pool.
     fn state(&self) -> PoolState;
+
+    /// The current state of the Pool.
+    fn extend_state(&self) -> PoolExtendState;
 
     /// Set dbus path associated with the Pool.
     fn set_dbus_path(&mut self, path: MaybeDbusPath) -> ();

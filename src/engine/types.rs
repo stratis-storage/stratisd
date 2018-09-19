@@ -54,6 +54,15 @@ impl PoolState {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PoolExtendState {
+    Initializing,
+    Good,
+    DataFailed,
+    MetaFailed,
+    MetaAndDataFailed,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FreeSpaceState {
     Good,
     Warn,

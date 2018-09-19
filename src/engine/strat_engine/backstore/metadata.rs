@@ -619,6 +619,14 @@ mod mda {
                 None => return Ok(None),
                 Some(ref mda) => mda,
             };
+
+            if mda.metadata_version != STRAT_METADATA_VERSION {
+                return Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    format!("Unknown metadata version: {}", mda.metadata_version),
+                ));
+            }
+
             let region_size = self.region_size.bytes();
 
             // Load the metadata region specified by index.
@@ -786,12 +794,6 @@ mod mda {
                 ));
             }
 
-            if self.metadata_version != STRAT_METADATA_VERSION {
-                return Err(StratisError::Engine(
-                    ErrorEnum::Invalid,
-                    format!("Unknown metadata version: {}", self.metadata_version),
-                ));
-            }
             Ok(data_buf)
         }
     }

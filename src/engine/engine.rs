@@ -176,7 +176,7 @@ pub trait Pool: Debug {
     /// The current state of the Pool.
     fn state(&self) -> PoolState;
 
-    /// The current state of the Pool.
+    /// The current extend state of the Pool.
     fn extend_state(&self) -> PoolExtendState;
 
     /// Set dbus path associated with the Pool.

@@ -618,6 +618,10 @@ impl ThinPool {
         }
         if self.extend_state() != new_state {
             self.pool_extend_state = new_state;
+            get_engine_listener_list().notify(&EngineEvent::PoolExtendStateChanged {
+                dbus_path: self.get_dbus_path(),
+                state: new_state,
+            });
         }
     }
 

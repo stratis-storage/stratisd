@@ -62,6 +62,18 @@ pub enum PoolExtendState {
     MetaAndDataFailed,
 }
 
+impl PoolExtendState {
+    pub fn to_dbus_value(&self) -> u16 {
+        match *self {
+            PoolExtendState::Initializing => 1,
+            PoolExtendState::Good => 2,
+            PoolExtendState::DataFailed => 3,
+            PoolExtendState::MetaFailed => 4,
+            PoolExtendState::MetaAndDataFailed => 5,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FreeSpaceState {
     Good,

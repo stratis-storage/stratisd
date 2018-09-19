@@ -5,6 +5,7 @@
 // Pool Properties
 pub const POOL_NAME_PROP: &str = "Name";
 pub const POOL_STATE_PROP: &str = "State";
+pub const POOL_EXTEND_STATE_PROP: &str = "ExtendState";
 
 // Filesystem Properties
 pub const FILESYSTEM_NAME_PROP: &str = "Name";

@@ -118,6 +118,9 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
                     Ok(DevOwnership::Contradiction)
                 }
             } else {
+                // FIXME: Put in something better here. Perhaps return
+                // everything that udev said about this device or just
+                // what the program figured out about the device.
                 Ok(DevOwnership::Theirs(
                     properties
                         .iter()

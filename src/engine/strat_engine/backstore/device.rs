@@ -57,9 +57,7 @@ pub enum DevOwnership {
 /// Returns true if a device has no signature and is not one of the paths of a multipath device,
 /// yes this is a bit convoluted.  Logic gleaned from blivet library.
 fn empty(device: &HashMap<String, String>) -> bool {
-    device
-        .get("DM_MULTIPATH_DEVICE_PATH")
-        .map_or(true, |v| v != "1")
+    !device.contains_key("DM_MULTIPATH_DEVICE_PATH")
         && !((device.contains_key("ID_PART_TABLE_TYPE")
             && !device.contains_key("ID_PART_ENTRY_DISK"))
             || device.contains_key("ID_FS_USAGE"))
@@ -93,10 +91,7 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
             } else {
                 Ok(DevOwnership::Unowned)
             }
-        } else if device
-            .get("DM_MULTIPATH_DEVICE_PATH")
-            .map_or(false, |v| v == "1")
-        {
+        } else if device.contains_key("DM_MULTIPATH_DEVICE_PATH") {
             Ok(DevOwnership::Theirs(String::from("multipath path")))
         } else if device.contains_key("ID_FS_TYPE") && device["ID_FS_TYPE"] == "stratis" {
             // Device is ours, but we don't get everything we need from udev db, lets go to disk.

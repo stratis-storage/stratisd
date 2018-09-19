@@ -62,8 +62,7 @@ fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
         .scan_devices()?
         .filter(|dev| dev.is_initialized())
         .filter(|dev| {
-            dev.property_value("DM_MULTIPATH_DEVICE_PATH")
-                .map_or(true, |v| v != "1")
+            dev.property_value("DM_MULTIPATH_DEVICE_PATH").is_none()
                 && !((dev.property_value("ID_PART_TABLE_TYPE").is_some()
                     && dev.property_value("ID_PART_ENTRY_DISK").is_none())
                     || dev.property_value("ID_FS_USAGE").is_some())
@@ -82,10 +81,7 @@ pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
     let devices: Vec<PathBuf> = enumerator
         .scan_devices()?
         .filter(|dev| dev.is_initialized())
-        .filter(|dev| {
-            dev.property_value("DM_MULTIPATH_DEVICE_PATH")
-                .map_or(true, |v| v != "1")
-        })
+        .filter(|dev| dev.property_value("DM_MULTIPATH_DEVICE_PATH").is_none())
         .filter_map(|i| i.devnode().map(|d| d.into()))
         .collect();
 

@@ -13,13 +13,24 @@ use stratis::{StratisError, StratisResult};
 
 use super::super::super::udev::get_udev;
 
+/// Returns true if udev indicates that the device is a multipath member
+/// device, else false. If there is any ambiguity, return true.
+/// This may happen if there was a failure to interpret a udev value that
+/// was set.
+/// WARNING: This method can be relied on only if DM_MULTIPATH* udev
+/// properties have been properly set by the time this property is read.
+pub fn multipath_member(device: &libudev::Device) -> bool {
+    get_udev_property(device, "DM_MULTIPATH_DEVICE_PATH")
+        .map_or(false, |v| v.map(|v| v == "1").unwrap_or(true))
+}
+
 /// Devices that _must_ be ignored. Such a device may have Stratis metadata
 /// on, but must _not_  be incorporated into stratisd hierarchy. The only
 /// example of such a thing right now is a metadata member device.
 /// WARNING: This method can be relied on only if DM_MULTIPATH* udev
 /// properties have been properly set by the time this property is read.
 pub fn must_ignore(device: &libudev::Device) -> bool {
-    get_udev_property(device, "DM_MULTIPATH_DEVICE_PATH").is_some()
+    multipath_member(device)
 }
 
 /// If the expression is true, then it seems that no other system is

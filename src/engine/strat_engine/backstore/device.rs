@@ -101,7 +101,10 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
 
     match udev_block_device_apply(devnode, udev_info)? {
         Some(Some(properties)) => {
-            if properties.get("DM_MULTIPATH_DEVICE_PATH").is_some() {
+            if properties
+                .get("DM_MULTIPATH_DEVICE_PATH")
+                .map_or(false, |v| v == "1")
+            {
                 Ok(DevOwnership::Multipath)
             } else if properties.get("ID_FS_TYPE") == Some(&"stratis".to_string()) {
                 if let Some((pool_uuid, device_uuid)) =

@@ -5,7 +5,7 @@
 use std::fmt::Debug;
 use std::sync::{Once, ONCE_INIT};
 
-use super::types::{BlockDevState, MaybeDbusPath, PoolExtendState, PoolState};
+use super::types::{BlockDevState, FreeSpaceState, MaybeDbusPath, PoolExtendState, PoolState};
 
 static INIT: Once = ONCE_INIT;
 static mut ENGINE_LISTENER_LIST: Option<EngineListenerList> = None;
@@ -29,6 +29,10 @@ pub enum EngineEvent<'a> {
         dbus_path: &'a MaybeDbusPath,
         from: &'a str,
         to: &'a str,
+    },
+    PoolSpaceStateChanged {
+        dbus_path: &'a MaybeDbusPath,
+        state: FreeSpaceState,
     },
     PoolStateChanged {
         dbus_path: &'a MaybeDbusPath,

@@ -81,6 +81,16 @@ pub enum FreeSpaceState {
     Crit,
 }
 
+impl FreeSpaceState {
+    pub fn to_dbus_value(&self) -> u16 {
+        match *self {
+            FreeSpaceState::Good => 1,
+            FreeSpaceState::Warn => 2,
+            FreeSpaceState::Crit => 3,
+        }
+    }
+}
+
 /// See Design Doc section 10.2.1 for more details.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BlockDevState {

@@ -364,6 +364,12 @@ fn get_pool_extend_state(
     get_pool_property(i, p, |(_, _, pool)| Ok(pool.extend_state().to_dbus_value()))
 }
 
+fn get_space_state(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+    get_pool_property(i, p, |(_, _, pool)| {
+        Ok(pool.free_space_state().to_dbus_value())
+    })
+}
+
 pub fn create_dbus_pool<'a>(
     dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
@@ -441,6 +447,11 @@ pub fn create_dbus_pool<'a>(
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_extend_state);
 
+    let space_state_property = f.property::<u16, _>(consts::POOL_SPACE_STATE_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_space_state);
+
     let object_name = format!(
         "{}/{}",
         STRATIS_BASE_PATH,
@@ -464,6 +475,7 @@ pub fn create_dbus_pool<'a>(
                 .add_p(total_physical_used_property)
                 .add_p(uuid_property)
                 .add_p(state_property)
+                .add_p(space_state_property)
                 .add_p(extend_state_property),
         );
 

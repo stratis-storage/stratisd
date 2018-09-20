@@ -19,8 +19,8 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::structures::Table;
 use super::super::types::{
-    BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolExtendState, PoolState,
-    PoolUuid, Redundancy, RenameAction,
+    BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState,
+    PoolState, PoolUuid, Redundancy, RenameAction,
 };
 
 use super::blockdev::SimDev;
@@ -36,6 +36,7 @@ pub struct SimPool {
     rdm: Rc<RefCell<Randomizer>>,
     pool_state: PoolState,
     pool_extend_state: PoolExtendState,
+    free_space_state: FreeSpaceState,
     dbus_path: MaybeDbusPath,
 }
 
@@ -57,6 +58,7 @@ impl SimPool {
                 rdm: Rc::clone(rdm),
                 pool_state: PoolState::Initializing,
                 pool_extend_state: PoolExtendState::Good,
+                free_space_state: FreeSpaceState::Good,
                 dbus_path: MaybeDbusPath(None),
             },
         )
@@ -288,6 +290,10 @@ impl Pool for SimPool {
 
     fn extend_state(&self) -> PoolExtendState {
         self.pool_extend_state
+    }
+
+    fn free_space_state(&self) -> FreeSpaceState {
+        self.free_space_state
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {

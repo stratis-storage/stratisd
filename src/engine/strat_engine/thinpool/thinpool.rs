@@ -558,7 +558,7 @@ impl ThinPool {
                 let current_total = usage.total_data + extend_size;
 
                 // Update pool space state
-                self.free_space_state = self.free_space_check(
+                self.free_space_check(
                     usage.used_data,
                     current_total + sectors_to_datablocks(backstore.available_in_backstore())
                         - usage.used_data,
@@ -625,6 +625,16 @@ impl ThinPool {
         }
     }
 
+    fn set_free_space_state(&mut self, new_state: FreeSpaceState) {
+        if self.free_space_state() != new_state {
+            self.free_space_state = new_state;
+            get_engine_listener_list().notify(&EngineEvent::PoolSpaceStateChanged {
+                dbus_path: self.get_dbus_path(),
+                state: new_state,
+            });
+        }
+    }
+
     /// Possibly transition to a new FreeSpaceState based on usage, and invoke
     /// policies (throttling, suspension) accordingly.
     fn free_space_check(
@@ -653,14 +663,7 @@ impl ThinPool {
             _ => FreeSpaceState::Crit,
         };
 
-        if self.free_space_state != new_state {
-            info!(
-                "Prev space state: {:?} New space state: {:?}",
-                self.free_space_state, new_state
-            );
-
-            // TODO: Dbus signal
-        }
+        self.set_free_space_state(new_state);
 
         match (self.free_space_state, new_state) {
             (FreeSpaceState::Good, FreeSpaceState::Warn) => {
@@ -976,6 +979,10 @@ impl ThinPool {
 
     pub fn extend_state(&self) -> PoolExtendState {
         self.pool_extend_state
+    }
+
+    pub fn free_space_state(&self) -> FreeSpaceState {
+        self.free_space_state
     }
 
     /// Rename a filesystem within the thin pool.

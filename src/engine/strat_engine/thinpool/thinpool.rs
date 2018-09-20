@@ -13,7 +13,7 @@ use devicemapper as dm;
 use devicemapper::{
     device_exists, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams,
     LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine,
-    ThinDevId, ThinPoolDev, ThinPoolStatusSummary, IEC,
+    ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, ThinPoolWorkingStatus, IEC,
 };
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
@@ -175,6 +175,22 @@ fn calc_lowater(
     }
 }
 
+/// Just a helper function to get the status of a thinpool device.
+fn get_thinpool_status(thinpool_dev: &ThinPoolDev) -> StratisResult<ThinPoolWorkingStatus> {
+    match thinpool_dev.status(get_dm())? {
+        ThinPoolStatus::Working(w) => Ok(*w),
+        ThinPoolStatus::Fail => {
+            let err_msg = format!(
+                "Status of thin pool with name {} device {} and devnode {} is Fail",
+                thinpool_dev.name(),
+                thinpool_dev.device(),
+                thinpool_dev.devnode().display(),
+            );
+            Err(StratisError::Error(err_msg.into()))
+        }
+    }
+}
+
 pub struct ThinPoolSizeParams {
     meta_size: MetaBlocks,
     data_size: DataBlocks,
@@ -225,6 +241,7 @@ pub struct ThinPool {
     backstore_device: Device,
     pool_state: PoolState,
     free_space_state: FreeSpaceState,
+    thin_pool_status: ThinPoolWorkingStatus,
     dbus_path: MaybeDbusPath,
 }
 
@@ -312,6 +329,8 @@ impl ThinPool {
             ),
         )?;
 
+        let thin_pool_status = get_thinpool_status(&thinpool_dev)?;
+
         Ok(ThinPool {
             thin_pool: thinpool_dev,
             meta_segments: vec![meta_segments],
@@ -324,6 +343,7 @@ impl ThinPool {
             backstore_device,
             pool_state: PoolState::Good,
             free_space_state,
+            thin_pool_status,
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -419,6 +439,9 @@ impl ThinPool {
         }
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
+
+        let thin_pool_status = get_thinpool_status(&thinpool_dev)?;
+
         Ok(ThinPool {
             thin_pool: thinpool_dev,
             meta_segments,
@@ -431,6 +454,7 @@ impl ThinPool {
             backstore_device,
             pool_state: PoolState::Good,
             free_space_state,
+            thin_pool_status,
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -476,6 +500,7 @@ impl ThinPool {
         let thinpool: dm::ThinPoolStatus = self.thin_pool.status(get_dm())?;
         match thinpool {
             dm::ThinPoolStatus::Working(ref status) => {
+                self.thin_pool_status = (**status).clone();
                 match status.summary {
                     ThinPoolStatusSummary::Good => {}
                     ThinPoolStatusSummary::ReadOnly => {
@@ -784,16 +809,8 @@ impl ThinPool {
     // This includes all the sectors being held as spares for the meta device,
     // all the sectors allocated to the meta data device, and all the sectors
     // in use on the data device.
-    pub fn total_physical_used(&self) -> StratisResult<Sectors> {
-        let data_dev_used = match self.thin_pool.status(get_dm())? {
-            dm::ThinPoolStatus::Working(ref status) => {
-                datablocks_to_sectors(status.usage.used_data)
-            }
-            _ => {
-                let err_msg = "thin pool failed, could not obtain usage";
-                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
-            }
-        };
+    pub fn total_physical_used(&self) -> Sectors {
+        let data_dev_used = datablocks_to_sectors(self.thin_pool_status.usage.used_data);
 
         let spare_total = self.meta_spare_segments.iter().map(|s| s.1).sum();
 
@@ -801,7 +818,7 @@ impl ThinPool {
 
         let mdv_total = self.mdv_segments.iter().map(|s| s.1).sum();
 
-        Ok(data_dev_used + spare_total + meta_dev_total + mdv_total)
+        data_dev_used + spare_total + meta_dev_total + mdv_total
     }
 
     pub fn get_filesystem_by_uuid(&self, uuid: FilesystemUuid) -> Option<(Name, &StratFilesystem)> {

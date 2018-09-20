@@ -86,7 +86,6 @@ pub trait Pool: Debug {
         pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-        force: bool,
     ) -> StratisResult<Vec<DevUuid>>;
 
     /// Destroy the pool.
@@ -199,7 +198,6 @@ pub trait Engine: Debug {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        force: bool,
     ) -> StratisResult<PoolUuid>;
 
     /// Evaluate a device node & devicemapper::Device to see if it's a valid

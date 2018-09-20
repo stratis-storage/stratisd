@@ -13,7 +13,7 @@ use devicemapper as dm;
 use devicemapper::{
     device_exists, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams,
     LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine,
-    ThinDevId, ThinPoolDev, ThinPoolStatusSummary, IEC,
+    ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
 };
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
@@ -237,6 +237,7 @@ pub struct ThinPool {
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
     state: State,
+    thin_pool_status: ThinPoolStatus,
     dbus_path: MaybeDbusPath,
 }
 
@@ -324,6 +325,8 @@ impl ThinPool {
             ),
         )?;
 
+        let thin_pool_status = thinpool_dev.status(get_dm())?;
+
         Ok(ThinPool {
             thin_pool: thinpool_dev,
             segments: Segments {
@@ -340,6 +343,7 @@ impl ThinPool {
                 pool_state: PoolState::Good,
                 free_space_state,
             },
+            thin_pool_status,
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -435,6 +439,9 @@ impl ThinPool {
         }
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
+
+        let thin_pool_status = thinpool_dev.status(get_dm())?;
+
         Ok(ThinPool {
             thin_pool: thinpool_dev,
             segments: Segments {
@@ -451,6 +458,7 @@ impl ThinPool {
                 pool_state: PoolState::Good,
                 free_space_state,
             },
+            thin_pool_status,
             dbus_path: MaybeDbusPath(None),
         })
     }

@@ -143,7 +143,7 @@ impl StratPool {
 
         thinpool.check(pool_uuid, &mut backstore)?;
 
-        let last_phys_used = Self::try_total_physical_used(&thinpool, &backstore)?;
+        let last_phys_used = StratPool::try_total_physical_used(&thinpool, &backstore)?;
 
         let mut pool = StratPool {
             backstore,
@@ -183,7 +183,7 @@ impl StratPool {
 
         let changed = thinpool.check(uuid, &mut backstore)?;
 
-        let last_phys_used = Self::try_total_physical_used(&thinpool, &backstore)?;
+        let last_phys_used = StratPool::try_total_physical_used(&thinpool, &backstore)?;
 
         let mut pool = StratPool {
             backstore,
@@ -367,7 +367,7 @@ impl Pool for StratPool {
     }
 
     fn total_physical_used(&mut self) -> Sectors {
-        match Self::try_total_physical_used(&self.thin_pool, &self.backstore) {
+        match StratPool::try_total_physical_used(&self.thin_pool, &self.backstore) {
             Ok(val) => {
                 self.last_phys_used = val;
                 val

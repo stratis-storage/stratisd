@@ -452,7 +452,7 @@ impl Pool for StratPool {
     }
 
     fn state(&self) -> PoolState {
-        self.thin_pool.state()
+        self.thin_pool.pool_state()
     }
 
     fn extend_state(&self) -> PoolExtendState {
@@ -752,7 +752,7 @@ mod tests {
                 _ => false,
             });
 
-            assert!(match pool.thin_pool.state() {
+            assert!(match pool.thin_pool.pool_state() {
                 PoolState::Running => true,
                 _ => false,
             });

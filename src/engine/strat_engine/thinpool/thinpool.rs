@@ -212,6 +212,14 @@ fn calc_lowater(
     }
 }
 
+/// The state of the pool is described by these various orthogonal attributes.
+#[derive(Debug)]
+struct State {
+    free_space_state: FreeSpaceState,
+    pool_extend_state: PoolExtendState,
+    pool_state: PoolState,
+}
+
 /// Segment lists that the ThinPool keeps track of.
 #[derive(Debug)]
 struct Segments {
@@ -266,9 +274,7 @@ pub struct ThinPool {
     /// layer. All DM components obtain their storage from this layer.
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
-    pool_state: PoolState,
-    pool_extend_state: PoolExtendState,
-    free_space_state: FreeSpaceState,
+    state: State,
     dbus_path: MaybeDbusPath,
 }
 
@@ -376,9 +382,11 @@ impl ThinPool {
             filesystems: Table::default(),
             mdv,
             backstore_device,
-            pool_state: PoolState::Initializing,
-            pool_extend_state: PoolExtendState::Initializing,
-            free_space_state,
+            state: State {
+                free_space_state,
+                pool_extend_state: PoolExtendState::Initializing,
+                pool_state: PoolState::Initializing,
+            },
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -486,9 +494,11 @@ impl ThinPool {
             filesystems: fs_table,
             mdv,
             backstore_device,
-            pool_state: PoolState::Initializing,
-            pool_extend_state: PoolExtendState::Initializing,
-            free_space_state,
+            state: State {
+                free_space_state,
+                pool_extend_state: PoolExtendState::Initializing,
+                pool_state: PoolState::Initializing,
+            },
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -539,17 +549,17 @@ impl ThinPool {
                 let mut data_extend_failed = false;
                 match status.summary {
                     ThinPoolStatusSummary::Good => {
-                        self.set_state(PoolState::Running);
+                        self.set_pool_state(PoolState::Running);
                     }
                     // If a pool is in ReadOnly mode it is due to either meta data full or
                     // the pool requires repair.
                     ThinPoolStatusSummary::ReadOnly => {
                         error!("Thinpool read only! -> ReadOnly");
-                        self.set_state(PoolState::ReadOnly);
+                        self.set_pool_state(PoolState::ReadOnly);
                     }
                     ThinPoolStatusSummary::OutOfSpace => {
                         error!("Thinpool out of space! -> OutOfSpace");
-                        self.set_state(PoolState::OutOfDataSpace);
+                        self.set_pool_state(PoolState::OutOfDataSpace);
                     }
                 }
 
@@ -624,7 +634,7 @@ impl ThinPool {
                 let lowater = calc_lowater(
                     current_total,
                     sectors_to_datablocks(backstore.available_in_backstore()),
-                    self.free_space_state,
+                    self.state.free_space_state,
                 );
 
                 self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
@@ -633,7 +643,7 @@ impl ThinPool {
             }
             ThinPoolStatus::Fail => {
                 error!("Thinpool status is fail -> Failed");
-                self.set_state(PoolState::Failed);
+                self.set_pool_state(PoolState::Failed);
                 // TODO: Take pool offline?
                 // TODO: Run thin_check
             }
@@ -653,9 +663,9 @@ impl ThinPool {
         Ok(should_save)
     }
 
-    fn set_state(&mut self, new_state: PoolState) {
-        if self.state() != new_state {
-            self.pool_state = new_state;
+    fn set_pool_state(&mut self, new_state: PoolState) {
+        if self.state.pool_state != new_state {
+            self.state.pool_state = new_state;
             get_engine_listener_list().notify(&EngineEvent::PoolStateChanged {
                 dbus_path: self.get_dbus_path(),
                 state: new_state,
@@ -673,7 +683,7 @@ impl ThinPool {
             new_state = PoolExtendState::MetaFailed;
         }
         if self.extend_state() != new_state {
-            self.pool_extend_state = new_state;
+            self.state.pool_extend_state = new_state;
             get_engine_listener_list().notify(&EngineEvent::PoolExtendStateChanged {
                 dbus_path: self.get_dbus_path(),
                 state: new_state,
@@ -683,7 +693,7 @@ impl ThinPool {
 
     fn set_free_space_state(&mut self, new_state: FreeSpaceState) {
         if self.free_space_state() != new_state {
-            self.free_space_state = new_state;
+            self.state.free_space_state = new_state;
             get_engine_listener_list().notify(&EngineEvent::PoolSpaceStateChanged {
                 dbus_path: self.get_dbus_path(),
                 state: new_state,
@@ -723,7 +733,7 @@ impl ThinPool {
 
         self.set_free_space_state(new_state);
 
-        match (self.free_space_state, new_state) {
+        match (self.state.free_space_state, new_state) {
             (FreeSpaceState::Good, FreeSpaceState::Warn) => {
                 // TODO: other steps to regain space: schedule fstrims?
                 set_write_throttling(
@@ -770,7 +780,7 @@ impl ThinPool {
     /// Tear down the components managed here: filesystems, the MDV,
     /// and the actual thinpool device itself.
     pub fn teardown(&mut self) -> StratisResult<()> {
-        self.set_state(PoolState::Stopping);
+        self.set_pool_state(PoolState::Stopping);
         // Must succeed in tearing down all filesystems before the
         // thinpool..
         for (_, _, ref mut fs) in &mut self.filesystems {
@@ -1037,16 +1047,16 @@ impl ThinPool {
         }
     }
 
-    pub fn state(&self) -> PoolState {
-        self.pool_state
+    pub fn pool_state(&self) -> PoolState {
+        self.state.pool_state
     }
 
     pub fn extend_state(&self) -> PoolExtendState {
-        self.pool_extend_state
+        self.state.pool_extend_state
     }
 
     pub fn free_space_state(&self) -> FreeSpaceState {
-        self.free_space_state
+        self.state.free_space_state
     }
 
     /// Rename a filesystem within the thin pool.

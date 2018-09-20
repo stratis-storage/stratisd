@@ -419,7 +419,7 @@ impl Pool for StratPool {
     }
 
     fn state(&self) -> PoolState {
-        self.thin_pool.state()
+        self.thin_pool.pool_state()
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {

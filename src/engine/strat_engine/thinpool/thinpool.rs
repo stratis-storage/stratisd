@@ -175,6 +175,13 @@ fn calc_lowater(
     }
 }
 
+/// The state of the pool is described by these various orthogonal attributes.
+#[derive(Debug)]
+struct State {
+    pool_state: PoolState,
+    free_space_state: FreeSpaceState,
+}
+
 /// Segment lists that the ThinPool keeps track of.
 #[derive(Debug)]
 struct Segments {
@@ -229,8 +236,7 @@ pub struct ThinPool {
     /// layer. All DM components obtain their storage from this layer.
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
-    pool_state: PoolState,
-    free_space_state: FreeSpaceState,
+    state: State,
     dbus_path: MaybeDbusPath,
 }
 
@@ -330,8 +336,10 @@ impl ThinPool {
             filesystems: Table::default(),
             mdv,
             backstore_device,
-            pool_state: PoolState::Good,
-            free_space_state,
+            state: State {
+                pool_state: PoolState::Good,
+                free_space_state,
+            },
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -439,8 +447,10 @@ impl ThinPool {
             filesystems: fs_table,
             mdv,
             backstore_device,
-            pool_state: PoolState::Good,
-            free_space_state,
+            state: State {
+                pool_state: PoolState::Good,
+                free_space_state,
+            },
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -490,11 +500,11 @@ impl ThinPool {
                     ThinPoolStatusSummary::Good => {}
                     ThinPoolStatusSummary::ReadOnly => {
                         error!("Thinpool readonly! -> BAD");
-                        self.set_state(PoolState::Bad);
+                        self.set_pool_state(PoolState::Bad);
                     }
                     ThinPoolStatusSummary::OutOfSpace => {
                         error!("Thinpool out of space! -> BAD");
-                        self.set_state(PoolState::Bad);
+                        self.set_pool_state(PoolState::Bad);
                     }
                 }
 
@@ -520,7 +530,7 @@ impl ThinPool {
                         }
                         Err(err) => {
                             error!("Thinpool meta extend failed! -> BAD: reason {:?}", err);
-                            self.set_state(PoolState::Bad);
+                            self.set_pool_state(PoolState::Bad);
                         }
                     }
                 }
@@ -547,7 +557,7 @@ impl ThinPool {
                             }
                             Err(err) => {
                                 error!("Thinpool data extend failed! -> BAD: reason: {:?}", err);
-                                self.set_state(PoolState::Bad);
+                                self.set_pool_state(PoolState::Bad);
                                 DataBlocks(0)
                             }
                         },
@@ -557,7 +567,7 @@ impl ThinPool {
                 let current_total = usage.total_data + extend_size;
 
                 // Update pool space state
-                self.free_space_state = self.free_space_check(
+                self.state.free_space_state = self.free_space_check(
                     usage.used_data,
                     current_total + sectors_to_datablocks(backstore.available_in_backstore())
                         - usage.used_data,
@@ -567,7 +577,7 @@ impl ThinPool {
                 let lowater = calc_lowater(
                     current_total,
                     sectors_to_datablocks(backstore.available_in_backstore()),
-                    self.free_space_state,
+                    self.state.free_space_state,
                 );
 
                 self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
@@ -575,7 +585,7 @@ impl ThinPool {
             }
             dm::ThinPoolStatus::Fail => {
                 error!("Thinpool status is `fail` -> BAD");
-                self.set_state(PoolState::Bad);
+                self.set_pool_state(PoolState::Bad);
                 // TODO: Take pool offline?
                 // TODO: Run thin_check
             }
@@ -595,9 +605,9 @@ impl ThinPool {
         Ok(should_save)
     }
 
-    fn set_state(&mut self, new_state: PoolState) {
-        if self.state() != new_state {
-            self.pool_state = new_state;
+    fn set_pool_state(&mut self, new_state: PoolState) {
+        if self.state.pool_state != new_state {
+            self.state.pool_state = new_state;
             get_engine_listener_list().notify(&EngineEvent::PoolStateChanged {
                 dbus_path: self.get_dbus_path(),
                 state: new_state,
@@ -633,16 +643,16 @@ impl ThinPool {
             _ => FreeSpaceState::Crit,
         };
 
-        if self.free_space_state != new_state {
+        if self.state.free_space_state != new_state {
             info!(
                 "Prev space state: {:?} New space state: {:?}",
-                self.free_space_state, new_state
+                self.state.free_space_state, new_state
             );
 
             // TODO: Dbus signal
         }
 
-        match (self.free_space_state, new_state) {
+        match (self.state.free_space_state, new_state) {
             (FreeSpaceState::Good, FreeSpaceState::Warn) => {
                 // TODO: other steps to regain space: schedule fstrims?
                 set_write_throttling(
@@ -949,8 +959,8 @@ impl ThinPool {
         }
     }
 
-    pub fn state(&self) -> PoolState {
-        self.pool_state
+    pub fn pool_state(&self) -> PoolState {
+        self.state.pool_state
     }
 
     /// Rename a filesystem within the thin pool.

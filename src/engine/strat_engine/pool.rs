@@ -109,6 +109,7 @@ pub struct StratPool {
     redundancy: Redundancy,
     thin_pool: ThinPool,
     dbus_path: MaybeDbusPath,
+    last_phys_used: Sectors,
 }
 
 impl StratPool {
@@ -142,11 +143,14 @@ impl StratPool {
 
         thinpool.check(pool_uuid, &mut backstore)?;
 
+        let last_phys_used = Self::try_total_physical_used(&thinpool, &backstore)?;
+
         let mut pool = StratPool {
             backstore,
             redundancy,
             thin_pool: thinpool,
             dbus_path: MaybeDbusPath(None),
+            last_phys_used,
         };
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
@@ -179,11 +183,14 @@ impl StratPool {
 
         let changed = thinpool.check(uuid, &mut backstore)?;
 
+        let last_phys_used = Self::try_total_physical_used(&thinpool, &backstore)?;
+
         let mut pool = StratPool {
             backstore,
             redundancy: Redundancy::NONE,
             thin_pool: thinpool,
             dbus_path: MaybeDbusPath(None),
+            last_phys_used,
         };
 
         let pool_name = &metadata.name;
@@ -210,6 +217,15 @@ impl StratPool {
 
     pub fn has_filesystems(&self) -> bool {
         self.thin_pool.has_filesystems()
+    }
+
+    fn try_total_physical_used(
+        thin_pool: &ThinPool,
+        backstore: &Backstore,
+    ) -> StratisResult<Sectors> {
+        thin_pool
+            .total_physical_used()
+            .and_then(|v| Ok(v + backstore.datatier_metadata_size()))
     }
 
     /// The names of DM devices belonging to this pool that may generate events
@@ -350,10 +366,21 @@ impl Pool for StratPool {
         self.backstore.datatier_size()
     }
 
-    fn total_physical_used(&self) -> StratisResult<Sectors> {
-        self.thin_pool
-            .total_physical_used()
-            .and_then(|v| Ok(v + self.backstore.datatier_metadata_size()))
+    fn total_physical_used(&mut self) -> Sectors {
+        match Self::try_total_physical_used(&self.thin_pool, &self.backstore) {
+            Ok(val) => {
+                self.last_phys_used = val;
+                val
+            }
+            Err(err) => {
+                error!(
+                    "try_total_physical_used failed, should never happen: {}",
+                    err
+                );
+                self.thin_pool.set_state(PoolState::Bad);
+                self.last_phys_used
+            }
+        }
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)> {

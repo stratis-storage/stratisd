@@ -337,20 +337,9 @@ fn get_pool_total_physical_used(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    fn get_used((_, uuid, pool): (Name, Uuid, &dyn Pool)) -> Result<String, MethodErr> {
-        let err_func = |_| {
-            MethodErr::failed(&format!(
-                "no total physical size computed for pool with uuid {}",
-                uuid
-            ))
-        };
-
-        pool.total_physical_used()
-            .map(|u| Ok(format!("{}", *u)))
-            .map_err(err_func)?
-    }
-
-    get_pool_property(i, p, get_used)
+    get_pool_property(i, p, |(_, _, pool)| {
+        Ok((*pool.total_physical_used()).to_string())
+    })
 }
 
 fn get_pool_total_physical_size(

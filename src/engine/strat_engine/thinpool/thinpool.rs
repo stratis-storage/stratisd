@@ -16,7 +16,7 @@ use uuid::Uuid;
 use devicemapper::{
     device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams, LinearDev,
     LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine, ThinDevId,
-    ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
+    ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, ThinPoolWorkingStatus, IEC,
 };
 
 use crate::{
@@ -178,6 +178,29 @@ struct Segments {
     mdv_segments: Vec<(Sectors, Sectors)>,
 }
 
+/// Just a helper function to get the status of a thinpool device.
+fn get_thinpool_status(thinpool_dev: &ThinPoolDev) -> StratisResult<ThinPoolWorkingStatus> {
+    match thinpool_dev.status(get_dm())? {
+        ThinPoolStatus::Error => {
+            let err_msg = format!("Devicemapper could not obtain the status for devicemapper thin pool with name {} device {} and devnode {}",
+                thinpool_dev.name(),
+                thinpool_dev.device(),
+                thinpool_dev.devnode().display());
+            Err(StratisError::Error(err_msg))
+        }
+        ThinPoolStatus::Fail => {
+            let err_msg = format!(
+                "Status of thin pool with name {} device {} and devnode {} is Fail",
+                thinpool_dev.name(),
+                thinpool_dev.device(),
+                thinpool_dev.devnode().display(),
+            );
+            Err(StratisError::Error(err_msg))
+        }
+        ThinPoolStatus::Working(w) => Ok(*w),
+    }
+}
+
 pub struct ThinPoolSizeParams {
     meta_size: MetaBlocks,
     data_size: DataBlocks,
@@ -226,6 +249,7 @@ pub struct ThinPool {
     pool_state: PoolState,
     pool_extend_state: PoolExtendState,
     free_space_state: FreeSpaceState,
+    thin_pool_status: ThinPoolWorkingStatus,
     dbus_path: MaybeDbusPath,
 }
 
@@ -322,6 +346,8 @@ impl ThinPool {
             ),
         )?;
 
+        let thin_pool_status = get_thinpool_status(&thinpool_dev)?;
+
         Ok(ThinPool {
             thin_pool: thinpool_dev,
             segments: Segments {
@@ -337,6 +363,7 @@ impl ThinPool {
             pool_state: PoolState::Initializing,
             pool_extend_state: PoolExtendState::Initializing,
             free_space_state,
+            thin_pool_status,
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -434,6 +461,9 @@ impl ThinPool {
         }
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
+
+        let thin_pool_status = get_thinpool_status(&thinpool_dev)?;
+
         Ok(ThinPool {
             thin_pool: thinpool_dev,
             segments: Segments {
@@ -449,6 +479,7 @@ impl ThinPool {
             pool_state: PoolState::Initializing,
             pool_extend_state: PoolExtendState::Initializing,
             free_space_state,
+            thin_pool_status,
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -479,6 +510,7 @@ impl ThinPool {
         let mut should_save: bool = false;
         match self.thin_pool.status(get_dm())? {
             ThinPoolStatus::Working(ref status) => {
+                self.thin_pool_status = (**status).clone();
                 let mut meta_extend_failed = false;
                 let mut data_extend_failed = false;
                 match status.summary {
@@ -806,21 +838,8 @@ impl ThinPool {
     // This includes all the sectors being held as spares for the meta device,
     // all the sectors allocated to the meta data device, and all the sectors
     // in use on the data device.
-    pub fn total_physical_used(&self) -> StratisResult<Sectors> {
-        let data_dev_used = match self.thin_pool.status(get_dm())? {
-            ThinPoolStatus::Working(ref status) => datablocks_to_sectors(status.usage.used_data),
-            ThinPoolStatus::Error => {
-                let err_msg = format!(
-                    "Devicemapper could not obtain status for devicemapper thin pool device {}",
-                    self.thin_pool.device(),
-                );
-                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
-            }
-            ThinPoolStatus::Fail => {
-                let err_msg = "thin pool failed, could not obtain usage";
-                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
-            }
-        };
+    pub fn total_physical_used(&self) -> Sectors {
+        let data_dev_used = datablocks_to_sectors(self.thin_pool_status.usage.used_data);
 
         let spare_total = self.segments.meta_spare_segments.iter().map(|s| s.1).sum();
 
@@ -828,7 +847,7 @@ impl ThinPool {
 
         let mdv_total = self.segments.mdv_segments.iter().map(|s| s.1).sum();
 
-        Ok(data_dev_used + spare_total + meta_dev_total + mdv_total)
+        data_dev_used + spare_total + meta_dev_total + mdv_total
     }
 
     pub fn get_filesystem_by_uuid(&self, uuid: FilesystemUuid) -> Option<(Name, &StratFilesystem)> {

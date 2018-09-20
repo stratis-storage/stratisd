@@ -51,7 +51,6 @@ class CreateFSTestCase(unittest.TestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
-                'force': False,
                 'devices': self._devs
             })
         self._pool_object = get_object(poolpath)
@@ -120,7 +119,6 @@ class CreateFSTestCase1(unittest.TestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
-                'force': False,
                 'devices': self._devs
             })
         self._pool_object = get_object(poolpath)

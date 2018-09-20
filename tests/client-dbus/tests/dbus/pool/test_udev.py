@@ -67,7 +67,6 @@ class UdevAdd(unittest.TestCase):
             get_object(TOP_OBJECT), {
                 'name': name,
                 'redundancy': (True, 0),
-                'force': False,
                 'devices': devices
             })
         return get_object(pool_object_path)

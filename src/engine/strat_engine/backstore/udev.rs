@@ -13,6 +13,15 @@ use stratis::{StratisError, StratisResult};
 
 use super::super::super::udev::get_udev;
 
+/// Returns true if udev indicates that the device belongs to Stratis, else
+/// false. If there is any ambiguity, returns false.
+/// This may happen if there was a failure to interpret a udev value that
+/// was set.
+pub fn stratis_device(device: &libudev::Device) -> bool {
+    get_udev_property(device, "ID_FS_TYPE")
+        .map_or(false, |v| v.map(|v| v == "stratis").unwrap_or(false))
+}
+
 /// Returns true if udev indicates that the device is a multipath member
 /// device, else false. If there is any ambiguity, return true.
 /// This may happen if there was a failure to interpret a udev value that

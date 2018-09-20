@@ -18,7 +18,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 use super::super::super::types::{DevUuid, PoolUuid};
 
 use super::metadata::device_identifiers;
-use super::udev::{udev_block_device_apply, unclaimed};
+use super::udev::{multipath_member, stratis_device, udev_block_device_apply, unclaimed};
 
 ioctl_read!(blkgetsize64, 0x12, 114, u64);
 
@@ -74,69 +74,19 @@ pub enum DevOwnership {
 /// Return an error if the device is not in the udev database.
 /// Return an error if the necessary udev information can not be read.
 pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
-    /// A helper function. None if the device is unclaimed, a HashMap of udev
-    /// properties otherwise. Omits all udev properties that can not be
-    /// converted to Strings.
-    fn udev_info(device: &libudev::Device) -> Option<HashMap<String, Option<String>>> {
-        if unclaimed(device) {
-            None
-        } else {
-            Some(
-                device
-                    .properties()
-                    .map(|i| {
-                        (
-                            i.name().to_str().map(|s| s.to_string()),
-                            i.value().to_str().map(|s| s.to_string()),
-                        )
-                    })
-                    .filter_map(|(n, v)| match (n, v) {
-                        (Some(n), v) => Some((n, v)),
-                        _ => None,
-                    })
-                    .collect(),
-            )
-        }
-    }
-
-    match udev_block_device_apply(devnode, udev_info)? {
-        Some(Some(properties)) => {
-            if properties
-                .get("DM_MULTIPATH_DEVICE_PATH")
-                .map_or(false, |v| v.as_ref().map_or(false, |v| v == "1"))
+    // Discover identity for a single udev device.
+    let do_it = |device: &libudev::Device| -> StratisResult<DevOwnership> {
+        if multipath_member(device) {
+            Ok(DevOwnership::Multipath)
+        } else if stratis_device(device) {
+            if let Some((pool_uuid, device_uuid)) =
+                device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
             {
-                Ok(DevOwnership::Multipath)
-            } else if properties
-                .get("ID_FS_TYPE")
-                .map_or(false, |v| v.as_ref().map_or(false, |v| v == "stratis"))
-            {
-                if let Some((pool_uuid, device_uuid)) =
-                    device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
-                {
-                    Ok(DevOwnership::Ours(pool_uuid, device_uuid))
-                } else {
-                    Ok(DevOwnership::Contradiction)
-                }
+                Ok(DevOwnership::Ours(pool_uuid, device_uuid))
             } else {
-                // FIXME: Put in something better here. Perhaps return
-                // everything that udev said about this device or just
-                // what the program figured out about the device.
-                Ok(DevOwnership::Theirs(
-                    properties
-                        .iter()
-                        .filter(|&(k, _)| k.contains("ID_FS_") || k.contains("ID_PART_TABLE_"))
-                        .map(|(k, v)| {
-                            (
-                                k.to_string(),
-                                v.as_ref()
-                                    .map_or("<unknown value>".into(), |v| v.to_string()),
-                            )
-                        })
-                        .collect(),
-                ))
+                Ok(DevOwnership::Contradiction)
             }
-        }
-        Some(None) => {
+        } else if unclaimed(device) {
             // Not a Stratis device OR running an older version of libblkid
             // that does not interpret Stratis devices. Fall back on reading
             // Stratis header via Stratis. Be more accepting of failures
@@ -163,15 +113,23 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
                     DevOwnership::Unowned
                 },
             )
+        } else {
+            // FIXME: Put in something better here. Perhaps return
+            // everything that udev said about this device or just
+            // what the program figured out about the device.
+            Ok(DevOwnership::Theirs(HashMap::new()))
         }
-        None => Err(StratisError::Engine(
+    };
+
+    udev_block_device_apply(devnode, do_it)?.unwrap_or_else(|| {
+        Err(StratisError::Engine(
             ErrorEnum::NotFound,
             format!(
                 "No device in udev database corresponding to device node {:?}",
                 devnode
             ),
-        )),
-    }
+        ))
+    })
 }
 
 #[cfg(test)]
@@ -192,15 +150,7 @@ mod test {
         cmd::udev_settle().unwrap();
 
         assert!(match identify(paths[0]).unwrap() {
-            DevOwnership::Theirs(properties) => {
-                assert_eq!(
-                    properties.get("ID_FS_USAGE"),
-                    Some(&"filesystem".to_string())
-                );
-                assert_eq!(properties.get("ID_FS_TYPE"), Some(&"ext3".to_string()));
-                assert!(properties.get("ID_FS_UUID").is_some());
-                true
-            }
+            DevOwnership::Theirs(_) => true,
             _ => false,
         })
     }

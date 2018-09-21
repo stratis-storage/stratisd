@@ -351,10 +351,8 @@ impl Pool for StratPool {
         self.backstore.datatier_size()
     }
 
-    fn total_physical_used(&self) -> StratisResult<Sectors> {
-        self.thin_pool
-            .total_physical_used()
-            .and_then(|v| Ok(v + self.backstore.datatier_metadata_size()))
+    fn total_physical_used(&self) -> Sectors {
+        self.thin_pool.total_physical_used() + self.backstore.datatier_metadata_size()
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)> {
@@ -419,7 +417,7 @@ impl Pool for StratPool {
     }
 
     fn state(&self) -> PoolState {
-        self.thin_pool.state()
+        self.thin_pool.pool_state()
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {

@@ -9,11 +9,10 @@ use std::borrow::BorrowMut;
 
 use uuid::Uuid;
 
-use devicemapper as dm;
 use devicemapper::{
     device_exists, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams,
     LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine,
-    ThinDevId, ThinPoolDev, ThinPoolStatusSummary, IEC,
+    ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, ThinPoolWorkingStatus, IEC,
 };
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
@@ -175,6 +174,38 @@ fn calc_lowater(
     }
 }
 
+/// Just a helper function to get the status of a thinpool device.
+fn get_thinpool_status(thinpool_dev: &ThinPoolDev) -> StratisResult<ThinPoolWorkingStatus> {
+    match thinpool_dev.status(get_dm())? {
+        ThinPoolStatus::Working(w) => Ok(*w),
+        ThinPoolStatus::Fail => {
+            let err_msg = format!(
+                "Status of thin pool with name {} device {} and devnode {} is Fail",
+                thinpool_dev.name(),
+                thinpool_dev.device(),
+                thinpool_dev.devnode().display(),
+            );
+            Err(StratisError::Error(err_msg.into()))
+        }
+    }
+}
+
+/// The state of the pool is described by these various orthogonal attributes.
+#[derive(Debug)]
+struct State {
+    pool_state: PoolState,
+    free_space_state: FreeSpaceState,
+}
+
+/// Segment lists that the ThinPool keeps track of.
+#[derive(Debug)]
+struct Segments {
+    meta_segments: Vec<(Sectors, Sectors)>,
+    meta_spare_segments: Vec<(Sectors, Sectors)>,
+    data_segments: Vec<(Sectors, Sectors)>,
+    mdv_segments: Vec<(Sectors, Sectors)>,
+}
+
 pub struct ThinPoolSizeParams {
     meta_size: MetaBlocks,
     data_size: DataBlocks,
@@ -212,10 +243,7 @@ impl Default for ThinPoolSizeParams {
 #[derive(Debug)]
 pub struct ThinPool {
     thin_pool: ThinPoolDev,
-    meta_segments: Vec<(Sectors, Sectors)>,
-    meta_spare_segments: Vec<(Sectors, Sectors)>,
-    data_segments: Vec<(Sectors, Sectors)>,
-    mdv_segments: Vec<(Sectors, Sectors)>,
+    segments: Segments,
     id_gen: ThinDevIdPool,
     filesystems: Table<StratFilesystem>,
     mdv: MetadataVol,
@@ -223,8 +251,8 @@ pub struct ThinPool {
     /// layer. All DM components obtain their storage from this layer.
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
-    pool_state: PoolState,
-    free_space_state: FreeSpaceState,
+    state: State,
+    thin_pool_status: ThinPoolWorkingStatus,
     dbus_path: MaybeDbusPath,
 }
 
@@ -312,18 +340,25 @@ impl ThinPool {
             ),
         )?;
 
+        let thin_pool_status = get_thinpool_status(&thinpool_dev)?;
+
         Ok(ThinPool {
             thin_pool: thinpool_dev,
-            meta_segments: vec![meta_segments],
-            meta_spare_segments: vec![spare_segments],
-            data_segments: vec![data_segments],
-            mdv_segments: vec![mdv_segments],
+            segments: Segments {
+                meta_segments: vec![meta_segments],
+                meta_spare_segments: vec![spare_segments],
+                data_segments: vec![data_segments],
+                mdv_segments: vec![mdv_segments],
+            },
             id_gen: ThinDevIdPool::new_from_ids(&[]),
             filesystems: Table::default(),
             mdv,
             backstore_device,
-            pool_state: PoolState::Good,
-            free_space_state,
+            state: State {
+                pool_state: PoolState::Good,
+                free_space_state,
+            },
+            thin_pool_status,
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -419,18 +454,26 @@ impl ThinPool {
         }
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
+
+        let thin_pool_status = get_thinpool_status(&thinpool_dev)?;
+
         Ok(ThinPool {
             thin_pool: thinpool_dev,
-            meta_segments,
-            meta_spare_segments: spare_segments,
-            data_segments,
-            mdv_segments,
+            segments: Segments {
+                meta_segments,
+                meta_spare_segments: spare_segments,
+                data_segments,
+                mdv_segments,
+            },
             id_gen: ThinDevIdPool::new_from_ids(&thin_ids),
             filesystems: fs_table,
             mdv,
             backstore_device,
-            pool_state: PoolState::Good,
-            free_space_state,
+            state: State {
+                pool_state: PoolState::Good,
+                free_space_state,
+            },
+            thin_pool_status,
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -473,18 +516,18 @@ impl ThinPool {
 
         let mut should_save: bool = false;
 
-        let thinpool: dm::ThinPoolStatus = self.thin_pool.status(get_dm())?;
-        match thinpool {
-            dm::ThinPoolStatus::Working(ref status) => {
+        match self.thin_pool.status(get_dm())? {
+            ThinPoolStatus::Working(ref status) => {
+                self.thin_pool_status = (**status).clone();
                 match status.summary {
                     ThinPoolStatusSummary::Good => {}
                     ThinPoolStatusSummary::ReadOnly => {
                         error!("Thinpool readonly! -> BAD");
-                        self.set_state(PoolState::Bad);
+                        self.set_pool_state(PoolState::Bad);
                     }
                     ThinPoolStatusSummary::OutOfSpace => {
                         error!("Thinpool out of space! -> BAD");
-                        self.set_state(PoolState::Bad);
+                        self.set_pool_state(PoolState::Bad);
                     }
                 }
 
@@ -510,7 +553,7 @@ impl ThinPool {
                         }
                         Err(err) => {
                             error!("Thinpool meta extend failed! -> BAD: reason {:?}", err);
-                            self.set_state(PoolState::Bad);
+                            self.set_pool_state(PoolState::Bad);
                         }
                     }
                 }
@@ -537,7 +580,7 @@ impl ThinPool {
                             }
                             Err(err) => {
                                 error!("Thinpool data extend failed! -> BAD: reason: {:?}", err);
-                                self.set_state(PoolState::Bad);
+                                self.set_pool_state(PoolState::Bad);
                                 DataBlocks(0)
                             }
                         },
@@ -547,7 +590,7 @@ impl ThinPool {
                 let current_total = usage.total_data + extend_size;
 
                 // Update pool space state
-                self.free_space_state = self.free_space_check(
+                self.state.free_space_state = self.free_space_check(
                     usage.used_data,
                     current_total + sectors_to_datablocks(backstore.available_in_backstore())
                         - usage.used_data,
@@ -557,15 +600,15 @@ impl ThinPool {
                 let lowater = calc_lowater(
                     current_total,
                     sectors_to_datablocks(backstore.available_in_backstore()),
-                    self.free_space_state,
+                    self.state.free_space_state,
                 );
 
                 self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
                 self.resume()?;
             }
-            dm::ThinPoolStatus::Fail => {
+            ThinPoolStatus::Fail => {
                 error!("Thinpool status is `fail` -> BAD");
-                self.set_state(PoolState::Bad);
+                self.set_pool_state(PoolState::Bad);
                 // TODO: Take pool offline?
                 // TODO: Run thin_check
             }
@@ -585,9 +628,9 @@ impl ThinPool {
         Ok(should_save)
     }
 
-    fn set_state(&mut self, new_state: PoolState) {
-        if self.state() != new_state {
-            self.pool_state = new_state;
+    fn set_pool_state(&mut self, new_state: PoolState) {
+        if self.state.pool_state != new_state {
+            self.state.pool_state = new_state;
             get_engine_listener_list().notify(&EngineEvent::PoolStateChanged {
                 dbus_path: self.get_dbus_path(),
                 state: new_state,
@@ -623,16 +666,16 @@ impl ThinPool {
             _ => FreeSpaceState::Crit,
         };
 
-        if self.free_space_state != new_state {
+        if self.state.free_space_state != new_state {
             info!(
                 "Prev space state: {:?} New space state: {:?}",
-                self.free_space_state, new_state
+                self.state.free_space_state, new_state
             );
 
             // TODO: Dbus signal
         }
 
-        match (self.free_space_state, new_state) {
+        match (self.state.free_space_state, new_state) {
             (FreeSpaceState::Good, FreeSpaceState::Warn) => {
                 // TODO: other steps to regain space: schedule fstrims?
                 set_write_throttling(
@@ -710,7 +753,7 @@ impl ThinPool {
             backstore,
             extend_size,
             DATA_BLOCK_SIZE,
-            &mut self.data_segments,
+            &mut self.segments.data_segments,
             true,
         )
     }
@@ -733,7 +776,7 @@ impl ThinPool {
             backstore,
             extend_size,
             MetaBlocks(1).sectors(),
-            &mut self.meta_segments,
+            &mut self.segments.meta_segments,
             false,
         )
     }
@@ -784,24 +827,16 @@ impl ThinPool {
     // This includes all the sectors being held as spares for the meta device,
     // all the sectors allocated to the meta data device, and all the sectors
     // in use on the data device.
-    pub fn total_physical_used(&self) -> StratisResult<Sectors> {
-        let data_dev_used = match self.thin_pool.status(get_dm())? {
-            dm::ThinPoolStatus::Working(ref status) => {
-                datablocks_to_sectors(status.usage.used_data)
-            }
-            _ => {
-                let err_msg = "thin pool failed, could not obtain usage";
-                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
-            }
-        };
+    pub fn total_physical_used(&self) -> Sectors {
+        let data_dev_used = datablocks_to_sectors(self.thin_pool_status.usage.used_data);
 
-        let spare_total = self.meta_spare_segments.iter().map(|s| s.1).sum();
+        let spare_total = self.segments.meta_spare_segments.iter().map(|s| s.1).sum();
 
         let meta_dev_total = self.thin_pool.meta_dev().size();
 
-        let mdv_total = self.mdv_segments.iter().map(|s| s.1).sum();
+        let mdv_total = self.segments.mdv_segments.iter().map(|s| s.1).sum();
 
-        Ok(data_dev_used + spare_total + meta_dev_total + mdv_total)
+        data_dev_used + spare_total + meta_dev_total + mdv_total
     }
 
     pub fn get_filesystem_by_uuid(&self, uuid: FilesystemUuid) -> Option<(Name, &StratFilesystem)> {
@@ -939,8 +974,8 @@ impl ThinPool {
         }
     }
 
-    pub fn state(&self) -> PoolState {
-        self.pool_state
+    pub fn pool_state(&self) -> PoolState {
+        self.state.pool_state
     }
 
     /// Rename a filesystem within the thin pool.
@@ -1073,11 +1108,12 @@ impl ThinPool {
 
 impl Recordable<FlexDevsSave> for ThinPool {
     fn record(&self) -> FlexDevsSave {
+        let segments = &self.segments;
         FlexDevsSave {
-            meta_dev: self.mdv_segments.to_vec(),
-            thin_meta_dev: self.meta_segments.to_vec(),
-            thin_data_dev: self.data_segments.to_vec(),
-            thin_meta_dev_spare: self.meta_spare_segments.to_vec(),
+            meta_dev: segments.mdv_segments.to_vec(),
+            thin_meta_dev: segments.meta_segments.to_vec(),
+            thin_data_dev: segments.data_segments.to_vec(),
+            thin_meta_dev_spare: segments.meta_spare_segments.to_vec(),
         }
     }
 }
@@ -1217,26 +1253,26 @@ mod tests {
                 .unwrap();
             // Write the write_buf until the pool is full
             loop {
-                let status: dm::ThinPoolStatus = pool.thin_pool.status(get_dm()).unwrap();
+                let status = pool.thin_pool.status(get_dm()).unwrap();
                 match status {
-                    dm::ThinPoolStatus::Working(_) => {
+                    ThinPoolStatus::Working(_) => {
                         f.write_all(write_buf).unwrap();
                         if f.sync_data().is_err() {
                             break;
                         }
                     }
-                    dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working."),
+                    ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working."),
                 }
             }
         }
         match pool.thin_pool.status(get_dm()).unwrap() {
-            dm::ThinPoolStatus::Working(ref status) => {
+            ThinPoolStatus::Working(ref status) => {
                 assert!(
                     status.summary == ThinPoolStatusSummary::OutOfSpace,
                     "Expected full pool"
                 );
             }
-            dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working/full."),
+            ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working/full."),
         };
         // Add block devices to the pool and run check() to extend
         backstore
@@ -1245,13 +1281,13 @@ mod tests {
         pool.check(pool_uuid, &mut backstore).unwrap();
         // Verify the pool is back in a Good state
         match pool.thin_pool.status(get_dm()).unwrap() {
-            dm::ThinPoolStatus::Working(ref status) => {
+            ThinPoolStatus::Working(ref status) => {
                 assert!(
                     status.summary == ThinPoolStatusSummary::Good,
                     "Expected pool to be restored to good state"
                 );
             }
-            dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail.  Expected working/good."),
+            ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail.  Expected working/good."),
         };
     }
 
@@ -1555,23 +1591,23 @@ mod tests {
         ).unwrap();
 
         match thin_pool.thin_pool.status(get_dm()).unwrap() {
-            dm::ThinPoolStatus::Working(ref status) => {
+            ThinPoolStatus::Working(ref status) => {
                 let usage = &status.usage;
                 assert_eq!(usage.total_meta, small_meta_size);
                 assert!(usage.used_meta > MetaBlocks(0));
             }
-            dm::ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
+            ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
         }
         // The meta device is smaller than meta lowater, so it should be expanded
         // in the thin_pool.check() call.
         thin_pool.check(pool_uuid, &mut backstore).unwrap();
         match thin_pool.thin_pool.status(get_dm()).unwrap() {
-            dm::ThinPoolStatus::Working(ref status) => {
+            ThinPoolStatus::Working(ref status) => {
                 let usage = &status.usage;
                 // validate that the meta has been expanded.
                 assert!(usage.total_meta > small_meta_size);
             }
-            dm::ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
+            ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
         }
     }
 

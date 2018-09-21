@@ -201,8 +201,8 @@ impl Pool for SimPool {
         Sectors(IEC::Ei)
     }
 
-    fn total_physical_used(&self) -> StratisResult<Sectors> {
-        Ok(Sectors(0))
+    fn total_physical_used(&self) -> Sectors {
+        Sectors(0)
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)> {

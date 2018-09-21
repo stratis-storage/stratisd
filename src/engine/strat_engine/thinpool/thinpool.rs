@@ -832,7 +832,7 @@ impl ThinPool {
     // This includes all the sectors being held as spares for the meta device,
     // all the sectors allocated to the meta data device, and all the sectors
     // in use on the data device.
-    pub fn total_physical_used(&self) -> StratisResult<Sectors> {
+    pub fn total_physical_used(&self) -> Sectors {
         let data_dev_used = datablocks_to_sectors(self.thin_pool_status.usage.used_data);
 
         let spare_total = self.segments.meta_spare_segments.iter().map(|s| s.1).sum();
@@ -841,7 +841,7 @@ impl ThinPool {
 
         let mdv_total = self.segments.mdv_segments.iter().map(|s| s.1).sum();
 
-        Ok(data_dev_used + spare_total + meta_dev_total + mdv_total)
+        data_dev_used + spare_total + meta_dev_total + mdv_total
     }
 
     pub fn get_filesystem_by_uuid(&self, uuid: FilesystemUuid) -> Option<(Name, &StratFilesystem)> {

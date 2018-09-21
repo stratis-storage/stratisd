@@ -43,7 +43,9 @@ test-travis:
 	sudo env "PATH=${PATH}" RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test travis_
 
 test:
-	RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 cargo test -- --skip real_ --skip loop_ --skip travis_
+	RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 cargo test -- --skip real_ --skip loop_ --skip travis_ --skip test_buffering
+	# Wants to be run by itself.
+	RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 cargo test test_buffering
 
 docs: stratisd.8 docs-rust
 

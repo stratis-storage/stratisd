@@ -174,6 +174,22 @@ fn calc_lowater(
     }
 }
 
+/// Just a helper function to get the status of a thinpool device.
+fn get_thinpool_status(thinpool_dev: &ThinPoolDev) -> StratisResult<ThinPoolWorkingStatus> {
+    match thinpool_dev.status(get_dm())? {
+        ThinPoolStatus::Working(w) => Ok(*w),
+        ThinPoolStatus::Fail => {
+            let err_msg = format!(
+                "Status of thin pool with name {} device {} and devnode {} is Fail",
+                thinpool_dev.name(),
+                thinpool_dev.device(),
+                thinpool_dev.devnode().display(),
+            );
+            Err(StratisError::Error(err_msg.into()))
+        }
+    }
+}
+
 /// The state of the pool is described by these various orthogonal attributes.
 #[derive(Debug)]
 struct State {
@@ -324,17 +340,7 @@ impl ThinPool {
             ),
         )?;
 
-        let (thin_pool_status, pool_state) = match thinpool_dev.status(get_dm())? {
-            ThinPoolStatus::Working(w) => (*w, PoolState::Good),
-            ThinPoolStatus::Fail => {
-                let err_msg = format!(
-                    "Status of thin pool with name {} and UUID {} is Fail",
-                    dm_name.as_ref(),
-                    dm_uuid.as_ref()
-                );
-                return Err(StratisError::Error(err_msg.into()));
-            }
-        };
+        let thin_pool_status = get_thinpool_status(&thinpool_dev)?;
 
         Ok(ThinPool {
             thin_pool: thinpool_dev,
@@ -349,7 +355,7 @@ impl ThinPool {
             mdv,
             backstore_device,
             state: State {
-                pool_state,
+                pool_state: PoolState::Good,
                 free_space_state,
             },
             thin_pool_status,
@@ -449,17 +455,7 @@ impl ThinPool {
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
 
-        let (thin_pool_status, pool_state) = match thinpool_dev.status(get_dm())? {
-            ThinPoolStatus::Working(w) => (*w, PoolState::Good),
-            ThinPoolStatus::Fail => {
-                let err_msg = format!(
-                    "Status of thin pool with name {} and UUID {} is Fail",
-                    dm_name.as_ref(),
-                    dm_uuid.as_ref()
-                );
-                return Err(StratisError::Error(err_msg.into()));
-            }
-        };
+        let thin_pool_status = get_thinpool_status(&thinpool_dev)?;
 
         Ok(ThinPool {
             thin_pool: thinpool_dev,
@@ -474,7 +470,7 @@ impl ThinPool {
             mdv,
             backstore_device,
             state: State {
-                pool_state,
+                pool_state: PoolState::Good,
                 free_space_state,
             },
             thin_pool_status,

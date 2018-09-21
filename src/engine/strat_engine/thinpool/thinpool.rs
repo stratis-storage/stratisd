@@ -9,7 +9,6 @@ use std::borrow::BorrowMut;
 
 use uuid::Uuid;
 
-use devicemapper as dm;
 use devicemapper::{
     device_exists, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams,
     LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine,
@@ -521,9 +520,8 @@ impl ThinPool {
 
         let mut should_save: bool = false;
 
-        let thinpool: dm::ThinPoolStatus = self.thin_pool.status(get_dm())?;
-        match thinpool {
-            dm::ThinPoolStatus::Working(ref status) => {
+        match self.thin_pool.status(get_dm())? {
+            ThinPoolStatus::Working(ref status) => {
                 self.thin_pool_status = (**status).clone();
                 match status.summary {
                     ThinPoolStatusSummary::Good => {}
@@ -612,7 +610,7 @@ impl ThinPool {
                 self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
                 self.resume()?;
             }
-            dm::ThinPoolStatus::Fail => {
+            ThinPoolStatus::Fail => {
                 error!("Thinpool status is `fail` -> BAD");
                 self.set_pool_state(PoolState::Bad);
                 // TODO: Take pool offline?
@@ -1259,26 +1257,26 @@ mod tests {
                 .unwrap();
             // Write the write_buf until the pool is full
             loop {
-                let status: dm::ThinPoolStatus = pool.thin_pool.status(get_dm()).unwrap();
+                let status = pool.thin_pool.status(get_dm()).unwrap();
                 match status {
-                    dm::ThinPoolStatus::Working(_) => {
+                    ThinPoolStatus::Working(_) => {
                         f.write_all(write_buf).unwrap();
                         if f.sync_data().is_err() {
                             break;
                         }
                     }
-                    dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working."),
+                    ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working."),
                 }
             }
         }
         match pool.thin_pool.status(get_dm()).unwrap() {
-            dm::ThinPoolStatus::Working(ref status) => {
+            ThinPoolStatus::Working(ref status) => {
                 assert!(
                     status.summary == ThinPoolStatusSummary::OutOfSpace,
                     "Expected full pool"
                 );
             }
-            dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working/full."),
+            ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working/full."),
         };
         // Add block devices to the pool and run check() to extend
         backstore
@@ -1287,13 +1285,13 @@ mod tests {
         pool.check(pool_uuid, &mut backstore).unwrap();
         // Verify the pool is back in a Good state
         match pool.thin_pool.status(get_dm()).unwrap() {
-            dm::ThinPoolStatus::Working(ref status) => {
+            ThinPoolStatus::Working(ref status) => {
                 assert!(
                     status.summary == ThinPoolStatusSummary::Good,
                     "Expected pool to be restored to good state"
                 );
             }
-            dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail.  Expected working/good."),
+            ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail.  Expected working/good."),
         };
     }
 
@@ -1597,23 +1595,23 @@ mod tests {
         ).unwrap();
 
         match thin_pool.thin_pool.status(get_dm()).unwrap() {
-            dm::ThinPoolStatus::Working(ref status) => {
+            ThinPoolStatus::Working(ref status) => {
                 let usage = &status.usage;
                 assert_eq!(usage.total_meta, small_meta_size);
                 assert!(usage.used_meta > MetaBlocks(0));
             }
-            dm::ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
+            ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
         }
         // The meta device is smaller than meta lowater, so it should be expanded
         // in the thin_pool.check() call.
         thin_pool.check(pool_uuid, &mut backstore).unwrap();
         match thin_pool.thin_pool.status(get_dm()).unwrap() {
-            dm::ThinPoolStatus::Working(ref status) => {
+            ThinPoolStatus::Working(ref status) => {
                 let usage = &status.usage;
                 // validate that the meta has been expanded.
                 assert!(usage.total_meta > small_meta_size);
             }
-            dm::ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
+            ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
         }
     }
 

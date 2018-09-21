@@ -524,6 +524,7 @@ impl ThinPool {
         let thinpool: dm::ThinPoolStatus = self.thin_pool.status(get_dm())?;
         match thinpool {
             dm::ThinPoolStatus::Working(ref status) => {
+                self.thin_pool_status = (**status).clone();
                 match status.summary {
                     ThinPoolStatusSummary::Good => {}
                     ThinPoolStatusSummary::ReadOnly => {

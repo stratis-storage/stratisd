@@ -833,15 +833,7 @@ impl ThinPool {
     // all the sectors allocated to the meta data device, and all the sectors
     // in use on the data device.
     pub fn total_physical_used(&self) -> StratisResult<Sectors> {
-        let data_dev_used = match self.thin_pool.status(get_dm())? {
-            dm::ThinPoolStatus::Working(ref status) => {
-                datablocks_to_sectors(status.usage.used_data)
-            }
-            _ => {
-                let err_msg = "thin pool failed, could not obtain usage";
-                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
-            }
-        };
+        let data_dev_used = datablocks_to_sectors(self.thin_pool_status.usage.used_data);
 
         let spare_total = self.segments.meta_spare_segments.iter().map(|s| s.1).sum();
 

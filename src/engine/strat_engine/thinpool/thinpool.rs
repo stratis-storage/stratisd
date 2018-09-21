@@ -13,7 +13,7 @@ use devicemapper as dm;
 use devicemapper::{
     device_exists, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams,
     LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine,
-    ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
+    ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, ThinPoolWorkingStatus, IEC,
 };
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
@@ -237,7 +237,7 @@ pub struct ThinPool {
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
     state: State,
-    thin_pool_status: ThinPoolStatus,
+    thin_pool_status: ThinPoolWorkingStatus,
     dbus_path: MaybeDbusPath,
 }
 
@@ -325,7 +325,17 @@ impl ThinPool {
             ),
         )?;
 
-        let thin_pool_status = thinpool_dev.status(get_dm())?;
+        let (thin_pool_status, pool_state) = match thinpool_dev.status(get_dm())? {
+            ThinPoolStatus::Working(w) => (*w, PoolState::Good),
+            ThinPoolStatus::Fail => {
+                let err_msg = format!(
+                    "Status of thin pool with name {} and UUID {} is Fail",
+                    dm_name.as_ref(),
+                    dm_uuid.as_ref()
+                );
+                return Err(StratisError::Error(err_msg.into()));
+            }
+        };
 
         Ok(ThinPool {
             thin_pool: thinpool_dev,
@@ -340,7 +350,7 @@ impl ThinPool {
             mdv,
             backstore_device,
             state: State {
-                pool_state: PoolState::Good,
+                pool_state,
                 free_space_state,
             },
             thin_pool_status,
@@ -440,7 +450,17 @@ impl ThinPool {
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
 
-        let thin_pool_status = thinpool_dev.status(get_dm())?;
+        let (thin_pool_status, pool_state) = match thinpool_dev.status(get_dm())? {
+            ThinPoolStatus::Working(w) => (*w, PoolState::Good),
+            ThinPoolStatus::Fail => {
+                let err_msg = format!(
+                    "Status of thin pool with name {} and UUID {} is Fail",
+                    dm_name.as_ref(),
+                    dm_uuid.as_ref()
+                );
+                return Err(StratisError::Error(err_msg.into()));
+            }
+        };
 
         Ok(ThinPool {
             thin_pool: thinpool_dev,
@@ -455,7 +475,7 @@ impl ThinPool {
             mdv,
             backstore_device,
             state: State {
-                pool_state: PoolState::Good,
+                pool_state,
                 free_space_state,
             },
             thin_pool_status,

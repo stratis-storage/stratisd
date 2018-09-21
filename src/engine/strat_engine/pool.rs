@@ -50,9 +50,18 @@ fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
 pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
     let flex_devs = &metadata.flex_devs;
     let next = next_index(&flex_devs);
+    let allocated_from_cap = metadata.backstore.cap.allocs[0].1;
 
-    // If the amount allocated from the cap device is not the same as that
-    // used by the flex devs, consider the situation an error.
+    if allocated_from_cap != next {
+        let err_msg = format!(
+            "{} used in thinpool, but {} allocated from backstore cap device",
+            next, allocated_from_cap
+        );
+        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+    }
+
+    // If the total length of the allocations in the flex devs, does not
+    // equal next, consider the situation an error.
     {
         let total_allocated = flex_devs
             .meta_dev
@@ -76,11 +85,9 @@ pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
     // Consider it an error if the amount allocated to the cap device is 0.
     // If this is the case, then the thin pool can not exist.
     {
-        let total_allocated = metadata
-            .backstore
-            .data_segments
+        let total_allocated = metadata.backstore.data_tier.blockdev.allocs[0]
             .iter()
-            .map(|x| x.2)
+            .map(|x| x.length)
             .sum::<Sectors>();
 
         if total_allocated == Sectors(0) {
@@ -163,13 +170,7 @@ impl StratPool {
         devnodes: &HashMap<Device, PathBuf>,
         metadata: &PoolSave,
     ) -> StratisResult<(Name, StratPool)> {
-        let mut backstore = Backstore::setup(
-            uuid,
-            &metadata.backstore,
-            devnodes,
-            None,
-            next_index(&metadata.flex_devs),
-        )?;
+        let mut backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, None)?;
         let mut thinpool = ThinPool::setup(
             uuid,
             &metadata.thinpool_dev,
@@ -554,9 +555,7 @@ mod tests {
         invariant(&pool, &name);
 
         let metadata1 = pool.record(name);
-        assert!(metadata1.backstore.cache_devs.is_none());
-        assert!(metadata1.backstore.cache_segments.is_none());
-        assert!(metadata1.backstore.meta_segments.is_none());
+        assert!(metadata1.backstore.cache_tier.is_none());
 
         let (_, fs_uuid) = pool.create_filesystems(uuid, &name, &[("stratis-filesystem", None)])
             .unwrap()
@@ -593,9 +592,7 @@ mod tests {
         invariant(&pool, &name);
 
         let metadata2 = pool.record(name);
-        assert!(metadata2.backstore.cache_devs.is_some());
-        assert!(metadata2.backstore.cache_segments.is_some());
-        assert!(metadata2.backstore.meta_segments.is_some());
+        assert!(metadata2.backstore.cache_tier.is_some());
 
         let mut buf = [0u8; 10];
         {

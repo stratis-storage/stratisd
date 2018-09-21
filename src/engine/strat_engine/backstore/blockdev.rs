@@ -17,7 +17,7 @@ use super::super::super::engine::BlockDev;
 use super::super::super::event::{get_engine_listener_list, EngineEvent};
 use super::super::super::types::{BlockDevState, DevUuid, MaybeDbusPath, PoolUuid};
 
-use super::super::serde_structs::{BlockDevSave, Recordable};
+use super::super::serde_structs::{BaseBlockDevSave, Recordable};
 
 use super::metadata::BDA;
 use super::range_alloc::RangeAllocator;
@@ -188,9 +188,9 @@ impl BlockDev for StratBlockDev {
     }
 }
 
-impl Recordable<BlockDevSave> for StratBlockDev {
-    fn record(&self) -> BlockDevSave {
-        BlockDevSave {
+impl Recordable<BaseBlockDevSave> for StratBlockDev {
+    fn record(&self) -> BaseBlockDevSave {
+        BaseBlockDevSave {
             uuid: self.uuid(),
             user_info: self.user_info.clone(),
             hardware_info: self.hardware_info.clone(),

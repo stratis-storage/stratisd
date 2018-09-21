@@ -13,7 +13,6 @@
 // restoring state from saved metadata.
 
 use serde::Serialize;
-use uuid::Uuid;
 
 use devicemapper::{Sectors, ThinDevId};
 
@@ -26,7 +25,11 @@ pub trait Recordable<T: Serialize> {
     fn record(&self) -> T;
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+// ALL structs that represent variable length metadata in pre-order
+// depth-first traversal order. Note that when organized by types rather than
+// values the structure is a DAG not a tree. This just means that there are
+// some duplicate type definitions which are obviously not defined twice.
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PoolSave {
     pub name: String,
     pub backstore: BackstoreSave,
@@ -34,8 +37,34 @@ pub struct PoolSave {
     pub thinpool_dev: ThinPoolDevSave,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BackstoreSave {
+    pub data_tier: DataTierSave,
+    pub cap: CapSave,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_tier: Option<CacheTierSave>,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DataTierSave {
+    pub blockdev: BlockDevSave,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlockDevSave {
+    pub allocs: Vec<Vec<BaseDevSave>>,
+    pub devs: Vec<BaseBlockDevSave>,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BaseDevSave {
+    pub parent: DevUuid,
+    pub start: Sectors,
+    pub length: Sectors,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BaseBlockDevSave {
     pub uuid: DevUuid,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_info: Option<String>,
@@ -43,16 +72,17 @@ pub struct BlockDevSave {
     pub hardware_info: Option<String>,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FilesystemSave {
-    pub name: String,
-    pub uuid: FilesystemUuid,
-    pub thin_id: ThinDevId,
-    pub size: Sectors,
-    pub created: u64, // Unix timestamp
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct CapSave {
+    pub allocs: Vec<(Sectors, Sectors)>,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct CacheTierSave {
+    pub blockdev: BlockDevSave,
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct FlexDevsSave {
     pub meta_dev: Vec<(Sectors, Sectors)>,
     pub thin_meta_dev: Vec<(Sectors, Sectors)>,
@@ -60,19 +90,19 @@ pub struct FlexDevsSave {
     pub thin_meta_dev_spare: Vec<(Sectors, Sectors)>,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BackstoreSave {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cache_devs: Option<Vec<BlockDevSave>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cache_segments: Option<Vec<(Uuid, Sectors, Sectors)>>,
-    pub data_devs: Vec<BlockDevSave>,
-    pub data_segments: Vec<(Uuid, Sectors, Sectors)>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub meta_segments: Option<Vec<(Uuid, Sectors, Sectors)>>,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ThinPoolDevSave {
     pub data_block_size: Sectors,
+}
+
+// Struct representing filesystem metadata. This metadata is not held in the
+// variable length metadata but on a separate filesystem that is maintained
+// by stratisd.
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct FilesystemSave {
+    pub name: String,
+    pub uuid: FilesystemUuid,
+    pub thin_id: ThinDevId,
+    pub size: Sectors,
+    pub created: u64, // Unix timestamp
 }

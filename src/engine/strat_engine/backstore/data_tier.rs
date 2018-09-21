@@ -12,6 +12,8 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
+use super::super::serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable};
+
 use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment};
 
@@ -27,24 +29,22 @@ pub struct DataTier {
 impl DataTier {
     /// Setup a previously existing data layer from the block_mgr and
     /// previously allocated segments.
-    pub fn setup(
-        block_mgr: BlockDevMgr,
-        segments: &[(DevUuid, Sectors, Sectors)],
-    ) -> StratisResult<DataTier> {
+    pub fn setup(block_mgr: BlockDevMgr, data_tier_save: &DataTierSave) -> StratisResult<DataTier> {
         let uuid_to_devno = block_mgr.uuid_to_devno();
-        let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> StratisResult<BlkDevSegment> {
-            let device = uuid_to_devno(triple.0).ok_or_else(|| {
+        let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
+            let parent = ld.parent;
+            let device = uuid_to_devno(parent).ok_or_else(|| {
                 StratisError::Engine(
                     ErrorEnum::NotFound,
-                    format!("missing device for UUUD {:?}", &triple.0),
+                    format!("missing device for UUUD {:?}", &parent),
                 )
             })?;
             Ok(BlkDevSegment::new(
-                triple.0,
-                Segment::new(device, triple.1, triple.2),
+                parent,
+                Segment::new(device, ld.start, ld.length),
             ))
         };
-        let segments = segments
+        let segments = data_tier_save.blockdev.allocs[0]
             .iter()
             .map(&mapper)
             .collect::<StratisResult<Vec<_>>>()?;
@@ -159,6 +159,17 @@ impl DataTier {
 
     pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
         self.block_mgr.blockdevs_mut()
+    }
+}
+
+impl Recordable<DataTierSave> for DataTier {
+    fn record(&self) -> DataTierSave {
+        DataTierSave {
+            blockdev: BlockDevSave {
+                allocs: vec![self.segments.record()],
+                devs: self.block_mgr.record(),
+            },
+        }
     }
 }
 

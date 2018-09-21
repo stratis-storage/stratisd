@@ -12,6 +12,8 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
+use super::super::serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Recordable};
+
 use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment};
 
@@ -33,8 +35,7 @@ impl CacheTier {
     /// previously allocated segments.
     pub fn setup(
         block_mgr: BlockDevMgr,
-        cache_segments: &[(DevUuid, Sectors, Sectors)],
-        meta_segments: &[(DevUuid, Sectors, Sectors)],
+        cache_tier_save: &CacheTierSave,
     ) -> StratisResult<CacheTier> {
         if block_mgr.avail_space() != Sectors(0) {
             let err_msg = format!(
@@ -45,25 +46,26 @@ impl CacheTier {
         }
 
         let uuid_to_devno = block_mgr.uuid_to_devno();
-        let mapper = |triple: &(DevUuid, Sectors, Sectors)| -> StratisResult<BlkDevSegment> {
-            let device = uuid_to_devno(triple.0).ok_or_else(|| {
+        let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
+            let parent = ld.parent;
+            let device = uuid_to_devno(parent).ok_or_else(|| {
                 StratisError::Engine(
                     ErrorEnum::NotFound,
-                    format!("missing device for UUUD {:?}", &triple.0),
+                    format!("missing device for UUUD {:?}", &parent),
                 )
             })?;
             Ok(BlkDevSegment::new(
-                triple.0,
-                Segment::new(device, triple.1, triple.2),
+                parent,
+                Segment::new(device, ld.start, ld.length),
             ))
         };
 
-        let meta_segments = meta_segments
+        let meta_segments = cache_tier_save.blockdev.allocs[1]
             .iter()
             .map(&mapper)
             .collect::<StratisResult<Vec<_>>>()?;
 
-        let cache_segments = cache_segments
+        let cache_segments = cache_tier_save.blockdev.allocs[0]
             .iter()
             .map(&mapper)
             .collect::<StratisResult<Vec<_>>>()?;
@@ -163,6 +165,17 @@ impl CacheTier {
         self.block_mgr
             .get_mut_blockdev_by_uuid(uuid)
             .and_then(|bd| Some((BlockDevTier::Cache, bd)))
+    }
+}
+
+impl Recordable<CacheTierSave> for CacheTier {
+    fn record(&self) -> CacheTierSave {
+        CacheTierSave {
+            blockdev: BlockDevSave {
+                allocs: vec![self.cache_segments.record(), self.meta_segments.record()],
+                devs: self.block_mgr.record(),
+            },
+        }
     }
 }
 

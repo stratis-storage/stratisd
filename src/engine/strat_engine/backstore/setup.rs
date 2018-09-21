@@ -17,7 +17,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
-use super::super::serde_structs::{BackstoreSave, BlockDevSave, PoolSave};
+use super::super::serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave};
 
 use super::blockdev::StratBlockDev;
 use super::device::blkdev_size;
@@ -125,16 +125,20 @@ pub fn get_blockdevs(
     backstore_save: &BackstoreSave,
     devnodes: &HashMap<Device, PathBuf>,
 ) -> StratisResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
-    let recorded_data_map: HashMap<DevUuid, (usize, &BlockDevSave)> = backstore_save
-        .data_devs
+    let recorded_data_map: HashMap<DevUuid, (usize, &BaseBlockDevSave)> = backstore_save
+        .data_tier
+        .blockdev
+        .devs
         .iter()
         .enumerate()
         .map(|(i, bds)| (bds.uuid, (i, bds)))
         .collect();
 
-    let recorded_cache_map: HashMap<DevUuid, (usize, &BlockDevSave)> =
-        match backstore_save.cache_devs {
-            Some(ref cache_devs) => cache_devs
+    let recorded_cache_map: HashMap<DevUuid, (usize, &BaseBlockDevSave)> =
+        match backstore_save.cache_tier {
+            Some(ref cache_tier) => cache_tier
+                .blockdev
+                .devs
                 .iter()
                 .enumerate()
                 .map(|(i, bds)| (bds.uuid, (i, bds)))
@@ -143,26 +147,19 @@ pub fn get_blockdevs(
         };
 
     let mut segment_table: HashMap<DevUuid, Vec<(Sectors, Sectors)>> = HashMap::new();
-    for seg in &backstore_save.data_segments {
+    for seg in &backstore_save.data_tier.blockdev.allocs[0] {
         segment_table
-            .entry(seg.0)
+            .entry(seg.parent)
             .or_insert_with(Vec::default)
-            .push((seg.1, seg.2))
+            .push((seg.start, seg.length))
     }
-    if let Some(ref segs) = backstore_save.cache_segments {
-        for seg in segs {
+
+    if let Some(ref cache_tier) = backstore_save.cache_tier {
+        for seg in cache_tier.blockdev.allocs.iter().flat_map(|i| i.iter()) {
             segment_table
-                .entry(seg.0)
+                .entry(seg.parent)
                 .or_insert_with(Vec::default)
-                .push((seg.1, seg.2))
-        }
-    }
-    if let Some(ref segs) = backstore_save.meta_segments {
-        for seg in segs {
-            segment_table
-                .entry(seg.0)
-                .or_insert_with(Vec::default)
-                .push((seg.1, seg.2))
+                .push((seg.start, seg.length))
         }
     }
 
@@ -175,8 +172,8 @@ pub fn get_blockdevs(
         device: Device,
         devnode: &Path,
         bda: BDA,
-        data_map: &HashMap<DevUuid, (usize, &BlockDevSave)>,
-        cache_map: &HashMap<DevUuid, (usize, &BlockDevSave)>,
+        data_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
+        cache_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
         segment_table: &HashMap<DevUuid, Vec<(Sectors, Sectors)>>,
     ) -> StratisResult<(BlockDevTier, StratBlockDev)> {
         // Return an error if apparent size of Stratis block device appears to
@@ -272,7 +269,7 @@ pub fn get_blockdevs(
     // sort the devices according to their order in the metadata.
     fn check_and_sort_devs(
         mut devs: Vec<StratBlockDev>,
-        dev_map: &HashMap<DevUuid, (usize, &BlockDevSave)>,
+        dev_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
     ) -> StratisResult<Vec<StratBlockDev>> {
         let mut uuids = HashSet::new();
         let mut duplicate_uuids = Vec::new();

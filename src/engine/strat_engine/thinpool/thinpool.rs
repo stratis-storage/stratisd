@@ -585,7 +585,7 @@ impl ThinPool {
         Ok(should_save)
     }
 
-    fn set_state(&mut self, new_state: PoolState) {
+    pub fn set_state(&mut self, new_state: PoolState) {
         if self.state() != new_state {
             self.pool_state = new_state;
             get_engine_listener_list().notify(&EngineEvent::PoolStateChanged {

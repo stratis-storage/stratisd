@@ -584,6 +584,8 @@ mod tests {
 
     use super::*;
 
+    const INITIAL_BACKSTORE_ALLOCATION: Sectors = CACHE_BLOCK_SIZE;
+
     /// Assert some invariants of the backstore
     /// * backstore.cache_tier.is_some() <=> backstore.cache.is_some() &&
     ///   backstore.cache_tier.is_some() => backstore.linear.is_none()
@@ -630,7 +632,9 @@ mod tests {
         invariant(&backstore);
 
         // Allocate space from the backstore so that the cap device is made.
-        backstore.alloc(pool_uuid, &[Sectors(1)]).unwrap();
+        backstore
+            .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
+            .unwrap();
 
         let cache_uuids = backstore
             .add_blockdevs(pool_uuid, initcachepaths, BlockDevTier::Cache, false)
@@ -789,7 +793,9 @@ mod tests {
         invariant(&backstore);
 
         // Allocate space from the backstore so that the cap device is made.
-        backstore.alloc(pool_uuid, &[Sectors(1)]).unwrap();
+        backstore
+            .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
+            .unwrap();
 
         let old_device = backstore.device();
 

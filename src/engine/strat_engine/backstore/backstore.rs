@@ -182,7 +182,7 @@ impl Backstore {
     /// from the backstore. This ensures that there is certainly a cap device.
     // Precondition: self.linear.is_some() XOR self.cache.is_some()
     // Postcondition: self.cache.is_some() && self.linear.is_none()
-    fn add_cachedevs(
+    pub fn add_cachedevs(
         &mut self,
         pool_uuid: PoolUuid,
         paths: &[&Path],
@@ -240,27 +240,12 @@ impl Backstore {
 
     /// Add datadevs to the backstore. The data tier always exists if the
     /// backstore exists at all, so there is no need to create it.
-    fn add_datadevs(
+    pub fn add_datadevs(
         &mut self,
         pool_uuid: PoolUuid,
         paths: &[&Path],
     ) -> StratisResult<Vec<DevUuid>> {
         self.data_tier.add(pool_uuid, paths)
-    }
-
-    /// Add the given paths to self. Return UUIDs of the new blockdevs
-    /// corresponding to the specified paths.
-    /// WARNING: metadata changing event
-    pub fn add_blockdevs(
-        &mut self,
-        pool_uuid: PoolUuid,
-        paths: &[&Path],
-        tier: BlockDevTier,
-    ) -> StratisResult<Vec<DevUuid>> {
-        match tier {
-            BlockDevTier::Cache => self.add_cachedevs(pool_uuid, paths),
-            BlockDevTier::Data => self.add_datadevs(pool_uuid, paths),
-        }
     }
 
     /// Extend the cap device whether it is a cache or not. Create the DM
@@ -636,9 +621,7 @@ mod tests {
             .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
             .unwrap();
 
-        let cache_uuids = backstore
-            .add_blockdevs(pool_uuid, initcachepaths, BlockDevTier::Cache)
-            .unwrap();
+        let cache_uuids = backstore.add_cachedevs(pool_uuid, initcachepaths).unwrap();
 
         invariant(&backstore);
 
@@ -661,15 +644,11 @@ mod tests {
             CacheDevStatus::Fail => panic!("cache status should succeed"),
         }
 
-        let data_uuids = backstore
-            .add_blockdevs(pool_uuid, datadevpaths, BlockDevTier::Data)
-            .unwrap();
+        let data_uuids = backstore.add_datadevs(pool_uuid, datadevpaths).unwrap();
         invariant(&backstore);
         assert_eq!(data_uuids.len(), datadevpaths.len());
 
-        let cache_uuids = backstore
-            .add_blockdevs(pool_uuid, cachedevpaths, BlockDevTier::Cache)
-            .unwrap();
+        let cache_uuids = backstore.add_cachedevs(pool_uuid, cachedevpaths).unwrap();
         invariant(&backstore);
         assert_eq!(cache_uuids.len(), cachedevpaths.len());
 
@@ -799,9 +778,7 @@ mod tests {
 
         let old_device = backstore.device();
 
-        backstore
-            .add_blockdevs(pool_uuid, paths2, BlockDevTier::Cache)
-            .unwrap();
+        backstore.add_cachedevs(pool_uuid, paths2).unwrap();
         invariant(&backstore);
 
         assert!(backstore.device() != old_device);

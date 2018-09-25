@@ -45,7 +45,7 @@ where
 /// D-Bus methods return.
 pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
     let error = match *err {
-        StratisError::Error(_) => DbusErrorEnum::INTERNAL_ERROR,
+        StratisError::Error(_) => DbusErrorEnum::ERROR,
         StratisError::Engine(ref e, _) => match *e {
             ErrorEnum::Error => DbusErrorEnum::ERROR,
             ErrorEnum::AlreadyExists => DbusErrorEnum::ALREADY_EXISTS,
@@ -53,14 +53,14 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
             ErrorEnum::Invalid => DbusErrorEnum::ERROR,
             ErrorEnum::NotFound => DbusErrorEnum::NOTFOUND,
         },
-        StratisError::Io(_) => DbusErrorEnum::IO_ERROR,
-        StratisError::Nix(_) => DbusErrorEnum::NIX_ERROR,
+        StratisError::Io(_) => DbusErrorEnum::ERROR,
+        StratisError::Nix(_) => DbusErrorEnum::ERROR,
         StratisError::Uuid(_)
         | StratisError::Utf8(_)
         | StratisError::Serde(_)
         | StratisError::DM(_)
         | StratisError::Dbus(_)
-        | StratisError::Udev(_) => DbusErrorEnum::INTERNAL_ERROR,
+        | StratisError::Udev(_) => DbusErrorEnum::ERROR,
     };
     let description = match *err {
         StratisError::DM(DmError::Core(ref err)) => err.to_string(),

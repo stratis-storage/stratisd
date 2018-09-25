@@ -16,6 +16,7 @@ Miscellaneous methods to support testing.
 """
 
 import os
+from pathlib import Path
 import string
 import subprocess
 import time
@@ -36,6 +37,27 @@ def _device_list(minimum):
         min_size=minimum)
 
 
+def stratisd_bin(given_binary):
+    """
+    See if we can locate binary in alternative location, we are
+    assuming that it's in either a debug or release sub dir.  This prevents
+    us from needing to change the build env. on CI servers.
+    :param given_binary:
+    :return:
+    """
+    if Path(given_binary).exists():
+        return given_binary
+
+    if "debug/stratisd" in given_binary:
+        alternative = given_binary.replace("debug/stratisd",
+                                           "release/stratisd", 1)
+    else:
+        alternative = given_binary.replace("release/stratisd",
+                                           "debug/stratisd", 1)
+
+    return alternative
+
+
 class Service():
     """
     Handle starting and stopping the Rust service.
@@ -45,7 +67,10 @@ class Service():
         """
         Start the stratisd daemon with the simulator.
         """
-        self._stratisd = subprocess.Popen([os.path.join(_STRATISD), '--sim'])
+        executable = stratisd_bin(_STRATISD)
+
+        self._stratisd = subprocess.Popen([os.path.join(executable), '--sim'])
+
         time.sleep(1)
 
     def tearDown(self):

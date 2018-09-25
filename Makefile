@@ -25,25 +25,25 @@ fmt-travis:
 
 build:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS='-D warnings' \
-	cargo build --target $(TARGET)
+	RUSTFLAGS='-g -D warnings' \
+	cargo build --target $(TARGET) --release
 
 build-no-default:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS='-D warnings' \
-	cargo build --no-default-features --target $(TARGET)
+	RUSTFLAGS='-g -D warnings' \
+	cargo build --no-default-features --target $(TARGET) --release
 
 test-loop:
-	sudo env "PATH=${PATH}" RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test loop_
+	sudo env "PATH=${PATH}" RUSTFLAGS='-g -D warnings' RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test loop_ --release
 
 test-real:
-	sudo env "PATH=${PATH}" RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test real_
+	sudo env "PATH=${PATH}" RUSTFLAGS='-g -D warnings' RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test real_ --release
 
 test-travis:
-	sudo env "PATH=${PATH}" RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test travis_
+	sudo env "PATH=${PATH}" RUSTFLAGS='-g -D warnings' RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test travis_ --release
 
 test:
-	RUSTFLAGS='-D warnings' RUST_BACKTRACE=1 cargo test -- --skip real_ --skip loop_ --skip travis_
+	RUSTFLAGS='-g -D warnings' RUST_BACKTRACE=1 cargo test --release -- --skip real_ --skip loop_ --skip travis_
 
 docs: stratisd.8 docs-rust
 

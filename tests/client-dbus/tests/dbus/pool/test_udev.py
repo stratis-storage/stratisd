@@ -33,6 +33,7 @@ from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._loopback import LoopBackDevices
 from .._dm import remove_stratis_setup
+from .._misc import stratisd_bin
 
 _STRATISD = os.environ['STRATISD']
 
@@ -124,7 +125,7 @@ class UdevAdd(unittest.TestCase):
         if self._service is None:
             dbus_interface_present = False
             self._service = subprocess.Popen(
-                [os.path.join(_STRATISD), '--debug'])
+                [os.path.join(stratisd_bin(_STRATISD)), '--debug'])
 
             limit = time.time() + 10.0
             while time.time() <= limit:

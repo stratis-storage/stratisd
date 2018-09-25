@@ -28,6 +28,8 @@ const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)
 
 const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
+const STRAT_SIGBLOCK_VERSION: u8 = 1;
+
 #[derive(Debug)]
 pub struct BDA {
     header: StaticHeader,
@@ -355,6 +357,7 @@ impl StaticHeader {
         let mut buf = [0u8; SECTOR_SIZE];
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size);
+        buf[28] = STRAT_SIGBLOCK_VERSION;
         buf[32..64].clone_from_slice(self.pool_uuid.simple().to_string().as_bytes());
         buf[64..96].clone_from_slice(self.dev_uuid.simple().to_string().as_bytes());
         LittleEndian::write_u64(&mut buf[96..104], *self.mda_size);
@@ -384,6 +387,14 @@ impl StaticHeader {
         }
 
         let blkdev_size = Sectors(LittleEndian::read_u64(&buf[20..28]));
+
+        let version = buf[28];
+        if version != STRAT_SIGBLOCK_VERSION {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                format!("Unknown sigblock version: {}", version),
+            ));
+        }
 
         let pool_uuid = Uuid::parse_str(from_utf8(&buf[32..64])?)?;
         let dev_uuid = Uuid::parse_str(from_utf8(&buf[64..96])?)?;
@@ -440,6 +451,9 @@ mod mda {
     const PER_MDA_REGION_COPIES: usize = 2;
     const NUM_PRIMARY_MDA_REGIONS: usize = NUM_MDA_REGIONS / PER_MDA_REGION_COPIES;
     pub const MIN_MDA_SECTORS: Sectors = Sectors(2032);
+
+    const STRAT_REGION_HDR_VERSION: u8 = 1;
+    const STRAT_METADATA_VERSION: u8 = 1;
 
     #[derive(Debug)]
     pub struct MDARegions {
@@ -563,6 +577,7 @@ mod mda {
                 last_updated: *time,
                 used,
                 data_crc: crc32::checksum_castagnoli(data),
+                metadata_version: STRAT_METADATA_VERSION,
             };
             let hdr_buf = header.to_buf();
 
@@ -604,6 +619,14 @@ mod mda {
                 None => return Ok(None),
                 Some(ref mda) => mda,
             };
+
+            if mda.metadata_version != STRAT_METADATA_VERSION {
+                return Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    format!("Unknown metadata version: {}", mda.metadata_version),
+                ));
+            }
+
             let region_size = self.region_size.bytes();
 
             // Load the metadata region specified by index.
@@ -659,6 +682,8 @@ mod mda {
         used: Bytes,
 
         data_crc: u32,
+
+        metadata_version: u8,
     }
 
     // Implementing Default explicitly because DateTime<Utc> does not implement
@@ -669,6 +694,7 @@ mod mda {
                 last_updated: Utc.timestamp(0, 0),
                 used: Bytes(0),
                 data_crc: 0,
+                metadata_version: STRAT_METADATA_VERSION,
             }
         }
     }
@@ -690,6 +716,16 @@ mod mda {
                 ));
             }
 
+            // Even though hdr_version is positioned later in struct, check it
+            // right after the CRC
+            let hdr_version = buf[28];
+            if hdr_version != STRAT_REGION_HDR_VERSION {
+                return Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    format!("Unknown region header version: {}", hdr_version),
+                ));
+            }
+
             match LittleEndian::read_u64(&buf[16..24]) {
                 0 => Ok(None),
                 secs => {
@@ -705,6 +741,7 @@ mod mda {
                         used,
                         last_updated: Utc.timestamp(secs as i64, nsecs),
                         data_crc: LittleEndian::read_u32(&buf[4..8]),
+                        metadata_version: buf[29],
                     }))
                 }
             }
@@ -720,6 +757,8 @@ mod mda {
             LittleEndian::write_u64(&mut buf[8..16], *self.used as u64);
             LittleEndian::write_u64(&mut buf[16..24], self.last_updated.timestamp() as u64);
             LittleEndian::write_u32(&mut buf[24..28], self.last_updated.timestamp_subsec_nanos());
+            buf[28] = STRAT_REGION_HDR_VERSION;
+            buf[29] = self.metadata_version;
 
             let buf_crc = crc32::checksum_castagnoli(&buf[4.._MDA_REGION_HDR_SIZE]);
             LittleEndian::write_u32(&mut buf[..4], buf_crc);
@@ -754,6 +793,7 @@ mod mda {
                     "MDA region data CRC".into(),
                 ));
             }
+
             Ok(data_buf)
         }
     }
@@ -809,9 +849,15 @@ mod mda {
         use super::*;
 
         #[test]
-        /// Verify that default MDAHeader is all 0s except for CRC.
+        /// Verify that default MDAHeader is all 0s except for CRC and versions.
         fn test_default_mda_header() {
-            assert!(MDAHeader::default().to_buf()[4..].iter().all(|x| *x == 0u8));
+            let buf = MDAHeader::default().to_buf();
+
+            // First 4 bytes is CRC. Then:
+            assert!(buf[4..28].iter().all(|x| *x == 0u8));
+            assert_eq!(buf[28], STRAT_REGION_HDR_VERSION);
+            assert_eq!(buf[29], STRAT_METADATA_VERSION);
+            assert!(buf[30..].iter().all(|x| *x == 0u8));
         }
 
         #[test]
@@ -848,6 +894,7 @@ mod mda {
                     last_updated: Utc.timestamp(sec, nsec),
                     used: Bytes(data.len() as u64),
                     data_crc: crc32::checksum_castagnoli(&data),
+                    metadata_version: STRAT_METADATA_VERSION,
                 };
                 let buf = header.to_buf();
                 let mda1 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
@@ -875,6 +922,7 @@ mod mda {
                 last_updated: Utc::now(),
                 used: Bytes(data.len() as u64),
                 data_crc: crc32::checksum_castagnoli(&data),
+                metadata_version: STRAT_METADATA_VERSION,
             };
             let mut buf = header.to_buf();
             LittleEndian::write_u32(&mut buf[..4], 0u32);
@@ -891,6 +939,7 @@ mod mda {
                 last_updated: Utc::now(),
                 used: Bytes(data.len() as u64),
                 data_crc: crc32::checksum_castagnoli(&data),
+                metadata_version: STRAT_METADATA_VERSION,
             };
             let buf = header.to_buf();
             assert!(MDAHeader::from_buf(&buf, MDA_REGION_HDR_SIZE).is_err());

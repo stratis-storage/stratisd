@@ -200,11 +200,12 @@ impl Backstore {
     ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(ref mut cache_tier) => {
+                let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, paths)?;
+
                 let cache_device = self
                     .cache
                     .as_mut()
                     .expect("cache_tier.is_some() <=> self.cache.is_some()");
-                let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, paths)?;
 
                 if cache_change {
                     let table = map_to_dm(&cache_tier.cache_segments);
@@ -233,6 +234,13 @@ impl Backstore {
 
                 let cache_tier = CacheTier::new(bdm)?;
 
+                let uuids = cache_tier
+                    .block_mgr
+                    .blockdevs()
+                    .iter()
+                    .map(|&(uuid, _)| uuid)
+                    .collect::<Vec<_>>();
+
                 let linear = self.linear
                     .take()
                     .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.linear.is_some())");
@@ -240,13 +248,6 @@ impl Backstore {
                 let cache = make_cache(pool_uuid, &cache_tier, linear, true)?;
 
                 self.cache = Some(cache);
-
-                let uuids = cache_tier
-                    .block_mgr
-                    .blockdevs()
-                    .iter()
-                    .map(|&(uuid, _)| uuid)
-                    .collect::<Vec<_>>();
 
                 self.cache_tier = Some(cache_tier);
 

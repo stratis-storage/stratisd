@@ -1217,8 +1217,6 @@ mod tests {
 
     use devicemapper::{Bytes, SECTOR_SIZE};
 
-    use super::super::super::super::types::BlockDevTier;
-
     use super::super::super::backstore::MIN_MDA_SECTORS;
     use super::super::super::cmd;
     use super::super::super::device::SyncAll;
@@ -1304,9 +1302,7 @@ mod tests {
         cmd::udev_settle().unwrap();
 
         // Add block devices to the pool and run check() to extend
-        backstore
-            .add_blockdevs(pool_uuid, &remaining_paths, BlockDevTier::Data)
-            .unwrap();
+        backstore.add_datadevs(pool_uuid, &remaining_paths).unwrap();
         pool.check(pool_uuid, &mut backstore).unwrap();
         // Verify the pool is back in a Good state
         match pool.thin_pool.status(get_dm()).unwrap() {
@@ -1896,9 +1892,7 @@ mod tests {
         let old_device = backstore
             .device()
             .expect("Space already allocated from backstore, backstore must have device");
-        backstore
-            .add_blockdevs(pool_uuid, paths1, BlockDevTier::Cache)
-            .unwrap();
+        backstore.add_cachedevs(pool_uuid, paths1).unwrap();
         let new_device = backstore
             .device()
             .expect("Space already allocated from backstore, backstore must have device");

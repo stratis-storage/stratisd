@@ -41,7 +41,7 @@ use super::mdv::MetadataVol;
 use super::thinids::ThinDevIdPool;
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
-const DATA_LOWATER: DataBlocks = DataBlocks(512);
+const DATA_LOWATER: DataBlocks = DataBlocks(1024);
 const META_LOWATER_FALLBACK: MetaBlocks = MetaBlocks(512);
 
 const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
@@ -1628,7 +1628,13 @@ mod tests {
                 // Simulate handling a DM event by extending the pool when
                 // the amount of free space in pool has decreased to the
                 // DATA_LOWATER value.
-                if i == *(datablocks_to_sectors(INITIAL_DATA_SIZE - DATA_LOWATER)) {
+                let pool_increase_when = if INITIAL_DATA_SIZE > DATA_LOWATER {
+                    INITIAL_DATA_SIZE - DATA_LOWATER
+                } else {
+                    // Extend immediately
+                    DataBlocks(0)
+                };
+                if i == *(datablocks_to_sectors(pool_increase_when)) {
                     pool.extend_thin_data_device(
                         pool_uuid,
                         &mut backstore,

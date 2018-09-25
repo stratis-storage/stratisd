@@ -577,7 +577,6 @@ mod mda {
                 last_updated: *time,
                 used,
                 data_crc: crc32::checksum_castagnoli(data),
-                metadata_version: STRAT_METADATA_VERSION,
             };
             let hdr_buf = header.to_buf();
 
@@ -619,14 +618,6 @@ mod mda {
                 None => return Ok(None),
                 Some(ref mda) => mda,
             };
-
-            if mda.metadata_version != STRAT_METADATA_VERSION {
-                return Err(StratisError::Engine(
-                    ErrorEnum::Invalid,
-                    format!("Unknown metadata version: {}", mda.metadata_version),
-                ));
-            }
-
             let region_size = self.region_size.bytes();
 
             // Load the metadata region specified by index.
@@ -682,8 +673,6 @@ mod mda {
         used: Bytes,
 
         data_crc: u32,
-
-        metadata_version: u8,
     }
 
     // Implementing Default explicitly because DateTime<Utc> does not implement
@@ -694,7 +683,6 @@ mod mda {
                 last_updated: Utc.timestamp(0, 0),
                 used: Bytes(0),
                 data_crc: 0,
-                metadata_version: STRAT_METADATA_VERSION,
             }
         }
     }
@@ -726,6 +714,14 @@ mod mda {
                 ));
             }
 
+            let metadata_version = buf[29];
+            if metadata_version != STRAT_METADATA_VERSION {
+                return Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    format!("Unknown metadata version: {}", metadata_version),
+                ));
+            }
+
             match LittleEndian::read_u64(&buf[16..24]) {
                 0 => Ok(None),
                 secs => {
@@ -741,7 +737,6 @@ mod mda {
                         used,
                         last_updated: Utc.timestamp(secs as i64, nsecs),
                         data_crc: LittleEndian::read_u32(&buf[4..8]),
-                        metadata_version: buf[29],
                     }))
                 }
             }
@@ -758,7 +753,7 @@ mod mda {
             LittleEndian::write_u64(&mut buf[16..24], self.last_updated.timestamp() as u64);
             LittleEndian::write_u32(&mut buf[24..28], self.last_updated.timestamp_subsec_nanos());
             buf[28] = STRAT_REGION_HDR_VERSION;
-            buf[29] = self.metadata_version;
+            buf[29] = STRAT_METADATA_VERSION;
 
             let buf_crc = crc32::checksum_castagnoli(&buf[4.._MDA_REGION_HDR_SIZE]);
             LittleEndian::write_u32(&mut buf[..4], buf_crc);
@@ -894,7 +889,6 @@ mod mda {
                     last_updated: Utc.timestamp(sec, nsec),
                     used: Bytes(data.len() as u64),
                     data_crc: crc32::checksum_castagnoli(&data),
-                    metadata_version: STRAT_METADATA_VERSION,
                 };
                 let buf = header.to_buf();
                 let mda1 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
@@ -922,7 +916,6 @@ mod mda {
                 last_updated: Utc::now(),
                 used: Bytes(data.len() as u64),
                 data_crc: crc32::checksum_castagnoli(&data),
-                metadata_version: STRAT_METADATA_VERSION,
             };
             let mut buf = header.to_buf();
             LittleEndian::write_u32(&mut buf[..4], 0u32);
@@ -939,7 +932,6 @@ mod mda {
                 last_updated: Utc::now(),
                 used: Bytes(data.len() as u64),
                 data_crc: crc32::checksum_castagnoli(&data),
-                metadata_version: STRAT_METADATA_VERSION,
             };
             let buf = header.to_buf();
             assert!(MDAHeader::from_buf(&buf, MDA_REGION_HDR_SIZE).is_err());

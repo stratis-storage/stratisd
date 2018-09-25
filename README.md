@@ -48,7 +48,8 @@ language runtime.
 ### Issue tracking and Development
 
 Stratisd development uses GitHub issue tracking, and new development occurs via
-GitHub pull requests (PRs).
+GitHub pull requests (PRs). Patches or bug reports may also be sent to the
+mailing list, if preferred.
 
 ### Setting up for development
 

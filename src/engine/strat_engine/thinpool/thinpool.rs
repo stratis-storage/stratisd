@@ -1167,6 +1167,7 @@ mod tests {
     use super::super::super::super::types::BlockDevTier;
 
     use super::super::super::backstore::MIN_MDA_SECTORS;
+    use super::super::super::cmd;
     use super::super::super::tests::{loopbacked, real};
 
     use super::super::filesystem::{fs_usage, FILESYSTEM_LOWATER};
@@ -1181,8 +1182,7 @@ mod tests {
         devlinks::setup_dev_path().unwrap();
         devlinks::setup_devlinks(Vec::new().into_iter());
         let (first_path, remaining_paths) = paths.split_at(1);
-        let mut backstore =
-            Backstore::initialize(pool_uuid, &first_path, MIN_MDA_SECTORS, false).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, &first_path, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1238,9 +1238,17 @@ mod tests {
             }
             dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working/full."),
         };
+
+        // Clear anything that may be on the remaining paths to ensure we can add them
+        // to the pool
+        for p in remaining_paths {
+            wipe_sectors(p, Sectors(0), MIN_MDA_SECTORS).unwrap();
+        }
+        cmd::udev_settle().unwrap();
+
         // Add block devices to the pool and run check() to extend
         backstore
-            .add_blockdevs(pool_uuid, &remaining_paths, BlockDevTier::Data, true)
+            .add_blockdevs(pool_uuid, &remaining_paths, BlockDevTier::Data)
             .unwrap();
         pool.check(pool_uuid, &mut backstore).unwrap();
         // Verify the pool is back in a Good state
@@ -1279,8 +1287,7 @@ mod tests {
     fn test_filesystem_snapshot(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         devlinks::setup_devlinks(Vec::new().into_iter());
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1384,8 +1391,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         devlinks::setup_devlinks(Vec::new().into_iter());
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1431,8 +1437,7 @@ mod tests {
     fn test_pool_setup(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         devlinks::setup_devlinks(Vec::new().into_iter());
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1491,8 +1496,7 @@ mod tests {
     fn test_thindev_destroy(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
         devlinks::setup_devlinks(Vec::new().into_iter());
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1541,8 +1545,7 @@ mod tests {
     fn test_meta_expand(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
         let small_meta_size = MetaBlocks(16);
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
         // Create a ThinPool with a very small meta device.
         let mut thin_pool = ThinPool::new(
             pool_uuid,
@@ -1600,8 +1603,7 @@ mod tests {
     fn test_thinpool_expand(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
         devlinks::setup_devlinks(Vec::new().into_iter());
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1662,8 +1664,7 @@ mod tests {
     fn test_xfs_expand(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
         devlinks::setup_devlinks(Vec::new().into_iter());
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1736,8 +1737,7 @@ mod tests {
     fn test_suspend_resume(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         devlinks::setup_devlinks(Vec::new().into_iter());
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1783,8 +1783,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         devlinks::setup_devlinks(Vec::new().into_iter());
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths2, MIN_MDA_SECTORS, false).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths2, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1835,7 +1834,7 @@ mod tests {
             .device()
             .expect("Space already allocated from backstore, backstore must have device");
         backstore
-            .add_blockdevs(pool_uuid, paths1, BlockDevTier::Cache, false)
+            .add_blockdevs(pool_uuid, paths1, BlockDevTier::Cache)
             .unwrap();
         let new_device = backstore
             .device()

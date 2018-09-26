@@ -200,9 +200,6 @@ impl Backstore {
         paths: &[&Path],
         thin_pool: &mut ThinPool,
     ) -> StratisResult<Vec<DevUuid>> {
-        // If adding cache devices, must suspend the pool, since the cache
-        // must be augmeneted with the new devices.
-        thin_pool.suspend()?;
         let uuids = match self.cache_tier {
             Some(ref mut cache_tier) => {
                 let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, paths)?;
@@ -214,8 +211,10 @@ impl Backstore {
 
                 if cache_change {
                     let table = map_to_dm(&cache_tier.cache_segments);
+                    thin_pool.suspend()?;
                     cache_device.set_cache_table(get_dm(), table)?;
                     cache_device.resume(get_dm())?;
+                    thin_pool.resume()?;
                 }
 
                 // NOTE: currently CacheTier::add() does not ever update the
@@ -223,8 +222,10 @@ impl Backstore {
                 // when CacheTier::add() is fixed, this code will become live.
                 if meta_change {
                     let table = map_to_dm(&cache_tier.meta_segments);
+                    thin_pool.suspend()?;
                     cache_device.set_meta_table(get_dm(), table)?;
                     cache_device.resume(get_dm())?;
+                    thin_pool.resume()?;
                 }
 
                 uuids
@@ -250,7 +251,10 @@ impl Backstore {
                     .take()
                     .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.linear.is_some())");
 
+                thin_pool.suspend()?;
                 let cache = make_cache(pool_uuid, &cache_tier, linear, true)?;
+                thin_pool.set_device(cache.device())?;
+                thin_pool.resume()?;
 
                 self.cache = Some(cache);
 
@@ -259,8 +263,6 @@ impl Backstore {
                 uuids
             }
         };
-        thin_pool.set_device(self.device().expect("Since thin pool exists, space must have been allocated from the backstore, so backstore must have a cap device"))?;
-        thin_pool.resume()?;
 
         Ok(uuids)
     }

@@ -14,7 +14,8 @@ use std::{
 };
 
 use devicemapper::{
-    Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus, IEC,
+    Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinDevWorkingStatus,
+    ThinPoolDev, ThinStatus, IEC,
 };
 
 use libmount;
@@ -46,10 +47,36 @@ const TEMP_MNT_POINT_PREFIX: &str = "stratis_mp_";
 /// expansion check is triggered by crossing the data low water mark for the thin pool.
 pub const FILESYSTEM_LOWATER: Sectors = Sectors(4 * (DATA_LOWATER.0 * DATA_BLOCK_SIZE.0));
 
+/// Get ThinDevWorkingStatus. If ThinDevStatus is Fail, return an error.
+fn get_thindev_status(thindev: &ThinDev) -> StratisResult<ThinDevWorkingStatus> {
+    match thindev.status(get_dm())? {
+        ThinStatus::Error => {
+            let err_msg = format!(
+                "Devicemapper could not obtain the status for thin device with name {} device {} and devnode {}",
+                thindev.name(),
+                thindev.device(),
+                thindev.devnode().display(),
+            );
+            Err(StratisError::Error(err_msg))
+        }
+        ThinStatus::Fail => {
+            let err_msg = format!(
+                "Status of thin device with name {} device {} and devnode {} is Fail",
+                thindev.name(),
+                thindev.device(),
+                thindev.devnode().display(),
+            );
+            Err(StratisError::Error(err_msg))
+        }
+        ThinStatus::Working(w) => Ok(*w),
+    }
+}
+
 #[derive(Debug)]
 pub struct StratFilesystem {
     thin_dev: ThinDev,
     created: DateTime<Utc>,
+    thin_dev_status: ThinDevWorkingStatus,
     dbus_path: MaybeDbusPath,
 }
 
@@ -97,11 +124,14 @@ impl StratFilesystem {
             return Err(err);
         }
 
+        let thin_dev_status = get_thindev_status(&thin_dev)?;
+
         Ok((
             fs_uuid,
             StratFilesystem {
                 thin_dev,
                 created: Utc::now(),
+                thin_dev_status,
                 dbus_path: MaybeDbusPath(None),
             },
         ))
@@ -122,9 +152,13 @@ impl StratFilesystem {
             &thinpool_dev,
             fssave.thin_id,
         )?;
+
+        let thin_dev_status = get_thindev_status(&thin_dev)?;
+
         Ok(StratFilesystem {
             thin_dev,
             created: Utc.timestamp(fssave.created as i64, 0),
+            thin_dev_status,
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -180,9 +214,12 @@ impl StratFilesystem {
                 }
 
                 set_uuid(&thin_dev.devnode(), snapshot_fs_uuid)?;
+
+                let thin_dev_status = get_thindev_status(&thin_dev)?;
                 Ok(StratFilesystem {
                     thin_dev,
                     created: Utc::now(),
+                    thin_dev_status,
                     dbus_path: MaybeDbusPath(None),
                 })
             }
@@ -200,7 +237,8 @@ impl StratFilesystem {
     /// TODO: deal with the thindev in a Fail state.
     pub fn check(&mut self) -> StratisResult<(FilesystemStatus, bool)> {
         match self.thin_dev.status(get_dm())? {
-            ThinStatus::Working(_) => {
+            ThinStatus::Working(w) => {
+                self.thin_dev_status = *w;
                 if let Some(mount_point) = self.mount_points()?.first() {
                     let (fs_total_bytes, fs_total_used_bytes) = fs_usage(&mount_point)?;
                     let free_bytes = fs_total_bytes - fs_total_used_bytes;
@@ -314,20 +352,7 @@ impl Filesystem for StratFilesystem {
     }
 
     fn used(&self) -> StratisResult<Bytes> {
-        match self.thin_dev.status(get_dm())? {
-            ThinStatus::Working(wk_status) => Ok(wk_status.nr_mapped_sectors.bytes()),
-            ThinStatus::Error => {
-                let error_msg = format!(
-                    "Unable to get status for filesystem thin device {}",
-                    self.thin_dev.device()
-                );
-                Err(StratisError::Engine(ErrorEnum::Error, error_msg))
-            }
-            ThinStatus::Fail => {
-                let error_msg = format!("ThinDev {} is in a failed state", self.thin_dev.device());
-                Err(StratisError::Engine(ErrorEnum::Error, error_msg))
-            }
-        }
+        Ok(self.thin_dev_status.nr_mapped_sectors.bytes())
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {

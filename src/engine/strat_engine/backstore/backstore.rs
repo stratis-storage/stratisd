@@ -40,14 +40,13 @@ use crate::{
 /// typical size.
 const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
 
-/// Make a DM cache device. If the cache device is being made new,
-/// take extra steps to make it clean.
-fn make_cache(
+/// Make some cache component devices. If the meta device is new, wipe it.
+/// Return the meta device and the cache device, in that order.
+fn make_cache_components(
     pool_uuid: PoolUuid,
     cache_tier: &CacheTier,
-    origin: LinearDev,
     new: bool,
-) -> StratisResult<CacheDev> {
+) -> StratisResult<(LinearDev, LinearDev)> {
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::MetaSub);
     let meta = LinearDev::setup(
         get_dm(),
@@ -73,6 +72,16 @@ fn make_cache(
         map_to_dm(&cache_tier.cache_segments),
     )?;
 
+    Ok((meta, cache))
+}
+
+/// Make a DM cache device from components.
+fn make_cache(
+    pool_uuid: PoolUuid,
+    origin: LinearDev,
+    meta: LinearDev,
+    cache: LinearDev,
+) -> StratisResult<CacheDev> {
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
     Ok(CacheDev::setup(
         get_dm(),
@@ -139,7 +148,8 @@ impl Backstore {
                 Some(ref cache_tier_save) => {
                     let cache_tier = CacheTier::setup(block_mgr, &cache_tier_save)?;
 
-                    let cache_device = make_cache(pool_uuid, &cache_tier, origin, false)?;
+                    let (meta, cache) = make_cache_components(pool_uuid, &cache_tier, false)?;
+                    let cache_device = make_cache(pool_uuid, origin, meta, cache)?;
                     (Some(cache_tier), Some(cache_device), None)
                 }
                 None => {
@@ -251,8 +261,9 @@ impl Backstore {
                     .take()
                     .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.linear.is_some())");
 
+                let (meta, cache) = make_cache_components(pool_uuid, &cache_tier, true)?;
                 thin_pool.suspend()?;
-                let cache = make_cache(pool_uuid, &cache_tier, linear, true)?;
+                let cache = make_cache(pool_uuid, linear, meta, cache)?;
                 thin_pool.set_device(cache.device())?;
                 thin_pool.resume()?;
 

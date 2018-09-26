@@ -194,7 +194,6 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> Meth
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let force: bool = get_next_arg(&mut iter, 0)?;
     let devs: Array<&str, _> = get_next_arg(&mut iter, 1)?;
 
     let dbus_context = m.tree.get_data();
@@ -212,7 +211,7 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> Meth
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
-    let result = pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, tier, force);
+    let result = pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, tier);
     let msg = match result {
         Ok(uuids) => {
             let return_value = uuids
@@ -391,14 +390,12 @@ pub fn create_dbus_pool<'a>(
         .out_arg(("return_string", "s"));
 
     let add_blockdevs_method = f.method("AddDataDevs", (), add_datadevs)
-        .in_arg(("force", "b"))
         .in_arg(("devices", "as"))
         .out_arg(("results", "ao"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
     let add_cachedevs_method = f.method("AddCacheDevs", (), add_cachedevs)
-        .in_arg(("force", "b"))
         .in_arg(("devices", "as"))
         .out_arg(("results", "ao"))
         .out_arg(("return_code", "q"))

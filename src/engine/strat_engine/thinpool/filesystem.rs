@@ -61,7 +61,7 @@ impl StratFilesystem {
     ) -> StratisResult<(FilesystemUuid, StratFilesystem)> {
         let fs_uuid = Uuid::new_v4();
         let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
-        let thin_dev = ThinDev::new(
+        let mut thin_dev = ThinDev::new(
             get_dm(),
             &dm_name,
             Some(&dm_uuid),
@@ -70,7 +70,11 @@ impl StratFilesystem {
             id,
         )?;
 
-        create_fs(&thin_dev.devnode(), fs_uuid)?;
+        if let Err(err) = create_fs(&thin_dev.devnode(), fs_uuid) {
+            thin_dev.destroy(get_dm(), thinpool_dev)?;
+            return Err(err);
+        }
+
         Ok((
             fs_uuid,
             StratFilesystem {

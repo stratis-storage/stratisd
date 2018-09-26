@@ -220,6 +220,22 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
+            &EngineEvent::PoolExtendStateChanged { dbus_path, state } => {
+                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+                    prop_changed_dispatch(
+                        &self.dbus_conn.borrow(),
+                        consts::POOL_EXTEND_STATE_PROP,
+                        state.to_dbus_value(),
+                        &dbus_path,
+                    ).unwrap_or_else(|()| {
+                        error!(
+                            "PoolExtendStateChanged: {} state: {} failed to send dbus update.",
+                            dbus_path,
+                            state.to_dbus_value(),
+                        );
+                    });
+                }
+            }
             &EngineEvent::PoolRenamed {
                 dbus_path,
                 from,
@@ -235,6 +251,22 @@ impl EngineListener for EventHandler {
                         error!(
                             "PoolRenamed: {} from: {} to: {} failed to send dbus update.",
                             dbus_path, from, to,
+                        );
+                    });
+                }
+            }
+            &EngineEvent::PoolSpaceStateChanged { dbus_path, state } => {
+                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+                    prop_changed_dispatch(
+                        &self.dbus_conn.borrow(),
+                        consts::POOL_SPACE_STATE_PROP,
+                        state.to_dbus_value(),
+                        &dbus_path,
+                    ).unwrap_or_else(|()| {
+                        error!(
+                            "PoolSpaceStateChanged: {} state: {} failed to send dbus update.",
+                            dbus_path,
+                            state.to_dbus_value(),
                         );
                     });
                 }

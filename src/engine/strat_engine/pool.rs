@@ -314,7 +314,9 @@ impl Pool for StratPool {
             // If adding cache devices, must suspend the pool, since the cache
             // must be augmeneted with the new devices.
             self.thin_pool.suspend()?;
-            let bdev_info = self.backstore.add_cachedevs(pool_uuid, paths)?;
+            let bdev_info = self
+                .backstore
+                .add_cachedevs(pool_uuid, paths, &self.thin_pool)?;
             self.thin_pool.set_device(self.backstore.device().expect("Since thin pool exists, space must have been allocated from the backstore, so backstore must have a cap device"))?;
             self.thin_pool.resume()?;
             Ok(bdev_info)

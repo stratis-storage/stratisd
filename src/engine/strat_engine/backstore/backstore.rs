@@ -29,6 +29,7 @@ use crate::{
             dm::get_dm,
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, Recordable},
+            thinpool::ThinPool,
         },
         BlockDevTier, DevUuid, PoolUuid,
     },
@@ -197,6 +198,7 @@ impl Backstore {
         &mut self,
         pool_uuid: PoolUuid,
         paths: &[&Path],
+        _thin_pool: &ThinPool,
     ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(ref mut cache_tier) => {
@@ -586,17 +588,14 @@ impl Recordable<BackstoreSave> for Backstore {
 mod tests {
     use uuid::Uuid;
 
-    use devicemapper::{CacheDevStatus, DataBlocks, IEC};
+    use devicemapper::IEC;
 
     use crate::engine::strat_engine::{
-        backstore::find_all,
         cmd,
         tests::{loopbacked, real},
     };
 
     use super::*;
-
-    const INITIAL_BACKSTORE_ALLOCATION: Sectors = CACHE_BLOCK_SIZE;
 
     /// Assert some invariants of the backstore
     /// * backstore.cache_tier.is_some() <=> backstore.cache.is_some() &&
@@ -621,107 +620,6 @@ mod tests {
             }
         );
         assert!(backstore.next <= backstore.size())
-    }
-
-    /// Test adding cachedevs to the backstore.
-    /// When cachedevs are added, cache tier, etc. must exist.
-    /// Nonetheless, because nothing is written or read, cache usage ought
-    /// to be 0. Adding some more cachedevs exercises different code path
-    /// from adding initial cachedevs.
-    fn test_add_cache_devs(paths: &[&Path]) {
-        assert!(paths.len() > 3);
-
-        let meta_size = Sectors(IEC::Mi);
-
-        let (initcachepaths, paths) = paths.split_at(1);
-        let (cachedevpaths, paths) = paths.split_at(1);
-        let (datadevpaths, initdatapaths) = paths.split_at(1);
-
-        let pool_uuid = Uuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::default()).unwrap();
-
-        invariant(&backstore);
-
-        // Allocate space from the backstore so that the cap device is made.
-        backstore
-            .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
-            .unwrap();
-
-        let cache_uuids = backstore.add_cachedevs(pool_uuid, initcachepaths).unwrap();
-
-        invariant(&backstore);
-
-        assert_eq!(cache_uuids.len(), initcachepaths.len());
-        assert_matches!(backstore.linear, None);
-
-        let cache_status = backstore
-            .cache
-            .as_ref()
-            .map(|c| c.status(get_dm()).unwrap())
-            .unwrap();
-
-        match cache_status {
-            CacheDevStatus::Working(status) => {
-                let usage = &status.usage;
-                assert_eq!(usage.used_cache, DataBlocks(0));
-                assert_eq!(usage.total_meta, meta_size.metablocks());
-                assert!(usage.total_cache > DataBlocks(0));
-            }
-            CacheDevStatus::Error => panic!("cache status could not be obtained"),
-            CacheDevStatus::Fail => panic!("cache is in a failed state"),
-        }
-
-        let data_uuids = backstore.add_datadevs(pool_uuid, datadevpaths).unwrap();
-        invariant(&backstore);
-        assert_eq!(data_uuids.len(), datadevpaths.len());
-
-        let cache_uuids = backstore.add_cachedevs(pool_uuid, cachedevpaths).unwrap();
-        invariant(&backstore);
-        assert_eq!(cache_uuids.len(), cachedevpaths.len());
-
-        let cache_status = backstore
-            .cache
-            .as_ref()
-            .map(|c| c.status(get_dm()).unwrap())
-            .unwrap();
-
-        match cache_status {
-            CacheDevStatus::Working(status) => {
-                let usage = &status.usage;
-                assert_eq!(usage.used_cache, DataBlocks(0));
-                assert_eq!(usage.total_meta, meta_size.metablocks());
-                assert!(usage.total_cache > DataBlocks(0));
-            }
-            CacheDevStatus::Error => panic!("cache status could not be obtained"),
-            CacheDevStatus::Fail => panic!("cache is in a failed state"),
-        }
-
-        backstore.destroy().unwrap();
-    }
-
-    #[test]
-    pub fn loop_test_add_cache_devs() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(4, 5, None),
-            test_add_cache_devs,
-        );
-    }
-
-    #[test]
-    pub fn real_test_add_cache_devs() {
-        real::test_with_spec(
-            &real::DeviceLimits::AtLeast(4, None, None),
-            test_add_cache_devs,
-        );
-    }
-
-    #[test]
-    pub fn travis_test_add_cache_devs() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(4, 5, None),
-            test_add_cache_devs,
-        );
     }
 
     /// Create a backstore.
@@ -785,77 +683,5 @@ mod tests {
     #[test]
     pub fn travis_test_request() {
         loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_request);
-    }
-
-    /// Create a backstore with a cache.
-    /// Setup the same backstore, should succeed.
-    /// Verify that blockdev metadatas are the same for the backstores.
-    /// Tear down the backstore.
-    /// Setup the same backstore again.
-    /// Verify blockdev metadata again.
-    /// Destroy all.
-    fn test_setup(paths: &[&Path]) {
-        assert!(paths.len() > 1);
-
-        let (paths1, paths2) = paths.split_at(paths.len() / 2);
-
-        let pool_uuid = Uuid::new_v4();
-
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths1, MDADataSize::default()).unwrap();
-        invariant(&backstore);
-
-        // Allocate space from the backstore so that the cap device is made.
-        backstore
-            .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
-            .unwrap();
-
-        let old_device = backstore.device();
-
-        backstore.add_cachedevs(pool_uuid, paths2).unwrap();
-        invariant(&backstore);
-
-        assert_ne!(backstore.device(), old_device);
-
-        let backstore_save = backstore.record();
-
-        cmd::udev_settle().unwrap();
-        let map = find_all().unwrap();
-        let map = &map[&pool_uuid];
-        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
-        invariant(&backstore);
-
-        let backstore_save2 = backstore.record();
-        assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
-        assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
-
-        backstore.teardown().unwrap();
-
-        cmd::udev_settle().unwrap();
-        let map = find_all().unwrap();
-        let map = &map[&pool_uuid];
-        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
-        invariant(&backstore);
-
-        let backstore_save2 = backstore.record();
-        assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
-        assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
-
-        backstore.destroy().unwrap();
-    }
-
-    #[test]
-    pub fn loop_test_setup() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
-    }
-
-    #[test]
-    pub fn real_test_setup() {
-        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_setup);
-    }
-
-    #[test]
-    pub fn travis_test_setup() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
     }
 }

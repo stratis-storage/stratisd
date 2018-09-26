@@ -35,7 +35,6 @@ SPECS = {
 <method name="CreatePool">
 <arg name="name" type="s" direction="in"/>
 <arg name="redundancy" type="(bq)" direction="in"/>
-<arg name="force" type="b" direction="in"/>
 <arg name="devices" type="as" direction="in"/>
 <arg name="result" type="(oao)" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>
@@ -56,14 +55,12 @@ SPECS = {
     """
 <interface name="org.storage.stratis1.pool">
 <method name="AddCacheDevs">
-<arg name="force" type="b" direction="in"/>
 <arg name="devices" type="as" direction="in"/>
 <arg name="results" type="ao" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
 </method>
 <method name="AddDataDevs">
-<arg name="force" type="b" direction="in"/>
 <arg name="devices" type="as" direction="in"/>
 <arg name="results" type="ao" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>

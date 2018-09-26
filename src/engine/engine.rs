@@ -32,7 +32,7 @@ pub trait Filesystem: Debug {
     fn created(&self) -> DateTime<Utc>;
 
     /// The amount of data stored on the filesystem, including overhead.
-    fn used(&self) -> StratisResult<Bytes>;
+    fn used(&self) -> Bytes;
 
     /// Set dbus path associated with the Pool.
     fn set_dbus_path(&mut self, path: MaybeDbusPath) -> ();

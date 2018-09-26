@@ -116,7 +116,8 @@ To run the safe unit tests:
 $ make test
 ```
 
-For a description of the unsafe unit tests, necessary setup steps, and how to run them, see `tests/README.md`.
+For a description of the unsafe unit tests, necessary setup steps, and how to
+run them, see [`tests/README.md`](tests/README.md).
 
 ## Licensing
 

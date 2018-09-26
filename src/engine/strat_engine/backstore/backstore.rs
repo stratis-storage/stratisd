@@ -736,6 +736,8 @@ mod tests {
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
 
+        invariant(&backstore);
+
         assert_matches!(
             backstore
                 .request(pool_uuid, Sectors(IEC::Ki), Sectors(IEC::Mi))
@@ -758,6 +760,7 @@ mod tests {
         let new_request = backstore
             .request(pool_uuid, request, Sectors(IEC::Ki))
             .unwrap();
+        invariant(&backstore);
 
         // Either there is nothing left to allocate or there is some, but it
         // is less than length.  If what is allocated now is more than length

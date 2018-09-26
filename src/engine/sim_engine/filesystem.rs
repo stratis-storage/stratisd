@@ -44,7 +44,7 @@ impl Filesystem for SimFilesystem {
     }
 
     fn used(&self) -> StratisResult<Bytes> {
-        Ok(Bytes(12345678))
+        Ok(Bytes(12_345_678))
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {

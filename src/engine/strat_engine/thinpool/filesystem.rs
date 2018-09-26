@@ -351,8 +351,8 @@ impl Filesystem for StratFilesystem {
         self.created
     }
 
-    fn used(&self) -> StratisResult<Bytes> {
-        Ok(self.thin_dev_status.nr_mapped_sectors.bytes())
+    fn used(&self) -> Bytes {
+        self.thin_dev_status.nr_mapped_sectors.bytes()
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {

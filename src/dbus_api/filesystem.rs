@@ -232,9 +232,5 @@ fn get_filesystem_used(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_filesystem_property(i, p, |(_, _, fs)| {
-        fs.used()
-            .map(|v| (*v).to_string())
-            .map_err(|_| MethodErr::failed(&"fs used() engine call failed".to_owned()))
-    })
+    get_filesystem_property(i, p, |(_, _, fs)| Ok((*fs.used()).to_string()))
 }

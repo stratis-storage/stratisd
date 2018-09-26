@@ -14,8 +14,8 @@ use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::types::{
-    BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolState, PoolUuid, Redundancy,
-    RenameAction,
+    BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState,
+    PoolState, PoolUuid, Redundancy, RenameAction,
 };
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -418,6 +418,14 @@ impl Pool for StratPool {
 
     fn state(&self) -> PoolState {
         self.thin_pool.state()
+    }
+
+    fn extend_state(&self) -> PoolExtendState {
+        self.thin_pool.extend_state()
+    }
+
+    fn free_space_state(&self) -> FreeSpaceState {
+        self.thin_pool.free_space_state()
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {

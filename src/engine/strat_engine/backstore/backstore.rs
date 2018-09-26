@@ -198,9 +198,12 @@ impl Backstore {
         &mut self,
         pool_uuid: PoolUuid,
         paths: &[&Path],
-        _thin_pool: &ThinPool,
+        thin_pool: &mut ThinPool,
     ) -> StratisResult<Vec<DevUuid>> {
-        match self.cache_tier {
+        // If adding cache devices, must suspend the pool, since the cache
+        // must be augmeneted with the new devices.
+        thin_pool.suspend()?;
+        let uuids = match self.cache_tier {
             Some(ref mut cache_tier) => {
                 let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, paths)?;
 
@@ -224,7 +227,7 @@ impl Backstore {
                     cache_device.resume(get_dm())?;
                 }
 
-                Ok(uuids)
+                uuids
             }
             None => {
                 // Note that variable length metadata is not stored on the
@@ -253,9 +256,13 @@ impl Backstore {
 
                 self.cache_tier = Some(cache_tier);
 
-                Ok(uuids)
+                uuids
             }
-        }
+        };
+        thin_pool.set_device(self.device().expect("Since thin pool exists, space must have been allocated from the backstore, so backstore must have a cap device"))?;
+        thin_pool.resume()?;
+
+        Ok(uuids)
     }
 
     /// Add datadevs to the backstore. The data tier always exists if the

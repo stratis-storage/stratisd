@@ -47,7 +47,9 @@ matrix:
           env: TASK=test-travis TARGET=x86_64-unknown-linux-gnu
           sudo: required
         # Run clippy, Rust linter, on src tree only
-        - rust: nightly
+        - rust: stable
+          before_script:
+              - rustup component add clippy-preview
           env: TASK=clippy TARGET=x86_64-unknown-linux-gnu
         # Run pylint, Python linter, on any Python test code
         - language: python

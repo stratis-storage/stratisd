@@ -184,7 +184,7 @@ impl EngineListener for EventHandler {
     fn notify(&self, event: &EngineEvent) {
         match *event {
             EngineEvent::BlockdevStateChanged { dbus_path, state } => {
-                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::BLOCKDEV_STATE_PROP,
@@ -204,7 +204,7 @@ impl EngineListener for EventHandler {
                 from,
                 to,
             } => {
-                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::FILESYSTEM_NAME_PROP,
@@ -219,7 +219,7 @@ impl EngineListener for EventHandler {
                 }
             }
             EngineEvent::PoolExtendStateChanged { dbus_path, state } => {
-                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::POOL_EXTEND_STATE_PROP,
@@ -239,7 +239,7 @@ impl EngineListener for EventHandler {
                 from,
                 to,
             } => {
-                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::POOL_NAME_PROP,
@@ -254,7 +254,7 @@ impl EngineListener for EventHandler {
                 }
             }
             EngineEvent::PoolSpaceStateChanged { dbus_path, state } => {
-                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::POOL_SPACE_STATE_PROP,
@@ -270,7 +270,7 @@ impl EngineListener for EventHandler {
                 }
             }
             EngineEvent::PoolStateChanged { dbus_path, state } => {
-                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::POOL_STATE_PROP,

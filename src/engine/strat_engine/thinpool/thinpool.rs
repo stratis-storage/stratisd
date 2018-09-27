@@ -657,10 +657,12 @@ impl ThinPool {
         let overall_used_pct = used_pct(*used, *used + *available);
         info!("Data tier percent used: {}", overall_used_pct);
 
-        let new_state = match overall_used_pct {
-            0...SPACE_WARN_PCT => FreeSpaceState::Good,
-            SPACE_WARN_PCT...SPACE_CRIT_PCT => FreeSpaceState::Warn,
-            _ => FreeSpaceState::Crit,
+        let new_state = if overall_used_pct < SPACE_WARN_PCT {
+            FreeSpaceState::Good
+        } else if overall_used_pct < SPACE_CRIT_PCT {
+            FreeSpaceState::Warn
+        } else {
+            FreeSpaceState::Crit
         };
 
         self.set_free_space_state(new_state);

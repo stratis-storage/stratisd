@@ -175,9 +175,7 @@ struct EventHandler {
 #[cfg(feature = "dbus_enabled")]
 impl EventHandler {
     pub fn new(dbus_conn: Rc<RefCell<Connection>>) -> EventHandler {
-        EventHandler {
-            dbus_conn: dbus_conn,
-        }
+        EventHandler { dbus_conn }
     }
 }
 
@@ -381,7 +379,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     tfd.set_state(
         TimerState::Periodic {
             current: interval,
-            interval: interval,
+            interval,
         },
         SetTimeFlags::Default,
     );

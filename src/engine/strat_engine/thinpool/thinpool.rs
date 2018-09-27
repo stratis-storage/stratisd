@@ -609,7 +609,7 @@ impl ThinPool {
 
     fn set_extend_state(&mut self, data_extend_failed: bool, meta_extend_failed: bool) {
         let mut new_state = PoolExtendState::Good;
-        if data_extend_failed == true && meta_extend_failed == true {
+        if data_extend_failed && meta_extend_failed {
             new_state = PoolExtendState::MetaAndDataFailed
         } else if data_extend_failed {
             new_state = PoolExtendState::DataFailed;

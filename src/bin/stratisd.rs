@@ -182,8 +182,8 @@ impl EventHandler {
 #[cfg(feature = "dbus_enabled")]
 impl EngineListener for EventHandler {
     fn notify(&self, event: &EngineEvent) {
-        match event {
-            &EngineEvent::BlockdevStateChanged { dbus_path, state } => {
+        match *event {
+            EngineEvent::BlockdevStateChanged { dbus_path, state } => {
                 if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
@@ -199,7 +199,7 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
-            &EngineEvent::FilesystemRenamed {
+            EngineEvent::FilesystemRenamed {
                 dbus_path,
                 from,
                 to,
@@ -208,7 +208,7 @@ impl EngineListener for EventHandler {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::FILESYSTEM_NAME_PROP,
-                        to.to_owned(),
+                        to.to_string(),
                         &dbus_path,
                     ).unwrap_or_else(|()| {
                         error!(
@@ -218,7 +218,7 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
-            &EngineEvent::PoolExtendStateChanged { dbus_path, state } => {
+            EngineEvent::PoolExtendStateChanged { dbus_path, state } => {
                 if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
@@ -234,7 +234,7 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
-            &EngineEvent::PoolRenamed {
+            EngineEvent::PoolRenamed {
                 dbus_path,
                 from,
                 to,
@@ -243,7 +243,7 @@ impl EngineListener for EventHandler {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::POOL_NAME_PROP,
-                        to.to_owned(),
+                        to.to_string(),
                         &dbus_path,
                     ).unwrap_or_else(|()| {
                         error!(
@@ -253,7 +253,7 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
-            &EngineEvent::PoolSpaceStateChanged { dbus_path, state } => {
+            EngineEvent::PoolSpaceStateChanged { dbus_path, state } => {
                 if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
@@ -269,7 +269,7 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
-            &EngineEvent::PoolStateChanged { dbus_path, state } => {
+            EngineEvent::PoolStateChanged { dbus_path, state } => {
                 if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),

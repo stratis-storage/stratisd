@@ -534,35 +534,32 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                         .iter()
                         .map(|w| w.to_pollfd()),
                 );
-            } else {
-                // See if we can bring up dbus.
-                if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
-                    info!("DBUS API is now available");
-                    let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
-                    get_engine_listener_list_mut().register_listener(event_handler);
-                    // Register all the pools with dbus
-                    for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
-                        libstratis::dbus_api::register_pool(
-                            &handle.connection.borrow(),
-                            &handle.context,
-                            &mut handle.tree,
-                            pool_uuid,
-                            pool,
-                            &handle.path,
-                        )?;
-                    }
-
-                    // Add dbus FD to fds as dbus is now available.
-                    fds.extend(
-                        handle
-                            .connection
-                            .borrow()
-                            .watch_fds()
-                            .iter()
-                            .map(|w| w.to_pollfd()),
-                    );
-                    dbus_handle = Some(handle);
+            } else if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
+                info!("DBUS API is now available");
+                let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
+                get_engine_listener_list_mut().register_listener(event_handler);
+                // Register all the pools with dbus
+                for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
+                    libstratis::dbus_api::register_pool(
+                        &handle.connection.borrow(),
+                        &handle.context,
+                        &mut handle.tree,
+                        pool_uuid,
+                        pool,
+                        &handle.path,
+                    )?;
                 }
+
+                // Add dbus FD to fds as dbus is now available.
+                fds.extend(
+                    handle
+                        .connection
+                        .borrow()
+                        .watch_fds()
+                        .iter()
+                        .map(|w| w.to_pollfd()),
+                );
+                dbus_handle = Some(handle);
             }
         }
 

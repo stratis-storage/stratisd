@@ -117,6 +117,16 @@ impl MetadataVol {
         Ok(mdv)
     }
 
+    /// Sync the specified directory
+    fn sync_dir(dir: &Path) -> StratisResult<()> {
+        // According to https://lwn.net/Articles/457667/ we also need to sync the containing
+        // directory
+
+        let d = OpenOptions::new().read(true).create(false).open(dir)?;
+        d.sync_all()?;
+        Ok(())
+    }
+
     /// Save info on a new filesystem to persistent storage, or update
     /// the existing info on a filesystem.
     // Write to a temp file and then rename to actual filename, to
@@ -152,6 +162,8 @@ impl MetadataVol {
 
         rename(temp_path, path)?;
 
+        MetadataVol::sync_dir(&self.mount_pt.join(FILESYSTEM_DIR))?;
+
         Ok(())
     }
 
@@ -169,6 +181,8 @@ impl MetadataVol {
                 return Err(From::from(err));
             }
         }
+
+        MetadataVol::sync_dir(&self.mount_pt.join(FILESYSTEM_DIR))?;
 
         Ok(())
     }

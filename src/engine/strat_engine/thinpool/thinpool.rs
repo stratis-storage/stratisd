@@ -6,6 +6,7 @@
 
 use std;
 use std::borrow::BorrowMut;
+use std::cmp::min;
 
 use uuid::Uuid;
 
@@ -278,7 +279,15 @@ impl ThinPool {
             Some(&dm_uuid),
             segs_to_table(backstore_device, &[meta_segments]),
         )?;
-        wipe_sectors(&meta_dev.devnode(), Sectors(0), meta_dev.size())?;
+
+        // Wipe the first 4 KiB, i.e. 8 sectors as recommended in kernel DM
+        // docs: device-mapper/thin-provisioning.txt: Setting up a fresh
+        // pool device.
+        wipe_sectors(
+            &meta_dev.devnode(),
+            Sectors(0),
+            min(Sectors(8), meta_dev.size()),
+        )?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinData);
         let data_dev = LinearDev::setup(

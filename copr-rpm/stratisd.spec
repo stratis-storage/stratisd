@@ -1,6 +1,7 @@
-%define build_timestamp %{lua: print(os.date("%Y%m%d%H%M"))}
+%global build_timestamp %{lua: print(os.date("%Y%m%d%H%M"))}
+%global oname stratisd
 
-Name:           stratisd
+Name:           stratisd-prerelease
 License:        MPL 2.0
 Group:          System Environment/Libraries
 Summary:        A daemon that manages block devices to create filesystems
@@ -16,11 +17,13 @@ BuildRequires:  systemd
 Requires:       xfsprogs
 Requires:       device-mapper-persistent-data
 
+Conflicts: stratisd
+
 %description
 A daemon that manages block devices to create filesystems.
 
 %prep
-%autosetup -n %{name}-master
+%autosetup -n %{oname}-master
 # %cargo_prep
 
 %build

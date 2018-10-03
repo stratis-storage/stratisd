@@ -7,7 +7,7 @@ Summary:        A daemon that manages block devices to create filesystems
 Version:        1.0.99
 Release:        1.%{build_timestamp}%{?dist}
 URL:            https://github.com/stratis-storage/stratisd
-Source0:        %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
+Source0:        %{url}/archive/master.tar.gz
 BuildRequires:  rust cargo dbus-devel systemd-devel
 BuildRequires:  %{_bindir}/a2x
 BuildRequires:  systemd

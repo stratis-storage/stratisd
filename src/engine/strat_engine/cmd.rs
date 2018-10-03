@@ -40,7 +40,7 @@ fn find_binary(name: &str) -> Option<PathBuf> {
 const MKFS_XFS: &str = "mkfs.xfs";
 const THIN_CHECK: &str = "thin_check";
 const THIN_REPAIR: &str = "thin_repair";
-const XFS_ADMIN: &str = "xfs_admin";
+const XFS_DB: &str = "xfs_db";
 const XFS_GROWFS: &str = "xfs_growfs";
 
 lazy_static! {
@@ -48,7 +48,7 @@ lazy_static! {
         (MKFS_XFS.to_string(), find_binary(MKFS_XFS)),
         (THIN_CHECK.to_string(), find_binary(THIN_CHECK)),
         (THIN_REPAIR.to_string(), find_binary(THIN_REPAIR)),
-        (XFS_ADMIN.to_string(), find_binary(XFS_ADMIN)),
+        (XFS_DB.to_string(), find_binary(XFS_DB)),
         (XFS_GROWFS.to_string(), find_binary(XFS_GROWFS)),
     ].iter()
         .cloned()
@@ -127,9 +127,8 @@ pub fn xfs_growfs(mount_point: &Path) -> StratisResult<()> {
 /// Set a new UUID for filesystem on the devnode.
 pub fn set_uuid(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
     execute_cmd(
-        Command::new(get_executable(XFS_ADMIN).as_os_str())
-            .arg("-U")
-            .arg(format!("{}", uuid))
+        Command::new(get_executable(XFS_DB).as_os_str())
+            .arg(format!("-c uuid {}", uuid))
             .arg(&devnode),
     )
 }

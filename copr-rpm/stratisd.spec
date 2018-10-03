@@ -20,7 +20,7 @@ Requires:       device-mapper-persistent-data
 A daemon that manages block devices to create filesystems.
 
 %prep
-%autosetup
+%autosetup -n %{name}-master
 # %cargo_prep
 
 %build

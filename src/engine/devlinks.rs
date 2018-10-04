@@ -32,7 +32,7 @@ pub fn setup_dev_path() -> StratisResult<()> {
 // Don't just remove and recreate everything in case there are processes
 // (e.g. user shells) with the current working directory within the tree.
 pub fn setup_pool_devlinks(pool_name: &str, pool: &Pool) -> () {
-    match || -> StratisResult<()> {
+    if let Err(err) = || -> StratisResult<()> {
         let pool_path = pool_directory(pool_name);
 
         if !pool_path.exists() {
@@ -56,14 +56,10 @@ pub fn setup_pool_devlinks(pool_name: &str, pool: &Pool) -> () {
 
         Ok(())
     }() {
-        Err(e) => {
-            warn!(
-                "setup_pool_devlinks failed for /dev/stratis/{}, reason {:?}",
-                pool_name, e
-            );
-            ()
-        }
-        Ok(_) => (),
+        warn!(
+            "setup_pool_devlinks failed for /dev/stratis/{}, reason {:?}",
+            pool_name, err
+        );
     };
 }
 
@@ -73,7 +69,7 @@ pub fn setup_pool_devlinks(pool_name: &str, pool: &Pool) -> () {
 // Don't just remove and recreate everything in case there are processes
 // (e.g. user shells) with the current working directory within the tree.
 pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>(pools: I) -> () {
-    match || -> StratisResult<()> {
+    if let Err(err) = || -> StratisResult<()> {
         let mut existing_dirs = fs::read_dir(DEV_PATH)?
             .map(|dir_e| {
                 dir_e.and_then(|d| Ok(d.file_name().into_string().expect("Unix is utf-8")))
@@ -91,12 +87,8 @@ pub fn setup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>(po
 
         Ok(())
     }() {
-        Err(e) => {
-            warn!("setup_devlinks failed, reason {:?}", e);
-            ()
-        }
-        Ok(_) => (),
-    };
+        warn!("setup_devlinks failed, reason {:?}", err);
+    }
 }
 
 /// Create a directory when a pool is added.

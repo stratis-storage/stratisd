@@ -41,8 +41,8 @@ pub enum PoolState {
 }
 
 impl PoolState {
-    pub fn to_dbus_value(&self) -> u16 {
-        match *self {
+    pub fn to_dbus_value(self) -> u16 {
+        match self {
             PoolState::Initializing => 1,
             PoolState::Running => 2,
             PoolState::ReadOnly => 3,
@@ -63,8 +63,8 @@ pub enum PoolExtendState {
 }
 
 impl PoolExtendState {
-    pub fn to_dbus_value(&self) -> u16 {
-        match *self {
+    pub fn to_dbus_value(self) -> u16 {
+        match self {
             PoolExtendState::Initializing => 1,
             PoolExtendState::Good => 2,
             PoolExtendState::DataFailed => 3,
@@ -82,8 +82,8 @@ pub enum FreeSpaceState {
 }
 
 impl FreeSpaceState {
-    pub fn to_dbus_value(&self) -> u16 {
-        match *self {
+    pub fn to_dbus_value(self) -> u16 {
+        match self {
             FreeSpaceState::Good => 1,
             FreeSpaceState::Warn => 2,
             FreeSpaceState::Crit => 3,
@@ -102,8 +102,8 @@ pub enum BlockDevState {
 }
 
 impl BlockDevState {
-    pub fn to_dbus_value(&self) -> u16 {
-        match *self {
+    pub fn to_dbus_value(self) -> u16 {
+        match self {
             BlockDevState::Missing => 0,
             BlockDevState::Bad => 1,
             BlockDevState::Spare => 2,

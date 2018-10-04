@@ -59,7 +59,7 @@ stratisd.8.gz: stratisd.8
 	gzip --stdout docs/stratisd.8 > docs/stratisd.8.gz
 
 clippy:
-	! cargo install clippy || RUSTFLAGS='-D warnings' cargo clippy
+	RUSTFLAGS='-D warnings' cargo clippy
 
 uml-graphs: ${HOME}/.cargo/bin/cargo-script
 	PATH=${HOME}/.cargo/bin:${PATH} cargo script scripts/uml_graphs.rs

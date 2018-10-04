@@ -56,7 +56,7 @@ class StratisTestCase(unittest.TestCase):
         """
         version = Manager.Properties.Version.Get(get_object(TOP_OBJECT))
         (major, _, _) = version.split(".")
-        self.assertEqual(major, "0")
+        self.assertEqual(major, "1")
 
 
 class StratisTestCase2(unittest.TestCase):

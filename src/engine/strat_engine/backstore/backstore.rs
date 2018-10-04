@@ -50,7 +50,11 @@ fn make_cache(
 
     if new {
         // See comment in ThinPool::new() method
-        wipe_sectors(&meta.devnode(), Sectors(0), meta.size())?;
+        wipe_sectors(
+            &meta.devnode(),
+            Sectors(0),
+            cmp::min(Sectors(8), meta.size()),
+        )?;
     }
 
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::CacheSub);

@@ -34,10 +34,22 @@ use super::thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE};
 fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
     let expect_msg = "Setting up rather than initializing a pool, so each flex dev must have been allocated at least some segments.";
     [
-        flex_devs.meta_dev.last().expect(expect_msg),
-        flex_devs.thin_meta_dev.last().expect(expect_msg),
-        flex_devs.thin_data_dev.last().expect(expect_msg),
-        flex_devs.thin_meta_dev_spare.last().expect(expect_msg),
+        flex_devs
+            .meta_dev
+            .last()
+            .unwrap_or_else(|| panic!(expect_msg)),
+        flex_devs
+            .thin_meta_dev
+            .last()
+            .unwrap_or_else(|| panic!(expect_msg)),
+        flex_devs
+            .thin_data_dev
+            .last()
+            .unwrap_or_else(|| panic!(expect_msg)),
+        flex_devs
+            .thin_meta_dev_spare
+            .last()
+            .unwrap_or_else(|| panic!(expect_msg)),
     ].iter()
         .max_by_key(|x| x.0)
         .map(|&&(start, length)| start + length)

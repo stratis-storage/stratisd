@@ -286,7 +286,7 @@ impl Filesystem for StratFilesystem {
             ThinStatus::Working(wk_status) => Ok(wk_status.nr_mapped_sectors.bytes()),
             ThinStatus::Fail => {
                 let error_msg = format!("ThinDev {} is in a failed state", self.thin_dev.device());
-                return Err(StratisError::Engine(ErrorEnum::Error, error_msg));
+                Err(StratisError::Engine(ErrorEnum::Error, error_msg))
             }
         }
     }

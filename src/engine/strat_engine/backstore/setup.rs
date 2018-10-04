@@ -285,7 +285,7 @@ pub fn get_blockdevs(
                 "The following list of Stratis UUIDs were each claimed by more than one Stratis device: {:?}",
                 duplicate_uuids
             );
-            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
+            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
         }
 
         let recorded_uuids: HashSet<_> = dev_map.keys().cloned().collect();
@@ -295,7 +295,7 @@ pub fn get_blockdevs(
                 uuids,
                 recorded_uuids
             );
-            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
+            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
         }
 
         // Sort the devices according to their original location in the

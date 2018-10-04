@@ -175,18 +175,16 @@ struct EventHandler {
 #[cfg(feature = "dbus_enabled")]
 impl EventHandler {
     pub fn new(dbus_conn: Rc<RefCell<Connection>>) -> EventHandler {
-        EventHandler {
-            dbus_conn: dbus_conn,
-        }
+        EventHandler { dbus_conn }
     }
 }
 
 #[cfg(feature = "dbus_enabled")]
 impl EngineListener for EventHandler {
     fn notify(&self, event: &EngineEvent) {
-        match event {
-            &EngineEvent::BlockdevStateChanged { dbus_path, state } => {
-                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+        match *event {
+            EngineEvent::BlockdevStateChanged { dbus_path, state } => {
+                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::BLOCKDEV_STATE_PROP,
@@ -201,16 +199,16 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
-            &EngineEvent::FilesystemRenamed {
+            EngineEvent::FilesystemRenamed {
                 dbus_path,
                 from,
                 to,
             } => {
-                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::FILESYSTEM_NAME_PROP,
-                        to.to_owned(),
+                        to.to_string(),
                         &dbus_path,
                     ).unwrap_or_else(|()| {
                         error!(
@@ -220,8 +218,8 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
-            &EngineEvent::PoolExtendStateChanged { dbus_path, state } => {
-                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+            EngineEvent::PoolExtendStateChanged { dbus_path, state } => {
+                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::POOL_EXTEND_STATE_PROP,
@@ -236,16 +234,16 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
-            &EngineEvent::PoolRenamed {
+            EngineEvent::PoolRenamed {
                 dbus_path,
                 from,
                 to,
             } => {
-                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::POOL_NAME_PROP,
-                        to.to_owned(),
+                        to.to_string(),
                         &dbus_path,
                     ).unwrap_or_else(|()| {
                         error!(
@@ -255,8 +253,8 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
-            &EngineEvent::PoolSpaceStateChanged { dbus_path, state } => {
-                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+            EngineEvent::PoolSpaceStateChanged { dbus_path, state } => {
+                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::POOL_SPACE_STATE_PROP,
@@ -271,8 +269,8 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
-            &EngineEvent::PoolStateChanged { dbus_path, state } => {
-                if let &MaybeDbusPath(Some(ref dbus_path)) = dbus_path {
+            EngineEvent::PoolStateChanged { dbus_path, state } => {
+                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::POOL_STATE_PROP,
@@ -381,7 +379,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     tfd.set_state(
         TimerState::Periodic {
             current: interval,
-            interval: interval,
+            interval,
         },
         SetTimeFlags::Default,
     );
@@ -534,35 +532,32 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                         .iter()
                         .map(|w| w.to_pollfd()),
                 );
-            } else {
-                // See if we can bring up dbus.
-                if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
-                    info!("DBUS API is now available");
-                    let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
-                    get_engine_listener_list_mut().register_listener(event_handler);
-                    // Register all the pools with dbus
-                    for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
-                        libstratis::dbus_api::register_pool(
-                            &handle.connection.borrow(),
-                            &handle.context,
-                            &mut handle.tree,
-                            pool_uuid,
-                            pool,
-                            &handle.path,
-                        )?;
-                    }
-
-                    // Add dbus FD to fds as dbus is now available.
-                    fds.extend(
-                        handle
-                            .connection
-                            .borrow()
-                            .watch_fds()
-                            .iter()
-                            .map(|w| w.to_pollfd()),
-                    );
-                    dbus_handle = Some(handle);
+            } else if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
+                info!("DBUS API is now available");
+                let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
+                get_engine_listener_list_mut().register_listener(event_handler);
+                // Register all the pools with dbus
+                for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
+                    libstratis::dbus_api::register_pool(
+                        &handle.connection.borrow(),
+                        &handle.context,
+                        &mut handle.tree,
+                        pool_uuid,
+                        pool,
+                        &handle.path,
+                    )?;
                 }
+
+                // Add dbus FD to fds as dbus is now available.
+                fds.extend(
+                    handle
+                        .connection
+                        .borrow()
+                        .watch_fds()
+                        .iter()
+                        .map(|w| w.to_pollfd()),
+                );
+                dbus_handle = Some(handle);
             }
         }
 

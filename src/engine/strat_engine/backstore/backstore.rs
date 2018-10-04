@@ -127,14 +127,14 @@ impl Backstore {
 
         let (cache_tier, cache, origin) = if !cachedevs.is_empty() {
             let block_mgr = BlockDevMgr::new(cachedevs, last_update_time);
-            match &backstore_save.cache_tier {
-                &Some(ref cache_tier_save) => {
+            match backstore_save.cache_tier {
+                Some(ref cache_tier_save) => {
                     let cache_tier = CacheTier::setup(block_mgr, &cache_tier_save)?;
 
                     let cache_device = make_cache(pool_uuid, &cache_tier, origin, false)?;
                     (Some(cache_tier), Some(cache_device), None)
                 }
-                &None => {
+                None => {
                     let err_msg = "Cachedevs exist, but cache metdata does not exist";
                     return Err(StratisError::Engine(ErrorEnum::Error, err_msg.into()));
                 }

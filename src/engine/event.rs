@@ -66,7 +66,7 @@ impl EngineListenerList {
 
     /// Notify a listener.
     pub fn notify(&self, event: &EngineEvent) {
-        for listener in self.listeners.iter() {
+        for listener in &self.listeners {
             listener.notify(&event);
         }
     }

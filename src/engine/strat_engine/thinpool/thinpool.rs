@@ -1325,6 +1325,14 @@ mod tests {
         );
     }
 
+    #[test]
+    pub fn travis_test_full_pool() {
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Exactly(2, Some(Bytes(IEC::Gi).sectors())),
+            test_full_pool,
+        );
+    }
+
     /// Verify a snapshot has the same files and same contents as the origin.
     fn test_filesystem_snapshot(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();

@@ -128,6 +128,7 @@ pub fn xfs_growfs(mount_point: &Path) -> StratisResult<()> {
 pub fn set_uuid(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
     execute_cmd(
         Command::new(get_executable(XFS_DB).as_os_str())
+            .arg("-x")
             .arg(format!("-c uuid {}", uuid))
             .arg(&devnode),
     )

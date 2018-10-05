@@ -246,7 +246,7 @@ impl Pool for SimPool {
         self.block_devs
             .iter_mut()
             .chain(self.cache_devs.iter_mut().into_iter())
-            .map(|(uuid, b)| (uuid.clone(), b as &mut BlockDev))
+            .map(|(uuid, b)| (*uuid, b as &mut BlockDev))
             .collect()
     }
 

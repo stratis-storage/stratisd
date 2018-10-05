@@ -6,6 +6,7 @@
 
 use std;
 use std::borrow::BorrowMut;
+use std::cmp::min;
 
 use uuid::Uuid;
 
@@ -278,7 +279,15 @@ impl ThinPool {
             Some(&dm_uuid),
             segs_to_table(backstore_device, &[meta_segments]),
         )?;
-        wipe_sectors(&meta_dev.devnode(), Sectors(0), meta_dev.size())?;
+
+        // Wipe the first 4 KiB, i.e. 8 sectors as recommended in kernel DM
+        // docs: device-mapper/thin-provisioning.txt: Setting up a fresh
+        // pool device.
+        wipe_sectors(
+            &meta_dev.devnode(),
+            Sectors(0),
+            min(Sectors(8), meta_dev.size()),
+        )?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinData);
         let data_dev = LinearDev::setup(
@@ -609,7 +618,7 @@ impl ThinPool {
 
     fn set_extend_state(&mut self, data_extend_failed: bool, meta_extend_failed: bool) {
         let mut new_state = PoolExtendState::Good;
-        if data_extend_failed == true && meta_extend_failed == true {
+        if data_extend_failed && meta_extend_failed {
             new_state = PoolExtendState::MetaAndDataFailed
         } else if data_extend_failed {
             new_state = PoolExtendState::DataFailed;
@@ -657,10 +666,12 @@ impl ThinPool {
         let overall_used_pct = used_pct(*used, *used + *available);
         info!("Data tier percent used: {}", overall_used_pct);
 
-        let new_state = match overall_used_pct {
-            0...SPACE_WARN_PCT => FreeSpaceState::Good,
-            SPACE_WARN_PCT...SPACE_CRIT_PCT => FreeSpaceState::Warn,
-            _ => FreeSpaceState::Crit,
+        let new_state = if overall_used_pct < SPACE_WARN_PCT {
+            FreeSpaceState::Good
+        } else if overall_used_pct < SPACE_CRIT_PCT {
+            FreeSpaceState::Warn
+        } else {
+            FreeSpaceState::Crit
         };
 
         self.set_free_space_state(new_state);

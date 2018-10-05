@@ -1207,8 +1207,8 @@ fn attempt_thin_repair(
 
 #[cfg(test)]
 mod tests {
-    use std::fs::{File, OpenOptions};
-    use std::io::{Read, Write};
+    use std::fs::OpenOptions;
+    use std::io::{BufWriter, Read, Write};
     use std::path::Path;
 
     use nix::mount::{mount, umount, MsFlags};
@@ -1221,6 +1221,7 @@ mod tests {
 
     use super::super::super::backstore::MIN_MDA_SECTORS;
     use super::super::super::cmd;
+    use super::super::super::device::SyncAll;
     use super::super::super::tests::{loopbacked, real};
 
     use super::super::filesystem::{fs_usage, FILESYSTEM_LOWATER};
@@ -1263,18 +1264,21 @@ mod tests {
                 None as Option<&str>,
             ).unwrap();
             let file_path = source_tmp_dir.path().join("stratis_test.txt");
-            let mut f: File = OpenOptions::new()
-                .create(true)
-                .write(true)
-                .open(file_path)
-                .unwrap();
+            let mut f = BufWriter::with_capacity(
+                IEC::Mi as usize,
+                OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .open(file_path)
+                    .unwrap(),
+            );
             // Write the write_buf until the pool is full
             loop {
                 let status: dm::ThinPoolStatus = pool.thin_pool.status(get_dm()).unwrap();
                 match status {
                     dm::ThinPoolStatus::Working(_) => {
                         f.write_all(write_buf).unwrap();
-                        if f.sync_data().is_err() {
+                        if f.sync_all().is_err() {
                             break;
                         }
                     }
@@ -1372,11 +1376,14 @@ mod tests {
             ).unwrap();
             for i in 0..file_count {
                 let file_path = source_tmp_dir.path().join(format!("stratis_test{}.txt", i));
-                let mut f = OpenOptions::new()
-                    .create(true)
-                    .write(true)
-                    .open(file_path)
-                    .unwrap();
+                let mut f = BufWriter::with_capacity(
+                    IEC::Mi as usize,
+                    OpenOptions::new()
+                        .create(true)
+                        .write(true)
+                        .open(file_path)
+                        .unwrap(),
+                );
                 f.write_all(write_buf).unwrap();
                 f.sync_all().unwrap();
             }
@@ -1672,7 +1679,10 @@ mod tests {
         let devnode = pool.get_filesystem_by_uuid(fs_uuid).unwrap().1.devnode();
         // Braces to ensure f is closed before destroy
         {
-            let mut f = OpenOptions::new().write(true).open(devnode).unwrap();
+            let mut f = BufWriter::with_capacity(
+                IEC::Mi as usize,
+                OpenOptions::new().write(true).open(devnode).unwrap(),
+            );
             // Write 1 more sector than is initially allocated to a pool
             let write_size = datablocks_to_sectors(INITIAL_DATA_SIZE) + Sectors(1);
             let buf = &[1u8; SECTOR_SIZE];

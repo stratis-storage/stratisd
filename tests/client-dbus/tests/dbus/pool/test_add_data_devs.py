@@ -51,6 +51,7 @@ class AddDataDevsTestCase(unittest.TestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
+                'force': False,
                 'devices': []
             })
         self._pool_object = get_object(poolpath)
@@ -76,8 +77,10 @@ class AddDataDevsTestCase(unittest.TestCase):
         blockdevs1 = blockdevs(props={'Pool': pool}).search(managed_objects)
         self.assertEqual(list(blockdevs1), [])
 
-        (result, rc, _) = Pool.Methods.AddDataDevs(self._pool_object,
-                                                   {'devices': []})
+        (result, rc, _) = Pool.Methods.AddDataDevs(self._pool_object, {
+            'force': False,
+            'devices': []
+        })
 
         self.assertEqual(result, [])
         self.assertEqual(rc, StratisdErrors.OK)
@@ -105,8 +108,11 @@ class AddDataDevsTestCase(unittest.TestCase):
         blockdevs1 = blockdevs(props={'Pool': pool}).search(managed_objects)
         self.assertEqual(list(blockdevs1), [])
 
-        (result, rc, _) = Pool.Methods.AddDataDevs(
-            self._pool_object, {'devices': _DEVICE_STRATEGY.example()})
+        (result, rc,
+         _) = Pool.Methods.AddDataDevs(self._pool_object, {
+             'force': False,
+             'devices': _DEVICE_STRATEGY.example()
+         })
 
         num_devices_added = len(result)
         managed_objects = \

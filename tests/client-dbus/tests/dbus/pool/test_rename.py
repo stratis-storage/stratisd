@@ -50,6 +50,7 @@ class SetNameTestCase(unittest.TestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
+                'force': False,
                 'devices': _DEVICE_STRATEGY.example()
             })
         self._pool_object = get_object(self._pool_object_path)

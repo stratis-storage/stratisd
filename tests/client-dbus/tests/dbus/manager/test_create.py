@@ -64,6 +64,7 @@ class Create2TestCase(unittest.TestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
+                'force': False,
                 'devices': devs
             })
 
@@ -96,11 +97,13 @@ class Create2TestCase(unittest.TestCase):
         Creation should always fail if RAID value is wrong.
         """
         devs = _DEVICE_STRATEGY.example()
-        (_, rc, _) = Manager.Methods.CreatePool(self._proxy, {
-            'name': self._POOLNAME,
-            'redundancy': (True, 1),
-            'devices': devs
-        })
+        (_, rc, _) = Manager.Methods.CreatePool(
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 1),
+                'force': False,
+                'devices': devs
+            })
         self.assertEqual(rc, StratisdErrors.ERROR)
 
 
@@ -121,6 +124,7 @@ class Create3TestCase(unittest.TestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
+                'force': False,
                 'devices': _DEVICE_STRATEGY.example()
             })
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
@@ -142,6 +146,7 @@ class Create3TestCase(unittest.TestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
+                'force': False,
                 'devices': _DEVICE_STRATEGY.example()
             })
         expected_rc = StratisdErrors.ALREADY_EXISTS

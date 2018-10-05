@@ -51,6 +51,7 @@ class AddCacheDevsTestCase1(unittest.TestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
+                'force': False,
                 'devices': []
             })
         self._pool_object = get_object(poolpath)
@@ -73,8 +74,10 @@ class AddCacheDevsTestCase1(unittest.TestCase):
                 'Name': self._POOLNAME
             }).search(managed_objects))
 
-        (result, rc, _) = Pool.Methods.AddCacheDevs(self._pool_object,
-                                                    {'devices': []})
+        (result, rc, _) = Pool.Methods.AddCacheDevs(self._pool_object, {
+            'force': False,
+            'devices': []
+        })
 
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
@@ -98,8 +101,11 @@ class AddCacheDevsTestCase1(unittest.TestCase):
                 'Name': self._POOLNAME
             }).search(managed_objects))
 
-        (result, rc, _) = Pool.Methods.AddCacheDevs(
-            self._pool_object, {'devices': _DEVICE_STRATEGY.example()})
+        (result, rc,
+         _) = Pool.Methods.AddCacheDevs(self._pool_object, {
+             'force': False,
+             'devices': _DEVICE_STRATEGY.example()
+         })
 
         num_devices_added = len(result)
         managed_objects = \
@@ -153,6 +159,7 @@ class AddCacheDevsTestCase2(unittest.TestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
+                'force': False,
                 'devices': _DEVICE_STRATEGY.example()
             })
         self._pool_object = get_object(poolpath)
@@ -188,8 +195,10 @@ class AddCacheDevsTestCase2(unittest.TestCase):
         }).search(managed_objects)
         self.assertEqual(list(blockdevs2), [])
 
-        (result, rc, _) = Pool.Methods.AddCacheDevs(self._pool_object,
-                                                    {'devices': []})
+        (result, rc, _) = Pool.Methods.AddCacheDevs(self._pool_object, {
+            'force': False,
+            'devices': []
+        })
 
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
@@ -217,8 +226,11 @@ class AddCacheDevsTestCase2(unittest.TestCase):
         }).search(managed_objects)
         self.assertEqual(self._devpaths, frozenset(
             op for (op, _) in blockdevs1))
-        (result, rc, _) = Pool.Methods.AddCacheDevs(
-            self._pool_object, {'devices': _DEVICE_STRATEGY.example()})
+        (result, rc,
+         _) = Pool.Methods.AddCacheDevs(self._pool_object, {
+             'force': False,
+             'devices': _DEVICE_STRATEGY.example()
+         })
 
         num_devices_added = len(result)
         managed_objects = \

@@ -97,6 +97,7 @@ class Destroy2TestCase(unittest.TestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
+                'force': False,
                 'devices': self._devices
             })
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
@@ -160,6 +161,7 @@ class Destroy3TestCase(unittest.TestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
+                'force': False,
                 'devices': _DEVICE_STRATEGY.example()
             })
         Pool.Methods.CreateFilesystems(
@@ -210,11 +212,13 @@ class Destroy4TestCase(unittest.TestCase):
         self._service = Service()
         self._service.setUp()
         self._proxy = get_object(TOP_OBJECT)
-        Manager.Methods.CreatePool(self._proxy, {
-            'name': self._POOLNAME,
-            'redundancy': (True, 0),
-            'devices': []
-        })
+        Manager.Methods.CreatePool(
+            self._proxy, {
+                'name': self._POOLNAME,
+                'redundancy': (True, 0),
+                'force': False,
+                'devices': []
+            })
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
     def tearDown(self):

@@ -163,6 +163,7 @@ impl Engine for StratEngine {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
+        force: bool,
     ) -> StratisResult<PoolUuid> {
         let redundancy = calculate_redundancy!(redundancy);
 
@@ -170,7 +171,7 @@ impl Engine for StratEngine {
             return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
-        let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy)?;
+        let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy, force)?;
 
         let name = Name::new(name.to_owned());
         devlinks::pool_added(&name);
@@ -368,7 +369,7 @@ mod test {
         let mut engine = StratEngine::initialize().unwrap();
 
         let name1 = "name1";
-        let uuid1 = engine.create_pool(&name1, paths, None).unwrap();
+        let uuid1 = engine.create_pool(&name1, paths, None, false).unwrap();
 
         let name2 = "name2";
         let action = engine.rename_pool(uuid1, name2).unwrap();
@@ -411,10 +412,10 @@ mod test {
         let mut engine = StratEngine::initialize().unwrap();
 
         let name1 = "name1";
-        let uuid1 = engine.create_pool(&name1, paths1, None).unwrap();
+        let uuid1 = engine.create_pool(&name1, paths1, None, false).unwrap();
 
         let name2 = "name2";
-        let uuid2 = engine.create_pool(&name2, paths2, None).unwrap();
+        let uuid2 = engine.create_pool(&name2, paths2, None, false).unwrap();
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());

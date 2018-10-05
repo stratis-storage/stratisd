@@ -182,10 +182,11 @@ impl BlockDevMgr {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_size: Sectors,
+        force: bool,
     ) -> StratisResult<BlockDevMgr> {
         let devices = resolve_devices(paths)?;
         Ok(BlockDevMgr::new(
-            initialize(pool_uuid, devices, mda_size, &HashSet::new())?,
+            initialize(pool_uuid, devices, mda_size, force, &HashSet::new())?,
             None,
         ))
     }
@@ -203,10 +204,15 @@ impl BlockDevMgr {
     /// Add paths to self.
     /// Return the uuids of all blockdevs corresponding to paths that were
     /// added.
-    pub fn add(&mut self, pool_uuid: PoolUuid, paths: &[&Path]) -> StratisResult<Vec<DevUuid>> {
+    pub fn add(
+        &mut self,
+        pool_uuid: PoolUuid,
+        paths: &[&Path],
+        force: bool,
+    ) -> StratisResult<Vec<DevUuid>> {
         let devices = resolve_devices(paths)?;
         let current_uuids = self.block_devs.iter().map(|bd| bd.uuid()).collect();
-        let bds = initialize(pool_uuid, devices, MIN_MDA_SECTORS, &current_uuids)?;
+        let bds = initialize(pool_uuid, devices, MIN_MDA_SECTORS, force, &current_uuids)?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
         Ok(bdev_uuids)
@@ -351,6 +357,7 @@ fn initialize(
     pool_uuid: PoolUuid,
     devices: HashMap<Device, &Path>,
     mda_size: Sectors,
+    force: bool,
     owned_devs: &HashSet<DevUuid>,
 ) -> StratisResult<Vec<StratBlockDev>> {
     /// Get device information, returns an error if problem with obtaining
@@ -373,6 +380,7 @@ fn initialize(
     fn filter_devs<'a, I>(
         dev_infos: I,
         pool_uuid: PoolUuid,
+        force: bool,
         owned_devs: &HashSet<DevUuid>,
     ) -> StratisResult<Vec<(Device, (&'a Path, Bytes, File))>>
     where
@@ -392,12 +400,16 @@ fn initialize(
             match ownership {
                 DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, f))),
                 DevOwnership::Theirs(signature) => {
-                    let err_str = format!(
-                        "Device {} has an existing signature {}",
-                        devnode.display(),
-                        signature
-                    );
-                    return Err(StratisError::Engine(ErrorEnum::Invalid, err_str));
+                    if !force {
+                        let err_str = format!(
+                            "Device {} has an existing signature {}",
+                            devnode.display(),
+                            signature
+                        );
+                        return Err(StratisError::Engine(ErrorEnum::Invalid, err_str));
+                    } else {
+                        add_devs.push((dev, (devnode, dev_size, f)))
+                    }
                 }
                 DevOwnership::Ours(uuid, dev_uuid) => {
                     if pool_uuid == uuid {
@@ -426,7 +438,7 @@ fn initialize(
 
     let dev_infos = devices.into_iter().map(|(d, p)| (d, dev_info(p)));
 
-    let add_devs = filter_devs(dev_infos, pool_uuid, owned_devs)?;
+    let add_devs = filter_devs(dev_infos, pool_uuid, force, owned_devs)?;
 
     let mut bds: Vec<StratBlockDev> = Vec::new();
     for (dev, (devnode, dev_size, mut f)) in add_devs {
@@ -474,7 +486,6 @@ mod tests {
     use super::super::setup::{find_all, get_metadata};
 
     use super::super::super::cmd;
-    use super::super::super::device::wipe_sectors;
 
     use super::*;
 
@@ -500,7 +511,8 @@ mod tests {
     /// After 2 Sectors have been allocated, that amount must also be included
     /// in balance.
     fn test_blockdevmgr_used(paths: &[&Path]) -> () {
-        let mut mgr = BlockDevMgr::initialize(Uuid::new_v4(), paths, MIN_MDA_SECTORS).unwrap();
+        let mut mgr =
+            BlockDevMgr::initialize(Uuid::new_v4(), paths, MIN_MDA_SECTORS, false).unwrap();
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
         let allocated = Sectors(2);
@@ -537,14 +549,16 @@ mod tests {
 
     /// Verify that it is impossible to initialize a set of disks of which
     /// even one of them has a signature.  Choose the dirty disk randomly.
-    fn test_fail_single_signature(paths: &[&Path]) -> () {
+    /// Verify that force flag allows initialization in the presence of
+    /// one device with a signature.
+    fn test_force_flag_dirty(paths: &[&Path]) -> () {
         let index = rand::random::<u8>() as usize % paths.len();
 
         cmd::create_ext3_fs(paths[index]).unwrap();
         cmd::udev_settle().unwrap();
 
         let pool_uuid = Uuid::new_v4();
-        assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS).is_err());
+        assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).is_err());
         assert!(paths.iter().enumerate().all(|(i, path)| {
             let tmp = if i == index {
                 DevOwnership::Theirs(String::from(""))
@@ -555,11 +569,7 @@ mod tests {
             usage_equal(&identify(path).unwrap(), &tmp)
         }));
 
-        // Clear out the beginning of the device and make sure we succeed now.
-        wipe_sectors(paths[index], Sectors(0), MIN_MDA_SECTORS).unwrap();
-        cmd::udev_settle().unwrap();
-
-        assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS).is_ok());
+        assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, true).is_ok());
         cmd::udev_settle().unwrap();
 
         assert!(paths.iter().all(|path| {
@@ -574,26 +584,26 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_fail_single_signature() {
+    pub fn loop_test_force_flag_dirty() {
         loopbacked::test_with_spec(
             loopbacked::DeviceLimits::Range(1, 3, None),
-            test_fail_single_signature,
+            test_force_flag_dirty,
         );
     }
 
     #[test]
-    pub fn real_test_fail_single_signature() {
+    pub fn real_test_force_flag_dirty() {
         real::test_with_spec(
             real::DeviceLimits::AtLeast(1, None, None),
-            test_fail_single_signature,
+            test_force_flag_dirty,
         );
     }
 
     #[test]
-    pub fn travis_test_fail_single_signature() {
+    pub fn travis_test_force_flag_dirty() {
         loopbacked::test_with_spec(
             loopbacked::DeviceLimits::Range(1, 3, None),
-            test_fail_single_signature,
+            test_force_flag_dirty,
         );
     }
 
@@ -602,49 +612,53 @@ mod tests {
     /// 1. Initialize devices with pool uuid.
     /// 2. Initializing again with different uuid must fail.
     /// 3. Adding the devices must succeed, because they already belong.
-    fn test_initialization_add_stratis(paths: &[&Path]) -> () {
+    /// 4. Initializing again with different uuid and force = true also fails.
+    fn test_force_flag_stratis(paths: &[&Path]) -> () {
         assert!(paths.len() > 1);
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let uuid = Uuid::new_v4();
         let uuid2 = Uuid::new_v4();
 
-        let mut bd_mgr = BlockDevMgr::initialize(uuid, paths1, MIN_MDA_SECTORS).unwrap();
+        let mut bd_mgr = BlockDevMgr::initialize(uuid, paths1, MIN_MDA_SECTORS, false).unwrap();
         cmd::udev_settle().unwrap();
 
-        assert!(BlockDevMgr::initialize(uuid2, paths1, MIN_MDA_SECTORS).is_err());
+        assert!(BlockDevMgr::initialize(uuid2, paths1, MIN_MDA_SECTORS, false).is_err());
+        // FIXME: this should succeed, but currently it fails, to be extra safe.
+        // See: https://github.com/stratis-storage/stratisd/pull/292
+        assert!(BlockDevMgr::initialize(uuid2, paths1, MIN_MDA_SECTORS, true).is_err());
 
         let original_length = bd_mgr.block_devs.len();
-        assert!(bd_mgr.add(uuid, paths1).is_ok());
+        assert!(bd_mgr.add(uuid, paths1, false).is_ok());
         assert_eq!(bd_mgr.block_devs.len(), original_length);
 
-        BlockDevMgr::initialize(uuid, paths2, MIN_MDA_SECTORS).unwrap();
+        BlockDevMgr::initialize(uuid, paths2, MIN_MDA_SECTORS, false).unwrap();
         cmd::udev_settle().unwrap();
 
-        assert!(bd_mgr.add(uuid, paths2).is_err());
+        assert!(bd_mgr.add(uuid, paths2, false).is_err());
     }
 
     #[test]
-    pub fn loop_test_initialization_stratis() {
+    pub fn loop_test_force_flag_stratis() {
         loopbacked::test_with_spec(
             loopbacked::DeviceLimits::Range(2, 3, None),
-            test_initialization_add_stratis,
+            test_force_flag_stratis,
         );
     }
 
     #[test]
-    pub fn real_test_initialization_stratis() {
+    pub fn real_test_force_flag_stratis() {
         real::test_with_spec(
             real::DeviceLimits::AtLeast(2, None, None),
-            test_initialization_add_stratis,
+            test_force_flag_stratis,
         );
     }
 
     #[test]
-    pub fn travis_test_initialization_stratis() {
+    pub fn travis_test_force_flag_stratis() {
         loopbacked::test_with_spec(
             loopbacked::DeviceLimits::Range(2, 3, None),
-            test_initialization_add_stratis,
+            test_force_flag_stratis,
         );
     }
 
@@ -664,7 +678,7 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let uuid1 = Uuid::new_v4();
-        BlockDevMgr::initialize(uuid1, paths1, MIN_MDA_SECTORS).unwrap();
+        BlockDevMgr::initialize(uuid1, paths1, MIN_MDA_SECTORS, false).unwrap();
 
         cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
@@ -674,7 +688,7 @@ mod tests {
         assert_eq!(devices.len(), paths1.len());
 
         let uuid2 = Uuid::new_v4();
-        BlockDevMgr::initialize(uuid2, paths2, MIN_MDA_SECTORS).unwrap();
+        BlockDevMgr::initialize(uuid2, paths2, MIN_MDA_SECTORS, false).unwrap();
 
         cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
@@ -715,7 +729,7 @@ mod tests {
     /// them releases all.
     fn test_ownership(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
-        let mut bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
+        let mut bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
 
         cmd::udev_settle().unwrap();
 

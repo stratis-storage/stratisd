@@ -33,6 +33,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let name: &str = get_next_arg(&mut iter, 0)?;
     let redundancy: (bool, u16) = get_next_arg(&mut iter, 1)?;
+    let force: bool = get_next_arg(&mut iter, 2)?;
     let devs: Array<&str, _> = get_next_arg(&mut iter, 3)?;
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
@@ -40,7 +41,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
     let mut engine = dbus_context.engine.borrow_mut();
-    let result = engine.create_pool(name, &blockdevs, tuple_to_option(redundancy));
+    let result = engine.create_pool(name, &blockdevs, tuple_to_option(redundancy), force);
 
     let return_message = message.method_return();
 
@@ -149,6 +150,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
     let create_pool_method = f.method("CreatePool", (), create_pool)
         .in_arg(("name", "s"))
         .in_arg(("redundancy", "(bq)"))
+        .in_arg(("force", "b"))
         .in_arg(("devices", "as"))
         .out_arg(("result", "(oao)"))
         .out_arg(("return_code", "q"))

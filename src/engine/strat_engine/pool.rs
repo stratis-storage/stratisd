@@ -138,10 +138,11 @@ impl StratPool {
         name: &str,
         paths: &[&Path],
         redundancy: Redundancy,
+        force: bool,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
-        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS)?;
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
 
         let thinpool = ThinPool::new(
             pool_uuid,
@@ -298,12 +299,13 @@ impl Pool for StratPool {
         pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
+        force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
         let bdev_info = if tier == BlockDevTier::Cache {
             // If adding cache devices, must suspend the pool, since the cache
             // must be augmeneted with the new devices.
             self.thin_pool.suspend()?;
-            let bdev_info = self.backstore.add_blockdevs(pool_uuid, paths, tier)?;
+            let bdev_info = self.backstore.add_blockdevs(pool_uuid, paths, tier, force)?;
             self.thin_pool.set_device(self.backstore.device().expect("Since thin pool exists, space must have been allocated from the backstore, so backstore must have a cap device"))?;
             self.thin_pool.resume()?;
             Ok(bdev_info)
@@ -311,7 +313,7 @@ impl Pool for StratPool {
             // If just adding data devices, no need to suspend the pool.
             // No action will be taken on the DM devices.
             self.backstore
-                .add_blockdevs(pool_uuid, paths, BlockDevTier::Data)
+                .add_blockdevs(pool_uuid, paths, BlockDevTier::Data, force)
         };
         self.write_metadata(pool_name)?;
         bdev_info
@@ -484,13 +486,15 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let name1 = "name1";
-        let (uuid1, mut pool1) = StratPool::initialize(&name1, paths1, Redundancy::NONE).unwrap();
+        let (uuid1, mut pool1) =
+            StratPool::initialize(&name1, paths1, Redundancy::NONE, false).unwrap();
         invariant(&pool1, &name1);
 
         let metadata1 = pool1.record(name1);
 
         let name2 = "name2";
-        let (uuid2, mut pool2) = StratPool::initialize(&name2, paths2, Redundancy::NONE).unwrap();
+        let (uuid2, mut pool2) =
+            StratPool::initialize(&name2, paths2, Redundancy::NONE, false).unwrap();
         invariant(&pool2, &name2);
 
         let metadata2 = pool2.record(name2);
@@ -539,7 +543,9 @@ mod tests {
     /// space required.
     fn test_empty_pool(paths: &[&Path]) -> () {
         assert_eq!(paths.len(), 0);
-        assert!(StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE).is_err());
+        assert!(
+            StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE, true,).is_err()
+        );
     }
 
     #[test]
@@ -563,7 +569,8 @@ mod tests {
 
         let name = "stratis-test-pool";
         devlinks::setup_devlinks(Vec::new().into_iter());
-        let (uuid, mut pool) = StratPool::initialize(&name, paths2, Redundancy::NONE).unwrap();
+        let (uuid, mut pool) =
+            StratPool::initialize(&name, paths2, Redundancy::NONE, false).unwrap();
         devlinks::pool_added(&name);
         invariant(&pool, &name);
 
@@ -600,7 +607,7 @@ mod tests {
                 .unwrap();
         }
 
-        pool.add_blockdevs(uuid, &name, paths1, BlockDevTier::Cache)
+        pool.add_blockdevs(uuid, &name, paths1, BlockDevTier::Cache, false)
             .unwrap();
         invariant(&pool, &name);
 

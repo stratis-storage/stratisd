@@ -162,8 +162,9 @@ impl Backstore {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_size: Sectors,
+        force: bool,
     ) -> StratisResult<Backstore> {
-        let data_tier = DataTier::new(BlockDevMgr::initialize(pool_uuid, paths, mda_size)?);
+        let data_tier = DataTier::new(BlockDevMgr::initialize(pool_uuid, paths, mda_size, force)?);
 
         Ok(Backstore {
             data_tier,
@@ -186,13 +187,14 @@ impl Backstore {
         &mut self,
         pool_uuid: PoolUuid,
         paths: &[&Path],
+        force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(ref mut cache_tier) => {
                 let mut cache_device = self.cache
                     .as_mut()
                     .expect("cache_tier.is_some() <=> self.cache.is_some()");
-                let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, paths)?;
+                let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, paths, force)?;
 
                 if cache_change {
                     let table = map_to_dm(&cache_tier.cache_segments);
@@ -212,7 +214,7 @@ impl Backstore {
                 Ok(uuids)
             }
             None => {
-                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS)?;
+                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS, force)?;
 
                 let cache_tier = CacheTier::new(bdm);
 
@@ -244,8 +246,9 @@ impl Backstore {
         &mut self,
         pool_uuid: PoolUuid,
         paths: &[&Path],
+        force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
-        self.data_tier.add(pool_uuid, paths)
+        self.data_tier.add(pool_uuid, paths, force)
     }
 
     /// Add the given paths to self. Return UUIDs of the new blockdevs
@@ -256,10 +259,11 @@ impl Backstore {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         tier: BlockDevTier,
+        force: bool,
     ) -> StratisResult<Vec<DevUuid>> {
         match tier {
-            BlockDevTier::Cache => self.add_cachedevs(pool_uuid, paths),
-            BlockDevTier::Data => self.add_datadevs(pool_uuid, paths),
+            BlockDevTier::Cache => self.add_cachedevs(pool_uuid, paths, force),
+            BlockDevTier::Data => self.add_datadevs(pool_uuid, paths, force),
         }
     }
 
@@ -627,7 +631,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         let mut backstore =
-            Backstore::initialize(pool_uuid, initdatapaths, MIN_MDA_SECTORS).unwrap();
+            Backstore::initialize(pool_uuid, initdatapaths, MIN_MDA_SECTORS, false).unwrap();
 
         invariant(&backstore);
 
@@ -637,7 +641,7 @@ mod tests {
             .unwrap();
 
         let cache_uuids = backstore
-            .add_blockdevs(pool_uuid, initcachepaths, BlockDevTier::Cache)
+            .add_blockdevs(pool_uuid, initcachepaths, BlockDevTier::Cache, false)
             .unwrap();
 
         invariant(&backstore);
@@ -662,13 +666,13 @@ mod tests {
         }
 
         let data_uuids = backstore
-            .add_blockdevs(pool_uuid, datadevpaths, BlockDevTier::Data)
+            .add_blockdevs(pool_uuid, datadevpaths, BlockDevTier::Data, false)
             .unwrap();
         invariant(&backstore);
         assert_eq!(data_uuids.len(), datadevpaths.len());
 
         let cache_uuids = backstore
-            .add_blockdevs(pool_uuid, cachedevpaths, BlockDevTier::Cache)
+            .add_blockdevs(pool_uuid, cachedevpaths, BlockDevTier::Cache, false)
             .unwrap();
         invariant(&backstore);
         assert_eq!(cache_uuids.len(), cachedevpaths.len());
@@ -725,7 +729,8 @@ mod tests {
         assert!(paths.len() > 0);
 
         let pool_uuid = Uuid::new_v4();
-        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
+        let mut backstore =
+            Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS, false).unwrap();
 
         assert!(
             backstore
@@ -755,9 +760,7 @@ mod tests {
         // then the amount available to be allocated was greater than
         // length * 2. In that case, length * 2 would have been allocated.
         assert!(new_request.is_none() || new_request.expect("!is_none()").1 < length);
-        cmd::udev_settle().unwrap();
         backstore.destroy().unwrap();
-        cmd::udev_settle().unwrap();
     }
 
     #[test]
@@ -789,7 +792,8 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
 
-        let mut backstore = Backstore::initialize(pool_uuid, paths1, MIN_MDA_SECTORS).unwrap();
+        let mut backstore =
+            Backstore::initialize(pool_uuid, paths1, MIN_MDA_SECTORS, false).unwrap();
         invariant(&backstore);
 
         // Allocate space from the backstore so that the cap device is made.
@@ -800,7 +804,7 @@ mod tests {
         let old_device = backstore.device();
 
         backstore
-            .add_blockdevs(pool_uuid, paths2, BlockDevTier::Cache)
+            .add_blockdevs(pool_uuid, paths2, BlockDevTier::Cache, false)
             .unwrap();
         invariant(&backstore);
 

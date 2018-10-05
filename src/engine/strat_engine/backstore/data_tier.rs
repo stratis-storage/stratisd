@@ -70,8 +70,13 @@ impl DataTier {
     /// Add the given paths to self. Return UUIDs of the new blockdevs
     /// corresponding to the specified paths.
     /// WARNING: metadata changing event
-    pub fn add(&mut self, pool_uuid: PoolUuid, paths: &[&Path]) -> StratisResult<Vec<DevUuid>> {
-        self.block_mgr.add(pool_uuid, paths)
+    pub fn add(
+        &mut self,
+        pool_uuid: PoolUuid,
+        paths: &[&Path],
+        force: bool,
+    ) -> StratisResult<Vec<DevUuid>> {
+        self.block_mgr.add(pool_uuid, paths, force)
     }
 
     /// Allocate at least request sectors from unallocated segments in
@@ -188,7 +193,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
 
-        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MIN_MDA_SECTORS).unwrap();
+        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MIN_MDA_SECTORS, false).unwrap();
 
         let mut data_tier = DataTier::new(mgr);
 
@@ -211,7 +216,7 @@ mod tests {
         assert_eq!(data_tier.size(), size);
         allocated = data_tier.allocated();
 
-        data_tier.add(pool_uuid, paths2).unwrap();
+        data_tier.add(pool_uuid, paths2, false).unwrap();
 
         // A data tier w/ additional blockdevs added
         assert!(data_tier.size() > size);

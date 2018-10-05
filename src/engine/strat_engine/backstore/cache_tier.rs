@@ -91,8 +91,9 @@ impl CacheTier {
         &mut self,
         pool_uuid: PoolUuid,
         paths: &[&Path],
+        force: bool,
     ) -> StratisResult<(Vec<DevUuid>, (bool, bool))> {
-        let uuids = self.block_mgr.add(pool_uuid, paths)?;
+        let uuids = self.block_mgr.add(pool_uuid, paths, force)?;
 
         let avail_space = self.block_mgr.avail_space();
         let segments = self.block_mgr
@@ -199,7 +200,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
 
-        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MIN_MDA_SECTORS).unwrap();
+        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MIN_MDA_SECTORS, false).unwrap();
 
         let mut cache_tier = CacheTier::new(mgr);
 
@@ -222,7 +223,7 @@ mod tests {
         assert_eq!(cache_tier.block_mgr.avail_space(), Sectors(0));
         assert_eq!(size - metadata_size, allocated + cache_metadata_size);
 
-        let (_, (cache, meta)) = cache_tier.add(pool_uuid, paths2).unwrap();
+        let (_, (cache, meta)) = cache_tier.add(pool_uuid, paths2, false).unwrap();
         // TODO: Ultimately, it should be the case that meta can be true.
         assert!(cache);
         assert!(!meta);

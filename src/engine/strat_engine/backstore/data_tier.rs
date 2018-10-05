@@ -4,6 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
+use std::cmp;
 use std::path::Path;
 
 use devicemapper::Sectors;
@@ -91,6 +92,17 @@ impl DataTier {
                 true
             }
             None => false,
+        }
+    }
+
+    /// Try to allocate up to request sectors. Return what was allocated.
+    pub fn request(&mut self, request: Sectors) -> Sectors {
+        let request = cmp::min(request, self.block_mgr.avail_space());
+        if self.alloc(request) {
+            request
+        } else {
+            error!("request equal to avail_space() should have succeeded");
+            Sectors(0)
         }
     }
 

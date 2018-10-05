@@ -364,7 +364,7 @@ impl Backstore {
     ) -> StratisResult<Option<(Sectors, Sectors)>> {
         assert!(modulus != Sectors(0));
 
-        let mut internal_request = (request / modulus) * modulus;
+        let internal_request = (request / modulus) * modulus;
 
         if internal_request == Sectors(0) {
             return Ok(None);
@@ -372,13 +372,8 @@ impl Backstore {
 
         let available = self.available_in_cap();
         if available < internal_request {
-            let mut allocated = false;
-            while !allocated && internal_request != Sectors(0) {
-                allocated = self.data_tier.alloc(internal_request - available);
-                let temp = internal_request / 2usize;
-                internal_request = (temp / modulus) * modulus;
-            }
-            if allocated {
+            let allocated = self.data_tier.request(internal_request - available);
+            if allocated > Sectors(0) {
                 self.extend_cap_device(pool_uuid)?;
 
                 let return_amt = cmp::min(request, self.available_in_cap());

@@ -310,8 +310,17 @@ impl Pool for StratPool {
         } else {
             // If just adding data devices, no need to suspend the pool.
             // No action will be taken on the DM devices.
-            self.backstore
-                .add_blockdevs(pool_uuid, paths, BlockDevTier::Data)
+            let bdev_info = self.backstore
+                .add_blockdevs(pool_uuid, paths, BlockDevTier::Data)?;
+
+            // Adding data devices does not change the state of the thin
+            // pool at all. However, if the thin pool is in a state
+            // where it would request an allocation from the backstore the
+            // addition of the new data devs may have changed its context
+            // so that it can satisfy the allocation request where
+            // previously it could not. Run check() in case that is true.
+            self.thin_pool.check(pool_uuid, &mut self.backstore)?;
+            Ok(bdev_info)
         };
         self.write_metadata(pool_name)?;
         bdev_info

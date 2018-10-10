@@ -18,7 +18,7 @@ use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
 use super::super::device::wipe_sectors;
 use super::super::dm::get_dm;
-use super::super::dmnames::{format_backstore_ids, CacheRole};
+use super::super::names::{format_backstore_ids, CacheRole};
 use super::super::serde_structs::{BackstoreSave, CapSave, Recordable};
 
 use super::blockdev::StratBlockDev;

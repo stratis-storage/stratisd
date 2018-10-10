@@ -462,10 +462,12 @@ impl Pool for StratPool {
 #[cfg(test)]
 mod tests {
     use std::fs::OpenOptions;
-    use std::io::{Read, Write};
+    use std::io::{BufWriter, Read, Write};
 
     use nix::mount::{mount, umount, MsFlags};
     use tempfile;
+
+    use devicemapper::{Bytes, IEC, SECTOR_SIZE};
 
     use super::super::super::devlinks;
     use super::super::super::types::Redundancy;
@@ -676,6 +678,81 @@ mod tests {
         real::test_with_spec(
             real::DeviceLimits::AtLeast(2, None, None),
             test_add_cachedevs,
+        );
+    }
+
+    /// Verify that adding additional blockdevs will cause a pool that is
+    /// out of space to be extended.
+    fn test_add_datadevs(paths: &[&Path]) {
+        assert!(paths.len() > 1);
+
+        let (paths1, paths2) = paths.split_at(1);
+
+        let name = "stratis-test-pool";
+        devlinks::setup_devlinks(Vec::new().into_iter());
+        let (pool_uuid, mut pool) = StratPool::initialize(&name, paths1, Redundancy::NONE).unwrap();
+        devlinks::pool_added(&name);
+        invariant(&pool, &name);
+
+        let fs_name = "stratis_test_filesystem";
+        let (_, fs_uuid) = pool.create_filesystems(pool_uuid, &name, &[(&fs_name, None)])
+            .unwrap()
+            .pop()
+            .expect("just created one");
+
+        let devnode = pool.get_filesystem(fs_uuid).unwrap().1.devnode();
+
+        {
+            let mut f = BufWriter::with_capacity(
+                IEC::Mi as usize,
+                OpenOptions::new().write(true).open(devnode).unwrap(),
+            );
+
+            let buf = &[1u8; SECTOR_SIZE];
+
+            while match pool.thin_pool.extend_state() {
+                PoolExtendState::DataFailed
+                | PoolExtendState::MetaFailed
+                | PoolExtendState::MetaAndDataFailed => false,
+                _ => true,
+            } {
+                f.write_all(buf).unwrap();
+                pool.thin_pool
+                    .check(pool_uuid, &mut pool.backstore)
+                    .unwrap();
+            }
+
+            pool.add_blockdevs(pool_uuid, &name, paths2, BlockDevTier::Data)
+                .unwrap();
+            assert!(match pool.thin_pool.extend_state() {
+                PoolExtendState::Good => true,
+                _ => false,
+            });
+
+            assert!(match pool.thin_pool.state() {
+                PoolState::Running => true,
+                _ => false,
+            });
+        }
+    }
+
+    #[test]
+    pub fn loop_test_add_datadevs() {
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(2, 3, Some((4u64 * Bytes(IEC::Gi)).sectors())),
+            test_add_datadevs,
+        );
+    }
+
+    #[test]
+    pub fn real_test_add_datadevs() {
+        real::test_with_spec(
+            real::DeviceLimits::AtLeast(
+                2,
+                Some((2u64 * Bytes(IEC::Gi)).sectors()),
+                Some((4u64 * Bytes(IEC::Gi)).sectors()),
+            ),
+            test_add_datadevs,
         );
     }
 }

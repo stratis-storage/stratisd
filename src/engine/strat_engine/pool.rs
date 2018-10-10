@@ -703,13 +703,16 @@ mod tests {
         let devnode = pool.get_filesystem(fs_uuid).unwrap().1.devnode();
 
         {
+            let buffer_length = IEC::Mi;
             let mut f = BufWriter::with_capacity(
-                IEC::Mi as usize,
+                buffer_length as usize,
                 OpenOptions::new().write(true).open(devnode).unwrap(),
             );
 
             let buf = &[1u8; SECTOR_SIZE];
 
+            let mut amount_written = Sectors(0);
+            let buffer_length = Bytes(buffer_length).sectors();
             while match pool.thin_pool.extend_state() {
                 PoolExtendState::DataFailed
                 | PoolExtendState::MetaFailed
@@ -717,9 +720,15 @@ mod tests {
                 _ => true,
             } {
                 f.write_all(buf).unwrap();
-                pool.thin_pool
-                    .check(pool_uuid, &mut pool.backstore)
-                    .unwrap();
+                amount_written += Sectors(1);
+                // Run check roughly every time the buffer is cleared.
+                // Running it more often is pointless as the pool is guaranteed
+                // not to see any effects unless the buffer is cleared.
+                if amount_written % buffer_length == Sectors(1) {
+                    pool.thin_pool
+                        .check(pool_uuid, &mut pool.backstore)
+                        .unwrap();
+                }
             }
 
             pool.add_blockdevs(pool_uuid, &name, paths2, BlockDevTier::Data)

@@ -26,7 +26,7 @@ use super::super::super::types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid};
 
 use super::super::cmd::{create_fs, set_uuid, xfs_growfs};
 use super::super::dm::get_dm;
-use super::super::dmnames::{format_thin_ids, ThinRole};
+use super::super::names::{format_thin_ids, ThinRole};
 use super::super::serde_structs::FilesystemSave;
 
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB

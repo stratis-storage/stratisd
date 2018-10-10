@@ -2,12 +2,15 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// Functions for dealing with device mapper names.
+// Functions for dealing with stratis and device mapper names.
 
 use std::fmt;
 use std::fmt::Display;
+use std::path::Path;
 
 use devicemapper::{DmNameBuf, DmUuidBuf};
+
+use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::engine::{FilesystemUuid, PoolUuid};
 
@@ -182,4 +185,53 @@ pub fn format_backstore_ids(pool_uuid: PoolUuid, role: CacheRole) -> (DmNameBuf,
         DmNameBuf::new(value.clone()).expect("FORMAT_VERSION display_length < 60"),
         DmUuidBuf::new(value).expect("FORMAT_VERSION display_length < 61"),
     )
+}
+
+/// Validate a path for use as a Pool or Filesystem name.
+pub fn validate_name(name: &str) -> StratisResult<()> {
+    let name_path = Path::new(name);
+    if name.contains('\u{0}') {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name contains NULL characters: {}", name),
+        ));
+    }
+    if name_path.components().collect::<Vec<_>>().len() != 1 {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name contains forbidden characters: {}", name),
+        ));
+    }
+    if name_path.is_absolute() {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name contains an absolute path : {}", name),
+        ));
+    }
+    if name == "." || name == ".." {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name contains . or .. : {}", name),
+        ));
+    }
+    if name.len() > 255 {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name too long : {}", name),
+        ));
+    }
+
+    if name.len() != name.trim().len() {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name contains leading or trailing space : {}", name),
+        ));
+    }
+    if name.chars().filter(|c| c.is_control()).count() > 0 {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name contains control characters : {}", name),
+        ));
+    }
+    Ok(())
 }

@@ -211,7 +211,7 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
     if name == "." || name == ".." {
         return Err(StratisError::Engine(
             ErrorEnum::Invalid,
-            format!("Name contains . or .. : {}", name),
+            format!("Name is . or .. : {}", name),
         ));
     }
     if name.len() > 255 {
@@ -234,4 +234,41 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use engine::strat_engine::names::validate_name;
+
+    #[test]
+    pub fn test_validate_name() {
+        assert!(validate_name(&'\u{0}'.to_string()).is_err());
+        assert!(validate_name("./some").is_err());
+        assert!(validate_name("../../root").is_err());
+        assert!(validate_name("/").is_err());
+        assert!(validate_name("\u{1c}\u{7}").is_err());
+        assert!(validate_name("./foo/bar.txt").is_err());
+        assert!(validate_name(".").is_err());
+        assert!(validate_name("..").is_err());
+        assert!(validate_name("/dev/sdb").is_err());
+        assert!(validate_name("").is_err());
+        assert!(validate_name("/").is_err());
+        assert!(validate_name(" leading_space").is_err());
+        assert!(validate_name("trailing_space ").is_err());
+        assert!(validate_name("\u{0}leading_null").is_err());
+        assert!(validate_name("trailing_null\u{0}").is_err());
+        assert!(validate_name("middle\u{0}_null").is_err());
+        assert!(validate_name("\u{0}multiple\u{0}_null\u{0}").is_err());
+
+        assert!(validate_name(&'\u{10fff8}'.to_string()).is_ok());
+        assert!(validate_name("*< ? >").is_ok());
+        assert!(validate_name("...").is_ok());
+        assert!(validate_name("ok.name").is_ok());
+        assert!(validate_name("ok name with spaces").is_ok());
+        assert!(validate_name("\\\\").is_ok());
+        assert!(validate_name("\u{211D}").is_ok());
+        assert!(validate_name("☺").is_ok());
+        assert!(validate_name("ok_name").is_ok());
+    }
 }

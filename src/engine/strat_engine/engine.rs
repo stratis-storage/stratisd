@@ -268,9 +268,13 @@ impl Engine for StratEngine {
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
-        pool.destroy()?;
-        devlinks::pool_removed(&pool_name);
-        Ok(true)
+        if let Err(err) = pool.destroy() {
+            self.pools.insert(pool_name, uuid, pool);
+            Err(err)
+        } else {
+            devlinks::pool_removed(&pool_name);
+            Ok(true)
+        }
     }
 
     fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction> {

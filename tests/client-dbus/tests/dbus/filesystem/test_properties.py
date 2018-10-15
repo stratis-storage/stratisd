@@ -90,4 +90,4 @@ class SetNameTestCase(unittest.TestCase):
 
         devnode = Filesystem.Properties.Devnode.Get(filesystem)
 
-        self.assertEqual(devnode, "/dev/stratis/deadpool/fs")
+        self.assertEqual(devnode, "/stratis/deadpool/fs")

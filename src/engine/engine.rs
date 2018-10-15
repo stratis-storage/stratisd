@@ -17,7 +17,7 @@ use super::types::{
 };
 use stratis::StratisResult;
 
-pub const DEV_PATH: &str = "/dev/stratis";
+pub const DEV_PATH: &str = "/stratis";
 
 pub trait Filesystem: Debug {
     /// path of the device node

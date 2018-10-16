@@ -27,7 +27,7 @@ pub fn setup_dev_path() -> StratisResult<()> {
     Ok(())
 }
 
-/// Setup the pool directory and the symlinks in /dev/stratis for the specified pool and filesystems
+/// Setup the pool directory and the symlinks in /stratis for the specified pool and filesystems
 /// it contains.
 // Don't just remove and recreate everything in case there are processes
 // (e.g. user shells) with the current working directory within the tree.
@@ -57,13 +57,13 @@ pub fn setup_pool_devlinks(pool_name: &str, pool: &Pool) -> () {
         Ok(())
     }() {
         warn!(
-            "setup_pool_devlinks failed for /dev/stratis/{}, reason {:?}",
+            "setup_pool_devlinks failed for /stratis/{}, reason {:?}",
             pool_name, err
         );
     };
 }
 
-/// Set up directories and symlinks under /dev/stratis based on current
+/// Set up directories and symlinks under /stratis based on current
 /// config. Clear out any directory or file that doesn't correspond to a pool
 /// or filesystem.
 // Don't just remove and recreate everything in case there are processes

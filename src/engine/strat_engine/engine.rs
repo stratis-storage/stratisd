@@ -167,9 +167,8 @@ impl Engine for StratEngine {
     ) -> StratisResult<PoolUuid> {
         let redundancy = calculate_redundancy!(redundancy);
 
-        if let Err(e) = validate_name(name) {
-            return Err(e);
-        }
+        validate_name(name)?;
+
         if self.pools.contains_name(name) {
             return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
@@ -278,9 +277,7 @@ impl Engine for StratEngine {
     }
 
     fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction> {
-        if let Err(e) = validate_name(new_name) {
-            return Err(e);
-        }
+        validate_name(new_name)?;
         let old_name = rename_pool_pre!(self; uuid; new_name);
 
         let (_, mut pool) = self.pools

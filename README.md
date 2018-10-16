@@ -4,7 +4,8 @@ A daemon that manages a pool of block devices to create flexible filesystems.
 
 ## Status
 
-March 8 2018: Stratis 0.5 released. See [release notes](docs/RELNOTES-0.5.md) for details.
+September 28 2018: Stratis 1.0 released.
+See [release notes](https://github.com/stratis-storage/stratis-docs/blob/master/docs/relnotes/relnotes-1.0.md) for details.
 
 ## Background
 

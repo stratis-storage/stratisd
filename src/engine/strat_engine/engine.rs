@@ -404,7 +404,7 @@ mod test {
     /// 3. Teardown the engine.
     /// 4. Initialize the engine.
     /// 5. Verify that pools can be found again.
-    /// 6. Teardown the engine and remove "/dev/stratis".
+    /// 6. Teardown the engine and remove "/stratis".
     /// 7. Initialize the engine one more time.
     /// 8. Verify that both pools are found and that there are no incomplete pools.
     fn test_setup(paths: &[&Path]) {

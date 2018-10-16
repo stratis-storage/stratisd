@@ -214,6 +214,7 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
             format!("Name is . or .. : {}", name),
         ));
     }
+    // Linux has a maximum filename length of 255 bytes
     if name.len() > 255 {
         return Err(StratisError::Engine(
             ErrorEnum::Invalid,

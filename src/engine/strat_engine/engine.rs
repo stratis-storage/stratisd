@@ -15,6 +15,7 @@ use super::super::engine::{Engine, Eventable, Pool};
 use super::super::event::{get_engine_listener_list, EngineEvent};
 use super::super::structures::Table;
 use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
+
 use super::backstore::device::is_stratis_device;
 use super::backstore::{find_all, get_metadata};
 #[cfg(test)]

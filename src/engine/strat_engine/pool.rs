@@ -274,9 +274,7 @@ impl Pool for StratPool {
     ) -> StratisResult<Vec<(&'b str, FilesystemUuid)>> {
         let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
         for name in names.keys() {
-            if let Err(e) = validate_name(name) {
-                return Err(e);
-            }
+            validate_name(name)?;
             if self.thin_pool.get_mut_filesystem_by_name(*name).is_some() {
                 return Err(StratisError::Engine(
                     ErrorEnum::AlreadyExists,
@@ -355,9 +353,7 @@ impl Pool for StratPool {
         uuid: FilesystemUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction> {
-        if let Err(e) = validate_name(new_name) {
-            return Err(e);
-        }
+        validate_name(new_name)?;
         self.thin_pool.rename_filesystem(pool_name, uuid, new_name)
     }
 
@@ -368,9 +364,7 @@ impl Pool for StratPool {
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
     ) -> StratisResult<(FilesystemUuid, &mut Filesystem)> {
-        if let Err(e) = validate_name(snapshot_name) {
-            return Err(e);
-        }
+        validate_name(snapshot_name)?;
         self.thin_pool
             .snapshot_filesystem(pool_uuid, pool_name, origin_uuid, snapshot_name)
     }

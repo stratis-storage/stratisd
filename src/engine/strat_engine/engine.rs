@@ -22,6 +22,7 @@ use super::backstore::{find_all, get_metadata};
 use super::cleanup::teardown_pools;
 use super::cmd::verify_binaries;
 use super::dm::{get_dm, get_dm_init};
+use super::names::validate_name;
 use super::pool::{check_metadata, StratPool};
 
 const REQUIRED_DM_MINOR_VERSION: u32 = 37;
@@ -166,6 +167,8 @@ impl Engine for StratEngine {
     ) -> StratisResult<PoolUuid> {
         let redundancy = calculate_redundancy!(redundancy);
 
+        validate_name(name)?;
+
         if self.pools.contains_name(name) {
             return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
@@ -278,6 +281,7 @@ impl Engine for StratEngine {
     }
 
     fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction> {
+        validate_name(new_name)?;
         let old_name = rename_pool_pre!(self; uuid; new_name);
 
         let (_, mut pool) = self.pools

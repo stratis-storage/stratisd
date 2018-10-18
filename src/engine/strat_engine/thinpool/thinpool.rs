@@ -32,7 +32,7 @@ use super::super::backstore::Backstore;
 use super::super::cmd::{thin_check, thin_repair};
 use super::super::device::wipe_sectors;
 use super::super::dm::get_dm;
-use super::super::dmnames::{
+use super::super::names::{
     format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole, ThinRole,
 };
 use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};

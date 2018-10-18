@@ -2,12 +2,15 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// Functions for dealing with device mapper names.
+// Functions for dealing with stratis and device mapper names.
 
 use std::fmt;
 use std::fmt::Display;
+use std::path::Path;
 
 use devicemapper::{DmNameBuf, DmUuidBuf};
+
+use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::engine::{FilesystemUuid, PoolUuid};
 
@@ -182,4 +185,93 @@ pub fn format_backstore_ids(pool_uuid: PoolUuid, role: CacheRole) -> (DmNameBuf,
         DmNameBuf::new(value.clone()).expect("FORMAT_VERSION display_length < 60"),
         DmUuidBuf::new(value).expect("FORMAT_VERSION display_length < 61"),
     )
+}
+
+/// Validate a path for use as a Pool or Filesystem name.
+pub fn validate_name(name: &str) -> StratisResult<()> {
+    let name_path = Path::new(name);
+    if name.contains('\u{0}') {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name contains NULL characters : {}", name),
+        ));
+    }
+    if name_path.components().collect::<Vec<_>>().len() != 1 {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name is a path with 0 or more than 1 components : {}", name),
+        ));
+    }
+    if name_path.is_absolute() {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name is an absolute path : {}", name),
+        ));
+    }
+    if name == "." || name == ".." {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name is . or .. : {}", name),
+        ));
+    }
+    // Linux has a maximum filename length of 255 bytes
+    if name.len() > 255 {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name has more than 255 characters : {}", name),
+        ));
+    }
+
+    if name.len() != name.trim().len() {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name contains leading or trailing space : {}", name),
+        ));
+    }
+    if name.chars().any(|c| c.is_control()) {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name contains control characters : {}", name),
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use engine::strat_engine::names::validate_name;
+
+    #[test]
+    pub fn test_validate_name() {
+        assert!(validate_name(&'\u{0}'.to_string()).is_err());
+        assert!(validate_name("./some").is_err());
+        assert!(validate_name("../../root").is_err());
+        assert!(validate_name("/").is_err());
+        assert!(validate_name("\u{1c}\u{7}").is_err());
+        assert!(validate_name("./foo/bar.txt").is_err());
+        assert!(validate_name(".").is_err());
+        assert!(validate_name("..").is_err());
+        assert!(validate_name("/dev/sdb").is_err());
+        assert!(validate_name("").is_err());
+        assert!(validate_name("/").is_err());
+        assert!(validate_name(" leading_space").is_err());
+        assert!(validate_name("trailing_space ").is_err());
+        assert!(validate_name("\u{0}leading_null").is_err());
+        assert!(validate_name("trailing_null\u{0}").is_err());
+        assert!(validate_name("middle\u{0}_null").is_err());
+        assert!(validate_name("\u{0}multiple\u{0}_null\u{0}").is_err());
+        assert!(validate_name(&"𐌏".repeat(64)).is_err());
+
+        assert!(validate_name(&"𐌏".repeat(63)).is_ok());
+        assert!(validate_name(&'\u{10fff8}'.to_string()).is_ok());
+        assert!(validate_name("*< ? >").is_ok());
+        assert!(validate_name("...").is_ok());
+        assert!(validate_name("ok.name").is_ok());
+        assert!(validate_name("ok name with spaces").is_ok());
+        assert!(validate_name("\\\\").is_ok());
+        assert!(validate_name("\u{211D}").is_ok());
+        assert!(validate_name("☺").is_ok());
+        assert!(validate_name("ok_name").is_ok());
+    }
 }

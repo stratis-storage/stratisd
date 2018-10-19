@@ -781,7 +781,7 @@ mod tests {
         backstore.add_cachedevs(pool_uuid, paths2).unwrap();
         invariant(&backstore);
 
-        assert!(backstore.device() != old_device);
+        assert_ne!(backstore.device(), old_device);
 
         let backstore_save = backstore.record();
 

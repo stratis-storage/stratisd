@@ -78,7 +78,6 @@ class CreateFSTestCase(unittest.TestCase):
             ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
         self.assertEqual(len([x for x in result]), 0)
 
-    @unittest.skip("skip until creating multiple filesystems is supported")
     def testDuplicateSpecs(self):
         """
         Test calling with duplicate specification for same filesystem name.
@@ -168,7 +167,6 @@ class CreateFSTestCase1(unittest.TestCase):
             ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
         self.assertEqual(len([x for x in result]), 2)
 
-    @unittest.skip("skip until creating multiple filesystems is supported")
     def testCreateWithConflict(self):
         """
         Test calling by specifying several volumes. Because there is already

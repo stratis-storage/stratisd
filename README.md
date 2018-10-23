@@ -67,10 +67,30 @@ Stratisd requires Rust 1.25+ and Cargo to build. These may be available via
 your distribution's package manager. If not, [Rustup](https://www.rustup.rs/)
 is available to install and update the Rust toolchain.
 
-Stratisd makes use of `rustfmt` to enforce consistent formatting in Rust files.
-PRs must pass the `fmt` task in the CI in order to be merged. The `fmt`
-task currently uses rustfmt-preview (pinned to 0.6.1).
+Stratisd makes use of `rustfmt` to enforce consistent formatting in Rust
+files.  PRs must pass the `fmt` task in the CI in order to be merged. The
+`fmt` task currently uses rustfmt-preview (pinned to 0.6.1, as shipped with
+Rust 1.27).
 
+##### Getting correct rustfmt (Fedora 28 x86_64)
+
+Since Fedora now ships with a newer version of rustfmt, one must get the old
+version and lock the version.
+
+1. `sudo rpm -Uvh
+   https://kojipkgs.fedoraproject.org//packages/rust/1.27.2/3.fc28/x86_64/rustfmt-preview-0.6.1-3.fc28.x86_64.rpm`
+1. `sudo dnf install python3-dnf-plugin-versionlock`
+1. `sudo dnf versionlock add rustfmt-preview`
+
+##### Getting correct rustfmt (Other distros and archs)
+
+Use [Rustup](https://rustup.rs/). The proper version of rustfmt (0.6.1)
+shipped with Rust 1.27.2.
+
+1. Install Rustup as shown on the Rustup website
+1. Logout and back in to ensure $PATH includes `~/.cargo/bin`
+1. `rustup default 1.27.2`
+1. `rustup component add rustfmt-preview`
 
 #### Secondary dependencies
 The rust library dbus-rs has an external dependency on the C dbus library

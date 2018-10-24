@@ -1286,8 +1286,9 @@ mod tests {
         }
         match pool.thin_pool.status(get_dm()).unwrap() {
             dm::ThinPoolStatus::Working(ref status) => {
-                assert!(
-                    status.summary == ThinPoolStatusSummary::OutOfSpace,
+                assert_eq!(
+                    status.summary,
+                    ThinPoolStatusSummary::OutOfSpace,
                     "Expected full pool"
                 );
             }
@@ -1307,8 +1308,9 @@ mod tests {
         // Verify the pool is back in a Good state
         match pool.thin_pool.status(get_dm()).unwrap() {
             dm::ThinPoolStatus::Working(ref status) => {
-                assert!(
-                    status.summary == ThinPoolStatusSummary::Good,
+                assert_eq!(
+                    status.summary,
+                    ThinPoolStatusSummary::Good,
                     "Expected pool to be restored to good state"
                 );
             }
@@ -1896,7 +1898,7 @@ mod tests {
         let new_device = backstore
             .device()
             .expect("Space already allocated from backstore, backstore must have device");
-        assert!(old_device != new_device);
+        assert_ne!(old_device, new_device);
         pool.set_device(new_device).unwrap();
         pool.resume().unwrap();
 

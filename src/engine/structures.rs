@@ -226,7 +226,7 @@ impl<T> Table<T> {
                 assert_eq!(old_name, name);
                 vec![(name, uuid, old_item)]
             } else {
-                assert!(old_name != name);
+                assert_ne!(old_name, name);
                 let other_uuid = self.name_to_uuid
                     .remove(&old_name)
                     .expect("invariant requires existence");

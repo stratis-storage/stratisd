@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 
 use devicemapper::{
     Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus, IEC,
-    SECTOR_SIZE,
 };
 
 use libmount;
@@ -28,14 +27,15 @@ use super::super::cmd::{create_fs, set_uuid, xfs_growfs};
 use super::super::dm::get_dm;
 use super::super::names::{format_thin_ids, ThinRole};
 use super::super::serde_structs::FilesystemSave;
+use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER};
 
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
 const TEMP_MNT_POINT_PREFIX: &str = "stratis_mp_";
 
-/// TODO: confirm that 256 MiB leaves enough time for stratisd to respond and extend before
-/// the filesystem is out of space.
-pub const FILESYSTEM_LOWATER: Sectors = Sectors(256 * IEC::Mi / (SECTOR_SIZE as u64)); // = 256 MiB
+/// Set the low water mark on the filesystem at 4 times the data low water.  The filesystem
+/// expansion check is triggered by crossing the data low water mark for the thin pool.
+pub const FILESYSTEM_LOWATER: Sectors = Sectors(DATA_LOWATER.0 * DATA_BLOCK_SIZE.0 * 4);
 
 #[derive(Debug)]
 pub struct StratFilesystem {

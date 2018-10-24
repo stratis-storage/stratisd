@@ -43,7 +43,7 @@ use super::mdv::MetadataVol;
 use super::thinids::ThinDevIdPool;
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
-const DATA_LOWATER: DataBlocks = DataBlocks(512);
+pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
 const META_LOWATER_FALLBACK: MetaBlocks = MetaBlocks(512);
 
 const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);

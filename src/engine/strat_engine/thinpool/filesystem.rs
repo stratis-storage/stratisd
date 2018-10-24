@@ -8,6 +8,8 @@ use uuid::Uuid;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::thread::sleep;
+use std::time::Duration;
 
 use devicemapper::{
     Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus, IEC,
@@ -71,8 +73,25 @@ impl StratFilesystem {
         )?;
 
         if let Err(err) = create_fs(&thin_dev.devnode(), fs_uuid) {
-            udev_settle()?;
-            thin_dev.destroy(get_dm(), thinpool_dev)?;
+            if let Err(err2) = udev_settle() {
+                error!(
+                    "While handling create_fs error, udev_settle() failed: {}",
+                    err2
+                );
+                // Should never happen, but just in case, give some time to
+                // get off the dev.
+                sleep(Duration::from_secs(5))
+            }
+            if let Err(err2) = thin_dev.destroy(get_dm(), thinpool_dev) {
+                error!(
+                    "While handling create_fs error, thin_dev.destroy() failed: {}",
+                    err2
+                );
+                // This will result in a dangling DM device that will prevent
+                // the thinpool from being destroyed, and wasted space in the
+                // thinpool.
+                // TODO: Recover. But how?
+            }
             return Err(err);
         }
 

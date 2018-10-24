@@ -63,7 +63,7 @@ impl StratFilesystem {
     ) -> StratisResult<(FilesystemUuid, StratFilesystem)> {
         let fs_uuid = Uuid::new_v4();
         let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
-        let mut thin_dev = ThinDev::new(
+        let thin_dev = ThinDev::new(
             get_dm(),
             &dm_name,
             Some(&dm_uuid),
@@ -72,37 +72,27 @@ impl StratFilesystem {
             id,
         )?;
 
-        if let Err(err) = create_fs(&thin_dev.devnode(), fs_uuid) {
-            if let Err(err2) = udev_settle() {
+        let mut fs = StratFilesystem {
+            thin_dev,
+            created: Utc::now(),
+            dbus_path: MaybeDbusPath(None),
+        };
+
+        if let Err(err) = create_fs(&fs.thin_dev.devnode(), fs_uuid) {
+            // If this fails, it will result in a dangling DM device that will
+            // prevent the thinpool from being destroyed, and leave wasted
+            // space in the thinpool.
+            // TODO: Recover. But how?
+            if let Err(err2) = fs.destroy(thinpool_dev) {
                 error!(
-                    "While handling create_fs error, udev_settle() failed: {}",
+                    "While handling failed create_fs(), fs.destroy() failed: {}",
                     err2
                 );
-                // Should never happen, but just in case, give some time to
-                // get off the dev.
-                sleep(Duration::from_secs(5))
-            }
-            if let Err(err2) = thin_dev.destroy(get_dm(), thinpool_dev) {
-                error!(
-                    "While handling create_fs error, thin_dev.destroy() failed: {}",
-                    err2
-                );
-                // This will result in a dangling DM device that will prevent
-                // the thinpool from being destroyed, and wasted space in the
-                // thinpool.
-                // TODO: Recover. But how?
             }
             return Err(err);
         }
 
-        Ok((
-            fs_uuid,
-            StratFilesystem {
-                thin_dev,
-                created: Utc::now(),
-                dbus_path: MaybeDbusPath(None),
-            },
-        ))
+        Ok((fs_uuid, fs))
     }
 
     /// Build a StratFilesystem that includes the ThinDev and related info.
@@ -237,6 +227,12 @@ impl StratFilesystem {
 
     /// Destroy the filesystem.
     pub fn destroy(&mut self, thin_pool: &ThinPoolDev) -> StratisResult<()> {
+        if let Err(err) = udev_settle() {
+            error!("While calling destroy(),  udev_settle() failed: {}", err);
+            // Should never happen, but just in case, give some time to
+            // get off the dev.
+            sleep(Duration::from_secs(5))
+        }
         self.thin_dev.destroy(get_dm(), thin_pool)?;
         Ok(())
     }

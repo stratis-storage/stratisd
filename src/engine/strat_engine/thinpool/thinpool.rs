@@ -899,10 +899,18 @@ impl ThinPool {
         name: &str,
         size: Option<Sectors>,
     ) -> StratisResult<FilesystemUuid> {
-        let (fs_uuid, new_filesystem) =
+        let (fs_uuid, mut new_filesystem) =
             StratFilesystem::initialize(pool_uuid, &self.thin_pool, size, self.id_gen.new_id()?)?;
         let name = Name::new(name.to_owned());
-        self.mdv.save_fs(&name, fs_uuid, &new_filesystem)?;
+        if let Err(err) = self.mdv.save_fs(&name, fs_uuid, &new_filesystem) {
+            if let Err(err2) = new_filesystem.destroy(&self.thin_pool) {
+                error!(
+                    "When handling failed save_fs(), fs.destroy() failed: {}",
+                    err2
+                )
+            }
+            return Err(err);
+        }
         devlinks::filesystem_added(pool_name, &name, &new_filesystem.devnode());
         self.filesystems.insert(name, fs_uuid, new_filesystem);
 

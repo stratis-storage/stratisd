@@ -24,7 +24,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 use super::super::super::engine::Filesystem;
 use super::super::super::types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid};
 
-use super::super::cmd::{create_fs, set_uuid, xfs_growfs};
+use super::super::cmd::{create_fs, set_uuid, udev_settle, xfs_growfs};
 use super::super::dm::get_dm;
 use super::super::names::{format_thin_ids, ThinRole};
 use super::super::serde_structs::FilesystemSave;
@@ -71,6 +71,7 @@ impl StratFilesystem {
         )?;
 
         if let Err(err) = create_fs(&thin_dev.devnode(), fs_uuid) {
+            udev_settle()?;
             thin_dev.destroy(get_dm(), thinpool_dev)?;
             return Err(err);
         }

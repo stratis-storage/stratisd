@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Utc};
 
-use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
+use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors, IEC, SECTOR_SIZE};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -22,7 +22,7 @@ use super::super::names::{format_backstore_ids, CacheRole};
 use super::super::serde_structs::{BackstoreSave, CapSave, Recordable};
 
 use super::blockdev::StratBlockDev;
-use super::blockdevmgr::{map_to_dm, BlockDevMgr};
+use super::blockdevmgr::{map_to_dm, BlkDevSegment, BlockDevMgr};
 use super::cache_tier::CacheTier;
 use super::data_tier::DataTier;
 use super::metadata::MIN_MDA_SECTORS;
@@ -31,6 +31,9 @@ use super::setup::get_blockdevs;
 /// Use a cache block size that the kernel docs indicate is the largest
 /// typical size.
 const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
+
+/// Temporarily limit total cache size to this value.
+const MAX_CACHE_SIZE: Sectors = Sectors(32 * IEC::Ti / SECTOR_SIZE as u64);
 
 /// Make a DM cache device. If the cache device is being made new,
 /// take extra steps to make it clean.
@@ -93,6 +96,22 @@ pub struct Backstore {
     linear: Option<LinearDev>,
     /// Index for managing allocation of cap device
     next: Sectors,
+}
+
+/// Limit max size of cachedev in a very crude way, until we can support
+/// extending the cache meta device.
+// Ignore all blkdevsegments that contain sectors that are beyond 32 TiB
+// TODO: Remove the need for this function
+fn constrain_max_cache_size(segs: &[BlkDevSegment]) -> &[BlkDevSegment] {
+    let mut acc = Sectors(0);
+    for (idx, seg) in segs.iter().enumerate() {
+        acc = Sectors((*acc).saturating_add(*seg.segment.length));
+        if acc > MAX_CACHE_SIZE {
+            return &segs[..idx];
+        }
+    }
+
+    segs
 }
 
 impl Backstore {
@@ -195,7 +214,7 @@ impl Backstore {
                 let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, paths)?;
 
                 if cache_change {
-                    let table = map_to_dm(&cache_tier.cache_segments);
+                    let table = map_to_dm(constrain_max_cache_size(&cache_tier.cache_segments));
                     cache_device.set_cache_table(get_dm(), table)?;
                     cache_device.resume(get_dm())?;
                 }
@@ -562,6 +581,8 @@ mod tests {
 
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
+    use super::super::blockdevmgr::Segment;
+
     use super::super::super::cmd;
     use super::super::super::tests::{loopbacked, real};
 
@@ -823,5 +844,58 @@ mod tests {
     #[test]
     pub fn travis_test_setup() {
         loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
+    }
+
+    #[test]
+    fn test_constrain_max_cache_size() {
+        // segment with one sector
+        let small_seg = BlkDevSegment {
+            uuid: Uuid::new_v4(),
+            segment: Segment::new(Device::from(1), Sectors(0), Sectors(1)),
+        };
+        // segment with MAX_CACHE_SIZE - 1 sector
+        let large_seg = BlkDevSegment {
+            uuid: Uuid::new_v4(),
+            segment: Segment::new(Device::from(1), Sectors(0), MAX_CACHE_SIZE - Sectors(1)),
+        };
+        // largest possible segment
+        let max_seg = BlkDevSegment {
+            uuid: Uuid::new_v4(),
+            segment: Segment::new(Device::from(1), Sectors(0), Sectors(u64::max_value())),
+        };
+
+        assert_eq!(constrain_max_cache_size(&[large_seg.clone()]).len(), 1);
+        assert_eq!(
+            constrain_max_cache_size(&[large_seg.clone(), large_seg.clone()]).len(),
+            1
+        );
+        assert_eq!(
+            constrain_max_cache_size(&[large_seg.clone(), small_seg.clone()]).len(),
+            2
+        );
+        assert_eq!(
+            constrain_max_cache_size(&[large_seg.clone(), small_seg.clone(), small_seg.clone()])
+                .len(),
+            2
+        );
+        assert_eq!(
+            constrain_max_cache_size(&[small_seg.clone(), large_seg.clone()]).len(),
+            2
+        );
+        assert_eq!(
+            constrain_max_cache_size(&[small_seg.clone(), small_seg.clone(), large_seg.clone()])
+                .len(),
+            2
+        );
+        assert_eq!(
+            constrain_max_cache_size(&[small_seg.clone(), small_seg.clone(), small_seg.clone()])
+                .len(),
+            3
+        );
+        assert_eq!(
+            constrain_max_cache_size(&[small_seg.clone(), small_seg.clone(), max_seg.clone()])
+                .len(),
+            2
+        );
     }
 }

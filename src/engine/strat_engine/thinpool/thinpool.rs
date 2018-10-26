@@ -38,7 +38,7 @@ use super::super::names::{
 use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 use super::super::set_write_throttling;
 
-use super::filesystem::{FilesystemStatus, StratFilesystem};
+use super::filesystem::{fs_settle, FilesystemStatus, StratFilesystem};
 use super::mdv::MetadataVol;
 use super::thinids::ThinDevIdPool;
 
@@ -903,6 +903,7 @@ impl ThinPool {
             StratFilesystem::initialize(pool_uuid, &self.thin_pool, size, self.id_gen.new_id()?)?;
         let name = Name::new(name.to_owned());
         if let Err(err) = self.mdv.save_fs(&name, fs_uuid, &new_filesystem) {
+            fs_settle();
             if let Err(err2) = new_filesystem.destroy(&self.thin_pool) {
                 error!(
                     "When handling failed save_fs(), fs.destroy() failed: {}",

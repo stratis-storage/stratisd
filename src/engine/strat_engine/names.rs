@@ -196,7 +196,7 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
             format!("Name contains NULL characters : {}", name),
         ));
     }
-    if name_path.components().collect::<Vec<_>>().len() != 1 {
+    if name_path.components().count() != 1 {
         return Err(StratisError::Engine(
             ErrorEnum::Invalid,
             format!("Name is a path with 0 or more than 1 components : {}", name),

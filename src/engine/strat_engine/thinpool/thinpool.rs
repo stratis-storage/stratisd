@@ -6,15 +6,16 @@
 
 use std;
 use std::borrow::BorrowMut;
-use std::cmp::min;
-
+use std::cmp::{max, min};
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use uuid::Uuid;
 
 use devicemapper as dm;
 use devicemapper::{
-    device_exists, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams,
-    LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine,
-    ThinDevId, ThinPoolDev, ThinPoolStatusSummary, IEC,
+    device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams, LinearDev,
+    LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine, ThinDevId,
+    ThinPoolDev, ThinPoolStatusSummary, IEC,
 };
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
@@ -44,6 +45,7 @@ use super::thinids::ThinDevIdPool;
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(512);
+const DATA_EXPAND_SIZE: Sectors = Sectors(16 * IEC::Mi); // 8 GiB
 const META_LOWATER_FALLBACK: MetaBlocks = MetaBlocks(512);
 
 const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
@@ -62,6 +64,40 @@ fn sectors_to_datablocks(sectors: Sectors) -> DataBlocks {
 
 fn datablocks_to_sectors(data_blocks: DataBlocks) -> Sectors {
     *data_blocks * DATA_BLOCK_SIZE
+}
+
+/// Get the value for the "Dirty" key in /proc/meminfo in Sectors.
+/// Return an error if "Dirty" key is not found, value can not be parsed,
+/// or there is some error reading /proc/meminfo.
+fn current_dirty_mem() -> StratisResult<Sectors> {
+    for line in BufReader::new(File::open("/proc/meminfo")?).lines() {
+        let line = line?;
+        let mut iter = line.split_whitespace();
+        if iter.next().map_or(false, |key| key == "Dirty") {
+            return if let Some(value) = iter.next() {
+                match value.parse::<u64>() {
+                    // multiply by 2 for KB to # of sectors conversion
+                    Ok(dirty_mem_size) => Ok(Sectors(dirty_mem_size * 2)),
+                    Err(_) => Err(StratisError::Engine(
+                        ErrorEnum::Invalid,
+                        format!(
+                            "Failed to parse value for \"Dirty\" key from /proc/meminfo : {:?}",
+                            value
+                        ),
+                    )),
+                }
+            } else {
+                Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    "No value found for \"Dirty\" key in /proc/meminfo".into(),
+                ))
+            };
+        }
+    }
+    Err(StratisError::Engine(
+        ErrorEnum::Invalid,
+        "\"Dirty\" key not found in /prop/meminfo".into(),
+    ))
 }
 
 /// Transform a list of segments belonging to a single device into a
@@ -468,7 +504,10 @@ impl ThinPool {
             let remaining = total - used;
             if remaining <= low_water {
                 Some(if data {
-                    Bytes(IEC::Gi).sectors()
+                    match current_dirty_mem() {
+                        Ok(dirty_mem_size) => max(dirty_mem_size, DATA_EXPAND_SIZE),
+                        Err(_) => DATA_EXPAND_SIZE,
+                    }
                 } else {
                     INITIAL_META_SIZE.sectors()
                 })

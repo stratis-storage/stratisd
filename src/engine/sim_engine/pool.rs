@@ -177,6 +177,13 @@ impl Pool for SimPool {
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
     ) -> StratisResult<(FilesystemUuid, &mut Filesystem)> {
+        if self.filesystems.contains_name(snapshot_name) {
+            return Err(StratisError::Engine(
+                ErrorEnum::AlreadyExists,
+                snapshot_name.to_string(),
+            ));
+        }
+
         let uuid = Uuid::new_v4();
         let snapshot = match self.get_filesystem(origin_uuid) {
             Some(_filesystem) => SimFilesystem::new(),

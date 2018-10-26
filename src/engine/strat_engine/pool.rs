@@ -365,6 +365,17 @@ impl Pool for StratPool {
         snapshot_name: &str,
     ) -> StratisResult<(FilesystemUuid, &mut Filesystem)> {
         validate_name(snapshot_name)?;
+
+        if self.thin_pool
+            .get_mut_filesystem_by_name(snapshot_name)
+            .is_some()
+        {
+            return Err(StratisError::Engine(
+                ErrorEnum::AlreadyExists,
+                snapshot_name.to_string(),
+            ));
+        }
+
         self.thin_pool
             .snapshot_filesystem(pool_uuid, pool_name, origin_uuid, snapshot_name)
     }

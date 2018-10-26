@@ -1725,19 +1725,17 @@ mod tests {
             // Write 1 more sector than is initially allocated to a pool
             let write_size = datablocks_to_sectors(INITIAL_DATA_SIZE) + Sectors(1);
             let buf = &[1u8; SECTOR_SIZE];
-            for i in 0..*write_size {
+            for _ in 0..*write_size {
                 f.write_all(buf).unwrap();
-                // Simulate handling a DM event by extending the pool when
-                // the amount of free space in pool has decreased to the
-                // DATA_LOWATER value.
-                if i == *(datablocks_to_sectors(INITIAL_DATA_SIZE - DATA_LOWATER)) {
-                    pool.extend_thin_data_device(
-                        pool_uuid,
-                        &mut backstore,
-                        datablocks_to_sectors(INITIAL_DATA_SIZE),
-                    ).unwrap();
-                }
             }
+            // Simulate handling a DM event by extending the pool when
+            // the amount of free space in pool has decreased to the
+            // DATA_LOWATER value.
+            pool.extend_thin_data_device(
+                pool_uuid,
+                &mut backstore,
+                datablocks_to_sectors(INITIAL_DATA_SIZE),
+            ).unwrap();
         }
     }
 

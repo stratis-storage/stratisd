@@ -177,6 +177,13 @@ impl Pool for SimPool {
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
     ) -> StratisResult<(FilesystemUuid, &mut Filesystem)> {
+        if self.filesystems.contains_name(snapshot_name) {
+            return Err(StratisError::Engine(
+                ErrorEnum::AlreadyExists,
+                snapshot_name.to_string(),
+            ));
+        }
+
         let uuid = Uuid::new_v4();
         let snapshot = match self.get_filesystem(origin_uuid) {
             Some(_filesystem) => SimFilesystem::new(),
@@ -245,7 +252,7 @@ impl Pool for SimPool {
     fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut BlockDev)> {
         self.block_devs
             .iter_mut()
-            .chain(self.cache_devs.iter_mut().into_iter())
+            .chain(self.cache_devs.iter_mut())
             .map(|(uuid, b)| (*uuid, b as &mut BlockDev))
             .collect()
     }

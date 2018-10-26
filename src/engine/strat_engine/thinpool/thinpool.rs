@@ -46,7 +46,7 @@ use super::thinids::ThinDevIdPool;
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(2048); // 2 GiB
 const DATA_EXPAND_SIZE: Sectors = Sectors(16 * IEC::Mi); // 8 GiB
-const META_LOWATER_FALLBACK: MetaBlocks = MetaBlocks(512);
+const META_LOWATER_FALLBACK: MetaBlocks = MetaBlocks(1024);
 
 const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
 const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);

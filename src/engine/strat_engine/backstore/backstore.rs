@@ -65,7 +65,7 @@ fn make_cache(
         get_dm(),
         &dm_name,
         Some(&dm_uuid),
-        map_to_dm(&cache_tier.cache_segments),
+        map_to_dm(constrain_max_cache_size(&cache_tier.cache_segments)),
     )?;
 
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);

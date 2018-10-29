@@ -89,7 +89,7 @@ fn current_dirty_mem() -> StratisResult<Sectors> {
                             ),
                                 ))
                             }
-                        };
+                        }
                     }
                 }
                 _ => continue,

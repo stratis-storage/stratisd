@@ -71,8 +71,8 @@ fn current_dirty_mem() -> StratisResult<Sectors> {
         let line = line?;
         let mut iter = line.split_whitespace();
         if iter.next().map_or(false, |key| key == "Dirty") {
-            if let Some(value) = iter.next() {
-                return match value.parse::<u64>() {
+            return if let Some(value) = iter.next() {
+                match value.parse::<u64>() {
                     // multiply by 2 for KB to # of sectors conversion
                     Ok(dirty_mem_size) => Ok(Sectors(dirty_mem_size * 2)),
                     Err(_) => Err(StratisError::Engine(
@@ -82,8 +82,13 @@ fn current_dirty_mem() -> StratisResult<Sectors> {
                             value
                         ),
                     )),
-                };
-            }
+                }
+            } else {
+                Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    "No value found for \"Dirty\" key in /proc/meminfo".into(),
+                ))
+            };
         }
     }
     Err(StratisError::Engine(

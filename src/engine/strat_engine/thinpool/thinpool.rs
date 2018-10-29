@@ -72,19 +72,17 @@ fn current_dirty_mem() -> StratisResult<Sectors> {
         let mut iter = line.split_whitespace();
         if iter.next().map_or(false, |key| key == "Dirty") {
             if let Some(value) = iter.next() {
-                match value.parse::<u64>() {
+                return match value.parse::<u64>() {
                     // multiply by 2 for KB to # of sectors conversion
-                    Ok(dirty_mem_size) => return Ok(Sectors(dirty_mem_size * 2)),
-                    Err(_) => {
-                        return Err(StratisError::Engine(
-                            ErrorEnum::Invalid,
-                            format!(
-                                "Failed to parse value of dirty_mem_size from /proc/meminfo : {:?}",
-                                value
-                            ),
-                        ))
-                    }
-                }
+                    Ok(dirty_mem_size) => Ok(Sectors(dirty_mem_size * 2)),
+                    Err(_) => Err(StratisError::Engine(
+                        ErrorEnum::Invalid,
+                        format!(
+                            "Failed to parse value of dirty_mem_size from /proc/meminfo : {:?}",
+                            value
+                        ),
+                    )),
+                };
             }
         }
     }

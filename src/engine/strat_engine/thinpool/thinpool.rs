@@ -66,6 +66,9 @@ fn datablocks_to_sectors(data_blocks: DataBlocks) -> Sectors {
     *data_blocks * DATA_BLOCK_SIZE
 }
 
+/// Get the value for the "Dirty" key in /proc/meminfo in Sectors.
+/// Return an error if "Dirty" key is not found, value can not be parsed,
+/// or there is some error reading /proc/meminfo.
 fn current_dirty_mem() -> StratisResult<Sectors> {
     for line in BufReader::new(File::open("/proc/meminfo")?).lines() {
         let line = line?;

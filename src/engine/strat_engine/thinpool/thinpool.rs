@@ -78,7 +78,7 @@ fn current_dirty_mem() -> StratisResult<Sectors> {
                     Err(_) => Err(StratisError::Engine(
                         ErrorEnum::Invalid,
                         format!(
-                            "Failed to parse value of dirty_mem_size from /proc/meminfo : {:?}",
+                            "Failed to parse value for \"Dirty\" key from /proc/meminfo : {:?}",
                             value
                         ),
                     )),
@@ -93,7 +93,7 @@ fn current_dirty_mem() -> StratisResult<Sectors> {
     }
     Err(StratisError::Engine(
         ErrorEnum::Invalid,
-        "Dirty value not found in /prop/meminfo".into(),
+        "\"Dirty\" key not found in /prop/meminfo".into(),
     ))
 }
 

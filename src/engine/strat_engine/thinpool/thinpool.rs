@@ -66,7 +66,7 @@ fn datablocks_to_sectors(data_blocks: DataBlocks) -> Sectors {
     *data_blocks * DATA_BLOCK_SIZE
 }
 
-pub fn current_dirty_mem() -> StratisResult<Sectors> {
+fn current_dirty_mem() -> StratisResult<Sectors> {
     let file = File::open("/proc/meminfo")?;
     let reader = BufReader::new(file);
 

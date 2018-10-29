@@ -855,6 +855,7 @@ mod tests {
         loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
     }
 
+    // TODO: Use proptest to test this method more effectively.
     #[test]
     fn test_constrain_max_cache_size() {
         // segment with one sector

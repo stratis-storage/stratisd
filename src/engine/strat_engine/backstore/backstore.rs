@@ -70,6 +70,8 @@ fn make_cache(
         get_dm(),
         &dm_name,
         Some(&dm_uuid),
+        // FIXME: Remove constraint when it becomes possible to dynamically
+        // extend the meta sub-device.
         map_to_dm(constrain_max_cache_size(&cache_tier.cache_segments)),
     )?;
 
@@ -219,6 +221,8 @@ impl Backstore {
                 let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, paths)?;
 
                 if cache_change {
+                    // FIXME: Remove constraint when it becomes possible to
+                    // dynamically extend the meta sub-device.
                     let table = map_to_dm(constrain_max_cache_size(&cache_tier.cache_segments));
                     cache_device.set_cache_table(get_dm(), table)?;
                     cache_device.resume(get_dm())?;

@@ -67,10 +67,7 @@ fn datablocks_to_sectors(data_blocks: DataBlocks) -> Sectors {
 }
 
 fn current_dirty_mem() -> StratisResult<Sectors> {
-    let file = File::open("/proc/meminfo")?;
-    let reader = BufReader::new(file);
-
-    for line in reader.lines() {
+    for line in BufReader::new(File::open("/proc/meminfo")?).lines() {
         let line = line?;
         let mut iter = line.split_whitespace();
         if let Some(key) = iter.next() {

@@ -62,9 +62,11 @@ class CreateSnapshotTestCase(unittest.TestCase):
             self._pool_object, {'specs': [self._VOLNAME]})
 
         self.assertEqual(rc, StratisdErrors.OK)
-        self.assertNotEqual(fs_objects, "/")
 
-        self._fs_object_path = fs_objects[0][0]
+        fs_object_path = fs_objects[0][0]
+        self.assertNotEqual(fs_object_path, "/")
+
+        self._fs_object_path = fs_object_path
 
     def tearDown(self):
         """

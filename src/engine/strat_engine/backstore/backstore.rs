@@ -32,7 +32,12 @@ use super::setup::get_blockdevs;
 /// typical size.
 const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
 
-/// Temporarily limit total cache size to this value.
+/// Limit total cache size to 32 TiB. With cache block size of 2048 sectors
+/// and cache meta sub-device 1 Mi-sectors (which are constants in the
+/// implementation at this time) the cache device runs out of metadata space
+/// at around 40 TiB.
+// TODO: Remove the definition of this constant when it becomes possible to
+// grow the cache indefinitely.
 const MAX_CACHE_SIZE: Sectors = Sectors(32 * IEC::Ti / SECTOR_SIZE as u64);
 
 /// Make a DM cache device. If the cache device is being made new,

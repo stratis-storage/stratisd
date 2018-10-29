@@ -860,7 +860,6 @@ impl ThinPool {
         self.filesystems.get_mut_by_uuid(uuid)
     }
 
-    #[allow(dead_code)]
     pub fn get_filesystem_by_name(&self, name: &str) -> Option<(FilesystemUuid, &StratFilesystem)> {
         self.filesystems.get_by_name(name)
     }

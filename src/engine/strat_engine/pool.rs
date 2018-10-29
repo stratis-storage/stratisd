@@ -367,7 +367,7 @@ impl Pool for StratPool {
         validate_name(snapshot_name)?;
 
         if self.thin_pool
-            .get_mut_filesystem_by_name(snapshot_name)
+            .get_filesystem_by_name(snapshot_name)
             .is_some()
         {
             return Err(StratisError::Engine(

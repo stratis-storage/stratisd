@@ -35,7 +35,7 @@ const TEMP_MNT_POINT_PREFIX: &str = "stratis_mp_";
 
 /// Set the low water mark on the filesystem at 4 times the data low water.  The filesystem
 /// expansion check is triggered by crossing the data low water mark for the thin pool.
-pub const FILESYSTEM_LOWATER: Sectors = Sectors(DATA_LOWATER.0 * DATA_BLOCK_SIZE.0 * 4);
+pub const FILESYSTEM_LOWATER: Sectors = Sectors(4 * (DATA_LOWATER.0 * DATA_BLOCK_SIZE.0));
 
 #[derive(Debug)]
 pub struct StratFilesystem {

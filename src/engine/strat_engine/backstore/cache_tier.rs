@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-use devicemapper::{Sectors, IEC};
+use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -16,6 +16,14 @@ use super::super::serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Reco
 
 use super::blockdev::StratBlockDev;
 use super::blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment};
+
+/// This is a temporary maximum cache size. In the future it will be possible
+/// to dynamically increase the cache size beyond this limit. When this is
+/// achieved this constant definition should be removed. This choice of a
+/// maximum cache size is a function of the current values for the cache block
+/// size, 2 Ki-sectors, and the current value for the metadata sub-device size,
+/// 1 Mi-sectors.
+const MAX_CACHE_SIZE: Sectors = Sectors(32 * IEC::Ti / SECTOR_SIZE as u64);
 
 /// Handles the cache devices.
 #[derive(Debug)]
@@ -83,6 +91,10 @@ impl CacheTier {
     /// the second is true if the meta sub-device's segments were changed.
     /// Adds all additional space to cache sub-device.
     /// WARNING: metadata changing event
+    ///
+    /// Return an error if the addition of the cachedevs would result in a
+    /// cache with a cache sub-device size greater than 32 TiB.
+    ///
     // FIXME: That all segments on the newly added device are added to the
     // cache sub-device and none to the meta sub-device could lead to failure.
     // Presumably, the size required for the meta sub-device varies directly
@@ -95,6 +107,25 @@ impl CacheTier {
         let uuids = self.block_mgr.add(pool_uuid, paths)?;
 
         let avail_space = self.block_mgr.avail_space();
+
+        // FIXME: This check will become unnecessary when cache metadata device
+        // can be increased dynamically.
+        if avail_space
+            + self.cache_segments
+                .iter()
+                .map(|x| x.segment.length)
+                .sum::<Sectors>() > MAX_CACHE_SIZE
+        {
+            self.block_mgr.remove_blockdevs(&uuids)?;
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                format!(
+                    "The size of the cache sub-device may not exceed {}",
+                    MAX_CACHE_SIZE
+                ),
+            ));
+        }
+
         let segments = self.block_mgr
             .alloc_space(&[avail_space])
             .expect("asked for exactly the space available, must get")
@@ -109,8 +140,11 @@ impl CacheTier {
 
     /// Setup a new CacheTier struct from the block_mgr.
     ///
+    /// Returns an error if the block devices passed would make the cache
+    /// sub-device too big.
+    ///
     /// WARNING: metadata changing event
-    pub fn new(mut block_mgr: BlockDevMgr) -> CacheTier {
+    pub fn new(mut block_mgr: BlockDevMgr) -> StratisResult<CacheTier> {
         let avail_space = block_mgr.avail_space();
 
         // FIXME: Come up with a better way to choose metadata device size
@@ -121,6 +155,19 @@ impl CacheTier {
             "every block device must be at least one GiB"
         );
 
+        // FIXME: This check will become unnecessary when cache metadata device
+        // can be increased dynamically.
+        if avail_space - meta_space > MAX_CACHE_SIZE {
+            block_mgr.destroy_all()?;
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                format!(
+                    "The size of the cache sub-device may not exceed {}",
+                    MAX_CACHE_SIZE
+                ),
+            ));
+        }
+
         let mut segments = block_mgr
             .alloc_space(&[meta_space, avail_space - meta_space])
             .expect("asked for exactly the space available, must get");
@@ -128,11 +175,11 @@ impl CacheTier {
         let cache_segments = segments.pop().expect("segments.len() == 2");
         let meta_segments = segments.pop().expect("segments.len() == 1");
 
-        CacheTier {
+        Ok(CacheTier {
             block_mgr,
             meta_segments,
             cache_segments,
-        }
+        })
     }
 
     /// Destroy the tier. Wipe its blockdevs.
@@ -201,7 +248,7 @@ mod tests {
 
         let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MIN_MDA_SECTORS).unwrap();
 
-        let mut cache_tier = CacheTier::new(mgr);
+        let mut cache_tier = CacheTier::new(mgr).unwrap();
 
         // A cache tier w/ some devices and everything promptly allocated to
         // the tier.

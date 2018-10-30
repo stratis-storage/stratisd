@@ -216,6 +216,46 @@ impl BlockDevMgr {
         wipe_blockdevs(&self.block_devs)
     }
 
+    /// Remove the specified block devs and erase their metadata.
+    ///
+    /// Precondition: It is the responsibility of the caller to ensure that
+    /// none of the blockdevs are in use, that is, have had any space allocated
+    /// from them for upper layers.
+    ///
+    /// If a specified blockdev is not found, returns an error and does nothing.
+    ///
+    /// NOTE: This method traverses the block_devs Vec from the rear to the
+    /// front, looking for blockdevs to remove. This is algorithmically
+    /// inefficient, unless it is assumed that the blockdevs specified are very
+    /// near the end of the Vec, which is expected to be the case. In that case,
+    /// the algorithm is O(n).
+    pub(super) fn remove_blockdevs(&mut self, uuids: &[DevUuid]) -> StratisResult<()> {
+        let mut removed = Vec::new();
+        for uuid in uuids {
+            let mut found = false;
+            let blockdevs_last_index = self.block_devs.len() - 1;
+            for i in 0..blockdevs_last_index {
+                let index = blockdevs_last_index - i;
+                if self.block_devs[index].uuid() == *uuid {
+                    removed.push(self.block_devs.swap_remove(index));
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                return Err(StratisError::Engine(
+                    ErrorEnum::Error,
+                    format!(
+                        "Blockdev corresponding to UUID: {} not found.",
+                        uuid.simple().to_string()
+                    ),
+                ));
+            }
+        }
+        wipe_blockdevs(&removed)?;
+        Ok(())
+    }
+
     /// Allocate space according to sizes vector request.
     /// Return the segments allocated for each request, or None if it was
     /// not possible to satisfy the request.

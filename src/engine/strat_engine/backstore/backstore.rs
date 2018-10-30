@@ -177,6 +177,10 @@ impl Backstore {
     /// Add cachedevs to the backstore.
     ///
     /// If the cache tier does not already exist, create it.
+    /// If the addition of the cache devs would result in a cache with a
+    /// cache sub-device size greater than 32 TiB return an error.
+    /// FIXME: This restriction on the size of the cache sub-device is
+    /// expected to be removed in subsequent versions.
     ///
     /// Precondition: Must be invoked only after some space has been allocated
     /// from the backstore. This ensures that there is certainly a cap device.
@@ -214,7 +218,7 @@ impl Backstore {
             None => {
                 let bdm = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS)?;
 
-                let cache_tier = CacheTier::new(bdm);
+                let cache_tier = CacheTier::new(bdm)?;
 
                 let linear = self.linear
                     .take()

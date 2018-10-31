@@ -8,6 +8,8 @@ use uuid::Uuid;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::thread::sleep;
+use std::time::Duration;
 
 use devicemapper::{
     Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus, IEC,
@@ -23,7 +25,7 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 use super::super::super::engine::Filesystem;
 use super::super::super::types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid};
 
-use super::super::cmd::{create_fs, set_uuid, xfs_growfs};
+use super::super::cmd::{create_fs, set_uuid, udev_settle, xfs_growfs};
 use super::super::dm::get_dm;
 use super::super::names::{format_thin_ids, ThinRole};
 use super::super::serde_structs::FilesystemSave;
@@ -51,6 +53,17 @@ pub enum FilesystemStatus {
     Failed,
 }
 
+/// If we try to create a filesystem and then fail in a step after making the
+/// fs, we may need to wait for udev to get off it before we can clean it up.
+pub fn fs_settle() -> () {
+    if let Err(err) = udev_settle() {
+        error!("udev_settle() failed: {}", err);
+        // Should never happen, but just in case, give much time to
+        // let udev finish.
+        sleep(Duration::from_secs(5));
+    }
+}
+
 impl StratFilesystem {
     /// Create a StratFilesystem on top of the given ThinDev.
     pub fn initialize(
@@ -71,7 +84,17 @@ impl StratFilesystem {
         )?;
 
         if let Err(err) = create_fs(&thin_dev.devnode(), fs_uuid) {
-            thin_dev.destroy(get_dm(), thinpool_dev)?;
+            fs_settle();
+            if let Err(err2) = thin_dev.destroy(get_dm(), thinpool_dev) {
+                error!(
+                    "While handling create_fs error, thin_dev.destroy() failed: {}",
+                    err2
+                );
+                // This will result in a dangling DM device that will prevent
+                // the thinpool from being destroyed, and wasted space in the
+                // thinpool.
+                // TODO: Recover. But how?
+            }
             return Err(err);
         }
 

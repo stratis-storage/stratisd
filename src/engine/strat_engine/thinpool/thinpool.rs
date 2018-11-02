@@ -1720,26 +1720,42 @@ mod tests {
         let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, fs_name, None)
             .unwrap();
 
-        let devnode = pool.get_filesystem_by_uuid(fs_uuid).unwrap().1.devnode();
-        // Braces to ensure f is closed before destroy
+        let fs_devnode = pool.get_filesystem_by_uuid(fs_uuid).unwrap().1.devnode();
+        let tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
+        mount(
+            Some(&fs_devnode),
+            tmp_dir.path(),
+            Some("xfs"),
+            MsFlags::empty(),
+            None as Option<&str>,
+        ).unwrap();
+
+        // This is a constant, since only explicit actions of the ThinPool
+        // can change it.
+        let data_lowater = pool.thin_pool.table().table.params.low_water_mark;
+
+        let (total_data, used_data) = match pool.thin_pool.status(get_dm()).unwrap() {
+            ThinPoolStatus::Working(ref status) => {
+                (status.usage.total_data, status.usage.used_data)
+            }
+            _ => panic!("Pool status indicates already failed."),
+        };
+
+        // used data is not 0, because the filesystem has been created
+        assert!(used_data != DataBlocks(0));
+
         {
             let mut f = BufWriter::with_capacity(
                 IEC::Mi as usize,
-                OpenOptions::new().write(true).open(devnode).unwrap(),
+                OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .open(tmp_dir.path().join("stratis_test.txt"))
+                    .unwrap(),
             );
-
-            // This is a constant, since only explicit actions of the ThinPool
-            // can change it.
-            let data_lowater = pool.thin_pool.table().table.params.low_water_mark;
-            let (total_data, used_data) = match pool.thin_pool.status(get_dm()).unwrap() {
-                ThinPoolStatus::Working(ref status) => {
-                    (status.usage.total_data, status.usage.used_data)
-                }
-                _ => panic!("Pool status indicates already failed."),
-            };
-
-            // used data is not 0, because the filesystem has been created
-            assert!(used_data != DataBlocks(0));
 
             // Keep going until pool gets to data lowater
             let buf = &[1u8; SECTOR_SIZE];
@@ -1819,6 +1835,7 @@ mod tests {
                 _ => panic!("Pool status indicates already failed."),
             }
         }
+        umount(tmp_dir.path()).unwrap();
     }
 
     #[test]

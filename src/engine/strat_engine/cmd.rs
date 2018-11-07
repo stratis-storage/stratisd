@@ -40,6 +40,7 @@ fn find_binary(name: &str) -> Option<PathBuf> {
 const MKFS_XFS: &str = "mkfs.xfs";
 const THIN_CHECK: &str = "thin_check";
 const THIN_REPAIR: &str = "thin_repair";
+const UDEVADM: &str = "udevadm";
 const XFS_DB: &str = "xfs_db";
 const XFS_GROWFS: &str = "xfs_growfs";
 
@@ -48,6 +49,7 @@ lazy_static! {
         (MKFS_XFS.to_string(), find_binary(MKFS_XFS)),
         (THIN_CHECK.to_string(), find_binary(THIN_CHECK)),
         (THIN_REPAIR.to_string(), find_binary(THIN_REPAIR)),
+        (UDEVADM.to_string(), find_binary(UDEVADM)),
         (XFS_DB.to_string(), find_binary(XFS_DB)),
         (XFS_GROWFS.to_string(), find_binary(XFS_GROWFS)),
     ].iter()
@@ -156,7 +158,7 @@ pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> StratisResult<()> {
 
 /// Call udevadm settle
 pub fn udev_settle() -> StratisResult<()> {
-    execute_cmd(Command::new("udevadm").arg("settle"))
+    execute_cmd(Command::new(get_executable(UDEVADM).as_os_str()).arg("settle"))
 }
 
 #[cfg(test)]

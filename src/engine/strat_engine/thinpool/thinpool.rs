@@ -264,6 +264,8 @@ pub struct ThinPool {
     pool_extend_state: PoolExtendState,
     free_space_state: FreeSpaceState,
     dbus_path: MaybeDbusPath,
+    meta_last_used: Sectors,
+    data_last_used: Sectors,
 }
 
 impl ThinPool {
@@ -371,6 +373,8 @@ impl ThinPool {
             pool_state: PoolState::Initializing,
             pool_extend_state: PoolExtendState::Initializing,
             free_space_state,
+            meta_last_used: Sectors(0),
+            data_last_used: Sectors(0),
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -479,6 +483,8 @@ impl ThinPool {
             pool_state: PoolState::Initializing,
             pool_extend_state: PoolExtendState::Initializing,
             free_space_state,
+            data_last_used: Sectors(0),
+            meta_last_used: Sectors(0),
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -497,14 +503,21 @@ impl ThinPool {
         fn calculate_extension_request(
             total: Sectors,
             used: Sectors,
+            last_used: Sectors,
             low_water: Sectors,
             data: bool,
         ) -> Option<Sectors> {
             let remaining = total - used;
+            debug!("calculate_extension_request");
             if remaining <= low_water {
+                debug!("remaining <= low_water");
                 Some(if data {
                     match current_dirty_mem() {
-                        Ok(dirty_mem_size) => max(dirty_mem_size, DATA_EXPAND_SIZE),
+                        Ok(dirty_mem_size) => {
+                            debug!("dirty_mem_size = {:?} dirty_mem_size + last = {:?} DATA_EXPAND_SIZE = {:?}", dirty_mem_size,  
+                                dirty_mem_size + (used - last_used), DATA_EXPAND_SIZE);
+                            max(dirty_mem_size + (used - last_used), DATA_EXPAND_SIZE)
+                        }
                         Err(_) => DATA_EXPAND_SIZE,
                     }
                 } else {
@@ -522,6 +535,7 @@ impl ThinPool {
             self.backstore_device
         );
 
+        debug!("Check...");
         let mut should_save: bool = false;
         match self.thin_pool.status(get_dm())? {
             ThinPoolStatus::Working(ref status) => {
@@ -554,6 +568,7 @@ impl ThinPool {
                 if let Some(request) = calculate_extension_request(
                     usage.total_meta.sectors(),
                     usage.used_meta.sectors(),
+                    self.meta_last_used,
                     meta_lowater.sectors(),
                     false,
                 ) {
@@ -573,6 +588,7 @@ impl ThinPool {
                     match calculate_extension_request(
                         datablocks_to_sectors(usage.total_data),
                         datablocks_to_sectors(usage.used_data),
+                        self.data_last_used,
                         datablocks_to_sectors(self.thin_pool.table().table.params.low_water_mark),
                         true,
                     ) {
@@ -619,6 +635,8 @@ impl ThinPool {
 
                 self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
                 self.resume()?;
+                self.data_last_used = datablocks_to_sectors(usage.used_data);
+                self.meta_last_used = usage.used_meta.sectors();
                 self.set_extend_state(data_extend_failed, meta_extend_failed);
             }
             ThinPoolStatus::Fail => {

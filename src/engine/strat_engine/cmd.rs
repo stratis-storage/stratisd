@@ -163,3 +163,8 @@ pub fn udev_settle() -> StratisResult<()> {
 pub fn create_ext3_fs(devnode: &Path) -> StratisResult<()> {
     execute_cmd(Command::new("mkfs.ext3").arg(&devnode))
 }
+
+#[cfg(test)]
+pub fn xfs_repair(devnode: &Path) -> StratisResult<()> {
+    execute_cmd(Command::new("xfs_repair").arg("-n").arg(&devnode))
+}

@@ -1704,6 +1704,7 @@ mod tests {
     /// 4. Expand the thin pool data device by twice the low water amount.
     /// 5. Continue to write until the amount written exceeds the original
     /// size of the data device.
+    /// 6. Run xfs_repair to verify success.
     fn test_thinpool_expand(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
         devlinks::setup_devlinks(Vec::new().into_iter());
@@ -1836,6 +1837,7 @@ mod tests {
             }
         }
         umount(tmp_dir.path()).unwrap();
+        assert!(cmd::xfs_repair(&fs_devnode).is_ok());
     }
 
     #[test]

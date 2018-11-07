@@ -72,7 +72,7 @@ fn current_dirty_mem() -> StratisResult<Sectors> {
     for line in BufReader::new(File::open("/proc/meminfo")?).lines() {
         let line = line?;
         let mut iter = line.split_whitespace();
-        if iter.next().map_or(false, |key| key == "Dirty") {
+        if iter.next().map_or(false, |key| key == "Dirty:") {
             return if let Some(value) = iter.next() {
                 match value.parse::<u64>() {
                     // multiply by 2 for KB to # of sectors conversion

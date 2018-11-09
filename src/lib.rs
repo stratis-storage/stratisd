@@ -29,7 +29,8 @@ extern crate walkdir;
 extern crate error_chain;
 
 #[cfg(test)]
-extern crate quickcheck;
+#[macro_use]
+extern crate proptest;
 
 #[macro_use]
 extern crate lazy_static;

@@ -48,30 +48,21 @@ impl Randomizer {
 
 #[cfg(test)]
 mod tests {
-    use quickcheck::QuickCheck;
+    use proptest::prelude::any;
 
     use super::*;
 
-    #[test]
-    fn prop_denominator_result() {
+    proptest! {
+        #[test]
         /// Verify that if the denominator is 0 the result is always false,
         /// if 1, always true.
-        fn denominator_result(denominator: u32) -> bool {
+        fn denominator_result(denominator in any::<u32>()) {
             let result = Randomizer::default()
                 .set_probability(denominator)
                 .throw_die();
-            if denominator > 1 {
-                true
-            } else {
-                if denominator == 0 {
-                    result == false
-                } else {
-                    result == true
-                }
-            }
+            prop_assert!(denominator > 1
+                         || (denominator != 0 && result == false)
+                         || (denominator == 0 && result == true));
         }
-        QuickCheck::new()
-            .tests(30)
-            .quickcheck(denominator_result as fn(u32) -> bool);
     }
 }

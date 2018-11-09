@@ -1275,7 +1275,7 @@ mod tests {
     fn test_full_pool(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         devlinks::setup_dev_path().unwrap();
-        devlinks::setup_devlinks(Vec::new().into_iter());
+        devlinks::cleanup_devlinks(Vec::new().into_iter());
         let (first_path, remaining_paths) = paths.split_at(1);
         let mut backstore = Backstore::initialize(pool_uuid, &first_path, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
@@ -1383,7 +1383,7 @@ mod tests {
     /// Verify a snapshot has the same files and same contents as the origin.
     fn test_filesystem_snapshot(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter());
+        devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
@@ -1490,7 +1490,7 @@ mod tests {
         let name2 = "name2";
 
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter());
+        devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
@@ -1536,7 +1536,7 @@ mod tests {
     /// some data on it.
     fn test_pool_setup(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter());
+        devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
@@ -1595,7 +1595,7 @@ mod tests {
     /// same thin id and verifying that it fails.
     fn test_thindev_destroy(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter());
+        devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
@@ -1707,7 +1707,7 @@ mod tests {
     /// 6. Run xfs_repair to verify success.
     fn test_thinpool_expand(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter());
+        devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
@@ -1864,7 +1864,7 @@ mod tests {
     /// compared to the original size.
     fn test_xfs_expand(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter());
+        devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
@@ -1937,7 +1937,7 @@ mod tests {
     /// to check idempotency.
     fn test_suspend_resume(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter());
+        devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
@@ -1983,7 +1983,7 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let pool_uuid = Uuid::new_v4();
-        devlinks::setup_devlinks(Vec::new().into_iter());
+        devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore = Backstore::initialize(pool_uuid, paths2, MIN_MDA_SECTORS).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,

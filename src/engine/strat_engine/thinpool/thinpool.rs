@@ -11,11 +11,10 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use uuid::Uuid;
 
-use devicemapper as dm;
 use devicemapper::{
     device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams, LinearDev,
     LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine, ThinDevId,
-    ThinPoolDev, ThinPoolStatusSummary, IEC,
+    ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
 };
 
 use stratis::{ErrorEnum, StratisError, StratisResult};
@@ -524,9 +523,8 @@ impl ThinPool {
         );
 
         let mut should_save: bool = false;
-        let thinpool: dm::ThinPoolStatus = self.thin_pool.status(get_dm())?;
-        match thinpool {
-            dm::ThinPoolStatus::Working(ref status) => {
+        match self.thin_pool.status(get_dm())? {
+            ThinPoolStatus::Working(ref status) => {
                 let mut meta_extend_failed = false;
                 let mut data_extend_failed = false;
                 match status.summary {
@@ -623,7 +621,7 @@ impl ThinPool {
                 self.resume()?;
                 self.set_extend_state(data_extend_failed, meta_extend_failed);
             }
-            dm::ThinPoolStatus::Fail => {
+            ThinPoolStatus::Fail => {
                 error!("Thinpool status is fail -> Failed");
                 self.set_state(PoolState::Failed);
                 // TODO: Take pool offline?
@@ -870,9 +868,7 @@ impl ThinPool {
     // in use on the data device.
     pub fn total_physical_used(&self) -> StratisResult<Sectors> {
         let data_dev_used = match self.thin_pool.status(get_dm())? {
-            dm::ThinPoolStatus::Working(ref status) => {
-                datablocks_to_sectors(status.usage.used_data)
-            }
+            ThinPoolStatus::Working(ref status) => datablocks_to_sectors(status.usage.used_data),
             _ => {
                 let err_msg = "thin pool failed, could not obtain usage";
                 return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
@@ -1319,27 +1315,26 @@ mod tests {
             );
             // Write the write_buf until the pool is full
             loop {
-                let status: dm::ThinPoolStatus = pool.thin_pool.status(get_dm()).unwrap();
-                match status {
-                    dm::ThinPoolStatus::Working(_) => {
+                match pool.thin_pool.status(get_dm()).unwrap() {
+                    ThinPoolStatus::Working(_) => {
                         f.write_all(write_buf).unwrap();
                         if f.sync_all().is_err() {
                             break;
                         }
                     }
-                    dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working."),
+                    ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working."),
                 }
             }
         }
         match pool.thin_pool.status(get_dm()).unwrap() {
-            dm::ThinPoolStatus::Working(ref status) => {
+            ThinPoolStatus::Working(ref status) => {
                 assert_eq!(
                     status.summary,
                     ThinPoolStatusSummary::OutOfSpace,
                     "Expected full pool"
                 );
             }
-            dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working/full."),
+            ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working/full."),
         };
 
         // Clear anything that may be on the remaining paths to ensure we can add them
@@ -1354,14 +1349,14 @@ mod tests {
         pool.check(pool_uuid, &mut backstore).unwrap();
         // Verify the pool is back in a Good state
         match pool.thin_pool.status(get_dm()).unwrap() {
-            dm::ThinPoolStatus::Working(ref status) => {
+            ThinPoolStatus::Working(ref status) => {
                 assert_eq!(
                     status.summary,
                     ThinPoolStatusSummary::Good,
                     "Expected pool to be restored to good state"
                 );
             }
-            dm::ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail.  Expected working/good."),
+            ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail.  Expected working/good."),
         };
     }
 
@@ -1663,23 +1658,23 @@ mod tests {
         ).unwrap();
 
         match thin_pool.thin_pool.status(get_dm()).unwrap() {
-            dm::ThinPoolStatus::Working(ref status) => {
+            ThinPoolStatus::Working(ref status) => {
                 let usage = &status.usage;
                 assert_eq!(usage.total_meta, small_meta_size);
                 assert!(usage.used_meta > MetaBlocks(0));
             }
-            dm::ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
+            ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
         }
         // The meta device is smaller than meta lowater, so it should be expanded
         // in the thin_pool.check() call.
         thin_pool.check(pool_uuid, &mut backstore).unwrap();
         match thin_pool.thin_pool.status(get_dm()).unwrap() {
-            dm::ThinPoolStatus::Working(ref status) => {
+            ThinPoolStatus::Working(ref status) => {
                 let usage = &status.usage;
                 // validate that the meta has been expanded.
                 assert!(usage.total_meta > small_meta_size);
             }
-            dm::ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
+            ThinPoolStatus::Fail => panic!("thin_pool.status() failed"),
         }
     }
 
@@ -1700,11 +1695,16 @@ mod tests {
         );
     }
 
-    /// Verify that the physical space allocated to a pool is expanded when
-    /// the number of sectors written to a thin-dev in the pool exceeds the
-    /// INITIAL_DATA_SIZE.  If we are able to write more sectors to the
-    /// filesystem than are initially allocated to the pool, the pool must
-    /// have been expanded.
+    /// Verify that thinpool is expanded to the point where more data can
+    /// be written to it than its original size.
+    /// 1. Initialize the pool.
+    /// 2. Make a filesystem.
+    /// 3. Write to a file until the amount left is definitely at or below the
+    /// low water mark.
+    /// 4. Expand the thin pool data device by twice the low water amount.
+    /// 5. Continue to write until the amount written exceeds the original
+    /// size of the data device.
+    /// 6. Run xfs_repair to verify success.
     fn test_thinpool_expand(paths: &[&Path]) -> () {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
@@ -1721,28 +1721,123 @@ mod tests {
         let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, fs_name, None)
             .unwrap();
 
-        let devnode = pool.get_filesystem_by_uuid(fs_uuid).unwrap().1.devnode();
-        // Braces to ensure f is closed before destroy
+        let fs_devnode = pool.get_filesystem_by_uuid(fs_uuid).unwrap().1.devnode();
+        let tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
+        mount(
+            Some(&fs_devnode),
+            tmp_dir.path(),
+            Some("xfs"),
+            MsFlags::empty(),
+            None as Option<&str>,
+        ).unwrap();
+
+        // This is a constant, since only explicit actions of the ThinPool
+        // can change it.
+        let data_lowater = pool.thin_pool.table().table.params.low_water_mark;
+
+        let (total_data, used_data) = match pool.thin_pool.status(get_dm()).unwrap() {
+            ThinPoolStatus::Working(ref status) => {
+                (status.usage.total_data, status.usage.used_data)
+            }
+            _ => panic!("Pool status indicates already failed."),
+        };
+
+        // used data is not 0, because the filesystem has been created
+        assert!(used_data != DataBlocks(0));
+
         {
             let mut f = BufWriter::with_capacity(
                 IEC::Mi as usize,
-                OpenOptions::new().write(true).open(devnode).unwrap(),
+                OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .open(tmp_dir.path().join("stratis_test.txt"))
+                    .unwrap(),
             );
-            // Write 1 more sector than is initially allocated to a pool
-            let write_size = datablocks_to_sectors(INITIAL_DATA_SIZE) + Sectors(1);
+
+            // Keep going until pool gets to data lowater
             let buf = &[1u8; SECTOR_SIZE];
-            for _ in 0..*write_size {
+            let mut amount_written = Sectors(0);
+            let total_data_sectors = datablocks_to_sectors(total_data);
+            let data_lowater_sectors = datablocks_to_sectors(data_lowater);
+            let used_data_sectors = datablocks_to_sectors(used_data);
+            let total_remaining = total_data_sectors - used_data_sectors;
+            while total_remaining - amount_written >= data_lowater_sectors {
                 f.write_all(buf).unwrap();
+                amount_written += Sectors(1);
             }
-            // Simulate handling a DM event by extending the pool when
-            // the amount of free space in pool has decreased to the
-            // DATA_LOWATER value.
-            pool.extend_thin_data_device(
-                pool_uuid,
-                &mut backstore,
-                datablocks_to_sectors(INITIAL_DATA_SIZE),
-            ).unwrap();
+
+            // Force the contents of the buffer to the thinpool data device.
+            f.sync_all().unwrap();
+
+            // Verify at or below data lowater, but pool still good.
+            match pool.thin_pool.status(get_dm()).unwrap() {
+                ThinPoolStatus::Working(ref status) => {
+                    assert_eq!(status.summary, ThinPoolStatusSummary::Good);
+                    assert!(status.usage.total_data - status.usage.used_data <= data_lowater);
+                }
+                _ => panic!("Pool status indicates already failed."),
+            }
+
+            // Extend the thin pool by twice the data lowater amount
+            let extend_amount = 2u64 * data_lowater_sectors;
+            let amount_extended =
+                pool.extend_thin_data_device(pool_uuid, &mut backstore, extend_amount)
+                    .unwrap();
+
+            assert_eq!(
+                amount_extended, extend_amount,
+                "The backstore was set up without enough space to properly extend the pool, this test has bad initial conditions"
+            );
+
+            let (new_total_data, new_used_data) = match pool.thin_pool.status(get_dm()).unwrap() {
+                ThinPoolStatus::Working(ref status) => {
+                    (status.usage.total_data, status.usage.used_data)
+                }
+                _ => panic!("Pool status indicates already failed."),
+            };
+
+            // The amount used after all that writing ought to be less than
+            // the original total, because it is impossible for it to be more
+            // as nothing was written after the pool was extended.
+            assert!(new_used_data < total_data);
+            assert_eq!(new_used_data, used_data);
+
+            // If the extension worked, the new size should be the old, plus
+            // the extension.
+            assert_eq!(
+                datablocks_to_sectors(new_total_data),
+                total_data_sectors + amount_extended
+            );
+
+            // Keep writing until amount written exceeds the original total
+            // data device size by data lowater.
+            let limit = datablocks_to_sectors(total_data + data_lowater - new_used_data);
+
+            let mut amount_written = Sectors(0);
+            while amount_written < limit {
+                f.write_all(buf).unwrap();
+                amount_written += Sectors(1);
+            }
+
+            // synching should succeed.
+            assert!(f.sync_all().is_ok());
+
+            // Verify amount written
+            match pool.thin_pool.status(get_dm()).unwrap() {
+                ThinPoolStatus::Working(ref status) => {
+                    assert_eq!(status.summary, ThinPoolStatusSummary::Good);
+                    assert!(status.usage.used_data > new_used_data);
+                    assert!(status.usage.used_data > total_data);
+                }
+                _ => panic!("Pool status indicates already failed."),
+            }
         }
+        umount(tmp_dir.path()).unwrap();
+        assert!(cmd::xfs_repair(&fs_devnode).is_ok());
     }
 
     #[test]

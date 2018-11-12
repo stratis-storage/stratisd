@@ -15,8 +15,6 @@
 Test accessing properties of a filesystem.
 """
 
-import unittest
-
 from stratisd_client_dbus import Filesystem
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import Pool
@@ -25,12 +23,12 @@ from stratisd_client_dbus import get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import _device_list
-from .._misc import Service
+from .._misc import SimTestCase
 
 _DEVICE_STRATEGY = _device_list(0)
 
 
-class SetNameTestCase(unittest.TestCase):
+class SetNameTestCase(SimTestCase):
     """
     Set up a pool with a name and one filesystem.
     """
@@ -41,9 +39,8 @@ class SetNameTestCase(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
+        super().setUp()
         self._fs_name = 'fs'
-        self._service = Service()
-        self._service.setUp()
         self._proxy = get_object(TOP_OBJECT)
         ((self._pool_object_path, _), _, _) = Manager.Methods.CreatePool(
             self._proxy, {
@@ -56,12 +53,6 @@ class SetNameTestCase(unittest.TestCase):
             self._pool_object, {'specs': [self._fs_name]})
         self._filesystem_object_path = created[0][0]
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testProps(self):
         """

@@ -27,12 +27,12 @@ from stratisd_client_dbus import get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import _device_list
-from .._misc import Service
+from .._misc import SimTestCase
 
 _DEVICE_STRATEGY = _device_list(0)
 
 
-class CreateFSTestCase(unittest.TestCase):
+class CreateFSTestCase(SimTestCase):
     """
     Test with an empty pool.
     """
@@ -43,8 +43,7 @@ class CreateFSTestCase(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._service = Service()
-        self._service.setUp()
+        super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY.example()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
@@ -55,12 +54,6 @@ class CreateFSTestCase(unittest.TestCase):
             })
         self._pool_object = get_object(poolpath)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testCreate(self):
         """
@@ -99,7 +92,7 @@ class CreateFSTestCase(unittest.TestCase):
         self.assertEqual(len([x for x in result]), 1)
 
 
-class CreateFSTestCase1(unittest.TestCase):
+class CreateFSTestCase1(SimTestCase):
     """
     Make a filesystem for the pool.
     """
@@ -111,8 +104,7 @@ class CreateFSTestCase1(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._service = Service()
-        self._service.setUp()
+        super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY.example()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
@@ -125,12 +117,6 @@ class CreateFSTestCase1(unittest.TestCase):
         Pool.Methods.CreateFilesystems(self._pool_object,
                                        {'specs': [self._VOLNAME]})
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testCreate(self):
         """

@@ -26,10 +26,10 @@ from stratisd_client_dbus import pools
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._misc import _device_list
 from .._misc import SimTestCase
+from .._misc import device_name_list
 
-_DEVICE_STRATEGY = _device_list(0)
+_DEVICE_STRATEGY = device_name_list()
 
 
 class Destroy1TestCase(SimTestCase):
@@ -82,7 +82,7 @@ class Destroy2TestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        self._devices = _DEVICE_STRATEGY.example()
+        self._devices = _DEVICE_STRATEGY()
         Manager.Methods.CreatePool(
             self._proxy, {
                 'name': self._POOLNAME,
@@ -142,7 +142,7 @@ class Destroy3TestCase(SimTestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
-                'devices': _DEVICE_STRATEGY.example()
+                'devices': _DEVICE_STRATEGY(),
             })
         Pool.Methods.CreateFilesystems(
             get_object(poolpath), {'specs': [self._VOLNAME]})

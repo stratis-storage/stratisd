@@ -24,10 +24,10 @@ from stratisd_client_dbus import pools
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._misc import _device_list
 from .._misc import SimTestCase
+from .._misc import device_name_list
 
-_DEVICE_STRATEGY = _device_list(0)
+_DEVICE_STRATEGY = device_name_list()
 
 
 class Create2TestCase(SimTestCase):
@@ -50,7 +50,7 @@ class Create2TestCase(SimTestCase):
 
         If rc is OK, then pool must exist.
         """
-        devs = _DEVICE_STRATEGY.example()
+        devs = _DEVICE_STRATEGY()
         ((poolpath, devnodes), rc, _) = Manager.Methods.CreatePool(
             self._proxy, {
                 'name': self._POOLNAME,
@@ -86,7 +86,7 @@ class Create2TestCase(SimTestCase):
         """
         Creation should always fail if RAID value is wrong.
         """
-        devs = _DEVICE_STRATEGY.example()
+        devs = _DEVICE_STRATEGY()
         (_, rc, _) = Manager.Methods.CreatePool(self._proxy, {
             'name': self._POOLNAME,
             'redundancy': (True, 1),
@@ -111,7 +111,7 @@ class Create3TestCase(SimTestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
-                'devices': _DEVICE_STRATEGY.example()
+                'devices': _DEVICE_STRATEGY(),
             })
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
 
@@ -126,7 +126,7 @@ class Create3TestCase(SimTestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
-                'devices': _DEVICE_STRATEGY.example()
+                'devices': _DEVICE_STRATEGY(),
             })
         expected_rc = StratisdErrors.ALREADY_EXISTS
         self.assertEqual(rc, expected_rc)

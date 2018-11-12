@@ -25,10 +25,10 @@ from stratisd_client_dbus import pools
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._misc import _device_list
 from .._misc import SimTestCase
+from .._misc import device_name_list
 
-_DEVICE_STRATEGY = _device_list(1)
+_DEVICE_STRATEGY = device_name_list(1)
 
 
 class AddCacheDevsTestCase1(SimTestCase):
@@ -90,7 +90,7 @@ class AddCacheDevsTestCase1(SimTestCase):
             }).search(managed_objects))
 
         (result, rc, _) = Pool.Methods.AddCacheDevs(
-            self._pool_object, {'devices': _DEVICE_STRATEGY.example()})
+            self._pool_object, {'devices': _DEVICE_STRATEGY()})
 
         num_devices_added = len(result)
         managed_objects = \
@@ -143,7 +143,7 @@ class AddCacheDevsTestCase2(SimTestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
-                'devices': _DEVICE_STRATEGY.example()
+                'devices': _DEVICE_STRATEGY()
             })
         self._pool_object = get_object(poolpath)
         self._devpaths = frozenset(devpaths)
@@ -202,7 +202,7 @@ class AddCacheDevsTestCase2(SimTestCase):
         self.assertEqual(self._devpaths, frozenset(
             op for (op, _) in blockdevs1))
         (result, rc, _) = Pool.Methods.AddCacheDevs(
-            self._pool_object, {'devices': _DEVICE_STRATEGY.example()})
+            self._pool_object, {'devices': _DEVICE_STRATEGY()})
 
         num_devices_added = len(result)
         managed_objects = \

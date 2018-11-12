@@ -37,7 +37,7 @@ def _device_list(minimum):
         min_size=minimum)
 
 
-class Service():
+class _Service():
     """
     Handle starting and stopping the Rust service.
     """
@@ -67,7 +67,7 @@ class SimTestCase(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._service = Service()
+        self._service = _Service()
         self._service.setUp()
 
     def tearDown(self):

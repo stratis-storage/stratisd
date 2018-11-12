@@ -1177,15 +1177,20 @@ impl ThinPool {
     }
 }
 
+impl Recordable<FlexDevsSave> for Segments {
+    fn record(&self) -> FlexDevsSave {
+        FlexDevsSave {
+            meta_dev: self.mdv_segments.to_vec(),
+            thin_meta_dev: self.meta_segments.to_vec(),
+            thin_data_dev: self.data_segments.to_vec(),
+            thin_meta_dev_spare: self.meta_spare_segments.to_vec(),
+        }
+    }
+}
+
 impl Recordable<FlexDevsSave> for ThinPool {
     fn record(&self) -> FlexDevsSave {
-        let segments = &self.segments;
-        FlexDevsSave {
-            meta_dev: segments.mdv_segments.to_vec(),
-            thin_meta_dev: segments.meta_segments.to_vec(),
-            thin_data_dev: segments.data_segments.to_vec(),
-            thin_meta_dev_spare: segments.meta_spare_segments.to_vec(),
-        }
+        self.segments.record()
     }
 }
 

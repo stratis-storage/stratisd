@@ -14,8 +14,6 @@
 """
 Test object path methods.
 """
-import unittest
-
 import dbus
 
 from dbus_python_client_gen import DPClientInvocationError
@@ -25,28 +23,15 @@ from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import get_object
 
 from .._misc import _device_list
-from .._misc import Service
+from .._misc import SimTestCase
 
 _DEVICE_STRATEGY = _device_list(0)
 
 
-class GetObjectTestCase(unittest.TestCase):
+class GetObjectTestCase(SimTestCase):
     """
     Test get_object method.
     """
-
-    def setUp(self):
-        """
-        Start the stratisd daemon with the simulator.
-        """
-        self._service = Service()
-        self._service.setUp()
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testNonExisting(self):
         """

@@ -15,8 +15,6 @@
 Test 'stratisd'.
 """
 
-import unittest
-
 from dbus_python_client_gen import DPClientInvalidArgError
 
 from stratisd_client_dbus import Manager
@@ -25,10 +23,10 @@ from stratisd_client_dbus import get_object
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._misc import Service
+from .._misc import SimTestCase
 
 
-class StratisTestCase(unittest.TestCase):
+class StratisTestCase(SimTestCase):
     """
     Test meta information about stratisd.
     """
@@ -37,16 +35,9 @@ class StratisTestCase(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._service = Service()
-        self._service.setUp()
+        super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testStratisVersion(self):
         """
@@ -59,7 +50,7 @@ class StratisTestCase(unittest.TestCase):
         self.assertEqual(major, "1")
 
 
-class StratisTestCase2(unittest.TestCase):
+class StratisTestCase2(SimTestCase):
     """
     Test exceptions raised by various errors.
     """
@@ -68,16 +59,9 @@ class StratisTestCase2(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._service = Service()
-        self._service.setUp()
+        super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testArguments(self):
         """

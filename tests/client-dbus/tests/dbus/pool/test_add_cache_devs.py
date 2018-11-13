@@ -15,8 +15,6 @@
 Test adding blockdevs to a pool.
 """
 
-import unittest
-
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import Pool
@@ -28,12 +26,12 @@ from stratisd_client_dbus import pools
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import _device_list
-from .._misc import Service
+from .._misc import SimTestCase
 
 _DEVICE_STRATEGY = _device_list(1)
 
 
-class AddCacheDevsTestCase1(unittest.TestCase):
+class AddCacheDevsTestCase1(SimTestCase):
     """
     Test adding cachedevs to a pool which is initially empty.
     """
@@ -44,8 +42,7 @@ class AddCacheDevsTestCase1(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._service = Service()
-        self._service.setUp()
+        super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
             self._proxy, {
@@ -55,12 +52,6 @@ class AddCacheDevsTestCase1(unittest.TestCase):
             })
         self._pool_object = get_object(poolpath)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testEmptyDevs(self):
         """
@@ -135,7 +126,7 @@ class AddCacheDevsTestCase1(unittest.TestCase):
         self.assertEqual(list(blockdevs4), [])
 
 
-class AddCacheDevsTestCase2(unittest.TestCase):
+class AddCacheDevsTestCase2(SimTestCase):
     """
     Test adding devices to a pool which has some data devices.
     """
@@ -146,8 +137,7 @@ class AddCacheDevsTestCase2(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._service = Service()
-        self._service.setUp()
+        super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         ((poolpath, devpaths), _, _) = Manager.Methods.CreatePool(
             self._proxy, {
@@ -158,12 +148,6 @@ class AddCacheDevsTestCase2(unittest.TestCase):
         self._pool_object = get_object(poolpath)
         self._devpaths = frozenset(devpaths)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testEmptyDevs(self):
         """

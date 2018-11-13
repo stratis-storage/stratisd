@@ -15,8 +15,6 @@
 Test destroying a filesystem in a pool.
 """
 
-import unittest
-
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import Pool
@@ -27,12 +25,12 @@ from stratisd_client_dbus import get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import _device_list
-from .._misc import Service
+from .._misc import SimTestCase
 
 _DEVICE_STRATEGY = _device_list(0)
 
 
-class DestroyFSTestCase(unittest.TestCase):
+class DestroyFSTestCase(SimTestCase):
     """
     Test with an empty pool.
     """
@@ -43,8 +41,7 @@ class DestroyFSTestCase(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._service = Service()
-        self._service.setUp()
+        super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY.example()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
@@ -55,12 +52,6 @@ class DestroyFSTestCase(unittest.TestCase):
             })
         self._pool_object = get_object(poolpath)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testDestroyNone(self):
         """
@@ -93,7 +84,7 @@ class DestroyFSTestCase(unittest.TestCase):
         self.assertEqual(len([x for x in result]), 0)
 
 
-class DestroyFSTestCase1(unittest.TestCase):
+class DestroyFSTestCase1(SimTestCase):
     """
     Make a filesystem for the pool.
     """
@@ -105,8 +96,7 @@ class DestroyFSTestCase1(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._service = Service()
-        self._service.setUp()
+        super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY.example()
         ((self._poolpath, _), _, _) = Manager.Methods.CreatePool(
@@ -119,12 +109,6 @@ class DestroyFSTestCase1(unittest.TestCase):
         (self._filesystems, _, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {'specs': [(self._VOLNAME, '', None)]})
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testDestroyOne(self):
         """

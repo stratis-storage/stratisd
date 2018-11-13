@@ -15,8 +15,6 @@
 Test 'CreatePool'.
 """
 
-import unittest
-
 from stratisd_client_dbus import MOPool
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import StratisdErrors
@@ -27,12 +25,12 @@ from stratisd_client_dbus import pools
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import _device_list
-from .._misc import Service
+from .._misc import SimTestCase
 
 _DEVICE_STRATEGY = _device_list(0)
 
 
-class Create2TestCase(unittest.TestCase):
+class Create2TestCase(SimTestCase):
     """
     Test 'create'.
     """
@@ -42,16 +40,9 @@ class Create2TestCase(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._service = Service()
-        self._service.setUp()
+        super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testCreate(self):
         """
@@ -104,7 +95,7 @@ class Create2TestCase(unittest.TestCase):
         self.assertEqual(rc, StratisdErrors.ERROR)
 
 
-class Create3TestCase(unittest.TestCase):
+class Create3TestCase(SimTestCase):
     """
     Test 'create' on name collision.
     """
@@ -114,8 +105,7 @@ class Create3TestCase(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._service = Service()
-        self._service.setUp()
+        super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         Manager.Methods.CreatePool(
             self._proxy, {
@@ -124,12 +114,6 @@ class Create3TestCase(unittest.TestCase):
                 'devices': _DEVICE_STRATEGY.example()
             })
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testCreate(self):
         """

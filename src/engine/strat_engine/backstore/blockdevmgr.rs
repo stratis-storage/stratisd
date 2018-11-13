@@ -432,10 +432,12 @@ fn initialize(
             match ownership {
                 DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, f))),
                 DevOwnership::Theirs(signature) => {
+                    let dev = devnode.display();
                     let err_str = format!(
-                        "Device {} has an existing signature {}",
-                        devnode.display(),
-                        signature
+                        "Device {} has an existing signature {}\nUse wipefs -a {} to erase it and make the device unused and suitable for use with Stratis",
+                        dev,
+                        signature,
+                        dev
                     );
                     return Err(StratisError::Engine(ErrorEnum::Invalid, err_str));
                 }

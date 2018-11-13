@@ -15,8 +15,6 @@
 Test DestroyPool.
 """
 
-import unittest
-
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import Pool
@@ -29,12 +27,12 @@ from stratisd_client_dbus import pools
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import _device_list
-from .._misc import Service
+from .._misc import SimTestCase
 
 _DEVICE_STRATEGY = _device_list(0)
 
 
-class Destroy1TestCase(unittest.TestCase):
+class Destroy1TestCase(SimTestCase):
     """
     Test 'destroy' on empty database.
 
@@ -46,16 +44,9 @@ class Destroy1TestCase(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._service = Service()
-        self._service.setUp()
+        super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testExecution(self):
         """
@@ -78,7 +69,7 @@ class Destroy1TestCase(unittest.TestCase):
         self.assertEqual(rc, StratisdErrors.OK)
 
 
-class Destroy2TestCase(unittest.TestCase):
+class Destroy2TestCase(SimTestCase):
     """
     Test 'destroy' on database which contains the given pool and an unknown
     number of devices.
@@ -89,8 +80,7 @@ class Destroy2TestCase(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._service = Service()
-        self._service.setUp()
+        super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         self._devices = _DEVICE_STRATEGY.example()
         Manager.Methods.CreatePool(
@@ -100,12 +90,6 @@ class Destroy2TestCase(unittest.TestCase):
                 'devices': self._devices
             })
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testExecution(self):
         """
@@ -140,7 +124,7 @@ class Destroy2TestCase(unittest.TestCase):
         self.assertEqual(len(list(blockdevs2)), 0)
 
 
-class Destroy3TestCase(unittest.TestCase):
+class Destroy3TestCase(SimTestCase):
     """
     Test 'destroy' on database which contains the given pool and a volume.
     """
@@ -152,9 +136,7 @@ class Destroy3TestCase(unittest.TestCase):
         Start the stratisd daemon with the simulator.
         Create a pool and a filesystem.
         """
-        self._service = Service()
-        self._service.setUp()
-
+        super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
             self._proxy, {
@@ -165,12 +147,6 @@ class Destroy3TestCase(unittest.TestCase):
         Pool.Methods.CreateFilesystems(
             get_object(poolpath), {'specs': [self._VOLNAME]})
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testExecution(self):
         """
@@ -197,7 +173,7 @@ class Destroy3TestCase(unittest.TestCase):
         self.assertEqual(pool, pool1)
 
 
-class Destroy4TestCase(unittest.TestCase):
+class Destroy4TestCase(SimTestCase):
     """
     Test 'destroy' on database which contains the given pool with no devices.
     """
@@ -207,8 +183,7 @@ class Destroy4TestCase(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._service = Service()
-        self._service.setUp()
+        super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         Manager.Methods.CreatePool(self._proxy, {
             'name': self._POOLNAME,
@@ -216,12 +191,6 @@ class Destroy4TestCase(unittest.TestCase):
             'devices': []
         })
         Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testExecution(self):
         """

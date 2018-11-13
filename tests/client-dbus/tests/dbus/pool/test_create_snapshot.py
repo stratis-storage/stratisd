@@ -15,8 +15,6 @@
 Test creating a snapshot
 """
 
-import unittest
-
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import Pool
@@ -27,12 +25,12 @@ from stratisd_client_dbus import get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import _device_list
-from .._misc import Service
+from .._misc import SimTestCase
 
 _DEVICE_STRATEGY = _device_list(0)
 
 
-class CreateSnapshotTestCase(unittest.TestCase):
+class CreateSnapshotTestCase(SimTestCase):
     """
     Test with an empty pool.
     """
@@ -45,8 +43,7 @@ class CreateSnapshotTestCase(unittest.TestCase):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._service = Service()
-        self._service.setUp()
+        super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY.example()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
@@ -67,12 +64,6 @@ class CreateSnapshotTestCase(unittest.TestCase):
         self.assertNotEqual(fs_object_path, "/")
 
         self._fs_object_path = fs_object_path
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()
 
     def testCreate(self):
         """

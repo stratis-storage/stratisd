@@ -212,6 +212,15 @@ fn calc_lowater(
     }
 }
 
+/// Segment lists that the ThinPool keeps track of.
+#[derive(Debug)]
+struct Segments {
+    meta_segments: Vec<(Sectors, Sectors)>,
+    meta_spare_segments: Vec<(Sectors, Sectors)>,
+    data_segments: Vec<(Sectors, Sectors)>,
+    mdv_segments: Vec<(Sectors, Sectors)>,
+}
+
 pub struct ThinPoolSizeParams {
     meta_size: MetaBlocks,
     data_size: DataBlocks,
@@ -249,10 +258,7 @@ impl Default for ThinPoolSizeParams {
 #[derive(Debug)]
 pub struct ThinPool {
     thin_pool: ThinPoolDev,
-    meta_segments: Vec<(Sectors, Sectors)>,
-    meta_spare_segments: Vec<(Sectors, Sectors)>,
-    data_segments: Vec<(Sectors, Sectors)>,
-    mdv_segments: Vec<(Sectors, Sectors)>,
+    segments: Segments,
     id_gen: ThinDevIdPool,
     filesystems: Table<StratFilesystem>,
     mdv: MetadataVol,
@@ -360,10 +366,12 @@ impl ThinPool {
 
         Ok(ThinPool {
             thin_pool: thinpool_dev,
-            meta_segments: vec![meta_segments],
-            meta_spare_segments: vec![spare_segments],
-            data_segments: vec![data_segments],
-            mdv_segments: vec![mdv_segments],
+            segments: Segments {
+                meta_segments: vec![meta_segments],
+                meta_spare_segments: vec![spare_segments],
+                data_segments: vec![data_segments],
+                mdv_segments: vec![mdv_segments],
+            },
             id_gen: ThinDevIdPool::new_from_ids(&[]),
             filesystems: Table::default(),
             mdv,
@@ -468,10 +476,12 @@ impl ThinPool {
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
         Ok(ThinPool {
             thin_pool: thinpool_dev,
-            meta_segments,
-            meta_spare_segments: spare_segments,
-            data_segments,
-            mdv_segments,
+            segments: Segments {
+                meta_segments,
+                meta_spare_segments: spare_segments,
+                data_segments,
+                mdv_segments,
+            },
             id_gen: ThinDevIdPool::new_from_ids(&thin_ids),
             filesystems: fs_table,
             mdv,
@@ -792,7 +802,7 @@ impl ThinPool {
             backstore,
             extend_size,
             DATA_BLOCK_SIZE,
-            &mut self.data_segments,
+            &mut self.segments.data_segments,
             true,
         )
     }
@@ -815,7 +825,7 @@ impl ThinPool {
             backstore,
             extend_size,
             MetaBlocks(1).sectors(),
-            &mut self.meta_segments,
+            &mut self.segments.meta_segments,
             false,
         )
     }
@@ -875,11 +885,11 @@ impl ThinPool {
             }
         };
 
-        let spare_total = self.meta_spare_segments.iter().map(|s| s.1).sum();
+        let spare_total = self.segments.meta_spare_segments.iter().map(|s| s.1).sum();
 
         let meta_dev_total = self.thin_pool.meta_dev().size();
 
-        let mdv_total = self.mdv_segments.iter().map(|s| s.1).sum();
+        let mdv_total = self.segments.mdv_segments.iter().map(|s| s.1).sum();
 
         Ok(data_dev_used + spare_total + meta_dev_total + mdv_total)
     }
@@ -1167,7 +1177,7 @@ impl ThinPool {
     }
 }
 
-impl Recordable<FlexDevsSave> for ThinPool {
+impl Recordable<FlexDevsSave> for Segments {
     fn record(&self) -> FlexDevsSave {
         FlexDevsSave {
             meta_dev: self.mdv_segments.to_vec(),
@@ -1175,6 +1185,12 @@ impl Recordable<FlexDevsSave> for ThinPool {
             thin_data_dev: self.data_segments.to_vec(),
             thin_meta_dev_spare: self.meta_spare_segments.to_vec(),
         }
+    }
+}
+
+impl Recordable<FlexDevsSave> for ThinPool {
+    fn record(&self) -> FlexDevsSave {
+        self.segments.record()
     }
 }
 

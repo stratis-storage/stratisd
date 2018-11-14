@@ -214,6 +214,11 @@ pub trait Engine: Debug {
     /// Returns true if some action was necessary, otherwise false.
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<bool>;
 
+    /// Deactivate a pool but leave on-disk metadata in place.
+    /// Useful for development and testing.
+    /// Returns true if some action was necessary, otherwise false.
+    fn teardown_pool(&mut self, uuid: PoolUuid) -> StratisResult<bool>;
+
     /// Rename pool with uuid to new_name.
     /// Raises an error if the mapping can't be applied because
     /// new_name is already in use.

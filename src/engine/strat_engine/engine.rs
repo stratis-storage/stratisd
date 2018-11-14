@@ -18,7 +18,6 @@ use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
 use super::backstore::device::is_stratis_device;
 use super::backstore::{find_all, get_metadata};
-#[cfg(test)]
 use super::cleanup::teardown_pools;
 use super::cmd::verify_binaries;
 use super::dm::{get_dm, get_dm_init};
@@ -156,7 +155,6 @@ impl StratEngine {
     }
 
     /// Teardown Stratis, preparatory to a shutdown.
-    #[cfg(test)]
     pub fn teardown(self) -> StratisResult<()> {
         teardown_pools(self.pools)
     }
@@ -281,6 +279,19 @@ impl Engine for StratEngine {
             devlinks::pool_removed(&pool_name);
             Ok(true)
         }
+    }
+
+    fn teardown_pool(&mut self, uuid: PoolUuid) -> StratisResult<bool> {
+        let (pool_name, pool) = match self.pools.remove_by_uuid(uuid) {
+            Some((name, pool)) => (name, pool),
+            None => return Ok(false),
+        };
+
+        let mut temp_table = Table::default();
+        temp_table.insert(pool_name.clone(), uuid, pool);
+        teardown_pools(temp_table)?;
+        devlinks::pool_removed(&pool_name);
+        Ok(true)
     }
 
     fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction> {

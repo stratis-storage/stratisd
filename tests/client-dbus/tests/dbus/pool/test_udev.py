@@ -32,7 +32,6 @@ from stratisd_client_dbus import Pool
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._loopback import LoopBackDevices
-from .._dm import remove_stratis_setup
 
 _STRATISD = os.environ['STRATISD']
 
@@ -160,7 +159,8 @@ class UdevAdd(unittest.TestCase):
             self._service.wait()
             self._service = None
 
-            remove_stratis_setup()
+            self._service = subprocess.Popen(
+                [os.path.join(_STRATISD), 'dev', 'teardown'])
 
     @staticmethod
     def _settle():

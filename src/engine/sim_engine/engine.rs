@@ -87,6 +87,10 @@ impl Engine for SimEngine {
         Ok(true)
     }
 
+    fn teardown_pool(&mut self, uuid: PoolUuid) -> StratisResult<bool> {
+        self.destroy_pool(uuid)
+    }
+
     fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction> {
         rename_pool_pre!(self; uuid; new_name);
 

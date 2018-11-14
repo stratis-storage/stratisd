@@ -215,7 +215,6 @@ impl StratPool {
     }
 
     /// Teardown a pool.
-    #[cfg(test)]
     pub fn teardown(&mut self) -> StratisResult<()> {
         self.thin_pool.teardown()?;
         self.backstore.teardown()

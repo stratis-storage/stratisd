@@ -471,7 +471,6 @@ impl Backstore {
     }
 
     /// Teardown the DM devices in the backstore.
-    #[cfg(test)]
     pub fn teardown(&mut self) -> StratisResult<()> {
         match self.cache {
             Some(ref mut cache) => cache.teardown(get_dm()),

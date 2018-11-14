@@ -29,7 +29,7 @@ use std::process::exit;
 use std::rc::Rc;
 
 use chrono::Duration;
-use clap::{App, Arg, ArgMatches};
+use clap::{App, Arg, SubCommand};
 use env_logger::Builder;
 use libc::pid_t;
 use log::LevelFilter;
@@ -293,7 +293,10 @@ impl EngineListener for EventHandler {
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered. Dump log entries on specified signal
 /// via buff_log.
-fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) -> StratisResult<()> {
+fn run(
+    engine: &Rc<RefCell<Engine>>,
+    buff_log: &buff_log::Handle<env_logger::Logger>,
+) -> StratisResult<()> {
     // Ensure that the debug log is output when we leave this function.
     let _guard = buff_log.to_guard();
 
@@ -311,16 +314,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     let mut monitor = libudev::Monitor::new(&context)?;
     monitor.match_subsystem_devtype("block", "disk")?;
     let mut udev = monitor.listen()?;
-
-    let engine: Rc<RefCell<Engine>> = {
-        if matches.is_present("sim") {
-            info!("Using SimEngine");
-            Rc::new(RefCell::new(SimEngine::default()))
-        } else {
-            info!("Using StratEngine");
-            Rc::new(RefCell::new(StratEngine::initialize()?))
-        }
-    };
 
     /*
     The file descriptor array indexes are:
@@ -584,6 +577,22 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     }
 }
 
+fn teardown(engine: &Rc<RefCell<Engine>>) -> StratisResult<()> {
+    let mut eng = engine.borrow_mut();
+    let pools = eng.pools()
+        .into_iter()
+        .map(|(name, uuid, _)| (name, uuid))
+        .collect::<Vec<_>>();
+    println!("Tearing down all pools");
+    for (name, uuid) in pools {
+        match eng.teardown_pool(uuid) {
+            Ok(_) => println!("Pool {} torn down", name),
+            Err(e) => println!("Could not tear down pool {}: {}", name, e),
+        }
+    }
+    Ok(())
+}
+
 fn main() {
     let matches = App::new("stratis")
         .version(VERSION)
@@ -598,6 +607,11 @@ fn main() {
                 .long("sim")
                 .help("Use simulator engine"),
         )
+        .subcommand(
+            SubCommand::with_name("dev")
+                .about("Developer/debug commands")
+                .subcommand(SubCommand::with_name("teardown").about("Tear down all pools")),
+        )
         .get_matches();
 
     // Using a let-expression here so that the scope of the lock file
@@ -605,13 +619,33 @@ fn main() {
     let lock_file = trylock_pid_file();
 
     let result = {
-        match lock_file {
-            Err(err) => Err(err),
-            Ok(_) => {
-                let log_handle = initialize_log(matches.is_present("debug"));
-                run(&matches, &log_handle)
+        || -> StratisResult<()> {
+            match lock_file {
+                Err(err) => Err(err),
+                Ok(_) => {
+                    let engine: Rc<RefCell<Engine>> = {
+                        if matches.is_present("sim") {
+                            info!("Using SimEngine");
+                            Rc::new(RefCell::new(SimEngine::default()))
+                        } else {
+                            info!("Using StratEngine");
+                            Rc::new(RefCell::new(StratEngine::initialize()?))
+                        }
+                    };
+
+                    match matches.subcommand() {
+                        ("dev", Some(matches)) => match matches.subcommand() {
+                            ("teardown", Some(_)) => teardown(&engine),
+                            _ => Err(StratisError::Error("Unknown dev command".into())),
+                        },
+                        _ => {
+                            let log_handle = initialize_log(matches.is_present("debug"));
+                            run(&engine, &log_handle)
+                        }
+                    }
+                }
             }
-        }
+        }()
     };
 
     if let Err(err) = result {

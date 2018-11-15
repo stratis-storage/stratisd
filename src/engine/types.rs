@@ -28,7 +28,7 @@ pub enum RenameAction {
 /// specific modes are used to represent the state when Stratis is either constructing
 /// the pool components or tearing them down.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PoolState {
+pub enum PoolThinpoolState {
     Initializing = 1,   // Startup in progress
     Running = 2,        // PM_WRITE - pool ok
     OutOfDataSpace = 4, // Meta

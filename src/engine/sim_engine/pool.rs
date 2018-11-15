@@ -19,8 +19,8 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::structures::Table;
 use super::super::types::{
-    BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolState, PoolThinpoolExtendState,
-    PoolThinpoolFreeSpaceState, PoolUuid, Redundancy, RenameAction,
+    BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolThinpoolExtendState,
+    PoolThinpoolFreeSpaceState, PoolThinpoolState, PoolUuid, Redundancy, RenameAction,
 };
 
 use super::blockdev::SimDev;
@@ -34,7 +34,7 @@ pub struct SimPool {
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
-    pool_state: PoolState,
+    pool_state: PoolThinpoolState,
     pool_extend_state: PoolThinpoolExtendState,
     free_space_state: PoolThinpoolFreeSpaceState,
     dbus_path: MaybeDbusPath,
@@ -56,7 +56,7 @@ impl SimPool {
                 filesystems: Table::default(),
                 redundancy,
                 rdm: Rc::clone(rdm),
-                pool_state: PoolState::Initializing,
+                pool_state: PoolThinpoolState::Initializing,
                 pool_extend_state: PoolThinpoolExtendState::Good,
                 free_space_state: PoolThinpoolFreeSpaceState::Good,
                 dbus_path: MaybeDbusPath(None),
@@ -290,7 +290,7 @@ impl Pool for SimPool {
         )
     }
 
-    fn state(&self) -> PoolState {
+    fn state(&self) -> PoolThinpoolState {
         self.pool_state
     }
 

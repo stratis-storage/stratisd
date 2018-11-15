@@ -12,8 +12,8 @@ use uuid::Uuid;
 use devicemapper::{Bytes, Device, Sectors};
 
 use super::types::{
-    BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolState,
-    PoolThinpoolExtendState, PoolThinpoolFreeSpaceState, PoolUuid, RenameAction,
+    BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name,
+    PoolThinpoolExtendState, PoolThinpoolFreeSpaceState, PoolThinpoolState, PoolUuid, RenameAction,
 };
 use stratis::StratisResult;
 
@@ -173,7 +173,7 @@ pub trait Pool: Debug {
     ) -> StratisResult<bool>;
 
     /// The current state of the Pool.
-    fn state(&self) -> PoolState;
+    fn state(&self) -> PoolThinpoolState;
 
     /// The current extend state of the Pool.
     fn extend_state(&self) -> PoolThinpoolExtendState;

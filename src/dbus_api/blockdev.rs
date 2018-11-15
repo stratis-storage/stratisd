@@ -236,20 +236,12 @@ fn get_blockdev_state(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    fn get_state(_: BlockDevTier, blockdev: &BlockDev) -> Result<u16, MethodErr> {
-        Ok(blockdev.state() as u16)
-    }
-
-    get_blockdev_property(i, p, get_state)
+    get_blockdev_property(i, p, |_, p| Ok(p.state() as u16))
 }
 
 fn get_blockdev_tier(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    fn get(tier: BlockDevTier, _: &BlockDev) -> Result<u16, MethodErr> {
-        Ok(tier as u16)
-    }
-
-    get_blockdev_property(i, p, get)
+    get_blockdev_property(i, p, |t, _| Ok(t as u16))
 }

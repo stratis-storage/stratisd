@@ -16,13 +16,13 @@ use super::super::engine::Engine;
 #[derive(Clone, Copy, Debug)]
 #[allow(non_camel_case_types)]
 pub enum DbusErrorEnum {
-    OK,
-    ERROR,
+    OK = 0,
+    ERROR = 1,
 
-    ALREADY_EXISTS,
-    BUSY,
-    INTERNAL_ERROR,
-    NOTFOUND,
+    ALREADY_EXISTS = 2,
+    BUSY = 3,
+    INTERNAL_ERROR = 4,
+    NOTFOUND = 5,
 }
 
 impl DbusErrorEnum {

@@ -59,11 +59,11 @@ pub enum FreeSpaceState {
 /// See Design Doc section 10.2.1 for more details.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BlockDevState {
-    Missing,
-    Bad,
-    Spare,
-    NotInUse,
-    InUse,
+    Missing = 0,
+    Bad = 1,
+    Spare = 2,
+    NotInUse = 3,
+    InUse = 4,
 }
 
 /// A struct that may contain a dbus::Path, or may not, and most certainly
@@ -79,8 +79,8 @@ pub struct MaybeDbusPath(
 /// data and blockdevs used for a cache.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BlockDevTier {
-    Data,
-    Cache,
+    Data = 0,
+    Cache = 1,
 }
 
 /// Redundancy classifications which the engine allows for pools.
@@ -88,7 +88,7 @@ pub enum BlockDevTier {
 #[allow(non_camel_case_types)]
 /// Redundancy specification for a pool.
 pub enum Redundancy {
-    NONE,
+    NONE = 0,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]

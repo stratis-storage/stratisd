@@ -131,13 +131,11 @@ pub enum BlockDevTier {
 }
 
 /// Redundancy classifications which the engine allows for pools.
-macro_attr! {
-    #[derive(Debug, Eq, PartialEq)]
-    #[allow(non_camel_case_types)]
-    /// Redundancy specification for a pool.
-    pub enum Redundancy {
-        NONE,
-    }
+#[derive(Debug, Eq, PartialEq)]
+#[allow(non_camel_case_types)]
+/// Redundancy specification for a pool.
+pub enum Redundancy {
+    NONE,
 }
 
 /// Get the u16 value of this Redundancy constructor.

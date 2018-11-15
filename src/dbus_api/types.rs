@@ -14,18 +14,16 @@ use uuid::Uuid;
 
 use super::super::engine::Engine;
 
-macro_attr! {
-    #[derive(Clone, Copy, Debug)]
-    #[allow(non_camel_case_types)]
-    pub enum DbusErrorEnum {
-        OK,
-        ERROR,
+#[derive(Clone, Copy, Debug)]
+#[allow(non_camel_case_types)]
+pub enum DbusErrorEnum {
+    OK,
+    ERROR,
 
-        ALREADY_EXISTS,
-        BUSY,
-        INTERNAL_ERROR,
-        NOTFOUND,
-    }
+    ALREADY_EXISTS,
+    BUSY,
+    INTERNAL_ERROR,
+    NOTFOUND,
 }
 
 /// Get the u16 value of this ErrorEnum constructor.

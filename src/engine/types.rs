@@ -41,7 +41,7 @@ pub enum PoolState {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PoolExtendState {
+pub enum PoolThinpoolExtendState {
     Initializing = 1,
     Good = 2,
     DataFailed = 3,

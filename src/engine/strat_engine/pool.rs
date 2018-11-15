@@ -14,7 +14,7 @@ use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::types::{
-    BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolExtendState, PoolState,
+    BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolState, PoolThinpoolExtendState,
     PoolThinpoolFreeSpaceState, PoolUuid, Redundancy, RenameAction,
 };
 use stratis::{ErrorEnum, StratisError, StratisResult};
@@ -455,7 +455,7 @@ impl Pool for StratPool {
         self.thin_pool.state()
     }
 
-    fn extend_state(&self) -> PoolExtendState {
+    fn extend_state(&self) -> PoolThinpoolExtendState {
         self.thin_pool.extend_state()
     }
 
@@ -728,9 +728,9 @@ mod tests {
             let mut amount_written = Sectors(0);
             let buffer_length = Bytes(buffer_length).sectors();
             while match pool.thin_pool.extend_state() {
-                PoolExtendState::DataFailed
-                | PoolExtendState::MetaFailed
-                | PoolExtendState::MetaAndDataFailed => false,
+                PoolThinpoolExtendState::DataFailed
+                | PoolThinpoolExtendState::MetaFailed
+                | PoolThinpoolExtendState::MetaAndDataFailed => false,
                 _ => true,
             } {
                 f.write_all(buf).unwrap();
@@ -748,7 +748,7 @@ mod tests {
             pool.add_blockdevs(pool_uuid, &name, paths2, BlockDevTier::Data)
                 .unwrap();
             assert!(match pool.thin_pool.extend_state() {
-                PoolExtendState::Good => true,
+                PoolThinpoolExtendState::Good => true,
                 _ => false,
             });
 

@@ -24,8 +24,8 @@ use super::super::super::engine::Filesystem;
 use super::super::super::event::{get_engine_listener_list, EngineEvent};
 use super::super::super::structures::Table;
 use super::super::super::types::{
-    FilesystemUuid, MaybeDbusPath, Name, PoolExtendState, PoolState, PoolThinpoolFreeSpaceState,
-    PoolUuid, RenameAction,
+    FilesystemUuid, MaybeDbusPath, Name, PoolState, PoolThinpoolExtendState,
+    PoolThinpoolFreeSpaceState, PoolUuid, RenameAction,
 };
 
 use super::super::backstore::Backstore;
@@ -267,7 +267,7 @@ pub struct ThinPool {
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
     pool_state: PoolState,
-    pool_extend_state: PoolExtendState,
+    pool_extend_state: PoolThinpoolExtendState,
     free_space_state: PoolThinpoolFreeSpaceState,
     dbus_path: MaybeDbusPath,
 }
@@ -377,7 +377,7 @@ impl ThinPool {
             mdv,
             backstore_device,
             pool_state: PoolState::Initializing,
-            pool_extend_state: PoolExtendState::Initializing,
+            pool_extend_state: PoolThinpoolExtendState::Initializing,
             free_space_state,
             dbus_path: MaybeDbusPath(None),
         })
@@ -487,7 +487,7 @@ impl ThinPool {
             mdv,
             backstore_device,
             pool_state: PoolState::Initializing,
-            pool_extend_state: PoolExtendState::Initializing,
+            pool_extend_state: PoolThinpoolExtendState::Initializing,
             free_space_state,
             dbus_path: MaybeDbusPath(None),
         })
@@ -664,17 +664,17 @@ impl ThinPool {
     }
 
     fn set_extend_state(&mut self, data_extend_failed: bool, meta_extend_failed: bool) {
-        let mut new_state = PoolExtendState::Good;
+        let mut new_state = PoolThinpoolExtendState::Good;
         if data_extend_failed && meta_extend_failed {
-            new_state = PoolExtendState::MetaAndDataFailed
+            new_state = PoolThinpoolExtendState::MetaAndDataFailed
         } else if data_extend_failed {
-            new_state = PoolExtendState::DataFailed;
+            new_state = PoolThinpoolExtendState::DataFailed;
         } else if meta_extend_failed {
-            new_state = PoolExtendState::MetaFailed;
+            new_state = PoolThinpoolExtendState::MetaFailed;
         }
         if self.extend_state() != new_state {
             self.pool_extend_state = new_state;
-            get_engine_listener_list().notify(&EngineEvent::PoolExtendStateChanged {
+            get_engine_listener_list().notify(&EngineEvent::PoolThinpoolExtendStateChanged {
                 dbus_path: self.get_dbus_path(),
                 state: new_state,
             });
@@ -1041,7 +1041,7 @@ impl ThinPool {
         self.pool_state
     }
 
-    pub fn extend_state(&self) -> PoolExtendState {
+    pub fn extend_state(&self) -> PoolThinpoolExtendState {
         self.pool_extend_state
     }
 

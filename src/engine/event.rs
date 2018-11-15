@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use std::sync::{Once, ONCE_INIT};
 
 use super::types::{
-    BlockDevState, MaybeDbusPath, PoolExtendState, PoolState, PoolThinpoolFreeSpaceState,
+    BlockDevState, MaybeDbusPath, PoolState, PoolThinpoolExtendState, PoolThinpoolFreeSpaceState,
 };
 
 static INIT: Once = ONCE_INIT;
@@ -23,9 +23,9 @@ pub enum EngineEvent<'a> {
         from: &'a str,
         to: &'a str,
     },
-    PoolExtendStateChanged {
+    PoolThinpoolExtendStateChanged {
         dbus_path: &'a MaybeDbusPath,
-        state: PoolExtendState,
+        state: PoolThinpoolExtendState,
     },
     PoolRenamed {
         dbus_path: &'a MaybeDbusPath,

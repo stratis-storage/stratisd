@@ -14,8 +14,8 @@ use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::types::{
-    BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState,
-    PoolState, PoolUuid, Redundancy, RenameAction,
+    BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolExtendState, PoolState,
+    PoolThinpoolFreeSpaceState, PoolUuid, Redundancy, RenameAction,
 };
 use stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -459,7 +459,7 @@ impl Pool for StratPool {
         self.thin_pool.extend_state()
     }
 
-    fn free_space_state(&self) -> FreeSpaceState {
+    fn free_space_state(&self) -> PoolThinpoolFreeSpaceState {
         self.thin_pool.free_space_state()
     }
 

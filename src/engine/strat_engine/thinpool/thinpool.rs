@@ -24,8 +24,8 @@ use super::super::super::engine::Filesystem;
 use super::super::super::event::{get_engine_listener_list, EngineEvent};
 use super::super::super::structures::Table;
 use super::super::super::types::{
-    FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid,
-    RenameAction,
+    FilesystemUuid, MaybeDbusPath, Name, PoolExtendState, PoolState, PoolThinpoolFreeSpaceState,
+    PoolUuid, RenameAction,
 };
 
 use super::super::backstore::Backstore;
@@ -180,7 +180,7 @@ fn coalesce_segs(
 fn calc_lowater(
     data_dev_size: DataBlocks,
     available: DataBlocks,
-    free_space_state: FreeSpaceState,
+    free_space_state: PoolThinpoolFreeSpaceState,
 ) -> DataBlocks {
     // Calculate the low water. dev_low_water and action_pct are the device
     // low water and the percent used at which an action should be taken for
@@ -207,7 +207,7 @@ fn calc_lowater(
     };
 
     match free_space_state {
-        FreeSpaceState::Good => calc_lowater_internal(DATA_LOWATER, SPACE_WARN_PCT),
+        PoolThinpoolFreeSpaceState::Good => calc_lowater_internal(DATA_LOWATER, SPACE_WARN_PCT),
         _ => calc_lowater_internal(THROTTLE_BLOCKS_PER_SEC, SPACE_CRIT_PCT),
     }
 }
@@ -268,7 +268,7 @@ pub struct ThinPool {
     backstore_device: Device,
     pool_state: PoolState,
     pool_extend_state: PoolExtendState,
-    free_space_state: FreeSpaceState,
+    free_space_state: PoolThinpoolFreeSpaceState,
     dbus_path: MaybeDbusPath,
 }
 
@@ -349,7 +349,7 @@ impl ThinPool {
 
         let (dm_name, dm_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
 
-        let (free_space_state, data_dev_size) = (FreeSpaceState::Good, data_dev.size());
+        let (free_space_state, data_dev_size) = (PoolThinpoolFreeSpaceState::Good, data_dev.size());
         let thinpool_dev = ThinPoolDev::new(
             get_dm(),
             &dm_name,
@@ -420,7 +420,7 @@ impl ThinPool {
             segs_to_table(backstore_device, &data_segments),
         )?;
 
-        let (free_space_state, data_dev_size) = (FreeSpaceState::Good, data_dev.size());
+        let (free_space_state, data_dev_size) = (PoolThinpoolFreeSpaceState::Good, data_dev.size());
         let thinpool_dev = ThinPoolDev::setup(
             get_dm(),
             &thinpool_name,
@@ -681,23 +681,23 @@ impl ThinPool {
         }
     }
 
-    fn set_free_space_state(&mut self, new_state: FreeSpaceState) {
+    fn set_free_space_state(&mut self, new_state: PoolThinpoolFreeSpaceState) {
         if self.free_space_state() != new_state {
             self.free_space_state = new_state;
-            get_engine_listener_list().notify(&EngineEvent::PoolSpaceStateChanged {
+            get_engine_listener_list().notify(&EngineEvent::PoolThinpoolFreeSpaceStateChanged {
                 dbus_path: self.get_dbus_path(),
                 state: new_state,
             });
         }
     }
 
-    /// Possibly transition to a new FreeSpaceState based on usage, and invoke
+    /// Possibly transition to a new PoolThinpoolFreeSpaceState based on usage, and invoke
     /// policies (throttling, suspension) accordingly.
     fn free_space_check(
         &mut self,
         used: DataBlocks,
         available: DataBlocks,
-    ) -> StratisResult<FreeSpaceState> {
+    ) -> StratisResult<PoolThinpoolFreeSpaceState> {
         // Return a value from 0 to 100 that is the percentage that "used"
         // makes up in "total".
         fn used_pct(used: u64, total: u64) -> u8 {
@@ -714,24 +714,24 @@ impl ThinPool {
         info!("Data tier percent used: {}", overall_used_pct);
 
         let new_state = if overall_used_pct < SPACE_WARN_PCT {
-            FreeSpaceState::Good
+            PoolThinpoolFreeSpaceState::Good
         } else if overall_used_pct < SPACE_CRIT_PCT {
-            FreeSpaceState::Warn
+            PoolThinpoolFreeSpaceState::Warn
         } else {
-            FreeSpaceState::Crit
+            PoolThinpoolFreeSpaceState::Crit
         };
 
         self.set_free_space_state(new_state);
 
         match (self.free_space_state, new_state) {
-            (FreeSpaceState::Good, FreeSpaceState::Warn) => {
+            (PoolThinpoolFreeSpaceState::Good, PoolThinpoolFreeSpaceState::Warn) => {
                 // TODO: other steps to regain space: schedule fstrims?
                 set_write_throttling(
                     self.thin_pool.data_dev().device(),
                     Some(datablocks_to_sectors(THROTTLE_BLOCKS_PER_SEC).bytes()),
                 )?;
             }
-            (FreeSpaceState::Good, FreeSpaceState::Crit) => {
+            (PoolThinpoolFreeSpaceState::Good, PoolThinpoolFreeSpaceState::Crit) => {
                 set_write_throttling(
                     self.thin_pool.data_dev().device(),
                     Some(datablocks_to_sectors(THROTTLE_BLOCKS_PER_SEC).bytes()),
@@ -741,21 +741,21 @@ impl ThinPool {
                     fs.suspend(true)?;
                 }
             }
-            (FreeSpaceState::Warn, FreeSpaceState::Good) => {
+            (PoolThinpoolFreeSpaceState::Warn, PoolThinpoolFreeSpaceState::Good) => {
                 set_write_throttling(self.thin_pool.data_dev().device(), None)?;
             }
-            (FreeSpaceState::Warn, FreeSpaceState::Crit) => {
+            (PoolThinpoolFreeSpaceState::Warn, PoolThinpoolFreeSpaceState::Crit) => {
                 for (_, _, fs) in &mut self.filesystems {
                     fs.suspend(true)?;
                 }
             }
-            (FreeSpaceState::Crit, FreeSpaceState::Good) => {
+            (PoolThinpoolFreeSpaceState::Crit, PoolThinpoolFreeSpaceState::Good) => {
                 for (_, _, fs) in &mut self.filesystems {
                     fs.resume()?;
                 }
                 set_write_throttling(self.thin_pool.data_dev().device(), None)?;
             }
-            (FreeSpaceState::Crit, FreeSpaceState::Warn) => {
+            (PoolThinpoolFreeSpaceState::Crit, PoolThinpoolFreeSpaceState::Warn) => {
                 for (_, _, fs) in &mut self.filesystems {
                     fs.resume()?;
                 }
@@ -1045,7 +1045,7 @@ impl ThinPool {
         self.pool_extend_state
     }
 
-    pub fn free_space_state(&self) -> FreeSpaceState {
+    pub fn free_space_state(&self) -> PoolThinpoolFreeSpaceState {
         self.free_space_state
     }
 

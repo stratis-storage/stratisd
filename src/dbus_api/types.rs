@@ -4,7 +4,6 @@
 
 use std::cell::{Cell, RefCell};
 use std::collections::vec_deque::{Drain, VecDeque};
-use std::convert::From;
 use std::rc::Rc;
 
 use dbus::tree::{DataType, MTFn, ObjectPath, Tree};
@@ -24,13 +23,6 @@ pub enum DbusErrorEnum {
     BUSY,
     INTERNAL_ERROR,
     NOTFOUND,
-}
-
-/// Get the u16 value of this ErrorEnum constructor.
-impl From<DbusErrorEnum> for u16 {
-    fn from(e: DbusErrorEnum) -> u16 {
-        e as u16
-    }
 }
 
 impl DbusErrorEnum {

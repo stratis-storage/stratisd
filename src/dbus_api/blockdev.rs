@@ -237,7 +237,7 @@ fn get_blockdev_state(
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
     fn get_state(_: BlockDevTier, blockdev: &BlockDev) -> Result<u16, MethodErr> {
-        Ok(blockdev.state().to_dbus_value())
+        Ok(blockdev.state() as u16)
     }
 
     get_blockdev_property(i, p, get_state)
@@ -248,11 +248,7 @@ fn get_blockdev_tier(
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
     fn get(tier: BlockDevTier, _: &BlockDev) -> Result<u16, MethodErr> {
-        let tier: u16 = match tier {
-            BlockDevTier::Data => 0,
-            BlockDevTier::Cache => 1,
-        };
-        Ok(tier)
+        Ok(tier as u16)
     }
 
     get_blockdev_property(i, p, get)

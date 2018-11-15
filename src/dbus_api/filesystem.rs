@@ -121,7 +121,7 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 "pool {} doesn't know about filesystem {}",
                 pool_uuid, filesystem_data.uuid
             );
-            let (rc, rs) = (u16::from(DbusErrorEnum::INTERNAL_ERROR), error_message);
+            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);
             return_message.append3(default_return, rc, rs)
         }
         Ok(RenameAction::Identity) => {

@@ -22,6 +22,13 @@ pub enum RenameAction {
     Renamed,
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub struct PoolThinpoolOmnibusState {
+    pub extend_state: PoolThinpoolExtendState,
+    pub free_space_state: PoolThinpoolFreeSpaceState,
+    pub overall_state: PoolThinpoolState,
+}
+
 /// A DM pool operates in 4 modes.  See drivers/md/dm-thin.c (enum pool_mode).
 /// The 4 modes map to Running, OutOfDataSpace, ReadOnly and Failed - in degrading
 /// order.  Stratis adds 2 additional modes - Initializing and Stopping.  The Stratis

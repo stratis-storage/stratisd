@@ -25,7 +25,7 @@ use super::super::super::event::{get_engine_listener_list, EngineEvent};
 use super::super::super::structures::Table;
 use super::super::super::types::{
     FilesystemUuid, MaybeDbusPath, Name, PoolThinpoolExtendState, PoolThinpoolFreeSpaceState,
-    PoolThinpoolState, PoolUuid, RenameAction,
+    PoolThinpoolOmnibusState, PoolThinpoolState, PoolUuid, RenameAction,
 };
 
 use super::super::backstore::Backstore;
@@ -266,9 +266,7 @@ pub struct ThinPool {
     /// layer. All DM components obtain their storage from this layer.
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
-    pool_state: PoolThinpoolState,
-    pool_extend_state: PoolThinpoolExtendState,
-    free_space_state: PoolThinpoolFreeSpaceState,
+    state: PoolThinpoolOmnibusState,
     dbus_path: MaybeDbusPath,
 }
 
@@ -376,9 +374,11 @@ impl ThinPool {
             filesystems: Table::default(),
             mdv,
             backstore_device,
-            pool_state: PoolThinpoolState::Initializing,
-            pool_extend_state: PoolThinpoolExtendState::Initializing,
-            free_space_state,
+            state: PoolThinpoolOmnibusState {
+                extend_state: PoolThinpoolExtendState::Initializing,
+                free_space_state,
+                overall_state: PoolThinpoolState::Initializing,
+            },
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -486,9 +486,11 @@ impl ThinPool {
             filesystems: fs_table,
             mdv,
             backstore_device,
-            pool_state: PoolThinpoolState::Initializing,
-            pool_extend_state: PoolThinpoolExtendState::Initializing,
-            free_space_state,
+            state: PoolThinpoolOmnibusState {
+                extend_state: PoolThinpoolExtendState::Initializing,
+                free_space_state,
+                overall_state: PoolThinpoolState::Initializing,
+            },
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -624,7 +626,7 @@ impl ThinPool {
                 let lowater = calc_lowater(
                     current_total,
                     sectors_to_datablocks(backstore.available_in_backstore()),
-                    self.free_space_state,
+                    self.state.free_space_state,
                 );
 
                 self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
@@ -655,7 +657,7 @@ impl ThinPool {
 
     fn set_state(&mut self, new_state: PoolThinpoolState) {
         if self.state() != new_state {
-            self.pool_state = new_state;
+            self.state.overall_state = new_state;
             get_engine_listener_list().notify(&EngineEvent::PoolThinpoolStateChanged {
                 dbus_path: self.get_dbus_path(),
                 state: new_state,
@@ -673,7 +675,7 @@ impl ThinPool {
             new_state = PoolThinpoolExtendState::MetaFailed;
         }
         if self.extend_state() != new_state {
-            self.pool_extend_state = new_state;
+            self.state.extend_state = new_state;
             get_engine_listener_list().notify(&EngineEvent::PoolThinpoolExtendStateChanged {
                 dbus_path: self.get_dbus_path(),
                 state: new_state,
@@ -683,7 +685,7 @@ impl ThinPool {
 
     fn set_free_space_state(&mut self, new_state: PoolThinpoolFreeSpaceState) {
         if self.free_space_state() != new_state {
-            self.free_space_state = new_state;
+            self.state.free_space_state = new_state;
             get_engine_listener_list().notify(&EngineEvent::PoolThinpoolFreeSpaceStateChanged {
                 dbus_path: self.get_dbus_path(),
                 state: new_state,
@@ -723,7 +725,7 @@ impl ThinPool {
 
         self.set_free_space_state(new_state);
 
-        match (self.free_space_state, new_state) {
+        match (self.state.free_space_state, new_state) {
             (PoolThinpoolFreeSpaceState::Good, PoolThinpoolFreeSpaceState::Warn) => {
                 // TODO: other steps to regain space: schedule fstrims?
                 set_write_throttling(
@@ -1038,15 +1040,15 @@ impl ThinPool {
     }
 
     pub fn state(&self) -> PoolThinpoolState {
-        self.pool_state
+        self.state.overall_state
     }
 
     pub fn extend_state(&self) -> PoolThinpoolExtendState {
-        self.pool_extend_state
+        self.state.extend_state
     }
 
     pub fn free_space_state(&self) -> PoolThinpoolFreeSpaceState {
-        self.free_space_state
+        self.state.free_space_state
     }
 
     /// Rename a filesystem within the thin pool.

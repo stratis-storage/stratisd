@@ -4,7 +4,6 @@
 
 use std::cell::{Cell, RefCell};
 use std::collections::vec_deque::{Drain, VecDeque};
-use std::convert::From;
 use std::rc::Rc;
 
 use dbus::tree::{DataType, MTFn, ObjectPath, Tree};
@@ -14,25 +13,16 @@ use uuid::Uuid;
 
 use super::super::engine::Engine;
 
-macro_attr! {
-    #[derive(Clone, Copy, Debug)]
-    #[allow(non_camel_case_types)]
-    pub enum DbusErrorEnum {
-        OK,
-        ERROR,
+#[derive(Clone, Copy, Debug)]
+#[allow(non_camel_case_types)]
+pub enum DbusErrorEnum {
+    OK = 0,
+    ERROR = 1,
 
-        ALREADY_EXISTS,
-        BUSY,
-        INTERNAL_ERROR,
-        NOTFOUND,
-    }
-}
-
-/// Get the u16 value of this ErrorEnum constructor.
-impl From<DbusErrorEnum> for u16 {
-    fn from(e: DbusErrorEnum) -> u16 {
-        e as u16
-    }
+    ALREADY_EXISTS = 2,
+    BUSY = 3,
+    INTERNAL_ERROR = 4,
+    NOTFOUND = 5,
 }
 
 impl DbusErrorEnum {

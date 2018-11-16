@@ -42,7 +42,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     if filesystems.count() > 1 {
         let error_message = "only 1 filesystem per request allowed";
-        let (rc, rs) = (u16::from(DbusErrorEnum::ERROR), error_message);
+        let (rc, rs) = (DbusErrorEnum::ERROR as u16, error_message);
         return Ok(vec![return_message.append3(default_return, rc, rs)]);
     }
 
@@ -167,7 +167,7 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Some(op) => get_data!(op; default_return; return_message).uuid,
         None => {
             let message = format!("no data for object path {}", filesystem);
-            let (rc, rs) = (u16::from(DbusErrorEnum::NOTFOUND), message);
+            let (rc, rs) = (DbusErrorEnum::NOTFOUND as u16, message);
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
@@ -273,7 +273,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", &pool_uuid);
-            let (rc, rs) = (u16::from(DbusErrorEnum::INTERNAL_ERROR), error_message);
+            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);
             return_message.append3(default_return, rc, rs)
         }
         Ok(RenameAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),
@@ -353,20 +353,18 @@ fn get_pool_total_physical_size(
 }
 
 fn get_pool_state(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(_, _, pool)| Ok(pool.state().to_dbus_value()))
+    get_pool_property(i, p, |(_, _, pool)| Ok(pool.state() as u16))
 }
 
 fn get_pool_extend_state(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(_, _, pool)| Ok(pool.extend_state().to_dbus_value()))
+    get_pool_property(i, p, |(_, _, pool)| Ok(pool.extend_state() as u16))
 }
 
 fn get_space_state(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(_, _, pool)| {
-        Ok(pool.free_space_state().to_dbus_value())
-    })
+    get_pool_property(i, p, |(_, _, pool)| Ok(pool.free_space_state() as u16))
 }
 
 pub fn create_dbus_pool<'a>(

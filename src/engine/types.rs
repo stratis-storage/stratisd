@@ -29,88 +29,41 @@ pub enum RenameAction {
 /// the pool components or tearing them down.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PoolState {
-    Initializing,   // Startup in progress
-    Running,        // PM_WRITE - pool ok
-    OutOfDataSpace, // Meta
-    ReadOnly,       // The kernel reports PM_OUT_OF_META_SPACE or PM_READ_ONLY as the
+    Initializing = 1,   // Startup in progress
+    Running = 2,        // PM_WRITE - pool ok
+    OutOfDataSpace = 4, // Meta
+    ReadOnly = 3,       // The kernel reports PM_OUT_OF_META_SPACE or PM_READ_ONLY as the
     // same state. PM_OUT_OF_META_SPACE may switch back to PM_WRITE when
     // the meta data device is expanded.  PM_READ_ONLY requires user
     // intervention to switch back to PM_WRITE mode.
-    Failed,   // All I/O fails
-    Stopping, // Teardown in progress
-}
-
-impl PoolState {
-    pub fn to_dbus_value(self) -> u16 {
-        match self {
-            PoolState::Initializing => 1,
-            PoolState::Running => 2,
-            PoolState::ReadOnly => 3,
-            PoolState::OutOfDataSpace => 4,
-            PoolState::Failed => 5,
-            PoolState::Stopping => 6,
-        }
-    }
+    Failed = 5,   // All I/O fails
+    Stopping = 6, // Teardown in progress
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PoolExtendState {
-    Initializing,
-    Good,
-    DataFailed,
-    MetaFailed,
-    MetaAndDataFailed,
-}
-
-impl PoolExtendState {
-    pub fn to_dbus_value(self) -> u16 {
-        match self {
-            PoolExtendState::Initializing => 1,
-            PoolExtendState::Good => 2,
-            PoolExtendState::DataFailed => 3,
-            PoolExtendState::MetaFailed => 4,
-            PoolExtendState::MetaAndDataFailed => 5,
-        }
-    }
+    Initializing = 1,
+    Good = 2,
+    DataFailed = 3,
+    MetaFailed = 4,
+    MetaAndDataFailed = 5,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FreeSpaceState {
-    Good,
-    Warn,
-    Crit,
-}
-
-impl FreeSpaceState {
-    pub fn to_dbus_value(self) -> u16 {
-        match self {
-            FreeSpaceState::Good => 1,
-            FreeSpaceState::Warn => 2,
-            FreeSpaceState::Crit => 3,
-        }
-    }
+    Good = 1,
+    Warn = 2,
+    Crit = 3,
 }
 
 /// See Design Doc section 10.2.1 for more details.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BlockDevState {
-    Missing,
-    Bad,
-    Spare,
-    NotInUse,
-    InUse,
-}
-
-impl BlockDevState {
-    pub fn to_dbus_value(self) -> u16 {
-        match self {
-            BlockDevState::Missing => 0,
-            BlockDevState::Bad => 1,
-            BlockDevState::Spare => 2,
-            BlockDevState::NotInUse => 3,
-            BlockDevState::InUse => 4,
-        }
-    }
+    Missing = 0,
+    Bad = 1,
+    Spare = 2,
+    NotInUse = 3,
+    InUse = 4,
 }
 
 /// A struct that may contain a dbus::Path, or may not, and most certainly
@@ -126,25 +79,16 @@ pub struct MaybeDbusPath(
 /// data and blockdevs used for a cache.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BlockDevTier {
-    Data,
-    Cache,
+    Data = 0,
+    Cache = 1,
 }
 
 /// Redundancy classifications which the engine allows for pools.
-macro_attr! {
-    #[derive(Debug, Eq, PartialEq)]
-    #[allow(non_camel_case_types)]
-    /// Redundancy specification for a pool.
-    pub enum Redundancy {
-        NONE,
-    }
-}
-
-/// Get the u16 value of this Redundancy constructor.
-impl From<Redundancy> for u16 {
-    fn from(r: Redundancy) -> u16 {
-        r as u16
-    }
+#[derive(Debug, Eq, PartialEq)]
+#[allow(non_camel_case_types)]
+/// Redundancy specification for a pool.
+pub enum Redundancy {
+    NONE = 0,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]

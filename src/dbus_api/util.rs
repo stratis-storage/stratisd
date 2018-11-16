@@ -66,12 +66,12 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
         StratisError::DM(DmError::Core(ref err)) => err.to_string(),
         ref err => err.description().to_owned(),
     };
-    (error.into(), description)
+    (error as u16, description)
 }
 
 /// Convenience function to get the error value for "OK"
 pub fn msg_code_ok() -> u16 {
-    DbusErrorEnum::OK.into()
+    DbusErrorEnum::OK as u16
 }
 
 /// Convenience function to get the error string for "OK"

@@ -188,13 +188,12 @@ impl EngineListener for EventHandler {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::BLOCKDEV_STATE_PROP,
-                        state.to_dbus_value(),
+                        state as u16,
                         &dbus_path,
                     ).unwrap_or_else(|()| {
                         error!(
                             "BlockdevStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path,
-                            state.to_dbus_value(),
+                            dbus_path, state as u16,
                         );
                     });
                 }
@@ -223,13 +222,12 @@ impl EngineListener for EventHandler {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::POOL_EXTEND_STATE_PROP,
-                        state.to_dbus_value(),
+                        state as u16,
                         &dbus_path,
                     ).unwrap_or_else(|()| {
                         error!(
                             "PoolExtendStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path,
-                            state.to_dbus_value(),
+                            dbus_path, state as u16,
                         );
                     });
                 }
@@ -258,13 +256,12 @@ impl EngineListener for EventHandler {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::POOL_SPACE_STATE_PROP,
-                        state.to_dbus_value(),
+                        state as u16,
                         &dbus_path,
                     ).unwrap_or_else(|()| {
                         error!(
                             "PoolSpaceStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path,
-                            state.to_dbus_value(),
+                            dbus_path, state as u16,
                         );
                     });
                 }
@@ -274,13 +271,12 @@ impl EngineListener for EventHandler {
                     prop_changed_dispatch(
                         &self.dbus_conn.borrow(),
                         consts::POOL_STATE_PROP,
-                        state.to_dbus_value(),
+                        state as u16,
                         &dbus_path,
                     ).unwrap_or_else(|()| {
                         error!(
                             "PoolStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path,
-                            state.to_dbus_value(),
+                            dbus_path, state as u16,
                         );
                     });
                 }

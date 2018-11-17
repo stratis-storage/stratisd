@@ -32,7 +32,7 @@ from stratisd_client_dbus import Pool
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._loopback import LoopBackDevices
-from .._dm import remove_stratis_setup
+from .._dm import remove_stratis_setup, _get_stratis_devices
 
 _STRATISD = os.environ['STRATISD']
 
@@ -121,6 +121,9 @@ class UdevAdd(unittest.TestCase):
         """
 
         if self._service is None:
+            assert UdevAdd._process_exists("stratisd") is None
+            assert _get_stratis_devices() == []
+
             dbus_interface_present = False
             self._service = subprocess.Popen([_STRATISD, '--debug'])
 
@@ -159,7 +162,10 @@ class UdevAdd(unittest.TestCase):
             self._service.wait()
             self._service = None
 
+            assert UdevAdd._process_exists("stratisd") is None
+
             remove_stratis_setup()
+            assert _get_stratis_devices() == []
 
     @staticmethod
     def _settle():
@@ -171,6 +177,21 @@ class UdevAdd(unittest.TestCase):
         # the event to be done, this seems to work for now.
         subprocess.check_call(['udevadm', 'settle'])
         time.sleep(1)
+
+    @staticmethod
+    def _process_exists(name):
+        """
+        Walk the process table looking for executable 'name', returns pid if one
+        found, else return None
+        """
+        for p in [pid for pid in os.listdir('/proc') if pid.isdigit()]:
+            try:
+                exe_name = os.readlink(os.path.join("/proc/", p, "exe"))
+            except OSError:
+                continue
+            if exe_name and exe_name.endswith(os.path.join("/", name)):
+                return p
+        return None
 
     # pylint: disable=too-many-locals
     def _test_driver(self,

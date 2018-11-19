@@ -46,7 +46,7 @@ class _Service():
         """
         Start the stratisd daemon with the simulator.
         """
-        self._stratisd = subprocess.Popen([os.path.join(_STRATISD), '--sim'])
+        self._stratisd = subprocess.Popen([_STRATISD, '--sim'])
         time.sleep(1)
 
     def tearDown(self):

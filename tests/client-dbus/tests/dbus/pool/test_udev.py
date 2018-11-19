@@ -122,8 +122,7 @@ class UdevAdd(unittest.TestCase):
 
         if self._service is None:
             dbus_interface_present = False
-            self._service = subprocess.Popen(
-                [os.path.join(_STRATISD), '--debug'])
+            self._service = subprocess.Popen([_STRATISD, '--debug'])
 
             limit = time.time() + 10.0
             while time.time() <= limit:

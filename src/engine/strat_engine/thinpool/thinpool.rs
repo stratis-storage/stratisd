@@ -221,12 +221,14 @@ struct Segments {
     mdv_segments: Vec<(Sectors, Sectors)>,
 }
 
+#[allow(dead_code)]
 pub struct ThinPoolSizeParams {
     meta_size: MetaBlocks,
     data_size: DataBlocks,
     mdv_size: Sectors,
 }
 
+#[allow(dead_code)]
 impl ThinPoolSizeParams {
     /// The number of Sectors in the MetaBlocks.
     pub fn meta_size(&self) -> Sectors {
@@ -280,14 +282,13 @@ impl ThinPool {
         data_block_size: Sectors,
         backstore: &mut Backstore,
     ) -> StratisResult<ThinPool> {
+        let mut available: Sectors = backstore.available_in_backstore();
+        available -= thin_pool_size.mdv_size();
+        let meta_size: Sectors = available / 1000u16;
+        let data_size = available - (meta_size * 2u16);
         let mut segments_list = match backstore.alloc(
             pool_uuid,
-            &[
-                thin_pool_size.meta_size(),
-                thin_pool_size.meta_size(),
-                thin_pool_size.data_size(),
-                thin_pool_size.mdv_size(),
-            ],
+            &[meta_size, meta_size, data_size, thin_pool_size.mdv_size()],
         )? {
             Some(sl) => sl,
             None => {
@@ -785,7 +786,7 @@ impl ThinPool {
     }
 
     /// Extend thinpool's data dev. See extend_thin_sub_device for more info.
-    fn extend_thin_data_device(
+    pub fn extend_thin_data_device(
         &mut self,
         pool_uuid: PoolUuid,
         backstore: &mut Backstore,
@@ -808,7 +809,7 @@ impl ThinPool {
     }
 
     /// Extend thinpool's meta dev. See extend_thin_sub_device for more info.
-    fn extend_thin_meta_device(
+    pub fn extend_thin_meta_device(
         &mut self,
         pool_uuid: PoolUuid,
         backstore: &mut Backstore,

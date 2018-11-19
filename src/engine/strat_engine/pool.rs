@@ -314,6 +314,16 @@ impl Pool for StratPool {
             // No action will be taken on the DM devices.
             let bdev_info = self.backstore.add_datadevs(pool_uuid, paths)?;
 
+            // Temporary: Immediately fully extend thin meta/data onto new
+            // blockdevs
+            let available = self.backstore.available_in_backstore();
+            let meta_size: Sectors = available / 1000u16;
+            let data_size = available - (meta_size * 2u16);
+            self.thin_pool
+                .extend_thin_meta_device(pool_uuid, &mut self.backstore, meta_size)?;
+            self.thin_pool
+                .extend_thin_data_device(pool_uuid, &mut self.backstore, data_size)?;
+
             // Adding data devices does not change the state of the thin
             // pool at all. However, if the thin pool is in a state
             // where it would request an allocation from the backstore the

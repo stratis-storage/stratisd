@@ -283,9 +283,17 @@ impl ThinPool {
         backstore: &mut Backstore,
     ) -> StratisResult<ThinPool> {
         let mut available: Sectors = backstore.available_in_backstore();
+        if available
+            < thin_pool_size.mdv_size()
+                + (thin_pool_size.meta_size() * 2u16)
+                + thin_pool_size.data_size()
+        {
+            let err_msg = "Could not allocate sufficient space for thinpool devices.";
+            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
+        }
         available -= thin_pool_size.mdv_size();
-        let meta_size: Sectors = available / 1000u16;
-        let data_size = available - (meta_size * 2u16);
+        let meta_size: Sectors = max(available / 1000u16, thin_pool_size.meta_size());
+        let data_size = max(available - (meta_size * 2u16), thin_pool_size.data_size());
         let mut segments_list = match backstore.alloc(
             pool_uuid,
             &[meta_size, meta_size, data_size, thin_pool_size.mdv_size()],

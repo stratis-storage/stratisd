@@ -127,7 +127,7 @@ class UdevAdd(unittest.TestCase):
             dbus_interface_present = False
             self._service = subprocess.Popen([_STRATISD, '--debug'])
 
-            limit = time.time() + 10.0
+            limit = time.time() + 120.0
             while time.time() <= limit:
                 try:
                     get_object(TOP_OBJECT)
@@ -135,7 +135,7 @@ class UdevAdd(unittest.TestCase):
                     break
                 # pylint: disable=bare-except
                 except:
-                    time.sleep(0.1)
+                    time.sleep(0.5)
 
                     # If service has exited we will bail
                     if self._service.poll() is not None:
@@ -176,7 +176,7 @@ class UdevAdd(unittest.TestCase):
         # What is the best way to ensure we wait long enough for
         # the event to be done, this seems to work for now.
         subprocess.check_call(['udevadm', 'settle'])
-        time.sleep(1)
+        time.sleep(2)
 
     @staticmethod
     def _process_exists(name):

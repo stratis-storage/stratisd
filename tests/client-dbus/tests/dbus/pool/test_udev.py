@@ -121,6 +121,13 @@ class UdevAdd(unittest.TestCase):
         """
 
         if self._service is None:
+            # The service uses the udev db at start, we need to ensure that it
+            # is in a consistent state for us to come up and find all the
+            # stratis devices and assemble the pools before we start processing
+            # dbus client requests.  Otherwise we have a race condition between
+            # what the client expects and what the service knows about.
+            self._settle()
+
             assert UdevAdd._process_exists("stratisd") is None
             assert _get_stratis_devices() == []
 

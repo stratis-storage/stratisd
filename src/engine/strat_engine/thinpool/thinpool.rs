@@ -584,14 +584,14 @@ impl ThinPool {
                     }
                 }
 
-                let extend_size = {
+                let extend_size = sectors_to_datablocks({
                     match calculate_extension_request(
                         datablocks_to_sectors(usage.total_data),
                         datablocks_to_sectors(usage.used_data),
                         datablocks_to_sectors(self.thin_pool.table().table.params.low_water_mark),
                         true,
                     ) {
-                        None => DataBlocks(0),
+                        None => Sectors(0),
                         Some(request) => {
                             match self.extend_thin_data_device(pool_uuid, backstore, request) {
                                 Ok(extend_size) => {
@@ -602,7 +602,7 @@ impl ThinPool {
                                         info!("Extended thin data device by {}", extend_size);
                                         should_save = true;
                                     }
-                                    sectors_to_datablocks(extend_size)
+                                    extend_size
                                 }
                                 Err(err) => {
                                     data_extend_failed = true;
@@ -610,12 +610,12 @@ impl ThinPool {
                                         "Thinpool data extend failed! -> Warning: reason: {:?}",
                                         err
                                     );
-                                    DataBlocks(0)
+                                    Sectors(0)
                                 }
                             }
                         }
                     }
-                };
+                });
 
                 let current_total = usage.total_data + extend_size;
 

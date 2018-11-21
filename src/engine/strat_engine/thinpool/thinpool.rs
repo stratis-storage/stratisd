@@ -569,8 +569,13 @@ impl ThinPool {
                 ) {
                     match self.extend_thin_meta_device(pool_uuid, backstore, request) {
                         Ok(extend_size) => {
-                            info!("Extended thin meta device by {}", extend_size);
-                            should_save = true;
+                            if extend_size == Sectors(0) {
+                                warn!("No free space available in backstore; can not extend thinpool metadata sub-device");
+                                meta_extend_failed = true;
+                            } else {
+                                info!("Extended thin meta device by {}", extend_size);
+                                should_save = true;
+                            }
                         }
                         Err(err) => {
                             meta_extend_failed = true;
@@ -590,8 +595,13 @@ impl ThinPool {
                         Some(request) => {
                             match self.extend_thin_data_device(pool_uuid, backstore, request) {
                                 Ok(extend_size) => {
-                                    info!("Extended thin data device by {}", extend_size);
-                                    should_save = true;
+                                    if extend_size == Sectors(0) {
+                                        warn!("No free space available in backstore, can not extend thinpool data sub-device");
+                                        data_extend_failed = true;
+                                    } else {
+                                        info!("Extended thin data device by {}", extend_size);
+                                        should_save = true;
+                                    }
                                     sectors_to_datablocks(extend_size)
                                 }
                                 Err(err) => {
@@ -829,7 +839,8 @@ impl ThinPool {
     /// Extend the thinpool's data or meta devices. The result is the value
     /// by which the device is extended which may be less than the requested
     /// amount. It is guaranteed that the returned amount is a multiple of the
-    /// modulus value. Sets existing_segs to the new value that specifies the
+    /// modulus value. The amount returned may be 0, if nothing could be
+    /// allocated. Sets existing_segs to the new value that specifies the
     /// arrangement of segments on the extended device. The data parameter is
     /// true if the method should extend the data device, false if the
     /// method should extend the meta device.
@@ -859,11 +870,7 @@ impl ThinPool {
 
             Ok(region.1)
         } else {
-            let err_msg = format!(
-                "Insufficient space to accomodate request for at least {}",
-                modulus
-            );
-            Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+            Ok(Sectors(0))
         }
     }
 

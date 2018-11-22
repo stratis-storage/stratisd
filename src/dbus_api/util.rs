@@ -115,6 +115,7 @@ pub fn prop_changed_dispatch<T: 'static>(
     prop_name: &str,
     new_value: T,
     path: &dbus::Path,
+    interface: &str,
 ) -> Result<(), ()>
 where
     T: RefArg,
@@ -123,6 +124,7 @@ where
     prop_changed
         .changed_properties
         .insert(prop_name.into(), Variant(Box::new(new_value)));
+    prop_changed.interface_name = interface.to_owned();
 
     conn.send(prop_changed.to_emit_message(path))?;
 

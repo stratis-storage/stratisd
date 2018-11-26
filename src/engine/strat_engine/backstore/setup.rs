@@ -30,13 +30,14 @@ use super::util::get_stratis_block_devices;
 pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     let mut pool_map = HashMap::new();
 
-    for devnode in get_stratis_block_devices()? {
-        match devnode_to_devno(&devnode)? {
+    for devnode in tll!(get_stratis_block_devices()) {
+        match tll!(devnode_to_devno(&devnode)) {
             None => continue,
             Some(devno) => {
-                if let Some((pool_uuid, _)) = StaticHeader::device_identifiers(
-                    &mut OpenOptions::new().read(true).open(&devnode)?,
-                )? {
+                if let Some((pool_uuid, _)) = tll!(StaticHeader::device_identifiers(&mut tll!(
+                    OpenOptions::new().read(true).open(&devnode)
+                ),))
+                {
                     pool_map
                         .entry(pool_uuid)
                         .or_insert_with(HashMap::new)

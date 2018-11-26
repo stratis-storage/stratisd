@@ -39,12 +39,12 @@ extern crate matches;
 #[macro_use]
 extern crate lazy_static;
 
+#[macro_use]
+pub mod util;
+
 pub mod engine;
 
 #[cfg(feature = "dbus_enabled")]
 pub mod dbus_api;
 
 pub mod stratis;
-
-#[macro_use]
-pub mod util;

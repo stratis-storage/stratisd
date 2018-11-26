@@ -115,9 +115,9 @@ impl StratEngine {
     /// Returns an error if there was an error reading device nodes.
     /// Returns an error if the binaries on which it depends can not be found.
     pub fn initialize() -> StratisResult<StratEngine> {
-        let dm = get_dm_init()?;
-        verify_binaries()?;
-        let minor_dm_version = dm.version()?.1;
+        let dm = tll!(get_dm_init());
+        tll!(verify_binaries());
+        let minor_dm_version = tll!(dm.version()).1;
         if minor_dm_version < REQUIRED_DM_MINOR_VERSION {
             let err_msg = format!(
                 "Requires DM minor version {} but kernel only supports {}",
@@ -126,9 +126,9 @@ impl StratEngine {
             return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
         }
 
-        devlinks::setup_dev_path()?;
+        tll!(devlinks::setup_dev_path());
 
-        let pools = find_all()?;
+        let pools = tll!(find_all());
 
         let mut table = Table::default();
         let mut incomplete_pools = HashMap::new();

@@ -6,6 +6,7 @@
 #![allow(doc_markdown)]
 
 extern crate devicemapper;
+#[macro_use(tll)]
 extern crate libstratis;
 #[macro_use]
 extern crate log;
@@ -145,12 +146,12 @@ fn trylock_pid_file() -> StratisResult<File> {
     };
     match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
         Ok(_) => {
-            f.write_all(format!("{}\n", getpid()).as_bytes())?;
+            tll!(f.write_all(format!("{}\n", getpid()).as_bytes()));
             Ok(f)
         }
         Err(_) => {
             let mut buf = String::new();
-            f.read_to_string(&mut buf)?;
+            tll!(f.read_to_string(&mut buf));
             // pidfile is supposed to contain pid of holder. But you never
             // know so be paranoid.
             let pid_str = buf
@@ -316,10 +317,10 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     // completed initialization. Unless the udev event has been recorded, the
     // engine will miss the device.
     // This is especially important since stratisd must run during early boot.
-    let context = libudev::Context::new()?;
-    let mut monitor = libudev::Monitor::new(&context)?;
-    monitor.match_subsystem_devtype("block", "disk")?;
-    let mut udev = monitor.listen()?;
+    let context = tll!(libudev::Context::new());
+    let mut monitor = tll!(libudev::Monitor::new(&context));
+    tll!(monitor.match_subsystem_devtype("block", "disk"));
+    let mut udev = tll!(monitor.listen());
 
     let engine: Rc<RefCell<Engine>> = {
         if matches.is_present("sim") {
@@ -327,7 +328,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
             Rc::new(RefCell::new(SimEngine::default()))
         } else {
             info!("Using StratEngine");
-            Rc::new(RefCell::new(StratEngine::initialize()?))
+            Rc::new(RefCell::new(tll!(StratEngine::initialize())))
         }
     };
 
@@ -371,8 +372,8 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         let mut mask = SigSet::empty();
         mask.add(signal::SIGINT);
         mask.add(signal::SIGUSR1);
-        mask.thread_block()?;
-        SignalFd::with_flags(&mask, SfdFlags::SFD_NONBLOCK)?
+        tll!(mask.thread_block());
+        tll!(SignalFd::with_flags(&mask, SfdFlags::SFD_NONBLOCK))
     };
 
     fds.push(libc::pollfd {
@@ -381,7 +382,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         events: libc::POLLIN,
     });
 
-    let mut tfd = TimerFd::new()?;
+    let mut tfd = tll!(TimerFd::new());
     let interval = Duration::minutes(DEFAULT_STATE_DUMP_MINUTES)
         .to_std()
         .expect("std::Duration can represent positive values");
@@ -437,7 +438,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
 
                         if let Some(ref mut handle) = dbus_handle {
                             if let Some(pool_uuid) = pool_uuid {
-                                libstratis::dbus_api::register_pool(
+                                tll!(libstratis::dbus_api::register_pool(
                                     &handle.connection.borrow(),
                                     &handle.context,
                                     &mut handle.tree,
@@ -450,7 +451,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                                         )
                                         .1,
                                     &handle.path,
-                                )?;
+                                ));
                             }
                         }
                     }
@@ -499,8 +500,8 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         // Handle engine events, if the engine is eventable
         if let Some(ref evt) = eventable {
             if fds[FD_INDEX_ENGINE].revents != 0 {
-                evt.clear_event()?;
-                engine.borrow_mut().evented()?;
+                tll!(evt.clear_event());
+                tll!(engine.borrow_mut().evented());
             }
         }
 
@@ -547,14 +548,14 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 get_engine_listener_list_mut().register_listener(event_handler);
                 // Register all the pools with dbus
                 for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
-                    libstratis::dbus_api::register_pool(
+                    tll!(libstratis::dbus_api::register_pool(
                         &handle.connection.borrow(),
                         &handle.context,
                         &mut handle.tree,
                         pool_uuid,
                         pool,
                         &handle.path,
-                    )?;
+                    ));
                 }
 
                 // Add dbus FD to fds as dbus is now available.

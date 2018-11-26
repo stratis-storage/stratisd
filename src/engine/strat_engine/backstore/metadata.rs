@@ -65,8 +65,8 @@ impl BDA {
         where
             F: Read + Seek,
         {
-            f.seek(SeekFrom::Start(offset as u64))?;
-            f.read_exact(&mut buf)?;
+            tll!(f.seek(SeekFrom::Start(offset as u64)));
+            tll!(f.read_exact(&mut buf));
             Ok(())
         }
 
@@ -273,7 +273,7 @@ impl StaticHeader {
     where
         F: Read + Seek + SyncAll,
     {
-        let (buf_loc_1, buf_loc_2) = BDA::read(f)?;
+        let (buf_loc_1, buf_loc_2) = tll!(BDA::read(f));
 
         match (
             StaticHeader::sigblock_from_buf(&buf_loc_1),

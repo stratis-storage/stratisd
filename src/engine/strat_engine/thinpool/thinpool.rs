@@ -776,11 +776,6 @@ impl ThinPool {
         backstore: &mut Backstore,
         extend_size: Sectors,
     ) -> StratisResult<Sectors> {
-        info!(
-            "Attempting to extend thinpool data device belonging to pool {} by {}",
-            pool_uuid, extend_size,
-        );
-
         ThinPool::extend_thin_sub_device(
             pool_uuid,
             &mut self.thin_pool,
@@ -799,11 +794,6 @@ impl ThinPool {
         backstore: &mut Backstore,
         extend_size: Sectors,
     ) -> StratisResult<Sectors> {
-        info!(
-            "Attempting to extend thinpool meta device belonging to pool {} by {}",
-            pool_uuid, extend_size,
-        );
-
         ThinPool::extend_thin_sub_device(
             pool_uuid,
             &mut self.thin_pool,
@@ -832,6 +822,13 @@ impl ThinPool {
         existing_segs: &mut Vec<(Sectors, Sectors)>,
         data: bool,
     ) -> StratisResult<Sectors> {
+        let sub_device_str = if data { "data" } else { "metadata" };
+        let pool_uuid_str = pool_uuid.simple().to_string();
+        info!(
+            "Attempting to extend thinpool {} sub-device belonging to pool {} by {}",
+            sub_device_str, pool_uuid_str, extend_size,
+        );
+
         let result = if let Some(region) = backstore.request(pool_uuid, extend_size, modulus)? {
             let device = backstore
                 .device()
@@ -851,8 +848,6 @@ impl ThinPool {
         } else {
             Ok(Sectors(0))
         };
-        let sub_device_str = if data { "data" } else { "metadata" };
-        let pool_uuid_str = pool_uuid.simple().to_string();
         match result {
             Ok(actual_extend_size) => {
                 if actual_extend_size == extend_size {

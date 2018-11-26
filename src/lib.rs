@@ -45,3 +45,6 @@ pub mod engine;
 pub mod dbus_api;
 
 pub mod stratis;
+
+#[macro_use]
+pub mod util;

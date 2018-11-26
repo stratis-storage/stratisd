@@ -854,16 +854,19 @@ impl ThinPool {
         let sub_device_str = if data { "data" } else { "metadata" };
         let pool_uuid_str = pool_uuid.simple().to_string();
         match result {
-            Ok(Sectors(0)) => {
-                warn!("No free space available in backstore; can not extend thinpool {} sub-device belonging to pool with uuid {}",
+            Ok(actual_extend_size) => {
+                if actual_extend_size == extend_size {
+                    info!(
+                        "Extended thinpool {} sub-device belonging to pool with uuid {} by {}",
+                        sub_device_str, pool_uuid_str, actual_extend_size
+                    );
+                } else {
+                    warn!("Insufficient free space available in backstore; extended thinpool {} sub-device belonging to pool with uuid {} by {}, request was {}",
                       sub_device_str,
-                      pool_uuid_str);
-            }
-            Ok(extend_size) => {
-                info!(
-                    "Extended thinpool {} sub-device belonging to pool with uuid {} by {}",
-                    sub_device_str, pool_uuid_str, extend_size
-                );
+                      pool_uuid_str,
+                      actual_extend_size,
+                      extend_size);
+                }
             }
             Err(ref err) => {
                 error!("Attempted to extend thinpool {} sub-device belonging to pool with uuid {} by {} but failed with error: {:?}",

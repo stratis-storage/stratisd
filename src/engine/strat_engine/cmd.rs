@@ -168,6 +168,7 @@ pub fn create_ext3_fs(devnode: &Path) -> StratisResult<()> {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 pub fn xfs_repair(devnode: &Path) -> StratisResult<()> {
     execute_cmd(Command::new("xfs_repair").arg("-n").arg(&devnode))
 }

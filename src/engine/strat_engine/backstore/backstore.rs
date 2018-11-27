@@ -414,6 +414,11 @@ impl Backstore {
         self.data_tier.size()
     }
 
+    /// The current usable size of all the blockdevs in the data tier.
+    pub fn datatier_usable_size(&self) -> Sectors {
+        self.data_tier.usable_size()
+    }
+
     /// The size of the cap device.
     ///
     /// The size of the cap device is obtained from the size of the component

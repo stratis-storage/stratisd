@@ -430,27 +430,29 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
 
                     #[cfg(feature = "dbus_enabled")]
                     {
-                        let pool_uuid = engine
-                            .borrow_mut()
-                            .block_evaluate(device, devnode)
-                            .unwrap_or(None);
+                        let mut eng_ref = engine.borrow_mut();
+                        let pool_uuid = eng_ref.block_evaluate(device, devnode).unwrap_or(None);
 
                         if let Some(ref mut handle) = dbus_handle {
                             if let Some(pool_uuid) = pool_uuid {
-                                libstratis::dbus_api::register_pool(
-                                    &handle.connection.borrow(),
-                                    &handle.context,
-                                    &mut handle.tree,
-                                    pool_uuid,
-                                    engine
-                                        .borrow_mut()
+                                let pool = eng_ref
                                         .get_mut_pool(pool_uuid)
                                         .expect(
                                             "block_evaluate() returned a pool UUID, pool must be available",
                                         )
-                                        .1,
+                                        .1;
+
+                                if let Err(e) = libstratis::dbus_api::register_pool(
+                                    &handle.connection.borrow(),
+                                    &handle.context,
+                                    &mut handle.tree,
+                                    pool_uuid,
+                                    pool,
                                     &handle.path,
-                                )?;
+                                ) {
+                                    error!("libstratis::dbus_api::register_pool {}, {:?}, Path {}, error: {}",
+                                            pool_uuid, pool, handle.path, e);
+                                }
                             }
                         }
                     }
@@ -547,14 +549,19 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 get_engine_listener_list_mut().register_listener(event_handler);
                 // Register all the pools with dbus
                 for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
-                    libstratis::dbus_api::register_pool(
+                    if let Err(e) = libstratis::dbus_api::register_pool(
                         &handle.connection.borrow(),
                         &handle.context,
                         &mut handle.tree,
                         pool_uuid,
                         pool,
                         &handle.path,
-                    )?;
+                    ) {
+                        error!(
+                            "libstratis::dbus_api::register_pool {}, {:?}, Path {}, error: {}",
+                            pool_uuid, pool, handle.path, e
+                        );
+                    }
                 }
 
                 // Add dbus FD to fds as dbus is now available.

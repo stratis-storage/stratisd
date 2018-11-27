@@ -13,6 +13,7 @@ use dbus::tree::{
     Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo, Tree,
 };
 use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
+use libc;
 use uuid::Uuid;
 
 use super::super::engine::{Engine, Pool, PoolUuid};
@@ -22,7 +23,7 @@ use super::blockdev::create_dbus_blockdev;
 use super::consts;
 use super::filesystem::create_dbus_filesystem;
 use super::pool::create_dbus_pool;
-use super::types::{ActionQueue, DbusContext, DbusErrorEnum, DeferredAction, TData};
+use super::types::{DbusContext, DbusErrorEnum, DeferredAction, TData};
 use super::util::{
     engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, tuple_to_option,
 };
@@ -208,82 +209,80 @@ fn register_pool_dbus(
 }
 
 /// Returned data from when you connect a stratis engine to dbus.
-pub struct DbusConnectionData<'a> {
+pub struct DbusConnectionData {
     pub connection: Rc<RefCell<Connection>>,
     pub tree: Tree<MTFn<TData>, TData>,
-    pub path: dbus::Path<'a>,
+    pub path: dbus::Path<'static>,
     pub context: DbusContext,
 }
 
-/// Connect a stratis engine to dbus.
-pub fn connect<'a>(engine: Rc<RefCell<Engine>>) -> Result<DbusConnectionData<'a>, dbus::Error> {
-    let c = Connection::get_private(BusType::System)?;
-    let (tree, object_path) = get_base_tree(DbusContext::new(engine));
-    let dbus_context = tree.get_data().clone();
-    tree.set_registered(&c, true)?;
-    c.register_name(
-        consts::STRATIS_BASE_SERVICE,
-        NameFlag::ReplaceExisting as u32,
-    )?;
-    Ok(DbusConnectionData {
-        connection: Rc::new(RefCell::new(c)),
-        tree,
-        path: object_path,
-        context: dbus_context,
-    })
-}
+impl DbusConnectionData {
+    /// Connect a stratis engine to dbus.
+    pub fn connect(engine: Rc<RefCell<Engine>>) -> Result<DbusConnectionData, dbus::Error> {
+        let c = Connection::get_private(BusType::System)?;
+        let (tree, object_path) = get_base_tree(DbusContext::new(engine));
+        let dbus_context = tree.get_data().clone();
+        tree.set_registered(&c, true)?;
+        c.register_name(
+            consts::STRATIS_BASE_SERVICE,
+            NameFlag::ReplaceExisting as u32,
+        )?;
+        Ok(DbusConnectionData {
+            connection: Rc::new(RefCell::new(c)),
+            tree,
+            path: object_path,
+            context: dbus_context,
+        })
+    }
 
-/// Given the UUID of a pool, register all the pertinent information with dbus.
-pub fn register_pool(
-    c: &Connection,
-    dbus_context: &DbusContext,
-    tree: &mut Tree<MTFn<TData>, TData>,
-    pool_uuid: Uuid,
-    pool: &mut Pool,
-    object_path: &dbus::Path<'static>,
-) -> Result<(), dbus::Error> {
-    register_pool_dbus(dbus_context, pool_uuid, pool, object_path);
-    process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut())
-}
+    /// Given the UUID of a pool, register all the pertinent information with dbus.
+    pub fn register_pool(&mut self, pool_uuid: Uuid, pool: &mut Pool) {
+        register_pool_dbus(&self.context, pool_uuid, pool, &self.path);
+        self.process_deferred_actions()
+    }
 
-/// Update the dbus tree with deferred adds and removes.
-fn process_deferred_actions(
-    c: &Connection,
-    tree: &mut Tree<MTFn<TData>, TData>,
-    actions: &mut ActionQueue,
-) -> Result<(), dbus::Error> {
-    for action in actions.drain() {
-        match action {
-            DeferredAction::Add(path) => {
-                c.register_object_path(path.get_name())?;
-                tree.insert(path);
-            }
-            DeferredAction::Remove(path) => {
-                c.unregister_object_path(&path);
-                tree.remove(&path);
+    /// Update the dbus tree with deferred adds and removes.
+    fn process_deferred_actions(&mut self) {
+        let mut actions = self.context.actions.borrow_mut();
+        for action in actions.drain() {
+            match action {
+                DeferredAction::Add(path) => {
+                    self.connection
+                        .borrow_mut()
+                        .register_object_path(path.get_name())
+                        .expect("Must succeed since object paths are unique");
+                    self.tree.insert(path);
+                }
+                DeferredAction::Remove(path) => {
+                    self.connection.borrow_mut().unregister_object_path(&path);
+                    self.tree.remove(&path);
+                }
             }
         }
     }
-    Ok(())
-}
 
-pub fn handle(
-    c: &Connection,
-    item: &ConnectionItem,
-    tree: &mut Tree<MTFn<TData>, TData>,
-    dbus_context: &DbusContext,
-) -> Result<(), dbus::Error> {
-    if let ConnectionItem::MethodCall(ref msg) = *item {
-        if let Some(v) = tree.handle(msg) {
-            // Probably the wisest is to ignore any send errors here -
-            // maybe the remote has disconnected during our processing.
-            for m in v {
-                let _ = c.send(m);
+    /// Handle any client dbus requests
+    pub fn handle(&mut self, fds: &[libc::pollfd]) {
+        for pfd in fds.iter().filter(|pfd| pfd.revents != 0) {
+            let items: Vec<ConnectionItem> = self
+                .connection
+                .borrow()
+                .watch_handle(pfd.fd, dbus::WatchEvent::from_revents(pfd.revents))
+                .collect();
+
+            for item in items {
+                if let ConnectionItem::MethodCall(ref msg) = item {
+                    if let Some(v) = self.tree.handle(msg) {
+                        // Probably the wisest is to ignore any send errors here -
+                        // maybe the remote has disconnected during our processing.
+                        for m in v {
+                            let _ = self.connection.borrow_mut().send(m);
+                        }
+                    }
+
+                    self.process_deferred_actions();
+                }
             }
         }
-
-        process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut())?;
     }
-
-    Ok(())
 }

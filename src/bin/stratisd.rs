@@ -17,12 +17,13 @@ extern crate libc;
 extern crate libudev;
 extern crate nix;
 extern crate timerfd;
+extern crate uuid;
 
 use std::cell::RefCell;
 use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{ErrorKind, Read, Write};
-use std::os::unix::io::AsRawFd;
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::PathBuf;
 use std::process::exit;
 use std::rc::Rc;
@@ -37,9 +38,10 @@ use nix::sys::signal::{self, SigSet};
 use nix::sys::signalfd::{SfdFlags, SignalFd};
 use nix::unistd::getpid;
 use timerfd::{SetTimeFlags, TimerFd, TimerState};
+use uuid::Uuid;
 
 #[cfg(feature = "dbus_enabled")]
-use dbus::{Connection, WatchEvent};
+use dbus::Connection;
 
 use devicemapper::Device;
 #[cfg(feature = "dbus_enabled")]
@@ -48,7 +50,7 @@ use libstratis::dbus_api::{consts, prop_changed_dispatch};
 use libstratis::engine::{
     get_engine_listener_list_mut, EngineEvent, EngineListener, MaybeDbusPath,
 };
-use libstratis::engine::{Engine, SimEngine, StratEngine};
+use libstratis::engine::{Engine, Pool, SimEngine, StratEngine};
 use libstratis::stratis::buff_log;
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
 
@@ -105,22 +107,6 @@ fn initialize_log(debug: bool) -> buff_log::Handle<env_logger::Logger> {
             Some(Duration::minutes(DEFAULT_LOG_HOLD_MINUTES)),
         )
     }
-}
-
-/// Given a udev event check to see if it's an add or change and if it is return the device node
-/// and devicemapper::Device.
-fn handle_udev_event(event: &libudev::Event) -> Option<(Device, PathBuf)> {
-    if event.event_type() == libudev::EventType::Add
-        || event.event_type() == libudev::EventType::Change
-    {
-        let device = event.device();
-        return device.devnode().and_then(|devnode| {
-            device
-                .devnum()
-                .and_then(|devnum| Some((Device::from(devnum), PathBuf::from(devnode))))
-        });
-    }
-    None
 }
 
 /// To ensure only one instance of stratisd runs at a time, acquire an
@@ -297,6 +283,209 @@ impl EngineListener for EventHandler {
     }
 }
 
+// Conditionally compiled support for a D-Bus interface.
+struct MaybeDbusSupport {
+    #[cfg(feature = "dbus_enabled")]
+    handle: Option<libstratis::dbus_api::DbusConnectionData>,
+}
+
+// If D-Bus compiled out, do very little.
+#[cfg(not(feature = "dbus_enabled"))]
+impl MaybeDbusSupport {
+    fn new() -> MaybeDbusSupport {
+        MaybeDbusSupport {}
+    }
+
+    fn process(
+        &mut self,
+        _engine: &Rc<RefCell<Engine>>,
+        _fds: &mut Vec<libc::pollfd>,
+        _dbus_client_index_start: usize,
+    ) {
+    }
+
+    fn register_pool(&mut self, _pool_uuid: Uuid, _pool: &mut Pool) {}
+
+    fn poll_timeout(&self) -> i32 {
+        // Non-DBus timeout is infinite
+        -1
+    }
+}
+
+#[cfg(feature = "dbus_enabled")]
+impl MaybeDbusSupport {
+    fn new() -> MaybeDbusSupport {
+        MaybeDbusSupport { handle: None }
+    }
+
+    /// Connect to D-Bus and register pools, if not already connected.
+    /// Return true if connected, otherwise false.
+    fn check_connect(&mut self, engine: &Rc<RefCell<Engine>>) -> bool {
+        if self.handle.is_none() {
+            match libstratis::dbus_api::DbusConnectionData::connect(Rc::clone(&engine)) {
+                Err(_err) => {
+                    warn!("D-Bus API is not available");
+                    false
+                }
+                Ok(mut handle) => {
+                    info!("D-Bus API is available");
+                    let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
+                    get_engine_listener_list_mut().register_listener(event_handler);
+                    // Register all the pools with dbus
+                    for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
+                        handle.register_pool(pool_uuid, pool)
+                    }
+                    self.handle = Some(handle);
+                    true
+                }
+            }
+        } else {
+            true
+        }
+    }
+
+    /// Handle any client dbus requests.
+    fn process(
+        &mut self,
+        engine: &Rc<RefCell<Engine>>,
+        fds: &mut Vec<libc::pollfd>,
+        dbus_client_index_start: usize,
+    ) {
+        if self.check_connect(engine) {
+            let handle = &mut self
+                .handle
+                .as_mut()
+                .expect("Connected, so handle is present");
+
+            handle.handle(&fds[dbus_client_index_start..]);
+
+            // Refresh list of dbus fds to poll for. This can change as
+            // D-Bus clients come and go.
+            fds.truncate(dbus_client_index_start);
+            fds.extend(
+                handle
+                    .connection
+                    .borrow()
+                    .watch_fds()
+                    .iter()
+                    .map(|w| w.to_pollfd()),
+            );
+        }
+    }
+
+    fn register_pool(&mut self, pool_uuid: Uuid, pool: &mut Pool) {
+        if let Some(h) = self.handle.as_mut() {
+            h.register_pool(pool_uuid, pool)
+        }
+    }
+
+    fn poll_timeout(&self) -> i32 {
+        // If there is no D-Bus connection set timeout to 1 sec (1000 ms), so
+        // that stratisd can periodically attempt to set up a connection.
+        // If the connection is up, set the timeout to infinite; there is no
+        // need to poll as events will be received.
+        self.handle.as_ref().map_or(1000, |_| -1)
+    }
+}
+
+// A facility for listening for and handling udev events that stratisd
+// considers interesting.
+struct UdevMonitor<'a> {
+    socket: libudev::MonitorSocket<'a>,
+}
+
+impl<'a> UdevMonitor<'a> {
+    fn create(context: &'a libudev::Context) -> StratisResult<UdevMonitor<'a>> {
+        let mut monitor = libudev::Monitor::new(context)?;
+        monitor.match_subsystem("block")?;
+
+        Ok(UdevMonitor {
+            socket: monitor.listen()?,
+        })
+    }
+
+    fn as_raw_fd(&mut self) -> RawFd {
+        self.socket.as_raw_fd()
+    }
+
+    /// Given some udev events, see if any new pools are formed, and set up
+    /// dbus if so.
+    fn handle_events(&mut self, engine: &mut Engine, dbus_support: &mut MaybeDbusSupport) {
+        while let Some(event) = self.socket.receive_event() {
+            if event.event_type() == libudev::EventType::Add
+                || event.event_type() == libudev::EventType::Change
+            {
+                let device = event.device();
+                let new_pool_uuid = device.devnode().and_then(|devnode| {
+                    device.devnum().and_then(|devnum| {
+                        engine
+                            .block_evaluate(Device::from(devnum), PathBuf::from(devnode))
+                            .unwrap_or(None)
+                    })
+                });
+                if let Some(pool_uuid) = new_pool_uuid {
+                    let (_, pool) = engine
+                        .get_mut_pool(pool_uuid)
+                        .expect("block_evaluate() returned a pool UUID, pool must be available");
+                    dbus_support.register_pool(pool_uuid, pool);
+                }
+            }
+        }
+    }
+}
+
+// Process any pending signals, return true if SIGINT received.
+// Return an error if there was an error reading the signal.
+fn process_signal(
+    sfd: &mut SignalFd,
+    buff_log: &buff_log::Handle<env_logger::Logger>,
+) -> StratisResult<bool> {
+    match sfd.read_signal() {
+        // This is an unsafe conversion, but in this context that is
+        // mostly harmless. A negative converted value, which is
+        // virtually impossible, will not match any of the masked
+        // values, and stratisd will panic and exit.
+        Ok(Some(sig)) => match sig.ssi_signo as i32 {
+            nix::libc::SIGUSR1 => {
+                info!(
+                    "SIGUSR1 received, dumping {} buffered log entries",
+                    buff_log.buffered_count()
+                );
+                buff_log.dump();
+                Ok(false)
+            }
+            nix::libc::SIGINT => {
+                info!("SIGINT received, exiting");
+                Ok(true)
+            }
+            signo => {
+                panic!("Caught an impossible signal {:?}", signo);
+            }
+        },
+        // No signals waiting (SFD_NONBLOCK flag is set)
+        Ok(None) => Ok(false),
+
+        Err(err) => Err(err.into()),
+    }
+}
+
+/// Handle blocking the event loop
+fn process_poll(poll_timeout: i32, fds: &mut Vec<libc::pollfd>) -> StratisResult<()> {
+    let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, poll_timeout) };
+
+    // TODO: refine this behavior.
+    // Different behaviors may be indicated, depending on the value of
+    // errno when return value is -1.
+    if r < 0 {
+        return Err(StratisError::Error(format!(
+            "poll command failed: number of fds: {}, timeout: {}",
+            fds.len(),
+            poll_timeout
+        )));
+    }
+    Ok(())
+}
+
 /// Set up all sorts of signal and event handling mechanisms.
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered. Dump log entries on specified signal
@@ -305,10 +494,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     // Ensure that the debug log is output when we leave this function.
     let _guard = buff_log.to_guard();
 
-    // Even if dbus is enabled at compile time, it may not be available at all times depending
-    // on the environment we are running in.
-    #[cfg(feature = "dbus_enabled")]
-    let mut dbus_handle: Option<libstratis::dbus_api::DbusConnectionData> = None;
+    let mut dbus_support = MaybeDbusSupport::new();
 
     // Setup a udev listener before initializing the engine. A device may
     // appear after the engine has read the /dev directory but before it has
@@ -316,9 +502,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     // engine will miss the device.
     // This is especially important since stratisd must run during early boot.
     let context = libudev::Context::new()?;
-    let mut monitor = libudev::Monitor::new(&context)?;
-    monitor.match_subsystem("block")?;
-    let mut udev = monitor.listen()?;
+    let mut udev_monitor = UdevMonitor::create(&context)?;
 
     let engine: Rc<RefCell<Engine>> = {
         if matches.is_present("sim") {
@@ -360,7 +544,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     let mut fds = Vec::new();
 
     fds.push(libc::pollfd {
-        fd: udev.as_raw_fd(),
+        fd: udev_monitor.as_raw_fd(),
         revents: 0,
         events: libc::POLLIN,
     });
@@ -408,7 +592,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         });
     };
 
-    #[cfg(feature = "dbus_enabled")]
     let dbus_client_index_start = if eventable.is_some() {
         FD_INDEX_ENGINE + 1
     } else {
@@ -418,84 +601,27 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     log_engine_state(&*engine.borrow());
 
     loop {
-        // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
-            while let Some(event) = udev.receive_event() {
-                if let Some((device, devnode)) = handle_udev_event(&event) {
-                    // If block evaluate returns an error we are going to ignore it as
-                    // there is nothing we can do for a device we are getting errors with.
-                    #[cfg(not(feature = "dbus_enabled"))]
-                    let _ = engine.borrow_mut().block_evaluate(device, devnode);
-
-                    #[cfg(feature = "dbus_enabled")]
-                    {
-                        let pool_uuid = engine
-                            .borrow_mut()
-                            .block_evaluate(device, devnode)
-                            .unwrap_or(None);
-
-                        if let Some(ref mut handle) = dbus_handle {
-                            if let Some(pool_uuid) = pool_uuid {
-                                libstratis::dbus_api::register_pool(
-                                    &handle.connection.borrow(),
-                                    &handle.context,
-                                    &mut handle.tree,
-                                    pool_uuid,
-                                    engine
-                                        .borrow_mut()
-                                        .get_mut_pool(pool_uuid)
-                                        .expect(
-                                            "block_evaluate() returned a pool UUID, pool must be available",
-                                        )
-                                        .1,
-                                    &handle.path,
-                                )?;
-                            }
-                        }
-                    }
-                }
-            }
+            udev_monitor.handle_events(&mut *engine.borrow_mut(), &mut dbus_support)
         }
 
-        // Process any signals off signalfd
         if fds[FD_INDEX_SIGNALFD].revents != 0 {
-            match sfd.read_signal() {
-                // This is an unsafe conversion, but in this context that is
-                // mostly harmless. A negative converted value, which is
-                // virtually impossible, will not match any of the masked
-                // values, and stratisd will panic and exit.
-                Ok(Some(sig)) => match sig.ssi_signo as i32 {
-                    nix::libc::SIGUSR1 => {
-                        info!(
-                            "SIGUSR1 received, dumping {} buffered log entries",
-                            buff_log.buffered_count()
-                        );
-                        buff_log.dump()
-                    }
-                    nix::libc::SIGINT => {
-                        info!("SIGINT received, exiting");
+            match process_signal(&mut sfd, &buff_log) {
+                Ok(should_exit) => {
+                    if should_exit {
                         return Ok(());
                     }
-                    signo => {
-                        panic!("Caught an impossible signal {:?}", signo);
-                    }
-                },
-                // No signals waiting (SFD_NONBLOCK flag is set)
-                Ok(None) => (),
-
-                // Pessimistically exit on an error reading the signal.
-                Err(err) => return Err(err.into()),
+                }
+                Err(e) => return Err(e),
             }
         }
 
-        // Process timerfd expiry
         if fds[FD_INDEX_DUMP_TIMERFD].revents != 0 {
             tfd.read(); // clear the event
             info!("Dump timer expired, dumping state");
             log_engine_state(&*engine.borrow());
         }
 
-        // Handle engine events, if the engine is eventable
         if let Some(ref evt) = eventable {
             if fds[FD_INDEX_ENGINE].revents != 0 {
                 evt.clear_event()?;
@@ -503,92 +629,9 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
             }
         }
 
-        // Iterate through D-Bus file descriptors (if enabled) and dbus is actually available,
-        // otherwise attempt to bring up the dbus interface.
-        #[cfg(feature = "dbus_enabled")]
-        {
-            if let Some(ref mut handle) = dbus_handle {
-                for pfd in fds[dbus_client_index_start..]
-                    .iter()
-                    .filter(|pfd| pfd.revents != 0)
-                {
-                    for item in handle
-                        .connection
-                        .borrow()
-                        .watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents))
-                    {
-                        if let Err(r) = libstratis::dbus_api::handle(
-                            &handle.connection.borrow(),
-                            &item,
-                            &mut handle.tree,
-                            &handle.context,
-                        ) {
-                            log_engine_state(&*engine.borrow());
-                            print_err(&From::from(r));
-                        }
-                    }
-                }
+        dbus_support.process(&engine, &mut fds, dbus_client_index_start);
 
-                // Refresh list of dbus fds to poll for. This can change as
-                // D-Bus clients come and go.
-                fds.truncate(dbus_client_index_start);
-                fds.extend(
-                    handle
-                        .connection
-                        .borrow()
-                        .watch_fds()
-                        .iter()
-                        .map(|w| w.to_pollfd()),
-                );
-            } else if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
-                info!("DBUS API is now available");
-                let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
-                get_engine_listener_list_mut().register_listener(event_handler);
-                // Register all the pools with dbus
-                for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
-                    libstratis::dbus_api::register_pool(
-                        &handle.connection.borrow(),
-                        &handle.context,
-                        &mut handle.tree,
-                        pool_uuid,
-                        pool,
-                        &handle.path,
-                    )?;
-                }
-
-                // Add dbus FD to fds as dbus is now available.
-                fds.extend(
-                    handle
-                        .connection
-                        .borrow()
-                        .watch_fds()
-                        .iter()
-                        .map(|w| w.to_pollfd()),
-                );
-                dbus_handle = Some(handle);
-            }
-        }
-
-        // If dbus support is compiled in and dbus isn't available we will set timeout to
-        // 1 second so that we periodically check to see if we can bring it up.
-        #[cfg(feature = "dbus_enabled")]
-        let poll_timeout = dbus_handle.as_ref().map_or(1000, |_| -1);
-        // Default timeout is infinite
-        #[cfg(not(feature = "dbus_enabled"))]
-        let poll_timeout = -1;
-
-        let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, poll_timeout) };
-
-        // TODO: refine this behavior.
-        // Different behaviors may be indicated, depending on the value of
-        // errno when return value is -1.
-        if r < 0 {
-            return Err(StratisError::Error(format!(
-                "poll command failed: number of fds: {}, timeout: {}",
-                fds.len(),
-                poll_timeout
-            )));
-        }
+        process_poll(dbus_support.poll_timeout(), &mut fds)?;
     }
 }
 

@@ -727,10 +727,12 @@ mod tests {
 
             let mut amount_written = Sectors(0);
             let buffer_length = Bytes(buffer_length).sectors();
-            while match pool.thin_pool.extend_state() {
-                PoolExtendState::DataFailed
-                | PoolExtendState::MetaFailed
-                | PoolExtendState::MetaAndDataFailed => false,
+            while match (pool.thin_pool.extend_state(), pool.thin_pool.state()) {
+                (PoolExtendState::DataFailed, _) => false,
+                (PoolExtendState::MetaFailed, _) => false,
+                (PoolExtendState::MetaAndDataFailed, _) => false,
+                (_, PoolState::OutOfDataSpace) => false,
+                (_, PoolState::ReadOnly) => false,
                 _ => true,
             } {
                 f.write_all(buf).unwrap();

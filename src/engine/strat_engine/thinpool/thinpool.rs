@@ -567,49 +567,34 @@ impl ThinPool {
                     meta_lowater.sectors(),
                     false,
                 ) {
-                    match self.extend_thin_meta_device(pool_uuid, backstore, request) {
-                        Ok(extend_size) => {
-                            info!("Extended thin meta device by {}", extend_size);
-                            should_save = true;
-                        }
-                        Err(err) => {
-                            meta_extend_failed = true;
-                            error!("Thinpool meta extend failed! -> reason {:?}", err);
-                        }
-                    }
+                    let meta_extend_failed =
+                        match self.extend_thin_meta_device(pool_uuid, backstore, request) {
+                            Ok(extend_size) => extend_size == Sectors(0),
+                            Err(_) => true,
+                        };
+                    should_save |= !meta_extend_failed;
                 }
 
-                let extend_size = {
+                let extend_size = sectors_to_datablocks({
                     match calculate_extension_request(
                         datablocks_to_sectors(usage.total_data),
                         datablocks_to_sectors(usage.used_data),
                         datablocks_to_sectors(self.thin_pool.table().table.params.low_water_mark),
                         true,
                     ) {
-                        None => DataBlocks(0),
+                        None => Sectors(0),
                         Some(request) => {
-                            match self.extend_thin_data_device(pool_uuid, backstore, request) {
-                                Ok(Sectors(0)) => {
-                                    warn!("data device fully extended, cannot extend further");
-                                    DataBlocks(0)
-                                }
-                                Ok(extend_size) => {
-                                    info!("Extended thin data device by {}", extend_size);
-                                    should_save = true;
-                                    sectors_to_datablocks(extend_size)
-                                }
-                                Err(err) => {
-                                    data_extend_failed = true;
-                                    error!(
-                                        "Thinpool data extend failed! -> Warning: reason: {:?}",
-                                        err
-                                    );
-                                    DataBlocks(0)
-                                }
-                            }
+                            let amount_allocated =
+                                match self.extend_thin_data_device(pool_uuid, backstore, request) {
+                                    Ok(extend_size) => extend_size,
+                                    Err(_) => Sectors(0),
+                                };
+                            data_extend_failed = amount_allocated == Sectors(0);
+                            should_save |= !data_extend_failed;
+                            amount_allocated
                         }
                     }
-                };
+                });
 
                 let current_total = usage.total_data + extend_size;
 
@@ -791,11 +776,6 @@ impl ThinPool {
         backstore: &mut Backstore,
         extend_size: Sectors,
     ) -> StratisResult<Sectors> {
-        info!(
-            "Attempting to extend thinpool data device belonging to pool {} by {}",
-            pool_uuid, extend_size,
-        );
-
         ThinPool::extend_thin_sub_device(
             pool_uuid,
             &mut self.thin_pool,
@@ -814,11 +794,6 @@ impl ThinPool {
         backstore: &mut Backstore,
         extend_size: Sectors,
     ) -> StratisResult<Sectors> {
-        info!(
-            "Attempting to extend thinpool meta device belonging to pool {} by {}",
-            pool_uuid, extend_size,
-        );
-
         ThinPool::extend_thin_sub_device(
             pool_uuid,
             &mut self.thin_pool,
@@ -833,7 +808,8 @@ impl ThinPool {
     /// Extend the thinpool's data or meta devices. The result is the value
     /// by which the device is extended which may be less than the requested
     /// amount. It is guaranteed that the returned amount is a multiple of the
-    /// modulus value. Sets existing_segs to the new value that specifies the
+    /// modulus value. The amount returned may be 0, if nothing could be
+    /// allocated. Sets existing_segs to the new value that specifies the
     /// arrangement of segments on the extended device. The data parameter is
     /// true if the method should extend the data device, false if the
     /// method should extend the meta device.
@@ -846,7 +822,14 @@ impl ThinPool {
         existing_segs: &mut Vec<(Sectors, Sectors)>,
         data: bool,
     ) -> StratisResult<Sectors> {
-        if let Some(region) = backstore.request(pool_uuid, extend_size, modulus)? {
+        let sub_device_str = if data { "data" } else { "metadata" };
+        let pool_uuid_str = pool_uuid.simple().to_string();
+        info!(
+            "Attempting to extend thinpool {} sub-device belonging to pool {} by {}",
+            sub_device_str, pool_uuid_str, extend_size,
+        );
+
+        let result = if let Some(region) = backstore.request(pool_uuid, extend_size, modulus)? {
             let device = backstore
                 .device()
                 .expect("If request succeeded, backstore must have cap device.");
@@ -863,12 +846,32 @@ impl ThinPool {
 
             Ok(region.1)
         } else {
-            let err_msg = format!(
-                "Insufficient space to accomodate request for at least {}",
-                modulus
-            );
-            Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+            Ok(Sectors(0))
+        };
+        match result {
+            Ok(actual_extend_size) => {
+                if actual_extend_size == extend_size {
+                    info!(
+                        "Extended thinpool {} sub-device belonging to pool with uuid {} by {}",
+                        sub_device_str, pool_uuid_str, actual_extend_size
+                    );
+                } else {
+                    warn!("Insufficient free space available in backstore; extended thinpool {} sub-device belonging to pool with uuid {} by {}, request was {}",
+                      sub_device_str,
+                      pool_uuid_str,
+                      actual_extend_size,
+                      extend_size);
+                }
+            }
+            Err(ref err) => {
+                error!("Attempted to extend thinpool {} sub-device belonging to pool with uuid {} by {} but failed with error: {:?}",
+                       sub_device_str,
+                       pool_uuid_str,
+                       extend_size,
+                       err);
+            }
         }
+        result
     }
 
     /// The number of physical sectors in use, that is, unavailable for storage

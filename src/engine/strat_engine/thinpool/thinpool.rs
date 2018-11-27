@@ -44,6 +44,8 @@ pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(2048); // 2 GiB
 
 const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
+// The smallest amount allocated to the thinpool meta device at one time
+const MIN_META_SEGMENT_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
 const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
 const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 
@@ -495,9 +497,10 @@ impl ThinPool {
 
                 // Ensure meta subdevice is approx. 1/1000th of total usable
                 // size
-                let target_meta_size = backstore.datatier_usable_size() / 1000u16;
-                if usage.total_meta.sectors() < target_meta_size {
-                    let meta_request = target_meta_size - usage.total_meta.sectors();
+                let target_meta_size = (backstore.datatier_usable_size() / 1000u16).metablocks();
+                if usage.total_meta < target_meta_size {
+                    let meta_request =
+                        max(target_meta_size - usage.total_meta, MIN_META_SEGMENT_SIZE).sectors();
                     meta_extend_failed =
                         match self.extend_thin_meta_device(pool_uuid, backstore, meta_request) {
                             Ok(extend_size) => extend_size == Sectors(0),
@@ -723,7 +726,7 @@ impl ThinPool {
             &mut self.thin_pool,
             backstore,
             extend_size,
-            MetaBlocks(1).sectors(),
+            MIN_META_SEGMENT_SIZE.sectors(),
             &mut self.segments.meta_segments,
             false,
         )

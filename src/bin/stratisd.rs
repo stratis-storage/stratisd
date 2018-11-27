@@ -305,7 +305,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     let mut dbus_handle: Option<libstratis::dbus_api::DbusConnectionData> = None;
 
     // Setup a udev listener before initializing the engine. A device may
-    // appear after the engine has read the /dev directory but before it has
+    // appear after the engine has processed the udev db, but before it has
     // completed initialization. Unless the udev event has been recorded, the
     // engine will miss the device.
     // This is especially important since stratisd must run during early boot.

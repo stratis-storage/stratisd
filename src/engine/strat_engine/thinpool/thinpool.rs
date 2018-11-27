@@ -6,9 +6,7 @@
 
 use std;
 use std::borrow::BorrowMut;
-use std::cmp::{max, min};
-use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::cmp::min;
 use uuid::Uuid;
 
 use devicemapper::{
@@ -44,8 +42,6 @@ use super::thinids::ThinDevIdPool;
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(2048); // 2 GiB
-const DATA_EXPAND_SIZE: Sectors = Sectors(16 * IEC::Mi); // 8 GiB
-const META_LOWATER_FALLBACK: MetaBlocks = MetaBlocks(1024);
 
 const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
 const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
@@ -63,40 +59,6 @@ fn sectors_to_datablocks(sectors: Sectors) -> DataBlocks {
 
 fn datablocks_to_sectors(data_blocks: DataBlocks) -> Sectors {
     *data_blocks * DATA_BLOCK_SIZE
-}
-
-/// Get the value for the "Dirty" key in /proc/meminfo in Sectors.
-/// Return an error if "Dirty" key is not found, value can not be parsed,
-/// or there is some error reading /proc/meminfo.
-fn current_dirty_mem() -> StratisResult<Sectors> {
-    for line in BufReader::new(File::open("/proc/meminfo")?).lines() {
-        let line = line?;
-        let mut iter = line.split_whitespace();
-        if iter.next().map_or(false, |key| key == "Dirty:") {
-            return if let Some(value) = iter.next() {
-                match value.parse::<u64>() {
-                    // multiply by 2 for KB to # of sectors conversion
-                    Ok(dirty_mem_size) => Ok(Sectors(dirty_mem_size * 2)),
-                    Err(_) => Err(StratisError::Engine(
-                        ErrorEnum::Invalid,
-                        format!(
-                            "Failed to parse value for \"Dirty\" key from /proc/meminfo : {:?}",
-                            value
-                        ),
-                    )),
-                }
-            } else {
-                Err(StratisError::Engine(
-                    ErrorEnum::Invalid,
-                    "No value found for \"Dirty\" key in /proc/meminfo".into(),
-                ))
-            };
-        }
-    }
-    Err(StratisError::Engine(
-        ErrorEnum::Invalid,
-        "\"Dirty\" key not found in /prop/meminfo".into(),
-    ))
 }
 
 /// Transform a list of segments belonging to a single device into a
@@ -364,7 +326,7 @@ impl ThinPool {
             ),
         )?;
 
-        Ok(ThinPool {
+        let mut tp = ThinPool {
             thin_pool: thinpool_dev,
             segments: Segments {
                 meta_segments: vec![meta_segments],
@@ -380,7 +342,11 @@ impl ThinPool {
             pool_extend_state: PoolExtendState::Initializing,
             free_space_state,
             dbus_path: MaybeDbusPath(None),
-        })
+        };
+
+        tp.check(pool_uuid, backstore)?;
+
+        Ok(tp)
     }
 
     /// Set up an "existing" thin pool.
@@ -509,34 +475,6 @@ impl ThinPool {
 
     /// Do the real work of check().
     fn do_check(&mut self, pool_uuid: PoolUuid, backstore: &mut Backstore) -> StratisResult<bool> {
-        // Calculate amount to request for data- or meta- device.
-        // Return None if device does not need to be expanded.
-        // Returned request, if it exists, is always INITIAL_META_SIZE
-        // for meta device, 1 Gi for data device.
-        // Since one event can have many potential causes (meta extension,
-        // data extension OR space state check), check remaining against
-        // low_water to see if our condition was even the cause of the event.
-        fn calculate_extension_request(
-            total: Sectors,
-            used: Sectors,
-            low_water: Sectors,
-            data: bool,
-        ) -> Option<Sectors> {
-            let remaining = total - used;
-            if remaining <= low_water {
-                Some(if data {
-                    match current_dirty_mem() {
-                        Ok(dirty_mem_size) => max(dirty_mem_size, DATA_EXPAND_SIZE),
-                        Err(_) => DATA_EXPAND_SIZE,
-                    }
-                } else {
-                    INITIAL_META_SIZE.sectors()
-                })
-            } else {
-                None
-            }
-        }
-
         assert_eq!(
             backstore.device().expect(
                 "thinpool exists and has been allocated to, so backstore must have a cap device"
@@ -567,48 +505,34 @@ impl ThinPool {
 
                 let usage = &status.usage;
 
-                // Kernel 4.19+ includes the kernel-set meta lowater value in
-                // thinpool status. For older kernels, use a default value.
-                let meta_lowater = status
-                    .meta_low_water
-                    .map(MetaBlocks)
-                    .unwrap_or(META_LOWATER_FALLBACK);
-                if let Some(request) = calculate_extension_request(
-                    usage.total_meta.sectors(),
-                    usage.used_meta.sectors(),
-                    meta_lowater.sectors(),
-                    false,
-                ) {
+                // Ensure meta blocks is 1/1000th of total usable size
+                let target_meta_size = backstore.datatier_usable_size() / 1000u16;
+                if usage.total_meta.sectors() < target_meta_size {
+                    let meta_request = target_meta_size - usage.total_meta.sectors();
                     let meta_extend_failed =
-                        match self.extend_thin_meta_device(pool_uuid, backstore, request) {
+                        match self.extend_thin_meta_device(pool_uuid, backstore, meta_request) {
                             Ok(extend_size) => extend_size == Sectors(0),
                             Err(_) => true,
                         };
                     should_save |= !meta_extend_failed;
                 }
 
-                let extend_size = sectors_to_datablocks({
-                    match calculate_extension_request(
-                        datablocks_to_sectors(usage.total_data),
-                        datablocks_to_sectors(usage.used_data),
-                        datablocks_to_sectors(self.thin_pool.table().table.params.low_water_mark),
-                        true,
-                    ) {
-                        None => Sectors(0),
-                        Some(request) => {
-                            let amount_allocated =
-                                match self.extend_thin_data_device(pool_uuid, backstore, request) {
-                                    Ok(extend_size) => extend_size,
-                                    Err(_) => Sectors(0),
-                                };
-                            data_extend_failed = amount_allocated == Sectors(0);
-                            should_save |= !data_extend_failed;
-                            amount_allocated
-                        }
-                    }
-                });
+                // Expand data blocks to fill all available remaining space
+                let free_space = backstore.available_in_backstore();
+                let total_extended = if free_space < DATA_BLOCK_SIZE {
+                    DataBlocks(0)
+                } else {
+                    let amount_allocated =
+                        match self.extend_thin_data_device(pool_uuid, backstore, free_space) {
+                            Ok(extend_size) => extend_size,
+                            Err(_) => Sectors(0),
+                        };
+                    data_extend_failed = amount_allocated == Sectors(0);
+                    should_save |= !data_extend_failed;
+                    sectors_to_datablocks(amount_allocated)
+                };
 
-                let current_total = usage.total_data + extend_size;
+                let current_total = usage.total_data + total_extended;
 
                 // Update pool space state
                 self.free_space_check(
@@ -1465,11 +1389,13 @@ mod tests {
         // written above. If we attempt to update the UUID on the snapshot
         // without expanding the pool, the pool will go into out-of-data-space
         // (queue IO) mode, causing the test to fail.
-        pool.extend_thin_data_device(
-            pool_uuid,
-            &mut backstore,
-            datablocks_to_sectors(INITIAL_DATA_SIZE),
-        ).unwrap();
+        // FIXME: not needed while doing "greedy" thinpool allocation
+        // (If that code is changed back, this test will start failing.)
+        // pool.extend_thin_data_device(
+        //     pool_uuid,
+        //     &mut backstore,
+        //     datablocks_to_sectors(INITIAL_DATA_SIZE),
+        // ).unwrap();
 
         let (_, snapshot_filesystem) =
             pool.snapshot_filesystem(pool_uuid, pool_name, fs_uuid, "test_snapshot")
@@ -1709,7 +1635,9 @@ mod tests {
         }
     }
 
-    #[test]
+    // FIXME: Requires data device extension
+    //#[test]
+    #[allow(dead_code)]
     pub fn loop_test_meta_expand() {
         // This test requires more than 1 GiB.
         loopbacked::test_with_spec(
@@ -1718,7 +1646,9 @@ mod tests {
         );
     }
 
-    #[test]
+    // FIXME: Requires data device extension
+    //#[test]
+    #[allow(dead_code)]
     pub fn real_test_meta_expand() {
         real::test_with_spec(
             real::DeviceLimits::Range(2, 3, None, None),
@@ -1871,7 +1801,9 @@ mod tests {
         assert!(cmd::xfs_repair(&fs_devnode).is_ok());
     }
 
-    #[test]
+    // FIXME: Requires data device extension
+    //#[test]
+    #[allow(dead_code)]
     pub fn loop_test_thinpool_expand() {
         // This test requires more than 1 GiB.
         loopbacked::test_with_spec(
@@ -1880,7 +1812,9 @@ mod tests {
         );
     }
 
-    #[test]
+    // FIXME: Requires data device extension
+    //#[test]
+    #[allow(dead_code)]
     pub fn real_test_thinpool_expand() {
         real::test_with_spec(
             real::DeviceLimits::AtLeast(1, None, None),

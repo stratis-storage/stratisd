@@ -32,7 +32,7 @@ from stratisd_client_dbus import Pool
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._loopback import LoopBackDevices
-from .._dm import remove_stratis_setup
+from .._dm import remove_stratis_setup, _get_stratis_devices
 
 _STRATISD = os.environ['STRATISD']
 
@@ -121,10 +121,20 @@ class UdevAdd(unittest.TestCase):
         """
 
         if self._service is None:
+            # The service uses the udev db at start, we need to ensure that it
+            # is in a consistent state for us to come up and find all the
+            # stratis devices and assemble the pools before we start processing
+            # dbus client requests.  Otherwise we have a race condition between
+            # what the client expects and what the service knows about.
+            self._settle()
+
+            assert UdevAdd._process_exists("stratisd") is None
+            assert _get_stratis_devices() == []
+
             dbus_interface_present = False
             self._service = subprocess.Popen([_STRATISD, '--debug'])
 
-            limit = time.time() + 10.0
+            limit = time.time() + 120.0
             while time.time() <= limit:
                 try:
                     get_object(TOP_OBJECT)
@@ -132,7 +142,7 @@ class UdevAdd(unittest.TestCase):
                     break
                 # pylint: disable=bare-except
                 except:
-                    time.sleep(0.1)
+                    time.sleep(0.5)
 
                     # If service has exited we will bail
                     if self._service.poll() is not None:
@@ -159,7 +169,10 @@ class UdevAdd(unittest.TestCase):
             self._service.wait()
             self._service = None
 
+            assert UdevAdd._process_exists("stratisd") is None
+
             remove_stratis_setup()
+            assert _get_stratis_devices() == []
 
     @staticmethod
     def _settle():
@@ -170,7 +183,22 @@ class UdevAdd(unittest.TestCase):
         # What is the best way to ensure we wait long enough for
         # the event to be done, this seems to work for now.
         subprocess.check_call(['udevadm', 'settle'])
-        time.sleep(1)
+        time.sleep(2)
+
+    @staticmethod
+    def _process_exists(name):
+        """
+        Walk the process table looking for executable 'name', returns pid if one
+        found, else return None
+        """
+        for p in [pid for pid in os.listdir('/proc') if pid.isdigit()]:
+            try:
+                exe_name = os.readlink(os.path.join("/proc/", p, "exe"))
+            except OSError:
+                continue
+            if exe_name and exe_name.endswith(os.path.join("/", name)):
+                return p
+        return None
 
     # pylint: disable=too-many-locals
     def _test_driver(self,

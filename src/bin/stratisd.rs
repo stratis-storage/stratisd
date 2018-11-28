@@ -604,7 +604,11 @@ fn main() {
         match lock_file {
             Err(err) => Err(err),
             Ok(_) => {
-                let log_handle = initialize_log(matches.is_present("debug"));
+                let debug = matches.is_present("debug");
+                let log_handle = initialize_log(debug);
+                if debug {
+                    env::set_var("RUST_BACKTRACE", "1");
+                }
                 run(&matches, &log_handle)
             }
         }

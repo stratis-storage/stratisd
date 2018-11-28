@@ -208,15 +208,15 @@ fn register_pool_dbus(
 }
 
 /// Returned data from when you connect a stratis engine to dbus.
-pub struct DbusConnectionData<'a> {
+pub struct DbusConnectionData {
     pub connection: Rc<RefCell<Connection>>,
     pub tree: Tree<MTFn<TData>, TData>,
-    pub path: dbus::Path<'a>,
+    pub path: dbus::Path<'static>,
     pub context: DbusContext,
 }
 
 /// Connect a stratis engine to dbus.
-pub fn connect<'a>(engine: Rc<RefCell<Engine>>) -> Result<DbusConnectionData<'a>, dbus::Error> {
+pub fn connect(engine: Rc<RefCell<Engine>>) -> Result<DbusConnectionData, dbus::Error> {
     let c = Connection::get_private(BusType::System)?;
     let (tree, object_path) = get_base_tree(DbusContext::new(engine));
     let dbus_context = tree.get_data().clone();

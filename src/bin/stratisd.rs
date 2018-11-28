@@ -312,6 +312,52 @@ impl<'a> UdevMonitor<'a> {
     }
 }
 
+/// Process the udev event by bringing up pools if possible and registering them with dbus api.
+fn process_udev_event(
+    udev_events: &mut UdevMonitor,
+    dbus_handle: &mut Option<libstratis::dbus_api::DbusConnectionData>,
+    engine: &Rc<RefCell<Engine>>,
+) -> StratisResult<()> {
+    while let Some(event) = udev_events.socket.receive_event() {
+        if let Some((device, devnode)) = handle_udev_event(&event) {
+            // If block evaluate returns an error we are going to ignore it as
+            // there is nothing we can do for a device we are getting errors with.
+            #[cfg(not(feature = "dbus_enabled"))]
+            let _ = engine.borrow_mut().block_evaluate(device, devnode);
+
+            #[cfg(feature = "dbus_enabled")]
+            {
+                let mut eng_ref = engine.borrow_mut();
+                let pool_uuid = eng_ref.block_evaluate(device, devnode).unwrap_or(None);
+
+                if let Some(ref mut handle) = dbus_handle {
+                    if let Some(pool_uuid) = pool_uuid {
+                        let pool = eng_ref
+                            .get_mut_pool(pool_uuid)
+                            .expect("block_evaluate() returned a pool UUID, pool must be available")
+                            .1;
+
+                        if let Err(e) = libstratis::dbus_api::register_pool(
+                            &handle.connection.borrow(),
+                            &handle.context,
+                            &mut handle.tree,
+                            pool_uuid,
+                            pool,
+                            &handle.path,
+                        ) {
+                            error!(
+                                "libstratis::dbus_api::register_pool {}, {:?}, Path {}, error: {}",
+                                pool_uuid, pool, handle.path, e
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Set up all sorts of signal and event handling mechanisms.
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered. Dump log entries on specified signal
@@ -433,42 +479,8 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     loop {
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
-            while let Some(event) = udev_events.socket.receive_event() {
-                if let Some((device, devnode)) = handle_udev_event(&event) {
-                    // If block evaluate returns an error we are going to ignore it as
-                    // there is nothing we can do for a device we are getting errors with.
-                    #[cfg(not(feature = "dbus_enabled"))]
-                    let _ = engine.borrow_mut().block_evaluate(device, devnode);
-
-                    #[cfg(feature = "dbus_enabled")]
-                    {
-                        let mut eng_ref = engine.borrow_mut();
-                        let pool_uuid = eng_ref.block_evaluate(device, devnode).unwrap_or(None);
-
-                        if let Some(ref mut handle) = dbus_handle {
-                            if let Some(pool_uuid) = pool_uuid {
-                                let pool = eng_ref
-                                        .get_mut_pool(pool_uuid)
-                                        .expect(
-                                            "block_evaluate() returned a pool UUID, pool must be available",
-                                        )
-                                        .1;
-
-                                if let Err(e) = libstratis::dbus_api::register_pool(
-                                    &handle.connection.borrow(),
-                                    &handle.context,
-                                    &mut handle.tree,
-                                    pool_uuid,
-                                    pool,
-                                    &handle.path,
-                                ) {
-                                    error!("libstratis::dbus_api::register_pool {}, {:?}, Path {}, error: {}",
-                                            pool_uuid, pool, handle.path, e);
-                                }
-                            }
-                        }
-                    }
-                }
+            if let Err(e) = process_udev_event(&mut udev_events, &mut dbus_handle, &engine) {
+                error!("process_udev_event: {:?}", e);
             }
         }
 

@@ -298,6 +298,21 @@ impl EngineListener for EventHandler {
     }
 }
 
+struct UdevMonitor<'a> {
+    socket: libudev::MonitorSocket<'a>,
+}
+
+impl<'a> UdevMonitor<'a> {
+    fn create(context: &'a libudev::Context) -> StratisResult<UdevMonitor<'a>> {
+        let mut monitor = libudev::Monitor::new(&context)?;
+        monitor.match_subsystem_devtype("block", "disk")?;
+
+        Ok(UdevMonitor {
+            socket: monitor.listen()?,
+        })
+    }
+}
+
 /// Set up all sorts of signal and event handling mechanisms.
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered. Dump log entries on specified signal
@@ -317,9 +332,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     // engine will miss the device.
     // This is especially important since stratisd must run during early boot.
     let context = libudev::Context::new()?;
-    let mut monitor = libudev::Monitor::new(&context)?;
-    monitor.match_subsystem_devtype("block", "disk")?;
-    let mut udev = monitor.listen()?;
+    let mut udev_events = UdevMonitor::create(&context)?;
 
     let engine: Rc<RefCell<Engine>> = {
         if matches.is_present("sim") {
@@ -361,7 +374,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     let mut fds = Vec::new();
 
     fds.push(libc::pollfd {
-        fd: udev.as_raw_fd(),
+        fd: udev_events.socket.as_raw_fd(),
         revents: 0,
         events: libc::POLLIN,
     });
@@ -421,7 +434,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     loop {
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
-            while let Some(event) = udev.receive_event() {
+            while let Some(event) = udev_events.socket.receive_event() {
                 if let Some((device, devnode)) = handle_udev_event(&event) {
                     // If block evaluate returns an error we are going to ignore it as
                     // there is nothing we can do for a device we are getting errors with.

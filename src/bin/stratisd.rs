@@ -359,6 +359,41 @@ fn process_udev_event(
     Ok(())
 }
 
+// Process any pending signals, return true if we should exit.
+fn process_signal(
+    sfd: &mut SignalFd,
+    buff_log: &buff_log::Handle<env_logger::Logger>,
+) -> StratisResult<bool> {
+    match sfd.read_signal() {
+        // This is an unsafe conversion, but in this context that is
+        // mostly harmless. A negative converted value, which is
+        // virtually impossible, will not match any of the masked
+        // values, and stratisd will panic and exit.
+        Ok(Some(sig)) => match sig.ssi_signo as i32 {
+            nix::libc::SIGUSR1 => {
+                info!(
+                    "SIGUSR1 received, dumping {} buffered log entries",
+                    buff_log.buffered_count()
+                );
+                buff_log.dump();
+                return Ok(false);
+            }
+            nix::libc::SIGINT => {
+                info!("SIGINT received, exiting");
+                return Ok(true);
+            }
+            signo => {
+                panic!("Caught an impossible signal {:?}", signo);
+            }
+        },
+        // No signals waiting (SFD_NONBLOCK flag is set)
+        Ok(None) => Ok(false),
+
+        // Pessimistically exit on an error reading the signal.
+        Err(err) => return Err(err.into()),
+    }
+}
+
 /// Set up all sorts of signal and event handling mechanisms.
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered. Dump log entries on specified signal
@@ -485,34 +520,15 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
             }
         }
 
-        // Process any signals off signalfd
+        // Process any signals off of signalfd
         if fds[FD_INDEX_SIGNALFD].revents != 0 {
-            match sfd.read_signal() {
-                // This is an unsafe conversion, but in this context that is
-                // mostly harmless. A negative converted value, which is
-                // virtually impossible, will not match any of the masked
-                // values, and stratisd will panic and exit.
-                Ok(Some(sig)) => match sig.ssi_signo as i32 {
-                    nix::libc::SIGUSR1 => {
-                        info!(
-                            "SIGUSR1 received, dumping {} buffered log entries",
-                            buff_log.buffered_count()
-                        );
-                        buff_log.dump()
-                    }
-                    nix::libc::SIGINT => {
-                        info!("SIGINT received, exiting");
+            match process_signal(&mut sfd, &buff_log) {
+                Ok(should_exit) => {
+                    if should_exit {
                         return Ok(());
                     }
-                    signo => {
-                        panic!("Caught an impossible signal {:?}", signo);
-                    }
-                },
-                // No signals waiting (SFD_NONBLOCK flag is set)
-                Ok(None) => (),
-
-                // Pessimistically exit on an error reading the signal.
-                Err(err) => return Err(err.into()),
+                }
+                Err(e) => error!("process_signal: {:?}", e),
             }
         }
 

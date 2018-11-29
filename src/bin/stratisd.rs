@@ -394,6 +394,88 @@ fn process_signal(
     }
 }
 
+/// Handle any client dbus requests.
+fn process_dbus(
+    handle: &mut libstratis::dbus_api::DbusConnectionData,
+    engine: &Rc<RefCell<Engine>>,
+    fds: &mut Vec<libc::pollfd>,
+    dbus_client_index_start: usize,
+) -> StratisResult<()> {
+    for pfd in fds[dbus_client_index_start..]
+        .iter()
+        .filter(|pfd| pfd.revents != 0)
+    {
+        for item in handle
+            .connection
+            .borrow()
+            .watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents))
+        {
+            if let Err(r) = libstratis::dbus_api::handle(
+                &handle.connection.borrow(),
+                &item,
+                &mut handle.tree,
+                &handle.context,
+            ) {
+                log_engine_state(&*engine.borrow());
+                print_err(&From::from(r));
+            }
+        }
+    }
+
+    // Refresh list of dbus fds to poll for. This can change as
+    // D-Bus clients come and go.
+    fds.truncate(dbus_client_index_start);
+    fds.extend(
+        handle
+            .connection
+            .borrow()
+            .watch_fds()
+            .iter()
+            .map(|w| w.to_pollfd()),
+    );
+
+    Ok(())
+}
+
+/// Iterate through all the pools and register them with the dbus interface and update the vector
+/// of file poll file descriptors.
+fn initialize_dbus(
+    handle: &mut libstratis::dbus_api::DbusConnectionData,
+    engine: &Rc<RefCell<Engine>>,
+    fds: &mut Vec<libc::pollfd>,
+) -> StratisResult<()> {
+    info!("DBUS API is now available");
+    let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
+    get_engine_listener_list_mut().register_listener(event_handler);
+    // Register all the pools with dbus
+    for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
+        if let Err(e) = libstratis::dbus_api::register_pool(
+            &handle.connection.borrow(),
+            &handle.context,
+            &mut handle.tree,
+            pool_uuid,
+            pool,
+            &handle.path,
+        ) {
+            error!(
+                "libstratis::dbus_api::register_pool {}, {:?}, Path {}, error: {}",
+                pool_uuid, pool, handle.path, e
+            );
+        }
+    }
+
+    // Add dbus FD to fds as dbus is now available.
+    fds.extend(
+        handle
+            .connection
+            .borrow()
+            .watch_fds()
+            .iter()
+            .map(|w| w.to_pollfd()),
+    );
+    Ok(())
+}
+
 /// Set up all sorts of signal and event handling mechanisms.
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered. Dump log entries on specified signal
@@ -552,69 +634,13 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         #[cfg(feature = "dbus_enabled")]
         {
             if let Some(ref mut handle) = dbus_handle {
-                for pfd in fds[dbus_client_index_start..]
-                    .iter()
-                    .filter(|pfd| pfd.revents != 0)
-                {
-                    for item in handle
-                        .connection
-                        .borrow()
-                        .watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents))
-                    {
-                        if let Err(r) = libstratis::dbus_api::handle(
-                            &handle.connection.borrow(),
-                            &item,
-                            &mut handle.tree,
-                            &handle.context,
-                        ) {
-                            log_engine_state(&*engine.borrow());
-                            print_err(&From::from(r));
-                        }
-                    }
+                process_dbus(handle, &engine, &mut fds, dbus_client_index_start)?;
+            } else {
+                // Try to establish dbus
+                if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
+                    initialize_dbus(&mut handle, &engine, &mut fds)?;
+                    dbus_handle = Some(handle);
                 }
-
-                // Refresh list of dbus fds to poll for. This can change as
-                // D-Bus clients come and go.
-                fds.truncate(dbus_client_index_start);
-                fds.extend(
-                    handle
-                        .connection
-                        .borrow()
-                        .watch_fds()
-                        .iter()
-                        .map(|w| w.to_pollfd()),
-                );
-            } else if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
-                info!("DBUS API is now available");
-                let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
-                get_engine_listener_list_mut().register_listener(event_handler);
-                // Register all the pools with dbus
-                for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
-                    if let Err(e) = libstratis::dbus_api::register_pool(
-                        &handle.connection.borrow(),
-                        &handle.context,
-                        &mut handle.tree,
-                        pool_uuid,
-                        pool,
-                        &handle.path,
-                    ) {
-                        error!(
-                            "libstratis::dbus_api::register_pool {}, {:?}, Path {}, error: {}",
-                            pool_uuid, pool, handle.path, e
-                        );
-                    }
-                }
-
-                // Add dbus FD to fds as dbus is now available.
-                fds.extend(
-                    handle
-                        .connection
-                        .borrow()
-                        .watch_fds()
-                        .iter()
-                        .map(|w| w.to_pollfd()),
-                );
-                dbus_handle = Some(handle);
             }
         }
 

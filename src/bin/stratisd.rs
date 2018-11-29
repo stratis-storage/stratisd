@@ -18,6 +18,7 @@ extern crate libc;
 extern crate libudev;
 extern crate nix;
 extern crate timerfd;
+extern crate uuid;
 
 use std::cell::RefCell;
 use std::env;
@@ -38,6 +39,7 @@ use nix::sys::signal::{self, SigSet};
 use nix::sys::signalfd::{SfdFlags, SignalFd};
 use nix::unistd::getpid;
 use timerfd::{SetTimeFlags, TimerFd, TimerState};
+use uuid::Uuid;
 
 #[cfg(feature = "dbus_enabled")]
 use dbus::{Connection, WatchEvent};
@@ -52,6 +54,9 @@ use libstratis::engine::{
 use libstratis::engine::{Engine, SimEngine, StratEngine};
 use libstratis::stratis::buff_log;
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
+
+#[cfg(feature = "dbus_enabled")]
+use libstratis::engine::Pool;
 
 const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
 
@@ -108,17 +113,20 @@ fn initialize_log(debug: bool) -> buff_log::Handle<env_logger::Logger> {
     }
 }
 
-/// Given a udev event check to see if it's an add or change and if it is return the device node
-/// and devicemapper::Device.
-fn handle_udev_event(event: &libudev::Event) -> Option<(Device, PathBuf)> {
+/// Given a udev event, if it's one of interest and the block device is a stratis device, return
+/// the pool UUID for it.
+fn handle_udev_event(event: &libudev::Event, engine: &Rc<RefCell<Engine>>) -> Option<Uuid> {
     if event.event_type() == libudev::EventType::Add
         || event.event_type() == libudev::EventType::Change
     {
         let device = event.device();
         return device.devnode().and_then(|devnode| {
-            device
-                .devnum()
-                .and_then(|devnum| Some((Device::from(devnum), PathBuf::from(devnode))))
+            device.devnum().and_then(|devnum| {
+                engine
+                    .borrow_mut()
+                    .block_evaluate(Device::from(devnum), PathBuf::from(devnode))
+                    .unwrap_or(None)
+            })
         });
     }
     None
@@ -313,52 +321,6 @@ impl<'a> UdevMonitor<'a> {
     }
 }
 
-/// Process the udev event by bringing up pools if possible and registering them with dbus api.
-fn process_udev_event(
-    udev_events: &mut UdevMonitor,
-    dbus_handle: &mut Option<libstratis::dbus_api::DbusConnectionData>,
-    engine: &Rc<RefCell<Engine>>,
-) -> StratisResult<()> {
-    while let Some(event) = udev_events.socket.receive_event() {
-        if let Some((device, devnode)) = handle_udev_event(&event) {
-            // If block evaluate returns an error we are going to ignore it as
-            // there is nothing we can do for a device we are getting errors with.
-            #[cfg(not(feature = "dbus_enabled"))]
-            let _ = engine.borrow_mut().block_evaluate(device, devnode);
-
-            #[cfg(feature = "dbus_enabled")]
-            {
-                let mut eng_ref = engine.borrow_mut();
-                let pool_uuid = eng_ref.block_evaluate(device, devnode).unwrap_or(None);
-
-                if let Some(ref mut handle) = dbus_handle {
-                    if let Some(pool_uuid) = pool_uuid {
-                        let pool = eng_ref
-                            .get_mut_pool(pool_uuid)
-                            .expect("block_evaluate() returned a pool UUID, pool must be available")
-                            .1;
-
-                        if let Err(e) = libstratis::dbus_api::register_pool(
-                            &handle.connection.borrow(),
-                            &handle.context,
-                            &mut handle.tree,
-                            pool_uuid,
-                            pool,
-                            &handle.path,
-                        ) {
-                            error!(
-                                "libstratis::dbus_api::register_pool {}, {:?}, Path {}, error: {}",
-                                pool_uuid, pool, handle.path, e
-                            );
-                        }
-                    }
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
 // Process any pending signals, return true if we should exit.
 fn process_signal(
     sfd: &mut SignalFd,
@@ -376,11 +338,11 @@ fn process_signal(
                     buff_log.buffered_count()
                 );
                 buff_log.dump();
-                return Ok(false);
+                Ok(false)
             }
             nix::libc::SIGINT => {
                 info!("SIGINT received, exiting");
-                return Ok(true);
+                Ok(true)
             }
             signo => {
                 panic!("Caught an impossible signal {:?}", signo);
@@ -390,11 +352,12 @@ fn process_signal(
         Ok(None) => Ok(false),
 
         // Pessimistically exit on an error reading the signal.
-        Err(err) => return Err(err.into()),
+        Err(err) => Err(err.into()),
     }
 }
 
 /// Handle any client dbus requests.
+#[cfg(feature = "dbus_enabled")]
 fn process_dbus(
     handle: &mut libstratis::dbus_api::DbusConnectionData,
     engine: &Rc<RefCell<Engine>>,
@@ -437,8 +400,33 @@ fn process_dbus(
     Ok(())
 }
 
+/// Handle registering the pool with the dbus library.  Wondering why the actual register_pool
+/// isn't implements with methods on the DbusConnectionData structure???
+#[cfg(feature = "dbus_enabled")]
+fn dbus_register_pool(
+    handle: &mut libstratis::dbus_api::DbusConnectionData,
+    pool_uuid: Uuid,
+    pool: &mut Pool,
+) -> StratisResult<()> {
+    if let Err(e) = libstratis::dbus_api::register_pool(
+        &handle.connection.borrow(),
+        &handle.context,
+        &mut handle.tree,
+        pool_uuid,
+        pool,
+        &handle.path,
+    ) {
+        error!(
+            "libstratis::dbus_api::register_pool {}, {:?}, Path {}, error: {}",
+            pool_uuid, pool, handle.path, e
+        );
+    }
+    Ok(())
+}
+
 /// Iterate through all the pools and register them with the dbus interface and update the vector
 /// of file poll file descriptors.
+#[cfg(feature = "dbus_enabled")]
 fn initialize_dbus(
     handle: &mut libstratis::dbus_api::DbusConnectionData,
     engine: &Rc<RefCell<Engine>>,
@@ -449,19 +437,7 @@ fn initialize_dbus(
     get_engine_listener_list_mut().register_listener(event_handler);
     // Register all the pools with dbus
     for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
-        if let Err(e) = libstratis::dbus_api::register_pool(
-            &handle.connection.borrow(),
-            &handle.context,
-            &mut handle.tree,
-            pool_uuid,
-            pool,
-            &handle.path,
-        ) {
-            error!(
-                "libstratis::dbus_api::register_pool {}, {:?}, Path {}, error: {}",
-                pool_uuid, pool, handle.path, e
-            );
-        }
+        dbus_register_pool(handle, pool_uuid, pool)?;
     }
 
     // Add dbus FD to fds as dbus is now available.
@@ -614,8 +590,23 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     loop {
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
-            if let Err(e) = process_udev_event(&mut udev_events, &mut dbus_handle, &engine) {
-                error!("process_udev_event: {:?}", e);
+            while let Some(event) = udev_events.socket.receive_event() {
+                if let Some(_pool_uuid) = handle_udev_event(&event, &engine) {
+                    #[cfg(feature = "dbus_enabled")]
+                    {
+                        let mut eng_ref = engine.borrow_mut();
+                        if let Some(ref mut handle) = dbus_handle {
+                            let pool = eng_ref
+                                .get_mut_pool(_pool_uuid)
+                                .expect(
+                                    "block_evaluate() returned a pool UUID, pool must be available",
+                                )
+                                .1;
+
+                            dbus_register_pool(handle, _pool_uuid, pool)?;
+                        }
+                    }
+                }
             }
         }
 
@@ -652,12 +643,9 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         {
             if let Some(ref mut handle) = dbus_handle {
                 process_dbus(handle, &engine, &mut fds, dbus_client_index_start)?;
-            } else {
-                // Try to establish dbus
-                if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
-                    initialize_dbus(&mut handle, &engine, &mut fds)?;
-                    dbus_handle = Some(handle);
-                }
+            } else if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
+                initialize_dbus(&mut handle, &engine, &mut fds)?;
+                dbus_handle = Some(handle);
             }
         }
 

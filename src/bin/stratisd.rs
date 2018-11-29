@@ -469,6 +469,23 @@ fn initialize_dbus(
     Ok(())
 }
 
+/// Handle blocking the event loop
+fn process_poll(poll_timeout: i32, fds: &mut Vec<libc::pollfd>) -> StratisResult<()> {
+    let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, poll_timeout) };
+
+    // TODO: refine this behavior.
+    // Different behaviors may be indicated, depending on the value of
+    // errno when return value is -1.
+    if r < 0 {
+        return Err(StratisError::Error(format!(
+            "poll command failed: number of fds: {}, timeout: {}",
+            fds.len(),
+            poll_timeout
+        )));
+    }
+    Ok(())
+}
+
 /// Set up all sorts of signal and event handling mechanisms.
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered. Dump log entries on specified signal
@@ -644,19 +661,8 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         // Default timeout is infinite
         #[cfg(not(feature = "dbus_enabled"))]
         let poll_timeout = -1;
-
-        let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, poll_timeout) };
-
-        // TODO: refine this behavior.
-        // Different behaviors may be indicated, depending on the value of
-        // errno when return value is -1.
-        if r < 0 {
-            return Err(StratisError::Error(format!(
-                "poll command failed: number of fds: {}, timeout: {}",
-                fds.len(),
-                poll_timeout
-            )));
-        }
+        // Block until we have something to handle
+        process_poll(poll_timeout, &mut fds)?;
     }
 }
 

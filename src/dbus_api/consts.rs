@@ -2,6 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+pub const STRATIS_BASE_PATH: &str = "/org/storage/stratis1";
+pub const STRATIS_BASE_SERVICE: &str = "org.storage.stratis1";
+
+pub const MANAGER_INTERFACE_NAME: &str = "org.storage.stratis1.Manager";
+
 pub const POOL_INTERFACE_NAME: &str = "org.storage.stratis1.pool";
 pub const POOL_NAME_PROP: &str = "Name";
 pub const POOL_STATE_PROP: &str = "State";

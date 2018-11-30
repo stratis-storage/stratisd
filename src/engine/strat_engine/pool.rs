@@ -747,15 +747,8 @@ mod tests {
 
             pool.add_blockdevs(pool_uuid, &name, paths2, BlockDevTier::Data)
                 .unwrap();
-            assert!(match pool.thin_pool.extend_state() {
-                PoolExtendState::Good => true,
-                _ => false,
-            });
-
-            assert!(match pool.thin_pool.state() {
-                PoolState::Running => true,
-                _ => false,
-            });
+            assert_matches!(pool.thin_pool.extend_state(), PoolExtendState::Good);
+            assert_matches!(pool.thin_pool.state(), PoolState::Running);
         }
     }
 

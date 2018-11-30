@@ -32,6 +32,10 @@ extern crate error_chain;
 #[macro_use]
 extern crate proptest;
 
+#[cfg(test)]
+#[macro_use]
+extern crate matches;
+
 #[macro_use]
 extern crate lazy_static;
 

@@ -22,7 +22,6 @@ import time
 import random
 import string
 import os
-import pyudev
 
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import ObjectManager
@@ -31,6 +30,8 @@ from stratisd_client_dbus import pools
 from stratisd_client_dbus import Pool
 
 from stratisd_client_dbus._constants import TOP_OBJECT
+
+import pyudev
 
 from .._loopback import LoopBackDevices
 from .._dm import remove_stratis_setup, _get_stratis_devices

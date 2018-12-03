@@ -23,7 +23,7 @@ use std::cell::RefCell;
 use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{ErrorKind, Read, Write};
-use std::os::unix::io::AsRawFd;
+use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::PathBuf;
 use std::process::exit;
 use std::rc::Rc;
@@ -315,6 +315,14 @@ impl<'a> UdevMonitor<'a> {
             socket: monitor.listen()?,
         })
     }
+
+    fn as_raw_fd(&mut self) -> RawFd {
+        self.socket.as_raw_fd()
+    }
+
+    fn receive_event(&mut self) -> Option<libudev::Event> {
+        self.socket.receive_event()
+    }
 }
 
 // Process any pending signals, return true if we should exit.
@@ -440,7 +448,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     // engine will miss the device.
     // This is especially important since stratisd must run during early boot.
     let context = libudev::Context::new()?;
-    let mut udev_events = UdevMonitor::create(&context)?;
+    let mut udev_monitor = UdevMonitor::create(&context)?;
 
     let engine: Rc<RefCell<Engine>> = {
         if matches.is_present("sim") {
@@ -482,7 +490,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     let mut fds = Vec::new();
 
     fds.push(libc::pollfd {
-        fd: udev_events.socket.as_raw_fd(),
+        fd: udev_monitor.as_raw_fd(),
         revents: 0,
         events: libc::POLLIN,
     });
@@ -542,7 +550,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     loop {
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
-            while let Some(event) = udev_events.socket.receive_event() {
+            while let Some(event) = udev_monitor.receive_event() {
                 if let Some(_pool_uuid) = handle_udev_event(&event, &engine) {
                     #[cfg(feature = "dbus_enabled")]
                     {

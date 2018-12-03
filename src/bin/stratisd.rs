@@ -42,7 +42,7 @@ use timerfd::{SetTimeFlags, TimerFd, TimerState};
 use uuid::Uuid;
 
 #[cfg(feature = "dbus_enabled")]
-use dbus::{Connection, WatchEvent};
+use dbus::Connection;
 
 use devicemapper::Device;
 #[cfg(feature = "dbus_enabled")]
@@ -54,9 +54,6 @@ use libstratis::engine::{
 use libstratis::engine::{Engine, SimEngine, StratEngine};
 use libstratis::stratis::buff_log;
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
-
-#[cfg(feature = "dbus_enabled")]
-use libstratis::engine::Pool;
 
 const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
 
@@ -353,30 +350,10 @@ fn process_signal(
 #[cfg(feature = "dbus_enabled")]
 fn process_dbus(
     handle: &mut libstratis::dbus_api::DbusConnectionData,
-    engine: &Rc<RefCell<Engine>>,
     fds: &mut Vec<libc::pollfd>,
     dbus_client_index_start: usize,
 ) -> StratisResult<()> {
-    for pfd in fds[dbus_client_index_start..]
-        .iter()
-        .filter(|pfd| pfd.revents != 0)
-    {
-        for item in handle
-            .connection
-            .borrow()
-            .watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents))
-        {
-            if let Err(r) = libstratis::dbus_api::handle(
-                &handle.connection.borrow(),
-                &item,
-                &mut handle.tree,
-                &handle.context,
-            ) {
-                log_engine_state(&*engine.borrow());
-                print_err(&From::from(r));
-            }
-        }
-    }
+    handle.handle(&fds[dbus_client_index_start..]);
 
     // Refresh list of dbus fds to poll for. This can change as
     // D-Bus clients come and go.
@@ -393,30 +370,6 @@ fn process_dbus(
     Ok(())
 }
 
-/// Handle registering the pool with the dbus library.  Wondering why the actual register_pool
-/// isn't implements with methods on the DbusConnectionData structure???
-#[cfg(feature = "dbus_enabled")]
-fn dbus_register_pool(
-    handle: &mut libstratis::dbus_api::DbusConnectionData,
-    pool_uuid: Uuid,
-    pool: &mut Pool,
-) -> StratisResult<()> {
-    if let Err(e) = libstratis::dbus_api::register_pool(
-        &handle.connection.borrow(),
-        &handle.context,
-        &mut handle.tree,
-        pool_uuid,
-        pool,
-        &handle.path,
-    ) {
-        error!(
-            "libstratis::dbus_api::register_pool {}, {:?}, Path {}, error: {}",
-            pool_uuid, pool, handle.path, e
-        );
-    }
-    Ok(())
-}
-
 /// Iterate through all the pools and register them with the dbus interface and update the vector
 /// of file poll file descriptors.
 #[cfg(feature = "dbus_enabled")]
@@ -430,7 +383,7 @@ fn initialize_dbus(
     get_engine_listener_list_mut().register_listener(event_handler);
     // Register all the pools with dbus
     for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
-        dbus_register_pool(handle, pool_uuid, pool)?;
+        handle.register_pool(pool_uuid, pool)?;
     }
 
     // Add dbus FD to fds as dbus is now available.
@@ -596,7 +549,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                                 )
                                 .1;
 
-                            dbus_register_pool(handle, _pool_uuid, pool)?;
+                            handle.register_pool(_pool_uuid, pool)?;
                         }
                     }
                 }
@@ -635,8 +588,10 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         #[cfg(feature = "dbus_enabled")]
         {
             if let Some(ref mut handle) = dbus_handle {
-                process_dbus(handle, &engine, &mut fds, dbus_client_index_start)?;
-            } else if let Ok(mut handle) = libstratis::dbus_api::connect(Rc::clone(&engine)) {
+                process_dbus(handle, &mut fds, dbus_client_index_start)?;
+            } else if let Ok(mut handle) =
+                libstratis::dbus_api::DbusConnectionData::connect(Rc::clone(&engine))
+            {
                 initialize_dbus(&mut handle, &engine, &mut fds)?;
                 dbus_handle = Some(handle);
             }

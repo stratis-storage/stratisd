@@ -51,7 +51,7 @@ use libstratis::dbus_api::{consts, prop_changed_dispatch};
 use libstratis::engine::{
     get_engine_listener_list_mut, EngineEvent, EngineListener, MaybeDbusPath,
 };
-use libstratis::engine::{Engine, SimEngine, StratEngine};
+use libstratis::engine::{Engine, Pool, SimEngine, StratEngine};
 use libstratis::stratis::buff_log;
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
 
@@ -290,6 +290,112 @@ impl EngineListener for EventHandler {
     }
 }
 
+struct MaybeDbusSupport {
+    #[cfg(feature = "dbus_enabled")]
+    handle: Option<libstratis::dbus_api::DbusConnectionData>,
+}
+
+// If D-Bus compiled out, do very little.
+#[cfg(not(feature = "dbus_enabled"))]
+impl MaybeDbusSupport {
+    fn new() -> MaybeDbusSupport {
+        MaybeDbusSupport {}
+    }
+
+    fn process(
+        &mut self,
+        _engine: &Rc<RefCell<Engine>>,
+        _fds: &mut Vec<libc::pollfd>,
+        _dbus_client_index_start: usize,
+    ) -> StratisResult<()> {
+        Ok(())
+    }
+
+    fn register_pool(&mut self, _pool_uuid: Uuid, _pool: &mut Pool) -> StratisResult<()> {
+        Ok(())
+    }
+
+    fn poll_timeout(&self) -> i32 {
+        // Non-DBus timeout is infinite
+        -1
+    }
+}
+
+#[cfg(feature = "dbus_enabled")]
+impl MaybeDbusSupport {
+    fn new() -> MaybeDbusSupport {
+        MaybeDbusSupport { handle: None }
+    }
+
+    /// Connect to D-Bus and register pools, if not already connected.
+    fn check_connect(&mut self, engine: &Rc<RefCell<Engine>>) -> StratisResult<bool> {
+        let mut connected = self.handle.is_some();
+        if !connected {
+            match libstratis::dbus_api::DbusConnectionData::connect(Rc::clone(&engine)) {
+                Err(_err) => {
+                    info!("D-Bus API is not available");
+                    connected = false;
+                }
+                Ok(mut handle) => {
+                    info!("D-Bus API is available");
+                    let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
+                    get_engine_listener_list_mut().register_listener(event_handler);
+                    // Register all the pools with dbus
+                    for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
+                        handle.register_pool(pool_uuid, pool)?;
+                    }
+                    self.handle = Some(handle);
+                    connected = true;
+                }
+            }
+        }
+        Ok(connected)
+    }
+
+    /// Handle any client dbus requests.
+    fn process(
+        &mut self,
+        engine: &Rc<RefCell<Engine>>,
+        fds: &mut Vec<libc::pollfd>,
+        dbus_client_index_start: usize,
+    ) -> StratisResult<()> {
+        if self.check_connect(engine)? {
+            let handle = &mut self.handle
+                .as_mut()
+                .expect("Connected, so handle is present");
+
+            handle.handle(&fds[dbus_client_index_start..]);
+
+            // Refresh list of dbus fds to poll for. This can change as
+            // D-Bus clients come and go.
+            fds.truncate(dbus_client_index_start);
+            fds.extend(
+                handle
+                    .connection
+                    .borrow()
+                    .watch_fds()
+                    .iter()
+                    .map(|w| w.to_pollfd()),
+            );
+        }
+        Ok(())
+    }
+
+    fn register_pool(&mut self, pool_uuid: Uuid, pool: &mut Pool) -> StratisResult<()> {
+        if let Some(h) = self.handle.as_mut() {
+            h.register_pool(pool_uuid, pool)?;
+        }
+        Ok(())
+    }
+
+    fn poll_timeout(&self) -> i32 {
+        // If dbus support is compiled in and dbus isn't available we will set
+        // timeout to 1 second so that we periodically check to see if we can
+        // bring it up.
+        self.handle.as_ref().map_or(1000, |_| -1)
+    }
+}
+
 struct UdevMonitor<'a> {
     socket: libudev::MonitorSocket<'a>,
 }
@@ -348,58 +454,6 @@ fn process_signal(
     }
 }
 
-/// Handle any client dbus requests.
-#[cfg(feature = "dbus_enabled")]
-fn process_dbus(
-    handle: &mut libstratis::dbus_api::DbusConnectionData,
-    fds: &mut Vec<libc::pollfd>,
-    dbus_client_index_start: usize,
-) -> StratisResult<()> {
-    handle.handle(&fds[dbus_client_index_start..]);
-
-    // Refresh list of dbus fds to poll for. This can change as
-    // D-Bus clients come and go.
-    fds.truncate(dbus_client_index_start);
-    fds.extend(
-        handle
-            .connection
-            .borrow()
-            .watch_fds()
-            .iter()
-            .map(|w| w.to_pollfd()),
-    );
-
-    Ok(())
-}
-
-/// Iterate through all the pools and register them with the dbus interface and update the vector
-/// of file poll file descriptors.
-#[cfg(feature = "dbus_enabled")]
-fn initialize_dbus(
-    handle: &mut libstratis::dbus_api::DbusConnectionData,
-    engine: &Rc<RefCell<Engine>>,
-    fds: &mut Vec<libc::pollfd>,
-) -> StratisResult<()> {
-    info!("DBUS API is now available");
-    let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
-    get_engine_listener_list_mut().register_listener(event_handler);
-    // Register all the pools with dbus
-    for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
-        handle.register_pool(pool_uuid, pool)?;
-    }
-
-    // Add dbus FD to fds as dbus is now available.
-    fds.extend(
-        handle
-            .connection
-            .borrow()
-            .watch_fds()
-            .iter()
-            .map(|w| w.to_pollfd()),
-    );
-    Ok(())
-}
-
 /// Handle blocking the event loop
 fn process_poll(poll_timeout: i32, fds: &mut Vec<libc::pollfd>) -> StratisResult<()> {
     let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, poll_timeout) };
@@ -425,10 +479,9 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     // Ensure that the debug log is output when we leave this function.
     let _guard = buff_log.to_guard();
 
-    // Even if dbus is enabled at compile time, it may not be available at all times depending
-    // on the environment we are running in.
-    #[cfg(feature = "dbus_enabled")]
-    let mut dbus_handle: Option<libstratis::dbus_api::DbusConnectionData> = None;
+    // Even if dbus is enabled at compile time, it may not be available at all
+    // times depending on the environment we are running in.
+    let mut dbus_support = MaybeDbusSupport::new();
 
     // Setup a udev listener before initializing the engine. A device may
     // appear after the engine has processed the udev db, but before it has
@@ -526,7 +579,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         });
     };
 
-    #[cfg(feature = "dbus_enabled")]
     let dbus_client_index_start = if eventable.is_some() {
         FD_INDEX_ENGINE + 1
     } else {
@@ -539,21 +591,13 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
             while let Some(event) = udev_monitor.receive_event() {
-                if let Some(_pool_uuid) = handle_udev_event(&event, &engine) {
-                    #[cfg(feature = "dbus_enabled")]
-                    {
-                        let mut eng_ref = engine.borrow_mut();
-                        if let Some(ref mut handle) = dbus_handle {
-                            let pool = eng_ref
-                                .get_mut_pool(_pool_uuid)
-                                .expect(
-                                    "block_evaluate() returned a pool UUID, pool must be available",
-                                )
-                                .1;
+                if let Some(pool_uuid) = handle_udev_event(&event, &engine) {
+                    let mut eng_ref = engine.borrow_mut();
+                    let (_, pool) = eng_ref
+                        .get_mut_pool(pool_uuid)
+                        .expect("block_evaluate() returned a pool UUID, pool must be available");
 
-                            handle.register_pool(_pool_uuid, pool)?;
-                        }
-                    }
+                    dbus_support.register_pool(pool_uuid, pool)?;
                 }
             }
         }
@@ -585,27 +629,12 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
             }
         }
 
-        // Iterate through D-Bus file descriptors (if enabled) and dbus is actually available,
-        // otherwise attempt to bring up the dbus interface.
-        #[cfg(feature = "dbus_enabled")]
-        {
-            if let Some(ref mut handle) = dbus_handle {
-                process_dbus(handle, &mut fds, dbus_client_index_start)?;
-            } else if let Ok(mut handle) =
-                libstratis::dbus_api::DbusConnectionData::connect(Rc::clone(&engine))
-            {
-                initialize_dbus(&mut handle, &engine, &mut fds)?;
-                dbus_handle = Some(handle);
-            }
-        }
+        // Iterate through D-Bus file descriptors (if enabled) and dbus is
+        // actually available, otherwise attempt to bring up the dbus
+        // interface.
+        dbus_support.process(&engine, &mut fds, dbus_client_index_start)?;
 
-        // If dbus support is compiled in and dbus isn't available we will set timeout to
-        // 1 second so that we periodically check to see if we can bring it up.
-        #[cfg(feature = "dbus_enabled")]
-        let poll_timeout = dbus_handle.as_ref().map_or(1000, |_| -1);
-        // Default timeout is infinite
-        #[cfg(not(feature = "dbus_enabled"))]
-        let poll_timeout = -1;
+        let poll_timeout = dbus_support.poll_timeout();
         // Block until we have something to handle
         process_poll(poll_timeout, &mut fds)?;
     }

@@ -13,6 +13,7 @@ use dbus::tree::{
     Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo, Tree,
 };
 use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
+use libc;
 use uuid::Uuid;
 
 use super::super::engine::{Engine, Pool, PoolUuid};

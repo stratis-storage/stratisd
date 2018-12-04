@@ -24,10 +24,7 @@ use super::consts;
 use super::filesystem::create_dbus_filesystem;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
-use super::util::{
-    engine_to_dbus_err_tuple, get_next_arg, get_uuid, msg_code_ok, msg_string_ok,
-    STRATIS_BASE_PATH, STRATIS_BASE_SERVICE,
-};
+use super::util::{engine_to_dbus_err_tuple, get_next_arg, get_uuid, msg_code_ok, msg_string_ok};
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
@@ -449,16 +446,14 @@ pub fn create_dbus_pool<'a>(
 
     let object_name = format!(
         "{}/{}",
-        STRATIS_BASE_PATH,
+        consts::STRATIS_BASE_PATH,
         dbus_context.get_next_id().to_string()
     );
-
-    let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "pool");
 
     let object_path = f.object_path(object_name, Some(OPContext::new(parent, uuid)))
         .introspectable()
         .add(
-            f.interface(interface_name, ())
+            f.interface(consts::POOL_INTERFACE_NAME, ())
                 .add_m(create_filesystems_method)
                 .add_m(destroy_filesystems_method)
                 .add_m(snapshot_method)

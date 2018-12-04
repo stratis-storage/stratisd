@@ -18,7 +18,6 @@ use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
 use super::util::{
     engine_to_dbus_err_tuple, get_next_arg, get_parent, get_uuid, msg_code_ok, msg_string_ok,
-    STRATIS_BASE_PATH, STRATIS_BASE_SERVICE,
 };
 
 pub fn create_dbus_blockdev<'a>(
@@ -82,16 +81,14 @@ pub fn create_dbus_blockdev<'a>(
 
     let object_name = format!(
         "{}/{}",
-        STRATIS_BASE_PATH,
+        consts::STRATIS_BASE_PATH,
         dbus_context.get_next_id().to_string()
     );
-
-    let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "blockdev");
 
     let object_path = f.object_path(object_name, Some(OPContext::new(parent, uuid)))
         .introspectable()
         .add(
-            f.interface(interface_name, ())
+            f.interface(consts::BLOCKDEV_INTERFACE_NAME, ())
                 .add_m(set_userid_method)
                 .add_p(devnode_property)
                 .add_p(hardware_info_property)

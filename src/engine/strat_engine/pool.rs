@@ -727,12 +727,9 @@ mod tests {
 
             let mut amount_written = Sectors(0);
             let buffer_length = Bytes(buffer_length).sectors();
-            while match pool.thin_pool.extend_state() {
-                PoolExtendState::DataFailed
-                | PoolExtendState::MetaFailed
-                | PoolExtendState::MetaAndDataFailed => false,
-                _ => true,
-            } {
+            while pool.thin_pool.extend_state() == PoolExtendState::Good
+                && pool.thin_pool.state() == PoolState::Running
+            {
                 f.write_all(buf).unwrap();
                 amount_written += Sectors(1);
                 // Run check roughly every time the buffer is cleared.

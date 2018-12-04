@@ -654,6 +654,11 @@ impl ThinPool {
                 dbus_path: self.get_dbus_path(),
                 state: new_state,
             });
+            info!(
+                "New state for thinpool with name {}: {:?}",
+                self.thin_pool.name(),
+                self.pool_state
+            );
         }
     }
 

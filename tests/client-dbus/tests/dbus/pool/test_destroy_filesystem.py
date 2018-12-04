@@ -24,10 +24,10 @@ from stratisd_client_dbus import get_object
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._misc import _device_list
 from .._misc import SimTestCase
+from .._misc import device_name_list
 
-_DEVICE_STRATEGY = _device_list(0)
+_DEVICE_STRATEGY = device_name_list()
 
 
 class DestroyFSTestCase(SimTestCase):
@@ -43,7 +43,7 @@ class DestroyFSTestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        self._devs = _DEVICE_STRATEGY.example()
+        self._devs = _DEVICE_STRATEGY()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
             self._proxy, {
                 'name': self._POOLNAME,
@@ -98,7 +98,7 @@ class DestroyFSTestCase1(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        self._devs = _DEVICE_STRATEGY.example()
+        self._devs = _DEVICE_STRATEGY()
         ((self._poolpath, _), _, _) = Manager.Methods.CreatePool(
             self._proxy, {
                 'name': self._POOLNAME,

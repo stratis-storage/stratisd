@@ -22,10 +22,7 @@ from stratisd_client_dbus import Manager
 from stratisd_client_dbus import ObjectManager
 from stratisd_client_dbus import get_object
 
-from .._misc import _device_list
 from .._misc import SimTestCase
-
-_DEVICE_STRATEGY = _device_list(0)
 
 
 class GetObjectTestCase(SimTestCase):

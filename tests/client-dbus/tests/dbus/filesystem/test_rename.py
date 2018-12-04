@@ -25,10 +25,10 @@ from stratisd_client_dbus import get_object
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._misc import _device_list
 from .._misc import SimTestCase
+from .._misc import device_name_list
 
-_DEVICE_STRATEGY = _device_list(0)
+_DEVICE_STRATEGY = device_name_list()
 
 
 class SetNameTestCase(SimTestCase):
@@ -49,7 +49,7 @@ class SetNameTestCase(SimTestCase):
             self._proxy, {
                 'name': self._POOLNAME,
                 'redundancy': (True, 0),
-                'devices': _DEVICE_STRATEGY.example()
+                'devices': _DEVICE_STRATEGY(),
             })
         self._pool_object = get_object(self._pool_object_path)
         (created, _, _) = Pool.Methods.CreateFilesystems(

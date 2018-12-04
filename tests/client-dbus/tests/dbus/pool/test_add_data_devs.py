@@ -25,10 +25,10 @@ from stratisd_client_dbus import pools
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._misc import _device_list
 from .._misc import SimTestCase
+from .._misc import device_name_list
 
-_DEVICE_STRATEGY = _device_list(1)
+_DEVICE_STRATEGY = device_name_list(1)
 
 
 class AddDataDevsTestCase(SimTestCase):
@@ -97,7 +97,7 @@ class AddDataDevsTestCase(SimTestCase):
         self.assertEqual(list(blockdevs1), [])
 
         (result, rc, _) = Pool.Methods.AddDataDevs(
-            self._pool_object, {'devices': _DEVICE_STRATEGY.example()})
+            self._pool_object, {'devices': _DEVICE_STRATEGY()})
 
         num_devices_added = len(result)
         managed_objects = \

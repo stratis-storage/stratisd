@@ -169,10 +169,10 @@ mod test {
 
         assert_eq!(device::is_stratis_device(paths[0]).unwrap(), None);
 
-        assert!(match device::identify(paths[0]).unwrap() {
-            device::DevOwnership::Unowned => true,
-            _ => false,
-        });
+        assert_matches!(
+            device::identify(paths[0]).unwrap(),
+            device::DevOwnership::Unowned
+        );
 
         assert_eq!(device::is_stratis_device(paths[0]).unwrap(), None);
     }

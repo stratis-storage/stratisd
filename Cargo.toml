@@ -34,6 +34,7 @@ features = ["serde", "v4"]
 loopdev = "0.2"
 either = "1.1.0"
 proptest = "0.7.2"
+matches = "0.1.8"
 
 [features]
 default = ["dbus_enabled"]

@@ -65,6 +65,18 @@ fn datablocks_to_sectors(data_blocks: DataBlocks) -> Sectors {
     *data_blocks * DATA_BLOCK_SIZE
 }
 
+/// Map thin pool status to its corresponding pool state
+fn status_to_state(status: &ThinPoolStatus) -> PoolState {
+    match *status {
+        ThinPoolStatus::Working(ref status) => match status.summary {
+            ThinPoolStatusSummary::Good => PoolState::Running,
+            ThinPoolStatusSummary::ReadOnly => PoolState::ReadOnly,
+            ThinPoolStatusSummary::OutOfSpace => PoolState::OutOfDataSpace,
+        },
+        ThinPoolStatus::Fail => PoolState::Failed,
+    }
+}
+
 /// Get the value for the "Dirty" key in /proc/meminfo in Sectors.
 /// Return an error if "Dirty" key is not found, value can not be parsed,
 /// or there is some error reading /proc/meminfo.
@@ -533,24 +545,20 @@ impl ThinPool {
         );
 
         let mut should_save: bool = false;
-        match self.thin_pool.status(get_dm())? {
+        let thin_pool_status = self.thin_pool.status(get_dm())?;
+        self.set_state(status_to_state(&thin_pool_status));
+        match thin_pool_status {
             ThinPoolStatus::Working(ref status) => {
                 let mut meta_extend_failed = false;
                 let mut data_extend_failed = false;
                 match status.summary {
-                    ThinPoolStatusSummary::Good => {
-                        self.set_state(PoolState::Running);
-                    }
-                    // If a pool is in ReadOnly mode it is due to either meta data full or
-                    // the pool requires repair.
                     ThinPoolStatusSummary::ReadOnly => {
-                        error!("Thinpool read only! -> ReadOnly");
-                        self.set_state(PoolState::ReadOnly);
+                        error!("Thinpool status is read only.");
                     }
                     ThinPoolStatusSummary::OutOfSpace => {
-                        error!("Thinpool out of space! -> OutOfSpace");
-                        self.set_state(PoolState::OutOfDataSpace);
+                        error!("Thinpool status is \"out of data space\"");
                     }
+                    _ => {}
                 }
 
                 let usage = &status.usage;
@@ -617,8 +625,7 @@ impl ThinPool {
                 self.set_extend_state(data_extend_failed, meta_extend_failed);
             }
             ThinPoolStatus::Fail => {
-                error!("Thinpool status is fail -> Failed");
-                self.set_state(PoolState::Failed);
+                error!("Thinpool status is Fail");
                 // TODO: Take pool offline?
                 // TODO: Run thin_check
             }

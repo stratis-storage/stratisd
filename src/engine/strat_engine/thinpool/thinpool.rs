@@ -631,14 +631,11 @@ impl ThinPool {
             }
         }
 
-        // We changed something. Maybe pool is better now?
-        if should_save && self.state() != PoolState::Running {
-            if let ThinPoolStatus::Working(working_status) = self.thin_pool.status(get_dm())? {
-                if let ThinPoolStatusSummary::Good = working_status.summary {
-                    self.set_state(PoolState::Running);
-                }
-            }
-        }
+        // Obtain thin pool status once more. If an action was taken something
+        // might have changed, and if an action was not taken, something might
+        // have changed. Set state based on thin pool status.
+        let thin_pool_status = self.thin_pool.status(get_dm())?;
+        self.set_state(status_to_state(&thin_pool_status));
 
         let filesystems = self.filesystems
             .borrow_mut()

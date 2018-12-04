@@ -571,78 +571,77 @@ impl ThinPool {
 
         let mut should_save: bool = false;
         let thin_pool_status = get_thinpool_status(self)?;
-        match thin_pool_status {
-            ThinPoolStatus::Working(ref status) => {
-                let mut meta_extend_failed = false;
-                let mut data_extend_failed = false;
 
-                let usage = &status.usage;
+        // TODO: Consider actions to be taken if thin pool status is Fail.
+        // Suggestions that have been made are to:
+        // * Take the pool offline
+        // * Run thin_check
+        if let ThinPoolStatus::Working(ref status) = thin_pool_status {
+            let mut meta_extend_failed = false;
+            let mut data_extend_failed = false;
 
-                // Kernel 4.19+ includes the kernel-set meta lowater value in
-                // thinpool status. For older kernels, use a default value.
-                let meta_lowater = status
-                    .meta_low_water
-                    .map(MetaBlocks)
-                    .unwrap_or(META_LOWATER_FALLBACK);
-                if let Some(request) = calculate_extension_request(
-                    usage.total_meta.sectors(),
-                    usage.used_meta.sectors(),
-                    meta_lowater.sectors(),
-                    false,
+            let usage = &status.usage;
+
+            // Kernel 4.19+ includes the kernel-set meta lowater value in
+            // thinpool status. For older kernels, use a default value.
+            let meta_lowater = status
+                .meta_low_water
+                .map(MetaBlocks)
+                .unwrap_or(META_LOWATER_FALLBACK);
+            if let Some(request) = calculate_extension_request(
+                usage.total_meta.sectors(),
+                usage.used_meta.sectors(),
+                meta_lowater.sectors(),
+                false,
+            ) {
+                let meta_extend_failed =
+                    match self.extend_thin_meta_device(pool_uuid, backstore, request) {
+                        Ok(extend_size) => extend_size == Sectors(0),
+                        Err(_) => true,
+                    };
+                should_save |= !meta_extend_failed;
+            }
+
+            let extend_size = sectors_to_datablocks({
+                match calculate_extension_request(
+                    datablocks_to_sectors(usage.total_data),
+                    datablocks_to_sectors(usage.used_data),
+                    datablocks_to_sectors(self.thin_pool.table().table.params.low_water_mark),
+                    true,
                 ) {
-                    let meta_extend_failed =
-                        match self.extend_thin_meta_device(pool_uuid, backstore, request) {
-                            Ok(extend_size) => extend_size == Sectors(0),
-                            Err(_) => true,
-                        };
-                    should_save |= !meta_extend_failed;
-                }
-
-                let extend_size = sectors_to_datablocks({
-                    match calculate_extension_request(
-                        datablocks_to_sectors(usage.total_data),
-                        datablocks_to_sectors(usage.used_data),
-                        datablocks_to_sectors(self.thin_pool.table().table.params.low_water_mark),
-                        true,
-                    ) {
-                        None => Sectors(0),
-                        Some(request) => {
-                            let amount_allocated =
-                                match self.extend_thin_data_device(pool_uuid, backstore, request) {
-                                    Ok(extend_size) => extend_size,
-                                    Err(_) => Sectors(0),
-                                };
-                            data_extend_failed = amount_allocated == Sectors(0);
-                            should_save |= !data_extend_failed;
-                            amount_allocated
-                        }
+                    None => Sectors(0),
+                    Some(request) => {
+                        let amount_allocated =
+                            match self.extend_thin_data_device(pool_uuid, backstore, request) {
+                                Ok(extend_size) => extend_size,
+                                Err(_) => Sectors(0),
+                            };
+                        data_extend_failed = amount_allocated == Sectors(0);
+                        should_save |= !data_extend_failed;
+                        amount_allocated
                     }
-                });
+                }
+            });
 
-                let current_total = usage.total_data + extend_size;
+            let current_total = usage.total_data + extend_size;
 
-                // Update pool space state
-                self.free_space_check(
-                    usage.used_data,
-                    current_total + sectors_to_datablocks(backstore.available_in_backstore())
-                        - usage.used_data,
-                )?;
+            // Update pool space state
+            self.free_space_check(
+                usage.used_data,
+                current_total + sectors_to_datablocks(backstore.available_in_backstore())
+                    - usage.used_data,
+            )?;
 
-                // Trigger next event depending on pool space state
-                let lowater = calc_lowater(
-                    current_total,
-                    sectors_to_datablocks(backstore.available_in_backstore()),
-                    self.free_space_state,
-                );
+            // Trigger next event depending on pool space state
+            let lowater = calc_lowater(
+                current_total,
+                sectors_to_datablocks(backstore.available_in_backstore()),
+                self.free_space_state,
+            );
 
-                self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
-                self.resume()?;
-                self.set_extend_state(data_extend_failed, meta_extend_failed);
-            }
-            ThinPoolStatus::Fail => {
-                // TODO: Take pool offline?
-                // TODO: Run thin_check
-            }
+            self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
+            self.resume()?;
+            self.set_extend_state(data_extend_failed, meta_extend_failed);
         }
 
         // Obtain thin pool status once more. If an action was taken something

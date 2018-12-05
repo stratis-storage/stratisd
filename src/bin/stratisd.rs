@@ -190,6 +190,7 @@ impl EngineListener for EventHandler {
                         consts::BLOCKDEV_STATE_PROP,
                         state as u16,
                         &dbus_path,
+                        consts::BLOCKDEV_INTERFACE_NAME,
                     ).unwrap_or_else(|()| {
                         error!(
                             "BlockdevStateChanged: {} state: {} failed to send dbus update.",
@@ -209,6 +210,7 @@ impl EngineListener for EventHandler {
                         consts::FILESYSTEM_NAME_PROP,
                         to.to_string(),
                         &dbus_path,
+                        consts::FILESYSTEM_INTERFACE_NAME,
                     ).unwrap_or_else(|()| {
                         error!(
                             "FilesystemRenamed: {} from: {} to: {} failed to send dbus update.",
@@ -224,6 +226,7 @@ impl EngineListener for EventHandler {
                         consts::POOL_EXTEND_STATE_PROP,
                         state as u16,
                         &dbus_path,
+                        consts::POOL_INTERFACE_NAME,
                     ).unwrap_or_else(|()| {
                         error!(
                             "PoolExtendStateChanged: {} state: {} failed to send dbus update.",
@@ -243,6 +246,7 @@ impl EngineListener for EventHandler {
                         consts::POOL_NAME_PROP,
                         to.to_string(),
                         &dbus_path,
+                        consts::POOL_INTERFACE_NAME,
                     ).unwrap_or_else(|()| {
                         error!(
                             "PoolRenamed: {} from: {} to: {} failed to send dbus update.",
@@ -258,6 +262,7 @@ impl EngineListener for EventHandler {
                         consts::POOL_SPACE_STATE_PROP,
                         state as u16,
                         &dbus_path,
+                        consts::POOL_INTERFACE_NAME,
                     ).unwrap_or_else(|()| {
                         error!(
                             "PoolSpaceStateChanged: {} state: {} failed to send dbus update.",
@@ -273,6 +278,7 @@ impl EngineListener for EventHandler {
                         consts::POOL_STATE_PROP,
                         state as u16,
                         &dbus_path,
+                        consts::POOL_INTERFACE_NAME,
                     ).unwrap_or_else(|()| {
                         error!(
                             "PoolStateChanged: {} state: {} failed to send dbus update.",

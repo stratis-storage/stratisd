@@ -19,12 +19,12 @@ use super::super::engine::{Engine, Pool, PoolUuid};
 use super::super::stratis::VERSION;
 
 use super::blockdev::create_dbus_blockdev;
+use super::consts;
 use super::filesystem::create_dbus_filesystem;
 use super::pool::create_dbus_pool;
 use super::types::{ActionQueue, DbusContext, DbusErrorEnum, DeferredAction, TData};
 use super::util::{
     engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, tuple_to_option,
-    STRATIS_BASE_PATH, STRATIS_BASE_SERVICE,
 };
 
 fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -170,13 +170,11 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_version);
 
-    let interface_name = format!("{}.{}", STRATIS_BASE_SERVICE, "Manager");
-
-    let obj_path = f.object_path(STRATIS_BASE_PATH, None)
+    let obj_path = f.object_path(consts::STRATIS_BASE_PATH, None)
         .introspectable()
         .object_manager()
         .add(
-            f.interface(interface_name, ())
+            f.interface(consts::MANAGER_INTERFACE_NAME, ())
                 .add_m(create_pool_method)
                 .add_m(destroy_pool_method)
                 .add_m(configure_simulator_method)
@@ -217,7 +215,10 @@ pub fn connect<'a>(engine: Rc<RefCell<Engine>>) -> Result<DbusConnectionData<'a>
     let (tree, object_path) = get_base_tree(DbusContext::new(engine));
     let dbus_context = tree.get_data().clone();
     tree.set_registered(&c, true)?;
-    c.register_name(STRATIS_BASE_SERVICE, NameFlag::ReplaceExisting as u32)?;
+    c.register_name(
+        consts::STRATIS_BASE_SERVICE,
+        NameFlag::ReplaceExisting as u32,
+    )?;
     Ok(DbusConnectionData {
         connection: Rc::new(RefCell::new(c)),
         tree,

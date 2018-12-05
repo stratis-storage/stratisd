@@ -110,25 +110,6 @@ fn initialize_log(debug: bool) -> buff_log::Handle<env_logger::Logger> {
     }
 }
 
-/// Given a udev event, if it's one of interest and the block device is a stratis device, return
-/// the pool UUID for it.
-fn handle_udev_event(event: &libudev::Event, engine: &Rc<RefCell<Engine>>) -> Option<Uuid> {
-    if event.event_type() == libudev::EventType::Add
-        || event.event_type() == libudev::EventType::Change
-    {
-        let device = event.device();
-        return device.devnode().and_then(|devnode| {
-            device.devnum().and_then(|devnum| {
-                engine
-                    .borrow_mut()
-                    .block_evaluate(Device::from(devnum), PathBuf::from(devnode))
-                    .unwrap_or(None)
-            })
-        });
-    }
-    None
-}
-
 /// To ensure only one instance of stratisd runs at a time, acquire an
 /// exclusive lock. Return an error if lock attempt fails.
 fn trylock_pid_file() -> StratisResult<File> {
@@ -414,8 +395,36 @@ impl<'a> UdevMonitor<'a> {
         self.socket.as_raw_fd()
     }
 
-    fn receive_event(&mut self) -> Option<libudev::Event> {
-        self.socket.receive_event()
+    /// Given some udev events, see if any new pools are formed, and set up
+    /// dbus if so.
+    fn handle_events(
+        &mut self,
+        engine: &Rc<RefCell<Engine>>,
+        dbus_support: &mut MaybeDbusSupport,
+    ) -> StratisResult<()> {
+        while let Some(event) = self.socket.receive_event() {
+            if event.event_type() == libudev::EventType::Add
+                || event.event_type() == libudev::EventType::Change
+            {
+                let device = event.device();
+                let new_pool_uuid = device.devnode().and_then(|devnode| {
+                    device.devnum().and_then(|devnum| {
+                        engine
+                            .borrow_mut()
+                            .block_evaluate(Device::from(devnum), PathBuf::from(devnode))
+                            .unwrap_or(None)
+                    })
+                });
+                if let Some(pool_uuid) = new_pool_uuid {
+                    let mut eng_ref = engine.borrow_mut();
+                    let (_, pool) = eng_ref
+                        .get_mut_pool(pool_uuid)
+                        .expect("block_evaluate() returned a pool UUID, pool must be available");
+                    dbus_support.register_pool(pool_uuid, pool)?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -590,16 +599,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     loop {
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
-            while let Some(event) = udev_monitor.receive_event() {
-                if let Some(pool_uuid) = handle_udev_event(&event, &engine) {
-                    let mut eng_ref = engine.borrow_mut();
-                    let (_, pool) = eng_ref
-                        .get_mut_pool(pool_uuid)
-                        .expect("block_evaluate() returned a pool UUID, pool must be available");
-
-                    dbus_support.register_pool(pool_uuid, pool)?;
-                }
-            }
+            udev_monitor.handle_events(&engine, &mut dbus_support)?;
         }
 
         // Process any signals off of signalfd

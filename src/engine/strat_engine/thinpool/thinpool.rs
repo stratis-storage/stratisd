@@ -509,6 +509,14 @@ impl ThinPool {
     /// Returns a bool communicating if a configuration change requiring a
     /// metadata save has been made.
     pub fn check(&mut self, pool_uuid: PoolUuid, backstore: &mut Backstore) -> StratisResult<bool> {
+        // Get the status of the thinpool and set the state as appropriate.
+        // Return the thinpool status.
+        fn get_thinpool_status(thin_pool: &mut ThinPool) -> StratisResult<ThinPoolStatus> {
+            let thin_pool_status = thin_pool.thin_pool.status(get_dm())?;
+            thin_pool.set_state(status_to_state(&thin_pool_status));
+            Ok(thin_pool_status)
+        }
+
         // Calculate amount to request for data- or meta- device.
         // Return None if device does not need to be expanded.
         // Returned request, if it exists, is always INITIAL_META_SIZE
@@ -545,8 +553,7 @@ impl ThinPool {
         );
 
         let mut should_save: bool = false;
-        let thin_pool_status = self.thin_pool.status(get_dm())?;
-        self.set_state(status_to_state(&thin_pool_status));
+        let thin_pool_status = get_thinpool_status(self)?;
         match thin_pool_status {
             ThinPoolStatus::Working(ref status) => {
                 let mut meta_extend_failed = false;
@@ -633,9 +640,8 @@ impl ThinPool {
 
         // Obtain thin pool status once more. If an action was taken something
         // might have changed, and if an action was not taken, something might
-        // have changed. Set state based on thin pool status.
-        let thin_pool_status = self.thin_pool.status(get_dm())?;
-        self.set_state(status_to_state(&thin_pool_status));
+        // have changed.
+        let _ = get_thinpool_status(self)?;
 
         let filesystems = self.filesystems
             .borrow_mut()

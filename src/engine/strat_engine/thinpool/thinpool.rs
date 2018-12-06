@@ -513,6 +513,23 @@ impl ThinPool {
         // Return the thinpool status.
         fn get_thinpool_status(thin_pool: &mut ThinPool) -> StratisResult<ThinPoolStatus> {
             let thin_pool_status = thin_pool.thin_pool.status(get_dm())?;
+            match thin_pool_status {
+                ThinPoolStatus::Fail => {
+                    error!("stratisd has detected that the the status of its thinpool with name {} is \"Fail\".",
+                           thin_pool.thin_pool.name());
+                }
+                ThinPoolStatus::Working(ref status) => match status.summary {
+                    ThinPoolStatusSummary::ReadOnly => {
+                        error!("stratisd has detected that the the status of its thinpool with name {} is \"ro\" (read only).",
+                               thin_pool.thin_pool.name());
+                    }
+                    ThinPoolStatusSummary::OutOfSpace => {
+                        error!("stratisd has detected that the the status of its thinpool with name {} is \"out of data space\".",
+                              thin_pool.thin_pool.name());
+                    }
+                    _ => {}
+                },
+            }
             thin_pool.set_state(status_to_state(&thin_pool_status));
             Ok(thin_pool_status)
         }
@@ -558,15 +575,6 @@ impl ThinPool {
             ThinPoolStatus::Working(ref status) => {
                 let mut meta_extend_failed = false;
                 let mut data_extend_failed = false;
-                match status.summary {
-                    ThinPoolStatusSummary::ReadOnly => {
-                        error!("Thinpool status is read only.");
-                    }
-                    ThinPoolStatusSummary::OutOfSpace => {
-                        error!("Thinpool status is \"out of data space\"");
-                    }
-                    _ => {}
-                }
 
                 let usage = &status.usage;
 
@@ -632,7 +640,6 @@ impl ThinPool {
                 self.set_extend_state(data_extend_failed, meta_extend_failed);
             }
             ThinPoolStatus::Fail => {
-                error!("Thinpool status is Fail");
                 // TODO: Take pool offline?
                 // TODO: Run thin_check
             }

@@ -513,6 +513,10 @@ impl ThinPool {
         // Return the thinpool status.
         fn get_thinpool_status(thin_pool: &mut ThinPool) -> StratisResult<ThinPoolStatus> {
             let thin_pool_status = thin_pool.thin_pool.status(get_dm())?;
+            // FIXME: Ideally, it would be best to log an error because the
+            // thin pool had entered a certain bad state only the first time
+            // this condition was detected. This method logs the error every
+            // time it is called, regardless, which should be fixed.
             match thin_pool_status {
                 ThinPoolStatus::Fail => {
                     error!("stratisd has detected that the the status of its thinpool with name {} is \"Fail\".",

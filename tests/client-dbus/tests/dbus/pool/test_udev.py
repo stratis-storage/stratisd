@@ -35,6 +35,7 @@ import pyudev
 
 from .._loopback import LoopBackDevices
 from .._dm import remove_stratis_setup, _get_stratis_devices
+from .._stratis_id import stratis_signature
 
 _STRATISD = os.environ['STRATISD']
 
@@ -56,6 +57,7 @@ class UdevAdd(unittest.TestCase):
     """
     Test udev add event support.
     """
+    lib_blk_id = True
 
     @staticmethod
     def _create_pool(name, devices):
@@ -200,12 +202,23 @@ class UdevAdd(unittest.TestCase):
         start = time.time()
         end_time = start + 10
 
-        while time.time() < end_time:
+        while UdevAdd.lib_blk_id and time.time() < end_time:
             found = sum(1 for _ in context.list_devices(
                 subsystem='block', ID_FS_TYPE='stratis'))
             if found == num_expected:
                 break
             time.sleep(1)
+
+        # If we are not matching our expectations, we may be running on a box
+        # that doesn't have blkid support, so lets probe the disks instead.  If
+        # we find a stratis disk now, we will set the flag UdevAdd.lib_blk_id to
+        # false so we don't waste so much time checking the udev db.
+        if found != num_expected and found == 0:
+            for blk_dev in context.list_devices(subsystem='block'):
+                if "DEVNAME" in blk_dev:
+                    if stratis_signature(blk_dev["DEVNAME"]):
+                        UdevAdd.lib_blk_id = False
+                        found += 1
 
         assert found == num_expected
 

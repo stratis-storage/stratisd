@@ -52,7 +52,7 @@ impl BlockDev for SimDev {
         BlockDevState::InUse
     }
 
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
+    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
         self.dbus_path = path
     }
 

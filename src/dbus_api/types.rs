@@ -114,7 +114,7 @@ impl ActionQueue {
     /// recursive, since no multi-level parent-child relationships currently
     /// exist.
     // Note: Path x is a child of path y if x's context's parent field is y.
-    pub fn push_remove(&mut self, item: &Path<'static>, tree: &Tree<MTFn<TData>, TData>) -> () {
+    pub fn push_remove(&mut self, item: &Path<'static>, tree: &Tree<MTFn<TData>, TData>) {
         for opath in tree.iter().filter(|opath| {
             opath
                 .get_data()

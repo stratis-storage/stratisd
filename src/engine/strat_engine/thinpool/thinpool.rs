@@ -1101,7 +1101,7 @@ impl ThinPool {
         Ok(true)
     }
 
-    pub fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
+    pub fn set_dbus_path(&mut self, path: MaybeDbusPath) {
         self.dbus_path = path
     }
 

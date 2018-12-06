@@ -47,7 +47,7 @@ impl Filesystem for SimFilesystem {
         Ok(Bytes(12_345_678))
     }
 
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
+    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
         self.dbus_path = path
     }
 

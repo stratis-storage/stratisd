@@ -55,7 +55,7 @@ pub enum FilesystemStatus {
 
 /// If we try to create a filesystem and then fail in a step after making the
 /// fs, we may need to wait for udev to get off it before we can clean it up.
-pub fn fs_settle() -> () {
+pub fn fs_settle() {
     if let Err(err) = udev_settle() {
         error!("udev_settle() failed: {}", err);
         // Should never happen, but just in case, give much time to
@@ -314,7 +314,7 @@ impl Filesystem for StratFilesystem {
         }
     }
 
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
+    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
         self.dbus_path = path
     }
 

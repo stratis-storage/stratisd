@@ -129,7 +129,7 @@ impl RangeAllocator {
 
     #[allow(dead_code)]
     /// Mark ranges previously marked as used as now unused.
-    fn remove_ranges(&mut self, to_free: &[(Sectors, Sectors)]) -> () {
+    fn remove_ranges(&mut self, to_free: &[(Sectors, Sectors)]) {
         for &(off, len) in to_free {
             // TODO: when this method goes into use, fix it so that it returns
             // an StratisResult, make this a try!.

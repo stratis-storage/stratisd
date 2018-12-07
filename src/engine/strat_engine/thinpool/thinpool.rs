@@ -636,15 +636,6 @@ impl ThinPool {
             }
         }
 
-        // We changed something. Maybe pool is better now?
-        if should_save && self.state() != PoolState::Running {
-            if let ThinPoolStatus::Working(working_status) = self.thin_pool.status(get_dm())? {
-                if let ThinPoolStatusSummary::Good = working_status.summary {
-                    self.set_state(PoolState::Running);
-                }
-            }
-        }
-
         let filesystems = self.filesystems
             .borrow_mut()
             .iter_mut()

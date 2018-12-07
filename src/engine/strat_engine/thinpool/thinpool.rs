@@ -319,7 +319,7 @@ impl ThinPool {
             ),
         )?;
 
-        let mut tp = ThinPool {
+        Ok(ThinPool {
             thin_pool: thinpool_dev,
             segments: Segments {
                 meta_segments: vec![meta_segments],
@@ -335,11 +335,7 @@ impl ThinPool {
             pool_extend_state: PoolExtendState::Initializing,
             free_space_state,
             dbus_path: MaybeDbusPath(None),
-        };
-
-        tp.check(pool_uuid, backstore)?;
-
-        Ok(tp)
+        })
     }
 
     /// Set up an "existing" thin pool.
@@ -353,7 +349,7 @@ impl ThinPool {
         pool_uuid: PoolUuid,
         thin_pool_save: &ThinPoolDevSave,
         flex_devs: &FlexDevsSave,
-        backstore: &mut Backstore,
+        backstore: &Backstore,
     ) -> StratisResult<ThinPool> {
         let mdv_segments = flex_devs.meta_dev.to_vec();
         let meta_segments = flex_devs.thin_meta_dev.to_vec();
@@ -435,7 +431,7 @@ impl ThinPool {
         }
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
-        let mut tp = ThinPool {
+        Ok(ThinPool {
             thin_pool: thinpool_dev,
             segments: Segments {
                 meta_segments,
@@ -451,11 +447,7 @@ impl ThinPool {
             pool_extend_state: PoolExtendState::Initializing,
             free_space_state,
             dbus_path: MaybeDbusPath(None),
-        };
-
-        tp.check(pool_uuid, backstore)?;
-
-        Ok(tp)
+        })
     }
 
     /// Run status checks and take actions on the thinpool and its components.
@@ -1464,7 +1456,7 @@ mod tests {
         let thinpoolsave: ThinPoolDevSave = pool.record();
         pool.teardown().unwrap();
 
-        let pool = ThinPool::setup(pool_uuid, &thinpoolsave, &flexdevs, &mut backstore).unwrap();
+        let pool = ThinPool::setup(pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
 
         assert_eq!(&*pool.get_filesystem_by_uuid(fs_uuid).unwrap().0, name2);
     }
@@ -1530,7 +1522,7 @@ mod tests {
         let thinpooldevsave: ThinPoolDevSave = pool.record();
 
         let new_pool =
-            ThinPool::setup(pool_uuid, &thinpooldevsave, &pool.record(), &mut backstore).unwrap();
+            ThinPool::setup(pool_uuid, &thinpooldevsave, &pool.record(), &backstore).unwrap();
 
         assert!(new_pool.get_filesystem_by_uuid(fs_uuid).is_some());
     }
@@ -1570,7 +1562,7 @@ mod tests {
         // Check that destroyed fs is not present in MDV. If the record
         // had been left on the MDV that didn't match a thin_id in the
         // thinpool, ::setup() will fail.
-        let pool = ThinPool::setup(pool_uuid, &thinpooldevsave, &flexdevs, &mut backstore).unwrap();
+        let pool = ThinPool::setup(pool_uuid, &thinpooldevsave, &flexdevs, &backstore).unwrap();
 
         assert!(pool.get_filesystem_by_uuid(fs_uuid).is_none());
     }

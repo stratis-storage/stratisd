@@ -579,7 +579,7 @@ impl ThinPool {
                     meta_lowater.sectors(),
                     false,
                 ) {
-                    let meta_extend_failed =
+                    meta_extend_failed =
                         match self.extend_thin_meta_device(pool_uuid, backstore, request) {
                             Ok(extend_size) => extend_size == Sectors(0),
                             Err(_) => true,

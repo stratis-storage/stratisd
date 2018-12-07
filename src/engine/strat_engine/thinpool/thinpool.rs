@@ -388,7 +388,9 @@ impl ThinPool {
             data_dev,
             thin_pool_save.data_block_size,
             calc_lowater(
-                DataBlocks(0), // we can't know this until we can call tp.status(). Call check() below.
+                // This is smaller than the actual amount used. This value
+                // is updated when the thinpool's check method is invoked.
+                DataBlocks(0),
                 sectors_to_datablocks(data_dev_size),
                 sectors_to_datablocks(backstore.available_in_backstore()),
             ),

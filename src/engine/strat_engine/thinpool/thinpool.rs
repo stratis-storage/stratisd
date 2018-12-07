@@ -1378,13 +1378,11 @@ mod tests {
         // written above. If we attempt to update the UUID on the snapshot
         // without expanding the pool, the pool will go into out-of-data-space
         // (queue IO) mode, causing the test to fail.
-        // FIXME: not needed while doing "greedy" thinpool allocation
-        // (If that code is changed back, this test will start failing.)
-        // pool.extend_thin_data_device(
-        //     pool_uuid,
-        //     &mut backstore,
-        //     datablocks_to_sectors(INITIAL_DATA_SIZE),
-        // ).unwrap();
+        pool.extend_thin_data_device(
+            pool_uuid,
+            &mut backstore,
+            datablocks_to_sectors(INITIAL_DATA_SIZE),
+        ).unwrap();
 
         let (_, snapshot_filesystem) =
             pool.snapshot_filesystem(pool_uuid, pool_name, fs_uuid, "test_snapshot")

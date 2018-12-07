@@ -62,19 +62,6 @@ fn datablocks_to_sectors(data_blocks: DataBlocks) -> Sectors {
     *data_blocks * DATA_BLOCK_SIZE
 }
 
-/// Round up a sectors value to the next multiple of "chunk".
-fn round_up_sectors(value: Sectors, chunk: Sectors) -> Option<Sectors> {
-    if chunk == Sectors(0) {
-        None
-    } else {
-        let add = match value % chunk {
-            Sectors(0) => Sectors(0),
-            rem => chunk - rem,
-        };
-        Some(value + add)
-    }
-}
-
 /// Transform a list of segments belonging to a single device into a
 /// list of target lines for a linear device.
 fn segs_to_table(
@@ -507,12 +494,10 @@ impl ThinPool {
                 let usage = &status.usage;
 
                 // Ensure meta blocks is 1/1000th of total usable size
-                let target_meta_size = backstore.datatier_usable_size() / 1000u16;
-                if usage.total_meta.sectors() < target_meta_size {
-                    let meta_request = round_up_sectors(
-                        target_meta_size - usage.total_meta.sectors(),
-                        MIN_META_SEGMENT_SIZE.sectors(),
-                    ).expect("MIN_META_SEGMENT_SIZE is not zero");
+                let target_meta_size = (backstore.datatier_usable_size() / 1000u16).metablocks();
+                if usage.total_meta < target_meta_size {
+                    let meta_request =
+                        max(target_meta_size - usage.total_meta, MIN_META_SEGMENT_SIZE).sectors();
                     let meta_extend_failed =
                         match self.extend_thin_meta_device(pool_uuid, backstore, meta_request) {
                             Ok(extend_size) => extend_size == Sectors(0),
@@ -2040,23 +2025,5 @@ mod tests {
     #[test]
     pub fn real_test_set_device() {
         real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None), test_set_device);
-    }
-
-    #[test]
-    fn test_round_up_sectors() {
-        assert_eq!(round_up_sectors(Sectors(31), Sectors(4)), Some(Sectors(32)));
-        assert_eq!(round_up_sectors(Sectors(32), Sectors(4)), Some(Sectors(32)));
-        assert_eq!(round_up_sectors(Sectors(33), Sectors(4)), Some(Sectors(36)));
-        assert_eq!(round_up_sectors(Sectors(35), Sectors(4)), Some(Sectors(36)));
-        assert_eq!(round_up_sectors(Sectors(33), Sectors(5)), Some(Sectors(35)));
-        assert_eq!(round_up_sectors(Sectors(35), Sectors(5)), Some(Sectors(35)));
-        assert_eq!(round_up_sectors(Sectors(36), Sectors(5)), Some(Sectors(40)));
-        assert_eq!(round_up_sectors(Sectors(33), Sectors(1)), Some(Sectors(33)));
-        assert_eq!(
-            round_up_sectors(Sectors(33), Sectors(121)),
-            Some(Sectors(121))
-        );
-        assert_eq!(round_up_sectors(Sectors(0), Sectors(121)), Some(Sectors(0)));
-        assert_eq!(round_up_sectors(Sectors(33), Sectors(0)), None);
     }
 }

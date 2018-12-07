@@ -498,7 +498,7 @@ impl ThinPool {
                 if usage.total_meta < target_meta_size {
                     let meta_request =
                         max(target_meta_size - usage.total_meta, MIN_META_SEGMENT_SIZE).sectors();
-                    let meta_extend_failed =
+                    meta_extend_failed =
                         match self.extend_thin_meta_device(pool_uuid, backstore, meta_request) {
                             Ok(extend_size) => extend_size == Sectors(0),
                             Err(_) => true,

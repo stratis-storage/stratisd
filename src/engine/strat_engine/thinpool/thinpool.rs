@@ -161,7 +161,7 @@ fn calc_lowater(used: DataBlocks, data_dev_size: DataBlocks, available: DataBloc
 
     // Calculate #3. This is not the same as #1 because pool might be fully
     // extended, but we still need events to extend filesystems
-    let fs_event_lowater = DataBlocks((*data_dev_size - *used).saturating_sub(*DATA_LOWATER));
+    let fs_event_lowater = DataBlocks((*(data_dev_size - used)).saturating_sub(*DATA_LOWATER));
 
     // Get the highest of the three values
     max(prelim_max, fs_event_lowater)

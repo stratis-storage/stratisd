@@ -500,11 +500,8 @@ impl ThinPool {
         let mut should_save = false;
 
         // Re-run to ensure pool status is updated if we made any changes
-        loop {
-            match self.do_check(pool_uuid, backstore)? {
-                true => should_save = true,
-                false => break,
-            }
+        while self.do_check(pool_uuid, backstore)? {
+            should_save = true;
         }
 
         Ok(should_save)

@@ -149,17 +149,10 @@ impl StratPool {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-        );
-
-        let mut thinpool = match thinpool {
-            Ok(thinpool) => thinpool,
-            Err(err) => {
-                let _ = backstore.destroy();
-                return Err(err);
-            }
-        };
-
-        thinpool.check(pool_uuid, &mut backstore)?;
+        ).map_err(|err| {
+            let _ = backstore.destroy();
+            err
+        })?;
 
         let mut pool = StratPool {
             backstore,
@@ -183,14 +176,12 @@ impl StratPool {
         metadata: &PoolSave,
     ) -> StratisResult<(Name, StratPool)> {
         let mut backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, None)?;
-        let mut thinpool = ThinPool::setup(
+        let (thinpool, should_save) = ThinPool::setup(
             uuid,
             &metadata.thinpool_dev,
             &metadata.flex_devs,
-            &backstore,
+            &mut backstore,
         )?;
-
-        let changed = thinpool.check(uuid, &mut backstore)?;
 
         let mut pool = StratPool {
             backstore,
@@ -201,7 +192,7 @@ impl StratPool {
 
         let pool_name = &metadata.name;
 
-        if changed {
+        if should_save {
             pool.write_metadata(pool_name)?;
         }
 

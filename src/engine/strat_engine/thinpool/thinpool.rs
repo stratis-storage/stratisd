@@ -477,7 +477,7 @@ impl ThinPool {
         match self.thin_pool.status(get_dm())? {
             ThinPoolStatus::Working(ref status) => {
                 let mut meta_extend_failed = false;
-                let mut data_extend_failed;
+                let mut data_extend_failed = false;
                 match status.summary {
                     ThinPoolStatusSummary::Good => {
                         self.set_state(PoolState::Running);
@@ -511,7 +511,9 @@ impl ThinPool {
 
                 // Expand data blocks to fill all available remaining space
                 let free_space = backstore.available_in_backstore();
-                let total_extended = {
+                let total_extended = if free_space < DATA_BLOCK_SIZE {
+                    DataBlocks(0)
+                } else {
                     let amount_allocated =
                         match self.extend_thin_data_device(pool_uuid, backstore, free_space) {
                             Ok(extend_size) => extend_size,

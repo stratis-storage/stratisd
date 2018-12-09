@@ -1,0 +1,13 @@
+Source: stratisd
+Section: admin
+Priority: optional
+Maintainer: Gert Dewit <gertux@hobbiton.be>
+Build-Depends: debhelper (>= 9), rustc, cargo, make, libdbus-1-dev, libudev-dev, libssl-dev, asciidoc
+Standards-Version: 3.9.8
+Homepage: https://github.com/stratis-storage/stratisd
+
+Package: stratisd
+Architecture: amd64
+Depends: xfsprogs, ${shlibs:Depends}
+Description: Block device managing daemon
+ A daemon that manages block devices to create filesystems

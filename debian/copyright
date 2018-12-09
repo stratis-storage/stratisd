@@ -1,0 +1,10 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: stratisd
+Source: https://github.com/stratis-storage/stratisd
+
+Files: *
+Copyright:
+ 2018 Stratis Storage
+License: MPL
+
+

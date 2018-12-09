@@ -31,3 +31,9 @@ htmlcov
 
 # proptest
 proptest-regression
+
+# debian package
+debian/.debhelper
+debian/files
+debian/stratisd*
+

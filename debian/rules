@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+BUILD_ROOT ?= "debian/stratisd"
+
+%:
+	dh $@ --with systemd
+
+override_dh_auto_test:
+
+override_dh_auto_build:
+
+override_dh_auto_install:
+	cargo install --path . --root $(BUILD_ROOT)/usr/libexec
+	mv $(BUILD_ROOT)/usr/libexec/bin/stratisd $(BUILD_ROOT)/usr/libexec/
+	rmdir $(BUILD_ROOT)/usr/libexec/bin
+	rm $(BUILD_ROOT)/usr/libexec/.crates.toml
+	install -Dpm0644 -t $(BUILD_ROOT)/etc/dbus-1/system.d stratisd.conf
+	install -Dpm0644 -t $(BUILD_ROOT)/lib/systemd/system stratisd.service
+	install -dm0755 $(BUILD_ROOT)/usr/share/man/man8
+	a2x -f manpage -D $(BUILD_ROOT)/usr/share/man/man8 docs/stratisd.txt
+	gzip $(BUILD_ROOT)/usr/share/man/man8/stratisd.8

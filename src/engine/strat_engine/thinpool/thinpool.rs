@@ -1228,6 +1228,50 @@ mod tests {
 
     const BYTES_PER_WRITE: usize = 2 * IEC::Ki as usize * SECTOR_SIZE as usize;
 
+    /// Test greedy allocation.
+    /// Verify that ThinPool::new() allocates nearly everything available.
+    /// Verify that meta and data devices are roughly in their correct
+    /// proportion.
+    /// FIXME: This is a temporary test; it should be removed when greedy
+    /// allocation is removed.
+    fn test_greedy_allocation(paths: &[&Path]) {
+        let pool_uuid = Uuid::new_v4();
+        devlinks::setup_dev_path().unwrap();
+        devlinks::cleanup_devlinks(Vec::new().into_iter());
+
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
+
+        let pool = ThinPool::new(
+            pool_uuid,
+            &ThinPoolSizeParams::default(),
+            DATA_BLOCK_SIZE,
+            &mut backstore,
+        ).unwrap();
+
+        assert!(backstore.available_in_backstore() < DATA_BLOCK_SIZE);
+
+        let meta_size = pool.thin_pool.meta_dev().size();
+        let data_size = pool.thin_pool.data_dev().size();
+        assert!(meta_size * 1500u64 > data_size);
+        assert!(meta_size * 500u64 < data_size || meta_size.metablocks() == INITIAL_META_SIZE);
+    }
+
+    #[test]
+    pub fn loop_test_greedy_allocation() {
+        loopbacked::test_with_spec(
+            loopbacked::DeviceLimits::Range(2, 3, None),
+            test_greedy_allocation,
+        );
+    }
+
+    #[test]
+    pub fn real_test_greedy_allocation() {
+        real::test_with_spec(
+            real::DeviceLimits::AtLeast(2, None, None),
+            test_greedy_allocation,
+        );
+    }
+
     /// Verify that a full pool extends properly when additional space is added.
     fn test_full_pool(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();

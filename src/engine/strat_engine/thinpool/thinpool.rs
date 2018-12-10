@@ -507,7 +507,7 @@ impl ThinPool {
 
                 let usage = &status.usage;
 
-                // Ensure meta blocks is 1/1000th of total usable size
+                // Ensure meta sub-device is 1/1000th of total usable size
                 let target_meta_size = (backstore.datatier_usable_size() / 1000u16).metablocks();
                 if usage.total_meta < target_meta_size {
                     let meta_request =

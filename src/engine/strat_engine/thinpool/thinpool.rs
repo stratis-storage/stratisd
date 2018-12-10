@@ -834,6 +834,7 @@ impl ThinPool {
         existing_segs: &mut Vec<(Sectors, Sectors)>,
         data: bool,
     ) -> StratisResult<Sectors> {
+        assert!(modulus != Sectors(0));
         let sub_device_str = if data { "data" } else { "metadata" };
         let pool_uuid_str = pool_uuid.simple().to_string();
         info!(
@@ -862,7 +863,9 @@ impl ThinPool {
         };
         match result {
             Ok(actual_extend_size) => {
-                if actual_extend_size == extend_size {
+                // (extend_size / modulus) * modulus is the maximum size that
+                // Backstore::request() can return when operating correctly.
+                if (extend_size / modulus) * modulus == actual_extend_size {
                     info!(
                         "Extended thinpool {} sub-device belonging to pool with uuid {} by {}",
                         sub_device_str, pool_uuid_str, actual_extend_size

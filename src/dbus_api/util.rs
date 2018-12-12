@@ -87,7 +87,7 @@ pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<
         .as_ref()
         .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
-    i.append(format!("{}", data.uuid.simple()));
+    i.append(data.uuid.to_simple_ref().to_string());
     Ok(())
 }
 

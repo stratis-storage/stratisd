@@ -358,8 +358,8 @@ impl StaticHeader {
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size);
         buf[28] = STRAT_SIGBLOCK_VERSION;
-        buf[32..64].clone_from_slice(self.pool_uuid.simple().to_string().as_bytes());
-        buf[64..96].clone_from_slice(self.dev_uuid.simple().to_string().as_bytes());
+        buf[32..64].clone_from_slice(self.pool_uuid.to_simple_ref().to_string().as_bytes());
+        buf[64..96].clone_from_slice(self.dev_uuid.to_simple_ref().to_string().as_bytes());
         LittleEndian::write_u64(&mut buf[96..104], *self.mda_size);
         LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size);
         LittleEndian::write_u64(&mut buf[120..128], self.initialization_time);
@@ -419,8 +419,8 @@ impl fmt::Debug for StaticHeader {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("StaticHeader")
             .field("blkdev_size", &self.blkdev_size)
-            .field("pool_uuid", &self.pool_uuid.simple().to_string())
-            .field("dev_uuid", &self.dev_uuid.simple().to_string())
+            .field("pool_uuid", &self.pool_uuid.to_simple_ref())
+            .field("dev_uuid", &self.dev_uuid.to_simple_ref())
             .field("mda_size", &self.mda_size)
             .field("reserved_size", &self.reserved_size)
             .field("flags", &self.flags)

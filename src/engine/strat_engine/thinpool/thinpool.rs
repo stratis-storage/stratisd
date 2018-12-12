@@ -751,7 +751,7 @@ impl ThinPool {
     ) -> StratisResult<Sectors> {
         assert!(modulus != Sectors(0));
         let sub_device_str = if data { "data" } else { "metadata" };
-        let pool_uuid_str = pool_uuid.simple().to_string();
+        let pool_uuid_str = pool_uuid.to_simple_ref();
         info!(
             "Attempting to extend thinpool {} sub-device belonging to pool {} by {}",
             sub_device_str, pool_uuid_str, extend_size,

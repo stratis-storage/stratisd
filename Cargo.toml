@@ -33,7 +33,7 @@ features = ["serde", "v4"]
 [dev-dependencies]
 loopdev = "0.2"
 either = "1.1.0"
-proptest = "0.7.2"
+proptest = "0.8.0"
 matches = "0.1.8"
 
 [features]

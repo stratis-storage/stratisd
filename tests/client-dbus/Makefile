@@ -6,6 +6,7 @@ lint:
 .PHONY: dbus-tests
 dbus-tests:
 	py.test-3 ./tests/dbus
+	py.test-3 ./tests/udev
 
 .PHONY: fmt
 fmt:

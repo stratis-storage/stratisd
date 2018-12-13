@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Used to test udev "add" event in stratisd
+Used to test behavior of the udev device discovery mechanism.
 """
 
 import unittest
@@ -33,9 +33,9 @@ from stratisd_client_dbus._constants import TOP_OBJECT
 
 import pyudev
 
-from .._loopback import LoopBackDevices
-from .._dm import remove_stratis_setup, _get_stratis_devices
-from .._stratis_id import stratis_signature
+from ._loopback import LoopBackDevices
+from ._dm import remove_stratis_setup, _get_stratis_devices
+from ._stratis_id import stratis_signature
 
 _STRATISD = os.environ['STRATISD']
 

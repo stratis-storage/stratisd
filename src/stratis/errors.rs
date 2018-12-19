@@ -33,7 +33,7 @@ pub enum StratisError {
     Engine(ErrorEnum, String),
     Io(io::Error),
     Nix(nix::Error),
-    Uuid(uuid::ParseError),
+    Uuid(uuid::parser::ParseError),
     Utf8(str::Utf8Error),
     Serde(serde_json::error::Error),
     DM(devicemapper::DmError),
@@ -111,8 +111,8 @@ impl From<nix::Error> for StratisError {
     }
 }
 
-impl From<uuid::ParseError> for StratisError {
-    fn from(err: uuid::ParseError) -> StratisError {
+impl From<uuid::parser::ParseError> for StratisError {
+    fn from(err: uuid::parser::ParseError) -> StratisError {
         StratisError::Uuid(err)
     }
 }

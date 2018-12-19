@@ -283,7 +283,7 @@ pub fn get_blockdevs(
         if !duplicate_uuids.is_empty() {
             let err_msg = format!(
                 "The following list of Stratis UUIDs were each claimed by more than one Stratis device: {}",
-                duplicate_uuids.iter().map(|p| p.simple().to_string()).collect::<Vec<String>>().join(", ")
+                duplicate_uuids.iter().map(|u| u.to_simple_ref().to_string()).collect::<Vec<_>>().join(", ")
             );
             return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
         }
@@ -292,8 +292,8 @@ pub fn get_blockdevs(
         if uuids != recorded_uuids {
             let err_msg = format!(
                 "UUIDs of devices found ({}) did not correspond with UUIDs specified in the metadata for this group of devices ({})",
-                uuids.iter().map(|p| p.simple().to_string()).collect::<Vec<String>>().join(", "),
-                recorded_uuids.iter().map(|p| p.simple().to_string()).collect::<Vec<String>>().join(", "),
+                uuids.iter().map(|u| u.to_simple_ref().to_string()).collect::<Vec<_>>().join(", "),
+                recorded_uuids.iter().map(|u| u.to_simple_ref().to_string()).collect::<Vec<_>>().join(", "),
             );
             return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
         }

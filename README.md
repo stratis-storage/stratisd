@@ -69,8 +69,7 @@ is available to install and update the Rust toolchain.
 
 Stratisd makes use of `rustfmt` to enforce consistent formatting in Rust
 files.  PRs must pass the `fmt` task in the CI in order to be merged. The
-`fmt` task currently uses rustfmt-preview (pinned to 0.6.1, as shipped with
-Rust 1.27).
+`fmt` task currently uses rustfmt 1.0 as shipped with Rust 1.31).
 
 ##### Getting correct rustfmt (Fedora 28 x86_64)
 

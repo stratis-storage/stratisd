@@ -19,9 +19,9 @@ fmt:
 	cargo fmt
 
 fmt-travis:
-	rustup default 1.27.0
-	rustup component add rustfmt-preview
-	cargo fmt -- --write-mode=check
+	rustup default 1.31.0
+	rustup component add rustfmt
+	cargo fmt -- --check
 
 build:
 	PKG_CONFIG_ALLOW_CROSS=1 \

@@ -30,7 +30,7 @@ impl<L: Log> Handle<L> {
     }
 
     /// Send buffered logs to the wrapped logger.
-    pub fn dump(&self) -> () {
+    pub fn dump(&self) {
         let shared = self.shared.lock().expect(LOCK_EXPECT_MSG);
         let mut vec = shared.buff.lock().expect(LOCK_EXPECT_MSG);
         for (time, item) in vec.drain(..) {

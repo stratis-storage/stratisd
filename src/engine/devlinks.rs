@@ -31,7 +31,7 @@ pub fn setup_dev_path() -> StratisResult<()> {
 /// it contains.
 // Don't just remove and recreate everything in case there are processes
 // (e.g. user shells) with the current working directory within the tree.
-pub fn setup_pool_devlinks(pool_name: &str, pool: &Pool) -> () {
+pub fn setup_pool_devlinks(pool_name: &str, pool: &Pool) {
     if let Err(err) = || -> StratisResult<()> {
         let pool_path = pool_directory(pool_name);
 
@@ -67,7 +67,7 @@ pub fn setup_pool_devlinks(pool_name: &str, pool: &Pool) -> () {
 /// config. Clear out any directory or file that doesn't correspond to a pool.
 // Don't just remove everything in case there are processes
 // (e.g. user shells) with the current working directory within the tree.
-pub fn cleanup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>(pools: I) -> () {
+pub fn cleanup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>(pools: I) {
     if let Err(err) = || -> StratisResult<()> {
         let mut existing_dirs = fs::read_dir(DEV_PATH)?
             .map(|dir_e| {
@@ -90,7 +90,7 @@ pub fn cleanup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a Pool)>>(
 }
 
 /// Create a directory when a pool is added.
-pub fn pool_added(pool: &str) -> () {
+pub fn pool_added(pool: &str) {
     let p = pool_directory(pool);
     if let Err(e) = fs::create_dir(&p) {
         warn!("unable to create pool directory {:?}, reason {:?}", p, e);
@@ -98,7 +98,7 @@ pub fn pool_added(pool: &str) -> () {
 }
 
 /// Remove the directory and its contents when the pool is removed.
-pub fn pool_removed(pool: &str) -> () {
+pub fn pool_removed(pool: &str) {
     let p = pool_directory(pool);
     if let Err(e) = fs::remove_dir_all(&p) {
         warn!("unable to remove pool directory {:?}, reason {:?}", p, e);
@@ -106,7 +106,7 @@ pub fn pool_removed(pool: &str) -> () {
 }
 
 /// Rename the directory to match the pool's new name.
-pub fn pool_renamed(old_name: &str, new_name: &str) -> () {
+pub fn pool_renamed(old_name: &str, new_name: &str) {
     let old = pool_directory(old_name);
     let new = pool_directory(new_name);
     if let Err(e) = fs::rename(&old, &new) {
@@ -119,7 +119,7 @@ pub fn pool_renamed(old_name: &str, new_name: &str) -> () {
 
 /// Create a symlink to the new filesystem's block device within its pool's
 /// directory.
-pub fn filesystem_added(pool_name: &str, fs_name: &str, devnode: &Path) -> () {
+pub fn filesystem_added(pool_name: &str, fs_name: &str, devnode: &Path) {
     let p = filesystem_mount_path(pool_name, fs_name);
 
     // Remove existing and recreate to ensure it points to the correct devnode
@@ -133,7 +133,7 @@ pub fn filesystem_added(pool_name: &str, fs_name: &str, devnode: &Path) -> () {
 }
 
 /// Remove the symlink when the filesystem is destroyed.
-pub fn filesystem_removed(pool_name: &str, fs_name: &str) -> () {
+pub fn filesystem_removed(pool_name: &str, fs_name: &str) {
     let p = filesystem_mount_path(pool_name, fs_name);
     if let Err(e) = fs::remove_file(&p) {
         warn!(
@@ -144,7 +144,7 @@ pub fn filesystem_removed(pool_name: &str, fs_name: &str) -> () {
 }
 
 /// Rename the symlink to track the filesystem's new name.
-pub fn filesystem_renamed(pool_name: &str, old_name: &str, new_name: &str) -> () {
+pub fn filesystem_renamed(pool_name: &str, old_name: &str, new_name: &str) {
     let old = filesystem_mount_path(pool_name, old_name);
     let new = filesystem_mount_path(pool_name, new_name);
     if let Err(e) = fs::rename(&old, &new) {

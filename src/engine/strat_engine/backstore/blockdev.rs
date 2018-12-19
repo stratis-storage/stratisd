@@ -179,7 +179,7 @@ impl BlockDev for StratBlockDev {
         }
     }
 
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
+    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
         self.dbus_path = path
     }
 

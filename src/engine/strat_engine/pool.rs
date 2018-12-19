@@ -463,7 +463,7 @@ impl Pool for StratPool {
         self.thin_pool.free_space_state()
     }
 
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> () {
+    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
         self.thin_pool.set_dbus_path(path.clone());
         self.dbus_path = path
     }

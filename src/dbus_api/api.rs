@@ -230,29 +230,35 @@ impl DbusConnectionData {
     }
 
     /// Given the UUID of a pool, register all the pertinent information with dbus.
-    pub fn register_pool(&mut self, pool_uuid: Uuid, pool: &mut Pool) -> Result<(), dbus::Error> {
+    pub fn register_pool(&mut self, pool_uuid: Uuid, pool: &mut Pool) {
         register_pool_dbus(&self.context, pool_uuid, pool, &self.path);
         self.process_deferred_actions()
     }
 
     /// Update the dbus tree with deferred adds and removes.
-    fn process_deferred_actions(&mut self) -> Result<(), dbus::Error> {
+    fn process_deferred_actions(&mut self) {
         let mut actions = self.context.actions.borrow_mut();
         for action in actions.drain() {
             match action {
                 DeferredAction::Add(path) => {
-                    self.connection
+                    match self.connection
                         .borrow_mut()
-                        .register_object_path(path.get_name())?;
-                    self.tree.insert(path);
-                }
+                        .register_object_path(path.get_name()) {
+                            Err(err) => {
+                                error!("Could not register object path {}, should never happen: {}",
+                                       path.get_name(), err)
+                            },
+                            Ok(_)=> {
+                                self.tree.insert(path);
+                            }
+                        }
+                },
                 DeferredAction::Remove(path) => {
                     self.connection.borrow_mut().unregister_object_path(&path);
                     self.tree.remove(&path);
                 }
             }
         }
-        Ok(())
     }
 
     /// Handle any client dbus requests
@@ -273,13 +279,7 @@ impl DbusConnectionData {
                         }
                     }
 
-                    if let Err(e) = self.process_deferred_actions() {
-                        // There are 2 functions to handle each of these lines in stratisd
-                        // (print_err, log_engine_state) we should relocate them to a library
-                        // if needed in both places
-                        debug!("Engine state: \n{:#?}", &*self.context.engine.borrow());
-                        error!("Client dbus handle: {}", e);
-                    }
+                    self.process_deferred_actions();
                 }
             }
         }

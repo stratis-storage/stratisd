@@ -74,7 +74,7 @@ impl BlkDevSegment {
 impl fmt::Debug for BlkDevSegment {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("BlkDevSegment")
-            .field("uuid", &self.uuid.simple().to_string())
+            .field("uuid", &self.uuid.to_simple_ref())
             .field("segment", &self.segment)
             .finish()
     }
@@ -247,7 +247,7 @@ impl BlockDevMgr {
                     ErrorEnum::Error,
                     format!(
                         "Blockdev corresponding to UUID: {} not found.",
-                        uuid.simple().to_string()
+                        uuid.to_simple_ref()
                     ),
                 ));
             }

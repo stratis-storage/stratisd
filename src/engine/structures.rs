@@ -20,9 +20,8 @@ impl<T: fmt::Debug> fmt::Debug for Table<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_map()
             .entries(
-                self.iter().map(|(name, uuid, item)| {
-                    ((name.to_string(), uuid.simple().to_string()), item)
-                }),
+                self.iter()
+                    .map(|(name, uuid, item)| ((name.to_string(), uuid.to_simple_ref()), item)),
             )
             .finish()
     }

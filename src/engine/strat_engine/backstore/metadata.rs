@@ -839,7 +839,9 @@ mod mda {
 
         use chrono::Utc;
         use proptest::{
-            collection::{self, SizeRange}, num, prelude::any,
+            collection::{self, SizeRange},
+            num,
+            prelude::any,
         };
 
         use super::super::*;
@@ -946,7 +948,10 @@ mod tests {
 
     use devicemapper::{Bytes, Sectors, IEC};
     use proptest::{
-        collection::{vec, SizeRange}, num, option, prelude::BoxedStrategy, strategy::Strategy,
+        collection::{vec, SizeRange},
+        num, option,
+        prelude::BoxedStrategy,
+        strategy::Strategy,
     };
     use uuid::Uuid;
 
@@ -1058,7 +1063,8 @@ mod tests {
             sh.mda_size,
             sh.blkdev_size,
             Utc::now().timestamp() as u64,
-        ).unwrap();
+        )
+        .unwrap();
 
         let timestamp0 = Utc::now();
         let timestamp1 = Utc::now();
@@ -1219,7 +1225,8 @@ mod tests {
             sh.mda_size,
             sh.blkdev_size,
             ts,
-        ).unwrap();
+        )
+        .unwrap();
 
         let mut buf_newer = Cursor::new(vec![0; buf_size]);
         BDA::initialize(
@@ -1229,7 +1236,8 @@ mod tests {
             sh.mda_size,
             sh.blkdev_size,
             ts + 1,
-        ).unwrap();
+        )
+        .unwrap();
 
         // We should always match this reference buffer as it's the newer one.
         let reference_buf = buf_newer.clone();

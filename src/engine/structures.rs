@@ -226,10 +226,12 @@ impl<T> Table<T> {
                 vec![(name, uuid, old_item)]
             } else {
                 assert_ne!(old_name, name);
-                let other_uuid = self.name_to_uuid
+                let other_uuid = self
+                    .name_to_uuid
                     .remove(&old_name)
                     .expect("invariant requires existence");
-                let (other_name, other_item) = self.items
+                let (other_name, other_item) = self
+                    .items
                     .remove(&old_uuid)
                     .expect("invariant requires existence");
                 assert_eq!(other_name, name);
@@ -238,7 +240,8 @@ impl<T> Table<T> {
             }),
             // entry with same name but different uuid ejected
             (Some(old_uuid), None) => {
-                let (other_name, other_item) = self.items
+                let (other_name, other_item) = self
+                    .items
                     .remove(&old_uuid)
                     .expect("invariant requires existence");
                 assert_eq!(other_name, name);
@@ -246,7 +249,8 @@ impl<T> Table<T> {
             }
             // entry with same uuid but different name ejected
             (None, Some((old_name, old_item))) => {
-                let other_uuid = self.name_to_uuid
+                let other_uuid = self
+                    .name_to_uuid
                     .remove(&old_name)
                     .expect("invariant requires existence");
                 assert_eq!(other_uuid, uuid);

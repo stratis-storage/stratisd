@@ -53,7 +53,8 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let pool_object_path: dbus::Path =
                 create_dbus_pool(dbus_context, object_path.clone(), pool_uuid, pool);
 
-            let bd_object_paths = pool.blockdevs_mut()
+            let bd_object_paths = pool
+                .blockdevs_mut()
                 .into_iter()
                 .map(|(uuid, bd)| {
                     create_dbus_blockdev(dbus_context, pool_object_path.clone(), uuid, bd)
@@ -146,7 +147,8 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
 
     let base_tree = f.tree(dbus_context);
 
-    let create_pool_method = f.method("CreatePool", (), create_pool)
+    let create_pool_method = f
+        .method("CreatePool", (), create_pool)
         .in_arg(("name", "s"))
         .in_arg(("redundancy", "(bq)"))
         .in_arg(("devices", "as"))
@@ -154,23 +156,27 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let destroy_pool_method = f.method("DestroyPool", (), destroy_pool)
+    let destroy_pool_method = f
+        .method("DestroyPool", (), destroy_pool)
         .in_arg(("pool", "o"))
         .out_arg(("action", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let configure_simulator_method = f.method("ConfigureSimulator", (), configure_simulator)
+    let configure_simulator_method = f
+        .method("ConfigureSimulator", (), configure_simulator)
         .in_arg(("denominator", "u"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let version_property = f.property::<&str, _>("Version", ())
+    let version_property = f
+        .property::<&str, _>("Version", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_version);
 
-    let obj_path = f.object_path(consts::STRATIS_BASE_PATH, None)
+    let obj_path = f
+        .object_path(consts::STRATIS_BASE_PATH, None)
         .introspectable()
         .object_manager()
         .add(

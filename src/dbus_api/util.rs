@@ -79,11 +79,13 @@ pub fn msg_string_ok() -> String {
 /// Get the UUID for an object path.
 pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
     let object_path = p.path.get_name();
-    let path = p.tree
+    let path = p
+        .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
 
-    let data = path.get_data()
+    let data = path
+        .get_data()
         .as_ref()
         .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
@@ -94,11 +96,13 @@ pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<
 /// Get the parent object path for an object path.
 pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
     let object_path = p.path.get_name();
-    let path = p.tree
+    let path = p
+        .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
 
-    let data = path.get_data()
+    let data = path
+        .get_data()
         .as_ref()
         .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 

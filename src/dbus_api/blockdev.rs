@@ -28,53 +28,63 @@ pub fn create_dbus_blockdev<'a>(
 ) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
-    let set_userid_method = f.method("SetUserInfo", (), set_user_info)
+    let set_userid_method = f
+        .method("SetUserInfo", (), set_user_info)
         .in_arg(("id", "s"))
         .out_arg(("changed", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let devnode_property = f.property::<&str, _>("Devnode", ())
+    let devnode_property = f
+        .property::<&str, _>("Devnode", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_blockdev_devnode);
 
-    let hardware_info_property = f.property::<&str, _>("HardwareInfo", ())
+    let hardware_info_property = f
+        .property::<&str, _>("HardwareInfo", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_blockdev_hardware_info);
 
-    let user_info_property = f.property::<&str, _>("UserInfo", ())
+    let user_info_property = f
+        .property::<&str, _>("UserInfo", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_user_info);
 
-    let initialization_time_property = f.property::<u64, _>("InitializationTime", ())
+    let initialization_time_property = f
+        .property::<u64, _>("InitializationTime", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_blockdev_initialization_time);
 
-    let total_physical_size_property = f.property::<&str, _>("TotalPhysicalSize", ())
+    let total_physical_size_property = f
+        .property::<&str, _>("TotalPhysicalSize", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_physical_size);
 
-    let state_property = f.property::<u16, _>(consts::BLOCKDEV_STATE_PROP, ())
+    let state_property = f
+        .property::<u16, _>(consts::BLOCKDEV_STATE_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_blockdev_state);
 
-    let pool_property = f.property::<&dbus::Path, _>("Pool", ())
+    let pool_property = f
+        .property::<&dbus::Path, _>("Pool", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_parent);
 
-    let uuid_property = f.property::<&str, _>("Uuid", ())
+    let uuid_property = f
+        .property::<&str, _>("Uuid", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid);
 
-    let tier_property = f.property::<u16, _>("Tier", ())
+    let tier_property = f
+        .property::<u16, _>("Tier", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_tier);
@@ -85,7 +95,8 @@ pub fn create_dbus_blockdev<'a>(
         dbus_context.get_next_id().to_string()
     );
 
-    let object_path = f.object_path(object_name, Some(OPContext::new(parent, uuid)))
+    let object_path = f
+        .object_path(object_name, Some(OPContext::new(parent, uuid)))
         .introspectable()
         .add(
             f.interface(consts::BLOCKDEV_INTERFACE_NAME, ())
@@ -121,7 +132,8 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = false;
 
-    let blockdev_path = m.tree
+    let blockdev_path = m
+        .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
     let blockdev_data = get_data!(blockdev_path; default_return; return_message);
@@ -160,7 +172,8 @@ where
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
 
-    let blockdev_path = p.tree
+    let blockdev_path = p
+        .tree
         .get(object_path)
         .expect("tree must contain implicit argument");
 

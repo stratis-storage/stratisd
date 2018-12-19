@@ -129,7 +129,8 @@ impl MetadataVol {
         fs: &StratFilesystem,
     ) -> StratisResult<()> {
         let data = serde_json::to_string(&fs.record(name, uuid))?;
-        let path = self.mount_pt
+        let path = self
+            .mount_pt
             .join(FILESYSTEM_DIR)
             .join(uuid.to_simple_ref().to_string())
             .with_extension("json");
@@ -157,7 +158,8 @@ impl MetadataVol {
 
     /// Remove info on a filesystem from persistent storage.
     pub fn rm_fs(&self, fs_uuid: FilesystemUuid) -> StratisResult<()> {
-        let fs_path = self.mount_pt
+        let fs_path = self
+            .mount_pt
             .join(FILESYSTEM_DIR)
             .join(fs_uuid.to_simple_ref().to_string())
             .with_extension("json");
@@ -241,9 +243,9 @@ fn remove_temp_files(dir: &Path) -> StratisResult<(u64, Vec<PathBuf>)> {
     let mut found = 0;
     let mut failed = Vec::new();
     for path in read_dir(dir)?
-    .filter_map(|e| e.ok()) // Just ignore entry on intermittent IO error
-    .map(|e| e.path())
-    .filter(|p| p.ends_with(".temp"))
+        .filter_map(|e| e.ok()) // Just ignore entry on intermittent IO error
+        .map(|e| e.path())
+        .filter(|p| p.ends_with(".temp"))
     {
         found += 1;
         remove_file(&path).unwrap_or_else(|_| failed.push(path));

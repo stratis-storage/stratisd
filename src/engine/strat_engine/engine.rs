@@ -206,7 +206,8 @@ impl Engine for StratEngine {
                 // TODO: Handle the case where we have found a device for an already active pool
                 // ref. https://github.com/stratis-storage/stratisd/issues/748
 
-                let (name, pool) = self.pools
+                let (name, pool) = self
+                    .pools
                     .get_by_uuid(pool_uuid)
                     .expect("pools.contains_uuid(pool_uuid)");
 
@@ -235,7 +236,8 @@ impl Engine for StratEngine {
                 }
                 None
             } else {
-                let mut devices = self.incomplete_pools
+                let mut devices = self
+                    .incomplete_pools
                     .remove(&pool_uuid)
                     .or_else(|| Some(HashMap::new()))
                     .expect("We just retrieved or created a HashMap");
@@ -270,7 +272,8 @@ impl Engine for StratEngine {
             return Ok(false);
         }
 
-        let (pool_name, mut pool) = self.pools
+        let (pool_name, mut pool) = self
+            .pools
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
@@ -287,7 +290,8 @@ impl Engine for StratEngine {
         validate_name(new_name)?;
         let old_name = rename_pool_pre!(self; uuid; new_name);
 
-        let (_, mut pool) = self.pools
+        let (_, mut pool) = self
+            .pools
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 

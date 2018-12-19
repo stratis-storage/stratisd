@@ -551,7 +551,8 @@ impl ThinPool {
             }
         }
 
-        let filesystems = self.filesystems
+        let filesystems = self
+            .filesystems
             .borrow_mut()
             .iter_mut()
             .map(|(_, _, fs)| fs.check())
@@ -992,7 +993,8 @@ impl ThinPool {
         let old_name = rename_filesystem_pre!(self; uuid; new_name);
         let new_name = Name::new(new_name.to_owned());
 
-        let filesystem = self.filesystems
+        let filesystem = self
+            .filesystems
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.filesystems.get_by_uuid() returned a value")
             .1;
@@ -1065,7 +1067,8 @@ impl ThinPool {
                 TargetLine::new(line.start, line.length, new_params)
             };
 
-        let meta_table = self.thin_pool
+        let meta_table = self
+            .thin_pool
             .meta_dev()
             .table()
             .table
@@ -1074,7 +1077,8 @@ impl ThinPool {
             .map(&xform_target_line)
             .collect::<Vec<_>>();
 
-        let data_table = self.thin_pool
+        let data_table = self
+            .thin_pool
             .data_dev()
             .table()
             .table
@@ -1083,7 +1087,8 @@ impl ThinPool {
             .map(&xform_target_line)
             .collect::<Vec<_>>();
 
-        let mdv_table = self.mdv
+        let mdv_table = self
+            .mdv
             .device()
             .table()
             .table
@@ -1238,7 +1243,8 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-        ).unwrap();
+        )
+        .unwrap();
 
         pool.check(pool_uuid, &mut backstore).unwrap();
 
@@ -1278,11 +1284,13 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-        ).unwrap();
+        )
+        .unwrap();
 
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name);
-        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
+        let fs_uuid = pool
+            .create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
             .unwrap();
         let write_buf = &[8u8; BYTES_PER_WRITE];
         let source_tmp_dir = tempfile::Builder::new()
@@ -1298,7 +1306,8 @@ mod tests {
                 Some("xfs"),
                 MsFlags::empty(),
                 None as Option<&str>,
-            ).unwrap();
+            )
+            .unwrap();
             let file_path = source_tmp_dir.path().join("stratis_test.txt");
             let mut f = BufWriter::with_capacity(
                 IEC::Mi as usize,
@@ -1385,11 +1394,13 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-        ).unwrap();
+        )
+        .unwrap();
 
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name);
-        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
+        let fs_uuid = pool
+            .create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
             .unwrap();
 
         let write_buf = &[8u8; SECTOR_SIZE];
@@ -1408,7 +1419,8 @@ mod tests {
                 Some("xfs"),
                 MsFlags::empty(),
                 None as Option<&str>,
-            ).unwrap();
+            )
+            .unwrap();
             for i in 0..file_count {
                 let file_path = source_tmp_dir.path().join(format!("stratis_test{}.txt", i));
                 let mut f = BufWriter::with_capacity(
@@ -1433,11 +1445,12 @@ mod tests {
             pool_uuid,
             &mut backstore,
             datablocks_to_sectors(INITIAL_DATA_SIZE),
-        ).unwrap();
+        )
+        .unwrap();
 
-        let (_, snapshot_filesystem) =
-            pool.snapshot_filesystem(pool_uuid, pool_name, fs_uuid, "test_snapshot")
-                .unwrap();
+        let (_, snapshot_filesystem) = pool
+            .snapshot_filesystem(pool_uuid, pool_name, fs_uuid, "test_snapshot")
+            .unwrap();
         let mut read_buf = [0u8; SECTOR_SIZE];
         let snapshot_tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
@@ -1450,7 +1463,8 @@ mod tests {
                 Some("xfs"),
                 MsFlags::empty(),
                 None as Option<&str>,
-            ).unwrap();
+            )
+            .unwrap();
             for i in 0..file_count {
                 let file_path = snapshot_tmp_dir
                     .path()
@@ -1492,11 +1506,13 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-        ).unwrap();
+        )
+        .unwrap();
 
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name);
-        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, &name1, None)
+        let fs_uuid = pool
+            .create_filesystem(pool_uuid, pool_name, &name1, None)
             .unwrap();
 
         let action = pool.rename_filesystem(pool_name, fs_uuid, name2).unwrap();
@@ -1538,11 +1554,13 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-        ).unwrap();
+        )
+        .unwrap();
 
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name);
-        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, "fsname", None)
+        let fs_uuid = pool
+            .create_filesystem(pool_uuid, pool_name, "fsname", None)
             .unwrap();
 
         let tmp_dir = tempfile::Builder::new()
@@ -1558,7 +1576,8 @@ mod tests {
                 Some("xfs"),
                 MsFlags::empty(),
                 None as Option<&str>,
-            ).unwrap();
+            )
+            .unwrap();
             writeln!(
                 &OpenOptions::new()
                     .create(true)
@@ -1566,7 +1585,8 @@ mod tests {
                     .open(new_file)
                     .unwrap(),
                 "data"
-            ).unwrap();
+            )
+            .unwrap();
         }
         let thinpooldevsave: ThinPoolDevSave = pool.record();
 
@@ -1597,11 +1617,13 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-        ).unwrap();
+        )
+        .unwrap();
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name);
         let fs_name = "stratis_test_filesystem";
-        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, &fs_name, None)
+        let fs_uuid = pool
+            .create_filesystem(pool_uuid, pool_name, &fs_name, None)
             .unwrap();
         pool.destroy_filesystem(pool_name, fs_uuid).unwrap();
         let flexdevs: FlexDevsSave = pool.record();
@@ -1647,7 +1669,8 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-        ).unwrap();
+        )
+        .unwrap();
 
         // Create a filesystem as small as possible.  Allocate 1 MiB bigger than
         // the low water mark.
@@ -1656,7 +1679,8 @@ mod tests {
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name);
         let fs_name = "stratis_test_filesystem";
-        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, fs_name, Some(fs_size))
+        let fs_uuid = pool
+            .create_filesystem(pool_uuid, pool_name, fs_name, Some(fs_size))
             .unwrap();
 
         // Braces to ensure f is closed before destroy and the borrow of
@@ -1676,7 +1700,8 @@ mod tests {
                 Some("xfs"),
                 MsFlags::empty(),
                 None as Option<&str>,
-            ).unwrap();
+            )
+            .unwrap();
             let buf = &[1u8; SECTOR_SIZE];
             for i in 0..*write_size {
                 let file_path = tmp_dir.path().join(format!("stratis_test{}.txt", i));
@@ -1720,7 +1745,8 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-        ).unwrap();
+        )
+        .unwrap();
 
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name);
@@ -1766,11 +1792,13 @@ mod tests {
             &ThinPoolSizeParams::default(),
             DATA_BLOCK_SIZE,
             &mut backstore,
-        ).unwrap();
+        )
+        .unwrap();
 
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(&pool_name);
-        let fs_uuid = pool.create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
+        let fs_uuid = pool
+            .create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
             .unwrap();
 
         let tmp_dir = tempfile::Builder::new()
@@ -1787,7 +1815,8 @@ mod tests {
                 Some("xfs"),
                 MsFlags::empty(),
                 None as Option<&str>,
-            ).unwrap();
+            )
+            .unwrap();
             OpenOptions::new()
                 .create(true)
                 .write(true)

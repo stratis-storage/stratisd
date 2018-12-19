@@ -34,18 +34,20 @@ impl<L: Log> Handle<L> {
         let shared = self.shared.lock().expect(LOCK_EXPECT_MSG);
         let mut vec = shared.buff.lock().expect(LOCK_EXPECT_MSG);
         for (time, item) in vec.drain(..) {
-            shared.log.log(&Record::builder()
-                .metadata(
-                    MetadataBuilder::new()
-                        .level(item.metadata.level)
-                        .target(&item.metadata.target)
-                        .build(),
-                )
-                .args(format_args!("{} {}", time, item.args))
-                .file(item.file.as_ref().map(|s| &**s))
-                .line(item.line)
-                .module_path(item.module_path.as_ref().map(|s| &**s))
-                .build());
+            shared.log.log(
+                &Record::builder()
+                    .metadata(
+                        MetadataBuilder::new()
+                            .level(item.metadata.level)
+                            .target(&item.metadata.target)
+                            .build(),
+                    )
+                    .args(format_args!("{} {}", time, item.args))
+                    .file(item.file.as_ref().map(|s| &**s))
+                    .line(item.line)
+                    .module_path(item.module_path.as_ref().map(|s| &**s))
+                    .build(),
+            );
         }
     }
 

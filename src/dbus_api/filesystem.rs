@@ -29,38 +29,45 @@ pub fn create_dbus_filesystem<'a>(
 ) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
-    let rename_method = f.method("SetName", (), rename_filesystem)
+    let rename_method = f
+        .method("SetName", (), rename_filesystem)
         .in_arg(("name", "s"))
         .out_arg(("action", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let devnode_property = f.property::<&str, _>("Devnode", ())
+    let devnode_property = f
+        .property::<&str, _>("Devnode", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_filesystem_devnode);
 
-    let name_property = f.property::<&str, _>(consts::FILESYSTEM_NAME_PROP, ())
+    let name_property = f
+        .property::<&str, _>(consts::FILESYSTEM_NAME_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_filesystem_name);
 
-    let pool_property = f.property::<&dbus::Path, _>("Pool", ())
+    let pool_property = f
+        .property::<&dbus::Path, _>("Pool", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_parent);
 
-    let uuid_property = f.property::<&str, _>("Uuid", ())
+    let uuid_property = f
+        .property::<&str, _>("Uuid", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid);
 
-    let created_property = f.property::<&str, _>("Created", ())
+    let created_property = f
+        .property::<&str, _>("Created", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_filesystem_created);
 
-    let used_property = f.property::<&str, _>(consts::FILESYSTEM_USED_PROP, ())
+    let used_property = f
+        .property::<&str, _>(consts::FILESYSTEM_USED_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_filesystem_used);
@@ -71,7 +78,8 @@ pub fn create_dbus_filesystem<'a>(
         dbus_context.get_next_id().to_string()
     );
 
-    let object_path = f.object_path(object_name, Some(OPContext::new(parent, uuid)))
+    let object_path = f
+        .object_path(object_name, Some(OPContext::new(parent, uuid)))
         .introspectable()
         .add(
             f.interface(consts::FILESYSTEM_INTERFACE_NAME, ())
@@ -101,7 +109,8 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = false;
 
-    let filesystem_path = m.tree
+    let filesystem_path = m
+        .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
     let filesystem_data = get_data!(filesystem_path; default_return; return_message);
@@ -149,7 +158,8 @@ where
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
 
-    let filesystem_path = p.tree
+    let filesystem_path = p
+        .tree
         .get(object_path)
         .expect("tree must contain implicit argument");
 

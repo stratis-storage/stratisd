@@ -63,7 +63,7 @@ to `/etc/dbus-1/system.d/`.
 
 
 #### Rust tools
-Stratisd requires Rust 1.25+ and Cargo to build. These may be available via
+Stratisd requires Rust 1.31+ and Cargo to build. These may be available via
 your distribution's package manager. If not, [Rustup](https://www.rustup.rs/)
 is available to install and update the Rust toolchain.
 

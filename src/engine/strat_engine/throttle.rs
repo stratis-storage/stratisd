@@ -83,7 +83,8 @@ mod tests {
         let mut buf = Vec::new();
         f.read_to_end(&mut buf)?;
         let buf = String::from_utf8_lossy(&buf);
-        Ok(buf.lines()
+        Ok(buf
+            .lines()
             .map(|line| {
                 let mut i = line.split_whitespace();
                 let a = i.next().expect("kernel is never wrong");

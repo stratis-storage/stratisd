@@ -153,7 +153,8 @@ fn trylock_pid_file() -> StratisResult<File> {
             f.read_to_string(&mut buf)?;
             // pidfile is supposed to contain pid of holder. But you never
             // know so be paranoid.
-            let pid_str = buf.split_whitespace()
+            let pid_str = buf
+                .split_whitespace()
                 .next()
                 .and_then(|s| s.parse::<pid_t>().ok())
                 .map(|pid| format!("{}", pid))
@@ -191,7 +192,8 @@ impl EngineListener for EventHandler {
                         state as u16,
                         &dbus_path,
                         consts::BLOCKDEV_INTERFACE_NAME,
-                    ).unwrap_or_else(|()| {
+                    )
+                    .unwrap_or_else(|()| {
                         error!(
                             "BlockdevStateChanged: {} state: {} failed to send dbus update.",
                             dbus_path, state as u16,
@@ -211,7 +213,8 @@ impl EngineListener for EventHandler {
                         to.to_string(),
                         &dbus_path,
                         consts::FILESYSTEM_INTERFACE_NAME,
-                    ).unwrap_or_else(|()| {
+                    )
+                    .unwrap_or_else(|()| {
                         error!(
                             "FilesystemRenamed: {} from: {} to: {} failed to send dbus update.",
                             dbus_path, from, to,
@@ -227,7 +230,8 @@ impl EngineListener for EventHandler {
                         state as u16,
                         &dbus_path,
                         consts::POOL_INTERFACE_NAME,
-                    ).unwrap_or_else(|()| {
+                    )
+                    .unwrap_or_else(|()| {
                         error!(
                             "PoolExtendStateChanged: {} state: {} failed to send dbus update.",
                             dbus_path, state as u16,
@@ -247,7 +251,8 @@ impl EngineListener for EventHandler {
                         to.to_string(),
                         &dbus_path,
                         consts::POOL_INTERFACE_NAME,
-                    ).unwrap_or_else(|()| {
+                    )
+                    .unwrap_or_else(|()| {
                         error!(
                             "PoolRenamed: {} from: {} to: {} failed to send dbus update.",
                             dbus_path, from, to,
@@ -263,7 +268,8 @@ impl EngineListener for EventHandler {
                         state as u16,
                         &dbus_path,
                         consts::POOL_INTERFACE_NAME,
-                    ).unwrap_or_else(|()| {
+                    )
+                    .unwrap_or_else(|()| {
                         error!(
                             "PoolSpaceStateChanged: {} state: {} failed to send dbus update.",
                             dbus_path, state as u16,
@@ -279,7 +285,8 @@ impl EngineListener for EventHandler {
                         state as u16,
                         &dbus_path,
                         consts::POOL_INTERFACE_NAME,
-                    ).unwrap_or_else(|()| {
+                    )
+                    .unwrap_or_else(|()| {
                         error!(
                             "PoolStateChanged: {} state: {} failed to send dbus update.",
                             dbus_path, state as u16,

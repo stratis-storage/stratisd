@@ -90,7 +90,8 @@ impl Engine for SimEngine {
     fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction> {
         rename_pool_pre!(self; uuid; new_name);
 
-        let (_, pool) = self.pools
+        let (_, pool) = self
+            .pools
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
@@ -257,11 +258,9 @@ mod tests {
     /// Creating a pool with an impossible raid level should fail
     fn create_pool_max_u16_raid() {
         let mut engine = SimEngine::default();
-        assert!(
-            engine
-                .create_pool("name", &[], Some(std::u16::MAX))
-                .is_err()
-        );
+        assert!(engine
+            .create_pool("name", &[], Some(std::u16::MAX))
+            .is_err());
     }
 
     #[test]

@@ -19,7 +19,7 @@ mod cleanup_errors {
     use nix;
     use std;
 
-    error_chain!{
+    error_chain! {
         foreign_links {
             Ioe(std::io::Error);
             Mnt(libmount::mountinfo::ParseError);
@@ -76,7 +76,8 @@ fn dm_stratis_devices_remove() -> Result<()> {
                 Ok(())
             }
         })
-    }().map_err(|e| e.chain_err(|| "Failed to ensure removal of all Stratis DM devices"))
+    }()
+    .map_err(|e| e.chain_err(|| "Failed to ensure removal of all Stratis DM devices"))
 }
 
 /// Try and un-mount any filesystems that have the name stratis in the mount point, returning
@@ -97,7 +98,8 @@ fn stratis_filesystems_unmount() -> Result<()> {
         }
 
         Ok(())
-    }().map_err(|e| e.chain_err(|| "Failed to ensure all Stratis filesystems were unmounted"))
+    }()
+    .map_err(|e| e.chain_err(|| "Failed to ensure all Stratis filesystems were unmounted"))
 }
 
 /// When a unit test panics we can leave the system in an inconsistent state.  This function

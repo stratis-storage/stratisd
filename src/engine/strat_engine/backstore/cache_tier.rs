@@ -111,10 +111,12 @@ impl CacheTier {
         // FIXME: This check will become unnecessary when cache metadata device
         // can be increased dynamically.
         if avail_space
-            + self.cache_segments
+            + self
+                .cache_segments
                 .iter()
                 .map(|x| x.segment.length)
-                .sum::<Sectors>() > MAX_CACHE_SIZE
+                .sum::<Sectors>()
+            > MAX_CACHE_SIZE
         {
             self.block_mgr.remove_blockdevs(&uuids)?;
             return Err(StratisError::Engine(
@@ -126,7 +128,8 @@ impl CacheTier {
             ));
         }
 
-        let segments = self.block_mgr
+        let segments = self
+            .block_mgr
             .alloc_space(&[avail_space])
             .expect("asked for exactly the space available, must get")
             .iter()

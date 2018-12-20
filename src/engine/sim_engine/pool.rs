@@ -160,7 +160,8 @@ impl Pool for SimPool {
     ) -> StratisResult<RenameAction> {
         rename_filesystem_pre!(self; uuid; new_name);
 
-        let (_, filesystem) = self.filesystems
+        let (_, filesystem) = self
+            .filesystems
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.filesystems.get_by_uuid() returned a value");
 
@@ -346,7 +347,8 @@ mod tests {
         let pool_name = "pool_name";
         let uuid = engine.create_pool(pool_name, &[], None).unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        let infos = pool.create_filesystems(uuid, pool_name, &[("old_name", None)])
+        let infos = pool
+            .create_filesystems(uuid, pool_name, &[("old_name", None)])
             .unwrap();
         assert!(
             match pool.rename_filesystem(pool_name, infos[0].1, "new_name") {
@@ -365,9 +367,9 @@ mod tests {
         let pool_name = "pool_name";
         let uuid = engine.create_pool(pool_name, &[], None).unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        let results =
-            pool.create_filesystems(uuid, pool_name, &[(old_name, None), (new_name, None)])
-                .unwrap();
+        let results = pool
+            .create_filesystems(uuid, pool_name, &[(old_name, None), (new_name, None)])
+            .unwrap();
         let old_uuid = results.iter().find(|x| x.0 == old_name).unwrap().1;
         assert!(
             match pool.rename_filesystem(pool_name, old_uuid, new_name) {
@@ -413,10 +415,9 @@ mod tests {
         let pool_name = "pool_name";
         let uuid = engine.create_pool(pool_name, &[], None).unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        assert!(
-            pool.destroy_filesystems(pool_name, &[Uuid::new_v4()])
-                .is_ok()
-        );
+        assert!(pool
+            .destroy_filesystems(pool_name, &[Uuid::new_v4()])
+            .is_ok());
     }
 
     #[test]
@@ -426,7 +427,8 @@ mod tests {
         let pool_name = "pool_name";
         let uuid = engine.create_pool(pool_name, &[], None).unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        let fs_results = pool.create_filesystems(uuid, pool_name, &[("fs_name", None)])
+        let fs_results = pool
+            .create_filesystems(uuid, pool_name, &[("fs_name", None)])
             .unwrap();
         let fs_uuid = fs_results[0].1;
         assert!(

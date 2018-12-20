@@ -43,7 +43,8 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         return Ok(vec![return_message.append3(default_return, rc, rs)]);
     }
 
-    let pool_path = m.tree
+    let pool_path = m
+        .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
@@ -102,7 +103,8 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return: Vec<&str> = Vec::new();
 
-    let pool_path = m.tree
+    let pool_path = m
+        .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
@@ -157,7 +159,8 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = dbus::Path::default();
 
-    let pool_path = m.tree
+    let pool_path = m
+        .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
@@ -200,7 +203,8 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> Meth
     let return_message = message.method_return();
     let default_return: Vec<dbus::Path> = Vec::new();
 
-    let pool_path = m.tree
+    let pool_path = m
+        .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
@@ -260,7 +264,8 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
     let default_return = false;
 
-    let pool_path = m.tree
+    let pool_path = m
+        .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
@@ -299,7 +304,8 @@ where
 {
     let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
-    let pool_path = p.tree
+    let pool_path = p
+        .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
 
@@ -374,74 +380,87 @@ pub fn create_dbus_pool<'a>(
 ) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
-    let create_filesystems_method = f.method("CreateFilesystems", (), create_filesystems)
+    let create_filesystems_method = f
+        .method("CreateFilesystems", (), create_filesystems)
         .in_arg(("specs", "as"))
         .out_arg(("filesystems", "a(os)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let destroy_filesystems_method = f.method("DestroyFilesystems", (), destroy_filesystems)
+    let destroy_filesystems_method = f
+        .method("DestroyFilesystems", (), destroy_filesystems)
         .in_arg(("filesystems", "ao"))
         .out_arg(("results", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let add_blockdevs_method = f.method("AddDataDevs", (), add_datadevs)
+    let add_blockdevs_method = f
+        .method("AddDataDevs", (), add_datadevs)
         .in_arg(("devices", "as"))
         .out_arg(("results", "ao"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let add_cachedevs_method = f.method("AddCacheDevs", (), add_cachedevs)
+    let add_cachedevs_method = f
+        .method("AddCacheDevs", (), add_cachedevs)
         .in_arg(("devices", "as"))
         .out_arg(("results", "ao"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let rename_method = f.method("SetName", (), rename_pool)
+    let rename_method = f
+        .method("SetName", (), rename_pool)
         .in_arg(("name", "s"))
         .out_arg(("action", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let snapshot_method = f.method("SnapshotFilesystem", (), snapshot_filesystem)
+    let snapshot_method = f
+        .method("SnapshotFilesystem", (), snapshot_filesystem)
         .in_arg(("origin", "o"))
         .in_arg(("snapshot_name", "s"))
         .out_arg(("result", "o"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let name_property = f.property::<&str, _>(consts::POOL_NAME_PROP, ())
+    let name_property = f
+        .property::<&str, _>(consts::POOL_NAME_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_name);
 
-    let total_physical_size_property = f.property::<&str, _>("TotalPhysicalSize", ())
+    let total_physical_size_property = f
+        .property::<&str, _>("TotalPhysicalSize", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_pool_total_physical_size);
 
-    let total_physical_used_property = f.property::<&str, _>("TotalPhysicalUsed", ())
+    let total_physical_used_property = f
+        .property::<&str, _>("TotalPhysicalUsed", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_pool_total_physical_used);
 
-    let uuid_property = f.property::<&str, _>("Uuid", ())
+    let uuid_property = f
+        .property::<&str, _>("Uuid", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid);
 
-    let state_property = f.property::<u16, _>(consts::POOL_STATE_PROP, ())
+    let state_property = f
+        .property::<u16, _>(consts::POOL_STATE_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_state);
 
-    let extend_state_property = f.property::<u16, _>(consts::POOL_EXTEND_STATE_PROP, ())
+    let extend_state_property = f
+        .property::<u16, _>(consts::POOL_EXTEND_STATE_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_extend_state);
 
-    let space_state_property = f.property::<u16, _>(consts::POOL_SPACE_STATE_PROP, ())
+    let space_state_property = f
+        .property::<u16, _>(consts::POOL_SPACE_STATE_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_space_state);
@@ -452,7 +471,8 @@ pub fn create_dbus_pool<'a>(
         dbus_context.get_next_id().to_string()
     );
 
-    let object_path = f.object_path(object_name, Some(OPContext::new(parent, uuid)))
+    let object_path = f
+        .object_path(object_name, Some(OPContext::new(parent, uuid)))
         .introspectable()
         .add(
             f.interface(consts::POOL_INTERFACE_NAME, ())

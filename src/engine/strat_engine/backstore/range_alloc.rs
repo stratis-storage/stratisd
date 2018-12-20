@@ -111,14 +111,16 @@ impl RangeAllocator {
                 }
                 (Some((prev_off, prev_len)), None) => {
                     // Contig with prev, just extend prev
-                    *self.used
+                    *self
+                        .used
                         .get_mut(&prev_off)
                         .expect("matched Some((prev_off, ...") = prev_len + len;
                 }
                 (Some((prev_off, prev_len)), Some((next_off, next_len))) => {
                     // Contig with both, remove next and extend prev
                     self.used.remove(&next_off);
-                    *self.used
+                    *self
+                        .used
                         .get_mut(&prev_off)
                         .expect("matched Some((prev_off, ...") = prev_len + len + next_len;
                 }
@@ -135,7 +137,8 @@ impl RangeAllocator {
             // an StratisResult, make this a try!.
             self.check_for_overflow(off, len).unwrap();
 
-            let maybe_prev = self.used
+            let maybe_prev = self
+                .used
                 .range((Unbounded, Included(off)))
                 .rev()
                 .next()
@@ -402,11 +405,9 @@ mod tests {
         assert_eq!(request.0, Sectors(128));
         assert_eq!(request.1, &[(Sectors(0), Sectors(128))]);
 
-        assert!(
-            allocator
-                .insert_ranges(&[(Sectors(1), Sectors(1))])
-                .is_err()
-        );
+        assert!(allocator
+            .insert_ranges(&[(Sectors(1), Sectors(1))])
+            .is_err());
     }
 
     #[test]
@@ -452,11 +453,9 @@ mod tests {
         let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
 
         // overflow limit range
-        assert!(
-            allocator
-                .insert_ranges(&[(Sectors(1), Sectors(128))])
-                .is_err()
-        );
+        assert!(allocator
+            .insert_ranges(&[(Sectors(1), Sectors(128))])
+            .is_err());
     }
 
     #[test]
@@ -468,10 +467,8 @@ mod tests {
         let mut allocator = RangeAllocator::new(Sectors(MAX), &[]).unwrap();
 
         // overflow max u64
-        assert!(
-            allocator
-                .insert_ranges(&[(Sectors(MAX), Sectors(1))])
-                .is_err()
-        );
+        assert!(allocator
+            .insert_ranges(&[(Sectors(MAX), Sectors(1))])
+            .is_err());
     }
 }

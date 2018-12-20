@@ -193,7 +193,8 @@ impl Backstore {
     ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(ref mut cache_tier) => {
-                let mut cache_device = self.cache
+                let mut cache_device = self
+                    .cache
                     .as_mut()
                     .expect("cache_tier.is_some() <=> self.cache.is_some()");
                 let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, paths)?;
@@ -480,12 +481,15 @@ impl Backstore {
     pub fn teardown(&mut self) -> StratisResult<()> {
         match self.cache {
             Some(ref mut cache) => cache.teardown(get_dm()),
-            None => if let Some(ref mut linear) = self.linear {
-                linear.teardown(get_dm())
-            } else {
-                Ok(())
-            },
-        }.map_err(|e| e.into())
+            None => {
+                if let Some(ref mut linear) = self.linear {
+                    linear.teardown(get_dm())
+                } else {
+                    Ok(())
+                }
+            }
+        }
+        .map_err(|e| e.into())
     }
 
     /// Return the device that this tier is currently using.
@@ -715,12 +719,10 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
 
-        assert!(
-            backstore
-                .request(pool_uuid, Sectors(IEC::Ki), Sectors(IEC::Mi))
-                .unwrap()
-                .is_none()
-        );
+        assert!(backstore
+            .request(pool_uuid, Sectors(IEC::Ki), Sectors(IEC::Mi))
+            .unwrap()
+            .is_none());
 
         let request = Sectors(IEC::Ei);
         let modulus = Sectors(IEC::Ki);

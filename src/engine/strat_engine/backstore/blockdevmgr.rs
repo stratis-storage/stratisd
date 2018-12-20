@@ -192,7 +192,8 @@ impl BlockDevMgr {
 
     /// Get a function that maps UUIDs to Devices.
     pub fn uuid_to_devno(&self) -> Box<Fn(DevUuid) -> Option<Device>> {
-        let uuid_map: HashMap<DevUuid, Device> = self.block_devs
+        let uuid_map: HashMap<DevUuid, Device> = self
+            .block_devs
             .iter()
             .map(|bd| (bd.uuid(), *bd.device()))
             .collect();
@@ -316,7 +317,8 @@ impl BlockDevMgr {
         };
 
         let data_size = Bytes(metadata.len() as u64).sectors();
-        let candidates = self.block_devs
+        let candidates = self
+            .block_devs
             .iter_mut()
             .filter(|b| b.max_metadata_size() >= data_size);
 
@@ -603,12 +605,11 @@ mod tests {
         cmd::udev_settle().unwrap();
 
         assert!(paths.iter().all(|path| {
-            let (t_pool_uuid, _) = StaticHeader::device_identifiers(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap()
-                .unwrap();
+            let (t_pool_uuid, _) = StaticHeader::device_identifiers(
+                &mut OpenOptions::new().read(true).open(path).unwrap(),
+            )
+            .unwrap()
+            .unwrap();
             pool_uuid == t_pool_uuid
         }));
     }
@@ -728,12 +729,10 @@ mod tests {
         let devices2 = pools.get(&uuid2).expect("pools.contains_key() was true");
         assert_eq!(devices2.len(), paths2.len());
 
-        assert!(
-            pools
-                .iter()
-                .map(|(uuid, devs)| get_metadata(*uuid, devs))
-                .all(|x| x.unwrap().is_none())
-        );
+        assert!(pools
+            .iter()
+            .map(|(uuid, devs)| get_metadata(*uuid, devs))
+            .all(|x| x.unwrap().is_none()));
     }
 
     #[test]
@@ -760,22 +759,20 @@ mod tests {
         cmd::udev_settle().unwrap();
 
         assert!(paths.iter().all(|path| {
-            let (t_pool_uuid, _) = StaticHeader::device_identifiers(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap()
-                .unwrap();
+            let (t_pool_uuid, _) = StaticHeader::device_identifiers(
+                &mut OpenOptions::new().read(true).open(path).unwrap(),
+            )
+            .unwrap()
+            .unwrap();
             pool_uuid == t_pool_uuid
         }));
 
         bd_mgr.destroy_all().unwrap();
         assert!(paths.iter().all(|path| {
-            let id = StaticHeader::device_identifiers(&mut OpenOptions::new()
-                .read(true)
-                .open(path)
-                .unwrap())
-                .unwrap();
+            let id = StaticHeader::device_identifiers(
+                &mut OpenOptions::new().read(true).open(path).unwrap(),
+            )
+            .unwrap();
             id.is_none()
         }));
     }

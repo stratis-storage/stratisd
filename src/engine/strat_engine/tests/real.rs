@@ -181,7 +181,8 @@ fn make_linear_test_dev(devnode: &Path, start: Sectors, length: Sectors) -> Line
         DmName::new(&format!("stratis_test_{}", Uuid::new_v4())).expect("valid format"),
         None,
         table.clone(),
-    ).unwrap()
+    )
+    .unwrap()
 }
 
 /// Run test on real devices, using given constraints. Constraints may result

@@ -51,10 +51,11 @@ fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
             .thin_meta_dev_spare
             .last()
             .unwrap_or_else(|| panic!(expect_msg)),
-    ].iter()
-        .max_by_key(|x| x.0)
-        .map(|&&(start, length)| start + length)
-        .expect("iterator is non-empty")
+    ]
+    .iter()
+    .max_by_key(|x| x.0)
+    .map(|&&(start, length)| start + length)
+    .expect("iterator is non-empty")
 }
 
 /// Check the metadata of an individual pool for consistency.
@@ -239,12 +240,11 @@ impl StratPool {
         pool_name: &Name,
         dm_name: &DmName,
     ) -> StratisResult<()> {
-        assert!(
-            self.thin_pool
-                .get_eventing_dev_names(pool_uuid)
-                .iter()
-                .any(|x| dm_name == &**x)
-        );
+        assert!(self
+            .thin_pool
+            .get_eventing_dev_names(pool_uuid)
+            .iter()
+            .any(|x| dm_name == &**x));
         if self.thin_pool.check(pool_uuid, &mut self.backstore)? {
             self.write_metadata(pool_name)?;
         }
@@ -286,7 +286,8 @@ impl Pool for StratPool {
         // TODO: Roll back on filesystem initialization failure.
         let mut result = Vec::new();
         for (name, size) in names {
-            let fs_uuid = self.thin_pool
+            let fs_uuid = self
+                .thin_pool
                 .create_filesystem(pool_uuid, pool_name, name, size)?;
             result.push((name, fs_uuid));
         }
@@ -366,7 +367,8 @@ impl Pool for StratPool {
     ) -> StratisResult<(FilesystemUuid, &mut Filesystem)> {
         validate_name(snapshot_name)?;
 
-        if self.thin_pool
+        if self
+            .thin_pool
             .get_filesystem_by_name(snapshot_name)
             .is_some()
         {
@@ -595,7 +597,8 @@ mod tests {
         let metadata1 = pool.record(name);
         assert!(metadata1.backstore.cache_tier.is_none());
 
-        let (_, fs_uuid) = pool.create_filesystems(uuid, &name, &[("stratis-filesystem", None)])
+        let (_, fs_uuid) = pool
+            .create_filesystems(uuid, &name, &[("stratis-filesystem", None)])
             .unwrap()
             .pop()
             .unwrap();
@@ -615,7 +618,8 @@ mod tests {
                 Some("xfs"),
                 MsFlags::empty(),
                 None as Option<&str>,
-            ).unwrap();
+            )
+            .unwrap();
             OpenOptions::new()
                 .create(true)
                 .write(true)
@@ -655,7 +659,8 @@ mod tests {
             uuid,
             &devices,
             &get_metadata(uuid, &devices).unwrap().unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
         invariant(&pool, &name);
 
         let mut buf = [0u8; 10];
@@ -667,7 +672,8 @@ mod tests {
                 Some("xfs"),
                 MsFlags::empty(),
                 None as Option<&str>,
-            ).unwrap();
+            )
+            .unwrap();
             OpenOptions::new()
                 .read(true)
                 .open(&new_file)
@@ -709,7 +715,8 @@ mod tests {
         invariant(&pool, &name);
 
         let fs_name = "stratis_test_filesystem";
-        let (_, fs_uuid) = pool.create_filesystems(pool_uuid, &name, &[(&fs_name, None)])
+        let (_, fs_uuid) = pool
+            .create_filesystems(pool_uuid, &name, &[(&fs_name, None)])
             .unwrap()
             .pop()
             .expect("just created one");

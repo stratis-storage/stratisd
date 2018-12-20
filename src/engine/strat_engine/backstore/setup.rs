@@ -74,7 +74,8 @@ pub fn get_metadata(
     // created pool; this allows for the method to be called in other
     // circumstances.
     let most_recent_time = {
-        match bdas.iter()
+        match bdas
+            .iter()
             .filter_map(|&(_, ref bda)| bda.last_update_time())
             .max()
         {
@@ -86,7 +87,8 @@ pub fn get_metadata(
     // Try to read from all available devnodes that could contain most
     // recent metadata. In the event of errors, continue to try until all are
     // exhausted.
-    for &(devnode, ref bda) in bdas.iter()
+    for &(devnode, ref bda) in bdas
+        .iter()
         .filter(|&&(_, ref bda)| bda.last_update_time() == Some(most_recent_time))
     {
         let poolsave = OpenOptions::new()
@@ -256,11 +258,13 @@ pub fn get_blockdevs(
             &recorded_data_map,
             &recorded_cache_map,
             &segment_table,
-        ).map(|(tier, blockdev)| {
+        )
+        .map(|(tier, blockdev)| {
             match tier {
                 BlockDevTier::Data => &mut datadevs,
                 BlockDevTier::Cache => &mut cachedevs,
-            }.push(blockdev)
+            }
+            .push(blockdev)
         })?;
     }
 

@@ -74,6 +74,7 @@ pub enum DeviceLimits {
 
 /// Get a list of lists of devices to use for tests.
 /// May return an empty list if the request is not satisfiable.
+#[allow(clippy::type_complexity)]
 fn get_device_runs<'a>(
     limits: &DeviceLimits,
     dev_sizes: &[(&'a Path, Sectors)],

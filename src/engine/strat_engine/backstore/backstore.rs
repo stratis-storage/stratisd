@@ -714,7 +714,7 @@ mod tests {
     /// Request an impossibly large amount.
     /// Verify that the backstore is now all used up.
     fn test_request(paths: &[&Path]) {
-        assert!(paths.len() > 0);
+        assert!(!paths.is_empty());
 
         let pool_uuid = Uuid::new_v4();
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();

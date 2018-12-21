@@ -254,13 +254,11 @@ impl StratFilesystem {
         }
     }
 
-    #[allow(dead_code)]
     pub fn suspend(&mut self, flush: bool) -> StratisResult<()> {
         self.thin_dev.suspend(get_dm(), flush)?;
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub fn resume(&mut self) -> StratisResult<()> {
         self.thin_dev.resume(get_dm())?;
         Ok(())

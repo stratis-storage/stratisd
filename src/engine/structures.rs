@@ -370,7 +370,7 @@ mod tests {
 
         // It has displaced the old thing.
         assert!(displaced.is_some());
-        let ref displaced_item = displaced.unwrap();
+        let displaced_item = &displaced.unwrap();
         assert_eq!(&*displaced_item[0].0, name);
         assert_eq!(displaced_item[0].1, uuid);
 
@@ -411,7 +411,7 @@ mod tests {
 
         // The items displaced consist exactly of the first item.
         assert!(displaced.is_some());
-        let ref displaced_item = displaced.unwrap();
+        let displaced_item = &displaced.unwrap();
         assert_eq!(&*displaced_item[0].0, name);
         assert_eq!(displaced_item[0].1, uuid);
         assert_eq!(displaced_item[0].2.stuff, thing_key);
@@ -455,7 +455,7 @@ mod tests {
 
         // The items displaced consist exactly of the first item.
         assert!(displaced.is_some());
-        let ref displaced_item = displaced.unwrap();
+        let displaced_item = &displaced.unwrap();
         assert_eq!(&*displaced_item[0].0, name);
         assert_eq!(displaced_item[0].1, uuid);
         assert_eq!(displaced_item[0].2.stuff, thing_key);
@@ -518,7 +518,7 @@ mod tests {
 
         // The items displaced consist of two items.
         assert!(displaced.is_some());
-        let ref displaced_items = displaced.unwrap();
+        let displaced_items = &displaced.unwrap();
         assert_eq!(displaced_items.len(), 2);
 
         // The first displaced item has the name of the just inserted item.

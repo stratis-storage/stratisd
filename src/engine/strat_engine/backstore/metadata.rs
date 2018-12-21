@@ -776,7 +776,7 @@ mod mda {
             // This comparison seems absurd when compiled in an environment
             // where usize is u64, which is usual. It is not absurd when
             // compiled in an environment where usize is u32.
-            #![allow(absurd_extreme_comparisons)]
+            #![allow(clippy::absurd_extreme_comparisons)]
             assert!(*self.used <= std::usize::MAX as u64);
             let mut data_buf = vec![0u8; *self.used as usize];
 

@@ -5,7 +5,7 @@
 mod filesystem;
 mod mdv;
 mod thinids;
-#[allow(module_inception)]
+#[allow(clippy::module_inception)]
 mod thinpool;
 
 pub use self::thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE};

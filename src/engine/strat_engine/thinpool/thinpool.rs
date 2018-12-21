@@ -1146,7 +1146,7 @@ impl Recordable<ThinPoolDevSave> for ThinPool {
 /// run thin_repair, using the spare segments, to try to repair the metadata
 /// dev. Return the metadata device, the metadata segments, and the
 /// spare segments.
-#[allow(type_complexity)]
+#[allow(clippy::type_complexity)]
 fn setup_metadev(
     pool_uuid: PoolUuid,
     thinpool_name: &DmName,
@@ -1154,7 +1154,7 @@ fn setup_metadev(
     meta_segments: Vec<(Sectors, Sectors)>,
     spare_segments: Vec<(Sectors, Sectors)>,
 ) -> StratisResult<(LinearDev, Vec<(Sectors, Sectors)>, Vec<(Sectors, Sectors)>)> {
-    #![allow(collapsible_if)]
+    #![allow(clippy::collapsible_if)]
     let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinMeta);
     let mut meta_dev = LinearDev::setup(
         get_dm(),

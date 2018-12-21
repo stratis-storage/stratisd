@@ -136,7 +136,7 @@ impl StratFilesystem {
     /// Mounting a filesystem with a duplicate UUID would require special handling,
     /// so snapshot_fs_uuid is used to update the new snapshot filesystem so it has
     /// a unique UUID.
-    #[allow(too_many_arguments)]
+    #[allow(clippy::too_many_arguments)]
     pub fn snapshot(
         &self,
         thin_pool: &ThinPoolDev,

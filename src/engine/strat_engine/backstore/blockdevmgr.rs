@@ -411,7 +411,7 @@ fn initialize(
     /// Filter devices for admission to pool based on dev_infos.
     /// If there is an error finding out the info, return that error.
     /// Also, return an error if a device is not appropriate for this pool.
-    #[allow(type_complexity)]
+    #[allow(clippy::type_complexity)]
     fn filter_devs<'a, I>(
         dev_infos: I,
         pool_uuid: PoolUuid,

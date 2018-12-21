@@ -2,8 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#![cfg_attr(not(feature = "clippy"), allow(unknown_lints))]
-#![allow(doc_markdown)]
+#![allow(clippy::doc_markdown)]
 
 extern crate devicemapper;
 extern crate libstratis;

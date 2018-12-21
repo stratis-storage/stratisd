@@ -65,7 +65,6 @@ mod tests {
     fn get_write_throttled_devices() -> StratisResult<Vec<(Device, u64)>> {
         // Find all cgroup subdirectories
         let mut cg_dirs = fs::read_dir(CGROUP_PATH)?
-            .into_iter()
             .filter_map(|entry| entry.ok())
             .map(|entry| entry.path())
             .filter(|path| path.is_dir())

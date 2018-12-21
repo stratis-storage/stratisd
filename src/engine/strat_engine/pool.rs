@@ -625,7 +625,7 @@ mod tests {
                 .write(true)
                 .open(&new_file)
                 .unwrap()
-                .write(bytestring)
+                .write_all(bytestring)
                 .unwrap();
         }
 
@@ -642,7 +642,7 @@ mod tests {
                 .read(true)
                 .open(&new_file)
                 .unwrap()
-                .read(&mut buf)
+                .read_exact(&mut buf)
                 .unwrap();
         }
         assert_eq!(&buf, bytestring);
@@ -678,7 +678,7 @@ mod tests {
                 .read(true)
                 .open(&new_file)
                 .unwrap()
-                .read(&mut buf)
+                .read_exact(&mut buf)
                 .unwrap();
         }
         assert_eq!(&buf, bytestring);

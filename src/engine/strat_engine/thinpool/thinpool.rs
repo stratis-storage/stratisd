@@ -1471,7 +1471,7 @@ mod tests {
                     .path()
                     .join(format!("stratis_test{}.txt", i));
                 let mut f = OpenOptions::new().read(true).open(file_path).unwrap();
-                f.read(&mut read_buf).unwrap();
+                f.read_exact(&mut read_buf).unwrap();
                 assert_eq!(read_buf[0..SECTOR_SIZE], write_buf[0..SECTOR_SIZE]);
             }
         }
@@ -1829,7 +1829,7 @@ mod tests {
                 .write(true)
                 .open(&new_file)
                 .unwrap()
-                .write(bytestring)
+                .write_all(bytestring)
                 .unwrap();
         }
         let filesystem_saves = pool.mdv.filesystems().unwrap();
@@ -1860,7 +1860,7 @@ mod tests {
                 .read(true)
                 .open(&new_file)
                 .unwrap()
-                .read(&mut buf)
+                .read_exact(&mut buf)
                 .unwrap();
         }
         assert_eq!(&buf, bytestring);

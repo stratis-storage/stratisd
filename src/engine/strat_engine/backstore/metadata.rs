@@ -964,10 +964,10 @@ mod tests {
     {
         let mut byte_to_corrupt = [0; 1];
         f.seek(SeekFrom::Start(position))?;
-        f.read(&mut byte_to_corrupt)?;
+        f.read_exact(&mut byte_to_corrupt)?;
         byte_to_corrupt[0] = !byte_to_corrupt[0];
         f.seek(SeekFrom::Start(position))?;
-        f.write(&byte_to_corrupt)?;
+        f.write_all(&byte_to_corrupt)?;
         f.sync_all()?;
         Ok(())
     }

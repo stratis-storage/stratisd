@@ -1260,7 +1260,7 @@ mod tests {
     #[test]
     pub fn loop_test_greedy_allocation() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_greedy_allocation,
         );
     }
@@ -1268,7 +1268,7 @@ mod tests {
     #[test]
     pub fn real_test_greedy_allocation() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(2, None, None),
+            &real::DeviceLimits::AtLeast(2, None, None),
             test_greedy_allocation,
         );
     }
@@ -1368,7 +1368,7 @@ mod tests {
     #[test]
     pub fn loop_test_full_pool() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Exactly(2, Some(Bytes(IEC::Gi).sectors())),
+            &loopbacked::DeviceLimits::Exactly(2, Some(Bytes(IEC::Gi).sectors())),
             test_full_pool,
         );
     }
@@ -1376,7 +1376,7 @@ mod tests {
     #[test]
     pub fn real_test_full_pool() {
         real::test_with_spec(
-            real::DeviceLimits::Exactly(
+            &real::DeviceLimits::Exactly(
                 2,
                 Some(Bytes(IEC::Gi).sectors()),
                 Some(Bytes(IEC::Gi * 4).sectors()),
@@ -1480,7 +1480,7 @@ mod tests {
     #[test]
     pub fn loop_test_filesystem_snapshot() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_filesystem_snapshot,
         );
     }
@@ -1488,7 +1488,7 @@ mod tests {
     #[test]
     pub fn real_test_filesystem_snapshot() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(2, None, None),
+            &real::DeviceLimits::AtLeast(2, None, None),
             test_filesystem_snapshot,
         );
     }
@@ -1530,7 +1530,7 @@ mod tests {
     #[test]
     pub fn loop_test_filesystem_rename() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_filesystem_rename,
         );
     }
@@ -1538,7 +1538,7 @@ mod tests {
     #[test]
     pub fn real_test_filesystem_rename() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(1, None, None),
+            &real::DeviceLimits::AtLeast(1, None, None),
             test_filesystem_rename,
         );
     }
@@ -1599,12 +1599,15 @@ mod tests {
 
     #[test]
     pub fn loop_test_pool_setup() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_pool_setup);
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 3, None),
+            test_pool_setup,
+        );
     }
 
     #[test]
     pub fn real_test_pool_setup() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_pool_setup);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_pool_setup);
     }
     /// Verify that destroy_filesystems actually deallocates the space
     /// from the thinpool, by attempting to reinstantiate it using the
@@ -1643,7 +1646,7 @@ mod tests {
     pub fn loop_test_thindev_destroy() {
         // This test requires more than 1 GiB.
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_thindev_destroy,
         );
     }
@@ -1651,7 +1654,7 @@ mod tests {
     #[test]
     pub fn real_test_thindev_destroy() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(1, None, None),
+            &real::DeviceLimits::AtLeast(1, None, None),
             test_thindev_destroy,
         );
     }
@@ -1726,12 +1729,15 @@ mod tests {
 
     #[test]
     pub fn loop_test_xfs_expand() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_xfs_expand);
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 3, None),
+            test_xfs_expand,
+        );
     }
 
     #[test]
     pub fn real_test_xfs_expand() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_xfs_expand);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_xfs_expand);
     }
 
     /// Just suspend and resume the device and make sure it doesn't crash.
@@ -1763,7 +1769,7 @@ mod tests {
     #[test]
     pub fn loop_test_suspend_resume() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_suspend_resume,
         );
     }
@@ -1771,7 +1777,7 @@ mod tests {
     #[test]
     pub fn real_test_suspend_resume() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(1, None, None),
+            &real::DeviceLimits::AtLeast(1, None, None),
             test_suspend_resume,
         );
     }
@@ -1872,11 +1878,14 @@ mod tests {
 
     #[test]
     pub fn loop_test_set_device() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_set_device);
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_set_device,
+        );
     }
 
     #[test]
     pub fn real_test_set_device() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None), test_set_device);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_set_device);
     }
 }

@@ -687,7 +687,7 @@ mod tests {
     #[test]
     pub fn loop_test_add_cache_devs() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(4, 5, None),
+            &loopbacked::DeviceLimits::Range(4, 5, None),
             test_add_cache_devs,
         );
     }
@@ -695,7 +695,7 @@ mod tests {
     #[test]
     pub fn real_test_add_cache_devs() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(4, None, None),
+            &real::DeviceLimits::AtLeast(4, None, None),
             test_add_cache_devs,
         );
     }
@@ -703,7 +703,7 @@ mod tests {
     #[test]
     pub fn travis_test_add_cache_devs() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(4, 5, None),
+            &loopbacked::DeviceLimits::Range(4, 5, None),
             test_add_cache_devs,
         );
     }
@@ -752,17 +752,17 @@ mod tests {
 
     #[test]
     pub fn loop_test_request() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_request);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_request);
     }
 
     #[test]
     pub fn real_test_request() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_request);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_request);
     }
 
     #[test]
     pub fn travis_test_request() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_request);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_request);
     }
 
     /// Create a backstore with a cache.
@@ -823,16 +823,16 @@ mod tests {
 
     #[test]
     pub fn loop_test_setup() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
     }
 
     #[test]
     pub fn real_test_setup() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None), test_setup);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_setup);
     }
 
     #[test]
     pub fn travis_test_setup() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
     }
 }

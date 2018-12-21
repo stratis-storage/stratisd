@@ -67,12 +67,12 @@ impl Drop for LoopTestDev {
 }
 
 /// Get a list of counts of devices to use for tests.
-fn get_device_counts(limits: DeviceLimits) -> Vec<(usize, Option<Sectors>)> {
+fn get_device_counts(limits: &DeviceLimits) -> Vec<(usize, Option<Sectors>)> {
     match limits {
-        DeviceLimits::Exactly(num, size) => vec![(num, size)],
+        DeviceLimits::Exactly(num, size) => vec![(*num, *size)],
         DeviceLimits::Range(lower, upper, size) => {
             assert!(lower < upper);
-            vec![(lower, size), (upper, size)]
+            vec![(*lower, *size), (*upper, *size)]
         }
     }
 }
@@ -90,11 +90,11 @@ fn get_devices(count: usize, size: Option<Sectors>, dir: &tempfile::TempDir) -> 
 }
 
 /// Run the designated tests according to the specification.
-pub fn test_with_spec<F>(limits: DeviceLimits, test: F)
+pub fn test_with_spec<F>(limits: &DeviceLimits, test: F)
 where
     F: Fn(&[&Path]) -> () + panic::RefUnwindSafe,
 {
-    let counts = get_device_counts(limits);
+    let counts = get_device_counts(&limits);
 
     init_logger();
 

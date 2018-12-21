@@ -130,7 +130,7 @@ mod tests {
     #[test]
     pub fn loop_test_write_throttling() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Exactly(1, Some(Bytes(IEC::Mi * 50).sectors())),
+            &loopbacked::DeviceLimits::Exactly(1, Some(Bytes(IEC::Mi * 50).sectors())),
             test_write_throttling,
         );
     }
@@ -138,7 +138,7 @@ mod tests {
     #[test]
     pub fn real_test_write_throttling() {
         real::test_with_spec(
-            real::DeviceLimits::Exactly(1, Some(Bytes(IEC::Mi * 50).sectors()), None),
+            &real::DeviceLimits::Exactly(1, Some(Bytes(IEC::Mi * 50).sectors()), None),
             test_write_throttling,
         );
     }

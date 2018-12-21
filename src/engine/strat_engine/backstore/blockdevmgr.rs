@@ -556,7 +556,7 @@ mod tests {
     #[test]
     pub fn loop_test_blockdevmgr_used() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_blockdevmgr_used,
         );
     }
@@ -564,7 +564,7 @@ mod tests {
     #[test]
     pub fn real_test_blockdevmgr_used() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(1, None, None),
+            &real::DeviceLimits::AtLeast(1, None, None),
             test_blockdevmgr_used,
         );
     }
@@ -572,7 +572,7 @@ mod tests {
     #[test]
     pub fn travis_test_blockdevmgr_used() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_blockdevmgr_used,
         );
     }
@@ -617,7 +617,7 @@ mod tests {
     #[test]
     pub fn loop_test_fail_single_signature() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_fail_single_signature,
         );
     }
@@ -625,7 +625,7 @@ mod tests {
     #[test]
     pub fn real_test_fail_single_signature() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(1, None, None),
+            &real::DeviceLimits::AtLeast(1, None, None),
             test_fail_single_signature,
         );
     }
@@ -633,7 +633,7 @@ mod tests {
     #[test]
     pub fn travis_test_fail_single_signature() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_fail_single_signature,
         );
     }
@@ -668,7 +668,7 @@ mod tests {
     #[test]
     pub fn loop_test_initialization_stratis() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_initialization_add_stratis,
         );
     }
@@ -676,7 +676,7 @@ mod tests {
     #[test]
     pub fn real_test_initialization_stratis() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(2, None, None),
+            &real::DeviceLimits::AtLeast(2, None, None),
             test_initialization_add_stratis,
         );
     }
@@ -684,7 +684,7 @@ mod tests {
     #[test]
     pub fn travis_test_initialization_stratis() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_initialization_add_stratis,
         );
     }
@@ -737,17 +737,23 @@ mod tests {
 
     #[test]
     pub fn loop_test_initialize() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_initialize);
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_initialize,
+        );
     }
 
     #[test]
     pub fn real_test_initialize() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None), test_initialize);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_initialize);
     }
 
     #[test]
     pub fn travis_test_initialize() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_initialize);
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_initialize,
+        );
     }
 
     /// Test that initialing devices claims all and that destroying
@@ -779,16 +785,16 @@ mod tests {
 
     #[test]
     pub fn loop_test_ownership() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
     }
 
     #[test]
     pub fn real_test_ownership() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_ownership);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_ownership);
     }
 
     #[test]
     pub fn travis_test_ownership() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
     }
 }

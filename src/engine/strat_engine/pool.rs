@@ -549,7 +549,7 @@ mod tests {
     #[test]
     pub fn loop_test_basic_metadata() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_basic_metadata,
         );
     }
@@ -557,7 +557,7 @@ mod tests {
     #[test]
     pub fn real_test_basic_metadata() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(2, None, None),
+            &real::DeviceLimits::AtLeast(2, None, None),
             test_basic_metadata,
         );
     }
@@ -571,12 +571,12 @@ mod tests {
 
     #[test]
     pub fn loop_test_empty_pool() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Exactly(0, None), test_empty_pool);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Exactly(0, None), test_empty_pool);
     }
 
     #[test]
     pub fn real_test_empty_pool() {
-        real::test_with_spec(real::DeviceLimits::Exactly(0, None, None), test_empty_pool);
+        real::test_with_spec(&real::DeviceLimits::Exactly(0, None, None), test_empty_pool);
     }
 
     /// Test that adding a cachedev causes metadata to be updated.
@@ -688,7 +688,7 @@ mod tests {
     #[test]
     pub fn loop_test_add_cachedevs() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_add_cachedevs,
         );
     }
@@ -696,7 +696,7 @@ mod tests {
     #[test]
     pub fn real_test_add_cachedevs() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(2, None, None),
+            &real::DeviceLimits::AtLeast(2, None, None),
             test_add_cachedevs,
         );
     }
@@ -759,7 +759,7 @@ mod tests {
     #[test]
     pub fn loop_test_add_datadevs() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, Some((4u64 * Bytes(IEC::Gi)).sectors())),
+            &loopbacked::DeviceLimits::Range(2, 3, Some((4u64 * Bytes(IEC::Gi)).sectors())),
             test_add_datadevs,
         );
     }
@@ -767,7 +767,7 @@ mod tests {
     #[test]
     pub fn real_test_add_datadevs() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(
+            &real::DeviceLimits::AtLeast(
                 2,
                 Some((2u64 * Bytes(IEC::Gi)).sectors()),
                 Some((4u64 * Bytes(IEC::Gi)).sectors()),

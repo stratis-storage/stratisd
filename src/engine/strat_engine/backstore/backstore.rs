@@ -798,7 +798,7 @@ mod tests {
 
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
-        let map = map.get(&pool_uuid).unwrap();
+        let map = &map[&pool_uuid];
         let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
         invariant(&backstore);
 
@@ -810,7 +810,7 @@ mod tests {
 
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
-        let map = map.get(&pool_uuid).unwrap();
+        let map = &map[&pool_uuid];
         let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
         invariant(&backstore);
 

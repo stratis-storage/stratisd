@@ -283,11 +283,11 @@ mod tests {
     // Verifies proper relationship between internal data structures.
     fn table_invariant<T>(table: &Table<T>) {
         for (uuid, &(ref name, _)) in &table.items {
-            assert_eq!(*uuid, *table.name_to_uuid.get(name).unwrap())
+            assert_eq!(uuid, &table.name_to_uuid[name])
         }
 
         for (name, uuid) in &table.name_to_uuid {
-            assert_eq!(*name, table.items.get(uuid).unwrap().0);
+            assert_eq!(name, &table.items[uuid].0);
         }
 
         // No extra garbage

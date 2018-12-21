@@ -525,8 +525,8 @@ mod tests {
         cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 2);
-        let devnodes1 = pools.get(&uuid1).unwrap();
-        let devnodes2 = pools.get(&uuid2).unwrap();
+        let devnodes1 = &pools[&uuid1];
+        let devnodes2 = &pools[&uuid2];
         let pool_save1 = get_metadata(uuid1, devnodes1).unwrap().unwrap();
         let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
@@ -538,8 +538,8 @@ mod tests {
         cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 2);
-        let devnodes1 = pools.get(&uuid1).unwrap();
-        let devnodes2 = pools.get(&uuid2).unwrap();
+        let devnodes1 = &pools[&uuid1];
+        let devnodes2 = &pools[&uuid2];
         let pool_save1 = get_metadata(uuid1, devnodes1).unwrap().unwrap();
         let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
@@ -654,7 +654,7 @@ mod tests {
         cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 1);
-        let devices = pools.get(&uuid).unwrap();
+        let devices = &pools[&uuid];
         let (name, pool) = StratPool::setup(
             uuid,
             &devices,

@@ -41,7 +41,7 @@ impl LoopTestDev {
     /// Create its backing store of specified size. The file is sparse but
     /// will appear to be zeroed.
     pub fn new(lc: &LoopControl, path: &Path, size: Option<Sectors>) -> LoopTestDev {
-        let size = size.unwrap_or(Bytes(IEC::Gi).sectors());
+        let size = size.unwrap_or_else(|| Bytes(IEC::Gi).sectors());
 
         let f = OpenOptions::new()
             .read(true)

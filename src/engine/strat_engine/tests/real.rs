@@ -87,7 +87,7 @@ fn get_device_runs<'a>(
         }
     };
 
-    let min_size = min_size.unwrap_or(Bytes(IEC::Gi).sectors());
+    let min_size = min_size.unwrap_or_else(|| Bytes(IEC::Gi).sectors());
 
     assert!(max_size.is_none() || Some(min_size) <= max_size);
 

@@ -1171,7 +1171,7 @@ mod tests {
 
             if let Some(index) = primary {
                 // Corrupt primary copy
-                corrupt_byte(&mut buf, (1 * SECTOR_SIZE + index) as u64).unwrap();
+                corrupt_byte(&mut buf, (SECTOR_SIZE + index) as u64).unwrap();
             }
 
             if let Some(index) = secondary {

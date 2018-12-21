@@ -13,9 +13,6 @@ addons:
 language: rust
 
 matrix:
-    allow_failures:
-        # Temporarily allow failure until after next release.
-        - env: TASK=clippy TARGET=x86_64-unknown-linux-gnu
     include:
         # Verify formatting of Rust code
         - rust: stable

@@ -58,8 +58,6 @@ impl EngineListenerList {
     }
 
     /// Add a listener.
-    // This code is marked dead because it is called only by bin/stratisd.rs
-    #[allow(dead_code)]
     pub fn register_listener(&mut self, listener: Box<EngineListener>) {
         self.listeners.push(listener);
     }

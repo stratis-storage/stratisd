@@ -65,13 +65,10 @@ impl Display for ThinPoolRole {
 #[derive(Clone, Copy)]
 pub enum CacheRole {
     /// The DM cache device, contains the other three devices.
-    #[allow(dead_code)]
     Cache,
     /// The cache sub-device of the DM cache device.
-    #[allow(dead_code)]
     CacheSub,
     /// The meta sub-device of the DM cache device.
-    #[allow(dead_code)]
     MetaSub,
     /// The origin sub-device of the DM cache device, holds the actual data.
     OriginSub,

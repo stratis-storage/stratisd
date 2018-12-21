@@ -298,7 +298,7 @@ mod tests {
         pub fn new(name: &str, uuid: Uuid) -> TestThing {
             TestThing {
                 name: name.to_owned(),
-                uuid: uuid.clone(),
+                uuid,
                 stuff: rand::random::<u32>(),
             }
         }

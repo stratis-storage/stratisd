@@ -848,7 +848,7 @@ mod mda {
         use super::*;
 
         // 82102984128000 in decimal, approx 17 million years
-        const UTC_TIMESTAMP_SECS_BOUND: i64 = 0x7779beb9f00;
+        const UTC_TIMESTAMP_SECS_BOUND: i64 = 0x777_9beb_9f00;
         const UTC_TIMESTAMP_NSECS_BOUND: u32 = 2_000_000_000u32;
 
         #[test]

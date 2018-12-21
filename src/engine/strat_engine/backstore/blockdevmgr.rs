@@ -528,8 +528,8 @@ mod tests {
             true
         } else {
             match left {
-                &DevOwnership::Theirs(_) => match right {
-                    &DevOwnership::Theirs(_) => true,
+                DevOwnership::Theirs(_) => match right {
+                    DevOwnership::Theirs(_) => true,
                     _ => false,
                 },
                 _ => false,

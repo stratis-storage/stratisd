@@ -242,7 +242,7 @@ mod tests {
     /// Do basic testing of the cache. Make a new cache and test some
     /// expected properties, then add some additional blockdevs and test
     /// some more properties.
-    fn cache_test_add(paths: &[&Path]) -> () {
+    fn cache_test_add(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);

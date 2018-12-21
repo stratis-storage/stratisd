@@ -182,7 +182,7 @@ mod tests {
     /// Put the data tier through some paces. Make it, alloc a small amount,
     /// add some more blockdevs, allocate enough that the newly added blockdevs
     /// must be allocated from for success.
-    fn test_add_and_alloc(paths: &[&Path]) -> () {
+    fn test_add_and_alloc(paths: &[&Path]) {
         assert!(paths.len() > 1);
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 

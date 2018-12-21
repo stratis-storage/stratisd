@@ -590,7 +590,7 @@ mod tests {
     /// * backstore's data tier allocated is equal to the size of the cap device
     /// * backstore's next index is always less than the size of the cap
     ///   device
-    fn invariant(backstore: &Backstore) -> () {
+    fn invariant(backstore: &Backstore) {
         assert!(
             (backstore.cache_tier.is_none() && backstore.cache.is_none())
                 || (backstore.cache_tier.is_some()
@@ -614,7 +614,7 @@ mod tests {
     /// Nonetheless, because nothing is written or read, cache usage ought
     /// to be 0. Adding some more cachedevs exercises different code path
     /// from adding initial cachedevs.
-    fn test_add_cache_devs(paths: &[&Path]) -> () {
+    fn test_add_cache_devs(paths: &[&Path]) {
         assert!(paths.len() > 3);
 
         let meta_size = Sectors(IEC::Mi);
@@ -713,7 +713,7 @@ mod tests {
     /// bigger than the reqested amount.
     /// Request an impossibly large amount.
     /// Verify that the backstore is now all used up.
-    fn test_request(paths: &[&Path]) -> () {
+    fn test_request(paths: &[&Path]) {
         assert!(paths.len() > 0);
 
         let pool_uuid = Uuid::new_v4();
@@ -772,7 +772,7 @@ mod tests {
     /// Setup the same backstore again.
     /// Verify blockdev metadata again.
     /// Destroy all.
-    fn test_setup(paths: &[&Path]) -> () {
+    fn test_setup(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);

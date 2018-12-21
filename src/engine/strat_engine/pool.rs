@@ -494,7 +494,7 @@ mod tests {
 
     use super::*;
 
-    fn invariant(pool: &StratPool, pool_name: &str) -> () {
+    fn invariant(pool: &StratPool, pool_name: &str) {
         check_metadata(&pool.record(&Name::new(pool_name.into()))).unwrap();
     }
 
@@ -564,7 +564,7 @@ mod tests {
 
     /// Verify that a pool with no devices does not have the minimum amount of
     /// space required.
-    fn test_empty_pool(paths: &[&Path]) -> () {
+    fn test_empty_pool(paths: &[&Path]) {
         assert_eq!(paths.len(), 0);
         assert!(StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE).is_err());
     }

@@ -1608,7 +1608,7 @@ mod tests {
     /// Verify that destroy_filesystems actually deallocates the space
     /// from the thinpool, by attempting to reinstantiate it using the
     /// same thin id and verifying that it fails.
-    fn test_thindev_destroy(paths: &[&Path]) -> () {
+    fn test_thindev_destroy(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
@@ -1660,7 +1660,7 @@ mod tests {
     /// dip below the FILESYSTEM_LOWATER mark. Verify that the space has been
     /// expanded by calling filesystem.check() then looking at the total space
     /// compared to the original size.
-    fn test_xfs_expand(paths: &[&Path]) -> () {
+    fn test_xfs_expand(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();

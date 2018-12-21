@@ -43,7 +43,7 @@ impl RealTestDev {
     }
 
     /// Teardown a real test dev
-    fn teardown(self) -> () {
+    fn teardown(self) {
         wipe_sectors(&self.as_path(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
         if let Some(mut ld) = self.dev.right() {
             ld.teardown(get_dm()).unwrap();
@@ -188,7 +188,7 @@ fn make_linear_test_dev(devnode: &Path, start: Sectors, length: Sectors) -> Line
 /// Run test on real devices, using given constraints. Constraints may result
 /// in multiple invocations of the test, with differing numbers of block
 /// devices.
-pub fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
+pub fn test_with_spec<F>(limits: DeviceLimits, test: F)
 where
     F: Fn(&[&Path]) -> () + panic::RefUnwindSafe,
 {

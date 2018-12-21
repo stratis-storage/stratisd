@@ -541,7 +541,7 @@ mod tests {
     /// size() - metadata_size() = avail_space().
     /// After 2 Sectors have been allocated, that amount must also be included
     /// in balance.
-    fn test_blockdevmgr_used(paths: &[&Path]) -> () {
+    fn test_blockdevmgr_used(paths: &[&Path]) {
         let mut mgr = BlockDevMgr::initialize(Uuid::new_v4(), paths, MIN_MDA_SECTORS).unwrap();
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
@@ -579,7 +579,7 @@ mod tests {
 
     /// Verify that it is impossible to initialize a set of disks of which
     /// even one of them has a signature.  Choose the dirty disk randomly.
-    fn test_fail_single_signature(paths: &[&Path]) -> () {
+    fn test_fail_single_signature(paths: &[&Path]) {
         let index = rand::random::<u8>() as usize % paths.len();
 
         cmd::create_ext3_fs(paths[index]).unwrap();
@@ -643,7 +643,7 @@ mod tests {
     /// 1. Initialize devices with pool uuid.
     /// 2. Initializing again with different uuid must fail.
     /// 3. Adding the devices must succeed, because they already belong.
-    fn test_initialization_add_stratis(paths: &[&Path]) -> () {
+    fn test_initialization_add_stratis(paths: &[&Path]) {
         assert!(paths.len() > 1);
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
@@ -699,7 +699,7 @@ mod tests {
     /// 5. Run find_all() again and verify that both sets of devices are found.
     /// 6. Verify that get_metadata() return an error. initialize() only
     /// initializes block devices, it does not write metadata.
-    fn test_initialize(paths: &[&Path]) -> () {
+    fn test_initialize(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
@@ -752,7 +752,7 @@ mod tests {
 
     /// Test that initialing devices claims all and that destroying
     /// them releases all.
-    fn test_ownership(paths: &[&Path]) -> () {
+    fn test_ownership(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         let mut bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
 

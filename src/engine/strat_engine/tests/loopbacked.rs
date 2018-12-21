@@ -90,7 +90,7 @@ fn get_devices(count: usize, size: Option<Sectors>, dir: &tempfile::TempDir) -> 
 }
 
 /// Run the designated tests according to the specification.
-pub fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
+pub fn test_with_spec<F>(limits: DeviceLimits, test: F)
 where
     F: Fn(&[&Path]) -> () + panic::RefUnwindSafe,
 {

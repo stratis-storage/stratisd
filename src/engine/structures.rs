@@ -281,7 +281,7 @@ mod tests {
 
     // A global invariant checker for the table.
     // Verifies proper relationship between internal data structures.
-    fn table_invariant<T>(table: &Table<T>) -> () {
+    fn table_invariant<T>(table: &Table<T>) {
         for (uuid, &(ref name, _)) in &table.items {
             assert_eq!(*uuid, *table.name_to_uuid.get(name).unwrap())
         }

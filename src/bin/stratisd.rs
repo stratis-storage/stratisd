@@ -61,7 +61,7 @@ const DEFAULT_STATE_DUMP_MINUTES: i64 = 10;
 const DEFAULT_LOG_HOLD_MINUTES: i64 = 30;
 
 /// If writing a program error to stderr fails, panic.
-fn print_err(err: &StratisError) -> () {
+fn print_err(err: &StratisError) {
     eprintln!("{}", err);
 }
 

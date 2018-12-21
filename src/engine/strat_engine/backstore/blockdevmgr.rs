@@ -585,14 +585,17 @@ mod tests {
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS).is_ok());
         cmd::udev_settle().unwrap();
 
-        assert!(paths.iter().all(|path| {
-            let (t_pool_uuid, _) = StaticHeader::device_identifiers(
-                &mut OpenOptions::new().read(true).open(path).unwrap(),
-            )
-            .unwrap()
-            .unwrap();
-            pool_uuid == t_pool_uuid
-        }));
+        for path in paths {
+            assert_eq!(
+                pool_uuid,
+                StaticHeader::device_identifiers(
+                    &mut OpenOptions::new().read(true).open(path).unwrap(),
+                )
+                .unwrap()
+                .unwrap()
+                .0
+            );
+        }
     }
 
     #[test]
@@ -745,23 +748,29 @@ mod tests {
 
         cmd::udev_settle().unwrap();
 
-        assert!(paths.iter().all(|path| {
-            let (t_pool_uuid, _) = StaticHeader::device_identifiers(
-                &mut OpenOptions::new().read(true).open(path).unwrap(),
-            )
-            .unwrap()
-            .unwrap();
-            pool_uuid == t_pool_uuid
-        }));
+        for path in paths {
+            assert_eq!(
+                pool_uuid,
+                StaticHeader::device_identifiers(
+                    &mut OpenOptions::new().read(true).open(path).unwrap(),
+                )
+                .unwrap()
+                .unwrap()
+                .0
+            );
+        }
 
         bd_mgr.destroy_all().unwrap();
-        assert!(paths.iter().all(|path| {
-            let id = StaticHeader::device_identifiers(
-                &mut OpenOptions::new().read(true).open(path).unwrap(),
-            )
-            .unwrap();
-            id.is_none()
-        }));
+
+        for path in paths {
+            assert_eq!(
+                StaticHeader::device_identifiers(
+                    &mut OpenOptions::new().read(true).open(path).unwrap(),
+                )
+                .unwrap(),
+                None
+            );
+        }
     }
 
     #[test]

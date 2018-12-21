@@ -520,23 +520,6 @@ mod tests {
 
     use super::*;
 
-    /// Returns true if two usages have the same type.  This is needed because
-    /// if Usage::Theirs(String::from("foo") != Usage::Theirs(String::from("bar").
-    /// TODO: See if there is a better way to solve this.
-    fn usage_equal(left: &DevOwnership, right: &DevOwnership) -> bool {
-        if left == right {
-            true
-        } else {
-            match left {
-                DevOwnership::Theirs(_) => match right {
-                    DevOwnership::Theirs(_) => true,
-                    _ => false,
-                },
-                _ => false,
-            }
-        }
-    }
-
     /// Verify that initially,
     /// size() - metadata_size() = avail_space().
     /// After 2 Sectors have been allocated, that amount must also be included
@@ -587,15 +570,13 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS).is_err());
-        assert!(paths.iter().enumerate().all(|(i, path)| {
-            let tmp = if i == index {
-                DevOwnership::Theirs(String::from(""))
+        for (i, path) in paths.iter().enumerate() {
+            if i == index {
+                assert_matches!(identify(path).unwrap(), DevOwnership::Theirs(_));
             } else {
-                DevOwnership::Unowned
-            };
-
-            usage_equal(&identify(path).unwrap(), &tmp)
-        }));
+                assert_matches!(identify(path).unwrap(), DevOwnership::Unowned);
+            }
+        }
 
         // Clear out the beginning of the device and make sure we succeed now.
         wipe_sectors(paths[index], Sectors(0), MIN_MDA_SECTORS).unwrap();

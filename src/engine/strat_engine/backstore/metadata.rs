@@ -892,7 +892,7 @@ mod mda {
 
                 // 4 is NUM_MDA_REGIONS which is not imported from super.
                 let region_size =
-                    (MIN_MDA_SECTORS / 4usize).bytes() + Bytes(region_size_ext as u64);
+                    (MIN_MDA_SECTORS / 4usize).bytes() + Bytes(u64::from(region_size_ext));
 
                 let header = MDAHeader {
                     last_updated: Utc.timestamp(sec, nsec),
@@ -977,7 +977,7 @@ mod tests {
     fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
         let pool_uuid = Uuid::new_v4();
         let dev_uuid = Uuid::new_v4();
-        let mda_size = MIN_MDA_SECTORS + Sectors((mda_size_factor * 4) as u64);
+        let mda_size = MIN_MDA_SECTORS + Sectors(u64::from(mda_size_factor * 4));
         let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
         StaticHeader::new(
             pool_uuid,

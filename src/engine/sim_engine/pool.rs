@@ -41,6 +41,7 @@ pub struct SimPool {
 }
 
 impl SimPool {
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(
         rdm: &Rc<RefCell<Randomizer>>,
         paths: &[&Path],

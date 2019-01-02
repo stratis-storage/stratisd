@@ -38,3 +38,4 @@ matches = "0.1.8"
 [features]
 default = ["dbus_enabled"]
 dbus_enabled = ["dbus"]
+incremental_policy = []

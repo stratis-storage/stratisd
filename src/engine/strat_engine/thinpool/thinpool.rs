@@ -138,15 +138,18 @@ trait ExtensionPolicy: Debug {
     fn data_extend_amount(&self, usage: &ThinPoolUsage, backstore: &Backstore) -> DataBlocks;
 }
 
+#[cfg(not(feature = "incremental_policy"))]
 #[derive(Debug)]
 struct GreedyExtensionPolicy {}
 
+#[cfg(not(feature = "incremental_policy"))]
 impl GreedyExtensionPolicy {
     fn new() -> GreedyExtensionPolicy {
         GreedyExtensionPolicy {}
     }
 }
 
+#[cfg(not(feature = "incremental_policy"))]
 impl ExtensionPolicy for GreedyExtensionPolicy {
     fn extension_lowater(
         &self,
@@ -171,6 +174,38 @@ impl ExtensionPolicy for GreedyExtensionPolicy {
         // Note: Assumes this is called after meta_extend_amount(), so it's
         // safe to just grab everything.
         sectors_to_datablocks(backstore.available_in_backstore())
+    }
+}
+
+#[cfg(feature = "incremental_policy")]
+#[derive(Debug)]
+struct IncrementalExtensionPolicy {}
+
+#[cfg(feature = "incremental_policy")]
+impl IncrementalExtensionPolicy {
+    fn new() -> IncrementalExtensionPolicy {
+        IncrementalExtensionPolicy {}
+    }
+}
+
+#[cfg(feature = "incremental_policy")]
+impl ExtensionPolicy for IncrementalExtensionPolicy {
+    fn extension_lowater(
+        &self,
+        _used: DataBlocks,
+        _data_dev_size: DataBlocks,
+        _available: DataBlocks,
+    ) -> Option<DataBlocks> {
+        Some(DATA_LOWATER)
+    }
+
+    fn meta_extend_amount(&self, usage: &ThinPoolUsage, _backstore: &Backstore) -> MetaBlocks {
+        // Extend by the current size, to double the meta dev's size
+        usage.total_meta
+    }
+
+    fn data_extend_amount(&self, _usage: &ThinPoolUsage, _backstore: &Backstore) -> DataBlocks {
+        DataBlocks(4096)
     }
 }
 
@@ -355,7 +390,12 @@ impl ThinPool {
         let (dm_name, dm_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
 
         let (free_space_state, data_dev_size) = (FreeSpaceState::Good, data_dev.size());
-        let policy = Box::new(GreedyExtensionPolicy::new());
+
+        #[cfg(not(feature = "incremental_policy"))]
+        let policy: Box<ExtensionPolicy> = Box::new(GreedyExtensionPolicy::new());
+        #[cfg(feature = "incremental_policy")]
+        let policy: Box<ExtensionPolicy> = Box::new(IncrementalExtensionPolicy::new());
+
         let thinpool_dev = ThinPoolDev::new(
             get_dm(),
             &dm_name,
@@ -429,7 +469,12 @@ impl ThinPool {
         )?;
 
         let (free_space_state, data_dev_size) = (FreeSpaceState::Good, data_dev.size());
-        let policy = Box::new(GreedyExtensionPolicy::new());
+
+        #[cfg(not(feature = "incremental_policy"))]
+        let policy: Box<ExtensionPolicy> = Box::new(GreedyExtensionPolicy::new());
+        #[cfg(feature = "incremental_policy")]
+        let policy: Box<ExtensionPolicy> = Box::new(IncrementalExtensionPolicy::new());
+
         let thinpool_dev = ThinPoolDev::setup(
             get_dm(),
             &thinpool_name,

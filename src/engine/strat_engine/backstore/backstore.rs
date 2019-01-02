@@ -416,6 +416,7 @@ impl Backstore {
     }
 
     /// The current usable size of all the blockdevs in the data tier.
+    #[allow(dead_code)]
     pub fn datatier_usable_size(&self) -> Sectors {
         self.data_tier.usable_size()
     }

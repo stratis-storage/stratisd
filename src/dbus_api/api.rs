@@ -247,20 +247,11 @@ impl DbusConnectionData {
         for action in actions.drain() {
             match action {
                 DeferredAction::Add(path) => {
-                    match self
-                        .connection
+                    self.connection
                         .borrow_mut()
                         .register_object_path(path.get_name())
-                    {
-                        Err(err) => error!(
-                            "Could not register object path {}, should never happen: {}",
-                            path.get_name(),
-                            err
-                        ),
-                        Ok(_) => {
-                            self.tree.insert(path);
-                        }
-                    }
+                        .expect("Must succeed since object paths are unique");
+                    self.tree.insert(path);
                 }
                 DeferredAction::Remove(path) => {
                     self.connection.borrow_mut().unregister_object_path(&path);

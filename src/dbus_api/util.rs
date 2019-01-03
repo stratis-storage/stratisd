@@ -15,7 +15,8 @@ use devicemapper::DmError;
 
 use super::super::stratis::{ErrorEnum, StratisError};
 
-use super::types::{DbusErrorEnum, TData};
+use super::consts;
+use super::types::{DbusContext, DbusErrorEnum, TData};
 
 /// Convert a tuple as option to an Option type
 pub fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {

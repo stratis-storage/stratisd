@@ -450,7 +450,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                                         )
                                         .1,
                                     &handle.path,
-                                )?;
+                                );
                             }
                         }
                     }
@@ -518,15 +518,12 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                         .borrow()
                         .watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents))
                     {
-                        if let Err(r) = libstratis::dbus_api::handle(
+                        libstratis::dbus_api::handle(
                             &handle.connection.borrow(),
                             &item,
                             &mut handle.tree,
                             &handle.context,
-                        ) {
-                            log_engine_state(&*engine.borrow());
-                            print_err(&From::from(r));
-                        }
+                        );
                     }
                 }
 
@@ -554,7 +551,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                         pool_uuid,
                         pool,
                         &handle.path,
-                    )?;
+                    );
                 }
 
                 // Add dbus FD to fds as dbus is now available.

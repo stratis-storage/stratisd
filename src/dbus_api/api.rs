@@ -241,7 +241,7 @@ pub fn register_pool(
     pool_uuid: Uuid,
     pool: &mut Pool,
     object_path: &dbus::Path<'static>,
-) -> Result<(), dbus::Error> {
+) {
     register_pool_dbus(dbus_context, pool_uuid, pool, object_path);
     process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut())
 }
@@ -251,11 +251,12 @@ fn process_deferred_actions(
     c: &Connection,
     tree: &mut Tree<MTFn<TData>, TData>,
     actions: &mut ActionQueue,
-) -> Result<(), dbus::Error> {
+) {
     for action in actions.drain() {
         match action {
             DeferredAction::Add(path) => {
-                c.register_object_path(path.get_name())?;
+                c.register_object_path(path.get_name())
+                    .expect("Each object path is unique, so there can be no conflict.");
                 tree.insert(path);
             }
             DeferredAction::Remove(path) => {
@@ -264,7 +265,6 @@ fn process_deferred_actions(
             }
         }
     }
-    Ok(())
 }
 
 pub fn handle(
@@ -272,7 +272,7 @@ pub fn handle(
     item: &ConnectionItem,
     tree: &mut Tree<MTFn<TData>, TData>,
     dbus_context: &DbusContext,
-) -> Result<(), dbus::Error> {
+) {
     if let ConnectionItem::MethodCall(ref msg) = *item {
         if let Some(v) = tree.handle(msg) {
             // Probably the wisest is to ignore any send errors here -
@@ -282,8 +282,8 @@ pub fn handle(
             }
         }
 
-        process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut())?;
+        process_deferred_actions(c, tree, &mut dbus_context.actions.borrow_mut());
     }
 
-    Ok(())
+    ()
 }

@@ -38,6 +38,16 @@ where
     Ok(value)
 }
 
+/// Generate a new object path which is guaranteed unique wrt. all previously
+/// generated object paths.
+pub fn make_object_path(context: &DbusContext) -> String {
+    format!(
+        "{}/{}",
+        consts::STRATIS_BASE_PATH,
+        context.get_next_id().to_string()
+    )
+}
+
 /// Translates an engine error to the (errorcode, string) tuple that Stratis
 /// D-Bus methods return.
 pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {

@@ -2,7 +2,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use super::blockdevmgr::BlkDevSegment;
+use devicemapper::Device;
+
+use crate::{
+    engine::{
+        strat_engine::{
+            backstore::blockdevmgr::{BlkDevSegment, Segment},
+            serde_structs::BaseDevSave,
+        },
+        types::DevUuid,
+    },
+    stratis::{ErrorEnum, StratisError, StratisResult},
+};
 
 /// Append the second list of BlkDevSegments to the first, or if the last
 /// segment of the first argument is adjacent to the first segment of the
@@ -44,4 +55,36 @@ pub fn coalesce_blkdevsegs(left: &[BlkDevSegment], right: &[BlkDevSegment]) -> V
         segments.extend_from_slice(right);
     }
     segments
+}
+
+/// Given a function that translates a Stratis UUID to a device
+/// number, and some metadata that describes a particular segment within
+/// a device by means of its Stratis UUID, and its start and offset w/in the
+/// device, return the corresponding BlkDevSegment structure.
+// This method necessarily takes a reference to a Box because it receives
+// the value from a function, and there is no other way for the function to
+// be returned from a closure.
+// In future, it may be possible to address this better with FnBox.
+#[allow(clippy::borrowed_box)]
+pub fn metadata_to_segment(
+    uuid_to_devno: &Box<dyn Fn(DevUuid) -> Option<Device>>,
+    base_dev_save: &BaseDevSave,
+) -> StratisResult<BlkDevSegment> {
+    let parent = base_dev_save.parent;
+    uuid_to_devno(parent)
+        .ok_or_else(|| {
+            StratisError::Engine(
+                ErrorEnum::NotFound,
+                format!(
+                    "No block device corresponding to stratisd UUID {:?} found",
+                    &parent
+                ),
+            )
+        })
+        .map(|device| {
+            BlkDevSegment::new(
+                parent,
+                Segment::new(device, base_dev_save.start, base_dev_save.length),
+            )
+        })
 }

@@ -12,15 +12,15 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                blockdevmgr::{BlkDevSegment, BlockDevMgr, Segment},
-                util::coalesce_blkdevsegs,
+                blockdevmgr::{BlkDevSegment, BlockDevMgr},
+                util::{coalesce_blkdevsegs, metadata_to_segment},
                 StratBlockDev,
             },
-            serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
+            serde_structs::{BlockDevSave, DataTierSave, Recordable},
         },
         BlockDevTier, DevUuid, PoolUuid,
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::StratisResult,
 };
 
 /// Handles the lowest level, base layer of this tier.
@@ -37,23 +37,11 @@ impl DataTier {
     /// previously allocated segments.
     pub fn setup(block_mgr: BlockDevMgr, data_tier_save: &DataTierSave) -> StratisResult<DataTier> {
         let uuid_to_devno = block_mgr.uuid_to_devno();
-        let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
-            let parent = ld.parent;
-            let device = uuid_to_devno(parent).ok_or_else(|| {
-                StratisError::Engine(
-                    ErrorEnum::NotFound,
-                    format!("missing device for UUUD {:?}", &parent),
-                )
-            })?;
-            Ok(BlkDevSegment::new(
-                parent,
-                Segment::new(device, ld.start, ld.length),
-            ))
-        };
-        let segments = data_tier_save.blockdev.allocs[0]
-            .iter()
-            .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()?;
+
+        let mut segments = Vec::new();
+        for base_dev_save in &data_tier_save.blockdev.allocs[0] {
+            segments.push(metadata_to_segment(&uuid_to_devno, &base_dev_save)?);
+        }
 
         Ok(DataTier {
             block_mgr,

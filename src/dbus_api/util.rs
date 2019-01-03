@@ -15,7 +15,8 @@ use devicemapper::DmError;
 
 use super::super::stratis::{ErrorEnum, StratisError};
 
-use super::types::{DbusErrorEnum, TData};
+use super::consts;
+use super::types::{DbusContext, DbusErrorEnum, TData};
 
 /// Convert a tuple as option to an Option type
 pub fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {
@@ -36,6 +37,16 @@ where
     };
     let value: T = iter.read::<T>().map_err(|_| MethodErr::invalid_arg(&loc))?;
     Ok(value)
+}
+
+/// Generate a new object path which is guaranteed unique wrt. all previously
+/// generated object paths.
+pub fn make_object_path(context: &DbusContext) -> String {
+    format!(
+        "{}/{}",
+        consts::STRATIS_BASE_PATH,
+        context.get_next_id().to_string()
+    )
 }
 
 /// Translates an engine error to the (errorcode, string) tuple that Stratis

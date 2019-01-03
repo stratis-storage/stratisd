@@ -24,7 +24,9 @@ use super::consts;
 use super::filesystem::create_dbus_filesystem;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
-use super::util::{engine_to_dbus_err_tuple, get_next_arg, get_uuid, msg_code_ok, msg_string_ok};
+use super::util::{
+    engine_to_dbus_err_tuple, get_next_arg, get_uuid, make_object_path, msg_code_ok, msg_string_ok,
+};
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
@@ -465,11 +467,7 @@ pub fn create_dbus_pool<'a>(
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_space_state);
 
-    let object_name = format!(
-        "{}/{}",
-        consts::STRATIS_BASE_PATH,
-        dbus_context.get_next_id().to_string()
-    );
+    let object_name = make_object_path(dbus_context);
 
     let object_path = f
         .object_path(object_name, Some(OPContext::new(parent, uuid)))

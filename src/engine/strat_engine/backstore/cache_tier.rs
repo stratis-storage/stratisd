@@ -12,10 +12,11 @@ use stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 
-use super::super::serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Recordable};
+use super::super::serde_structs::{BlockDevSave, CacheTierSave, Recordable};
 
 use super::blockdev::StratBlockDev;
-use super::blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment};
+use super::blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr};
+use super::junk::junk;
 
 /// This is a temporary maximum cache size. In the future it will be possible
 /// to dynamically increase the cache size beyond this limit. When this is
@@ -54,29 +55,16 @@ impl CacheTier {
         }
 
         let uuid_to_devno = block_mgr.uuid_to_devno();
-        let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
-            let parent = ld.parent;
-            let device = uuid_to_devno(parent).ok_or_else(|| {
-                StratisError::Engine(
-                    ErrorEnum::NotFound,
-                    format!("missing device for UUUD {:?}", &parent),
-                )
-            })?;
-            Ok(BlkDevSegment::new(
-                parent,
-                Segment::new(device, ld.start, ld.length),
-            ))
-        };
 
-        let meta_segments = cache_tier_save.blockdev.allocs[1]
-            .iter()
-            .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()?;
+        let mut meta_segments = Vec::new();
+        for base_dev_save in &cache_tier_save.blockdev.allocs[1] {
+            meta_segments.push(junk(&uuid_to_devno, &base_dev_save)?);
+        }
 
-        let cache_segments = cache_tier_save.blockdev.allocs[0]
-            .iter()
-            .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()?;
+        let mut cache_segments = Vec::new();
+        for base_dev_save in &cache_tier_save.blockdev.allocs[0] {
+            cache_segments.push(junk(&uuid_to_devno, &base_dev_save)?);
+        }
 
         Ok(CacheTier {
             block_mgr,

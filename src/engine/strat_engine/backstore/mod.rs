@@ -10,6 +10,7 @@ mod cache_tier;
 mod cleanup;
 mod data_tier;
 pub mod device;
+mod junk;
 mod metadata;
 mod range_alloc;
 mod setup;

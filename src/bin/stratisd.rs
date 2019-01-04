@@ -520,7 +520,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     0   == Always udev fd index
     1   == SIGNAL FD index
     2   == TIMER FD for periodic dump index
-    2   == engine index if eventable
+    3   == engine index if eventable
     3/4 == Start of dbus client file descriptor(s)
             * 3 if engine is not eventable
             * else 4

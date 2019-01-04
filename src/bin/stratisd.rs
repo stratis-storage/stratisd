@@ -319,13 +319,13 @@ impl MaybeDbusSupport {
     }
 
     /// Connect to D-Bus and register pools, if not already connected.
+    /// Return true if connected, otherwise false.
     fn check_connect(&mut self, engine: &Rc<RefCell<Engine>>) -> bool {
-        let mut connected = self.handle.is_some();
-        if !connected {
+        if self.handle.is_none() {
             match libstratis::dbus_api::DbusConnectionData::connect(Rc::clone(&engine)) {
                 Err(_err) => {
                     info!("D-Bus API is not available");
-                    connected = false;
+                    false
                 }
                 Ok(mut handle) => {
                     info!("D-Bus API is available");
@@ -336,11 +336,12 @@ impl MaybeDbusSupport {
                         handle.register_pool(pool_uuid, pool)
                     }
                     self.handle = Some(handle);
-                    connected = true;
+                    true
                 }
             }
+        } else {
+            true
         }
-        connected
     }
 
     /// Handle any client dbus requests.

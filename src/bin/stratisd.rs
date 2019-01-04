@@ -385,6 +385,8 @@ impl MaybeDbusSupport {
     }
 }
 
+// A facility for listening for and handling udev events that stratisd
+// considers interesting.
 struct UdevMonitor<'a> {
     socket: libudev::MonitorSocket<'a>,
 }

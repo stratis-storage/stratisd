@@ -43,7 +43,7 @@ impl RealTestDev {
     }
 
     /// Teardown a real test dev
-    fn teardown(self) -> () {
+    fn teardown(self) {
         wipe_sectors(&self.as_path(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
         if let Some(mut ld) = self.dev.right() {
             ld.teardown(get_dm()).unwrap();
@@ -74,20 +74,21 @@ pub enum DeviceLimits {
 
 /// Get a list of lists of devices to use for tests.
 /// May return an empty list if the request is not satisfiable.
+#[allow(clippy::type_complexity)]
 fn get_device_runs<'a>(
-    limits: DeviceLimits,
+    limits: &DeviceLimits,
     dev_sizes: &[(&'a Path, Sectors)],
 ) -> Vec<Vec<(&'a Path, Option<(Sectors, Sectors)>)>> {
     let (lower, maybe_upper, min_size, max_size) = match limits {
-        DeviceLimits::Exactly(num, min_size, max_size) => (num, Some(num), min_size, max_size),
-        DeviceLimits::AtLeast(num, min_size, max_size) => (num, None, min_size, max_size),
+        DeviceLimits::Exactly(num, min_size, max_size) => (*num, Some(*num), *min_size, *max_size),
+        DeviceLimits::AtLeast(num, min_size, max_size) => (*num, None, *min_size, *max_size),
         DeviceLimits::Range(lower, upper, min_size, max_size) => {
             assert!(lower < upper);
-            (lower, Some(upper), min_size, max_size)
+            (*lower, Some(*upper), *min_size, *max_size)
         }
     };
 
-    let min_size = min_size.unwrap_or(Bytes(IEC::Gi).sectors());
+    let min_size = min_size.unwrap_or_else(|| Bytes(IEC::Gi).sectors());
 
     assert!(max_size.is_none() || Some(min_size) <= max_size);
 
@@ -188,7 +189,7 @@ fn make_linear_test_dev(devnode: &Path, start: Sectors, length: Sectors) -> Line
 /// Run test on real devices, using given constraints. Constraints may result
 /// in multiple invocations of the test, with differing numbers of block
 /// devices.
-pub fn test_with_spec<F>(limits: DeviceLimits, test: F) -> ()
+pub fn test_with_spec<F>(limits: &DeviceLimits, test: F)
 where
     F: Fn(&[&Path]) -> () + panic::RefUnwindSafe,
 {
@@ -218,7 +219,7 @@ where
         })
         .collect();
 
-    let runs = get_device_runs(limits, &dev_sizes);
+    let runs = get_device_runs(&limits, &dev_sizes);
 
     assert!(!runs.is_empty());
 

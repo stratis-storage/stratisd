@@ -590,7 +590,7 @@ mod tests {
     /// * backstore's data tier allocated is equal to the size of the cap device
     /// * backstore's next index is always less than the size of the cap
     ///   device
-    fn invariant(backstore: &Backstore) -> () {
+    fn invariant(backstore: &Backstore) {
         assert!(
             (backstore.cache_tier.is_none() && backstore.cache.is_none())
                 || (backstore.cache_tier.is_some()
@@ -614,7 +614,7 @@ mod tests {
     /// Nonetheless, because nothing is written or read, cache usage ought
     /// to be 0. Adding some more cachedevs exercises different code path
     /// from adding initial cachedevs.
-    fn test_add_cache_devs(paths: &[&Path]) -> () {
+    fn test_add_cache_devs(paths: &[&Path]) {
         assert!(paths.len() > 3);
 
         let meta_size = Sectors(IEC::Mi);
@@ -687,7 +687,7 @@ mod tests {
     #[test]
     pub fn loop_test_add_cache_devs() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(4, 5, None),
+            &loopbacked::DeviceLimits::Range(4, 5, None),
             test_add_cache_devs,
         );
     }
@@ -695,7 +695,7 @@ mod tests {
     #[test]
     pub fn real_test_add_cache_devs() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(4, None, None),
+            &real::DeviceLimits::AtLeast(4, None, None),
             test_add_cache_devs,
         );
     }
@@ -703,7 +703,7 @@ mod tests {
     #[test]
     pub fn travis_test_add_cache_devs() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(4, 5, None),
+            &loopbacked::DeviceLimits::Range(4, 5, None),
             test_add_cache_devs,
         );
     }
@@ -713,8 +713,8 @@ mod tests {
     /// bigger than the reqested amount.
     /// Request an impossibly large amount.
     /// Verify that the backstore is now all used up.
-    fn test_request(paths: &[&Path]) -> () {
-        assert!(paths.len() > 0);
+    fn test_request(paths: &[&Path]) {
+        assert!(!paths.is_empty());
 
         let pool_uuid = Uuid::new_v4();
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
@@ -752,17 +752,17 @@ mod tests {
 
     #[test]
     pub fn loop_test_request() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_request);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_request);
     }
 
     #[test]
     pub fn real_test_request() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_request);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_request);
     }
 
     #[test]
     pub fn travis_test_request() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_request);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_request);
     }
 
     /// Create a backstore with a cache.
@@ -772,7 +772,7 @@ mod tests {
     /// Setup the same backstore again.
     /// Verify blockdev metadata again.
     /// Destroy all.
-    fn test_setup(paths: &[&Path]) -> () {
+    fn test_setup(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
@@ -798,7 +798,7 @@ mod tests {
 
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
-        let map = map.get(&pool_uuid).unwrap();
+        let map = &map[&pool_uuid];
         let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
         invariant(&backstore);
 
@@ -810,7 +810,7 @@ mod tests {
 
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
-        let map = map.get(&pool_uuid).unwrap();
+        let map = &map[&pool_uuid];
         let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
         invariant(&backstore);
 
@@ -823,16 +823,16 @@ mod tests {
 
     #[test]
     pub fn loop_test_setup() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
     }
 
     #[test]
     pub fn real_test_setup() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None), test_setup);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_setup);
     }
 
     #[test]
     pub fn travis_test_setup() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
     }
 }

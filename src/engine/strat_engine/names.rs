@@ -240,6 +240,7 @@ mod tests {
     use engine::strat_engine::names::validate_name;
 
     #[test]
+    #[allow(clippy::cyclomatic_complexity)]
     pub fn test_validate_name() {
         assert!(validate_name(&'\u{0}'.to_string()).is_err());
         assert!(validate_name("./some").is_err());

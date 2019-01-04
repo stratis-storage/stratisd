@@ -89,7 +89,6 @@ fn stratis_filesystems_unmount() -> Result<()> {
         let parser = libmount::mountinfo::Parser::new(mount_data.as_bytes());
 
         for mount_point in parser
-            .into_iter()
             .filter_map(|x| x.ok())
             .filter_map(|m| m.mount_point.into_owned().into_string().ok())
             .filter(|mp| mp.contains("stratis"))

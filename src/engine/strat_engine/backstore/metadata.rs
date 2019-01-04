@@ -776,7 +776,7 @@ mod mda {
             // This comparison seems absurd when compiled in an environment
             // where usize is u64, which is usual. It is not absurd when
             // compiled in an environment where usize is u32.
-            #![allow(absurd_extreme_comparisons)]
+            #![allow(clippy::absurd_extreme_comparisons)]
             assert!(*self.used <= std::usize::MAX as u64);
             let mut data_buf = vec![0u8; *self.used as usize];
 
@@ -848,7 +848,7 @@ mod mda {
         use super::*;
 
         // 82102984128000 in decimal, approx 17 million years
-        const UTC_TIMESTAMP_SECS_BOUND: i64 = 0x7779beb9f00;
+        const UTC_TIMESTAMP_SECS_BOUND: i64 = 0x777_9beb_9f00;
         const UTC_TIMESTAMP_NSECS_BOUND: u32 = 2_000_000_000u32;
 
         #[test]
@@ -892,7 +892,7 @@ mod mda {
 
                 // 4 is NUM_MDA_REGIONS which is not imported from super.
                 let region_size =
-                    (MIN_MDA_SECTORS / 4usize).bytes() + Bytes(region_size_ext as u64);
+                    (MIN_MDA_SECTORS / 4usize).bytes() + Bytes(u64::from(region_size_ext));
 
                 let header = MDAHeader {
                     last_updated: Utc.timestamp(sec, nsec),
@@ -964,10 +964,10 @@ mod tests {
     {
         let mut byte_to_corrupt = [0; 1];
         f.seek(SeekFrom::Start(position))?;
-        f.read(&mut byte_to_corrupt)?;
+        f.read_exact(&mut byte_to_corrupt)?;
         byte_to_corrupt[0] = !byte_to_corrupt[0];
         f.seek(SeekFrom::Start(position))?;
-        f.write(&byte_to_corrupt)?;
+        f.write_all(&byte_to_corrupt)?;
         f.sync_all()?;
         Ok(())
     }
@@ -977,7 +977,7 @@ mod tests {
     fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
         let pool_uuid = Uuid::new_v4();
         let dev_uuid = Uuid::new_v4();
-        let mda_size = MIN_MDA_SECTORS + Sectors((mda_size_factor * 4) as u64);
+        let mda_size = MIN_MDA_SECTORS + Sectors(u64::from(mda_size_factor * 4));
         let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
         StaticHeader::new(
             pool_uuid,
@@ -1171,7 +1171,7 @@ mod tests {
 
             if let Some(index) = primary {
                 // Corrupt primary copy
-                corrupt_byte(&mut buf, (1 * SECTOR_SIZE + index) as u64).unwrap();
+                corrupt_byte(&mut buf, (SECTOR_SIZE + index) as u64).unwrap();
             }
 
             if let Some(index) = secondary {

@@ -7,5 +7,5 @@ pub use self::stratis::VERSION;
 
 pub mod buff_log;
 mod errors;
-#[allow(module_inception)]
+#[allow(clippy::module_inception)]
 mod stratis;

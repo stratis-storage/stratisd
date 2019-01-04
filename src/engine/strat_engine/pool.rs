@@ -494,7 +494,7 @@ mod tests {
 
     use super::*;
 
-    fn invariant(pool: &StratPool, pool_name: &str) -> () {
+    fn invariant(pool: &StratPool, pool_name: &str) {
         check_metadata(&pool.record(&Name::new(pool_name.into()))).unwrap();
     }
 
@@ -525,8 +525,8 @@ mod tests {
         cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 2);
-        let devnodes1 = pools.get(&uuid1).unwrap();
-        let devnodes2 = pools.get(&uuid2).unwrap();
+        let devnodes1 = &pools[&uuid1];
+        let devnodes2 = &pools[&uuid2];
         let pool_save1 = get_metadata(uuid1, devnodes1).unwrap().unwrap();
         let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
@@ -538,8 +538,8 @@ mod tests {
         cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 2);
-        let devnodes1 = pools.get(&uuid1).unwrap();
-        let devnodes2 = pools.get(&uuid2).unwrap();
+        let devnodes1 = &pools[&uuid1];
+        let devnodes2 = &pools[&uuid2];
         let pool_save1 = get_metadata(uuid1, devnodes1).unwrap().unwrap();
         let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
@@ -549,7 +549,7 @@ mod tests {
     #[test]
     pub fn loop_test_basic_metadata() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_basic_metadata,
         );
     }
@@ -557,26 +557,26 @@ mod tests {
     #[test]
     pub fn real_test_basic_metadata() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(2, None, None),
+            &real::DeviceLimits::AtLeast(2, None, None),
             test_basic_metadata,
         );
     }
 
     /// Verify that a pool with no devices does not have the minimum amount of
     /// space required.
-    fn test_empty_pool(paths: &[&Path]) -> () {
+    fn test_empty_pool(paths: &[&Path]) {
         assert_eq!(paths.len(), 0);
         assert!(StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE).is_err());
     }
 
     #[test]
     pub fn loop_test_empty_pool() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Exactly(0, None), test_empty_pool);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Exactly(0, None), test_empty_pool);
     }
 
     #[test]
     pub fn real_test_empty_pool() {
-        real::test_with_spec(real::DeviceLimits::Exactly(0, None, None), test_empty_pool);
+        real::test_with_spec(&real::DeviceLimits::Exactly(0, None, None), test_empty_pool);
     }
 
     /// Test that adding a cachedev causes metadata to be updated.
@@ -625,7 +625,7 @@ mod tests {
                 .write(true)
                 .open(&new_file)
                 .unwrap()
-                .write(bytestring)
+                .write_all(bytestring)
                 .unwrap();
         }
 
@@ -642,7 +642,7 @@ mod tests {
                 .read(true)
                 .open(&new_file)
                 .unwrap()
-                .read(&mut buf)
+                .read_exact(&mut buf)
                 .unwrap();
         }
         assert_eq!(&buf, bytestring);
@@ -654,7 +654,7 @@ mod tests {
         cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 1);
-        let devices = pools.get(&uuid).unwrap();
+        let devices = &pools[&uuid];
         let (name, pool) = StratPool::setup(
             uuid,
             &devices,
@@ -678,7 +678,7 @@ mod tests {
                 .read(true)
                 .open(&new_file)
                 .unwrap()
-                .read(&mut buf)
+                .read_exact(&mut buf)
                 .unwrap();
         }
         assert_eq!(&buf, bytestring);
@@ -688,7 +688,7 @@ mod tests {
     #[test]
     pub fn loop_test_add_cachedevs() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_add_cachedevs,
         );
     }
@@ -696,7 +696,7 @@ mod tests {
     #[test]
     pub fn real_test_add_cachedevs() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(2, None, None),
+            &real::DeviceLimits::AtLeast(2, None, None),
             test_add_cachedevs,
         );
     }
@@ -759,7 +759,7 @@ mod tests {
     #[test]
     pub fn loop_test_add_datadevs() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, Some((4u64 * Bytes(IEC::Gi)).sectors())),
+            &loopbacked::DeviceLimits::Range(2, 3, Some((4u64 * Bytes(IEC::Gi)).sectors())),
             test_add_datadevs,
         );
     }
@@ -767,7 +767,7 @@ mod tests {
     #[test]
     pub fn real_test_add_datadevs() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(
+            &real::DeviceLimits::AtLeast(
                 2,
                 Some((2u64 * Bytes(IEC::Gi)).sectors()),
                 Some((4u64 * Bytes(IEC::Gi)).sectors()),

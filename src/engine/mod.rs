@@ -30,7 +30,7 @@ pub use self::types::RenameAction;
 mod macros;
 
 mod devlinks;
-#[allow(module_inception)]
+#[allow(clippy::module_inception)]
 mod engine;
 mod event;
 mod sim_engine;

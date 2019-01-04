@@ -61,8 +61,8 @@ mod tests {
                 .set_probability(denominator)
                 .throw_die();
             prop_assert!(denominator > 1
-                         || (denominator != 0 && result == false)
-                         || (denominator == 0 && result == true));
+                         || (denominator != 0 && !result)
+                         || (denominator == 0 && result));
         }
     }
 }

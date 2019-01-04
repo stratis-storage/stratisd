@@ -281,13 +281,13 @@ mod tests {
 
     // A global invariant checker for the table.
     // Verifies proper relationship between internal data structures.
-    fn table_invariant<T>(table: &Table<T>) -> () {
+    fn table_invariant<T>(table: &Table<T>) {
         for (uuid, &(ref name, _)) in &table.items {
-            assert_eq!(*uuid, *table.name_to_uuid.get(name).unwrap())
+            assert_eq!(uuid, &table.name_to_uuid[name])
         }
 
         for (name, uuid) in &table.name_to_uuid {
-            assert_eq!(*name, table.items.get(uuid).unwrap().0);
+            assert_eq!(name, &table.items[uuid].0);
         }
 
         // No extra garbage
@@ -298,7 +298,7 @@ mod tests {
         pub fn new(name: &str, uuid: Uuid) -> TestThing {
             TestThing {
                 name: name.to_owned(),
-                uuid: uuid.clone(),
+                uuid,
                 stuff: rand::random::<u32>(),
             }
         }
@@ -370,7 +370,7 @@ mod tests {
 
         // It has displaced the old thing.
         assert!(displaced.is_some());
-        let ref displaced_item = displaced.unwrap();
+        let displaced_item = &displaced.unwrap();
         assert_eq!(&*displaced_item[0].0, name);
         assert_eq!(displaced_item[0].1, uuid);
 
@@ -411,7 +411,7 @@ mod tests {
 
         // The items displaced consist exactly of the first item.
         assert!(displaced.is_some());
-        let ref displaced_item = displaced.unwrap();
+        let displaced_item = &displaced.unwrap();
         assert_eq!(&*displaced_item[0].0, name);
         assert_eq!(displaced_item[0].1, uuid);
         assert_eq!(displaced_item[0].2.stuff, thing_key);
@@ -455,7 +455,7 @@ mod tests {
 
         // The items displaced consist exactly of the first item.
         assert!(displaced.is_some());
-        let ref displaced_item = displaced.unwrap();
+        let displaced_item = &displaced.unwrap();
         assert_eq!(&*displaced_item[0].0, name);
         assert_eq!(displaced_item[0].1, uuid);
         assert_eq!(displaced_item[0].2.stuff, thing_key);
@@ -518,7 +518,7 @@ mod tests {
 
         // The items displaced consist of two items.
         assert!(displaced.is_some());
-        let ref displaced_items = displaced.unwrap();
+        let displaced_items = &displaced.unwrap();
         assert_eq!(displaced_items.len(), 2);
 
         // The first displaced item has the name of the just inserted item.

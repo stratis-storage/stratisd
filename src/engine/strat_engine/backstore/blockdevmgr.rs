@@ -411,7 +411,7 @@ fn initialize(
     /// Filter devices for admission to pool based on dev_infos.
     /// If there is an error finding out the info, return that error.
     /// Also, return an error if a device is not appropriate for this pool.
-    #[allow(type_complexity)]
+    #[allow(clippy::type_complexity)]
     fn filter_devs<'a, I>(
         dev_infos: I,
         pool_uuid: PoolUuid,
@@ -520,28 +520,11 @@ mod tests {
 
     use super::*;
 
-    /// Returns true if two usages have the same type.  This is needed because
-    /// if Usage::Theirs(String::from("foo") != Usage::Theirs(String::from("bar").
-    /// TODO: See if there is a better way to solve this.
-    fn usage_equal(left: &DevOwnership, right: &DevOwnership) -> bool {
-        if left == right {
-            true
-        } else {
-            match left {
-                &DevOwnership::Theirs(_) => match right {
-                    &DevOwnership::Theirs(_) => true,
-                    _ => false,
-                },
-                _ => false,
-            }
-        }
-    }
-
     /// Verify that initially,
     /// size() - metadata_size() = avail_space().
     /// After 2 Sectors have been allocated, that amount must also be included
     /// in balance.
-    fn test_blockdevmgr_used(paths: &[&Path]) -> () {
+    fn test_blockdevmgr_used(paths: &[&Path]) {
         let mut mgr = BlockDevMgr::initialize(Uuid::new_v4(), paths, MIN_MDA_SECTORS).unwrap();
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
@@ -556,7 +539,7 @@ mod tests {
     #[test]
     pub fn loop_test_blockdevmgr_used() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_blockdevmgr_used,
         );
     }
@@ -564,7 +547,7 @@ mod tests {
     #[test]
     pub fn real_test_blockdevmgr_used() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(1, None, None),
+            &real::DeviceLimits::AtLeast(1, None, None),
             test_blockdevmgr_used,
         );
     }
@@ -572,14 +555,14 @@ mod tests {
     #[test]
     pub fn travis_test_blockdevmgr_used() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_blockdevmgr_used,
         );
     }
 
     /// Verify that it is impossible to initialize a set of disks of which
     /// even one of them has a signature.  Choose the dirty disk randomly.
-    fn test_fail_single_signature(paths: &[&Path]) -> () {
+    fn test_fail_single_signature(paths: &[&Path]) {
         let index = rand::random::<u8>() as usize % paths.len();
 
         cmd::create_ext3_fs(paths[index]).unwrap();
@@ -587,15 +570,13 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS).is_err());
-        assert!(paths.iter().enumerate().all(|(i, path)| {
-            let tmp = if i == index {
-                DevOwnership::Theirs(String::from(""))
+        for (i, path) in paths.iter().enumerate() {
+            if i == index {
+                assert_matches!(identify(path).unwrap(), DevOwnership::Theirs(_));
             } else {
-                DevOwnership::Unowned
-            };
-
-            usage_equal(&identify(path).unwrap(), &tmp)
-        }));
+                assert_matches!(identify(path).unwrap(), DevOwnership::Unowned);
+            }
+        }
 
         // Clear out the beginning of the device and make sure we succeed now.
         wipe_sectors(paths[index], Sectors(0), MIN_MDA_SECTORS).unwrap();
@@ -604,20 +585,23 @@ mod tests {
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS).is_ok());
         cmd::udev_settle().unwrap();
 
-        assert!(paths.iter().all(|path| {
-            let (t_pool_uuid, _) = StaticHeader::device_identifiers(
-                &mut OpenOptions::new().read(true).open(path).unwrap(),
-            )
-            .unwrap()
-            .unwrap();
-            pool_uuid == t_pool_uuid
-        }));
+        for path in paths {
+            assert_eq!(
+                pool_uuid,
+                StaticHeader::device_identifiers(
+                    &mut OpenOptions::new().read(true).open(path).unwrap(),
+                )
+                .unwrap()
+                .unwrap()
+                .0
+            );
+        }
     }
 
     #[test]
     pub fn loop_test_fail_single_signature() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_fail_single_signature,
         );
     }
@@ -625,7 +609,7 @@ mod tests {
     #[test]
     pub fn real_test_fail_single_signature() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(1, None, None),
+            &real::DeviceLimits::AtLeast(1, None, None),
             test_fail_single_signature,
         );
     }
@@ -633,7 +617,7 @@ mod tests {
     #[test]
     pub fn travis_test_fail_single_signature() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_fail_single_signature,
         );
     }
@@ -643,7 +627,7 @@ mod tests {
     /// 1. Initialize devices with pool uuid.
     /// 2. Initializing again with different uuid must fail.
     /// 3. Adding the devices must succeed, because they already belong.
-    fn test_initialization_add_stratis(paths: &[&Path]) -> () {
+    fn test_initialization_add_stratis(paths: &[&Path]) {
         assert!(paths.len() > 1);
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
@@ -668,7 +652,7 @@ mod tests {
     #[test]
     pub fn loop_test_initialization_stratis() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_initialization_add_stratis,
         );
     }
@@ -676,7 +660,7 @@ mod tests {
     #[test]
     pub fn real_test_initialization_stratis() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(2, None, None),
+            &real::DeviceLimits::AtLeast(2, None, None),
             test_initialization_add_stratis,
         );
     }
@@ -684,7 +668,7 @@ mod tests {
     #[test]
     pub fn travis_test_initialization_stratis() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_initialization_add_stratis,
         );
     }
@@ -699,7 +683,7 @@ mod tests {
     /// 5. Run find_all() again and verify that both sets of devices are found.
     /// 6. Verify that get_metadata() return an error. initialize() only
     /// initializes block devices, it does not write metadata.
-    fn test_initialize(paths: &[&Path]) -> () {
+    fn test_initialize(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
@@ -737,58 +721,70 @@ mod tests {
 
     #[test]
     pub fn loop_test_initialize() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_initialize);
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_initialize,
+        );
     }
 
     #[test]
     pub fn real_test_initialize() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None), test_initialize);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_initialize);
     }
 
     #[test]
     pub fn travis_test_initialize() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_initialize);
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_initialize,
+        );
     }
 
     /// Test that initialing devices claims all and that destroying
     /// them releases all.
-    fn test_ownership(paths: &[&Path]) -> () {
+    fn test_ownership(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         let mut bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
 
         cmd::udev_settle().unwrap();
 
-        assert!(paths.iter().all(|path| {
-            let (t_pool_uuid, _) = StaticHeader::device_identifiers(
-                &mut OpenOptions::new().read(true).open(path).unwrap(),
-            )
-            .unwrap()
-            .unwrap();
-            pool_uuid == t_pool_uuid
-        }));
+        for path in paths {
+            assert_eq!(
+                pool_uuid,
+                StaticHeader::device_identifiers(
+                    &mut OpenOptions::new().read(true).open(path).unwrap(),
+                )
+                .unwrap()
+                .unwrap()
+                .0
+            );
+        }
 
         bd_mgr.destroy_all().unwrap();
-        assert!(paths.iter().all(|path| {
-            let id = StaticHeader::device_identifiers(
-                &mut OpenOptions::new().read(true).open(path).unwrap(),
-            )
-            .unwrap();
-            id.is_none()
-        }));
+
+        for path in paths {
+            assert_eq!(
+                StaticHeader::device_identifiers(
+                    &mut OpenOptions::new().read(true).open(path).unwrap(),
+                )
+                .unwrap(),
+                None
+            );
+        }
     }
 
     #[test]
     pub fn loop_test_ownership() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
     }
 
     #[test]
     pub fn real_test_ownership() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_ownership);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_ownership);
     }
 
     #[test]
     pub fn travis_test_ownership() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
     }
 }

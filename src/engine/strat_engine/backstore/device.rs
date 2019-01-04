@@ -180,7 +180,7 @@ mod test {
     #[test]
     pub fn loop_test_device_other_ownership() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_other_ownership,
         );
     }
@@ -188,18 +188,18 @@ mod test {
     #[test]
     pub fn real_test_device_other_ownership() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(1, None, None),
+            &real::DeviceLimits::AtLeast(1, None, None),
             test_other_ownership,
         );
     }
 
     #[test]
     pub fn loop_test_device_empty() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_empty);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_empty);
     }
 
     #[test]
     pub fn real_test_device_empty() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_empty);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_empty);
     }
 }

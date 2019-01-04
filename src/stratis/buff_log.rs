@@ -170,7 +170,7 @@ impl OwnedRecord {
     }
 }
 
-#[allow(type_complexity)]
+#[allow(clippy::type_complexity)]
 #[derive(Debug)]
 struct BuffLogger<L: Log> {
     pass_through: bool,

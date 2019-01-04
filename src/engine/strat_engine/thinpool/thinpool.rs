@@ -228,6 +228,7 @@ pub struct ThinPool {
 
 impl ThinPool {
     /// Make a new thin pool.
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(
         pool_uuid: PoolUuid,
         thin_pool_size: &ThinPoolSizeParams,
@@ -1146,7 +1147,7 @@ impl Recordable<ThinPoolDevSave> for ThinPool {
 /// run thin_repair, using the spare segments, to try to repair the metadata
 /// dev. Return the metadata device, the metadata segments, and the
 /// spare segments.
-#[allow(type_complexity)]
+#[allow(clippy::type_complexity)]
 fn setup_metadev(
     pool_uuid: PoolUuid,
     thinpool_name: &DmName,
@@ -1154,7 +1155,7 @@ fn setup_metadev(
     meta_segments: Vec<(Sectors, Sectors)>,
     spare_segments: Vec<(Sectors, Sectors)>,
 ) -> StratisResult<(LinearDev, Vec<(Sectors, Sectors)>, Vec<(Sectors, Sectors)>)> {
-    #![allow(collapsible_if)]
+    #![allow(clippy::collapsible_if)]
     let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinMeta);
     let mut meta_dev = LinearDev::setup(
         get_dm(),
@@ -1259,7 +1260,7 @@ mod tests {
     #[test]
     pub fn loop_test_greedy_allocation() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_greedy_allocation,
         );
     }
@@ -1267,7 +1268,7 @@ mod tests {
     #[test]
     pub fn real_test_greedy_allocation() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(2, None, None),
+            &real::DeviceLimits::AtLeast(2, None, None),
             test_greedy_allocation,
         );
     }
@@ -1367,7 +1368,7 @@ mod tests {
     #[test]
     pub fn loop_test_full_pool() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Exactly(2, Some(Bytes(IEC::Gi).sectors())),
+            &loopbacked::DeviceLimits::Exactly(2, Some(Bytes(IEC::Gi).sectors())),
             test_full_pool,
         );
     }
@@ -1375,7 +1376,7 @@ mod tests {
     #[test]
     pub fn real_test_full_pool() {
         real::test_with_spec(
-            real::DeviceLimits::Exactly(
+            &real::DeviceLimits::Exactly(
                 2,
                 Some(Bytes(IEC::Gi).sectors()),
                 Some(Bytes(IEC::Gi * 4).sectors()),
@@ -1470,7 +1471,7 @@ mod tests {
                     .path()
                     .join(format!("stratis_test{}.txt", i));
                 let mut f = OpenOptions::new().read(true).open(file_path).unwrap();
-                f.read(&mut read_buf).unwrap();
+                f.read_exact(&mut read_buf).unwrap();
                 assert_eq!(read_buf[0..SECTOR_SIZE], write_buf[0..SECTOR_SIZE]);
             }
         }
@@ -1479,7 +1480,7 @@ mod tests {
     #[test]
     pub fn loop_test_filesystem_snapshot() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_filesystem_snapshot,
         );
     }
@@ -1487,7 +1488,7 @@ mod tests {
     #[test]
     pub fn real_test_filesystem_snapshot() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(2, None, None),
+            &real::DeviceLimits::AtLeast(2, None, None),
             test_filesystem_snapshot,
         );
     }
@@ -1529,7 +1530,7 @@ mod tests {
     #[test]
     pub fn loop_test_filesystem_rename() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_filesystem_rename,
         );
     }
@@ -1537,7 +1538,7 @@ mod tests {
     #[test]
     pub fn real_test_filesystem_rename() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(1, None, None),
+            &real::DeviceLimits::AtLeast(1, None, None),
             test_filesystem_rename,
         );
     }
@@ -1598,17 +1599,20 @@ mod tests {
 
     #[test]
     pub fn loop_test_pool_setup() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_pool_setup);
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 3, None),
+            test_pool_setup,
+        );
     }
 
     #[test]
     pub fn real_test_pool_setup() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_pool_setup);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_pool_setup);
     }
     /// Verify that destroy_filesystems actually deallocates the space
     /// from the thinpool, by attempting to reinstantiate it using the
     /// same thin id and verifying that it fails.
-    fn test_thindev_destroy(paths: &[&Path]) -> () {
+    fn test_thindev_destroy(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
@@ -1642,7 +1646,7 @@ mod tests {
     pub fn loop_test_thindev_destroy() {
         // This test requires more than 1 GiB.
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_thindev_destroy,
         );
     }
@@ -1650,7 +1654,7 @@ mod tests {
     #[test]
     pub fn real_test_thindev_destroy() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(1, None, None),
+            &real::DeviceLimits::AtLeast(1, None, None),
             test_thindev_destroy,
         );
     }
@@ -1660,7 +1664,7 @@ mod tests {
     /// dip below the FILESYSTEM_LOWATER mark. Verify that the space has been
     /// expanded by calling filesystem.check() then looking at the total space
     /// compared to the original size.
-    fn test_xfs_expand(paths: &[&Path]) -> () {
+    fn test_xfs_expand(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
@@ -1725,12 +1729,15 @@ mod tests {
 
     #[test]
     pub fn loop_test_xfs_expand() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(1, 3, None), test_xfs_expand);
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 3, None),
+            test_xfs_expand,
+        );
     }
 
     #[test]
     pub fn real_test_xfs_expand() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(1, None, None), test_xfs_expand);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_xfs_expand);
     }
 
     /// Just suspend and resume the device and make sure it doesn't crash.
@@ -1762,7 +1769,7 @@ mod tests {
     #[test]
     pub fn loop_test_suspend_resume() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_suspend_resume,
         );
     }
@@ -1770,7 +1777,7 @@ mod tests {
     #[test]
     pub fn real_test_suspend_resume() {
         real::test_with_spec(
-            real::DeviceLimits::AtLeast(1, None, None),
+            &real::DeviceLimits::AtLeast(1, None, None),
             test_suspend_resume,
         );
     }
@@ -1822,7 +1829,7 @@ mod tests {
                 .write(true)
                 .open(&new_file)
                 .unwrap()
-                .write(bytestring)
+                .write_all(bytestring)
                 .unwrap();
         }
         let filesystem_saves = pool.mdv.filesystems().unwrap();
@@ -1853,7 +1860,7 @@ mod tests {
                 .read(true)
                 .open(&new_file)
                 .unwrap()
-                .read(&mut buf)
+                .read_exact(&mut buf)
                 .unwrap();
         }
         assert_eq!(&buf, bytestring);
@@ -1871,11 +1878,14 @@ mod tests {
 
     #[test]
     pub fn loop_test_set_device() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), test_set_device);
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_set_device,
+        );
     }
 
     #[test]
     pub fn real_test_set_device() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None), test_set_device);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_set_device);
     }
 }

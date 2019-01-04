@@ -147,6 +147,7 @@ impl CacheTier {
     /// sub-device too big.
     ///
     /// WARNING: metadata changing event
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(mut block_mgr: BlockDevMgr) -> StratisResult<CacheTier> {
         let avail_space = block_mgr.avail_space();
 
@@ -242,7 +243,7 @@ mod tests {
     /// Do basic testing of the cache. Make a new cache and test some
     /// expected properties, then add some additional blockdevs and test
     /// some more properties.
-    fn cache_test_add(paths: &[&Path]) -> () {
+    fn cache_test_add(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
@@ -295,16 +296,16 @@ mod tests {
 
     #[test]
     pub fn loop_cache_test_add() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), cache_test_add);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), cache_test_add);
     }
 
     #[test]
     pub fn real_cache_test_add() {
-        real::test_with_spec(real::DeviceLimits::AtLeast(2, None, None), cache_test_add);
+        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), cache_test_add);
     }
 
     #[test]
     pub fn travis_cache_test_add() {
-        loopbacked::test_with_spec(loopbacked::DeviceLimits::Range(2, 3, None), cache_test_add);
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), cache_test_add);
     }
 }

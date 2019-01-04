@@ -65,7 +65,6 @@ mod tests {
     fn get_write_throttled_devices() -> StratisResult<Vec<(Device, u64)>> {
         // Find all cgroup subdirectories
         let mut cg_dirs = fs::read_dir(CGROUP_PATH)?
-            .into_iter()
             .filter_map(|entry| entry.ok())
             .map(|entry| entry.path())
             .filter(|path| path.is_dir())
@@ -131,7 +130,7 @@ mod tests {
     #[test]
     pub fn loop_test_write_throttling() {
         loopbacked::test_with_spec(
-            loopbacked::DeviceLimits::Exactly(1, Some(Bytes(IEC::Mi * 50).sectors())),
+            &loopbacked::DeviceLimits::Exactly(1, Some(Bytes(IEC::Mi * 50).sectors())),
             test_write_throttling,
         );
     }
@@ -139,7 +138,7 @@ mod tests {
     #[test]
     pub fn real_test_write_throttling() {
         real::test_with_spec(
-            real::DeviceLimits::Exactly(1, Some(Bytes(IEC::Mi * 50).sectors()), None),
+            &real::DeviceLimits::Exactly(1, Some(Bytes(IEC::Mi * 50).sectors()), None),
             test_write_throttling,
         );
     }

@@ -378,9 +378,9 @@ impl MaybeDbusSupport {
     }
 
     fn poll_timeout(&self) -> i32 {
-        // If dbus support is compiled in and dbus isn't available we will set
-        // timeout to 1 second so that we periodically check to see if we can
-        // bring it up.
+        // If there is no D-Bus connection set timeout to 1 sec (1000 ms), so
+        // that stratisd can periodically attempt to set up a connection.
+        // If the connection is up, set the timeout to infinite.
         self.handle.as_ref().map_or(1000, |_| -1)
     }
 }

@@ -434,6 +434,7 @@ impl<'a> UdevMonitor<'a> {
 }
 
 // Process any pending signals, return true if SIGINT received.
+// Return an error if there was an error reading the signal.
 fn process_signal(
     sfd: &mut SignalFd,
     buff_log: &buff_log::Handle<env_logger::Logger>,
@@ -463,7 +464,6 @@ fn process_signal(
         // No signals waiting (SFD_NONBLOCK flag is set)
         Ok(None) => Ok(false),
 
-        // Pessimistically exit on an error reading the signal.
         Err(err) => Err(err.into()),
     }
 }

@@ -433,7 +433,7 @@ impl<'a> UdevMonitor<'a> {
     }
 }
 
-// Process any pending signals, return true if we should exit.
+// Process any pending signals, return true if SIGINT received.
 fn process_signal(
     sfd: &mut SignalFd,
     buff_log: &buff_log::Handle<env_logger::Logger>,

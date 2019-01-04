@@ -600,12 +600,10 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     log_engine_state(&*engine.borrow());
 
     loop {
-        // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
             udev_monitor.handle_events(&mut *engine.borrow_mut(), &mut dbus_support)
         }
 
-        // Process any signals off of signalfd
         if fds[FD_INDEX_SIGNALFD].revents != 0 {
             match process_signal(&mut sfd, &buff_log) {
                 Ok(should_exit) => {
@@ -617,14 +615,12 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
             }
         }
 
-        // Process timerfd expiry
         if fds[FD_INDEX_DUMP_TIMERFD].revents != 0 {
             tfd.read(); // clear the event
             info!("Dump timer expired, dumping state");
             log_engine_state(&*engine.borrow());
         }
 
-        // Handle engine events, if the engine is eventable
         if let Some(ref evt) = eventable {
             if fds[FD_INDEX_ENGINE].revents != 0 {
                 evt.clear_event()?;

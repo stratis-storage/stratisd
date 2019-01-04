@@ -639,9 +639,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         // interface.
         dbus_support.process(&engine, &mut fds, dbus_client_index_start);
 
-        let poll_timeout = dbus_support.poll_timeout();
-        // Block until we have something to handle
-        process_poll(poll_timeout, &mut fds)?;
+        process_poll(dbus_support.poll_timeout(), &mut fds)?;
     }
 }
 

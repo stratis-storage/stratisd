@@ -262,7 +262,7 @@ impl DbusConnectionData {
     }
 
     /// Handle any client dbus requests
-    pub fn handle(&mut self, fds: &[libc::pollfd]) -> () {
+    pub fn handle(&mut self, fds: &[libc::pollfd]) {
         for pfd in fds.iter().filter(|pfd| pfd.revents != 0) {
             let items: Vec<ConnectionItem> = self
                 .connection

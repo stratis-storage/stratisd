@@ -493,8 +493,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     // Ensure that the debug log is output when we leave this function.
     let _guard = buff_log.to_guard();
 
-    // Even if dbus is enabled at compile time, it may not be available at all
-    // times depending on the environment we are running in.
     let mut dbus_support = MaybeDbusSupport::new();
 
     // Setup a udev listener before initializing the engine. A device may
@@ -634,9 +632,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
             }
         }
 
-        // Iterate through D-Bus file descriptors (if enabled) and dbus is
-        // actually available, otherwise attempt to bring up the dbus
-        // interface.
         dbus_support.process(&engine, &mut fds, dbus_client_index_start);
 
         process_poll(dbus_support.poll_timeout(), &mut fds)?;

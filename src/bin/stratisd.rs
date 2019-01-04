@@ -405,7 +405,7 @@ impl<'a> UdevMonitor<'a> {
 
     /// Given some udev events, see if any new pools are formed, and set up
     /// dbus if so.
-    fn handle_events(&mut self, engine: &Rc<RefCell<Engine>>, dbus_support: &mut MaybeDbusSupport) {
+    fn handle_events(&mut self, engine: &mut Engine, dbus_support: &mut MaybeDbusSupport) {
         while let Some(event) = self.socket.receive_event() {
             if event.event_type() == libudev::EventType::Add
                 || event.event_type() == libudev::EventType::Change
@@ -414,14 +414,12 @@ impl<'a> UdevMonitor<'a> {
                 let new_pool_uuid = device.devnode().and_then(|devnode| {
                     device.devnum().and_then(|devnum| {
                         engine
-                            .borrow_mut()
                             .block_evaluate(Device::from(devnum), PathBuf::from(devnode))
                             .unwrap_or(None)
                     })
                 });
                 if let Some(pool_uuid) = new_pool_uuid {
-                    let mut eng_ref = engine.borrow_mut();
-                    let (_, pool) = eng_ref
+                    let (_, pool) = engine
                         .get_mut_pool(pool_uuid)
                         .expect("block_evaluate() returned a pool UUID, pool must be available");
                     dbus_support.register_pool(pool_uuid, pool);
@@ -602,7 +600,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     loop {
         // Process any udev block events
         if fds[FD_INDEX_UDEV].revents != 0 {
-            udev_monitor.handle_events(&engine, &mut dbus_support)
+            udev_monitor.handle_events(&mut *engine.borrow_mut(), &mut dbus_support)
         }
 
         // Process any signals off of signalfd

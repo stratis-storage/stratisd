@@ -14,7 +14,6 @@ use dbus::tree::{
 };
 use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
 use libc;
-use uuid::Uuid;
 
 use super::super::engine::{Engine, Pool, PoolUuid};
 use super::super::stratis::VERSION;
@@ -192,22 +191,6 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
     (base_tree.add(obj_path), path)
 }
 
-/// Given an Pool, create all the needed dbus objects to represent it.
-fn register_pool_dbus(
-    dbus_context: &DbusContext,
-    pool_uuid: PoolUuid,
-    pool: &mut Pool,
-    object_path: &dbus::Path<'static>,
-) {
-    let pool_path = create_dbus_pool(dbus_context, object_path.clone(), pool_uuid, pool);
-    for (_, fs_uuid, fs) in pool.filesystems_mut() {
-        create_dbus_filesystem(dbus_context, pool_path.clone(), fs_uuid, fs);
-    }
-    for (uuid, bd) in pool.blockdevs_mut() {
-        create_dbus_blockdev(dbus_context, pool_path.clone(), uuid, bd);
-    }
-}
-
 /// Returned data from when you connect a stratis engine to dbus.
 pub struct DbusConnectionData {
     pub connection: Rc<RefCell<Connection>>,
@@ -236,8 +219,15 @@ impl DbusConnectionData {
     }
 
     /// Given the UUID of a pool, register all the pertinent information with dbus.
-    pub fn register_pool(&mut self, pool_uuid: Uuid, pool: &mut Pool) {
-        register_pool_dbus(&self.context, pool_uuid, pool, &self.path);
+    pub fn register_pool(&mut self, pool_uuid: PoolUuid, pool: &mut Pool) {
+        let pool_path = create_dbus_pool(&self.context, self.path.clone(), pool_uuid, pool);
+        for (_, fs_uuid, fs) in pool.filesystems_mut() {
+            create_dbus_filesystem(&self.context, pool_path.clone(), fs_uuid, fs);
+        }
+        for (uuid, bd) in pool.blockdevs_mut() {
+            create_dbus_blockdev(&self.context, pool_path.clone(), uuid, bd);
+        }
+
         self.process_deferred_actions()
     }
 

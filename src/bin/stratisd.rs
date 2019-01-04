@@ -615,7 +615,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                         return Ok(());
                     }
                 }
-                Err(e) => error!("process_signal: {:?}", e),
+                Err(e) => return Err(e),
             }
         }
 

@@ -391,7 +391,7 @@ struct UdevMonitor<'a> {
 
 impl<'a> UdevMonitor<'a> {
     fn create(context: &'a libudev::Context) -> StratisResult<UdevMonitor<'a>> {
-        let mut monitor = libudev::Monitor::new(&context)?;
+        let mut monitor = libudev::Monitor::new(context)?;
         monitor.match_subsystem_devtype("block", "disk")?;
 
         Ok(UdevMonitor {

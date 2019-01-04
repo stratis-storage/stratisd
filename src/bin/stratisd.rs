@@ -324,7 +324,7 @@ impl MaybeDbusSupport {
         if self.handle.is_none() {
             match libstratis::dbus_api::DbusConnectionData::connect(Rc::clone(&engine)) {
                 Err(_err) => {
-                    info!("D-Bus API is not available");
+                    warn!("D-Bus API is not available");
                     false
                 }
                 Ok(mut handle) => {

@@ -283,6 +283,7 @@ impl EngineListener for EventHandler {
     }
 }
 
+// Conditionally compiled support for a D-Bus interface.
 struct MaybeDbusSupport {
     #[cfg(feature = "dbus_enabled")]
     handle: Option<libstratis::dbus_api::DbusConnectionData>,

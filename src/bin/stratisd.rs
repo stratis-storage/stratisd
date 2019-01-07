@@ -45,7 +45,7 @@ use dbus::Connection;
 
 use devicemapper::Device;
 #[cfg(feature = "dbus_enabled")]
-use libstratis::dbus_api::{consts, prop_changed_dispatch};
+use libstratis::dbus_api::{consts, prop_changed_dispatch, DbusConnectionData};
 #[cfg(feature = "dbus_enabled")]
 use libstratis::engine::{
     get_engine_listener_list_mut, EngineEvent, EngineListener, MaybeDbusPath,
@@ -319,13 +319,15 @@ impl MaybeDbusSupport {
     }
 
     /// Connect to D-Bus and register pools, if not already connected.
-    /// Return true if connected, otherwise false.
-    fn setup_connection(&mut self, engine: &Rc<RefCell<Engine>>) -> bool {
+    /// Return the connection, if made or already existing, otherwise, None.
+    fn setup_connection(
+        &mut self,
+        engine: &Rc<RefCell<Engine>>,
+    ) -> Option<&mut DbusConnectionData> {
         if self.handle.is_none() {
             match libstratis::dbus_api::DbusConnectionData::connect(Rc::clone(&engine)) {
                 Err(_err) => {
                     warn!("D-Bus API is not available");
-                    false
                 }
                 Ok(mut handle) => {
                     info!("D-Bus API is available");
@@ -336,12 +338,10 @@ impl MaybeDbusSupport {
                         handle.register_pool(pool_uuid, pool)
                     }
                     self.handle = Some(handle);
-                    true
                 }
             }
-        } else {
-            true
-        }
+        };
+        self.handle.as_mut()
     }
 
     /// Handle any client dbus requests.
@@ -351,12 +351,7 @@ impl MaybeDbusSupport {
         fds: &mut Vec<libc::pollfd>,
         dbus_client_index_start: usize,
     ) {
-        if self.setup_connection(engine) {
-            let handle = &mut self
-                .handle
-                .as_mut()
-                .expect("Connected, so handle is present");
-
+        if let Some(handle) = self.setup_connection(engine) {
             handle.handle(&fds[dbus_client_index_start..]);
 
             // Refresh list of dbus fds to poll for. This can change as

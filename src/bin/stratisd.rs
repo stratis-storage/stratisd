@@ -320,7 +320,7 @@ impl MaybeDbusSupport {
 
     /// Connect to D-Bus and register pools, if not already connected.
     /// Return true if connected, otherwise false.
-    fn check_connect(&mut self, engine: &Rc<RefCell<Engine>>) -> bool {
+    fn setup_connection(&mut self, engine: &Rc<RefCell<Engine>>) -> bool {
         if self.handle.is_none() {
             match libstratis::dbus_api::DbusConnectionData::connect(Rc::clone(&engine)) {
                 Err(_err) => {
@@ -351,7 +351,7 @@ impl MaybeDbusSupport {
         fds: &mut Vec<libc::pollfd>,
         dbus_client_index_start: usize,
     ) {
-        if self.check_connect(engine) {
+        if self.setup_connection(engine) {
             let handle = &mut self
                 .handle
                 .as_mut()

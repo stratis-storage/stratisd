@@ -402,8 +402,9 @@ impl<'a> UdevMonitor<'a> {
         self.socket.as_raw_fd()
     }
 
-    /// Given some udev events, see if any new pools are formed, and set up
-    /// dbus if so.
+    /// Handle udev events.
+    /// Check if a pool can be constructed and update engine and D-Bus layer
+    /// data structures if so.
     fn handle_events(&mut self, engine: &mut Engine, dbus_support: &mut MaybeDbusSupport) {
         while let Some(event) = self.socket.receive_event() {
             if event.event_type() == libudev::EventType::Add

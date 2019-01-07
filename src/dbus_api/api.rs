@@ -227,8 +227,6 @@ impl DbusConnectionData {
         for (uuid, bd) in pool.blockdevs_mut() {
             create_dbus_blockdev(&self.context, pool_path.clone(), uuid, bd);
         }
-
-        self.process_deferred_actions()
     }
 
     /// Update the dbus tree with deferred adds and removes.

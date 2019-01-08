@@ -496,14 +496,19 @@ impl ThinPool {
                 // size
                 let target_meta_size = (backstore.datatier_usable_size() / 1000u16).metablocks();
                 if usage.total_meta < target_meta_size {
-                    let meta_request =
-                        max(target_meta_size - usage.total_meta, MIN_META_SEGMENT_SIZE).sectors();
-                    meta_extend_failed =
-                        match self.extend_thin_meta_device(pool_uuid, backstore, meta_request) {
+                    let meta_request = target_meta_size - usage.total_meta;
+
+                    if meta_request > MIN_META_SEGMENT_SIZE {
+                        meta_extend_failed = match self.extend_thin_meta_device(
+                            pool_uuid,
+                            backstore,
+                            meta_request.sectors(),
+                        ) {
                             Ok(extend_size) => extend_size == Sectors(0),
                             Err(_) => true,
                         };
-                    should_save |= !meta_extend_failed;
+                        should_save |= !meta_extend_failed;
+                    }
                 }
 
                 // Expand data blocks to fill all available remaining space

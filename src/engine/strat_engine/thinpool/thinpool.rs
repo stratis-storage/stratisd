@@ -34,7 +34,6 @@ use super::super::names::{
     format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole, ThinRole,
 };
 use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
-use super::super::set_write_throttling;
 
 use super::filesystem::{fs_settle, FilesystemStatus, StratFilesystem};
 use super::mdv::MetadataVol;
@@ -51,9 +50,6 @@ const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 
 const SPACE_WARN_PCT: u8 = 90;
 const SPACE_CRIT_PCT: u8 = 95;
-
-/// When Stratis initiates throttling, this is the value it always specifies.
-const THROTTLE_BLOCKS_PER_SEC: DataBlocks = DataBlocks(10);
 
 fn sectors_to_datablocks(sectors: Sectors) -> DataBlocks {
     DataBlocks(sectors / DATA_BLOCK_SIZE)
@@ -606,7 +602,7 @@ impl ThinPool {
     }
 
     /// Possibly transition to a new FreeSpaceState based on usage, and invoke
-    /// policies (throttling, suspension) accordingly.
+    /// policies (suspension) accordingly.
     fn free_space_check(
         &mut self,
         used: DataBlocks,
@@ -640,24 +636,13 @@ impl ThinPool {
         match (self.free_space_state, new_state) {
             (FreeSpaceState::Good, FreeSpaceState::Warn) => {
                 // TODO: other steps to regain space: schedule fstrims?
-                set_write_throttling(
-                    self.thin_pool.data_dev().device(),
-                    Some(datablocks_to_sectors(THROTTLE_BLOCKS_PER_SEC).bytes()),
-                )?;
             }
             (FreeSpaceState::Good, FreeSpaceState::Crit) => {
-                set_write_throttling(
-                    self.thin_pool.data_dev().device(),
-                    Some(datablocks_to_sectors(THROTTLE_BLOCKS_PER_SEC).bytes()),
-                )?;
-
                 for (_, _, fs) in &mut self.filesystems {
                     fs.suspend(true)?;
                 }
             }
-            (FreeSpaceState::Warn, FreeSpaceState::Good) => {
-                set_write_throttling(self.thin_pool.data_dev().device(), None)?;
-            }
+            (FreeSpaceState::Warn, FreeSpaceState::Good) => {}
             (FreeSpaceState::Warn, FreeSpaceState::Crit) => {
                 for (_, _, fs) in &mut self.filesystems {
                     fs.suspend(true)?;
@@ -667,7 +652,6 @@ impl ThinPool {
                 for (_, _, fs) in &mut self.filesystems {
                     fs.resume()?;
                 }
-                set_write_throttling(self.thin_pool.data_dev().device(), None)?;
             }
             (FreeSpaceState::Crit, FreeSpaceState::Warn) => {
                 for (_, _, fs) in &mut self.filesystems {

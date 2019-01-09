@@ -4,7 +4,7 @@ version = "1.0.2"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.com>"]
 
 [dependencies]
-dbus = {version = "0.6.1", optional = true}
+dbus = {version = "0.6.4", optional = true}
 clap = "2"
 nix = "0.11"
 devicemapper = "0.26.0"
@@ -24,7 +24,6 @@ error-chain = "0.12"
 libudev = "0.2.0"
 lazy_static = "1.0.0"
 timerfd = "1.0.0"
-walkdir = "2.2.5"
 
 [dependencies.uuid]
 version = "0.7"

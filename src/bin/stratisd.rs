@@ -317,7 +317,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     // This is especially important since stratisd must run during early boot.
     let context = libudev::Context::new()?;
     let mut monitor = libudev::Monitor::new(&context)?;
-    monitor.match_subsystem_devtype("block", "disk")?;
+    monitor.match_subsystem("block")?;
     let mut udev = monitor.listen()?;
 
     let engine: Rc<RefCell<Engine>> = {

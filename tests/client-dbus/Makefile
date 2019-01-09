@@ -18,3 +18,6 @@ fmt-travis:
 .PHONY: udev-tests
 udev-tests:
 	py.test-3 ./tests/udev
+
+.PHONY: tests
+tests: dbus-tests udev-tests

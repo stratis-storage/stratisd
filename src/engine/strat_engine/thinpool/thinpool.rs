@@ -635,6 +635,10 @@ impl ThinPool {
 
         self.set_free_space_state(new_state);
 
+        // FreeSpaceState::Warn is never used.
+        assert_ne!(self.free_space_state, FreeSpaceState::Warn);
+        assert_ne!(new_state, FreeSpaceState::Warn);
+
         match (self.free_space_state, new_state) {
             (FreeSpaceState::Good, FreeSpaceState::Crit) => {
                 for (_, _, fs) in &mut self.filesystems {

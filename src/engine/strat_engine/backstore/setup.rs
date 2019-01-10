@@ -21,7 +21,7 @@ use crate::{
             backstore::{
                 blkdev_size,
                 metadata::{StaticHeader, BDA},
-                util::get_stratis_block_devices,
+                udev::get_stratis_block_devices,
                 StratBlockDev,
             },
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},

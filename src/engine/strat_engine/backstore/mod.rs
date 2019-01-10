@@ -13,7 +13,7 @@ pub mod device;
 mod metadata;
 mod range_alloc;
 mod setup;
-mod util;
+mod udev;
 
 pub use self::{
     backstore::Backstore,

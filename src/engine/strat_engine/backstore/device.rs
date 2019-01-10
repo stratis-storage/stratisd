@@ -15,7 +15,7 @@ use devicemapper::{devnode_to_devno, Bytes, Device};
 
 use crate::{
     engine::{
-        strat_engine::backstore::{metadata::StaticHeader, util::get_udev_block_device},
+        strat_engine::backstore::{metadata::StaticHeader, udev::get_udev_block_device},
         DevUuid, PoolUuid,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},

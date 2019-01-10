@@ -14,6 +14,7 @@ mod metadata;
 mod range_alloc;
 mod setup;
 mod udev;
+mod util;
 
 pub use self::{
     backstore::Backstore,

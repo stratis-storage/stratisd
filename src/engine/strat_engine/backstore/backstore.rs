@@ -12,13 +12,16 @@ use std::{
 
 use chrono::{DateTime, Utc};
 
-use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
+use devicemapper::{
+    CacheDev, Device, DmDevice, LinearDev, LinearDevTargetParams, LinearTargetParams, Sectors,
+    TargetLine,
+};
 
 use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                blockdevmgr::{map_to_dm, BlockDevMgr},
+                blockdevmgr::{BlkDevSegment, BlockDevMgr},
                 cache_tier::CacheTier,
                 data_tier::DataTier,
                 metadata::MDADataSize,
@@ -38,6 +41,31 @@ use crate::{
 /// Use a cache block size that the kernel docs indicate is the largest
 /// typical size.
 const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
+
+/// Build a linear dev target table from BlkDevSegments. This is useful for
+/// calls to the devicemapper library.
+fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParams>> {
+    let mut table = Vec::new();
+    let mut logical_start_offset = Sectors(0);
+
+    let segments = bsegs
+        .iter()
+        .map(|bseg| bseg.to_segment())
+        .collect::<Vec<_>>();
+    for segment in segments {
+        let (physical_start_offset, length) = (segment.start, segment.length);
+        let params = LinearTargetParams::new(segment.device, physical_start_offset);
+        let line = TargetLine::new(
+            logical_start_offset,
+            length,
+            LinearDevTargetParams::Linear(params),
+        );
+        table.push(line);
+        logical_start_offset += length;
+    }
+
+    table
+}
 
 /// Make a DM cache device. If the cache device is being made new,
 /// take extra steps to make it clean.

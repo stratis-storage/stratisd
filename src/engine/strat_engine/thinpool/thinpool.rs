@@ -48,7 +48,6 @@ const MIN_META_SEGMENT_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
 const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
 const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 
-const SPACE_WARN_PCT: u8 = 90;
 const SPACE_CRIT_PCT: u8 = 95;
 
 fn sectors_to_datablocks(sectors: Sectors) -> DataBlocks {
@@ -628,10 +627,8 @@ impl ThinPool {
         let overall_used_pct = used_pct(*used, *used + *available);
         info!("Data tier percent used: {}", overall_used_pct);
 
-        let new_state = if overall_used_pct < SPACE_WARN_PCT {
+        let new_state = if overall_used_pct < SPACE_CRIT_PCT {
             FreeSpaceState::Good
-        } else if overall_used_pct < SPACE_CRIT_PCT {
-            FreeSpaceState::Warn
         } else {
             FreeSpaceState::Crit
         };
@@ -639,20 +636,16 @@ impl ThinPool {
         self.set_free_space_state(new_state);
 
         match (self.free_space_state, new_state) {
-            (FreeSpaceState::Good, FreeSpaceState::Crit)
-            | (FreeSpaceState::Warn, FreeSpaceState::Crit) => {
+            (FreeSpaceState::Good, FreeSpaceState::Crit) => {
                 for (_, _, fs) in &mut self.filesystems {
                     fs.suspend(true)?;
                 }
             }
-            (FreeSpaceState::Crit, FreeSpaceState::Good)
-            | (FreeSpaceState::Crit, FreeSpaceState::Warn) => {
+            (FreeSpaceState::Crit, FreeSpaceState::Good) => {
                 for (_, _, fs) in &mut self.filesystems {
                     fs.resume()?;
                 }
             }
-            (FreeSpaceState::Good, FreeSpaceState::Warn)
-            | (FreeSpaceState::Warn, FreeSpaceState::Good) => {}
 
             // These all represent no change in the state, so nothing is done.
             (old, new) => assert_eq!(old, new),

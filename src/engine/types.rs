@@ -52,8 +52,7 @@ pub enum PoolExtendState {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FreeSpaceState {
     Good = 1,
-    Warn = 2,
-    Crit = 3,
+    Crit = 2,
 }
 
 /// See Design Doc section 10.2.1 for more details.

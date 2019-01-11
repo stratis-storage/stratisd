@@ -8,13 +8,13 @@ use std::path::{Path, PathBuf};
 
 use devicemapper::{Device, DmNameBuf};
 
-use super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::engine::{Engine, EngineEvent, Name, Pool, PoolUuid, Redundancy, RenameAction};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::devlinks;
-use super::super::engine::{Engine, Eventable, Pool};
-use super::super::event::{get_engine_listener_list, EngineEvent};
+use super::super::engine::Eventable;
+use super::super::event::get_engine_listener_list;
 use super::super::structures::Table;
-use super::super::types::{Name, PoolUuid, Redundancy, RenameAction};
 
 use super::backstore::device::is_stratis_device;
 use super::backstore::{find_all, get_metadata};
@@ -372,7 +372,7 @@ impl Engine for StratEngine {
 mod test {
     use std::fs::remove_dir_all;
 
-    use super::super::super::engine::DEV_PATH;
+    use crate::engine::engine::DEV_PATH;
 
     use super::super::tests::{loopbacked, real};
 

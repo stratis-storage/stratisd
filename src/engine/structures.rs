@@ -268,7 +268,7 @@ mod tests {
     use rand;
     use uuid::Uuid;
 
-    use super::super::types::Name;
+    use crate::engine::Name;
 
     use super::Table;
 

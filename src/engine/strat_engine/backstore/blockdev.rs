@@ -11,11 +11,10 @@ use chrono::{DateTime, TimeZone, Utc};
 
 use devicemapper::{Device, Sectors};
 
-use super::super::super::super::stratis::StratisResult;
+use crate::engine::{BlockDev, BlockDevState, DevUuid, EngineEvent, MaybeDbusPath, PoolUuid};
+use crate::stratis::StratisResult;
 
-use super::super::super::engine::BlockDev;
-use super::super::super::event::{get_engine_listener_list, EngineEvent};
-use super::super::super::types::{BlockDevState, DevUuid, MaybeDbusPath, PoolUuid};
+use crate::engine::event::get_engine_listener_list;
 
 use super::super::serde_structs::{BaseBlockDevSave, Recordable};
 

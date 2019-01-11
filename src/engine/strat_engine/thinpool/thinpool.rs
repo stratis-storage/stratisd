@@ -15,16 +15,14 @@ use devicemapper::{
     ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
 };
 
-use super::super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use super::super::super::devlinks;
-use super::super::super::engine::Filesystem;
-use super::super::super::event::{get_engine_listener_list, EngineEvent};
-use super::super::super::structures::Table;
-use super::super::super::types::{
-    FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid,
-    RenameAction,
+use crate::engine::{
+    devlinks, EngineEvent, Filesystem, FilesystemUuid, MaybeDbusPath, Name, PoolUuid, RenameAction,
 };
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
+
+use crate::engine::event::get_engine_listener_list;
+use crate::engine::structures::Table;
+use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
 
 use super::super::backstore::Backstore;
 use super::super::cmd::{thin_check, thin_repair};

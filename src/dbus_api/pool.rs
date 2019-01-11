@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 use devicemapper::Sectors;
 
-use super::super::engine::{BlockDevTier, MaybeDbusPath, Name, Pool, RenameAction};
+use crate::engine::{BlockDevTier, MaybeDbusPath, Name, Pool, RenameAction};
 
 use super::blockdev::create_dbus_blockdev;
 use super::consts;

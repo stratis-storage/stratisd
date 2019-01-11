@@ -12,13 +12,14 @@ use uuid::Uuid;
 
 use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
-use super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use super::super::engine::{BlockDev, Filesystem, Pool};
-use super::super::types::{
-    BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState,
-    PoolState, PoolUuid, Redundancy, RenameAction,
+use crate::engine::{
+    BlockDev, BlockDevTier, DevUuid, Filesystem, FilesystemUuid, MaybeDbusPath, Name, Pool,
+    PoolUuid, Redundancy, RenameAction,
 };
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
+
+use super::super::types::{FreeSpaceState, PoolExtendState, PoolState};
+
 use super::backstore::{Backstore, StratBlockDev, MIN_MDA_SECTORS};
 use super::names::validate_name;
 use super::serde_structs::{FlexDevsSave, PoolSave, Recordable};
@@ -485,8 +486,8 @@ mod tests {
 
     use devicemapper::{Bytes, IEC, SECTOR_SIZE};
 
-    use super::super::super::devlinks;
-    use super::super::super::types::Redundancy;
+    use crate::engine::devlinks;
+    use crate::engine::types::Redundancy;
 
     use super::super::backstore::{find_all, get_metadata};
     use super::super::cmd;

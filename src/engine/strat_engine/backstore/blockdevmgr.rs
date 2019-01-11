@@ -17,10 +17,8 @@ use devicemapper::{
     Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine, IEC,
 };
 
-use super::super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use super::super::super::engine::BlockDev;
-use super::super::super::types::{DevUuid, PoolUuid};
+use crate::engine::{BlockDev, DevUuid, PoolUuid};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable};
 

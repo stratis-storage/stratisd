@@ -13,9 +13,8 @@ use serde_json;
 
 use devicemapper::{devnode_to_devno, Device, Sectors};
 
-use super::super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
+use crate::engine::{BlockDevTier, DevUuid, PoolUuid};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave};
 

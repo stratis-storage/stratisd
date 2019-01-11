@@ -13,7 +13,7 @@ use dbus::SignalArgs;
 
 use devicemapper::DmError;
 
-use super::super::stratis::{ErrorEnum, StratisError};
+use crate::stratis::{ErrorEnum, StratisError};
 
 use super::types::{DbusErrorEnum, TData};
 

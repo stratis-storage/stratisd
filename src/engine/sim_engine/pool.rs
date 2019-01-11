@@ -14,14 +14,14 @@ use uuid::Uuid;
 
 use devicemapper::{Sectors, IEC};
 
-use super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use super::super::engine::{BlockDev, Filesystem, Pool};
-use super::super::structures::Table;
-use super::super::types::{
-    BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState,
-    PoolState, PoolUuid, Redundancy, RenameAction,
+use crate::engine::{
+    BlockDev, BlockDevTier, DevUuid, Filesystem, FilesystemUuid, MaybeDbusPath, Name, Pool,
+    PoolUuid, Redundancy, RenameAction,
 };
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
+
+use super::super::structures::Table;
+use super::super::types::{FreeSpaceState, PoolExtendState, PoolState};
 
 use super::blockdev::SimDev;
 use super::filesystem::SimFilesystem;
@@ -320,7 +320,7 @@ mod tests {
 
     use uuid::Uuid;
 
-    use super::super::super::engine::Engine;
+    use crate::engine::Engine;
 
     use super::super::SimEngine;
 

@@ -8,7 +8,7 @@ use std::collections::Bound::{Included, Unbounded};
 
 use devicemapper::Sectors;
 
-use super::super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 #[derive(Debug)]
 pub struct RangeAllocator {

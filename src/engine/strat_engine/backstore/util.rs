@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use libudev;
 
-use super::super::super::super::stratis::StratisResult;
+use crate::stratis::StratisResult;
 
 use super::device::is_stratis_device;
 

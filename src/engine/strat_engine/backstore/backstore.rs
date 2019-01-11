@@ -12,9 +12,8 @@ use chrono::{DateTime, Utc};
 
 use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
 
-use super::super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
+use crate::engine::{BlockDevTier, DevUuid, PoolUuid};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::device::wipe_sectors;
 use super::super::dm::get_dm;

@@ -4,7 +4,7 @@
 
 // Code to handle cleanup after a failed operation.
 
-use super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::structures::Table;
 

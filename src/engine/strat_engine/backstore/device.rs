@@ -11,9 +11,9 @@ use std::path::Path;
 
 use devicemapper::{devnode_to_devno, Bytes, Device};
 
-use super::super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::engine::{DevUuid, PoolUuid};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::super::types::{DevUuid, PoolUuid};
 use super::metadata::StaticHeader;
 use super::util::get_udev_block_device;
 

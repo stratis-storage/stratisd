@@ -15,8 +15,8 @@ use dbus::tree::{
 use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
 use uuid::Uuid;
 
-use super::super::engine::{Engine, Pool, PoolUuid};
-use super::super::stratis::VERSION;
+use crate::engine::{Engine, Pool, PoolUuid};
+use crate::stratis::VERSION;
 
 use super::blockdev::create_dbus_blockdev;
 use super::consts;

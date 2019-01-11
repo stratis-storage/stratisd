@@ -16,10 +16,10 @@ use serde_json;
 
 use devicemapper::{DmDevice, LinearDev, LinearDevTargetParams, TargetLine};
 
-use super::super::super::super::stratis::StratisResult;
+use crate::engine::{FilesystemUuid, Name, PoolUuid};
+use crate::stratis::StratisResult;
 
-use super::super::super::engine::DEV_PATH;
-use super::super::super::types::{FilesystemUuid, Name, PoolUuid};
+use crate::engine::engine::DEV_PATH;
 
 use super::super::cmd::create_fs;
 use super::super::dm::get_dm;

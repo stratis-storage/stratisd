@@ -8,9 +8,8 @@ use std::path::Path;
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
-use super::super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
+use crate::engine::{BlockDevTier, DevUuid, PoolUuid};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Recordable};
 

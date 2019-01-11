@@ -10,8 +10,8 @@ use std::path::Path;
 
 use devicemapper::{DmNameBuf, DmUuidBuf};
 
-use super::super::super::engine::{FilesystemUuid, PoolUuid};
-use super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::engine::{FilesystemUuid, PoolUuid};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 const FORMAT_VERSION: u16 = 1;
 

@@ -9,7 +9,7 @@ use std::sync::{Once, ONCE_INIT};
 
 use devicemapper::{DmResult, DM};
 
-use super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::engine::Eventable;
 

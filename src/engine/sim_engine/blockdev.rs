@@ -11,8 +11,7 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors, IEC};
 
-use super::super::engine::BlockDev;
-use super::super::types::{BlockDevState, MaybeDbusPath};
+use crate::engine::{BlockDev, BlockDevState, MaybeDbusPath};
 
 use super::randomization::Randomizer;
 

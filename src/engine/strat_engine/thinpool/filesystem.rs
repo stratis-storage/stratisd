@@ -20,7 +20,7 @@ use nix::mount::{mount, umount, MsFlags};
 use nix::sys::statvfs::statvfs;
 use tempfile;
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
+use super::super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::engine::Filesystem;
 use super::super::super::types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid};

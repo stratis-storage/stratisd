@@ -16,7 +16,7 @@ use serde_json;
 
 use devicemapper::{DmDevice, LinearDev, LinearDevTargetParams, TargetLine};
 
-use stratis::StratisResult;
+use super::super::super::super::stratis::StratisResult;
 
 use super::super::super::engine::DEV_PATH;
 use super::super::super::types::{FilesystemUuid, Name, PoolUuid};

@@ -9,8 +9,9 @@ use std::path::{Path, PathBuf};
 
 use libudev;
 
+use super::super::super::super::stratis::StratisResult;
+
 use super::device::is_stratis_device;
-use stratis::StratisResult;
 
 /// Takes a libudev device entry and returns the properties as a HashMap.
 fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {

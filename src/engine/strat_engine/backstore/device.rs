@@ -10,7 +10,8 @@ use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
 
 use devicemapper::{devnode_to_devno, Bytes, Device};
-use stratis::{ErrorEnum, StratisError, StratisResult};
+
+use super::super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{DevUuid, PoolUuid};
 use super::metadata::StaticHeader;

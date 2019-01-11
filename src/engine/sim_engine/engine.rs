@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 use devicemapper::Device;
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
+use super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::engine::{Engine, Eventable, Pool};
 use super::super::structures::Table;
@@ -146,12 +146,10 @@ mod tests {
     use proptest::prelude::any;
     use uuid::Uuid;
 
-    use stratis::{ErrorEnum, StratisError};
+    use super::super::super::super::engine::{Engine, RenameAction};
+    use super::super::super::super::stratis::{ErrorEnum, StratisError};
 
     use super::SimEngine;
-
-    use engine::Engine;
-    use engine::RenameAction;
 
     proptest! {
         #[test]

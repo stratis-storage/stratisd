@@ -11,7 +11,7 @@ use chrono::{DateTime, TimeZone, Utc};
 
 use devicemapper::{Device, Sectors};
 
-use stratis::StratisResult;
+use super::super::super::super::stratis::StratisResult;
 
 use super::super::super::engine::BlockDev;
 use super::super::super::event::{get_engine_listener_list, EngineEvent};

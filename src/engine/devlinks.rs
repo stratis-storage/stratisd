@@ -8,7 +8,7 @@ use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::{fs, str};
 
-use stratis::StratisResult;
+use super::super::stratis::StratisResult;
 
 use super::super::engine::Pool;
 use super::types::{Name, PoolUuid};

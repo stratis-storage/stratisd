@@ -8,7 +8,7 @@ use std::path::Path;
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
+use super::super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 

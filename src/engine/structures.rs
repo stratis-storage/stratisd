@@ -8,7 +8,7 @@ use std::iter::IntoIterator;
 
 use uuid::Uuid;
 
-use engine::Name;
+use super::types::Name;
 
 /// Map UUID and name to T items.
 pub struct Table<T> {
@@ -268,7 +268,7 @@ mod tests {
     use rand;
     use uuid::Uuid;
 
-    use engine::Name;
+    use super::super::types::Name;
 
     use super::Table;
 

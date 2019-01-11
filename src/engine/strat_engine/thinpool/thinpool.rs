@@ -15,7 +15,7 @@ use devicemapper::{
     ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
 };
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
+use super::super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::devlinks;
 use super::super::super::engine::Filesystem;

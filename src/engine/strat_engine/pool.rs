@@ -12,13 +12,13 @@ use uuid::Uuid;
 
 use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
+use super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
+
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::types::{
     BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState,
     PoolState, PoolUuid, Redundancy, RenameAction,
 };
-use stratis::{ErrorEnum, StratisError, StratisResult};
-
 use super::backstore::{Backstore, StratBlockDev, MIN_MDA_SECTORS};
 use super::names::validate_name;
 use super::serde_structs::{FlexDevsSave, PoolSave, Recordable};

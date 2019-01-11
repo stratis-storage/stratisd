@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
+use super::super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{DevUuid, PoolUuid};
 
@@ -440,7 +440,7 @@ mod mda {
 
     use devicemapper::{Bytes, Sectors};
 
-    use stratis::{ErrorEnum, StratisError, StratisResult};
+    use super::super::super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
 
     use super::SyncAll;
 

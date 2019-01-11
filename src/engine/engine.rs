@@ -11,12 +11,12 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, Device, Sectors};
 
+use super::super::stratis::StratisResult;
+
 use super::types::{
     BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name,
     PoolExtendState, PoolState, PoolUuid, RenameAction,
 };
-use stratis::StratisResult;
-
 pub const DEV_PATH: &str = "/stratis";
 
 pub trait Filesystem: Debug {

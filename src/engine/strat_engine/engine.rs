@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use devicemapper::{Device, DmNameBuf};
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
+use super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::devlinks;
 use super::super::engine::{Engine, Eventable, Pool};
@@ -372,7 +372,7 @@ impl Engine for StratEngine {
 mod test {
     use std::fs::remove_dir_all;
 
-    use engine::engine::DEV_PATH;
+    use super::super::super::engine::DEV_PATH;
 
     use super::super::tests::{loopbacked, real};
 

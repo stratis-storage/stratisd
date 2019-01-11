@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use devicemapper::{Sectors, IEC};
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
+use super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::engine::{BlockDev, Filesystem, Pool};
 use super::super::structures::Table;
@@ -320,7 +320,7 @@ mod tests {
 
     use uuid::Uuid;
 
-    use engine::Engine;
+    use super::super::super::engine::Engine;
 
     use super::super::SimEngine;
 

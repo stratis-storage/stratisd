@@ -13,7 +13,7 @@ use serde_json;
 
 use devicemapper::{devnode_to_devno, Device, Sectors};
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
+use super::super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 

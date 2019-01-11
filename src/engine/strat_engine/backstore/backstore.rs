@@ -12,7 +12,7 @@ use chrono::{DateTime, Utc};
 
 use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
+use super::super::super::super::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
 

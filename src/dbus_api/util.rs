@@ -13,10 +13,10 @@ use dbus::SignalArgs;
 
 use devicemapper::DmError;
 
-use super::super::stratis::{ErrorEnum, StratisError};
+use crate::stratis::{ErrorEnum, StratisError};
 
-use super::consts;
-use super::types::{DbusContext, DbusErrorEnum, TData};
+use crate::dbus_api::consts;
+use crate::dbus_api::types::{DbusContext, DbusErrorEnum, TData};
 
 /// Convert a tuple as option to an Option type
 pub fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {

@@ -16,8 +16,8 @@ use devicemapper::{Bytes, Sectors, IEC};
 
 use self::loopdev::{LoopControl, LoopDevice};
 
-use super::logger::init_logger;
-use super::util::clean_up;
+use crate::engine::strat_engine::tests::logger::init_logger;
+use crate::engine::strat_engine::tests::util::clean_up;
 
 /// Ways of specifying range of numbers of devices to use for tests.
 /// Unlike real tests, there is no AtLeast constructor, as, at least in theory

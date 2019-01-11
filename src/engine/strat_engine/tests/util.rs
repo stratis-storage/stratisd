@@ -11,8 +11,8 @@ use nix::mount::{umount2, MntFlags};
 
 use devicemapper::{DevId, DmOptions};
 
-use super::super::cmd;
-use super::super::dm::{get_dm, get_dm_init};
+use crate::engine::strat_engine::cmd;
+use crate::engine::strat_engine::dm::{get_dm, get_dm_init};
 
 mod cleanup_errors {
     use libmount;

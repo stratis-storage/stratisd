@@ -10,7 +10,7 @@ use std::path::Path;
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
-use stratis::StratisResult;
+use crate::stratis::StratisResult;
 
 /// The SyncAll trait unifies the File type with other types that do
 /// not implement sync_all(). The purpose is to allow testing of methods

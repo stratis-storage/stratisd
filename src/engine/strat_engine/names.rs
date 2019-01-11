@@ -10,9 +10,8 @@ use std::path::Path;
 
 use devicemapper::{DmNameBuf, DmUuidBuf};
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
-
-use super::super::super::engine::{FilesystemUuid, PoolUuid};
+use crate::engine::{FilesystemUuid, PoolUuid};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 const FORMAT_VERSION: u16 = 1;
 
@@ -237,7 +236,7 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
 #[cfg(test)]
 mod tests {
 
-    use engine::strat_engine::names::validate_name;
+    use super::*;
 
     #[test]
     #[allow(clippy::cyclomatic_complexity)]

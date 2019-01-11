@@ -13,11 +13,10 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::engine::{DevUuid, PoolUuid};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::super::types::{DevUuid, PoolUuid};
-
-use super::super::device::SyncAll;
+use crate::engine::strat_engine::device::SyncAll;
 
 pub use self::mda::{validate_mda_size, MIN_MDA_SECTORS};
 
@@ -440,9 +439,9 @@ mod mda {
 
     use devicemapper::{Bytes, Sectors};
 
-    use stratis::{ErrorEnum, StratisError, StratisResult};
+    use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-    use super::SyncAll;
+    use crate::engine::strat_engine::device::SyncAll;
 
     const _MDA_REGION_HDR_SIZE: usize = 32;
     const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);

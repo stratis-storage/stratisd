@@ -14,3 +14,10 @@ fmt:
 .PHONY: fmt-travis
 fmt-travis:
 	yapf --style pep8 --recursive --diff check.py setup.py src tests
+
+.PHONY: udev-tests
+udev-tests:
+	py.test-3 ./tests/udev
+
+.PHONY: tests
+tests: dbus-tests udev-tests

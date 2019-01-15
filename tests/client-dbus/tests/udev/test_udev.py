@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Used to test udev "add" event in stratisd
+Used to test behavior of the udev device discovery mechanism.
 """
 
 import unittest
@@ -22,6 +22,7 @@ import time
 import random
 import string
 import os
+import pyudev
 
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import ObjectManager
@@ -31,8 +32,9 @@ from stratisd_client_dbus import Pool
 
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._loopback import LoopBackDevices
-from .._dm import remove_stratis_setup, _get_stratis_devices
+from ._loopback import LoopBackDevices
+from ._dm import remove_stratis_setup, _get_stratis_devices
+from ._stratis_id import stratis_signature
 
 _STRATISD = os.environ['STRATISD']
 
@@ -54,6 +56,7 @@ class UdevAdd(unittest.TestCase):
     """
     Test udev add event support.
     """
+    lib_blk_id = True
 
     @staticmethod
     def _create_pool(name, devices):
@@ -186,6 +189,39 @@ class UdevAdd(unittest.TestCase):
         time.sleep(2)
 
     @staticmethod
+    def _expected_stratis_block_devices(num_expected):
+        """
+        Check that the expected number of stratis devices exist.  If not keep
+        checking until they do show up or our timeout has been exceeded.
+        :param num_expected:
+        :return: None (May assert)
+        """
+        found = 0
+        context = pyudev.Context()
+        start = time.time()
+        end_time = start + 10
+
+        while UdevAdd.lib_blk_id and time.time() < end_time:
+            found = sum(1 for _ in context.list_devices(
+                subsystem='block', ID_FS_TYPE='stratis'))
+            if found == num_expected:
+                break
+            time.sleep(1)
+
+        # If we are not matching our expectations, we may be running on a box
+        # that doesn't have blkid support, so lets probe the disks instead.  If
+        # we find a stratis disk now, we will set the flag UdevAdd.lib_blk_id to
+        # false so we don't waste so much time checking the udev db.
+        if found != num_expected and found == 0:
+            for blk_dev in context.list_devices(subsystem='block'):
+                if "DEVNAME" in blk_dev:
+                    if stratis_signature(blk_dev["DEVNAME"]):
+                        UdevAdd.lib_blk_id = False
+                        found += 1
+
+        assert found == num_expected
+
+    @staticmethod
     def _process_exists(name):
         """
         Walk the process table looking for executable 'name', returns pid if one
@@ -235,6 +271,10 @@ class UdevAdd(unittest.TestCase):
 
         # Start & Stop the service
         self._stop_service_remove_dm_tables()
+
+        UdevAdd._expected_stratis_block_devices(
+            dev_count_pool * number_of_pools)
+
         self._start_service()
 
         # We should have all the devices, so pool should exist after toggle
@@ -246,6 +286,8 @@ class UdevAdd(unittest.TestCase):
         for device_tokens in pool_data.values():
             for d in device_tokens:
                 self._lb_mgr.unplug(d)
+
+        UdevAdd._expected_stratis_block_devices(0)
 
         self._start_service()
 
@@ -259,8 +301,13 @@ class UdevAdd(unittest.TestCase):
            [pool_data[p][i] for i in range(dev_count_pool) for p in pool_names]
 
         # Add all but the last device for each pool
+        running_count = 0
+
         for device_token in activation_sequence[:-number_of_pools]:
             self._lb_mgr.hotplug(device_token)
+            running_count += 1
+
+            UdevAdd._expected_stratis_block_devices(running_count)
 
             if some_existing:
                 self._stop_service_remove_dm_tables()
@@ -274,6 +321,9 @@ class UdevAdd(unittest.TestCase):
         for device_token in activation_sequence[-number_of_pools:]:
             self._lb_mgr.hotplug(device_token)
 
+        UdevAdd._expected_stratis_block_devices(
+            number_of_pools * dev_count_pool)
+
         self._settle()
         self.assertEqual(len(UdevAdd._get_pools()), number_of_pools)
 
@@ -284,6 +334,7 @@ class UdevAdd(unittest.TestCase):
         # from same test fixture
         self._stop_service_remove_dm_tables()
         self._lb_mgr.destroy_devices()
+        UdevAdd._expected_stratis_block_devices(0)
 
     def test_combinations(self):
         """
@@ -325,6 +376,9 @@ class UdevAdd(unittest.TestCase):
         self.assertEqual(len(UdevAdd._get_pools()), 1)
 
         self._stop_service_remove_dm_tables()
+
+        UdevAdd._expected_stratis_block_devices(num_devices)
+
         self._start_service()
 
         # Make sure on a start with all the devices the pool is there!
@@ -336,6 +390,8 @@ class UdevAdd(unittest.TestCase):
         for d in device_tokens:
             self._lb_mgr.unplug(d)
 
+        UdevAdd._expected_stratis_block_devices(0)
+
         self._start_service()
 
         self.assertEqual(len(UdevAdd._get_pools()), 0)
@@ -344,6 +400,7 @@ class UdevAdd(unittest.TestCase):
             self._lb_mgr.hotplug(d)
 
         self._settle()
+        UdevAdd._expected_stratis_block_devices(num_devices)
 
         self.assertEqual(len(UdevAdd._get_pools()), 1)
 
@@ -353,6 +410,7 @@ class UdevAdd(unittest.TestCase):
                 self._lb_mgr.generate_udev_add_event(d)
 
         self._settle()
+        UdevAdd._expected_stratis_block_devices(num_devices)
 
         self.assertEqual(len(UdevAdd._get_pools()), 1)
 
@@ -398,18 +456,26 @@ class UdevAdd(unittest.TestCase):
             UdevAdd._create_pool(pool_name, self._device_files(this_pool))
 
             self._stop_service_remove_dm_tables()
+
+            UdevAdd._expected_stratis_block_devices(len(this_pool))
+
             for d in this_pool:
                 self._lb_mgr.unplug(d)
+
+            UdevAdd._expected_stratis_block_devices(0)
 
             self._start_service()
 
         # Hot plug activate each pool in sequence and force a duplicate name
         # error.
+        plugged = 0
         for i in range(num_pools):
             for d in pool_tokens[i]:
                 self._lb_mgr.hotplug(d)
+                plugged += 1
 
             self._settle()
+            UdevAdd._expected_stratis_block_devices(plugged)
 
             # They all have the same name, so we should only get 1 pool!
             self.assertEqual(len(UdevAdd._get_pools()), 1)
@@ -432,6 +498,7 @@ class UdevAdd(unittest.TestCase):
                     self._lb_mgr.generate_udev_add_event(d)
 
             self._settle()
+            UdevAdd._expected_stratis_block_devices(plugged)
             self.assertEqual(
                 len(UdevAdd._get_pools()), existing_pool_count + 1)
 

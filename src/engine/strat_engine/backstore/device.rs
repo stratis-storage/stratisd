@@ -14,8 +14,8 @@ use devicemapper::{devnode_to_devno, Bytes, Device};
 use crate::engine::{DevUuid, PoolUuid};
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::metadata::StaticHeader;
-use super::util::get_udev_block_device;
+use crate::engine::strat_engine::backstore::metadata::StaticHeader;
+use crate::engine::strat_engine::backstore::util::get_udev_block_device;
 
 ioctl_read!(blkgetsize64, 0x12, 114, u64);
 
@@ -140,10 +140,10 @@ pub fn is_stratis_device(devnode: &Path) -> StratisResult<Option<(PoolUuid, DevU
 mod test {
     use std::path::Path;
 
-    use super::super::super::cmd;
-    use super::super::super::tests::{loopbacked, real};
+    use crate::engine::strat_engine::cmd;
+    use crate::engine::strat_engine::tests::{loopbacked, real};
 
-    use super::super::device;
+    use super::*;
 
     /// Verify that the device is not stratis by creating a device with XFS fs.
     fn test_other_ownership(paths: &[&Path]) {
@@ -151,10 +151,10 @@ mod test {
 
         cmd::udev_settle().unwrap();
 
-        assert_eq!(device::is_stratis_device(paths[0]).unwrap(), None);
+        assert_eq!(is_stratis_device(paths[0]).unwrap(), None);
 
-        assert!(match device::identify(paths[0]).unwrap() {
-            device::DevOwnership::Theirs(identity) => {
+        assert!(match identify(paths[0]).unwrap() {
+            DevOwnership::Theirs(identity) => {
                 assert!(identity.contains("ID_FS_USAGE=filesystem"));
                 assert!(identity.contains("ID_FS_TYPE=ext3"));
                 assert!(identity.contains("ID_FS_UUID"));
@@ -168,14 +168,11 @@ mod test {
     fn test_empty(paths: &[&Path]) {
         cmd::udev_settle().unwrap();
 
-        assert_eq!(device::is_stratis_device(paths[0]).unwrap(), None);
+        assert_eq!(is_stratis_device(paths[0]).unwrap(), None);
 
-        assert_matches!(
-            device::identify(paths[0]).unwrap(),
-            device::DevOwnership::Unowned
-        );
+        assert_matches!(identify(paths[0]).unwrap(), DevOwnership::Unowned);
 
-        assert_eq!(device::is_stratis_device(paths[0]).unwrap(), None);
+        assert_eq!(is_stratis_device(paths[0]).unwrap(), None);
     }
 
     #[test]

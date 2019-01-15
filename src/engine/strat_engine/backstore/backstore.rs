@@ -15,17 +15,16 @@ use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
 use crate::engine::{BlockDevTier, DevUuid, PoolUuid};
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::device::wipe_sectors;
-use super::super::dm::get_dm;
-use super::super::names::{format_backstore_ids, CacheRole};
-use super::super::serde_structs::{BackstoreSave, CapSave, Recordable};
+use crate::engine::strat_engine::backstore::{StratBlockDev, MIN_MDA_SECTORS};
+use crate::engine::strat_engine::device::wipe_sectors;
+use crate::engine::strat_engine::dm::get_dm;
+use crate::engine::strat_engine::names::{format_backstore_ids, CacheRole};
+use crate::engine::strat_engine::serde_structs::{BackstoreSave, CapSave, Recordable};
 
-use super::blockdev::StratBlockDev;
-use super::blockdevmgr::{map_to_dm, BlockDevMgr};
-use super::cache_tier::CacheTier;
-use super::data_tier::DataTier;
-use super::metadata::MIN_MDA_SECTORS;
-use super::setup::get_blockdevs;
+use crate::engine::strat_engine::backstore::blockdevmgr::{map_to_dm, BlockDevMgr};
+use crate::engine::strat_engine::backstore::cache_tier::CacheTier;
+use crate::engine::strat_engine::backstore::data_tier::DataTier;
+use crate::engine::strat_engine::backstore::setup::get_blockdevs;
 
 /// Use a cache block size that the kernel docs indicate is the largest
 /// typical size.
@@ -574,10 +573,9 @@ mod tests {
 
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
-    use super::super::super::cmd;
-    use super::super::super::tests::{loopbacked, real};
-
-    use super::super::setup::find_all;
+    use crate::engine::strat_engine::backstore::find_all;
+    use crate::engine::strat_engine::cmd;
+    use crate::engine::strat_engine::tests::{loopbacked, real};
 
     use super::*;
 

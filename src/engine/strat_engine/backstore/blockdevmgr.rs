@@ -20,13 +20,13 @@ use devicemapper::{
 use crate::engine::{BlockDev, DevUuid, PoolUuid};
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable};
+use crate::engine::strat_engine::backstore::{blkdev_size, StratBlockDev, MIN_MDA_SECTORS};
+use crate::engine::strat_engine::serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable};
 
-use super::blockdev::StratBlockDev;
-use super::cleanup::wipe_blockdevs;
-use super::device::{blkdev_size, identify, resolve_devices, DevOwnership};
-use super::metadata::{validate_mda_size, BDA, MIN_MDA_SECTORS};
-use super::util::hw_lookup;
+use crate::engine::strat_engine::backstore::cleanup::wipe_blockdevs;
+use crate::engine::strat_engine::backstore::device::{identify, resolve_devices, DevOwnership};
+use crate::engine::strat_engine::backstore::metadata::{validate_mda_size, BDA};
+use crate::engine::strat_engine::backstore::util::hw_lookup;
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 const MAX_NUM_TO_WRITE: usize = 10;
@@ -508,13 +508,12 @@ mod tests {
     use rand;
     use uuid::Uuid;
 
-    use super::super::super::tests::{loopbacked, real};
+    use crate::engine::strat_engine::backstore::{find_all, get_metadata, MIN_MDA_SECTORS};
+    use crate::engine::strat_engine::cmd;
+    use crate::engine::strat_engine::device::wipe_sectors;
+    use crate::engine::strat_engine::tests::{loopbacked, real};
 
-    use super::super::metadata::{StaticHeader, MIN_MDA_SECTORS};
-    use super::super::setup::{find_all, get_metadata};
-
-    use super::super::super::cmd;
-    use super::super::super::device::wipe_sectors;
+    use crate::engine::strat_engine::backstore::metadata::StaticHeader;
 
     use super::*;
 

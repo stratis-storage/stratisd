@@ -6,7 +6,7 @@
 
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::blockdev::StratBlockDev;
+use crate::engine::strat_engine::backstore::StratBlockDev;
 
 /// Wipe some blockdevs of their identifying headers.
 /// Return an error if any of the blockdevs could not be wiped.

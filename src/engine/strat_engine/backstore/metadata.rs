@@ -16,7 +16,7 @@ use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
 use crate::engine::{DevUuid, PoolUuid};
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::device::SyncAll;
+use crate::engine::strat_engine::device::SyncAll;
 
 pub use self::mda::{validate_mda_size, MIN_MDA_SECTORS};
 

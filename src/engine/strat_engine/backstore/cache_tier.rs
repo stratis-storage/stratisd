@@ -11,10 +11,14 @@ use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 use crate::engine::{BlockDevTier, DevUuid, PoolUuid};
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Recordable};
+use crate::engine::strat_engine::backstore::StratBlockDev;
+use crate::engine::strat_engine::serde_structs::{
+    BaseDevSave, BlockDevSave, CacheTierSave, Recordable,
+};
 
-use super::blockdev::StratBlockDev;
-use super::blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment};
+use crate::engine::strat_engine::backstore::blockdevmgr::{
+    coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment,
+};
 
 /// This is a temporary maximum cache size. In the future it will be possible
 /// to dynamically increase the cache size beyond this limit. When this is
@@ -233,9 +237,8 @@ mod tests {
 
     use uuid::Uuid;
 
-    use super::super::super::tests::{loopbacked, real};
-
-    use super::super::metadata::MIN_MDA_SECTORS;
+    use crate::engine::strat_engine::backstore::MIN_MDA_SECTORS;
+    use crate::engine::strat_engine::tests::{loopbacked, real};
 
     use super::*;
 

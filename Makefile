@@ -1,4 +1,4 @@
-DENY = "-D warnings -D future-incompatible"
+DENY = "-D warnings -D future-incompatible -D unused"
 
 TARGET ?= "x86_64-unknown-linux-gnu"
 

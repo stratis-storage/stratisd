@@ -8,22 +8,22 @@ use std::path::{Path, PathBuf};
 
 use devicemapper::{Device, DmNameBuf};
 
-use crate::engine::{Engine, EngineEvent, Name, Pool, PoolUuid, Redundancy, RenameAction};
+use crate::engine::{
+    devlinks, Engine, EngineEvent, Name, Pool, PoolUuid, Redundancy, RenameAction,
+};
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::devlinks;
-use super::super::engine::Eventable;
-use super::super::event::get_engine_listener_list;
-use super::super::structures::Table;
+use crate::engine::engine::Eventable;
+use crate::engine::event::get_engine_listener_list;
+use crate::engine::structures::Table;
 
-use super::backstore::device::is_stratis_device;
-use super::backstore::{find_all, get_metadata};
+use crate::engine::strat_engine::backstore::{find_all, get_metadata, is_stratis_device};
 #[cfg(test)]
-use super::cleanup::teardown_pools;
-use super::cmd::verify_binaries;
-use super::dm::{get_dm, get_dm_init};
-use super::names::validate_name;
-use super::pool::{check_metadata, StratPool};
+use crate::engine::strat_engine::cleanup::teardown_pools;
+use crate::engine::strat_engine::cmd::verify_binaries;
+use crate::engine::strat_engine::dm::{get_dm, get_dm_init};
+use crate::engine::strat_engine::names::validate_name;
+use crate::engine::strat_engine::pool::{check_metadata, StratPool};
 
 const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 
@@ -374,7 +374,7 @@ mod test {
 
     use crate::engine::engine::DEV_PATH;
 
-    use super::super::tests::{loopbacked, real};
+    use crate::engine::strat_engine::tests::{loopbacked, real};
 
     use super::*;
 

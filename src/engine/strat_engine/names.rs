@@ -236,7 +236,7 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
 #[cfg(test)]
 mod tests {
 
-    use super::validate_name;
+    use super::*;
 
     #[test]
     #[allow(clippy::cyclomatic_complexity)]

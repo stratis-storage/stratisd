@@ -13,7 +13,7 @@ use devicemapper::{Bytes, Sectors, IEC};
 
 use crate::engine::{BlockDev, BlockDevState, MaybeDbusPath};
 
-use super::randomization::Randomizer;
+use crate::engine::sim_engine::randomization::Randomizer;
 
 #[derive(Debug)]
 /// A simulated device.

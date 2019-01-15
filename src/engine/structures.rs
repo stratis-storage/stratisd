@@ -8,7 +8,7 @@ use std::iter::IntoIterator;
 
 use uuid::Uuid;
 
-use super::types::Name;
+use crate::engine::types::Name;
 
 /// Map UUID and name to T items.
 pub struct Table<T> {
@@ -270,7 +270,7 @@ mod tests {
 
     use crate::engine::Name;
 
-    use super::Table;
+    use super::*;
 
     #[derive(Debug)]
     struct TestThing {

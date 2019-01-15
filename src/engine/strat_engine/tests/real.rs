@@ -17,12 +17,12 @@ use devicemapper::{
     LinearTargetParams, Sectors, TargetLine, IEC,
 };
 
-use super::super::backstore::blkdev_size;
-use super::super::device::wipe_sectors;
-use super::super::dm::get_dm;
+use crate::engine::strat_engine::backstore::blkdev_size;
+use crate::engine::strat_engine::device::wipe_sectors;
+use crate::engine::strat_engine::dm::get_dm;
 
-use super::logger::init_logger;
-use super::util::clean_up;
+use crate::engine::strat_engine::tests::logger::init_logger;
+use crate::engine::strat_engine::tests::util::clean_up;
 
 pub struct RealTestDev {
     dev: Either<PathBuf, LinearDev>,

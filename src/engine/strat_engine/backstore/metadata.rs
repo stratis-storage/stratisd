@@ -441,7 +441,7 @@ mod mda {
 
     use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-    use super::SyncAll;
+    use crate::engine::strat_engine::device::SyncAll;
 
     const _MDA_REGION_HDR_SIZE: usize = 32;
     const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);

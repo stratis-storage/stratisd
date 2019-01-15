@@ -33,9 +33,11 @@ use crate::engine::strat_engine::names::{
 };
 use crate::engine::strat_engine::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
-use super::filesystem::{fs_settle, FilesystemStatus, StratFilesystem};
-use super::mdv::MetadataVol;
-use super::thinids::ThinDevIdPool;
+use crate::engine::strat_engine::thinpool::filesystem::{
+    fs_settle, FilesystemStatus, StratFilesystem,
+};
+use crate::engine::strat_engine::thinpool::mdv::MetadataVol;
+use crate::engine::strat_engine::thinpool::thinids::ThinDevIdPool;
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(2048); // 2 GiB
@@ -1207,7 +1209,7 @@ mod tests {
     use crate::engine::strat_engine::device::SyncAll;
     use crate::engine::strat_engine::tests::{loopbacked, real};
 
-    use super::super::filesystem::{fs_usage, FILESYSTEM_LOWATER};
+    use crate::engine::strat_engine::thinpool::filesystem::{fs_usage, FILESYSTEM_LOWATER};
 
     use super::*;
 

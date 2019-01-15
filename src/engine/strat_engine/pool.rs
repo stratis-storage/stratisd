@@ -18,12 +18,12 @@ use crate::engine::{
 };
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::types::{FreeSpaceState, PoolExtendState, PoolState};
+use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
 
-use super::backstore::{Backstore, StratBlockDev, MIN_MDA_SECTORS};
-use super::names::validate_name;
-use super::serde_structs::{FlexDevsSave, PoolSave, Recordable};
-use super::thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE};
+use crate::engine::strat_engine::backstore::{Backstore, StratBlockDev, MIN_MDA_SECTORS};
+use crate::engine::strat_engine::names::validate_name;
+use crate::engine::strat_engine::serde_structs::{FlexDevsSave, PoolSave, Recordable};
+use crate::engine::strat_engine::thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE};
 
 /// Get the index which indicates the start of unallocated space in the cap
 /// device.
@@ -489,9 +489,9 @@ mod tests {
     use crate::engine::devlinks;
     use crate::engine::types::Redundancy;
 
-    use super::super::backstore::{find_all, get_metadata};
-    use super::super::cmd;
-    use super::super::tests::{loopbacked, real};
+    use crate::engine::strat_engine::backstore::{find_all, get_metadata};
+    use crate::engine::strat_engine::cmd;
+    use crate::engine::strat_engine::tests::{loopbacked, real};
 
     use super::*;
 

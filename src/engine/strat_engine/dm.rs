@@ -11,7 +11,7 @@ use devicemapper::{DmResult, DM};
 
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::engine::Eventable;
+use crate::engine::engine::Eventable;
 
 static INIT: Once = ONCE_INIT;
 static mut DM_CONTEXT: Option<DmResult<DM>> = None;

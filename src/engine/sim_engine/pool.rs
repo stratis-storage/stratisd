@@ -20,12 +20,12 @@ use crate::engine::{
 };
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::structures::Table;
-use super::super::types::{FreeSpaceState, PoolExtendState, PoolState};
+use crate::engine::structures::Table;
+use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
 
-use super::blockdev::SimDev;
-use super::filesystem::SimFilesystem;
-use super::randomization::Randomizer;
+use crate::engine::sim_engine::blockdev::SimDev;
+use crate::engine::sim_engine::filesystem::SimFilesystem;
+use crate::engine::sim_engine::randomization::Randomizer;
 
 #[derive(Debug)]
 pub struct SimPool {
@@ -322,7 +322,7 @@ mod tests {
 
     use crate::engine::Engine;
 
-    use super::super::SimEngine;
+    use crate::engine::sim_engine::SimEngine;
 
     use super::*;
 

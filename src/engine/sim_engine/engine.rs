@@ -16,11 +16,11 @@ use devicemapper::Device;
 use crate::engine::{Engine, Name, Pool, PoolUuid, Redundancy, RenameAction};
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::engine::Eventable;
-use super::super::structures::Table;
+use crate::engine::engine::Eventable;
+use crate::engine::structures::Table;
 
-use super::pool::SimPool;
-use super::randomization::Randomizer;
+use crate::engine::sim_engine::pool::SimPool;
+use crate::engine::sim_engine::randomization::Randomizer;
 
 #[derive(Debug, Default)]
 pub struct SimEngine {
@@ -149,7 +149,7 @@ mod tests {
     use crate::engine::{Engine, RenameAction};
     use crate::stratis::{ErrorEnum, StratisError};
 
-    use super::SimEngine;
+    use super::*;
 
     proptest! {
         #[test]

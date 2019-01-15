@@ -24,7 +24,7 @@ use crate::engine::strat_engine::cmd::create_fs;
 use crate::engine::strat_engine::dm::get_dm;
 use crate::engine::strat_engine::serde_structs::FilesystemSave;
 
-use super::filesystem::StratFilesystem;
+use crate::engine::strat_engine::thinpool::filesystem::StratFilesystem;
 
 // TODO: Monitor fs size and extend linear and fs if needed
 // TODO: Document format of stuff on MDV in SWDD (currently ad-hoc)

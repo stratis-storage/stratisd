@@ -11,8 +11,8 @@ use std::{fs, str};
 use crate::engine::Pool;
 use crate::stratis::StratisResult;
 
-use super::engine::DEV_PATH;
-use super::types::{Name, PoolUuid};
+use crate::engine::engine::DEV_PATH;
+use crate::engine::types::{Name, PoolUuid};
 
 /// Set up the root Stratis directory, where dev links as well as temporary
 /// MDV mounts will be created. This must occur before any pools are setup.

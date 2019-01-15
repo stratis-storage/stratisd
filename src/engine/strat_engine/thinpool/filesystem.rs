@@ -27,8 +27,9 @@ use crate::engine::strat_engine::cmd::{create_fs, set_uuid, udev_settle, xfs_gro
 use crate::engine::strat_engine::dm::get_dm;
 use crate::engine::strat_engine::names::{format_thin_ids, ThinRole};
 use crate::engine::strat_engine::serde_structs::FilesystemSave;
+use crate::engine::strat_engine::thinpool::DATA_BLOCK_SIZE;
 
-use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER};
+use crate::engine::strat_engine::thinpool::thinpool::DATA_LOWATER;
 
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 

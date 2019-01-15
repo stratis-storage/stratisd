@@ -11,6 +11,7 @@ extern crate uuid;
 #[cfg(feature = "dbus_enabled")]
 extern crate dbus;
 
+#[cfg(feature = "dbus_enabled")]
 extern crate libc;
 extern crate libmount;
 extern crate rand;

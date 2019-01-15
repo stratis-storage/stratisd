@@ -23,10 +23,10 @@ use tempfile;
 use crate::engine::{Filesystem, FilesystemUuid, MaybeDbusPath, Name, PoolUuid};
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::cmd::{create_fs, set_uuid, udev_settle, xfs_growfs};
-use super::super::dm::get_dm;
-use super::super::names::{format_thin_ids, ThinRole};
-use super::super::serde_structs::FilesystemSave;
+use crate::engine::strat_engine::cmd::{create_fs, set_uuid, udev_settle, xfs_growfs};
+use crate::engine::strat_engine::dm::get_dm;
+use crate::engine::strat_engine::names::{format_thin_ids, ThinRole};
+use crate::engine::strat_engine::serde_structs::FilesystemSave;
 
 use super::thinpool::{DATA_BLOCK_SIZE, DATA_LOWATER};
 

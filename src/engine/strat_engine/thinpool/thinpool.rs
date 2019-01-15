@@ -24,14 +24,14 @@ use crate::engine::event::get_engine_listener_list;
 use crate::engine::structures::Table;
 use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
 
-use super::super::backstore::Backstore;
-use super::super::cmd::{thin_check, thin_repair};
-use super::super::device::wipe_sectors;
-use super::super::dm::get_dm;
-use super::super::names::{
+use crate::engine::strat_engine::backstore::Backstore;
+use crate::engine::strat_engine::cmd::{thin_check, thin_repair};
+use crate::engine::strat_engine::device::wipe_sectors;
+use crate::engine::strat_engine::dm::get_dm;
+use crate::engine::strat_engine::names::{
     format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole, ThinRole,
 };
-use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
+use crate::engine::strat_engine::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
 use super::filesystem::{fs_settle, FilesystemStatus, StratFilesystem};
 use super::mdv::MetadataVol;
@@ -1202,10 +1202,10 @@ mod tests {
 
     use devicemapper::{Bytes, SECTOR_SIZE};
 
-    use super::super::super::backstore::MIN_MDA_SECTORS;
-    use super::super::super::cmd;
-    use super::super::super::device::SyncAll;
-    use super::super::super::tests::{loopbacked, real};
+    use crate::engine::strat_engine::backstore::MIN_MDA_SECTORS;
+    use crate::engine::strat_engine::cmd;
+    use crate::engine::strat_engine::device::SyncAll;
+    use crate::engine::strat_engine::tests::{loopbacked, real};
 
     use super::super::filesystem::{fs_usage, FILESYSTEM_LOWATER};
 

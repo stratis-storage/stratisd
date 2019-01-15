@@ -20,10 +20,9 @@ use crate::engine::{FilesystemUuid, Name, PoolUuid};
 use crate::stratis::StratisResult;
 
 use crate::engine::engine::DEV_PATH;
-
-use super::super::cmd::create_fs;
-use super::super::dm::get_dm;
-use super::super::serde_structs::FilesystemSave;
+use crate::engine::strat_engine::cmd::create_fs;
+use crate::engine::strat_engine::dm::get_dm;
+use crate::engine::strat_engine::serde_structs::FilesystemSave;
 
 use super::filesystem::StratFilesystem;
 

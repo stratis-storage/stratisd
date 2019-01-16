@@ -55,6 +55,10 @@ matrix:
           before_script:
               - rustup component add clippy
           env: TASK=clippy TARGET=x86_64-unknown-linux-gnu
+        # Run destructive tests on rust beta, in order to be good Rustaceans
+        - rust: beta
+          env: TASK=test-travis TARGET=x86_64-unknown-linux-gnu
+          sudo: required
         # Run pylint, Python linter, on any Python test code
         - language: python
           python: "3.4"

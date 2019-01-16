@@ -17,7 +17,8 @@ use super::consts;
 use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
 
 use super::util::{
-    engine_to_dbus_err_tuple, get_next_arg, get_parent, get_uuid, msg_code_ok, msg_string_ok,
+    engine_to_dbus_err_tuple, get_next_arg, get_parent, get_uuid, make_object_path, msg_code_ok,
+    msg_string_ok,
 };
 
 pub fn create_dbus_blockdev<'a>(
@@ -89,11 +90,7 @@ pub fn create_dbus_blockdev<'a>(
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_tier);
 
-    let object_name = format!(
-        "{}/{}",
-        consts::STRATIS_BASE_PATH,
-        dbus_context.get_next_id().to_string()
-    );
+    let object_name = make_object_path(dbus_context);
 
     let object_path = f
         .object_path(object_name, Some(OPContext::new(parent, uuid)))

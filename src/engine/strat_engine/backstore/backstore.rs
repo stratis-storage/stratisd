@@ -414,20 +414,21 @@ impl Backstore {
             return Ok(None);
         }
 
-        let available_in_cap = self.available_in_cap();
-        if available_in_cap >= internal_request {
+        if self.available_in_cap() >= internal_request {
             self.next += internal_request;
             Ok(Some((self.next - internal_request, internal_request)))
         } else {
             let available_in_data_tier = self.data_tier.usable_size() - self.data_tier.allocated();
-            let datatier_request =
-                cmp::min(internal_request - available_in_cap, available_in_data_tier);
+            let datatier_request = cmp::min(
+                internal_request - self.available_in_cap(),
+                available_in_data_tier,
+            );
             if datatier_request == Sectors(0) {
                 // Sorry, datatier is full. Partial return solely from cap?
-                if available_in_cap < modulus {
+                if self.available_in_cap() < modulus {
                     Ok(None)
                 } else {
-                    let return_amt = align_down(available_in_cap, modulus);
+                    let return_amt = align_down(self.available_in_cap(), modulus);
                     self.next += return_amt;
                     Ok(Some((self.next - return_amt, return_amt)))
                 }

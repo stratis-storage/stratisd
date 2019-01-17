@@ -419,7 +419,7 @@ impl Backstore {
             self.next += internal_request;
             Ok(Some((self.next - internal_request, internal_request)))
         } else {
-            let available_in_data_tier = self.available_in_backstore() - available_in_cap;
+            let available_in_data_tier = self.data_tier.usable_size() - self.data_tier.allocated();
             let datatier_request =
                 cmp::min(internal_request - available_in_cap, available_in_data_tier);
             if datatier_request == Sectors(0) {

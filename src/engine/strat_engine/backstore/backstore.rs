@@ -777,8 +777,7 @@ mod tests {
     }
 
     /// Create a backstore.
-    /// Request a amount that can not be allocated because the modulus is
-    /// bigger than the reqested amount.
+    /// Ensure modulus works properly.
     /// Request an impossibly large amount.
     /// Verify that the backstore is now all used up.
     fn test_request(paths: &[&Path]) {
@@ -787,10 +786,25 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
 
+        // 0-length requests return None
         assert!(backstore
-            .request(pool_uuid, Sectors(IEC::Ki), Sectors(IEC::Mi))
+            .request(pool_uuid, Sectors(0), Sectors(IEC::Mi))
             .unwrap()
             .is_none());
+
+        // nonzero requests rounded up to modulus
+        let (_start, length) = backstore
+            .request(pool_uuid, Sectors(IEC::Ki), Sectors(IEC::Mi))
+            .unwrap()
+            .unwrap();
+        assert_eq!(length, Sectors(IEC::Mi));
+
+        // nonzero requests rounded up to modulus
+        let (_start, length) = backstore
+            .request(pool_uuid, Sectors(6), Sectors(4))
+            .unwrap()
+            .unwrap();
+        assert_eq!(length, Sectors(8));
 
         let request = Sectors(IEC::Ei);
         let modulus = Sectors(IEC::Ki);

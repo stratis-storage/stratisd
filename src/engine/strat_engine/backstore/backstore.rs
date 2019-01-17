@@ -415,10 +415,7 @@ impl Backstore {
         }
 
         let available_in_cap = self.available_in_cap();
-        if available_in_cap >= internal_request {
-            self.next += internal_request;
-            Ok(Some((self.next - internal_request, internal_request)))
-        } else {
+        if available_in_cap < internal_request {
             let available_in_data_tier = self.available_in_backstore() - available_in_cap;
             let datatier_request =
                 cmp::min(internal_request - available_in_cap, available_in_data_tier);
@@ -449,6 +446,9 @@ impl Backstore {
                     Ok(Some((self.next - return_amt, return_amt)))
                 }
             }
+        } else {
+            self.next += internal_request;
+            Ok(Some((self.next - internal_request, internal_request)))
         }
     }
 

@@ -14,6 +14,7 @@ addons:
 language: rust
 
 matrix:
+    fast-finish: true
     allow_failures:
         # Temporarily allow failure until Travis bug is fixed.
         - env: TASK=build TARGET=i686-unknown-linux-gnu PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/

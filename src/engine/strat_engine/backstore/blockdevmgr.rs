@@ -141,7 +141,7 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParam
     let mut logical_start_offset = Sectors(0);
 
     let segments = bsegs
-        .into_iter()
+        .iter()
         .map(|bseg| bseg.to_segment())
         .collect::<Vec<_>>();
     for segment in segments {

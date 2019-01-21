@@ -96,7 +96,6 @@ impl DataTier {
 
     /// The sum of the lengths of all the sectors that have been mapped to an
     /// upper device.
-    #[cfg(test)]
     pub fn allocated(&self) -> Sectors {
         self.segments
             .iter()

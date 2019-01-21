@@ -18,7 +18,7 @@ impl ThinDevIdPool {
     /// Make a new pool from a possibly empty Vec of ids.
     /// Does not verify the absence of duplicate ids.
     pub fn new_from_ids(ids: &[ThinDevId]) -> ThinDevIdPool {
-        let max_id: Option<u32> = ids.into_iter().map(|x| (*x).into()).max();
+        let max_id: Option<u32> = ids.iter().map(|x| (*x).into()).max();
         ThinDevIdPool {
             next_id: max_id.map(|x| x + 1).unwrap_or(0),
         }

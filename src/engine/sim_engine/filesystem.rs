@@ -35,7 +35,7 @@ impl SimFilesystem {
 impl Filesystem for SimFilesystem {
     fn devnode(&self) -> PathBuf {
         ["/stratis", &format!("random-{}", self.rand)]
-            .into_iter()
+            .iter()
             .collect()
     }
 

@@ -12,17 +12,18 @@ use uuid::Uuid;
 
 use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
-use super::super::engine::{BlockDev, Filesystem, Pool};
-use super::super::types::{
-    BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState,
-    PoolState, PoolUuid, Redundancy, RenameAction,
+use crate::engine::{
+    BlockDev, BlockDevTier, DevUuid, Filesystem, FilesystemUuid, MaybeDbusPath, Name, Pool,
+    PoolUuid, Redundancy, RenameAction,
 };
-use stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::backstore::{Backstore, StratBlockDev, MIN_MDA_SECTORS};
-use super::names::validate_name;
-use super::serde_structs::{FlexDevsSave, PoolSave, Recordable};
-use super::thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE};
+use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
+
+use crate::engine::strat_engine::backstore::{Backstore, StratBlockDev, MIN_MDA_SECTORS};
+use crate::engine::strat_engine::names::validate_name;
+use crate::engine::strat_engine::serde_structs::{FlexDevsSave, PoolSave, Recordable};
+use crate::engine::strat_engine::thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE};
 
 /// Get the index which indicates the start of unallocated space in the cap
 /// device.
@@ -485,12 +486,12 @@ mod tests {
 
     use devicemapper::{Bytes, IEC, SECTOR_SIZE};
 
-    use super::super::super::devlinks;
-    use super::super::super::types::Redundancy;
+    use crate::engine::devlinks;
+    use crate::engine::types::Redundancy;
 
-    use super::super::backstore::{find_all, get_metadata};
-    use super::super::cmd;
-    use super::super::tests::{loopbacked, real};
+    use crate::engine::strat_engine::backstore::{find_all, get_metadata};
+    use crate::engine::strat_engine::cmd;
+    use crate::engine::strat_engine::tests::{loopbacked, real};
 
     use super::*;
 

@@ -10,10 +10,8 @@ use std::path::PathBuf;
 
 use devicemapper::Bytes;
 
-use super::super::engine::Filesystem;
-use super::super::types::MaybeDbusPath;
-
-use stratis::StratisResult;
+use crate::engine::{Filesystem, MaybeDbusPath};
+use crate::stratis::StratisResult;
 
 #[derive(Debug)]
 pub struct SimFilesystem {

@@ -16,16 +16,15 @@ use serde_json;
 
 use devicemapper::{DmDevice, LinearDev, LinearDevTargetParams, TargetLine};
 
-use stratis::StratisResult;
+use crate::engine::{FilesystemUuid, Name, PoolUuid};
+use crate::stratis::StratisResult;
 
-use super::super::super::engine::DEV_PATH;
-use super::super::super::types::{FilesystemUuid, Name, PoolUuid};
+use crate::engine::engine::DEV_PATH;
+use crate::engine::strat_engine::cmd::create_fs;
+use crate::engine::strat_engine::dm::get_dm;
+use crate::engine::strat_engine::serde_structs::FilesystemSave;
 
-use super::super::cmd::create_fs;
-use super::super::dm::get_dm;
-use super::super::serde_structs::FilesystemSave;
-
-use super::filesystem::StratFilesystem;
+use crate::engine::strat_engine::thinpool::filesystem::StratFilesystem;
 
 // TODO: Monitor fs size and extend linear and fs if needed
 // TODO: Document format of stuff on MDV in SWDD (currently ad-hoc)

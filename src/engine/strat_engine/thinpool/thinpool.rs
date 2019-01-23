@@ -15,29 +15,29 @@ use devicemapper::{
     ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
 };
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
-
-use super::super::super::devlinks;
-use super::super::super::engine::Filesystem;
-use super::super::super::event::{get_engine_listener_list, EngineEvent};
-use super::super::super::structures::Table;
-use super::super::super::types::{
-    FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid,
-    RenameAction,
+use crate::engine::{
+    devlinks, EngineEvent, Filesystem, FilesystemUuid, MaybeDbusPath, Name, PoolUuid, RenameAction,
 };
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::backstore::Backstore;
-use super::super::cmd::{thin_check, thin_repair};
-use super::super::device::wipe_sectors;
-use super::super::dm::get_dm;
-use super::super::names::{
+use crate::engine::event::get_engine_listener_list;
+use crate::engine::structures::Table;
+use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
+
+use crate::engine::strat_engine::backstore::Backstore;
+use crate::engine::strat_engine::cmd::{thin_check, thin_repair};
+use crate::engine::strat_engine::device::wipe_sectors;
+use crate::engine::strat_engine::dm::get_dm;
+use crate::engine::strat_engine::names::{
     format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole, ThinRole,
 };
-use super::super::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
+use crate::engine::strat_engine::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
-use super::filesystem::{fs_settle, FilesystemStatus, StratFilesystem};
-use super::mdv::MetadataVol;
-use super::thinids::ThinDevIdPool;
+use crate::engine::strat_engine::thinpool::filesystem::{
+    fs_settle, FilesystemStatus, StratFilesystem,
+};
+use crate::engine::strat_engine::thinpool::mdv::MetadataVol;
+use crate::engine::strat_engine::thinpool::thinids::ThinDevIdPool;
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(2048); // 2 GiB
@@ -1204,12 +1204,12 @@ mod tests {
 
     use devicemapper::{Bytes, SECTOR_SIZE};
 
-    use super::super::super::backstore::MIN_MDA_SECTORS;
-    use super::super::super::cmd;
-    use super::super::super::device::SyncAll;
-    use super::super::super::tests::{loopbacked, real};
+    use crate::engine::strat_engine::backstore::MIN_MDA_SECTORS;
+    use crate::engine::strat_engine::cmd;
+    use crate::engine::strat_engine::device::SyncAll;
+    use crate::engine::strat_engine::tests::{loopbacked, real};
 
-    use super::super::filesystem::{fs_usage, FILESYSTEM_LOWATER};
+    use crate::engine::strat_engine::thinpool::filesystem::{fs_usage, FILESYSTEM_LOWATER};
 
     use super::*;
 

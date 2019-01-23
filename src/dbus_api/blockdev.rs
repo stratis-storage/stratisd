@@ -11,12 +11,11 @@ use dbus::Message;
 
 use uuid::Uuid;
 
-use super::super::engine::{BlockDev, BlockDevTier, MaybeDbusPath};
+use crate::dbus_api::consts;
+use crate::engine::{BlockDev, BlockDevTier, MaybeDbusPath};
 
-use super::consts;
-use super::types::{DbusContext, DbusErrorEnum, OPContext, TData};
-
-use super::util::{
+use crate::dbus_api::types::{DbusContext, DbusErrorEnum, OPContext, TData};
+use crate::dbus_api::util::{
     engine_to_dbus_err_tuple, get_next_arg, get_parent, get_uuid, make_object_path, msg_code_ok,
     msg_string_ok,
 };

@@ -11,7 +11,7 @@ use dbus::Path;
 
 use uuid::Uuid;
 
-use super::super::engine::Engine;
+use crate::engine::Engine;
 
 #[derive(Clone, Copy, Debug)]
 #[allow(non_camel_case_types)]

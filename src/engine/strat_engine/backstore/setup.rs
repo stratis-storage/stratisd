@@ -13,16 +13,14 @@ use serde_json;
 
 use devicemapper::{devnode_to_devno, Device, Sectors};
 
-use stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::engine::{BlockDevTier, DevUuid, PoolUuid};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use super::super::super::types::{BlockDevTier, DevUuid, PoolUuid};
+use crate::engine::strat_engine::backstore::{blkdev_size, StratBlockDev};
+use crate::engine::strat_engine::serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave};
 
-use super::super::serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave};
-
-use super::blockdev::StratBlockDev;
-use super::device::blkdev_size;
-use super::metadata::{StaticHeader, BDA};
-use super::util::get_stratis_block_devices;
+use crate::engine::strat_engine::backstore::metadata::{StaticHeader, BDA};
+use crate::engine::strat_engine::backstore::util::get_stratis_block_devices;
 
 /// Find all Stratis devices.
 ///

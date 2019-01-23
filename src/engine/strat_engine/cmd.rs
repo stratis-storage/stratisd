@@ -20,7 +20,7 @@ use std::process::Command;
 
 use uuid::Uuid;
 
-use stratis::{StratisError, StratisResult};
+use crate::stratis::{StratisError, StratisResult};
 
 /// Find the binary with the given name by looking in likely locations.
 /// Return None if no binary was found.

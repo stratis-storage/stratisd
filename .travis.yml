@@ -21,8 +21,10 @@ matrix:
         # Allow beta failure until problems are addressed
         - rust: beta
     include:
-        # Verify formatting of Rust code
-        - rust: stable
+        # Run rustfmt using the compiler currently recommended for development
+        - rust: 1.31.0
+          before_script:
+              - rustup component add rustfmt
           env: TASK=fmt-travis TARGET=x86_64-unknown-linux-gnu
         # Verify that source builds with standard defaults
         - rust: stable

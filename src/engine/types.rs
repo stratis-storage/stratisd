@@ -5,7 +5,7 @@
 use std::borrow::Borrow;
 use std::fmt;
 use std::ops::Deref;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[cfg(feature = "dbus_enabled")]
 use dbus;
@@ -92,11 +92,11 @@ pub enum Redundancy {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Name(Rc<String>);
+pub struct Name(Arc<String>);
 
 impl Name {
     pub fn new(name: String) -> Name {
-        Name(Rc::new(name))
+        Name(Arc::new(name))
     }
 
     pub fn to_owned(&self) -> String {

@@ -190,7 +190,7 @@ pub trait Pool: Debug {
     fn get_dbus_path(&self) -> &MaybeDbusPath;
 }
 
-pub trait Engine: Debug {
+pub trait Engine: Debug + Send {
     /// Create a Stratis pool.
     /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a

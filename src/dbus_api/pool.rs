@@ -50,7 +50,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let mut engine = dbus_context.engine.borrow_mut();
+    let mut engine = get_engine!(dbus_context; default_return; return_message);
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let result = pool.create_filesystems(
@@ -110,7 +110,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let mut engine = dbus_context.engine.borrow_mut();
+    let mut engine = get_engine!(dbus_context; default_return; return_message);
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let mut filesystem_map: HashMap<Uuid, dbus::Path<'static>> = HashMap::new();
@@ -175,7 +175,7 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     };
 
-    let mut engine = dbus_context.engine.borrow_mut();
+    let mut engine = get_engine!(dbus_context; default_return; return_message);
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let msg = match pool.snapshot_filesystem(pool_uuid, &pool_name, fs_uuid, snapshot_name) {
@@ -210,7 +210,7 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> Meth
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let mut engine = dbus_context.engine.borrow_mut();
+    let mut engine = get_engine!(dbus_context; default_return; return_message);
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
@@ -271,9 +271,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let msg = match dbus_context
-        .engine
-        .borrow_mut()
+    let msg = match get_engine!(dbus_context; default_return; return_message)
         .rename_pool(pool_uuid, new_name)
     {
         Ok(RenameAction::NoSource) => {
@@ -316,7 +314,11 @@ where
         .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?
         .uuid;
 
-    let engine = dbus_context.engine.borrow();
+    let engine = dbus_context
+        .engine
+        .lock()
+        .ok()
+        .ok_or_else(|| MethodErr::failed(&String::from("unable to get engine lock")))?;
     let (pool_name, pool) = engine.get_pool(pool_uuid).ok_or_else(|| {
         MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))
     })?;

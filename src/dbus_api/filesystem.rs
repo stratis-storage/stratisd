@@ -114,7 +114,7 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_path = get_parent!(m; filesystem_data; default_return; return_message);
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let mut engine = dbus_context.engine.borrow_mut();
+    let mut engine = get_engine!(dbus_context; default_return; return_message);
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let msg = match pool.rename_filesystem(&pool_name, filesystem_data.uuid, new_name) {
@@ -177,7 +177,11 @@ where
         .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?
         .uuid;
 
-    let engine = dbus_context.engine.borrow();
+    let engine = dbus_context
+        .engine
+        .lock()
+        .ok()
+        .ok_or_else(|| MethodErr::failed(&String::from("unable to get engine lock")))?;
     let (pool_name, pool) = engine.get_pool(pool_uuid).ok_or_else(|| {
         MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))
     })?;

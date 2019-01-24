@@ -2,9 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::cell::RefCell;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::vec::Vec;
 
 use dbus;
@@ -39,12 +38,11 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
-    let mut engine = dbus_context.engine.borrow_mut();
-    let result = engine.create_pool(name, &blockdevs, tuple_to_option(redundancy));
-
     let return_message = message.method_return();
-
     let default_return: (dbus::Path, Vec<dbus::Path>) = (dbus::Path::default(), Vec::new());
+
+    let mut engine = get_engine!(dbus_context; default_return; return_message);
+    let result = engine.create_pool(name, &blockdevs, tuple_to_option(redundancy));
 
     let msg = match result {
         Ok(pool_uuid) => {
@@ -97,19 +95,20 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     };
 
-    let msg = match dbus_context.engine.borrow_mut().destroy_pool(pool_uuid) {
-        Ok(action) => {
-            dbus_context
-                .actions
-                .borrow_mut()
-                .push_remove(&object_path, m.tree);
-            return_message.append3(action, msg_code_ok(), msg_string_ok())
-        }
-        Err(err) => {
-            let (rc, rs) = engine_to_dbus_err_tuple(&err);
-            return_message.append3(default_return, rc, rs)
-        }
-    };
+    let msg =
+        match get_engine!(dbus_context; default_return; return_message).destroy_pool(pool_uuid) {
+            Ok(action) => {
+                dbus_context
+                    .actions
+                    .borrow_mut()
+                    .push_remove(&object_path, m.tree);
+                return_message.append3(action, msg_code_ok(), msg_string_ok())
+            }
+            Err(err) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&err);
+                return_message.append3(default_return, rc, rs)
+            }
+        };
     Ok(vec![msg])
 }
 
@@ -123,14 +122,11 @@ fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut iter = message.iter_init();
 
     let denominator: u32 = get_next_arg(&mut iter, 0)?;
+    let return_message = message.method_return();
 
     let dbus_context = m.tree.get_data();
-    let result = dbus_context
-        .engine
-        .borrow_mut()
-        .configure_simulator(denominator);
 
-    let return_message = message.method_return();
+    let result = get_engine!(dbus_context; false; return_message).configure_simulator(denominator);
 
     let msg = match result {
         Ok(_) => return_message.append2(msg_code_ok(), msg_string_ok()),
@@ -193,7 +189,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
 
 /// Returned data from when you connect a stratis engine to dbus.
 pub struct DbusConnectionData {
-    pub connection: Rc<RefCell<Connection>>,
+    pub connection: Arc<Mutex<Connection>>,
     pub tree: Tree<MTFn<TData>, TData>,
     pub path: dbus::Path<'static>,
     pub context: DbusContext,
@@ -201,7 +197,7 @@ pub struct DbusConnectionData {
 
 impl DbusConnectionData {
     /// Connect a stratis engine to dbus.
-    pub fn connect(engine: Rc<RefCell<Engine>>) -> Result<DbusConnectionData, dbus::Error> {
+    pub fn connect(engine: Arc<Mutex<Engine>>) -> Result<DbusConnectionData, dbus::Error> {
         let c = Connection::get_private(BusType::System)?;
         let (tree, object_path) = get_base_tree(DbusContext::new(engine));
         let dbus_context = tree.get_data().clone();
@@ -211,7 +207,7 @@ impl DbusConnectionData {
             NameFlag::ReplaceExisting as u32,
         )?;
         Ok(DbusConnectionData {
-            connection: Rc::new(RefCell::new(c)),
+            connection: Arc::new(Mutex::new(c)),
             tree,
             path: object_path,
             context: dbus_context,
@@ -238,13 +234,17 @@ impl DbusConnectionData {
             match action {
                 DeferredAction::Add(path) => {
                     self.connection
-                        .borrow_mut()
+                        .lock()
+                        .unwrap()
                         .register_object_path(path.get_name())
                         .expect("Must succeed since object paths are unique");
                     self.tree.insert(path);
                 }
                 DeferredAction::Remove(path) => {
-                    self.connection.borrow_mut().unregister_object_path(&path);
+                    self.connection
+                        .lock()
+                        .unwrap()
+                        .unregister_object_path(&path);
                     self.tree.remove(&path);
                 }
             }
@@ -256,7 +256,8 @@ impl DbusConnectionData {
         for pfd in fds.iter().filter(|pfd| pfd.revents != 0) {
             let items: Vec<ConnectionItem> = self
                 .connection
-                .borrow()
+                .lock()
+                .unwrap()
                 .watch_handle(pfd.fd, dbus::WatchEvent::from_revents(pfd.revents))
                 .collect();
 
@@ -266,7 +267,7 @@ impl DbusConnectionData {
                         // Probably the wisest is to ignore any send errors here -
                         // maybe the remote has disconnected during our processing.
                         for m in v {
-                            let _ = self.connection.borrow_mut().send(m);
+                            let _ = self.connection.lock().unwrap().send(m);
                         }
                     }
 

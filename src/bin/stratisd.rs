@@ -19,14 +19,13 @@ extern crate nix;
 extern crate timerfd;
 extern crate uuid;
 
-use std::cell::RefCell;
 use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{ErrorKind, Read, Write};
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::PathBuf;
 use std::process::exit;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use chrono::Duration;
 use clap::{App, Arg, ArgMatches};
@@ -155,12 +154,12 @@ fn trylock_pid_file() -> StratisResult<File> {
 #[cfg(feature = "dbus_enabled")]
 #[derive(Debug)]
 struct EventHandler {
-    dbus_conn: Rc<RefCell<Connection>>,
+    dbus_conn: Arc<Mutex<Connection>>,
 }
 
 #[cfg(feature = "dbus_enabled")]
 impl EventHandler {
-    pub fn new(dbus_conn: Rc<RefCell<Connection>>) -> EventHandler {
+    pub fn new(dbus_conn: Arc<Mutex<Connection>>) -> EventHandler {
         EventHandler { dbus_conn }
     }
 }
@@ -172,7 +171,7 @@ impl EngineListener for EventHandler {
             EngineEvent::BlockdevStateChanged { dbus_path, state } => {
                 if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
+                        &self.dbus_conn.lock().unwrap(),
                         consts::BLOCKDEV_STATE_PROP,
                         state as u16,
                         &dbus_path,
@@ -193,7 +192,7 @@ impl EngineListener for EventHandler {
             } => {
                 if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
+                        &self.dbus_conn.lock().unwrap(),
                         consts::FILESYSTEM_NAME_PROP,
                         to.to_string(),
                         &dbus_path,
@@ -210,7 +209,7 @@ impl EngineListener for EventHandler {
             EngineEvent::PoolExtendStateChanged { dbus_path, state } => {
                 if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
+                        &self.dbus_conn.lock().unwrap(),
                         consts::POOL_EXTEND_STATE_PROP,
                         state as u16,
                         &dbus_path,
@@ -231,7 +230,7 @@ impl EngineListener for EventHandler {
             } => {
                 if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
+                        &self.dbus_conn.lock().unwrap(),
                         consts::POOL_NAME_PROP,
                         to.to_string(),
                         &dbus_path,
@@ -248,7 +247,7 @@ impl EngineListener for EventHandler {
             EngineEvent::PoolSpaceStateChanged { dbus_path, state } => {
                 if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
+                        &self.dbus_conn.lock().unwrap(),
                         consts::POOL_SPACE_STATE_PROP,
                         state as u16,
                         &dbus_path,
@@ -265,7 +264,7 @@ impl EngineListener for EventHandler {
             EngineEvent::PoolStateChanged { dbus_path, state } => {
                 if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
+                        &self.dbus_conn.lock().unwrap(),
                         consts::POOL_STATE_PROP,
                         state as u16,
                         &dbus_path,
@@ -298,7 +297,7 @@ impl MaybeDbusSupport {
 
     fn process(
         &mut self,
-        _engine: &Rc<RefCell<Engine>>,
+        _engine: &Arc<Mutex<Engine>>,
         _fds: &mut Vec<libc::pollfd>,
         _dbus_client_index_start: usize,
     ) {
@@ -320,21 +319,18 @@ impl MaybeDbusSupport {
 
     /// Connect to D-Bus and register pools, if not already connected.
     /// Return the connection, if made or already existing, otherwise, None.
-    fn setup_connection(
-        &mut self,
-        engine: &Rc<RefCell<Engine>>,
-    ) -> Option<&mut DbusConnectionData> {
+    fn setup_connection(&mut self, engine: &Arc<Mutex<Engine>>) -> Option<&mut DbusConnectionData> {
         if self.handle.is_none() {
-            match libstratis::dbus_api::DbusConnectionData::connect(Rc::clone(&engine)) {
+            match libstratis::dbus_api::DbusConnectionData::connect(Arc::clone(&engine)) {
                 Err(_err) => {
                     warn!("D-Bus API is not available");
                 }
                 Ok(mut handle) => {
                     info!("D-Bus API is available");
-                    let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
+                    let event_handler = Box::new(EventHandler::new(Arc::clone(&handle.connection)));
                     get_engine_listener_list_mut().register_listener(event_handler);
                     // Register all the pools with dbus
-                    for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
+                    for (_, pool_uuid, mut pool) in engine.lock().unwrap().pools_mut() {
                         handle.register_pool(pool_uuid, pool)
                     }
                     self.handle = Some(handle);
@@ -347,7 +343,7 @@ impl MaybeDbusSupport {
     /// Handle any client dbus requests.
     fn process(
         &mut self,
-        engine: &Rc<RefCell<Engine>>,
+        engine: &Arc<Mutex<Engine>>,
         fds: &mut Vec<libc::pollfd>,
         dbus_client_index_start: usize,
     ) {
@@ -360,7 +356,8 @@ impl MaybeDbusSupport {
             fds.extend(
                 handle
                     .connection
-                    .borrow()
+                    .lock()
+                    .unwrap()
                     .watch_fds()
                     .iter()
                     .map(|w| w.to_pollfd()),
@@ -500,13 +497,13 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     let context = libudev::Context::new()?;
     let mut udev_monitor = UdevMonitor::create(&context)?;
 
-    let engine: Rc<RefCell<Engine>> = {
+    let engine: Arc<Mutex<Engine>> = {
         if matches.is_present("sim") {
             info!("Using SimEngine");
-            Rc::new(RefCell::new(SimEngine::default()))
+            Arc::new(Mutex::new(SimEngine::default()))
         } else {
             info!("Using StratEngine");
-            Rc::new(RefCell::new(StratEngine::initialize()?))
+            Arc::new(Mutex::new(StratEngine::initialize()?))
         }
     };
 
@@ -578,7 +575,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         events: libc::POLLIN,
     });
 
-    let eventable = engine.borrow().get_eventable();
+    let eventable = { engine.lock().expect("lock is not poisoned").get_eventable() };
 
     if let Some(ref evt) = eventable {
         fds.push(libc::pollfd {
@@ -594,11 +591,11 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         FD_INDEX_ENGINE
     };
 
-    log_engine_state(&*engine.borrow());
+    log_engine_state(&*engine.lock().unwrap());
 
     loop {
         if fds[FD_INDEX_UDEV].revents != 0 {
-            udev_monitor.handle_events(&mut *engine.borrow_mut(), &mut dbus_support)
+            udev_monitor.handle_events(&mut *engine.lock().unwrap(), &mut dbus_support)
         }
 
         if fds[FD_INDEX_SIGNALFD].revents != 0 {
@@ -615,13 +612,13 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         if fds[FD_INDEX_DUMP_TIMERFD].revents != 0 {
             tfd.read(); // clear the event
             info!("Dump timer expired, dumping state");
-            log_engine_state(&*engine.borrow());
+            log_engine_state(&*engine.lock().unwrap());
         }
 
         if let Some(ref evt) = eventable {
             if fds[FD_INDEX_ENGINE].revents != 0 {
                 evt.clear_event()?;
-                engine.borrow_mut().evented()?;
+                engine.lock().unwrap().evented()?;
             }
         }
 

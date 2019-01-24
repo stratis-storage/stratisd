@@ -4,17 +4,17 @@
 
 use std::fmt;
 
-use rand::{thread_rng, Rng, ThreadRng};
+use rand::{OsRng, Rng};
 
 pub struct Randomizer {
-    rng: ThreadRng,
+    rng: OsRng,
     denominator: u32,
 }
 
 impl Default for Randomizer {
     fn default() -> Randomizer {
         Randomizer {
-            rng: thread_rng(),
+            rng: OsRng::new().expect("rng init shouldn't fail"),
             denominator: 0u32,
         }
     }

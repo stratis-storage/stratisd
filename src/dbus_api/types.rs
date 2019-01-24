@@ -5,6 +5,7 @@
 use std::cell::{Cell, RefCell};
 use std::collections::vec_deque::{Drain, VecDeque};
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use dbus::tree::{DataType, MTFn, ObjectPath, Tree};
 use dbus::Path;
@@ -62,12 +63,12 @@ impl OPContext {
 #[derive(Debug, Clone)]
 pub struct DbusContext {
     pub(super) next_index: Rc<Cell<u64>>,
-    pub(super) engine: Rc<RefCell<Engine>>,
+    pub(super) engine: Arc<Mutex<Engine>>,
     pub(super) actions: Rc<RefCell<ActionQueue>>,
 }
 
 impl DbusContext {
-    pub fn new(engine: Rc<RefCell<Engine>>) -> DbusContext {
+    pub fn new(engine: Arc<Mutex<Engine>>) -> DbusContext {
         DbusContext {
             actions: Rc::new(RefCell::new(ActionQueue::default())),
             engine,

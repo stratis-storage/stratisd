@@ -2,12 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::cell::RefCell;
 use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::vec::Vec;
 
 use uuid::Uuid;
@@ -33,7 +32,7 @@ pub struct SimPool {
     cache_devs: HashMap<DevUuid, SimDev>,
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
-    rdm: Rc<RefCell<Randomizer>>,
+    rdm: Arc<Mutex<Randomizer>>,
     pool_state: PoolState,
     pool_extend_state: PoolExtendState,
     free_space_state: FreeSpaceState,
@@ -43,12 +42,12 @@ pub struct SimPool {
 impl SimPool {
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
-        rdm: &Rc<RefCell<Randomizer>>,
+        rdm: &Arc<Mutex<Randomizer>>,
         paths: &[&Path],
         redundancy: Redundancy,
     ) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
-        let device_pairs = devices.iter().map(|p| SimDev::new(Rc::clone(rdm), p));
+        let device_pairs = devices.iter().map(|p| SimDev::new(Arc::clone(rdm), p));
         (
             Uuid::new_v4(),
             SimPool {
@@ -56,7 +55,7 @@ impl SimPool {
                 cache_devs: HashMap::new(),
                 filesystems: Table::default(),
                 redundancy,
-                rdm: Rc::clone(rdm),
+                rdm: Arc::clone(rdm),
                 pool_state: PoolState::Initializing,
                 pool_extend_state: PoolExtendState::Good,
                 free_space_state: FreeSpaceState::Good,
@@ -121,7 +120,7 @@ impl Pool for SimPool {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs: Vec<_> = devices
             .iter()
-            .map(|p| SimDev::new(Rc::clone(&self.rdm), p))
+            .map(|p| SimDev::new(Arc::clone(&self.rdm), p))
             .collect();
         let ret_uuids = device_pairs.iter().map(|&(uuid, _)| uuid).collect();
 

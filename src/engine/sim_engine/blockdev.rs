@@ -2,9 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::cell::RefCell;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, TimeZone, Utc};
 use uuid::Uuid;
@@ -19,7 +18,7 @@ use crate::engine::sim_engine::randomization::Randomizer;
 /// A simulated device.
 pub struct SimDev {
     devnode: PathBuf,
-    rdm: Rc<RefCell<Randomizer>>,
+    rdm: Arc<Mutex<Randomizer>>,
     user_info: Option<String>,
     hardware_info: Option<String>,
     initialization_time: u64,
@@ -63,7 +62,7 @@ impl BlockDev for SimDev {
 impl SimDev {
     /// Generates a new device from any devnode.
     #[allow(clippy::new_ret_no_self)]
-    pub fn new(rdm: Rc<RefCell<Randomizer>>, devnode: &Path) -> (Uuid, SimDev) {
+    pub fn new(rdm: Arc<Mutex<Randomizer>>, devnode: &Path) -> (Uuid, SimDev) {
         (
             Uuid::new_v4(),
             SimDev {

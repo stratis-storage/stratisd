@@ -4,12 +4,11 @@
 
 extern crate libc;
 
-use std::cell::RefCell;
 use std::collections::hash_map::RandomState;
 use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use devicemapper::Device;
 
@@ -25,7 +24,7 @@ use crate::engine::sim_engine::randomization::Randomizer;
 #[derive(Debug, Default)]
 pub struct SimEngine {
     pools: Table<SimPool>,
-    rdm: Rc<RefCell<Randomizer>>,
+    rdm: Arc<Mutex<Randomizer>>,
 }
 
 impl SimEngine {}
@@ -46,9 +45,9 @@ impl Engine for SimEngine {
         let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
         let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
 
-        let (pool_uuid, pool) = SimPool::new(&Rc::clone(&self.rdm), &devices, redundancy);
+        let (pool_uuid, pool) = SimPool::new(&Arc::clone(&self.rdm), &devices, redundancy);
 
-        if self.rdm.borrow_mut().throw_die() {
+        if self.rdm.lock().unwrap().throw_die() {
             return Err(StratisError::Engine(ErrorEnum::Error, "X".into()));
         }
 
@@ -110,7 +109,7 @@ impl Engine for SimEngine {
 
     /// Set properties of the simulator
     fn configure_simulator(&mut self, denominator: u32) -> StratisResult<()> {
-        self.rdm.borrow_mut().set_probability(denominator);
+        self.rdm.lock().unwrap().set_probability(denominator);
         Ok(())
     }
 

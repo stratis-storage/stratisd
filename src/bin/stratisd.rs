@@ -26,6 +26,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::PathBuf;
 use std::process::exit;
 use std::sync::{Arc, Mutex};
+use std::thread::spawn;
 
 use chrono::Duration;
 use clap::{App, Arg, ArgMatches};
@@ -479,6 +480,17 @@ fn process_poll(poll_timeout: i32, fds: &mut Vec<libc::pollfd>) -> StratisResult
     Ok(())
 }
 
+// Compile check for needed traits for thread safety
+pub fn do_something_threaded(engine: Arc<Mutex<Engine>>) -> bool {
+    let handle = spawn(move || {
+        let b_e = engine.lock().unwrap();
+        b_e.pools().len()
+    });
+
+    println!("engine has {} pools", handle.join().unwrap());
+    true
+}
+
 /// Set up all sorts of signal and event handling mechanisms.
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered. Dump log entries on specified signal
@@ -506,6 +518,8 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
             Arc::new(Mutex::new(StratEngine::initialize()?))
         }
     };
+
+    do_something_threaded(Arc::clone(&engine));
 
     /*
     The file descriptor array indexes are:

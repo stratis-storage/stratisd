@@ -639,30 +639,21 @@ impl ThinPool {
         self.set_free_space_state(new_state);
 
         match (self.free_space_state, new_state) {
-            (FreeSpaceState::Good, FreeSpaceState::Warn) => {
-                // TODO: other steps to regain space: schedule fstrims?
-            }
-            (FreeSpaceState::Good, FreeSpaceState::Crit) => {
+            (FreeSpaceState::Good, FreeSpaceState::Crit)
+            | (FreeSpaceState::Warn, FreeSpaceState::Crit) => {
                 for (_, _, fs) in &mut self.filesystems {
                     fs.suspend(true)?;
                 }
             }
-            (FreeSpaceState::Warn, FreeSpaceState::Good) => {}
-            (FreeSpaceState::Warn, FreeSpaceState::Crit) => {
-                for (_, _, fs) in &mut self.filesystems {
-                    fs.suspend(true)?;
-                }
-            }
-            (FreeSpaceState::Crit, FreeSpaceState::Good) => {
+            (FreeSpaceState::Crit, FreeSpaceState::Good)
+            | (FreeSpaceState::Crit, FreeSpaceState::Warn) => {
                 for (_, _, fs) in &mut self.filesystems {
                     fs.resume()?;
                 }
             }
-            (FreeSpaceState::Crit, FreeSpaceState::Warn) => {
-                for (_, _, fs) in &mut self.filesystems {
-                    fs.resume()?;
-                }
-            }
+            (FreeSpaceState::Good, FreeSpaceState::Warn)
+            | (FreeSpaceState::Warn, FreeSpaceState::Good) => {}
+
             // These all represent no change in the state, so nothing is done.
             (old, new) => assert_eq!(old, new),
         };

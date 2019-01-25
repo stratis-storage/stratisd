@@ -167,11 +167,7 @@ mod test {
     /// Test a blank device and ensure it comes up as device::Usage::Unowned
     fn test_empty(paths: &[&Path]) {
         cmd::udev_settle().unwrap();
-
-        assert_eq!(is_stratis_device(paths[0]).unwrap(), None);
-
         assert_matches!(identify(paths[0]).unwrap(), DevOwnership::Unowned);
-
         assert_eq!(is_stratis_device(paths[0]).unwrap(), None);
     }
 

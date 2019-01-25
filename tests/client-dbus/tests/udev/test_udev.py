@@ -34,7 +34,7 @@ from stratisd_client_dbus._constants import TOP_OBJECT
 
 from ._loopback import LoopBackDevices
 from ._dm import remove_stratis_setup, _get_stratis_devices
-from ._stratis_id import stratis_signature
+from ._stratis_id import stratis_signature, dump_stratis_signature_area
 
 _STRATISD = os.environ['STRATISD']
 
@@ -189,13 +189,42 @@ class UdevAdd(unittest.TestCase):
         time.sleep(2)
 
     @staticmethod
-    def _expected_stratis_block_devices(num_expected):
+    def dump_state(context, expected_paths):
+        """
+        Dump everything we can when we are missing stratis devices!
+        :param context:  udev context
+        :param expected_paths: list of devices which we know should have
+               signatures
+        :return: None
+        """
+        print("We expect Stratis signatures on %d device(s)" %
+              len(expected_paths))
+        for d in expected_paths:
+            signature = stratis_signature(d)
+            print("%s shows signature check of %s" % (d, signature))
+
+            if signature is None:
+                # We are really expecting this device to have the signature
+                # lets dump the signature area of the disk
+                dump_stratis_signature_area(d)
+
+        print("Udev db dump of all block devices")
+        for d in context.list_devices(subsystem='block'):
+            for k, v in d.items():
+                print("%s:%s" % (k, str(v)))
+            print("")
+
+    @staticmethod
+    def _expected_stratis_block_devices(num_expected, expected_paths):
         """
         Check that the expected number of stratis devices exist.  If not keep
         checking until they do show up or our timeout has been exceeded.
         :param num_expected:
         :return: None (May assert)
         """
+
+        assert num_expected == len(expected_paths)
+
         found = 0
         context = pyudev.Context()
         start = time.time()
@@ -218,6 +247,9 @@ class UdevAdd(unittest.TestCase):
                     if stratis_signature(blk_dev["DEVNAME"]):
                         UdevAdd.lib_blk_id = False
                         found += 1
+
+        if found != num_expected:
+            UdevAdd.dump_state(context, expected_paths)
 
         assert found == num_expected
 
@@ -260,6 +292,8 @@ class UdevAdd(unittest.TestCase):
 
         self._start_service()
 
+        expected_stratis_devices = []
+
         # Create the pools
         for _ in range(number_of_pools):
             device_tokens = \
@@ -268,12 +302,13 @@ class UdevAdd(unittest.TestCase):
             pool_name = rs(5)
             UdevAdd._create_pool(pool_name, self._device_files(device_tokens))
             pool_data[pool_name] = device_tokens
+            expected_stratis_devices.extend(self._device_files(device_tokens))
 
         # Start & Stop the service
         self._stop_service_remove_dm_tables()
 
         UdevAdd._expected_stratis_block_devices(
-            dev_count_pool * number_of_pools)
+            dev_count_pool * number_of_pools, expected_stratis_devices)
 
         self._start_service()
 
@@ -287,7 +322,7 @@ class UdevAdd(unittest.TestCase):
             for d in device_tokens:
                 self._lb_mgr.unplug(d)
 
-        UdevAdd._expected_stratis_block_devices(0)
+        UdevAdd._expected_stratis_block_devices(0, [])
 
         self._start_service()
 
@@ -302,12 +337,15 @@ class UdevAdd(unittest.TestCase):
 
         # Add all but the last device for each pool
         running_count = 0
+        running_devices = []
 
         for device_token in activation_sequence[:-number_of_pools]:
             self._lb_mgr.hotplug(device_token)
             running_count += 1
+            running_devices.extend(self._device_files([device_token]))
 
-            UdevAdd._expected_stratis_block_devices(running_count)
+            UdevAdd._expected_stratis_block_devices(running_count,
+                                                    running_devices)
 
             if some_existing:
                 self._stop_service_remove_dm_tables()
@@ -322,7 +360,7 @@ class UdevAdd(unittest.TestCase):
             self._lb_mgr.hotplug(device_token)
 
         UdevAdd._expected_stratis_block_devices(
-            number_of_pools * dev_count_pool)
+            number_of_pools * dev_count_pool, expected_stratis_devices)
 
         self._settle()
         self.assertEqual(len(UdevAdd._get_pools()), number_of_pools)
@@ -334,7 +372,7 @@ class UdevAdd(unittest.TestCase):
         # from same test fixture
         self._stop_service_remove_dm_tables()
         self._lb_mgr.destroy_devices()
-        UdevAdd._expected_stratis_block_devices(0)
+        UdevAdd._expected_stratis_block_devices(0, [])
 
     def test_combinations(self):
         """
@@ -377,7 +415,8 @@ class UdevAdd(unittest.TestCase):
 
         self._stop_service_remove_dm_tables()
 
-        UdevAdd._expected_stratis_block_devices(num_devices)
+        UdevAdd._expected_stratis_block_devices(
+            num_devices, self._device_files(device_tokens))
 
         self._start_service()
 
@@ -390,7 +429,7 @@ class UdevAdd(unittest.TestCase):
         for d in device_tokens:
             self._lb_mgr.unplug(d)
 
-        UdevAdd._expected_stratis_block_devices(0)
+        UdevAdd._expected_stratis_block_devices(0, [])
 
         self._start_service()
 
@@ -400,7 +439,8 @@ class UdevAdd(unittest.TestCase):
             self._lb_mgr.hotplug(d)
 
         self._settle()
-        UdevAdd._expected_stratis_block_devices(num_devices)
+        UdevAdd._expected_stratis_block_devices(
+            num_devices, self._device_files(device_tokens))
 
         self.assertEqual(len(UdevAdd._get_pools()), 1)
 
@@ -410,7 +450,8 @@ class UdevAdd(unittest.TestCase):
                 self._lb_mgr.generate_udev_add_event(d)
 
         self._settle()
-        UdevAdd._expected_stratis_block_devices(num_devices)
+        UdevAdd._expected_stratis_block_devices(
+            num_devices, self._device_files(device_tokens))
 
         self.assertEqual(len(UdevAdd._get_pools()), 1)
 
@@ -454,28 +495,31 @@ class UdevAdd(unittest.TestCase):
 
             pool_tokens.append(this_pool)
             UdevAdd._create_pool(pool_name, self._device_files(this_pool))
+            devices = self._device_files(this_pool)
 
             self._stop_service_remove_dm_tables()
 
-            UdevAdd._expected_stratis_block_devices(len(this_pool))
+            UdevAdd._expected_stratis_block_devices(len(this_pool), devices)
 
             for d in this_pool:
                 self._lb_mgr.unplug(d)
 
-            UdevAdd._expected_stratis_block_devices(0)
+            UdevAdd._expected_stratis_block_devices(0, [])
 
             self._start_service()
 
         # Hot plug activate each pool in sequence and force a duplicate name
         # error.
         plugged = 0
+        devices_plugged = []
         for i in range(num_pools):
             for d in pool_tokens[i]:
                 self._lb_mgr.hotplug(d)
                 plugged += 1
+                devices_plugged.extend(self._device_files([d]))
 
             self._settle()
-            UdevAdd._expected_stratis_block_devices(plugged)
+            UdevAdd._expected_stratis_block_devices(plugged, devices_plugged)
 
             # They all have the same name, so we should only get 1 pool!
             self.assertEqual(len(UdevAdd._get_pools()), 1)
@@ -498,7 +542,7 @@ class UdevAdd(unittest.TestCase):
                     self._lb_mgr.generate_udev_add_event(d)
 
             self._settle()
-            UdevAdd._expected_stratis_block_devices(plugged)
+            UdevAdd._expected_stratis_block_devices(plugged, devices_plugged)
             self.assertEqual(
                 len(UdevAdd._get_pools()), existing_pool_count + 1)
 

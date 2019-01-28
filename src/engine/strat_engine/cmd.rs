@@ -14,9 +14,11 @@
 // the existence of the file is checked before the command is invoked, and
 // an explicit error is returned if the executable can not be found.
 
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use uuid::Uuid;
 

@@ -2,22 +2,25 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::fmt::Debug;
-use std::os::unix::io::RawFd;
-use std::path::{Path, PathBuf};
+use std::{
+    fmt::Debug,
+    os::unix::io::RawFd,
+    path::{Path, PathBuf},
+};
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Device, Sectors};
 
-use crate::engine::{
-    BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolUuid,
-    RenameAction,
+use crate::{
+    engine::{
+        types::{FreeSpaceState, PoolExtendState, PoolState},
+        BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolUuid,
+        RenameAction,
+    },
+    stratis::StratisResult,
 };
-use crate::stratis::StratisResult;
-
-use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
 
 pub const DEV_PATH: &str = "/stratis";
 

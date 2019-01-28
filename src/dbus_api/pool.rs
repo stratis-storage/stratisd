@@ -2,29 +2,33 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::HashMap;
-use std::path::Path;
-use std::vec::Vec;
+use std::{collections::HashMap, path::Path, vec::Vec};
 
-use dbus;
-use dbus::arg::{Array, IterAppend};
-use dbus::tree::{
-    Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
+use dbus::{
+    self,
+    arg::{Array, IterAppend},
+    tree::{
+        Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
+    },
+    Message,
 };
-use dbus::Message;
 
 use uuid::Uuid;
 
 use devicemapper::Sectors;
 
-use crate::dbus_api::consts;
-use crate::engine::{BlockDevTier, MaybeDbusPath, Name, Pool, RenameAction};
-
-use crate::dbus_api::blockdev::create_dbus_blockdev;
-use crate::dbus_api::filesystem::create_dbus_filesystem;
-use crate::dbus_api::types::{DbusContext, DbusErrorEnum, OPContext, TData};
-use crate::dbus_api::util::{
-    engine_to_dbus_err_tuple, get_next_arg, get_uuid, make_object_path, msg_code_ok, msg_string_ok,
+use crate::{
+    dbus_api::{
+        blockdev::create_dbus_blockdev,
+        consts,
+        filesystem::create_dbus_filesystem,
+        types::{DbusContext, DbusErrorEnum, OPContext, TData},
+        util::{
+            engine_to_dbus_err_tuple, get_next_arg, get_uuid, make_object_path, msg_code_ok,
+            msg_string_ok,
+        },
+    },
+    engine::{BlockDevTier, MaybeDbusPath, Name, Pool, RenameAction},
 };
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {

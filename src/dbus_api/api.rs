@@ -2,29 +2,32 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::cell::RefCell;
-use std::path::Path;
-use std::rc::Rc;
-use std::vec::Vec;
+use std::{cell::RefCell, path::Path, rc::Rc, vec::Vec};
 
-use dbus;
-use dbus::arg::{Array, IterAppend};
-use dbus::tree::{
-    Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo, Tree,
+use dbus::{
+    self,
+    arg::{Array, IterAppend},
+    tree::{
+        Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
+        Tree,
+    },
+    BusType, Connection, ConnectionItem, Message, NameFlag,
 };
-use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
 use libc;
 
-use crate::dbus_api::consts;
-use crate::engine::{Engine, Pool, PoolUuid};
-use crate::stratis::VERSION;
-
-use crate::dbus_api::blockdev::create_dbus_blockdev;
-use crate::dbus_api::filesystem::create_dbus_filesystem;
-use crate::dbus_api::pool::create_dbus_pool;
-use crate::dbus_api::types::{DbusContext, DbusErrorEnum, DeferredAction, TData};
-use crate::dbus_api::util::{
-    engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, tuple_to_option,
+use crate::{
+    dbus_api::{
+        blockdev::create_dbus_blockdev,
+        consts,
+        filesystem::create_dbus_filesystem,
+        pool::create_dbus_pool,
+        types::{DbusContext, DbusErrorEnum, DeferredAction, TData},
+        util::{
+            engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, tuple_to_option,
+        },
+    },
+    engine::{Engine, Pool, PoolUuid},
+    stratis::VERSION,
 };
 
 fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {

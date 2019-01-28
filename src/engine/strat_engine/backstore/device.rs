@@ -4,18 +4,22 @@
 
 // Functions for dealing with devices.
 
-use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
-use std::os::unix::prelude::AsRawFd;
-use std::path::Path;
+use std::{
+    collections::HashMap,
+    fs::{File, OpenOptions},
+    os::unix::prelude::AsRawFd,
+    path::Path,
+};
 
 use devicemapper::{devnode_to_devno, Bytes, Device};
 
-use crate::engine::{DevUuid, PoolUuid};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use crate::engine::strat_engine::backstore::metadata::StaticHeader;
-use crate::engine::strat_engine::backstore::util::get_udev_block_device;
+use crate::{
+    engine::{
+        strat_engine::backstore::{metadata::StaticHeader, util::get_udev_block_device},
+        DevUuid, PoolUuid,
+    },
+    stratis::{ErrorEnum, StratisError, StratisResult},
+};
 
 ioctl_read!(blkgetsize64, 0x12, 114, u64);
 
@@ -140,8 +144,10 @@ pub fn is_stratis_device(devnode: &Path) -> StratisResult<Option<(PoolUuid, DevU
 mod test {
     use std::path::Path;
 
-    use crate::engine::strat_engine::cmd;
-    use crate::engine::strat_engine::tests::{loopbacked, real};
+    use crate::engine::strat_engine::{
+        cmd,
+        tests::{loopbacked, real},
+    };
 
     use super::*;
 

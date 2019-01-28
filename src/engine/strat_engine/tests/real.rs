@@ -2,9 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::fs::OpenOptions;
-use std::path::{Path, PathBuf};
-use std::{cmp, panic};
+use std::{
+    cmp,
+    fs::OpenOptions,
+    panic,
+    path::{Path, PathBuf},
+};
 
 use either::Either;
 use serde_json::{from_reader, Value};
@@ -15,12 +18,12 @@ use devicemapper::{
     LinearTargetParams, Sectors, TargetLine, IEC,
 };
 
-use crate::engine::strat_engine::backstore::blkdev_size;
-use crate::engine::strat_engine::device::wipe_sectors;
-use crate::engine::strat_engine::dm::get_dm;
-
-use crate::engine::strat_engine::tests::logger::init_logger;
-use crate::engine::strat_engine::tests::util::clean_up;
+use crate::engine::strat_engine::{
+    backstore::blkdev_size,
+    device::wipe_sectors,
+    dm::get_dm,
+    tests::{logger::init_logger, util::clean_up},
+};
 
 pub struct RealTestDev {
     dev: Either<PathBuf, LinearDev>,

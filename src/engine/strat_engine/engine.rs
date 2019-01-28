@@ -2,28 +2,34 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::clone::Clone;
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::{
+    clone::Clone,
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use devicemapper::{Device, DmNameBuf};
 
-use crate::engine::{
-    devlinks, Engine, EngineEvent, Name, Pool, PoolUuid, Redundancy, RenameAction,
-};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use crate::engine::engine::Eventable;
-use crate::engine::event::get_engine_listener_list;
-use crate::engine::structures::Table;
-
-use crate::engine::strat_engine::backstore::{find_all, get_metadata, is_stratis_device};
 #[cfg(test)]
 use crate::engine::strat_engine::cleanup::teardown_pools;
-use crate::engine::strat_engine::cmd::verify_binaries;
-use crate::engine::strat_engine::dm::{get_dm, get_dm_init};
-use crate::engine::strat_engine::names::validate_name;
-use crate::engine::strat_engine::pool::{check_metadata, StratPool};
+
+use crate::{
+    engine::{
+        devlinks,
+        engine::Eventable,
+        event::get_engine_listener_list,
+        strat_engine::{
+            backstore::{find_all, get_metadata, is_stratis_device},
+            cmd::verify_binaries,
+            dm::{get_dm, get_dm_init},
+            names::validate_name,
+            pool::{check_metadata, StratPool},
+        },
+        structures::Table,
+        Engine, EngineEvent, Name, Pool, PoolUuid, Redundancy, RenameAction,
+    },
+    stratis::{ErrorEnum, StratisError, StratisResult},
+};
 
 const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 

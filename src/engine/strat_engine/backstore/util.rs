@@ -3,15 +3,15 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 // Utilities to support Stratis.
-use std::collections::HashMap;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use libudev;
 
-use crate::stratis::StratisResult;
-
-use crate::engine::strat_engine::backstore::is_stratis_device;
+use crate::{engine::strat_engine::backstore::is_stratis_device, stratis::StratisResult};
 
 /// Takes a libudev device entry and returns the properties as a HashMap.
 fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {

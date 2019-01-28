@@ -4,19 +4,23 @@
 
 use std::error::Error;
 
-use dbus;
-use dbus::arg::{ArgType, Iter, IterAppend, RefArg, Variant};
-use dbus::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
-use dbus::tree::{MTFn, MethodErr, PropInfo};
-use dbus::Connection;
-use dbus::SignalArgs;
+use dbus::{
+    self,
+    arg::{ArgType, Iter, IterAppend, RefArg, Variant},
+    stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged,
+    tree::{MTFn, MethodErr, PropInfo},
+    Connection, SignalArgs,
+};
 
 use devicemapper::DmError;
 
-use crate::stratis::{ErrorEnum, StratisError};
-
-use crate::dbus_api::consts;
-use crate::dbus_api::types::{DbusContext, DbusErrorEnum, TData};
+use crate::{
+    dbus_api::{
+        consts,
+        types::{DbusContext, DbusErrorEnum, TData},
+    },
+    stratis::{ErrorEnum, StratisError},
+};
 
 /// Convert a tuple as option to an Option type
 pub fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {

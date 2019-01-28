@@ -2,22 +2,27 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus;
-use dbus::arg::IterAppend;
-use dbus::tree::{
-    Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
+use dbus::{
+    self,
+    arg::IterAppend,
+    tree::{
+        Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
+    },
+    Message,
 };
-use dbus::Message;
 
 use uuid::Uuid;
 
-use crate::dbus_api::consts;
-use crate::engine::{BlockDev, BlockDevTier, MaybeDbusPath};
-
-use crate::dbus_api::types::{DbusContext, DbusErrorEnum, OPContext, TData};
-use crate::dbus_api::util::{
-    engine_to_dbus_err_tuple, get_next_arg, get_parent, get_uuid, make_object_path, msg_code_ok,
-    msg_string_ok,
+use crate::{
+    dbus_api::{
+        consts,
+        types::{DbusContext, DbusErrorEnum, OPContext, TData},
+        util::{
+            engine_to_dbus_err_tuple, get_next_arg, get_parent, get_uuid, make_object_path,
+            msg_code_ok, msg_string_ok,
+        },
+    },
+    engine::{BlockDev, BlockDevTier, MaybeDbusPath},
 };
 
 pub fn create_dbus_blockdev<'a>(

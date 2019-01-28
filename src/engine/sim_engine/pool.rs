@@ -2,30 +2,29 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::cell::RefCell;
-use std::collections::hash_map::RandomState;
-use std::collections::{HashMap, HashSet};
-use std::iter::FromIterator;
-use std::path::Path;
-use std::rc::Rc;
-use std::vec::Vec;
+use std::{
+    cell::RefCell,
+    collections::{hash_map::RandomState, HashMap, HashSet},
+    iter::FromIterator,
+    path::Path,
+    rc::Rc,
+    vec::Vec,
+};
 
 use uuid::Uuid;
 
 use devicemapper::{Sectors, IEC};
 
-use crate::engine::{
-    BlockDev, BlockDevTier, DevUuid, Filesystem, FilesystemUuid, MaybeDbusPath, Name, Pool,
-    PoolUuid, Redundancy, RenameAction,
+use crate::{
+    engine::{
+        sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
+        structures::Table,
+        types::{FreeSpaceState, PoolExtendState, PoolState},
+        BlockDev, BlockDevTier, DevUuid, Filesystem, FilesystemUuid, MaybeDbusPath, Name, Pool,
+        PoolUuid, Redundancy, RenameAction,
+    },
+    stratis::{ErrorEnum, StratisError, StratisResult},
 };
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use crate::engine::structures::Table;
-use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
-
-use crate::engine::sim_engine::blockdev::SimDev;
-use crate::engine::sim_engine::filesystem::SimFilesystem;
-use crate::engine::sim_engine::randomization::Randomizer;
 
 #[derive(Debug)]
 pub struct SimPool {

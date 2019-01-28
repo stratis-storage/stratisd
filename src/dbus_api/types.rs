@@ -2,12 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::cell::{Cell, RefCell};
-use std::collections::vec_deque::{Drain, VecDeque};
-use std::rc::Rc;
+use std::{
+    cell::{Cell, RefCell},
+    collections::vec_deque::{Drain, VecDeque},
+    rc::Rc,
+};
 
-use dbus::tree::{DataType, MTFn, ObjectPath, Tree};
-use dbus::Path;
+use dbus::{
+    tree::{DataType, MTFn, ObjectPath, Tree},
+    Path,
+};
 
 use uuid::Uuid;
 

@@ -7,7 +7,7 @@ pull_request_rules:
   conditions:
   - label!=do not merge
   - '#approved-reviews-by>=2'
-  - status-success=continuous-integration/travis-ci
+  - status-success=continuous-integration/travis-ci/pr
   - status-success=stratisd
   - status-success=cli-with-stratisd
   name: default

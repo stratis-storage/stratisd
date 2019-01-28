@@ -4,9 +4,10 @@
 
 // Code to handle cleanup after a failed operation.
 
-use crate::engine::strat_engine::pool::StratPool;
-use crate::engine::structures::Table;
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::{
+    engine::{strat_engine::pool::StratPool, structures::Table},
+    stratis::{ErrorEnum, StratisError, StratisResult},
+};
 
 /// Teardown pools.
 pub fn teardown_pools(pools: Table<StratPool>) -> StratisResult<()> {

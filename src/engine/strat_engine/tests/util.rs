@@ -2,17 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::fs::File;
-use std::io::Read;
-use std::path::PathBuf;
+use std::{fs::File, io::Read, path::PathBuf};
 
 use libmount;
 use nix::mount::{umount2, MntFlags};
 
 use devicemapper::{DevId, DmOptions};
 
-use crate::engine::strat_engine::cmd;
-use crate::engine::strat_engine::dm::{get_dm, get_dm_init};
+use crate::engine::strat_engine::{
+    cmd,
+    dm::{get_dm, get_dm_init},
+};
 
 // For an explanation see:
 // https://github.com/rust-lang-nursery/error-chain/issues/254.

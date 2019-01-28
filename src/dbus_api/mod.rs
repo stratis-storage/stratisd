@@ -13,5 +13,4 @@ mod pool;
 mod types;
 mod util;
 
-pub use self::api::DbusConnectionData;
-pub use self::util::prop_changed_dispatch;
+pub use self::{api::DbusConnectionData, util::prop_changed_dispatch};

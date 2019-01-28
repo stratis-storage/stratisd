@@ -4,25 +4,32 @@
 
 // Manage the linear volume that stores metadata on pool levels 5-7.
 
-use std::convert::From;
-use std::fs::{create_dir, read_dir, remove_dir, remove_file, rename, OpenOptions};
-use std::io::prelude::*;
-use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
+use std::{
+    convert::From,
+    fs::{create_dir, read_dir, remove_dir, remove_file, rename, OpenOptions},
+    io::{prelude::*, ErrorKind},
+    path::{Path, PathBuf},
+};
 
-use nix;
-use nix::mount::{mount, umount, MsFlags};
+use nix::{
+    self,
+    mount::{mount, umount, MsFlags},
+};
 use serde_json;
 
 use devicemapper::{DmDevice, LinearDev, LinearDevTargetParams, TargetLine};
 
-use crate::engine::engine::DEV_PATH;
-use crate::engine::strat_engine::cmd::create_fs;
-use crate::engine::strat_engine::dm::get_dm;
-use crate::engine::strat_engine::serde_structs::FilesystemSave;
-use crate::engine::strat_engine::thinpool::filesystem::StratFilesystem;
-use crate::engine::{FilesystemUuid, Name, PoolUuid};
-use crate::stratis::StratisResult;
+use crate::{
+    engine::{
+        engine::DEV_PATH,
+        strat_engine::{
+            cmd::create_fs, dm::get_dm, serde_structs::FilesystemSave,
+            thinpool::filesystem::StratFilesystem,
+        },
+        FilesystemUuid, Name, PoolUuid,
+    },
+    stratis::StratisResult,
+};
 
 // TODO: Monitor fs size and extend linear and fs if needed
 // TODO: Document format of stuff on MDV in SWDD (currently ad-hoc)

@@ -2,9 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::fmt;
-use std::io::{self, Read, Seek, SeekFrom};
-use std::str::from_utf8;
+use std::{
+    fmt,
+    io::{self, Read, Seek, SeekFrom},
+    str::from_utf8,
+};
 
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Utc};
@@ -13,9 +15,10 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
 
-use crate::engine::strat_engine::device::SyncAll;
-use crate::engine::{DevUuid, PoolUuid};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::{
+    engine::{strat_engine::device::SyncAll, DevUuid, PoolUuid},
+    stratis::{ErrorEnum, StratisError, StratisResult},
+};
 
 pub use self::mda::{validate_mda_size, MIN_MDA_SECTORS};
 
@@ -482,9 +485,11 @@ impl fmt::Debug for StaticHeader {
 }
 
 mod mda {
-    use std;
-    use std::cmp::Ordering;
-    use std::io::{Read, Seek, SeekFrom};
+    use std::{
+        self,
+        cmp::Ordering,
+        io::{Read, Seek, SeekFrom},
+    };
 
     use byteorder::{ByteOrder, LittleEndian};
     use chrono::{DateTime, TimeZone, Utc};
@@ -492,9 +497,10 @@ mod mda {
 
     use devicemapper::{Bytes, Sectors};
 
-    use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
-    use crate::engine::strat_engine::device::SyncAll;
+    use crate::{
+        engine::strat_engine::device::SyncAll,
+        stratis::{ErrorEnum, StratisError, StratisResult},
+    };
 
     const _MDA_REGION_HDR_SIZE: usize = 32;
     const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
@@ -884,8 +890,7 @@ mod mda {
             num,
         };
 
-        use super::super::*;
-        use super::*;
+        use super::{super::*, *};
 
         // 82102984128000 in decimal, approx 17 million years
         const UTC_TIMESTAMP_SECS_BOUND: i64 = 0x777_9beb_9f00;
@@ -966,7 +971,6 @@ mod mda {
 mod tests {
     use std::io::{Cursor, Write};
 
-    use devicemapper::{Bytes, Sectors, IEC};
     use proptest::{
         collection::{vec, SizeRange},
         num, option,
@@ -974,6 +978,8 @@ mod tests {
         strategy::Strategy,
     };
     use uuid::Uuid;
+
+    use devicemapper::{Bytes, Sectors, IEC};
 
     use super::*;
 

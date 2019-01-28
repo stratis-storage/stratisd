@@ -4,10 +4,12 @@
 
 // Code to handle a collection of block devices.
 
-use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::fs::{File, OpenOptions};
-use std::path::Path;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+    fs::{File, OpenOptions},
+    path::Path,
+};
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{seq, thread_rng};
@@ -17,14 +19,23 @@ use devicemapper::{
     Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine, IEC,
 };
 
-use crate::engine::strat_engine::backstore::cleanup::wipe_blockdevs;
-use crate::engine::strat_engine::backstore::device::{identify, resolve_devices, DevOwnership};
-use crate::engine::strat_engine::backstore::metadata::{validate_mda_size, BDA};
-use crate::engine::strat_engine::backstore::util::hw_lookup;
-use crate::engine::strat_engine::backstore::{blkdev_size, StratBlockDev, MIN_MDA_SECTORS};
-use crate::engine::strat_engine::serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable};
-use crate::engine::{BlockDev, DevUuid, PoolUuid};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::{
+    engine::{
+        strat_engine::{
+            backstore::{
+                blkdev_size,
+                cleanup::wipe_blockdevs,
+                device::{identify, resolve_devices, DevOwnership},
+                metadata::{validate_mda_size, BDA},
+                util::hw_lookup,
+                StratBlockDev, MIN_MDA_SECTORS,
+            },
+            serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
+        },
+        BlockDev, DevUuid, PoolUuid,
+    },
+    stratis::{ErrorEnum, StratisError, StratisResult},
+};
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 const MAX_NUM_TO_WRITE: usize = 10;
@@ -503,10 +514,12 @@ mod tests {
     use rand;
     use uuid::Uuid;
 
-    use crate::engine::strat_engine::backstore::{find_all, get_metadata, MIN_MDA_SECTORS};
-    use crate::engine::strat_engine::cmd;
-    use crate::engine::strat_engine::device::wipe_sectors;
-    use crate::engine::strat_engine::tests::{loopbacked, real};
+    use crate::engine::strat_engine::{
+        backstore::{find_all, get_metadata, MIN_MDA_SECTORS},
+        cmd,
+        device::wipe_sectors,
+        tests::{loopbacked, real},
+    };
 
     use crate::engine::strat_engine::backstore::metadata::StaticHeader;
 

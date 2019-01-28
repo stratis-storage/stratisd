@@ -7,24 +7,30 @@
 #[macro_use]
 extern crate log;
 
-use std::cell::RefCell;
-use std::env;
-use std::fs::{File, OpenOptions};
-use std::io::{ErrorKind, Read, Write};
-use std::os::unix::io::{AsRawFd, RawFd};
-use std::path::PathBuf;
-use std::process::exit;
-use std::rc::Rc;
+use std::{
+    cell::RefCell,
+    env,
+    fs::{File, OpenOptions},
+    io::{ErrorKind, Read, Write},
+    os::unix::io::{AsRawFd, RawFd},
+    path::PathBuf,
+    process::exit,
+    rc::Rc,
+};
 
 use chrono::Duration;
 use clap::{App, Arg, ArgMatches};
 use env_logger::Builder;
 use libc::pid_t;
 use log::LevelFilter;
-use nix::fcntl::{flock, FlockArg};
-use nix::sys::signal::{self, SigSet};
-use nix::sys::signalfd::{SfdFlags, SignalFd};
-use nix::unistd::getpid;
+use nix::{
+    fcntl::{flock, FlockArg},
+    sys::{
+        signal::{self, SigSet},
+        signalfd::{SfdFlags, SignalFd},
+    },
+    unistd::getpid,
+};
 use timerfd::{SetTimeFlags, TimerFd, TimerState};
 use uuid::Uuid;
 
@@ -38,9 +44,10 @@ use libstratis::dbus_api::{consts, prop_changed_dispatch, DbusConnectionData};
 use libstratis::engine::{
     get_engine_listener_list_mut, EngineEvent, EngineListener, MaybeDbusPath,
 };
-use libstratis::engine::{Engine, Pool, SimEngine, StratEngine};
-use libstratis::stratis::buff_log;
-use libstratis::stratis::{StratisError, StratisResult, VERSION};
+use libstratis::{
+    engine::{Engine, Pool, SimEngine, StratEngine},
+    stratis::{buff_log, StratisError, StratisResult, VERSION},
+};
 
 const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
 

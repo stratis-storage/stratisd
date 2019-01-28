@@ -2,17 +2,20 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::cell::RefCell;
-use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::{
+    cell::RefCell,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 use chrono::{DateTime, TimeZone, Utc};
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors, IEC};
 
-use crate::engine::sim_engine::randomization::Randomizer;
-use crate::engine::{BlockDev, BlockDevState, MaybeDbusPath};
+use crate::engine::{
+    sim_engine::randomization::Randomizer, BlockDev, BlockDevState, MaybeDbusPath,
+};
 
 #[derive(Debug)]
 /// A simulated device.

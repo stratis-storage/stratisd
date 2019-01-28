@@ -4,13 +4,17 @@
 
 // Get ability to instantiate a devicemapper context.
 
-use std::os::unix::io::{AsRawFd, RawFd};
-use std::sync::{Once, ONCE_INIT};
+use std::{
+    os::unix::io::{AsRawFd, RawFd},
+    sync::{Once, ONCE_INIT},
+};
 
 use devicemapper::{DmResult, DM};
 
-use crate::engine::engine::Eventable;
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::{
+    engine::engine::Eventable,
+    stratis::{ErrorEnum, StratisError, StratisResult},
+};
 
 static INIT: Once = ONCE_INIT;
 static mut DM_CONTEXT: Option<DmResult<DM>> = None;

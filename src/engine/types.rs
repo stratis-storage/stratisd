@@ -2,10 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::borrow::Borrow;
-use std::fmt;
-use std::ops::Deref;
-use std::rc::Rc;
+use std::{borrow::Borrow, fmt, ops::Deref, rc::Rc};
 
 #[cfg(feature = "dbus_enabled")]
 use dbus;

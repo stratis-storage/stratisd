@@ -2,16 +2,23 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::HashSet;
-use std::io::ErrorKind;
-use std::os::unix::fs::symlink;
-use std::path::{Path, PathBuf};
-use std::{fs, str};
+use std::{
+    collections::HashSet,
+    fs,
+    io::ErrorKind,
+    os::unix::fs::symlink,
+    path::{Path, PathBuf},
+    str,
+};
 
-use crate::engine::engine::DEV_PATH;
-use crate::engine::types::{Name, PoolUuid};
-use crate::engine::Pool;
-use crate::stratis::StratisResult;
+use crate::{
+    engine::{
+        engine::DEV_PATH,
+        types::{Name, PoolUuid},
+        Pool,
+    },
+    stratis::StratisResult,
+};
 
 /// Set up the root Stratis directory, where dev links as well as temporary
 /// MDV mounts will be created. This must occur before any pools are setup.

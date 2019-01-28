@@ -4,14 +4,17 @@
 
 // Functions for dealing with stratis and device mapper names.
 
-use std::fmt;
-use std::fmt::Display;
-use std::path::Path;
+use std::{
+    fmt::{self, Display},
+    path::Path,
+};
 
 use devicemapper::{DmNameBuf, DmUuidBuf};
 
-use crate::engine::{FilesystemUuid, PoolUuid};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::{
+    engine::{FilesystemUuid, PoolUuid},
+    stratis::{ErrorEnum, StratisError, StratisResult},
+};
 
 const FORMAT_VERSION: u16 = 1;
 

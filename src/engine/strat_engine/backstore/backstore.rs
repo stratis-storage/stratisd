@@ -4,25 +4,35 @@
 
 // Code to handle the backing store of a pool.
 
-use std::cmp;
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::{
+    cmp,
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use chrono::{DateTime, Utc};
 
 use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
 
-use crate::engine::strat_engine::backstore::blockdevmgr::{map_to_dm, BlockDevMgr};
-use crate::engine::strat_engine::backstore::cache_tier::CacheTier;
-use crate::engine::strat_engine::backstore::data_tier::DataTier;
-use crate::engine::strat_engine::backstore::setup::get_blockdevs;
-use crate::engine::strat_engine::backstore::{StratBlockDev, MIN_MDA_SECTORS};
-use crate::engine::strat_engine::device::wipe_sectors;
-use crate::engine::strat_engine::dm::get_dm;
-use crate::engine::strat_engine::names::{format_backstore_ids, CacheRole};
-use crate::engine::strat_engine::serde_structs::{BackstoreSave, CapSave, Recordable};
-use crate::engine::{BlockDevTier, DevUuid, PoolUuid};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::{
+    engine::{
+        strat_engine::{
+            backstore::{
+                blockdevmgr::{map_to_dm, BlockDevMgr},
+                cache_tier::CacheTier,
+                data_tier::DataTier,
+                setup::get_blockdevs,
+                StratBlockDev, MIN_MDA_SECTORS,
+            },
+            device::wipe_sectors,
+            dm::get_dm,
+            names::{format_backstore_ids, CacheRole},
+            serde_structs::{BackstoreSave, CapSave, Recordable},
+        },
+        BlockDevTier, DevUuid, PoolUuid,
+    },
+    stratis::{ErrorEnum, StratisError, StratisResult},
+};
 
 /// Use a cache block size that the kernel docs indicate is the largest
 /// typical size.
@@ -571,9 +581,11 @@ mod tests {
 
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
-    use crate::engine::strat_engine::backstore::find_all;
-    use crate::engine::strat_engine::cmd;
-    use crate::engine::strat_engine::tests::{loopbacked, real};
+    use crate::engine::strat_engine::{
+        backstore::find_all,
+        cmd,
+        tests::{loopbacked, real},
+    };
 
     use super::*;
 

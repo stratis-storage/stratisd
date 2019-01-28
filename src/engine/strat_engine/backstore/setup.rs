@@ -5,20 +5,31 @@
 // Code to handle initial setup steps for a pool.
 // Initial setup steps are steps that do not alter the environment.
 
-use std::collections::{HashMap, HashSet};
-use std::fs::OpenOptions;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    fs::OpenOptions,
+    path::{Path, PathBuf},
+};
 
 use serde_json;
 
 use devicemapper::{devnode_to_devno, Device, Sectors};
 
-use crate::engine::strat_engine::backstore::metadata::{StaticHeader, BDA};
-use crate::engine::strat_engine::backstore::util::get_stratis_block_devices;
-use crate::engine::strat_engine::backstore::{blkdev_size, StratBlockDev};
-use crate::engine::strat_engine::serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave};
-use crate::engine::{BlockDevTier, DevUuid, PoolUuid};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::{
+    engine::{
+        strat_engine::{
+            backstore::{
+                blkdev_size,
+                metadata::{StaticHeader, BDA},
+                util::get_stratis_block_devices,
+                StratBlockDev,
+            },
+            serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
+        },
+        BlockDevTier, DevUuid, PoolUuid,
+    },
+    stratis::{ErrorEnum, StratisError, StratisResult},
+};
 
 /// Find all Stratis devices.
 ///

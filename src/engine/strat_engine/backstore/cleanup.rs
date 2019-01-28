@@ -4,9 +4,8 @@
 
 // Code to handle cleanup after a failed operation.
 
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
 use crate::engine::strat_engine::backstore::StratBlockDev;
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 /// Wipe some blockdevs of their identifying headers.
 /// Return an error if any of the blockdevs could not be wiped.

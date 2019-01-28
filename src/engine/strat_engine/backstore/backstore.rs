@@ -12,19 +12,17 @@ use chrono::{DateTime, Utc};
 
 use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
 
-use crate::engine::{BlockDevTier, DevUuid, PoolUuid};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
+use crate::engine::strat_engine::backstore::blockdevmgr::{map_to_dm, BlockDevMgr};
+use crate::engine::strat_engine::backstore::cache_tier::CacheTier;
+use crate::engine::strat_engine::backstore::data_tier::DataTier;
+use crate::engine::strat_engine::backstore::setup::get_blockdevs;
 use crate::engine::strat_engine::backstore::{StratBlockDev, MIN_MDA_SECTORS};
 use crate::engine::strat_engine::device::wipe_sectors;
 use crate::engine::strat_engine::dm::get_dm;
 use crate::engine::strat_engine::names::{format_backstore_ids, CacheRole};
 use crate::engine::strat_engine::serde_structs::{BackstoreSave, CapSave, Recordable};
-
-use crate::engine::strat_engine::backstore::blockdevmgr::{map_to_dm, BlockDevMgr};
-use crate::engine::strat_engine::backstore::cache_tier::CacheTier;
-use crate::engine::strat_engine::backstore::data_tier::DataTier;
-use crate::engine::strat_engine::backstore::setup::get_blockdevs;
+use crate::engine::{BlockDevTier, DevUuid, PoolUuid};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 /// Use a cache block size that the kernel docs indicate is the largest
 /// typical size.

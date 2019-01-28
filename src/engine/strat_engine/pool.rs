@@ -12,18 +12,16 @@ use uuid::Uuid;
 
 use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
+use crate::engine::strat_engine::backstore::{Backstore, StratBlockDev, MIN_MDA_SECTORS};
+use crate::engine::strat_engine::names::validate_name;
+use crate::engine::strat_engine::serde_structs::{FlexDevsSave, PoolSave, Recordable};
+use crate::engine::strat_engine::thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE};
+use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
 use crate::engine::{
     BlockDev, BlockDevTier, DevUuid, Filesystem, FilesystemUuid, MaybeDbusPath, Name, Pool,
     PoolUuid, Redundancy, RenameAction,
 };
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
-
-use crate::engine::strat_engine::backstore::{Backstore, StratBlockDev, MIN_MDA_SECTORS};
-use crate::engine::strat_engine::names::validate_name;
-use crate::engine::strat_engine::serde_structs::{FlexDevsSave, PoolSave, Recordable};
-use crate::engine::strat_engine::thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE};
 
 /// Get the index which indicates the start of unallocated space in the cap
 /// device.

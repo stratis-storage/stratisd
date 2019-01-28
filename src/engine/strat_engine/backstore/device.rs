@@ -11,11 +11,10 @@ use std::path::Path;
 
 use devicemapper::{devnode_to_devno, Bytes, Device};
 
-use crate::engine::{DevUuid, PoolUuid};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
 use crate::engine::strat_engine::backstore::metadata::StaticHeader;
 use crate::engine::strat_engine::backstore::util::get_udev_block_device;
+use crate::engine::{DevUuid, PoolUuid};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 ioctl_read!(blkgetsize64, 0x12, 114, u64);
 

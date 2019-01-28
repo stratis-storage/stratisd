@@ -5,9 +5,8 @@
 use std::fmt::Debug;
 use std::sync::{Once, ONCE_INIT};
 
-use crate::engine::MaybeDbusPath;
-
 use crate::engine::types::{BlockDevState, FreeSpaceState, PoolExtendState, PoolState};
+use crate::engine::MaybeDbusPath;
 
 static INIT: Once = ONCE_INIT;
 static mut ENGINE_LISTENER_LIST: Option<EngineListenerList> = None;

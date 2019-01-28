@@ -11,13 +11,12 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, Device, Sectors};
 
+use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
 use crate::engine::{
     BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolUuid,
     RenameAction,
 };
 use crate::stratis::StratisResult;
-
-use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
 
 pub const DEV_PATH: &str = "/stratis";
 

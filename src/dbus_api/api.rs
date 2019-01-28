@@ -15,17 +15,16 @@ use dbus::tree::{
 use dbus::{BusType, Connection, ConnectionItem, Message, NameFlag};
 use libc;
 
-use crate::dbus_api::consts;
-use crate::engine::{Engine, Pool, PoolUuid};
-use crate::stratis::VERSION;
-
 use crate::dbus_api::blockdev::create_dbus_blockdev;
+use crate::dbus_api::consts;
 use crate::dbus_api::filesystem::create_dbus_filesystem;
 use crate::dbus_api::pool::create_dbus_pool;
 use crate::dbus_api::types::{DbusContext, DbusErrorEnum, DeferredAction, TData};
 use crate::dbus_api::util::{
     engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, tuple_to_option,
 };
+use crate::engine::{Engine, Pool, PoolUuid};
+use crate::stratis::VERSION;
 
 fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;

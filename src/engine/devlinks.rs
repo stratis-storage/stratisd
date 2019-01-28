@@ -8,11 +8,10 @@ use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::{fs, str};
 
-use crate::engine::Pool;
-use crate::stratis::StratisResult;
-
 use crate::engine::engine::DEV_PATH;
 use crate::engine::types::{Name, PoolUuid};
+use crate::engine::Pool;
+use crate::stratis::StratisResult;
 
 /// Set up the root Stratis directory, where dev links as well as temporary
 /// MDV mounts will be created. This must occur before any pools are setup.

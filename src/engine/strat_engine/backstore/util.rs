@@ -9,9 +9,8 @@ use std::path::{Path, PathBuf};
 
 use libudev;
 
-use crate::stratis::StratisResult;
-
 use crate::engine::strat_engine::backstore::is_stratis_device;
+use crate::stratis::StratisResult;
 
 /// Takes a libudev device entry and returns the properties as a HashMap.
 fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {

@@ -8,17 +8,15 @@ use std::path::Path;
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
-use crate::engine::{BlockDevTier, DevUuid, PoolUuid};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
+use crate::engine::strat_engine::backstore::blockdevmgr::{
+    coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment,
+};
 use crate::engine::strat_engine::backstore::StratBlockDev;
 use crate::engine::strat_engine::serde_structs::{
     BaseDevSave, BlockDevSave, CacheTierSave, Recordable,
 };
-
-use crate::engine::strat_engine::backstore::blockdevmgr::{
-    coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment,
-};
+use crate::engine::{BlockDevTier, DevUuid, PoolUuid};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 /// This is a temporary maximum cache size. In the future it will be possible
 /// to dynamically increase the cache size beyond this limit. When this is

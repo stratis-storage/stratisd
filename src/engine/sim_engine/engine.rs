@@ -11,14 +11,12 @@ use std::rc::Rc;
 
 use devicemapper::Device;
 
-use crate::engine::{Engine, Name, Pool, PoolUuid, Redundancy, RenameAction};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
 use crate::engine::engine::Eventable;
-use crate::engine::structures::Table;
-
 use crate::engine::sim_engine::pool::SimPool;
 use crate::engine::sim_engine::randomization::Randomizer;
+use crate::engine::structures::Table;
+use crate::engine::{Engine, Name, Pool, PoolUuid, Redundancy, RenameAction};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 #[derive(Debug, Default)]
 pub struct SimEngine {

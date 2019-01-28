@@ -17,16 +17,14 @@ use devicemapper::{
     Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine, IEC,
 };
 
-use crate::engine::{BlockDev, DevUuid, PoolUuid};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use crate::engine::strat_engine::backstore::{blkdev_size, StratBlockDev, MIN_MDA_SECTORS};
-use crate::engine::strat_engine::serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable};
-
 use crate::engine::strat_engine::backstore::cleanup::wipe_blockdevs;
 use crate::engine::strat_engine::backstore::device::{identify, resolve_devices, DevOwnership};
 use crate::engine::strat_engine::backstore::metadata::{validate_mda_size, BDA};
 use crate::engine::strat_engine::backstore::util::hw_lookup;
+use crate::engine::strat_engine::backstore::{blkdev_size, StratBlockDev, MIN_MDA_SECTORS};
+use crate::engine::strat_engine::serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable};
+use crate::engine::{BlockDev, DevUuid, PoolUuid};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 const MAX_NUM_TO_WRITE: usize = 10;

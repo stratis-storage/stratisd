@@ -17,15 +17,7 @@ use devicemapper::{
     ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
 };
 
-use crate::engine::{
-    devlinks, EngineEvent, Filesystem, FilesystemUuid, MaybeDbusPath, Name, PoolUuid, RenameAction,
-};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
 use crate::engine::event::get_engine_listener_list;
-use crate::engine::structures::Table;
-use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
-
 use crate::engine::strat_engine::backstore::Backstore;
 use crate::engine::strat_engine::cmd::{thin_check, thin_repair, udev_settle};
 use crate::engine::strat_engine::device::wipe_sectors;
@@ -34,10 +26,15 @@ use crate::engine::strat_engine::names::{
     format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole, ThinRole,
 };
 use crate::engine::strat_engine::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
-
 use crate::engine::strat_engine::thinpool::filesystem::{FilesystemStatus, StratFilesystem};
 use crate::engine::strat_engine::thinpool::mdv::MetadataVol;
 use crate::engine::strat_engine::thinpool::thinids::ThinDevIdPool;
+use crate::engine::structures::Table;
+use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
+use crate::engine::{
+    devlinks, EngineEvent, Filesystem, FilesystemUuid, MaybeDbusPath, Name, PoolUuid, RenameAction,
+};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(2048); // 2 GiB

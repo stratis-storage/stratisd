@@ -8,15 +8,8 @@ use std::path::{Path, PathBuf};
 
 use devicemapper::{Device, DmNameBuf};
 
-use crate::engine::{
-    devlinks, Engine, EngineEvent, Name, Pool, PoolUuid, Redundancy, RenameAction,
-};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
 use crate::engine::engine::Eventable;
 use crate::engine::event::get_engine_listener_list;
-use crate::engine::structures::Table;
-
 use crate::engine::strat_engine::backstore::{find_all, get_metadata, is_stratis_device};
 #[cfg(test)]
 use crate::engine::strat_engine::cleanup::teardown_pools;
@@ -24,6 +17,11 @@ use crate::engine::strat_engine::cmd::verify_binaries;
 use crate::engine::strat_engine::dm::{get_dm, get_dm_init};
 use crate::engine::strat_engine::names::validate_name;
 use crate::engine::strat_engine::pool::{check_metadata, StratPool};
+use crate::engine::structures::Table;
+use crate::engine::{
+    devlinks, Engine, EngineEvent, Name, Pool, PoolUuid, Redundancy, RenameAction,
+};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 

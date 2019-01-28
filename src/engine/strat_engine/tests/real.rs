@@ -6,21 +6,21 @@ use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::{cmp, panic};
 
-use either::Either;
 use serde_json::{from_reader, Value};
 use uuid::Uuid;
 
 use devicemapper::{
-    devnode_to_devno, Bytes, Device, DmDevice, DmName, LinearDev, LinearDevTargetParams,
-    LinearTargetParams, Sectors, TargetLine, IEC,
+    devnode_to_devno, Bytes, Device, DmDevice, DmName, LinearDev, LinearDevTargetParams, LinearTargetParams,
+    Sectors, TargetLine, IEC,
 };
 
 use crate::engine::strat_engine::backstore::blkdev_size;
 use crate::engine::strat_engine::device::wipe_sectors;
 use crate::engine::strat_engine::dm::get_dm;
-
 use crate::engine::strat_engine::tests::logger::init_logger;
 use crate::engine::strat_engine::tests::util::clean_up;
+
+use either::Either;
 
 pub struct RealTestDev {
     dev: Either<PathBuf, LinearDev>,

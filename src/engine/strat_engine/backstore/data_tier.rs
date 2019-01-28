@@ -8,17 +8,15 @@ use std::path::Path;
 
 use devicemapper::Sectors;
 
-use crate::engine::{BlockDevTier, DevUuid, PoolUuid};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
+use crate::engine::strat_engine::backstore::blockdevmgr::{
+    coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment,
+};
 use crate::engine::strat_engine::backstore::StratBlockDev;
 use crate::engine::strat_engine::serde_structs::{
     BaseDevSave, BlockDevSave, DataTierSave, Recordable,
 };
-
-use crate::engine::strat_engine::backstore::blockdevmgr::{
-    coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment,
-};
+use crate::engine::{BlockDevTier, DevUuid, PoolUuid};
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 /// Handles the lowest level, base layer of this tier.
 #[derive(Debug)]

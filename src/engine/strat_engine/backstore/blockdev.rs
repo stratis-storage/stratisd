@@ -11,15 +11,12 @@ use chrono::{DateTime, TimeZone, Utc};
 
 use devicemapper::{Device, Sectors};
 
-use crate::engine::{BlockDev, BlockDevState, DevUuid, EngineEvent, MaybeDbusPath, PoolUuid};
-use crate::stratis::StratisResult;
-
 use crate::engine::event::get_engine_listener_list;
-
-use crate::engine::strat_engine::serde_structs::{BaseBlockDevSave, Recordable};
-
 use crate::engine::strat_engine::backstore::metadata::BDA;
 use crate::engine::strat_engine::backstore::range_alloc::RangeAllocator;
+use crate::engine::strat_engine::serde_structs::{BaseBlockDevSave, Recordable};
+use crate::engine::{BlockDev, BlockDevState, DevUuid, EngineEvent, MaybeDbusPath, PoolUuid};
+use crate::stratis::StratisResult;
 
 #[derive(Debug)]
 pub struct StratBlockDev {

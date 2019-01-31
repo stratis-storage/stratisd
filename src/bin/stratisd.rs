@@ -15,7 +15,6 @@ extern crate libc;
 extern crate libudev;
 extern crate nix;
 extern crate timerfd;
-extern crate uuid;
 
 use std::env;
 use std::fs::{File, OpenOptions};

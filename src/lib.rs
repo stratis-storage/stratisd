@@ -8,7 +8,6 @@ extern crate chrono;
 extern crate crc;
 extern crate uuid;
 
-extern crate libc;
 extern crate libmount;
 extern crate rand;
 extern crate serde;
@@ -24,11 +23,7 @@ extern crate libudev;
 #[macro_use]
 extern crate error_chain;
 
-extern crate failure;
 extern crate varlink;
-
-//#[macro_use]
-//extern crate failure_derive;
 
 #[cfg(test)]
 #[macro_use]

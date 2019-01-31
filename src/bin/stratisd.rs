@@ -10,8 +10,6 @@ extern crate libstratis;
 extern crate log;
 extern crate chrono;
 extern crate clap;
-#[cfg(feature = "dbus_enabled")]
-extern crate dbus;
 extern crate env_logger;
 extern crate libc;
 extern crate libudev;
@@ -37,21 +35,11 @@ use nix::sys::signal::{self, SigSet};
 use nix::sys::signalfd::{SfdFlags, SignalFd};
 use nix::unistd::getpid;
 use timerfd::{SetTimeFlags, TimerFd, TimerState};
-use uuid::Uuid;
-
-#[cfg(feature = "dbus_enabled")]
-use dbus::Connection;
 
 use libstratis::varlink_api::StratisVarlinkService;
 
 use devicemapper::Device;
-#[cfg(feature = "dbus_enabled")]
-use libstratis::dbus_api::{consts, prop_changed_dispatch, DbusConnectionData};
-#[cfg(feature = "dbus_enabled")]
-use libstratis::engine::{
-    get_engine_listener_list_mut, EngineEvent, EngineListener, MaybeDbusPath,
-};
-use libstratis::engine::{Engine, Pool, SimEngine, StratEngine};
+use libstratis::engine::{Engine, SimEngine, StratEngine};
 use libstratis::stratis::buff_log;
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
 
@@ -153,235 +141,6 @@ fn trylock_pid_file() -> StratisResult<File> {
     }
 }
 
-#[cfg(feature = "dbus_enabled")]
-#[derive(Debug)]
-struct EventHandler {
-    dbus_conn: Arc<Mutex<Connection>>,
-}
-
-#[cfg(feature = "dbus_enabled")]
-impl EventHandler {
-    pub fn new(dbus_conn: Arc<Mutex<Connection>>) -> EventHandler {
-        EventHandler { dbus_conn }
-    }
-}
-
-#[cfg(feature = "dbus_enabled")]
-impl EngineListener for EventHandler {
-    fn notify(&self, event: &EngineEvent) {
-        match *event {
-            EngineEvent::BlockdevStateChanged { dbus_path, state } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.lock().unwrap(),
-                        consts::BLOCKDEV_STATE_PROP,
-                        state as u16,
-                        &dbus_path,
-                        consts::BLOCKDEV_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        error!(
-                            "BlockdevStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path, state as u16,
-                        );
-                    });
-                }
-            }
-            EngineEvent::FilesystemRenamed {
-                dbus_path,
-                from,
-                to,
-            } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.lock().unwrap(),
-                        consts::FILESYSTEM_NAME_PROP,
-                        to.to_string(),
-                        &dbus_path,
-                        consts::FILESYSTEM_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        error!(
-                            "FilesystemRenamed: {} from: {} to: {} failed to send dbus update.",
-                            dbus_path, from, to,
-                        );
-                    });
-                }
-            }
-            EngineEvent::PoolExtendStateChanged { dbus_path, state } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.lock().unwrap(),
-                        consts::POOL_EXTEND_STATE_PROP,
-                        state as u16,
-                        &dbus_path,
-                        consts::POOL_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        error!(
-                            "PoolExtendStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path, state as u16,
-                        );
-                    });
-                }
-            }
-            EngineEvent::PoolRenamed {
-                dbus_path,
-                from,
-                to,
-            } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.lock().unwrap(),
-                        consts::POOL_NAME_PROP,
-                        to.to_string(),
-                        &dbus_path,
-                        consts::POOL_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        error!(
-                            "PoolRenamed: {} from: {} to: {} failed to send dbus update.",
-                            dbus_path, from, to,
-                        );
-                    });
-                }
-            }
-            EngineEvent::PoolSpaceStateChanged { dbus_path, state } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.lock().unwrap(),
-                        consts::POOL_SPACE_STATE_PROP,
-                        state as u16,
-                        &dbus_path,
-                        consts::POOL_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        error!(
-                            "PoolSpaceStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path, state as u16,
-                        );
-                    });
-                }
-            }
-            EngineEvent::PoolStateChanged { dbus_path, state } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.lock().unwrap(),
-                        consts::POOL_STATE_PROP,
-                        state as u16,
-                        &dbus_path,
-                        consts::POOL_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        error!(
-                            "PoolStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path, state as u16,
-                        );
-                    });
-                }
-            }
-        }
-    }
-}
-
-// Conditionally compiled support for a D-Bus interface.
-struct MaybeDbusSupport {
-    #[cfg(feature = "dbus_enabled")]
-    handle: Option<libstratis::dbus_api::DbusConnectionData>,
-}
-
-// If D-Bus compiled out, do very little.
-#[cfg(not(feature = "dbus_enabled"))]
-impl MaybeDbusSupport {
-    fn new() -> MaybeDbusSupport {
-        MaybeDbusSupport {}
-    }
-
-    fn process(
-        &mut self,
-        _engine: &Arc<Mutex<Engine>>,
-        _fds: &mut Vec<libc::pollfd>,
-        _dbus_client_index_start: usize,
-    ) {
-    }
-
-    fn register_pool(&mut self, _pool_uuid: Uuid, _pool: &mut Pool) {}
-
-    fn poll_timeout(&self) -> i32 {
-        // Non-DBus timeout is infinite
-        -1
-    }
-}
-
-#[cfg(feature = "dbus_enabled")]
-impl MaybeDbusSupport {
-    fn new() -> MaybeDbusSupport {
-        MaybeDbusSupport { handle: None }
-    }
-
-    /// Connect to D-Bus and register pools, if not already connected.
-    /// Return the connection, if made or already existing, otherwise, None.
-    fn setup_connection(&mut self, engine: &Arc<Mutex<Engine>>) -> Option<&mut DbusConnectionData> {
-        if self.handle.is_none() {
-            match libstratis::dbus_api::DbusConnectionData::connect(Arc::clone(&engine)) {
-                Err(_err) => {
-                    warn!("D-Bus API is not available");
-                }
-                Ok(mut handle) => {
-                    info!("D-Bus API is available");
-                    let event_handler = Box::new(EventHandler::new(Arc::clone(&handle.connection)));
-                    get_engine_listener_list_mut().register_listener(event_handler);
-                    // Register all the pools with dbus
-                    for (_, pool_uuid, mut pool) in engine.lock().unwrap().pools_mut() {
-                        handle.register_pool(pool_uuid, pool)
-                    }
-                    self.handle = Some(handle);
-                }
-            }
-        };
-        self.handle.as_mut()
-    }
-
-    /// Handle any client dbus requests.
-    fn process(
-        &mut self,
-        engine: &Arc<Mutex<Engine>>,
-        fds: &mut Vec<libc::pollfd>,
-        dbus_client_index_start: usize,
-    ) {
-        if let Some(handle) = self.setup_connection(engine) {
-            handle.handle(&fds[dbus_client_index_start..]);
-
-            // Refresh list of dbus fds to poll for. This can change as
-            // D-Bus clients come and go.
-            fds.truncate(dbus_client_index_start);
-            fds.extend(
-                handle
-                    .connection
-                    .lock()
-                    .unwrap()
-                    .watch_fds()
-                    .iter()
-                    .map(|w| w.to_pollfd()),
-            );
-        }
-    }
-
-    fn register_pool(&mut self, pool_uuid: Uuid, pool: &mut Pool) {
-        if let Some(h) = self.handle.as_mut() {
-            h.register_pool(pool_uuid, pool)
-        }
-    }
-
-    fn poll_timeout(&self) -> i32 {
-        // If there is no D-Bus connection set timeout to 1 sec (1000 ms), so
-        // that stratisd can periodically attempt to set up a connection.
-        // If the connection is up, set the timeout to infinite; there is no
-        // need to poll as events will be received.
-        self.handle.as_ref().map_or(1000, |_| -1)
-    }
-}
-
 // A facility for listening for and handling udev events that stratisd
 // considers interesting.
 struct UdevMonitor<'a> {
@@ -405,25 +164,19 @@ impl<'a> UdevMonitor<'a> {
     /// Handle udev events.
     /// Check if a pool can be constructed and update engine and D-Bus layer
     /// data structures if so.
-    fn handle_events(&mut self, engine: &mut Engine, dbus_support: &mut MaybeDbusSupport) {
+    fn handle_events(&mut self, engine: &mut Engine) {
         while let Some(event) = self.socket.receive_event() {
             if event.event_type() == libudev::EventType::Add
                 || event.event_type() == libudev::EventType::Change
             {
                 let device = event.device();
-                let new_pool_uuid = device.devnode().and_then(|devnode| {
+                let _ = device.devnode().and_then(|devnode| {
                     device.devnum().and_then(|devnum| {
                         engine
                             .block_evaluate(Device::from(devnum), PathBuf::from(devnode))
                             .unwrap_or(None)
                     })
                 });
-                if let Some(pool_uuid) = new_pool_uuid {
-                    let (_, pool) = engine
-                        .get_mut_pool(pool_uuid)
-                        .expect("block_evaluate() returned a pool UUID, pool must be available");
-                    dbus_support.register_pool(pool_uuid, pool);
-                }
             }
         }
     }
@@ -465,8 +218,8 @@ fn process_signal(
 }
 
 /// Handle blocking the event loop
-fn process_poll(poll_timeout: i32, fds: &mut Vec<libc::pollfd>) -> StratisResult<()> {
-    let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, poll_timeout) };
+fn process_poll(fds: &mut Vec<libc::pollfd>) -> StratisResult<()> {
+    let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, -1) };
 
     // TODO: refine this behavior.
     // Different behaviors may be indicated, depending on the value of
@@ -475,7 +228,7 @@ fn process_poll(poll_timeout: i32, fds: &mut Vec<libc::pollfd>) -> StratisResult
         return Err(StratisError::Error(format!(
             "poll command failed: number of fds: {}, timeout: {}",
             fds.len(),
-            poll_timeout
+            -1
         )));
     }
     Ok(())
@@ -488,8 +241,6 @@ fn process_poll(poll_timeout: i32, fds: &mut Vec<libc::pollfd>) -> StratisResult
 fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) -> StratisResult<()> {
     // Ensure that the debug log is output when we leave this function.
     let _guard = buff_log.to_guard();
-
-    let mut dbus_support = MaybeDbusSupport::new();
 
     // Setup a udev listener before initializing the engine. A device may
     // appear after the engine has processed the udev db, but before it has
@@ -589,7 +340,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         });
     };
 
-    let dbus_client_index_start = if eventable.is_some() {
+    let varlink_index_start = if eventable.is_some() {
         FD_INDEX_ENGINE + 1
     } else {
         FD_INDEX_ENGINE
@@ -597,11 +348,11 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
 
     log_engine_state(&*engine.lock().unwrap());
 
-    let mut varlink_index_start = 0;
+    fds.extend(varlink.poll_fds());
 
     loop {
         if fds[FD_INDEX_UDEV].revents != 0 {
-            udev_monitor.handle_events(&mut *engine.lock().unwrap(), &mut dbus_support)
+            udev_monitor.handle_events(&mut *engine.lock().unwrap())
         }
 
         if fds[FD_INDEX_SIGNALFD].revents != 0 {
@@ -628,20 +379,12 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
             }
         }
 
-        // Handle IPC requests over varlink, we need to do this before we call into
-        // dbus_support.process as that truncates the fds vector.
-        if varlink_index_start != 0 {
-            varlink.handle(&fds[varlink_index_start..]);
-        }
-
-        dbus_support.process(&engine, &mut fds, dbus_client_index_start);
-
-        // The fds gets truncated and extended in dbus_support.process, lets figure out where
-        // we are putting the varlink fds.
-        varlink_index_start = fds.len();
+        // Handle Client requests
+        varlink.handle(&fds[varlink_index_start..]);
+        fds.truncate(varlink_index_start);
         fds.extend(varlink.poll_fds());
 
-        process_poll(dbus_support.poll_timeout(), &mut fds)?;
+        process_poll(&mut fds)?;
     }
 }
 

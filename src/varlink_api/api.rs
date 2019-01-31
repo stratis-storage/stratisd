@@ -78,7 +78,6 @@ pub fn engine_to_varlink_err_tuple(err: &StratisError) -> (i64, String) {
         | StratisError::Utf8(_)
         | StratisError::Serde(_)
         | StratisError::DM(_)
-        | StratisError::Dbus(_)
         | StratisError::Udev(_) => VarlinkErrorEnum::INTERNAL_ERROR,
     };
     (error.into(), err.description().to_owned())

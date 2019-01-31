@@ -8,10 +8,6 @@ extern crate chrono;
 extern crate crc;
 extern crate uuid;
 
-#[cfg(feature = "dbus_enabled")]
-extern crate dbus;
-
-#[cfg(feature = "dbus_enabled")]
 extern crate libc;
 extern crate libmount;
 extern crate rand;
@@ -46,9 +42,6 @@ extern crate matches;
 extern crate lazy_static;
 
 pub mod engine;
-
-#[cfg(feature = "dbus_enabled")]
-pub mod dbus_api;
 
 extern crate chainerror;
 

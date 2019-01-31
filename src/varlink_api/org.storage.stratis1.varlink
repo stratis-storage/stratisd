@@ -1,0 +1,58 @@
+interface org.storage.stratis1
+
+type Filesystem (
+    uuid: string,
+    name: string,
+    devnode: string,
+    used: string,
+    created: string
+)
+
+type BlockDev (
+    uuid: string,
+    devnode: string,
+    hardware_info: string,
+    initialization_time: string,
+    total_physical_size: string,
+    state: int,
+    tier: int,
+    user_info: string
+)
+
+type Pool (
+    uuid: string,
+    name: string,
+    total_physical_size: string,
+    total_pyhsical_used: string,
+    extend_state: int,
+    space_state: int,
+    state: int,
+    block_devs: []BlockDev,
+    file_systems: []Filesystem
+)
+
+# Query operations
+method Version() -> (version: string)
+method Pools() -> (pools: []Pool)
+
+
+# Using the convention of [type][action] & [type][member][action]
+
+# Pool operations
+method PoolCreate(name: string, redundancy: ?int, devices: []string) -> (pool_uuid: string)
+method PoolDestroy(pool_uuid: string) -> (deleted: bool)
+method PoolDevsAdd(pool_uuid: string, devices: []string) -> (block_uuids: []string)
+method PoolNameSet(pool_uuid: string, new_name: string) -> (changed: bool)
+method PoolCacheAdd(pool_uuid: string, devices: []string) -> (block_uuids: []string)
+
+# Filesystem operations
+method FileSystemCreate(pool_uuid: string, name: []string) -> (fs_uuid: string)
+method FileSystemDestroy(pool_uuid: string, fs_uuid: []string) -> (deleted: bool)
+method FileSystemSnapshot(pool_uuid: string, fs_uuid: string, name: string) -> (fs_uuid: string)
+method FileSystemNameSet(pool_uuid: string, fs_uuid: string, name: string) -> (changed: bool)
+
+# BlockDevOperations
+method BlockDevUserInfoSet(pool_uuid: string, block_dev_uuid: string, user_info: string) -> (changed: bool)
+
+# What kind(s) of error(s) do we want to expose?
+error BaseError( code: int, reason: string )

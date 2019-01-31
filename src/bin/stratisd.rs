@@ -26,7 +26,6 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::PathBuf;
 use std::process::exit;
 use std::sync::{Arc, Mutex};
-use std::thread::spawn;
 
 use chrono::Duration;
 use clap::{App, Arg, ArgMatches};
@@ -42,6 +41,8 @@ use uuid::Uuid;
 
 #[cfg(feature = "dbus_enabled")]
 use dbus::Connection;
+
+use libstratis::varlink_api::StratisVarlinkService;
 
 use devicemapper::Device;
 #[cfg(feature = "dbus_enabled")]
@@ -508,6 +509,8 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         }
     };
 
+    let mut varlink = StratisVarlinkService::initialize(Arc::clone(&engine))?;
+
     /*
     The file descriptor array indexes are:
 
@@ -594,6 +597,8 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
 
     log_engine_state(&*engine.lock().unwrap());
 
+    let mut varlink_index_start = 0;
+
     loop {
         if fds[FD_INDEX_UDEV].revents != 0 {
             udev_monitor.handle_events(&mut *engine.lock().unwrap(), &mut dbus_support)
@@ -623,7 +628,18 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
             }
         }
 
+        // Handle IPC requests over varlink, we need to do this before we call into
+        // dbus_support.process as that truncates the fds vector.
+        if varlink_index_start != 0 {
+            varlink.handle(&fds[varlink_index_start..]);
+        }
+
         dbus_support.process(&engine, &mut fds, dbus_client_index_start);
+
+        // The fds gets truncated and extended in dbus_support.process, lets figure out where
+        // we are putting the varlink fds.
+        varlink_index_start = fds.len();
+        fds.extend(varlink.poll_fds());
 
         process_poll(dbus_support.poll_timeout(), &mut fds)?;
     }

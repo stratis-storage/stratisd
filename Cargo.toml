@@ -2,6 +2,7 @@
 name = "libstratis"
 version = "1.0.3"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.com>"]
+build = "src/varlink_api/build.rs"
 
 [dependencies]
 dbus = {version = "0.6.4", optional = true}
@@ -24,6 +25,11 @@ error-chain = "0.12"
 libudev = "0.2.0"
 lazy_static = "1.0.0"
 timerfd = "1.0.0"
+varlink = "7.0.0"
+failure = "0.1"
+failure_derive = "0.1"
+macro-attr = "0.2.0"
+chainerror = "0.4.1"
 
 [dependencies.uuid]
 version = "0.7"
@@ -38,3 +44,6 @@ matches = "0.1.8"
 [features]
 default = ["dbus_enabled"]
 dbus_enabled = ["dbus"]
+
+[build-dependencies]
+varlink_generator = "7"

@@ -28,6 +28,12 @@ extern crate libudev;
 #[macro_use]
 extern crate error_chain;
 
+extern crate failure;
+extern crate varlink;
+
+//#[macro_use]
+//extern crate failure_derive;
+
 #[cfg(test)]
 #[macro_use]
 extern crate proptest;
@@ -44,4 +50,10 @@ pub mod engine;
 #[cfg(feature = "dbus_enabled")]
 pub mod dbus_api;
 
+extern crate chainerror;
+
 pub mod stratis;
+pub mod varlink_api;
+
+#[macro_use]
+extern crate macro_attr;

@@ -66,6 +66,32 @@ pub enum BlockDevState {
     InUse = 4,
 }
 
+impl fmt::Display for BlockDevState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            BlockDevState::Missing => write!(f, "Missing"),
+            BlockDevState::Bad => write!(f, "Bad"),
+            BlockDevState::Spare => write!(f, "Spare"),
+            BlockDevState::NotInUse => write!(f, "NotInUse"),
+            BlockDevState::InUse => write!(f, "InUse"),
+        }
+    }
+}
+
+impl BlockDevState {
+    // It appears rust doesn't have a std trait(s) for numeric
+    pub fn from_i64(i: i64) -> Option<Self> {
+        match i {
+            0 => Some(BlockDevState::Missing),
+            1 => Some(BlockDevState::Bad),
+            2 => Some(BlockDevState::Spare),
+            3 => Some(BlockDevState::NotInUse),
+            4 => Some(BlockDevState::InUse),
+            _ => None,
+        }
+    }
+}
+
 /// A struct that may contain a dbus::Path, or may not, and most certainly
 /// doesn't if dbus is compiled out. This avoids littering engine code with
 /// conditional code.
@@ -81,6 +107,26 @@ pub struct MaybeDbusPath(
 pub enum BlockDevTier {
     Data = 0,
     Cache = 1,
+}
+
+impl fmt::Display for BlockDevTier {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            BlockDevTier::Data => write!(f, "Data"),
+            BlockDevTier::Cache => write!(f, "Cache"),
+        }
+    }
+}
+
+impl BlockDevTier {
+    // It appears rust doesn't have a std trait(s) for numeric
+    pub fn from_i64(i: i64) -> Option<Self> {
+        match i {
+            0 => Some(BlockDevTier::Data),
+            1 => Some(BlockDevTier::Cache),
+            _ => None,
+        }
+    }
 }
 
 /// Redundancy classifications which the engine allows for pools.

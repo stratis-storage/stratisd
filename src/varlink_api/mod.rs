@@ -6,4 +6,6 @@ mod api;
 mod org_storage_stratis1;
 
 pub use self::api::StratisVarlinkService;
-pub use self::org_storage_stratis1::{r#Pool, VarlinkClient, VarlinkClientInterface};
+pub use self::org_storage_stratis1::{
+    ErrorKind, VarlinkCallError, VarlinkClient, VarlinkClientInterface,
+};

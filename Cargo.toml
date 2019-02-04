@@ -30,6 +30,7 @@ failure_derive = "0.1"
 macro-attr = "0.2.0"
 chainerror = "0.4.1"
 decimal = "2.0.4"
+unicode-width = "0.1.5"
 
 [dependencies.uuid]
 version = "0.7"

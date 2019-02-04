@@ -4,6 +4,7 @@
 
 #[macro_use]
 extern crate decimal;
+extern crate unicode_width;
 
 extern crate clap;
 extern crate libstratis;
@@ -16,6 +17,7 @@ use std::str::FromStr;
 use std::{i128, i64};
 
 use clap::{App, Arg, SubCommand};
+use unicode_width::UnicodeWidthStr;
 use varlink::Connection;
 
 use libstratis::engine::{BlockDevState, BlockDevTier};
@@ -30,18 +32,28 @@ fn print_table(column_headings: Vec<&str>, row_entries: Vec<Vec<String>>, alignm
     let column_lengths: Vec<usize> = (0..num_columns)
         .map(|i| {
             cmp::max(
-                column_headings[i].len(),
-                row_entries.iter().map(|r| r[i].len()).max().unwrap_or(0),
+                UnicodeWidthStr::width(column_headings[i]),
+                row_entries
+                    .iter()
+                    .map(|r| UnicodeWidthStr::width(r[i].as_str()))
+                    .max()
+                    .unwrap_or(0),
             )
         })
         .collect();
 
     fn format_item(i: &str, column_width: usize, alignment: &str) -> String {
+        let uw = UnicodeWidthStr::width(i);
+        let cc = i.chars().count();
+        let mut t_cw = column_width;
+
+        t_cw -= uw - cc;
+
         match alignment {
-            ">" => format!("{txt:>width$}", txt = i, width = column_width),
-            "<" => format!("{txt:<width$}", txt = i, width = column_width),
-            "^" => format!("{txt:^width$}", txt = i, width = column_width),
-            _ => format!("{txt:width$}", txt = i, width = column_width),
+            ">" => format!("{txt:>width$}", txt = i, width = t_cw),
+            "<" => format!("{txt:<width$}", txt = i, width = t_cw),
+            "^" => format!("{txt:^width$}", txt = i, width = t_cw),
+            _ => format!("{txt:width$}", txt = i, width = t_cw),
         }
     }
 

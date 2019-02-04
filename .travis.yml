@@ -32,9 +32,10 @@ matrix:
         # Verify that source builds with no defaults enabled
         - rust: stable
           env: TASK=build-no-default TARGET=x86_64-unknown-linux-gnu
-        # Verify that source builds on lowest supported compiler version
+        # Verify that source and tests build on rustc 1.31.0
+        # rustc 1.31.0 is the lowest supported compiler version.
         - rust: 1.31.0
-          env: TASK=build TARGET=x86_64-unknown-linux-gnu
+          env: TASK=test TARGET=x86_64-unknown-linux-gnu
         # Verify that source builds on a 32 bit system
         - rust: stable
           env: TASK=build TARGET=i686-unknown-linux-gnu PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/

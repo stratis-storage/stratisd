@@ -17,6 +17,7 @@ use crate::engine::strat_engine::dm::{get_dm, get_dm_init};
 // For an explanation see:
 // https://github.com/rust-lang-nursery/error-chain/issues/254.
 // FIXME: Drop dependence on error-chain entirely.
+#[allow(deprecated)]
 mod cleanup_errors {
     use libmount;
     use nix;

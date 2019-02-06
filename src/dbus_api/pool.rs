@@ -209,11 +209,19 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> Meth
         .get(object_path)
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
+
+    if let Err(err) = dbus_context
+        .engine
+        .borrow()
+        .ensure_devices_not_known(&blockdevs)
+    {
+        let (rc, rs) = engine_to_dbus_err_tuple(&err);
+        return Ok(vec![return_message.append3(default_return, rc, rs)]);
+    }
 
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
-
-    let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
     let result = pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, tier);
     let msg = match result {

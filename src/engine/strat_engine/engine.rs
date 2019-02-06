@@ -177,6 +177,8 @@ impl Engine for StratEngine {
             return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.into()));
         }
 
+        self.ensure_devices_not_known(&blockdev_paths)?;
+
         let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy)?;
 
         let name = Name::new(name.to_owned());
@@ -284,6 +286,34 @@ impl Engine for StratEngine {
             devlinks::pool_removed(&pool_name);
             Ok(true)
         }
+    }
+
+    fn ensure_devices_not_known(&self, blockdev_paths: &[&Path]) -> Result<(), StratisError> {
+        let mut error_message = String::new();
+
+        // TODO Perhaps figure out a way to utilize iterator(s) here.  My initial attempts fell flat
+        // with borrow issues and when dealing with the fact that we have an iterator where
+        // each item has an iterator too, necessitating a flatten etc.
+        //
+        // Performance of this code in large configurations will suffer
+        for (name, pool_uuid, p) in self.pools() {
+            for (_, blockdev) in p.blockdevs() {
+                for b in blockdev_paths.iter() {
+                    if *b == blockdev.devnode().as_path() {
+                        error_message.push_str(&format!(
+                            "Block device {:?} is already part of pool {} {}\n",
+                            b, name, pool_uuid
+                        ));
+                    }
+                }
+            }
+        }
+
+        if !error_message.is_empty() {
+            return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
+        }
+
+        Ok(())
     }
 
     fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction> {

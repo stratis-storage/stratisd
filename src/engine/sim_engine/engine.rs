@@ -87,6 +87,10 @@ impl Engine for SimEngine {
         Ok(true)
     }
 
+    fn ensure_devices_not_known(&self, _blockdev_paths: &[&Path]) -> Result<(), StratisError> {
+        Ok(())
+    }
+
     fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction> {
         rename_pool_pre!(self; uuid; new_name);
 

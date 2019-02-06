@@ -216,6 +216,11 @@ pub trait Engine: Debug {
     /// Returns true if some action was necessary, otherwise false.
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<bool>;
 
+    /// Checks that the supplied block device path(s) are not already known to the engine.  This is
+    /// used for precondition check to ensure we aren't trying to add known device(s) to the
+    /// same pool or different pool.  This check needs visibility to the entire engine state.
+    fn ensure_devices_not_known(&self, blockdev_paths: &[&Path]) -> StratisResult<()>;
+
     /// Rename pool with uuid to new_name.
     /// Raises an error if the mapping can't be applied because
     /// new_name is already in use.

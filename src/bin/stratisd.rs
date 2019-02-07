@@ -351,6 +351,7 @@ impl MaybeDbusSupport {
         fds: &mut Vec<libc::pollfd>,
         dbus_client_index_start: usize,
     ) {
+        info!("Begin handling dbus events");
         if let Some(handle) = self.setup_connection(engine) {
             handle.handle(&fds[dbus_client_index_start..]);
 
@@ -366,6 +367,7 @@ impl MaybeDbusSupport {
                     .map(|w| w.to_pollfd()),
             );
         }
+        info!("Finish handling dbus events");
     }
 
     fn register_pool(&mut self, pool_uuid: Uuid, pool: &mut Pool) {
@@ -407,6 +409,7 @@ impl<'a> UdevMonitor<'a> {
     /// Check if a pool can be constructed and update engine and D-Bus layer
     /// data structures if so.
     fn handle_events(&mut self, engine: &mut Engine, dbus_support: &mut MaybeDbusSupport) {
+        info!("Begin handling udev events");
         while let Some(event) = self.socket.receive_event() {
             if event.event_type() == libudev::EventType::Add
                 || event.event_type() == libudev::EventType::Change
@@ -427,6 +430,7 @@ impl<'a> UdevMonitor<'a> {
                 }
             }
         }
+        info!("Finish handling udev events");
     }
 }
 
@@ -467,6 +471,7 @@ fn process_signal(
 
 /// Handle blocking the event loop
 fn process_poll(poll_timeout: i32, fds: &mut Vec<libc::pollfd>) -> StratisResult<()> {
+    info!("Begin waiting for some event");
     let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, poll_timeout) };
 
     // TODO: refine this behavior.
@@ -479,6 +484,7 @@ fn process_poll(poll_timeout: i32, fds: &mut Vec<libc::pollfd>) -> StratisResult
             poll_timeout
         )));
     }
+    info!("Finish waiting for some event (received an event or timed out)");
     Ok(())
 }
 
@@ -620,8 +626,10 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
 
         if let Some(ref evt) = eventable {
             if fds[FD_INDEX_ENGINE].revents != 0 {
+                info!("Begin handling engine events");
                 evt.clear_event()?;
                 engine.borrow_mut().evented()?;
+                info!("Finish handling engine events");
             }
         }
 

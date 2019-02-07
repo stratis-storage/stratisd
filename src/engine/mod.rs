@@ -6,6 +6,7 @@ pub use self::devlinks::filesystem_mount_path;
 
 pub use self::engine::BlockDev;
 pub use self::engine::Engine;
+pub use self::engine::Eventable;
 pub use self::engine::Filesystem;
 pub use self::engine::Pool;
 

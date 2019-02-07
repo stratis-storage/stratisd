@@ -50,7 +50,7 @@ use libstratis::dbus_api::{consts, prop_changed_dispatch, DbusConnectionData};
 use libstratis::engine::{
     get_engine_listener_list_mut, EngineEvent, EngineListener, MaybeDbusPath,
 };
-use libstratis::engine::{Engine, Pool, SimEngine, StratEngine};
+use libstratis::engine::{Engine, Eventable, Pool, SimEngine, StratEngine};
 use libstratis::stratis::buff_log;
 use libstratis::stratis::{StratisError, StratisResult, VERSION};
 
@@ -488,6 +488,15 @@ fn process_poll(poll_timeout: i32, fds: &mut Vec<libc::pollfd>) -> StratisResult
     Ok(())
 }
 
+/// Handle engine events.
+fn handle_engine_events(engine: &mut Engine, evt: &Eventable) -> StratisResult<()> {
+    info!("Begin handling engine events");
+    evt.clear_event()?;
+    engine.evented()?;
+    info!("Finish handling engine events");
+    Ok(())
+}
+
 /// Set up all sorts of signal and event handling mechanisms.
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered. Dump log entries on specified signal
@@ -624,12 +633,9 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
             log_engine_state(&*engine.borrow());
         }
 
-        if let Some(ref evt) = eventable {
+        if let Some(evt) = eventable {
             if fds[FD_INDEX_ENGINE].revents != 0 {
-                info!("Begin handling engine events");
-                evt.clear_event()?;
-                engine.borrow_mut().evented()?;
-                info!("Finish handling engine events");
+                handle_engine_events(&mut *engine.borrow_mut(), evt)?;
             }
         }
 

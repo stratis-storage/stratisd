@@ -63,9 +63,9 @@ so should be avoided.
 Stratisd requires Rust 1.31+ and Cargo to build. These may be available via
 your distribution's package manager. If not, [Rustup](https://www.rustup.rs/)
 is available to install and update the Rust toolchain.
-Once toolchain and other dependencies are in place, run `cargo build` to build, and then run the
-`stratisd` executable in `./target/debug/` as root. Pass the `--help` option
-for more information on additional developer options.
+Once toolchain and other dependencies are in place, run `make build` to build, and then run the
+`stratisd` executable in `./target/x86_64-unknown-linux-gnu/debug` as root.
+Pass the `--help` option for more information on additional developer options.
 
 ##### Secondary dependencies
 The rust library dbus-rs has an external dependency on the C dbus library

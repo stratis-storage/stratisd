@@ -2,11 +2,6 @@
 
 A daemon that manages a pool of block devices to create flexible filesystems.
 
-## Status
-
-September 28 2018: Stratis 1.0 released.
-See [release notes](https://github.com/stratis-storage/stratis-docs/blob/master/docs/relnotes/relnotes-1.0.md) for details.
-
 ## Background
 
 Stratis (which includes [stratisd](https://github.com/stratis-storage/stratisd)
@@ -54,24 +49,20 @@ mailing list, if preferred.
 
 ### Setting up for development
 
-#### Dbus configuration file
+#### Development Compiler
+The version of the compiler recommended for development is 1.31. Other
+versions of the compiler may disagree with the CI tasks on some points,
+so should be avoided.
 
-Stratisd runs as root, and requires access to the D-Bus system bus. Thus in
-order to work properly, a D-Bus conf file must exist to grant access, either
-installed by distribution packaging; or manually, by copying `stratisd.conf`
-to `/etc/dbus-1/system.d/`.
-
-
-#### Rust tools
+#### Building
 Stratisd requires Rust 1.31+ and Cargo to build. These may be available via
 your distribution's package manager. If not, [Rustup](https://www.rustup.rs/)
 is available to install and update the Rust toolchain.
+Once toolchain and other dependencies are in place, run `make build` to build, and then run the
+`stratisd` executable in `./target/x86_64-unknown-linux-gnu/debug` as root.
+Pass the `--help` option for more information on additional developer options.
 
-Stratisd makes use of `rustfmt` to enforce consistent formatting in Rust
-files.  PRs must pass the `fmt` task in the CI in order to be merged. The
-`fmt` task currently uses rustfmt 1.0 as shipped with Rust 1.31).
-
-#### Secondary dependencies
+##### Secondary dependencies
 The rust library dbus-rs has an external dependency on the C dbus library
 [dbus development library](https://www.freedesktop.org/wiki/Software/dbus/).
 Please check with your distributions package manager to locate the needed
@@ -85,7 +76,7 @@ The files needed to build dbus-rs include, but are not limited to:
 /usr/lib64/pkgconfig/dbus-1.pc
 ```
 
-Also, the rust library libudev-sys has an dependency on the C libudev library.
+Also, the rust library libudev-sys has a dependency on the C libudev library.
 Please check with your distributions package manager to locate the needed
 package (e.g libudev-dev for Debian-based, systemd-devel for Fedora RPM-based
 Linux distributions).
@@ -96,16 +87,34 @@ At least, you need to include:
 /usr/lib64/pkgconfig/libudev.pc
 ```
 
-#### Building
-Once toolchain and other dependencies are in place, run `cargo build` to build, and then run the
-`stratisd` executable in `./target/debug/` as root. Pass the `--help` option
-for more information on additional developer options.
 
-#### Reformatting
-To reformat all files to ensure proper formatting, run `cargo fmt` to ensure
-your changes conform to the expected formatting before submitting a pull request.
+#### Formatting
+Stratisd makes use of `rustfmt` to enforce consistent formatting in Rust
+files.  PRs must pass the `fmt` task in the CI in order to be merged.
+Run `make fmt` to ensure your changes conform to the expected formatting
+before submitting a pull request. Formatting changes a bit with different
+versions of the compiler; make sure to use the current development version.
+
+#### Linting
+Stratisd makes use of `clippy` to detect Rust lints. PRs must pass the
+`clippy` task in the CI in order to be merged. To check for lints, run
+`make clippy`. The lints change a bit with different versions of the compiler;
+make sure to use the current development version.
+
+#### Configuring
+
+Stratisd runs as root, and requires access to the D-Bus system bus. Thus in
+order to work properly, a D-Bus conf file must exist to grant access, either
+installed by distribution packaging; or manually, by copying `stratisd.conf`
+to `/etc/dbus-1/system.d/`.
 
 #### Testing
+
+Stratisd is tested in two ways. The first way makes use of the Rust test
+infrastructure and has more access to stratisd internals. The second way
+makes use of the stratisd D-Bus interface.
+
+##### Tests that make use of the Rust test infrastructure
 Stratisd incorporates two testing modalities:
 * safe unit tests, which can be run without affecting your storage configuration
 * unsafe unit tests, which may create and destroy devices during execution
@@ -118,6 +127,10 @@ $ make test
 
 For a description of the unsafe unit tests, necessary setup steps, and how to
 run them, see [`tests/README.md`](tests/README.md).
+
+##### Test that interact with stratisd via the D-Bus
+For a description of the D-Bus-based tests see
+[`tests/client-dbus/README.rst`](tests/client-dbus/README.rst).
 
 ## Licensing
 

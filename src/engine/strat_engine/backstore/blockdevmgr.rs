@@ -422,11 +422,8 @@ fn initialize(
         for (dev, dev_result) in dev_infos {
             let (devnode, dev_size, ownership, mut f) = dev_result?;
             if dev_size < MIN_DEV_SIZE {
-                let error_message = format!(
-                    "{} too small, minimum {} bytes",
-                    devnode.display(),
-                    MIN_DEV_SIZE
-                );
+                let error_message =
+                    format!("{} too small, minimum {}", devnode.display(), MIN_DEV_SIZE);
                 return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
             };
             match ownership {

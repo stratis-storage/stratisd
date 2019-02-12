@@ -21,7 +21,7 @@ import subprocess
 _DM_BIN = os.getenv('STRATIS_DMSETUP_BIN', "/usr/sbin/dmsetup")
 
 
-def _get_stratis_devices():
+def get_stratis_devices():
     """
     Return a list of stratis DM devices
     :return: A list of stratis DM devices
@@ -48,7 +48,7 @@ def remove_stratis_setup():
     :return: None
     """
     attempts = 0
-    devices = _get_stratis_devices()
+    devices = get_stratis_devices()
     max_loops = len(devices) * 5
 
     # There is some dependency ordering with regards to dm tables, we will

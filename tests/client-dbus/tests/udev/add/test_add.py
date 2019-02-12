@@ -1,0 +1,341 @@
+# Copyright 2018 Red Hat, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""
+Used to test behavior of the udev device discovery mechanism.
+"""
+
+import unittest
+
+from ..lib._daemon import Daemon
+from ..lib._loopback import LoopBackDevices
+from ..lib._stratis import pool_create, pools_get, pool_name_set, ipc_responding
+from ..lib._udev import StratisBlockDevices
+from ..lib._utils import rs, settle
+
+
+class UdevAdd(unittest.TestCase):
+    """
+    Test udev add event support.
+    """
+
+    def _device_files(self, tokens):
+        """
+        Converts a list of loop back devices to a list of /dev file entries
+        :param tokens: Loop back device list
+        :return: List of loop back devices
+        """
+        return [self._lb_mgr.device_file(t) for t in tokens]
+
+    def setUp(self):
+        """
+        Common needed things
+        """
+        self._lb_mgr = LoopBackDevices()
+        self.addCleanup(self._clean_up)
+        self._service = Daemon(ipc_responding)
+        self._stratis_block_devices = StratisBlockDevices()
+
+    def _clean_up(self):
+        """
+        Cleans up the test environment
+        :return: None
+        """
+        self._service.stop_remove_dm_tables()
+
+        # Remove the loop back devices
+        if self._lb_mgr:
+            self._lb_mgr.destroy_all()
+            self._lb_mgr = None
+
+    # pylint: disable=too-many-locals
+    def _test_driver(self,
+                     number_of_pools,
+                     dev_count_pool,
+                     some_existing=False):
+        """
+        We want to test 1..N number of devices in the following scenarios:
+
+        * Devices with no signatures getting hot-plug
+        * 1 or more devices in pool
+          - All devices present @ startup
+          - 1 or more @ startup, but incomplete number of devices at startup
+          - 0 @ startup, systematically adding one @ a time
+
+        :param number_of_pools: Number of pools
+        :param dev_count_pool: Number of devices in each pool
+        :param some_existing: Hotplug some devices before we start the daemon
+        :return: None
+        """
+
+        pool_data = {}
+
+        self._service.start()
+
+        expected_stratis_devices = []
+
+        # Create the pools
+        for _ in range(number_of_pools):
+            device_tokens = \
+               [self._lb_mgr.create_device() for _ in range(dev_count_pool)]
+
+            # Ensure newly created block devices are in udev db.
+            settle()
+
+            pool_name = rs(5)
+            pool_create(pool_name, self._device_files(device_tokens))
+            pool_data[pool_name] = device_tokens
+            expected_stratis_devices.extend(self._device_files(device_tokens))
+
+        # Start & Stop the service
+        self._service.stop_remove_dm_tables()
+
+        self._stratis_block_devices.expected(expected_stratis_devices)
+
+        self._service.start()
+
+        # We should have all the devices, so pool should exist after toggle
+        self.assertEqual(len(pools_get()), number_of_pools)
+
+        self._service.stop_remove_dm_tables()
+
+        # Unplug all the devices
+        for device_tokens in pool_data.values():
+            for d in device_tokens:
+                self._lb_mgr.unplug(d)
+
+        self._stratis_block_devices.expected([])
+
+        self._service.start()
+
+        self.assertEqual(len(pools_get()), 0)
+
+        # Systematically add a device to each pool, checking that the pool
+        # isn't assembled until complete
+        pool_names = pool_data.keys()
+
+        activation_sequence = \
+           [pool_data[p][i] for i in range(dev_count_pool) for p in pool_names]
+
+        # Add all but the last device for each pool
+        running_count = 0
+        running_devices = []
+
+        for device_token in activation_sequence[:-number_of_pools]:
+            self._lb_mgr.hotplug(device_token)
+            running_count += 1
+            running_devices.extend(self._device_files([device_token]))
+
+            self._stratis_block_devices.expected(running_devices)
+
+            if some_existing:
+                self._service.stop_remove_dm_tables()
+                self._service.start()
+            else:
+                settle()
+            result = pools_get()
+            self.assertEqual(len(result), 0)
+
+        # Add the last device that makes each pool complete
+        for device_token in activation_sequence[-number_of_pools:]:
+            self._lb_mgr.hotplug(device_token)
+
+        self._stratis_block_devices.expected(expected_stratis_devices)
+
+        settle()
+        self.assertEqual(len(pools_get()), number_of_pools)
+
+        for pn in pool_names:
+            self.assertEqual(len(pools_get(pn)), 1)
+
+        # After this test we need to clean-up in case we are running again
+        # from same test fixture
+        self._service.stop_remove_dm_tables()
+        self._lb_mgr.destroy_devices()
+        self._stratis_block_devices.expected([])
+
+    def test_combinations(self):
+        """
+        Test combinations of pools and number of devices in each pool
+        :return:
+        """
+        for pools_num in range(3):
+            for device_num in range(1, 4):
+                self._test_driver(pools_num, device_num)
+
+    def test_existing(self):
+        """
+        While we are adding devices back we will stop start the daemon to ensure
+        it can start with one or more devices present and complete when the
+        other devices come in later.
+        :return: None
+        """
+        self._test_driver(2, 4, True)
+
+    def _single_pool(self, num_devices, num_hotplugs=0):
+        """
+        Creates a single pool with specified number of devices.
+        :param num_devices: Number of devices to use for pool
+        :param num_hotplugs: Number of extra udev "add" event per devices
+        :return: None
+        """
+        self._service.start()
+        result = pools_get()
+        self.assertEqual(len(result), 0)
+
+        device_tokens = \
+           [self._lb_mgr.create_device() for _ in range(num_devices)]
+
+        # Ensure newly created block devices are in udev db.
+        settle()
+
+        self.assertEqual(len(device_tokens), num_devices)
+
+        pool_name = rs(5)
+        pool_create(pool_name, self._device_files(device_tokens))
+
+        self.assertEqual(len(pools_get()), 1)
+
+        self._service.stop_remove_dm_tables()
+
+        self._stratis_block_devices.expected(self._device_files(device_tokens))
+
+        self._service.start()
+
+        # Make sure on a start with all the devices the pool is there!
+        self.assertEqual(len(pools_get()), 1)
+
+        self._service.stop_remove_dm_tables()
+
+        # Remove the devices
+        for d in device_tokens:
+            self._lb_mgr.unplug(d)
+
+        self._stratis_block_devices.expected([])
+
+        self._service.start()
+
+        self.assertEqual(len(pools_get()), 0)
+
+        for d in device_tokens:
+            self._lb_mgr.hotplug(d)
+
+        settle()
+        self._stratis_block_devices.expected(self._device_files(device_tokens))
+
+        self.assertEqual(len(pools_get()), 1)
+
+        # Generate unnecessary hot plug adds
+        for _ in range(num_hotplugs):
+            for d in device_tokens:
+                self._lb_mgr.generate_udev_add_event(d)
+
+        settle()
+        self._stratis_block_devices.expected(self._device_files(device_tokens))
+
+        self.assertEqual(len(pools_get()), 1)
+
+    def test_simultaneous(self):
+        """
+        Create a single pool with 16 devices and simulate them being hotplug
+        at same time
+        :return: None
+        """
+        self._single_pool(16)
+
+    def test_spurious_adds(self):
+        """
+        Create a single pool with 16 devices and simulate them being hotplug
+        at same time and with spurious additional "add" udev events
+        :return: None
+        """
+        self._single_pool(16, 4)
+
+    def test_simple_udev_add(self):
+        """
+        Create a single pool with 1 device!
+        :return: None
+        """
+        self._single_pool(1, 1)
+
+    def test_duplicate_pool_name(self):
+        """
+        Create more than one pool with the same name, then dynamically fix it
+        :return: None
+        """
+        pool_name = rs(12)
+        pool_tokens = []
+        num_pools = 3
+
+        self._service.start()
+
+        # Create some pools with duplicate names
+        for i in range(num_pools):
+            this_pool = [self._lb_mgr.create_device() for _ in range(i + 1)]
+
+            # Ensure newly created block devices are in udev db.
+            settle()
+
+            pool_tokens.append(this_pool)
+            pool_create(pool_name, self._device_files(this_pool))
+            devices = self._device_files(this_pool)
+
+            self._service.stop_remove_dm_tables()
+
+            self._stratis_block_devices.expected(devices)
+
+            for d in this_pool:
+                self._lb_mgr.unplug(d)
+
+            self._stratis_block_devices.expected([])
+
+            self._service.start()
+
+        # Hot plug activate each pool in sequence and force a duplicate name
+        # error.
+        plugged = 0
+        devices_plugged = []
+        for i in range(num_pools):
+            for d in pool_tokens[i]:
+                self._lb_mgr.hotplug(d)
+                plugged += 1
+                devices_plugged.extend(self._device_files([d]))
+
+            settle()
+            self._stratis_block_devices.expected(devices_plugged)
+
+            # They all have the same name, so we should only get 1 pool!
+            self.assertEqual(len(pools_get()), 1)
+
+        # Lets dynamically rename the active pools and then hot-plug the other
+        # pools so that they all come up.  This simulates what an end user
+        # could do to fix this condition until we have CLI support to assist.
+        for _ in range(num_pools - 1):
+            current_pools = pools_get()
+
+            existing_pool_count = len(current_pools)
+
+            # Change the active pool name to be unique
+            for p in current_pools:
+                pool_name_set(p, rs(10))
+
+            # Generate synthetic add events
+            for add_index in range(num_pools):
+                for d in pool_tokens[add_index]:
+                    self._lb_mgr.generate_udev_add_event(d)
+
+            settle()
+            self._stratis_block_devices.expected(devices_plugged)
+            self.assertEqual(len(pools_get()), existing_pool_count + 1)
+
+        self.assertEqual(len(pools_get()), num_pools)

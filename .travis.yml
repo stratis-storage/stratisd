@@ -16,10 +16,10 @@ language: rust
 matrix:
     fast_finish: true
     allow_failures:
-        # Temporarily allow failure until Travis bug is fixed.
-        - env: TASK=build TARGET=i686-unknown-linux-gnu PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
         # Allow beta tasks to fail
         - rust: beta
+        # Allow Python related tasks to fail  
+        - python: "3.4"
     include:
         # Run rustfmt using the compiler currently recommended for development
         - rust: 1.31.0

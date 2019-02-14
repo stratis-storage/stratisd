@@ -48,17 +48,26 @@ def _udev_rule_present():
 def flight_check():
     """
     Make sure everything is in place for nbd devices to work with Stratis
-    :return: None, will assert if anything is missing
+    :return: Empty string on success, else report what's missing.
     """
     # Make sure module is loaded
-    assert _kernel_module_present()
+    rc = ""
+
+    if not _kernel_module_present():
+        rc += "NBD kernel module not loaded. "
 
     # Make sure udev rules knows about nbd devices
-    assert _udev_rule_present()
+    if not _udev_rule_present():
+        rc += "Udev rule 60-block.rules does not know about nbd* devices. "
 
     # Make sure we have nbd and nbd-kit executables
-    assert os.path.isfile(_NBDCLIENT_BIN)
-    assert os.path.isfile(_NBDKIT_BIN)
+    if not os.path.isfile(_NBDCLIENT_BIN):
+        rc += "Missing nbd-client executable. "
+
+    if not os.path.isfile(_NBDKIT_BIN):
+        rc += "Missing nbdkit executable."
+
+    return rc
 
 
 class NbdDevices(DeviceFile):

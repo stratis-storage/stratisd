@@ -75,11 +75,12 @@ class Daemon:
             if self._service.poll() is not None:
                 rc = self._service.returncode
                 self._service = None
-                raise Exception("Daemon unexpectedly exited with %s" % str(rc))
+                raise AssertionError(
+                    "Daemon unexpectedly exited with %s" % str(rc))
 
             # Ensure we actually were able to communicate with dbus
             if not service_up:
-                raise Exception("Daemon IPC did not become available")
+                raise AssertionError("Daemon IPC did not become available")
 
             assert process_exists("stratisd") is not None
 
@@ -89,13 +90,22 @@ class Daemon:
         :return: None (may assert)
         """
         if self._service:
-            assert process_exists("stratisd") is not None
+            present_at_entry = process_exists("stratisd")
 
             self._service.terminate()
             self._service.wait()
             self._service = None
 
-            assert process_exists("stratisd") is None
-
             remove_stratis_setup()
-            assert get_stratis_devices() == []
+
+            # Raise exception after all the cleanup is done so caller can
+            # continue clean up, yet still report errors.
+            if present_at_entry is None:
+                raise AssertionError(
+                    "Stratis daemon was not running as expected!")
+
+            if process_exists("stratisd") is not None:
+                raise AssertionError("Unable to stop daemon!")
+
+            if get_stratis_devices():
+                raise AssertionError("Stratis devices exist after clean-up")

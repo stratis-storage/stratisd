@@ -52,7 +52,7 @@ class DeviceFile(ABC):
 
         with open(backing_file, 'ab') as bd:
             # Sparse file, so go big (1 TiB)
-            bd.truncate(1024**4)
+            assert 1024**4 == bd.truncate(1024**4)
 
         device = self.attach(backing_file)
         token = uuid.uuid4()

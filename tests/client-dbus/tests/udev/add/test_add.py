@@ -15,16 +15,13 @@
 Used to test behavior of the udev device discovery mechanism.
 """
 
-import unittest
-
-from ..lib._daemon import Daemon
 from ..lib._loopback import LoopBackDevices
-from ..lib._stratis import pool_create, pools_get, pool_name_set, ipc_responding
-from ..lib._udev import StratisBlockDevices
+from ..lib._stratis import pool_create, pools_get, pool_name_set
+from ..lib._test_case_base import UdevBase
 from ..lib._utils import rs, settle
 
 
-class UdevAdd(unittest.TestCase):
+class UdevAdd(UdevBase):
     """
     Test udev add event support.
     """
@@ -35,28 +32,14 @@ class UdevAdd(unittest.TestCase):
         :param tokens: Loop back device list
         :return: List of loop back devices
         """
-        return [self._lb_mgr.device_file(t) for t in tokens]
+        return [self._blk_mgr.device_file(t) for t in tokens]
 
     def setUp(self):
         """
         Common needed things
         """
-        self._lb_mgr = LoopBackDevices()
-        self.addCleanup(self._clean_up)
-        self._service = Daemon(ipc_responding)
-        self._stratis_block_devices = StratisBlockDevices()
-
-    def _clean_up(self):
-        """
-        Cleans up the test environment
-        :return: None
-        """
-        self._service.stop_remove_dm_tables()
-
-        # Remove the loop back devices
-        if self._lb_mgr:
-            self._lb_mgr.destroy_all()
-            self._lb_mgr = None
+        super(UdevAdd, self).setUp()
+        self._blk_mgr = LoopBackDevices()
 
     # pylint: disable=too-many-locals
     def _test_driver(self,
@@ -87,7 +70,7 @@ class UdevAdd(unittest.TestCase):
         # Create the pools
         for _ in range(number_of_pools):
             device_tokens = \
-               [self._lb_mgr.create_device() for _ in range(dev_count_pool)]
+               [self._blk_mgr.create_device() for _ in range(dev_count_pool)]
 
             # Ensure newly created block devices are in udev db.
             settle()
@@ -112,7 +95,7 @@ class UdevAdd(unittest.TestCase):
         # Unplug all the devices
         for device_tokens in pool_data.values():
             for d in device_tokens:
-                self._lb_mgr.unplug(d)
+                self._blk_mgr.unplug(d)
 
         self._stratis_block_devices.expected([])
 
@@ -132,7 +115,7 @@ class UdevAdd(unittest.TestCase):
         running_devices = []
 
         for device_token in activation_sequence[:-number_of_pools]:
-            self._lb_mgr.hotplug(device_token)
+            self._blk_mgr.hotplug(device_token)
             running_count += 1
             running_devices.extend(self._device_files([device_token]))
 
@@ -148,7 +131,7 @@ class UdevAdd(unittest.TestCase):
 
         # Add the last device that makes each pool complete
         for device_token in activation_sequence[-number_of_pools:]:
-            self._lb_mgr.hotplug(device_token)
+            self._blk_mgr.hotplug(device_token)
 
         self._stratis_block_devices.expected(expected_stratis_devices)
 
@@ -161,7 +144,7 @@ class UdevAdd(unittest.TestCase):
         # After this test we need to clean-up in case we are running again
         # from same test fixture
         self._service.stop_remove_dm_tables()
-        self._lb_mgr.destroy_devices()
+        self._blk_mgr.destroy_devices()
         self._stratis_block_devices.expected([])
 
     def test_combinations(self):
@@ -194,7 +177,7 @@ class UdevAdd(unittest.TestCase):
         self.assertEqual(len(result), 0)
 
         device_tokens = \
-           [self._lb_mgr.create_device() for _ in range(num_devices)]
+           [self._blk_mgr.create_device() for _ in range(num_devices)]
 
         # Ensure newly created block devices are in udev db.
         settle()
@@ -219,7 +202,7 @@ class UdevAdd(unittest.TestCase):
 
         # Remove the devices
         for d in device_tokens:
-            self._lb_mgr.unplug(d)
+            self._blk_mgr.unplug(d)
 
         self._stratis_block_devices.expected([])
 
@@ -228,7 +211,7 @@ class UdevAdd(unittest.TestCase):
         self.assertEqual(len(pools_get()), 0)
 
         for d in device_tokens:
-            self._lb_mgr.hotplug(d)
+            self._blk_mgr.hotplug(d)
 
         settle()
         self._stratis_block_devices.expected(self._device_files(device_tokens))
@@ -238,7 +221,7 @@ class UdevAdd(unittest.TestCase):
         # Generate unnecessary hot plug adds
         for _ in range(num_hotplugs):
             for d in device_tokens:
-                self._lb_mgr.generate_udev_add_event(d)
+                self._blk_mgr.generate_udev_add_event(d)
 
         settle()
         self._stratis_block_devices.expected(self._device_files(device_tokens))
@@ -281,7 +264,7 @@ class UdevAdd(unittest.TestCase):
 
         # Create some pools with duplicate names
         for i in range(num_pools):
-            this_pool = [self._lb_mgr.create_device() for _ in range(i + 1)]
+            this_pool = [self._blk_mgr.create_device() for _ in range(i + 1)]
 
             # Ensure newly created block devices are in udev db.
             settle()
@@ -295,7 +278,7 @@ class UdevAdd(unittest.TestCase):
             self._stratis_block_devices.expected(devices)
 
             for d in this_pool:
-                self._lb_mgr.unplug(d)
+                self._blk_mgr.unplug(d)
 
             self._stratis_block_devices.expected([])
 
@@ -307,7 +290,7 @@ class UdevAdd(unittest.TestCase):
         devices_plugged = []
         for i in range(num_pools):
             for d in pool_tokens[i]:
-                self._lb_mgr.hotplug(d)
+                self._blk_mgr.hotplug(d)
                 plugged += 1
                 devices_plugged.extend(self._device_files([d]))
 
@@ -332,7 +315,7 @@ class UdevAdd(unittest.TestCase):
             # Generate synthetic add events
             for add_index in range(num_pools):
                 for d in pool_tokens[add_index]:
-                    self._lb_mgr.generate_udev_add_event(d)
+                    self._blk_mgr.generate_udev_add_event(d)
 
             settle()
             self._stratis_block_devices.expected(devices_plugged)

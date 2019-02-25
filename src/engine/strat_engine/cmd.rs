@@ -83,11 +83,17 @@ fn execute_cmd(cmd: &mut Command) -> StratisResult<()> {
             if result.status.success() {
                 Ok(())
             } else {
+                let exit_reason = result
+                    .status
+                    .code()
+                    .map_or(String::from("process terminated by signal"), |ec| {
+                        ec.to_string()
+                    });
                 let std_out_txt = String::from_utf8_lossy(&result.stdout);
                 let std_err_txt = String::from_utf8_lossy(&result.stderr);
                 let err_msg = format!(
-                    "Command failed: cmd: {:?}, stdout: {} stderr: {}",
-                    cmd, std_out_txt, std_err_txt
+                    "Command failed: cmd: {:?}, exit reason: {} stdout: {} stderr: {}",
+                    cmd, exit_reason, std_out_txt, std_err_txt
                 );
                 Err(StratisError::Error(err_msg))
             }

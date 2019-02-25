@@ -18,9 +18,6 @@ matrix:
     allow_failures:
         # Allow beta tasks to fail
         - rust: beta
-        # Allow Python lint to fail; dbus-python does not install easily on
-        # newer versons of Python.
-        - env: TASK=lint
     include:
         # Run rustfmt using the compiler currently recommended for development
         - rust: 1.31.0
@@ -66,6 +63,8 @@ matrix:
           sudo: required
         # Run pylint, Python linter, on any Python test code
         - language: python
+          # dbus-python does not compile on higher versions of python on
+          # trusty distribution of Ubuntu.
           python: "3.4"
           install: pip3 install -r tests/client-dbus/requirements.txt
           before_script:

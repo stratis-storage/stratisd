@@ -18,8 +18,9 @@ matrix:
     allow_failures:
         # Allow beta tasks to fail
         - rust: beta
-        # Allow Python related tasks to fail  
-        - python: "3.4"
+        # Allow Python lint to fail; dbus-python does not install easily on
+        # newer versons of Python.
+        - env: TASK=lint
     include:
         # Run rustfmt using the compiler currently recommended for development
         - rust: 1.31.0
@@ -72,7 +73,7 @@ matrix:
           env: TASK=lint
         # Format any Python test code using yapf
         - language: python
-          python: "3.4"
+          python: "3.6"
           install: pip3 install -r tests/client-dbus/requirements.txt
           before_script:
               - cd tests/client-dbus

@@ -267,6 +267,8 @@ impl StaticHeader {
     /// Return None if it's not a Stratis device.
     /// Return an error if the metadata seems to indicate that the device is
     /// a Stratis device, but no well-formed signature block could be read.
+    /// Return an error if neither sigblock location can be read.
+    /// Return an error if the sigblocks differ in some unaccountable way.
     /// Returns an error if a write intended to repair an ill-formed,
     /// unreadable, or stale signature block failed.
     fn setup<F>(f: &mut F) -> StratisResult<Option<StaticHeader>>
@@ -285,10 +287,18 @@ impl StaticHeader {
                             (Some(loc_1), Some(loc_2)) => {
                                 if loc_1 == loc_2 {
                                     Ok(Some(loc_1))
+                                } else if loc_1.initialization_time == loc_2.initialization_time {
+                                    // Inexplicable disagreement among static headers
+                                    let err_str = "Appeared to be a Stratis device, but signature blocks disagree.";
+                                    Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
                                 } else if loc_1.initialization_time > loc_2.initialization_time {
+                                    // If the first header block is newer, overwrite second with
+                                    // contents of first.
                                     BDA::write(f, &buf_loc_1, MetadataLocation::Second)?;
                                     Ok(Some(loc_1))
                                 } else {
+                                    // The second header block must be newer, so overwrite first
+                                    // with contents of second.
                                     BDA::write(f, &buf_loc_2, MetadataLocation::First)?;
                                     Ok(Some(loc_2))
                                 }
@@ -373,7 +383,8 @@ impl StaticHeader {
             }
             (Err(_), Err(_)) => {
                 // Unable to read the device at all.
-                Ok(None)
+                let err_str = "Unable to read data at sigblock locations.";
+                Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
             }
         }
     }

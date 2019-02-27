@@ -334,10 +334,10 @@ fn get_pool_total_physical_used(
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
     fn get_used((_, uuid, pool): (Name, Uuid, &Pool)) -> Result<String, MethodErr> {
-        let err_func = |_| {
+        let err_func = |err| {
             MethodErr::failed(&format!(
-                "no total physical size computed for pool with uuid {}",
-                uuid
+                "no total physical size computed for pool with uuid {}, cause: {}",
+                uuid, err
             ))
         };
 

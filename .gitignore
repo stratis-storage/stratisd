@@ -30,4 +30,4 @@ tests/test_config.json
 htmlcov
 
 # proptest
-proptest-regression
+proptest-regression*

@@ -100,6 +100,7 @@ def dump_stratis_signature_area(block_device):
             buf = h.read(SB_AREA_SIZE)
             print("Stratis superblock area for %s" % block_device)
             _hex_dump(buf)
+    # pylint: disable=broad-except
     except BaseException as e:
         print("Error reading up the super block area on %s reason: %s" %
               (block_device, str(e)))

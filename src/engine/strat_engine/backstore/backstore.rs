@@ -75,6 +75,60 @@ fn make_cache(
     )?)
 }
 
+/// Align sectors up to another value.
+fn align_up(value: Sectors, align: Sectors) -> Sectors {
+    match value % align {
+        Sectors(0) => value,
+        rem => value + (align - rem),
+    }
+}
+
+#[test]
+fn test_align_up() {
+    assert_eq!(align_up(Sectors(14), Sectors(16)), Sectors(16));
+    assert_eq!(align_up(Sectors(16), Sectors(16)), Sectors(16));
+    assert_eq!(align_up(Sectors(17), Sectors(16)), Sectors(32));
+    assert_eq!(align_up(Sectors(0), Sectors(16)), Sectors(0));
+
+    assert_eq!(align_up(Sectors(16), Sectors(17)), Sectors(17));
+    assert_eq!(align_up(Sectors(17), Sectors(17)), Sectors(17));
+    assert_eq!(align_up(Sectors(18), Sectors(17)), Sectors(34));
+    assert_eq!(align_up(Sectors(0), Sectors(17)), Sectors(0));
+}
+
+#[test]
+#[should_panic]
+fn test_align_up_div0() {
+    assert_eq!(align_up(Sectors(16), Sectors(0)), Sectors(0));
+}
+
+/// Align sectors down to another value.
+fn align_down(value: Sectors, align: Sectors) -> Sectors {
+    match value % align {
+        Sectors(0) => value,
+        rem => value - rem,
+    }
+}
+
+#[test]
+fn test_align_down() {
+    assert_eq!(align_down(Sectors(14), Sectors(16)), Sectors(0));
+    assert_eq!(align_down(Sectors(16), Sectors(16)), Sectors(16));
+    assert_eq!(align_down(Sectors(17), Sectors(16)), Sectors(16));
+    assert_eq!(align_down(Sectors(0), Sectors(16)), Sectors(0));
+
+    assert_eq!(align_down(Sectors(16), Sectors(17)), Sectors(0));
+    assert_eq!(align_down(Sectors(17), Sectors(17)), Sectors(17));
+    assert_eq!(align_down(Sectors(18), Sectors(17)), Sectors(17));
+    assert_eq!(align_down(Sectors(0), Sectors(17)), Sectors(0));
+}
+
+#[test]
+#[should_panic]
+fn test_align_down_div0() {
+    assert_eq!(align_down(Sectors(16), Sectors(0)), Sectors(0));
+}
+
 /// This structure can allocate additional space to the upper layer, but it
 /// cannot accept returned space. When it is extended to be able to accept
 /// returned space the allocation algorithm will have to be revised.
@@ -352,33 +406,48 @@ impl Backstore {
     ) -> StratisResult<Option<(Sectors, Sectors)>> {
         assert!(modulus != Sectors(0));
 
-        let mut internal_request = (request / modulus) * modulus;
+        let internal_request = align_up(request, modulus);
 
         if internal_request == Sectors(0) {
             return Ok(None);
         }
 
-        let available = self.available_in_cap();
-        if available < internal_request {
-            let mut allocated = false;
-            while !allocated && internal_request != Sectors(0) {
-                allocated = self.data_tier.alloc(internal_request - available);
-                let temp = internal_request / 2usize;
-                internal_request = (temp / modulus) * modulus;
-            }
-            if allocated {
-                self.extend_cap_device(pool_uuid)?;
-
-                let return_amt = cmp::min(request, self.available_in_cap());
-                let return_amt = (return_amt / modulus) * modulus;
-                self.next += return_amt;
-                Ok(Some((self.next - return_amt, return_amt)))
-            } else {
-                Ok(None)
-            }
-        } else {
+        if self.available_in_cap() >= internal_request {
             self.next += internal_request;
             Ok(Some((self.next - internal_request, internal_request)))
+        } else {
+            let available_in_data_tier = self.data_tier.usable_size() - self.data_tier.allocated();
+            let datatier_request = cmp::min(
+                internal_request - self.available_in_cap(),
+                available_in_data_tier,
+            );
+            if datatier_request == Sectors(0) {
+                // Sorry, datatier is full. Partial return solely from cap?
+                if self.available_in_cap() < modulus {
+                    Ok(None)
+                } else {
+                    let return_amt = align_down(self.available_in_cap(), modulus);
+                    self.next += return_amt;
+                    Ok(Some((self.next - return_amt, return_amt)))
+                }
+            } else {
+                // Should never fail if our math is right
+                assert_eq!(self.data_tier.alloc(datatier_request), true);
+
+                self.extend_cap_device(pool_uuid)?;
+
+                let return_amt = cmp::min(
+                    internal_request,
+                    align_down(self.available_in_cap(), modulus),
+                );
+
+                if return_amt == Sectors(0) {
+                    Ok(None)
+                } else {
+                    self.next += return_amt;
+                    Ok(Some((self.next - return_amt, return_amt)))
+                }
+            }
         }
     }
 
@@ -706,8 +775,7 @@ mod tests {
     }
 
     /// Create a backstore.
-    /// Request a amount that can not be allocated because the modulus is
-    /// bigger than the reqested amount.
+    /// Ensure modulus works properly.
     /// Request an impossibly large amount.
     /// Verify that the backstore is now all used up.
     fn test_request(paths: &[&Path]) {
@@ -716,10 +784,25 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
 
+        // 0-length requests return None
         assert!(backstore
-            .request(pool_uuid, Sectors(IEC::Ki), Sectors(IEC::Mi))
+            .request(pool_uuid, Sectors(0), Sectors(IEC::Mi))
             .unwrap()
             .is_none());
+
+        // nonzero requests rounded up to modulus
+        let (_start, length) = backstore
+            .request(pool_uuid, Sectors(IEC::Ki), Sectors(IEC::Mi))
+            .unwrap()
+            .unwrap();
+        assert_eq!(length, Sectors(IEC::Mi));
+
+        // nonzero requests rounded up to modulus
+        let (_start, length) = backstore
+            .request(pool_uuid, Sectors(6), Sectors(4))
+            .unwrap()
+            .unwrap();
+        assert_eq!(length, Sectors(8));
 
         let request = Sectors(IEC::Ei);
         let modulus = Sectors(IEC::Ki);

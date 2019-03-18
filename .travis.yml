@@ -20,10 +20,15 @@ matrix:
         - rust: beta
     include:
         # Run rustfmt using the compiler currently recommended for development
-        - rust: 1.31.0
+        - rust: 1.32.0
           before_script:
               - rustup component add rustfmt
           env: TASK=fmt-travis TARGET=x86_64-unknown-linux-gnu
+        # Run clippy, the Rust linter, using currently recommended compiler
+        - rust: 1.32.0
+          before_script:
+              - rustup component add clippy
+          env: TASK=clippy TARGET=x86_64-unknown-linux-gnu
         # Verify that source builds with standard defaults
         - rust: stable
           env: TASK=build TARGET=x86_64-unknown-linux-gnu
@@ -52,11 +57,6 @@ matrix:
         - rust: stable
           env: TASK=test-travis TARGET=x86_64-unknown-linux-gnu
           sudo: required
-        # Run clippy, the Rust linter, using currently recommended compiler
-        - rust: 1.31.0
-          before_script:
-              - rustup component add clippy
-          env: TASK=clippy TARGET=x86_64-unknown-linux-gnu
         # Run destructive tests on rust beta, in order to be good Rustaceans
         - rust: beta
           env: TASK=test-travis TARGET=x86_64-unknown-linux-gnu

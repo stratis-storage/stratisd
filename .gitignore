@@ -11,6 +11,7 @@ target
 .project 
 .settings
 .vscode
+.log
 tests/test_config.json
 # man pages
 *.8

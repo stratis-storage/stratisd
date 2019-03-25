@@ -4,20 +4,8 @@
 
 #![allow(clippy::doc_markdown)]
 
-extern crate devicemapper;
-extern crate libstratis;
 #[macro_use]
 extern crate log;
-extern crate chrono;
-extern crate clap;
-#[cfg(feature = "dbus_enabled")]
-extern crate dbus;
-extern crate env_logger;
-extern crate libc;
-extern crate libudev;
-extern crate nix;
-extern crate timerfd;
-extern crate uuid;
 
 use std::cell::RefCell;
 use std::env;
@@ -334,7 +322,7 @@ impl MaybeDbusSupport {
                     let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
                     get_engine_listener_list_mut().register_listener(event_handler);
                     // Register all the pools with dbus
-                    for (_, pool_uuid, mut pool) in engine.borrow_mut().pools_mut() {
+                    for (_, pool_uuid, pool) in engine.borrow_mut().pools_mut() {
                         handle.register_pool(pool_uuid, pool)
                     }
                     self.handle = Some(handle);

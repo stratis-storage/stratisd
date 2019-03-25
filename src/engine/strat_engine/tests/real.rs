@@ -2,13 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-extern crate either;
-
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::{cmp, panic};
 
-use self::either::Either;
+use either::Either;
 use serde_json::{from_reader, Value};
 use uuid::Uuid;
 

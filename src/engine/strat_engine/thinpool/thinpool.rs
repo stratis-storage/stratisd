@@ -5,7 +5,6 @@
 // Code to handle management of a pool's thinpool device.
 
 use std;
-use std::borrow::BorrowMut;
 use std::cmp::{max, min};
 use uuid::Uuid;
 
@@ -561,14 +560,14 @@ impl ThinPool {
             }
         }
 
-        let filesystems = self
-            .filesystems
-            .borrow_mut()
-            .iter_mut()
-            .map(|(_, _, fs)| fs.check())
-            .collect::<StratisResult<Vec<_>>>()?;
-
-        for fs_status in filesystems {
+        for (name, uuid, fs) in self.filesystems.iter_mut() {
+            let (fs_status, save_mdv) = fs.check()?;
+            if save_mdv {
+                if let Err(e) = self.mdv.save_fs(name, *uuid, &fs) {
+                    error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}", 
+                                uuid, name, pool_uuid, e);
+                }
+            }
             if let FilesystemStatus::Failed = fs_status {
                 // TODO: filesystem failed, how to recover?
             }

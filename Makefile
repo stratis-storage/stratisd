@@ -8,9 +8,6 @@ ${HOME}/.cargo/bin/cargo-tree:
 ${HOME}/.cargo/bin/cargo-outdated:
 	cargo install cargo-outdated
 
-${HOME}/.cargo/bin/cargo-script:
-	cargo install cargo-script
-
 tree: ${HOME}/.cargo/bin/cargo-tree
 	PATH=${HOME}/.cargo/bin:${PATH} cargo tree
 
@@ -60,9 +57,6 @@ stratisd.8.gz: stratisd.8
 
 clippy:
 	cargo clippy --all-targets --all-features -- -D warnings
-
-uml-graphs: ${HOME}/.cargo/bin/cargo-script
-	PATH=${HOME}/.cargo/bin:${PATH} cargo script scripts/uml_graphs.rs
 
 .PHONY:
 	build

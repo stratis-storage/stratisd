@@ -202,6 +202,7 @@ impl StratFilesystem {
     pub fn check(&mut self) -> StratisResult<(FilesystemStatus, bool)> {
         match self.thin_dev.status(get_dm())? {
             ThinStatus::Working(_) => {
+                let mut save_fs = false;
                 if let Some(mount_point) = self.mount_points()?.first() {
                     let (fs_total_bytes, fs_total_used_bytes) = fs_usage(&mount_point)?;
                     let free_bytes = fs_total_bytes - fs_total_used_bytes;
@@ -210,26 +211,28 @@ impl StratFilesystem {
                         table.length =
                             self.thin_dev.size() + self.extend_size(self.thin_dev.size());
                         if self.thin_dev.set_table(get_dm(), table).is_err() {
-                            return Ok((FilesystemStatus::ThinDevExtendFailed, false));
+                            return Ok((FilesystemStatus::ThinDevExtendFailed, save_fs));
+                        } else {
+                            save_fs = true;
                         }
                         if xfs_growfs(&mount_point).is_err() {
-                            return Ok((FilesystemStatus::XfsGrowFailed, true));
+                            return Ok((FilesystemStatus::XfsGrowFailed, save_fs));
                         }
                     }
                 }
                 // TODO: do anything when filesystem is not mounted?
                 // TODO: periodically kick off fstrim?
+                Ok((FilesystemStatus::Good, save_fs))
             }
             ThinStatus::Error => {
                 let error_msg = format!(
                     "Unable to get status for filesystem thin device {}",
                     self.thin_dev.device()
                 );
-                return Err(StratisError::Engine(ErrorEnum::Error, error_msg));
+                Err(StratisError::Engine(ErrorEnum::Error, error_msg))
             }
-            ThinStatus::Fail => return Ok((FilesystemStatus::Failed, false)),
+            ThinStatus::Fail => Ok((FilesystemStatus::Failed, false)),
         }
-        Ok((FilesystemStatus::Good, true))
     }
 
     /// Return an extend size for the thindev under the filesystem
@@ -297,6 +300,10 @@ impl StratFilesystem {
         }
 
         Ok(ret_vec)
+    }
+    #[cfg(test)]
+    pub fn thindev_size(&self) -> Sectors {
+        self.thin_dev.size()
     }
 }
 

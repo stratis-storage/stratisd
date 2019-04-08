@@ -1658,10 +1658,12 @@ mod tests {
 
     /// Verify that the logical space allocated to a filesystem is expanded when
     /// the number of sectors written to the filesystem causes the free space to
-    /// dip below the FILESYSTEM_LOWATER mark. Verify that the space has been
-    /// expanded by calling filesystem.check() then looking at the total space
-    /// compared to the original size.
-    fn test_xfs_expand(paths: &[&Path]) {
+    /// dip below the FILESYSTEM_LOWATER mark. Verify that the filesystem space has
+    /// been expanded by calling pool.check() then looking at the total space used
+    /// compared to the original size.  Verify that the MDV has been updated
+    /// by tearing down/reconstructing the pool and verify the thindev size is updated.
+    fn test_thindev_expand(paths: &[&Path]) {
+        let start_thindev_size: Sectors;
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
@@ -1683,18 +1685,16 @@ mod tests {
         let fs_uuid = pool
             .create_filesystem(pool_uuid, pool_name, fs_name, Some(fs_size))
             .unwrap();
+        let tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
 
-        // Braces to ensure f is closed before destroy and the borrow of
-        // pool is complete
+        // Braces to ensure the mutable borrow of pool is limited
         {
             let filesystem = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap().1;
-            // Write 2 MiB of data. The filesystem's free space is now 1 MiB
-            // below FILESYSTEM_LOWATER.
-            let write_size = Bytes(IEC::Mi * 2).sectors();
-            let tmp_dir = tempfile::Builder::new()
-                .prefix("stratis_testing")
-                .tempdir()
-                .unwrap();
+            start_thindev_size = filesystem.thindev_size();
+
             mount(
                 Some(&filesystem.devnode()),
                 tmp_dir.path(),
@@ -1703,38 +1703,53 @@ mod tests {
                 None as Option<&str>,
             )
             .unwrap();
-            let buf = &[1u8; SECTOR_SIZE];
-            for i in 0..*write_size {
-                let file_path = tmp_dir.path().join(format!("stratis_test{}.txt", i));
-                let mut f = OpenOptions::new()
-                    .create(true)
-                    .write(true)
-                    .open(file_path)
-                    .unwrap();
-                if f.write_all(buf).is_err() {
-                    break;
-                }
-            }
-            let (orig_fs_total_bytes, _) = fs_usage(&tmp_dir.path()).unwrap();
-            // Simulate handling a DM event by running a filesystem check.
-            filesystem.check().unwrap();
-            let (fs_total_bytes, _) = fs_usage(&tmp_dir.path()).unwrap();
-            assert!(fs_total_bytes > orig_fs_total_bytes);
-            umount(tmp_dir.path()).unwrap();
         }
+        // Write 2 MiB of data. The filesystem's free space is now 1 MiB
+        // below FILESYSTEM_LOWATER.
+        let write_size = Bytes(IEC::Mi * 2).sectors();
+        let buf = &[1u8; SECTOR_SIZE];
+        for i in 0..*write_size {
+            let file_path = tmp_dir.path().join(format!("stratis_test{}.txt", i));
+            let mut f = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .open(file_path)
+                .unwrap();
+            if f.write_all(buf).is_err() {
+                break;
+            }
+        }
+        let (orig_fs_total_bytes, _) = fs_usage(&tmp_dir.path()).unwrap();
+        // Simulate handling a DM event by running a pool check.
+        pool.check(pool_uuid, &mut backstore).unwrap();
+        let (fs_total_bytes, _) = fs_usage(&tmp_dir.path()).unwrap();
+        assert!(fs_total_bytes > orig_fs_total_bytes);
+        umount(tmp_dir.path()).unwrap();
+
+        // Teardown and reconstruct the pool to verify the MDV has the updated size
+        let flexdevs: FlexDevsSave = pool.record();
+        let thinpoolsave: ThinPoolDevSave = pool.record();
+        pool.teardown().unwrap();
+        let mut pool = ThinPool::setup(pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
+        let filesystem = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap().1;
+        let thindev_size = filesystem.thindev_size();
+        assert!(thindev_size > start_thindev_size)
     }
 
     #[test]
-    pub fn loop_test_xfs_expand() {
+    pub fn loop_test_thindev_expand() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(1, 3, None),
-            test_xfs_expand,
+            test_thindev_expand,
         );
     }
 
     #[test]
-    pub fn real_test_xfs_expand() {
-        real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_xfs_expand);
+    pub fn real_test_thindev_expand() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(1, None, None),
+            test_thindev_expand,
+        );
     }
 
     /// Just suspend and resume the device and make sure it doesn't crash.

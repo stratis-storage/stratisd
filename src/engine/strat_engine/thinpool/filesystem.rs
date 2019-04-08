@@ -299,6 +299,10 @@ impl StratFilesystem {
 
         Ok(ret_vec)
     }
+    #[cfg(test)]
+    pub fn thindev_size(&self) -> Sectors {
+        self.thin_dev.size()
+    }
 }
 
 impl Filesystem for StratFilesystem {

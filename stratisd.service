@@ -5,6 +5,7 @@ Before=local-fs-pre.target
 DefaultDependencies=no
 
 [Service]
+Environment="RUST_BACKTRACE=1"
 ExecStart=/usr/libexec/stratisd --debug
 KillSignal=SIGINT
 Restart=on-abort

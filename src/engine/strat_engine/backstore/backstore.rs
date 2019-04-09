@@ -651,7 +651,8 @@ mod tests {
                 assert_eq!(usage.total_meta, meta_size.metablocks());
                 assert!(usage.total_cache > DataBlocks(0));
             }
-            CacheDevStatus::Fail => panic!("cache status should succeed"),
+            CacheDevStatus::Error => panic!("cache status could not be obtained"),
+            CacheDevStatus::Fail => panic!("cache is in a failed state"),
         }
 
         let data_uuids = backstore.add_datadevs(pool_uuid, datadevpaths).unwrap();
@@ -675,7 +676,8 @@ mod tests {
                 assert_eq!(usage.total_meta, meta_size.metablocks());
                 assert!(usage.total_cache > DataBlocks(0));
             }
-            CacheDevStatus::Fail => panic!("cache status should succeed"),
+            CacheDevStatus::Error => panic!("cache status could not be obtained"),
+            CacheDevStatus::Fail => panic!("cache is in a failed state"),
         }
 
         backstore.destroy().unwrap();

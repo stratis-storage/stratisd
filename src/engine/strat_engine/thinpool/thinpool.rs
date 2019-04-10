@@ -545,6 +545,14 @@ impl ThinPool {
                 self.resume()?;
                 self.set_extend_state(data_extend_failed, meta_extend_failed);
             }
+            ThinPoolStatus::Error => {
+                // Do not set the state, because it is unknown.
+                warn!(
+                    "Devicemapper could not obtain the status for devicemapper thinpool device {} belonging to pool with UUID {}",
+                    self.thin_pool.device(),
+                    pool_uuid
+                );
+            }
             ThinPoolStatus::Fail => {
                 error!("Thinpool status is fail -> Failed");
                 self.set_state(PoolState::Failed);
@@ -794,7 +802,14 @@ impl ThinPool {
     pub fn total_physical_used(&self) -> StratisResult<Sectors> {
         let data_dev_used = match self.thin_pool.status(get_dm())? {
             ThinPoolStatus::Working(ref status) => datablocks_to_sectors(status.usage.used_data),
-            _ => {
+            ThinPoolStatus::Error => {
+                let err_msg = format!(
+                    "Devicemapper could not obtain status for devicemapper thin pool device {}",
+                    self.thin_pool.device(),
+                );
+                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+            }
+            ThinPoolStatus::Fail => {
                 let err_msg = "thin pool failed, could not obtain usage";
                 return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
             }
@@ -1307,6 +1322,7 @@ mod tests {
                             break;
                         }
                     }
+                    ThinPoolStatus::Error => panic!("Could not obtain status for thinpool."),
                     ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working."),
                 }
             }
@@ -1319,6 +1335,7 @@ mod tests {
                     "Expected full pool"
                 );
             }
+            ThinPoolStatus::Error => panic!("Could not obtain status for thinpool."),
             ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working/full."),
         };
 
@@ -1341,6 +1358,7 @@ mod tests {
                     "Expected pool to be restored to good state"
                 );
             }
+            ThinPoolStatus::Error => panic!("Could not obtain status for thinpool."),
             ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail.  Expected working/good."),
         };
     }

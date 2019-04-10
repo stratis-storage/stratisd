@@ -7,7 +7,7 @@ authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.com>"]
 dbus = {version = "0.6.4", optional = true}
 clap = "2"
 nix = "0.13"
-devicemapper = "0.26.0"
+devicemapper = "0.27.0"
 crc = "1"
 byteorder = "1"
 chrono = "0.4"

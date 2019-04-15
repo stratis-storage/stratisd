@@ -7,6 +7,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::{File, OpenOptions};
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::Path;
 
 use chrono::{DateTime, Duration, Utc};
@@ -399,7 +400,11 @@ fn initialize(
     /// its signature as determined by calling device::identify(),
     /// and an open File handle, all of which are needed later.
     fn dev_info(devnode: &Path) -> StratisResult<(&Path, Bytes, DevOwnership, File)> {
-        let f = OpenOptions::new().read(true).write(true).open(&devnode)?;
+        let f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .custom_flags(libc::O_SYNC)
+            .open(&devnode)?;
         let dev_size = blkdev_size(&f)?;
         let ownership = identify(devnode)?;
 

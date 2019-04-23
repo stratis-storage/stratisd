@@ -20,7 +20,6 @@ log = "0.4"
 env_logger="0.5"
 libc = "0.2.47"
 libmount = "0.1.10"
-error-chain = "0.12"
 libudev = "0.2.0"
 lazy_static = "1.0.0"
 timerfd = "1.0.0"
@@ -30,6 +29,7 @@ version = "0.7"
 features = ["serde", "v4"]
 
 [dev-dependencies]
+error-chain = "0.12"
 loopdev = "0.2"
 either = "1.1.0"
 proptest = "0.8.0"

@@ -633,7 +633,13 @@ impl ThinPool {
         }
 
         let overall_used_pct = used_pct(*used, *used + *available);
-        info!("Data tier percent used: {}", overall_used_pct);
+        debug!("Data tier percent used: {}", overall_used_pct);
+        if overall_used_pct >= 90 {
+            info!(
+                "Percent used has reached a critical threshold level; data tier percent used: {}",
+                overall_used_pct
+            );
+        }
 
         let new_state = if overall_used_pct < SPACE_WARN_PCT {
             FreeSpaceState::Good

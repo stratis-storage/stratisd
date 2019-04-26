@@ -189,7 +189,7 @@ impl BlockDevMgr {
     }
 
     /// Get a function that maps UUIDs to Devices.
-    pub fn uuid_to_devno(&self) -> Box<Fn(DevUuid) -> Option<Device>> {
+    pub fn uuid_to_devno(&self) -> Box<dyn Fn(DevUuid) -> Option<Device>> {
         let uuid_map: HashMap<DevUuid, Device> = self
             .block_devs
             .iter()

@@ -24,7 +24,7 @@ pub fn create_dbus_blockdev<'a>(
     dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
     uuid: Uuid,
-    blockdev: &mut BlockDev,
+    blockdev: &mut dyn BlockDev,
 ) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
@@ -162,7 +162,7 @@ fn get_blockdev_property<F, R>(
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn(BlockDevTier, &BlockDev) -> Result<R, MethodErr>,
+    F: Fn(BlockDevTier, &dyn BlockDev) -> Result<R, MethodErr>,
     R: dbus::arg::Append,
 {
     let dbus_context = p.tree.get_data();

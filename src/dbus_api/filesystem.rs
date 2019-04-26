@@ -25,7 +25,7 @@ pub fn create_dbus_filesystem<'a>(
     dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
     uuid: Uuid,
-    filesystem: &mut Filesystem,
+    filesystem: &mut dyn Filesystem,
 ) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
@@ -148,7 +148,7 @@ fn get_filesystem_property<F, R>(
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn((Name, Name, &Filesystem)) -> Result<R, MethodErr>,
+    F: Fn((Name, Name, &dyn Filesystem)) -> Result<R, MethodErr>,
     R: dbus::arg::Append,
 {
     let dbus_context = p.tree.get_data();

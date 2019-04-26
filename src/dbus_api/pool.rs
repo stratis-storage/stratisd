@@ -300,7 +300,7 @@ fn get_pool_property<F, R>(
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn((Name, Uuid, &Pool)) -> Result<R, MethodErr>,
+    F: Fn((Name, Uuid, &dyn Pool)) -> Result<R, MethodErr>,
     R: dbus::arg::Append,
 {
     let dbus_context = p.tree.get_data();
@@ -333,7 +333,7 @@ fn get_pool_total_physical_used(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    fn get_used((_, uuid, pool): (Name, Uuid, &Pool)) -> Result<String, MethodErr> {
+    fn get_used((_, uuid, pool): (Name, Uuid, &dyn Pool)) -> Result<String, MethodErr> {
         let err_func = |_| {
             MethodErr::failed(&format!(
                 "no total physical size computed for pool with uuid {}",
@@ -377,7 +377,7 @@ pub fn create_dbus_pool<'a>(
     dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
     uuid: Uuid,
-    pool: &mut Pool,
+    pool: &mut dyn Pool,
 ) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 

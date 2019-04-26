@@ -849,17 +849,17 @@ impl ThinPool {
         !self.filesystems.is_empty()
     }
 
-    pub fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)> {
+    pub fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {
         self.filesystems
             .iter()
-            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &Filesystem))
+            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &dyn Filesystem))
             .collect()
     }
 
-    pub fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut Filesystem)> {
+    pub fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut dyn Filesystem)> {
         self.filesystems
             .iter_mut()
-            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &mut Filesystem))
+            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &mut dyn Filesystem))
             .collect()
     }
 
@@ -899,7 +899,7 @@ impl ThinPool {
         pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<(FilesystemUuid, &mut Filesystem)> {
+    ) -> StratisResult<(FilesystemUuid, &mut dyn Filesystem)> {
         let snapshot_fs_uuid = Uuid::new_v4();
         let (snapshot_dm_name, snapshot_dm_uuid) =
             format_thin_ids(pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));

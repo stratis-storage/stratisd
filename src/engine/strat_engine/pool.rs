@@ -365,7 +365,7 @@ impl Pool for StratPool {
         pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<(FilesystemUuid, &mut Filesystem)> {
+    ) -> StratisResult<(FilesystemUuid, &mut dyn Filesystem)> {
         validate_name(snapshot_name)?;
 
         if self
@@ -393,51 +393,51 @@ impl Pool for StratPool {
             .and_then(|v| Ok(v + self.backstore.datatier_metadata_size()))
     }
 
-    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)> {
+    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {
         self.thin_pool.filesystems()
     }
 
-    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut Filesystem)> {
+    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut dyn Filesystem)> {
         self.thin_pool.filesystems_mut()
     }
 
-    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &Filesystem)> {
+    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &dyn Filesystem)> {
         self.thin_pool
             .get_filesystem_by_uuid(uuid)
-            .map(|(name, fs)| (name, fs as &Filesystem))
+            .map(|(name, fs)| (name, fs as &dyn Filesystem))
     }
 
-    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<(Name, &mut Filesystem)> {
+    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<(Name, &mut dyn Filesystem)> {
         self.thin_pool
             .get_mut_filesystem_by_uuid(uuid)
-            .map(|(name, fs)| (name, fs as &mut Filesystem))
+            .map(|(name, fs)| (name, fs as &mut dyn Filesystem))
     }
 
-    fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
+    fn blockdevs(&self) -> Vec<(DevUuid, &dyn BlockDev)> {
         self.backstore
             .blockdevs()
             .iter()
-            .map(|&(u, b)| (u, b as &BlockDev))
+            .map(|&(u, b)| (u, b as &dyn BlockDev))
             .collect()
     }
 
-    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut BlockDev)> {
+    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut dyn BlockDev)> {
         self.backstore
             .blockdevs_mut()
             .into_iter()
-            .map(|(u, b)| (u, b as &mut BlockDev))
+            .map(|(u, b)| (u, b as &mut dyn BlockDev))
             .collect()
     }
 
-    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)> {
         self.get_strat_blockdev(uuid)
-            .map(|(t, b)| (t, b as &BlockDev))
+            .map(|(t, b)| (t, b as &dyn BlockDev))
     }
 
-    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)> {
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut dyn BlockDev)> {
         self.backstore
             .get_mut_blockdev_by_uuid(uuid)
-            .map(|(t, b)| (t, b as &mut BlockDev))
+            .map(|(t, b)| (t, b as &mut dyn BlockDev))
     }
 
     fn set_blockdev_user_info(

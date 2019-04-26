@@ -56,7 +56,7 @@ fn print_err(err: &StratisError) {
 }
 
 /// Log the engine state in a formatted way.
-fn log_engine_state(engine: &Engine) {
+fn log_engine_state(engine: &dyn Engine) {
     debug!("Engine state: \n{:#?}", engine);
 }
 
@@ -286,13 +286,13 @@ impl MaybeDbusSupport {
 
     fn process(
         &mut self,
-        _engine: &Rc<RefCell<Engine>>,
+        _engine: &Rc<RefCell<dyn Engine>>,
         _fds: &mut Vec<libc::pollfd>,
         _dbus_client_index_start: usize,
     ) {
     }
 
-    fn register_pool(&mut self, _pool_uuid: Uuid, _pool: &mut Pool) {}
+    fn register_pool(&mut self, _pool_uuid: Uuid, _pool: &mut dyn Pool) {}
 
     fn poll_timeout(&self) -> i32 {
         // Non-DBus timeout is infinite
@@ -310,7 +310,7 @@ impl MaybeDbusSupport {
     /// Return the connection, if made or already existing, otherwise, None.
     fn setup_connection(
         &mut self,
-        engine: &Rc<RefCell<Engine>>,
+        engine: &Rc<RefCell<dyn Engine>>,
     ) -> Option<&mut DbusConnectionData> {
         if self.handle.is_none() {
             match libstratis::dbus_api::DbusConnectionData::connect(Rc::clone(&engine)) {
@@ -335,7 +335,7 @@ impl MaybeDbusSupport {
     /// Handle any client dbus requests.
     fn process(
         &mut self,
-        engine: &Rc<RefCell<Engine>>,
+        engine: &Rc<RefCell<dyn Engine>>,
         fds: &mut Vec<libc::pollfd>,
         dbus_client_index_start: usize,
     ) {
@@ -356,7 +356,7 @@ impl MaybeDbusSupport {
         }
     }
 
-    fn register_pool(&mut self, pool_uuid: Uuid, pool: &mut Pool) {
+    fn register_pool(&mut self, pool_uuid: Uuid, pool: &mut dyn Pool) {
         if let Some(h) = self.handle.as_mut() {
             h.register_pool(pool_uuid, pool)
         }
@@ -394,7 +394,7 @@ impl<'a> UdevMonitor<'a> {
     /// Handle udev events.
     /// Check if a pool can be constructed and update engine and D-Bus layer
     /// data structures if so.
-    fn handle_events(&mut self, engine: &mut Engine, dbus_support: &mut MaybeDbusSupport) {
+    fn handle_events(&mut self, engine: &mut dyn Engine, dbus_support: &mut MaybeDbusSupport) {
         while let Some(event) = self.socket.receive_event() {
             if event.event_type() == libudev::EventType::Add
                 || event.event_type() == libudev::EventType::Change
@@ -488,7 +488,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     let context = libudev::Context::new()?;
     let mut udev_monitor = UdevMonitor::create(&context)?;
 
-    let engine: Rc<RefCell<Engine>> = {
+    let engine: Rc<RefCell<dyn Engine>> = {
         if matches.is_present("sim") {
             info!("Using SimEngine");
             Rc::new(RefCell::new(SimEngine::default()))

@@ -1,4 +1,4 @@
-DENY = "-D warnings -D future-incompatible -D unused -D ellipsis-inclusive-range-patterns"
+DENY = "-D warnings -D future-incompatible -D unused -D bare-trait-objects -D ellipsis-inclusive-range-patterns"
 
 TARGET ?= "x86_64-unknown-linux-gnu"
 

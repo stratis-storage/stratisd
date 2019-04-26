@@ -178,7 +178,7 @@ impl Pool for SimPool {
         _pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<(FilesystemUuid, &mut Filesystem)> {
+    ) -> StratisResult<(FilesystemUuid, &mut dyn Filesystem)> {
         if self.filesystems.contains_name(snapshot_name) {
             return Err(StratisError::Engine(
                 ErrorEnum::AlreadyExists,
@@ -217,62 +217,62 @@ impl Pool for SimPool {
         Ok(Sectors(0))
     }
 
-    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)> {
+    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {
         self.filesystems
             .iter()
-            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &Filesystem))
+            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &dyn Filesystem))
             .collect()
     }
 
-    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut Filesystem)> {
+    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut dyn Filesystem)> {
         self.filesystems
             .iter_mut()
-            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &mut Filesystem))
+            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &mut dyn Filesystem))
             .collect()
     }
 
-    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &Filesystem)> {
+    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &dyn Filesystem)> {
         self.filesystems
             .get_by_uuid(uuid)
-            .map(|(name, p)| (name, p as &Filesystem))
+            .map(|(name, p)| (name, p as &dyn Filesystem))
     }
 
-    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<(Name, &mut Filesystem)> {
+    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<(Name, &mut dyn Filesystem)> {
         self.filesystems
             .get_mut_by_uuid(uuid)
-            .map(|(name, p)| (name, p as &mut Filesystem))
+            .map(|(name, p)| (name, p as &mut dyn Filesystem))
     }
 
-    fn blockdevs(&self) -> Vec<(DevUuid, &BlockDev)> {
+    fn blockdevs(&self) -> Vec<(DevUuid, &dyn BlockDev)> {
         self.block_devs
             .iter()
             .chain(self.cache_devs.iter())
-            .map(|(uuid, bd)| (*uuid, bd as &BlockDev))
+            .map(|(uuid, bd)| (*uuid, bd as &dyn BlockDev))
             .collect()
     }
 
-    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut BlockDev)> {
+    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut dyn BlockDev)> {
         self.block_devs
             .iter_mut()
             .chain(self.cache_devs.iter_mut())
-            .map(|(uuid, b)| (*uuid, b as &mut BlockDev))
+            .map(|(uuid, b)| (*uuid, b as &mut dyn BlockDev))
             .collect()
     }
 
-    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)> {
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)> {
         self.block_devs
             .get(&uuid)
-            .and_then(|bd| Some((BlockDevTier::Data, bd as &BlockDev)))
+            .and_then(|bd| Some((BlockDevTier::Data, bd as &dyn BlockDev)))
             .or_else(move || {
                 self.cache_devs
                     .get(&uuid)
-                    .and_then(|bd| Some((BlockDevTier::Cache, bd as &BlockDev)))
+                    .and_then(|bd| Some((BlockDevTier::Cache, bd as &dyn BlockDev)))
             })
     }
 
-    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)> {
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut dyn BlockDev)> {
         self.get_mut_blockdev_internal(uuid)
-            .map(|(tier, bd)| (tier, bd as &mut BlockDev))
+            .map(|(tier, bd)| (tier, bd as &mut dyn BlockDev))
     }
 
     fn set_blockdev_user_info(

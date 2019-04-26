@@ -48,7 +48,7 @@ pub trait EngineListener: Debug {
 
 #[derive(Debug)]
 pub struct EngineListenerList {
-    listeners: Vec<Box<EngineListener>>,
+    listeners: Vec<Box<dyn EngineListener>>,
 }
 
 impl EngineListenerList {
@@ -60,7 +60,7 @@ impl EngineListenerList {
     }
 
     /// Add a listener.
-    pub fn register_listener(&mut self, listener: Box<EngineListener>) {
+    pub fn register_listener(&mut self, listener: Box<dyn EngineListener>) {
         self.listeners.push(listener);
     }
 

@@ -62,12 +62,12 @@ impl OPContext {
 #[derive(Debug, Clone)]
 pub struct DbusContext {
     pub(super) next_index: Rc<Cell<u64>>,
-    pub(super) engine: Rc<RefCell<Engine>>,
+    pub(super) engine: Rc<RefCell<dyn Engine>>,
     pub(super) actions: Rc<RefCell<ActionQueue>>,
 }
 
 impl DbusContext {
-    pub fn new(engine: Rc<RefCell<Engine>>) -> DbusContext {
+    pub fn new(engine: Rc<RefCell<dyn Engine>>) -> DbusContext {
         DbusContext {
             actions: Rc::new(RefCell::new(ActionQueue::default())),
             engine,

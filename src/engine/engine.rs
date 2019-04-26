@@ -125,7 +125,7 @@ pub trait Pool: Debug {
         pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<(FilesystemUuid, &mut Filesystem)>;
+    ) -> StratisResult<(FilesystemUuid, &mut dyn Filesystem)>;
 
     /// The total number of Sectors belonging to this pool.
     /// There are no exclusions, so this number includes overhead sectors
@@ -141,29 +141,29 @@ pub trait Pool: Debug {
     fn total_physical_used(&self) -> StratisResult<Sectors>;
 
     /// Get all the filesystems belonging to this pool.
-    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Filesystem)>;
+    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)>;
 
     /// Get all the filesystems belonging to this pool as mutable references.
-    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut Filesystem)>;
+    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut dyn Filesystem)>;
 
     /// Get the filesystem in this pool with this UUID.
-    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &Filesystem)>;
+    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &dyn Filesystem)>;
 
     /// Get the mutable filesystem in this pool with this UUID.
-    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<(Name, &mut Filesystem)>;
+    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<(Name, &mut dyn Filesystem)>;
 
     /// Get _all_ the blockdevs that belong to this pool.
     /// All really means all. For example, it does not exclude cache blockdevs.
-    fn blockdevs(&self) -> Vec<(Uuid, &BlockDev)>;
+    fn blockdevs(&self) -> Vec<(Uuid, &dyn BlockDev)>;
 
     /// Get all the blockdevs belonging to this pool as mutable references.
-    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut BlockDev)>;
+    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut dyn BlockDev)>;
 
     /// Get the blockdev in this pool with this UUID.
-    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &BlockDev)>;
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)>;
 
     /// Get a mutable reference to the blockdev in this pool with this UUID.
-    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut BlockDev)>;
+    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut dyn BlockDev)>;
 
     /// Set the user-settable string associated with the blockdev specified
     /// by the uuid.
@@ -223,24 +223,24 @@ pub trait Engine: Debug {
     fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction>;
 
     /// Find the pool designated by uuid.
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &Pool)>;
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)>;
 
     /// Get a mutable referent to the pool designated by uuid.
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut Pool)>;
+    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.
     fn configure_simulator(&mut self, denominator: u32) -> StratisResult<()>;
 
     /// Get all pools belonging to this engine.
-    fn pools(&self) -> Vec<(Name, PoolUuid, &Pool)>;
+    fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)>;
 
     /// Get mutable references to all pools belonging to this engine.
-    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut Pool)>;
+    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)>;
 
     /// If the engine would like to include an event in the message loop, it
     /// may return an Eventable from this method.
-    fn get_eventable(&self) -> Option<&'static Eventable>;
+    fn get_eventable(&self) -> Option<&'static dyn Eventable>;
 
     /// Notify the engine that an event has occurred on the Eventable.
     fn evented(&mut self) -> StratisResult<()>;

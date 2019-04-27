@@ -6,12 +6,13 @@
 
 use std;
 use std::cmp::{max, min};
+use std::fmt::Debug;
 use uuid::Uuid;
 
 use devicemapper::{
     device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams, LinearDev,
     LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine, ThinDevId,
-    ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
+    ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, ThinPoolUsage, IEC,
 };
 
 use crate::engine::{
@@ -123,42 +124,129 @@ fn coalesce_segs(
     segments
 }
 
-/// Calculate new low water based on the current thinpool data device size and
-/// the number of free sectors in the backstore (free in data tier; or
-/// allocated *to* the backstore cap device, but not yet allocated *from* the
-/// cap device.)
-/// Lowater needed for three things:
-/// 1. Extend data device (currently not applicable due to greedy allocation)
-/// 2. Get an event when pool exceeds SPACE_CRIT_PCT
-/// 3. Get an event when usage has increased enough that we might need to
-///    extend a filesystem
-fn calc_lowater(used: DataBlocks, data_dev_size: DataBlocks, available: DataBlocks) -> DataBlocks {
-    let total = data_dev_size + available;
+trait ExtensionPolicy: Debug {
+    fn extension_lowater(
+        &self,
+        used: DataBlocks,
+        data_dev_size: DataBlocks,
+        available: DataBlocks,
+    ) -> Option<DataBlocks>;
 
-    // Calculate #2. Calculated against total size.
+    fn meta_extend_amount(&self, usage: &ThinPoolUsage, backstore: &Backstore) -> MetaBlocks;
+
+    fn data_extend_amount(&self, usage: &ThinPoolUsage, backstore: &Backstore) -> DataBlocks;
+}
+
+#[cfg(not(feature = "incremental_policy"))]
+#[derive(Debug)]
+struct GreedyExtensionPolicy {}
+
+#[cfg(not(feature = "incremental_policy"))]
+impl GreedyExtensionPolicy {
+    fn new() -> GreedyExtensionPolicy {
+        GreedyExtensionPolicy {}
+    }
+}
+
+#[cfg(not(feature = "incremental_policy"))]
+impl ExtensionPolicy for GreedyExtensionPolicy {
+    fn extension_lowater(
+        &self,
+        _used: DataBlocks,
+        _data_dev_size: DataBlocks,
+        _available: DataBlocks,
+    ) -> Option<DataBlocks> {
+        None // We allocated everything, so no extension events are needed
+    }
+
+    fn meta_extend_amount(&self, usage: &ThinPoolUsage, backstore: &Backstore) -> MetaBlocks {
+        // Ensure meta subdevice is approx. 1/1000th of total usable size
+        let target_meta_size = (backstore.datatier_usable_size() / 1000u16).metablocks();
+        if usage.total_meta < target_meta_size {
+            target_meta_size - usage.total_meta
+        } else {
+            MetaBlocks(0)
+        }
+    }
+    fn data_extend_amount(&self, _usage: &ThinPoolUsage, backstore: &Backstore) -> DataBlocks {
+        // Expand data blocks to fill all remaining space
+        // Note: Assumes this is called after meta_extend_amount(), so it's
+        // safe to just grab everything.
+        sectors_to_datablocks(backstore.available_in_backstore())
+    }
+}
+
+#[cfg(feature = "incremental_policy")]
+#[derive(Debug)]
+struct IncrementalExtensionPolicy {}
+
+#[cfg(feature = "incremental_policy")]
+impl IncrementalExtensionPolicy {
+    fn new() -> IncrementalExtensionPolicy {
+        IncrementalExtensionPolicy {}
+    }
+}
+
+#[cfg(feature = "incremental_policy")]
+impl ExtensionPolicy for IncrementalExtensionPolicy {
+    fn extension_lowater(
+        &self,
+        _used: DataBlocks,
+        _data_dev_size: DataBlocks,
+        _available: DataBlocks,
+    ) -> Option<DataBlocks> {
+        Some(DATA_LOWATER)
+    }
+
+    fn meta_extend_amount(&self, usage: &ThinPoolUsage, _backstore: &Backstore) -> MetaBlocks {
+        // Extend by the current size, to double the meta dev's size
+        usage.total_meta
+    }
+
+    fn data_extend_amount(&self, _usage: &ThinPoolUsage, _backstore: &Backstore) -> DataBlocks {
+        DataBlocks(4096)
+    }
+}
+
+/// Calculate new low water, an event point for the soonest of three possibilities:
+/// 1. Data device needs extension
+/// 2. Pool exceeds SPACE_CRIT_PCT
+/// 3. Usage has increased enough that we might need to extend a filesystem
+fn calc_lowater(
+    used: DataBlocks,
+    data_dev_size: DataBlocks,
+    available: DataBlocks,
+    policy: &ExtensionPolicy,
+) -> DataBlocks {
+    // Assert some stuff
     assert!(SPACE_CRIT_PCT <= 100);
-    let low_water_for_crit = total - ((total * SPACE_CRIT_PCT) / 100u8);
     assert!(DataBlocks(std::u64::MAX) - available >= DATA_LOWATER);
 
-    // Compare values of #1 and #2 above to get which one is higher
-    // WARNING: Do not alter this if-expression to a max-expression.
-    // Doing so would invalidate the assertion below.
-    // Need to add available to LOWATER to make it apples-to-apples with
-    // low_water_for_crit.
-    let prelim_max = if DATA_LOWATER + available > low_water_for_crit {
-        DATA_LOWATER
-    } else {
-        assert!(low_water_for_crit >= available);
-        // Adjust for against end of data dev instead of total
-        low_water_for_crit - available
+    // Get #1 from policy
+    let extension_lowater = policy.extension_lowater(used, data_dev_size, available);
+
+    // Calc #2.
+    let low_water_for_crit = {
+        let total = data_dev_size + available;
+        total - ((total * SPACE_CRIT_PCT) / 100u8) - available
     };
 
-    // Calculate #3. This is not the same as #1 because pool might be fully
-    // extended, but we still need events to extend filesystems
+    // Calc #3. This is not the same as #1 because pool might be fully
+    // extended, but we still need some events to extend filesystems
     let fs_event_lowater = DataBlocks((*(data_dev_size - used)).saturating_sub(*DATA_LOWATER));
 
-    // Get the highest of the three values
-    max(prelim_max, fs_event_lowater)
+    // Soonest-triggering of the three values
+    debug!(
+        "calc_lowater: extension: {:?} crit {} fs-event {}",
+        extension_lowater, low_water_for_crit, fs_event_lowater,
+    );
+    max(
+        max(
+            extension_lowater.unwrap_or(DataBlocks(0)),
+            low_water_for_crit,
+        ),
+        fs_event_lowater,
+    )
 }
 
 /// Segment lists that the ThinPool keeps track of.
@@ -218,6 +306,7 @@ pub struct ThinPool {
     pool_state: PoolState,
     pool_extend_state: PoolExtendState,
     free_space_state: FreeSpaceState,
+    extension_policy: Box<ExtensionPolicy>,
     dbus_path: MaybeDbusPath,
 }
 
@@ -300,6 +389,12 @@ impl ThinPool {
         let (dm_name, dm_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
 
         let (free_space_state, data_dev_size) = (FreeSpaceState::Good, data_dev.size());
+
+        #[cfg(not(feature = "incremental_policy"))]
+        let policy: Box<ExtensionPolicy> = Box::new(GreedyExtensionPolicy::new());
+        #[cfg(feature = "incremental_policy")]
+        let policy: Box<ExtensionPolicy> = Box::new(IncrementalExtensionPolicy::new());
+
         let thinpool_dev = ThinPoolDev::new(
             get_dm(),
             &dm_name,
@@ -311,6 +406,7 @@ impl ThinPool {
                 DataBlocks(0),
                 sectors_to_datablocks(data_dev_size),
                 sectors_to_datablocks(backstore.available_in_backstore()),
+                &*policy,
             ),
         )?;
 
@@ -329,6 +425,7 @@ impl ThinPool {
             pool_state: PoolState::Initializing,
             pool_extend_state: PoolExtendState::Initializing,
             free_space_state,
+            extension_policy: policy,
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -371,6 +468,12 @@ impl ThinPool {
         )?;
 
         let (free_space_state, data_dev_size) = (FreeSpaceState::Good, data_dev.size());
+
+        #[cfg(not(feature = "incremental_policy"))]
+        let policy: Box<ExtensionPolicy> = Box::new(GreedyExtensionPolicy::new());
+        #[cfg(feature = "incremental_policy")]
+        let policy: Box<ExtensionPolicy> = Box::new(IncrementalExtensionPolicy::new());
+
         let thinpool_dev = ThinPoolDev::setup(
             get_dm(),
             &thinpool_name,
@@ -384,6 +487,7 @@ impl ThinPool {
                 DataBlocks(0),
                 sectors_to_datablocks(data_dev_size),
                 sectors_to_datablocks(backstore.available_in_backstore()),
+                &*policy,
             ),
         )?;
 
@@ -441,6 +545,7 @@ impl ThinPool {
             pool_state: PoolState::Initializing,
             pool_extend_state: PoolExtendState::Initializing,
             free_space_state,
+            extension_policy: policy,
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -491,38 +596,36 @@ impl ThinPool {
 
                 let usage = &status.usage;
 
-                // Ensure meta subdevice is approx. 1/1000th of total usable
-                // size
-                let target_meta_size = (backstore.datatier_usable_size() / 1000u16).metablocks();
-                if usage.total_meta < target_meta_size {
-                    let meta_request = target_meta_size - usage.total_meta;
-
-                    if meta_request > MIN_META_SEGMENT_SIZE {
-                        meta_extend_failed = match self.extend_thin_meta_device(
-                            pool_uuid,
-                            backstore,
-                            meta_request.sectors(),
-                        ) {
-                            Ok(extend_size) => extend_size == Sectors(0),
-                            Err(_) => true,
-                        };
-                        should_save |= !meta_extend_failed;
-                    }
+                let meta_request = self.extension_policy.meta_extend_amount(usage, backstore);
+                if meta_request > MetaBlocks(0) {
+                    meta_extend_failed = match self.extend_thin_meta_device(
+                        pool_uuid,
+                        backstore,
+                        meta_request.sectors(),
+                    ) {
+                        Ok(extend_size) => extend_size == Sectors(0),
+                        Err(_) => true,
+                    };
+                    should_save |= !meta_extend_failed;
                 }
 
-                // Expand data blocks to fill all available remaining space
-                let free_space = backstore.available_in_backstore();
-                let total_extended = if free_space < DATA_BLOCK_SIZE {
-                    DataBlocks(0)
-                } else {
-                    let amount_allocated =
-                        match self.extend_thin_data_device(pool_uuid, backstore, free_space) {
+                let data_request = self.extension_policy.data_extend_amount(usage, backstore);
+                let total_extended = {
+                    if data_request > DataBlocks(0) {
+                        let amount_allocated = match self.extend_thin_data_device(
+                            pool_uuid,
+                            backstore,
+                            datablocks_to_sectors(data_request),
+                        ) {
                             Ok(extend_size) => extend_size,
                             Err(_) => Sectors(0),
                         };
-                    data_extend_failed = amount_allocated == Sectors(0);
-                    should_save |= !data_extend_failed;
-                    sectors_to_datablocks(amount_allocated)
+                        data_extend_failed = amount_allocated == Sectors(0);
+                        should_save |= !data_extend_failed;
+                        sectors_to_datablocks(amount_allocated)
+                    } else {
+                        DataBlocks(0)
+                    }
                 };
 
                 let current_total = usage.total_data + total_extended;
@@ -538,6 +641,7 @@ impl ThinPool {
                     usage.used_data,
                     current_total,
                     sectors_to_datablocks(backstore.available_in_backstore()),
+                    &*self.extension_policy,
                 );
 
                 self.thin_pool.set_low_water_mark(get_dm(), lowater)?;

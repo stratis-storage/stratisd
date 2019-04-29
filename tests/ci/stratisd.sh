@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-export PATH="~/.cargo/bin:$PATH"
+export PATH="$HOME/.cargo/bin:$PATH"
 export STRATIS_DEPS_DIR=$WORKSPACE/stratis-deps
 export RUST_LOG=libstratis=debug
 export TEST_BLOCKDEVS_FILE=~/test_config.json

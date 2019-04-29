@@ -80,7 +80,6 @@ then
     git clone https://github.com/stratis-storage/dbus-client-gen.git
     git clone https://github.com/stratis-storage/into-dbus-python.git
     git clone https://github.com/stratis-storage/dbus-signature-pyparsing.git
-    git clone https://github.com/stratis-storage/hs-dbus-signature.git
 
     # Set the PYTHONPATH to use the dependencies
     export PYTHONPATH=src:$STRATIS_DEPS_DIR/dbus-client-gen/src:$STRATIS_DEPS_DIR/dbus-python-client-gen/src:$STRATIS_DEPS_DIR/into-dbus-python/src:$STRATIS_DEPS_DIR/dbus-signature-pyparsing/src

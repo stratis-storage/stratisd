@@ -5,6 +5,7 @@
 pub use self::{
     devlinks::filesystem_mount_path,
     engine::{BlockDev, Engine, Filesystem, Pool},
+    errors::Error,
     event::{get_engine_listener_list_mut, EngineEvent, EngineListener},
     sim_engine::SimEngine,
     strat_engine::StratEngine,

@@ -5,10 +5,11 @@
 mod backstore;
 #[cfg(test)]
 mod cleanup;
-mod cmd;
+pub(self) mod cmd;
 mod device;
 mod dm;
 mod engine;
+mod errors;
 mod names;
 mod pool;
 mod serde_structs;

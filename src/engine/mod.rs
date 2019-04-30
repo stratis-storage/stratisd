@@ -22,6 +22,6 @@ mod devlinks;
 mod engine;
 mod event;
 mod sim_engine;
-mod strat_engine;
+pub(self) mod strat_engine;
 mod structures;
 mod types;

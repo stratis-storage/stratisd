@@ -32,7 +32,11 @@ const BINARIES_PATHS: [&str; 4] = ["/usr/sbin", "/sbin", "/usr/bin", "/bin"];
 pub enum ErrorKind {
     /// Binaries that stratisd relies on for operation not available.
     /// names is the names of all binaries not found.
-    BinariesNotFound { names: Vec<String> },
+    /// locations lists the locations searched.
+    BinariesNotFound {
+        names: Vec<String>,
+        locations: Vec<String>,
+    },
 
     /// The attempt to execute the external binary failed
     /// cmd is a string representation of the command.
@@ -45,9 +49,12 @@ pub enum ErrorKind {
 impl std::fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ErrorKind::BinariesNotFound { names } => {
-                write!(f, "binaries not found: [{}]", names.join(" ,"))
-            }
+            ErrorKind::BinariesNotFound { names, locations } => write!(
+                f,
+                "executables not found: [{}], locations searched: [{}]",
+                names.join(" ,"),
+                locations.join(" ,")
+            ),
             ErrorKind::CommandExecutionFailure { cmd } => {
                 write!(f, "failed to execute cmd {}", cmd)
             }
@@ -213,18 +220,19 @@ lazy_static! {
 /// Verify that all binaries that the engine might invoke are available at some
 /// path. Return an error if any are missing. Required to be called on engine
 /// initialization.
-pub fn verify_binaries() -> StratisResult<()> {
-    match BINARIES.iter().find(|&(_, ref path)| path.is_none()) {
-        None => Ok(()),
-        Some((ref name, _)) => Err(StratisError::Error(format!(
-            "Unable to find executable \"{}\" in any of {}",
-            name,
-            BINARIES_PATHS
-                .iter()
-                .map(|p| format!("\"{}\"", p))
-                .collect::<Vec<_>>()
-                .join(", "),
-        ))),
+pub fn verify_binaries() -> Result<(), Error> {
+    let missing: Vec<String> = BINARIES
+        .iter()
+        .filter(|&(_, ref path)| path.is_none())
+        .map(|(name, _)| name.to_owned())
+        .collect();
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        Err(Error::new(ErrorKind::BinariesNotFound {
+            names: missing,
+            locations: BINARIES_PATHS.iter().map(|path| path.to_string()).collect(),
+        }))
     }
 }
 

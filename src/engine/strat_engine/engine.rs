@@ -122,7 +122,9 @@ impl StratEngine {
     /// Returns an error if the binaries on which it depends can not be found.
     pub fn initialize() -> StratisResult<StratEngine> {
         let dm = get_dm_init()?;
-        verify_binaries()?;
+        verify_binaries().map_err(|err| {
+            crate::engine::Error::from(crate::engine::strat_engine::Error::from(err))
+        })?;
         let minor_dm_version = dm.version()?.1;
         if minor_dm_version < REQUIRED_DM_MINOR_VERSION {
             let err_msg = format!(

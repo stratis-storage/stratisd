@@ -22,21 +22,24 @@ then
     exit 1
 fi
 
+if [ ! -d $WORKSPACE/tests/ ]
+then
+    echo "$WORKSPACE/tests/ does not exist.  Verify WORKSPACE is set to correct directory."
+    exit 1
+fi
 
 # Each CI system must have a TEST_BLOCKDEVS_FILE file populated with
 # block devices that are safe to use/overwrite on the system.
-if [ -s "$TEST_BLOCKDEVS_FILE" ]
+# Only check for this for "make test-real".
+if [ $TARGET == "test-real" ]
 then
-    if [ ! -d $WORKSPACE/tests/ ]
+    if [ -s "$TEST_BLOCKDEVS_FILE" ]
     then
-        echo "$WORKSPACE/tests/ does not exist.  Verify WORKSPACE is set to correct directory."
+        cp $TEST_BLOCKDEVS_FILE $WORKSPACE/tests/.
+    else
+        echo "Required file $TEST_BLOCKDEVS_FILE not found."
         exit 1
     fi
-
-    cp $TEST_BLOCKDEVS_FILE $WORKSPACE/tests/.
-else
-    echo "Required file $TEST_BLOCKDEVS_FILE not found."
-    exit 1
 fi
 
 cd $WORKSPACE

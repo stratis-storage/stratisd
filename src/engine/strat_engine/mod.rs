@@ -16,6 +16,7 @@ mod serde_structs;
 mod thinpool;
 
 pub use self::engine::StratEngine;
+pub use self::errors::Error;
 
 #[cfg(test)]
 mod tests;

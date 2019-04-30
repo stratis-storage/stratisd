@@ -20,6 +20,7 @@ mod macros;
 mod devlinks;
 #[allow(clippy::module_inception)]
 mod engine;
+mod errors;
 mod event;
 mod sim_engine;
 pub(self) mod strat_engine;

@@ -23,8 +23,6 @@ use std::{
 use backtrace::Backtrace;
 use uuid::Uuid;
 
-use crate::stratis::{StratisError, StratisResult};
-
 const BINARIES_PATHS: [&str; 4] = ["/usr/sbin", "/sbin", "/usr/bin", "/bin"];
 
 #[derive(Debug)]
@@ -238,29 +236,20 @@ pub fn verify_binaries() -> Result<(), Error> {
 
 /// Invoke the specified command. Return an error if invoking the command
 /// fails or if the command itself fails.
-fn execute_cmd(cmd: &mut Command) -> StratisResult<()> {
+fn execute_cmd(cmd: &mut Command) -> Result<(), Error> {
     match cmd.output() {
-        Err(err) => Err(StratisError::Error(format!(
-            "Failed to execute command {:?}, err: {:?}",
-            cmd, err
-        ))),
+        Err(err) => Err(Error::new(ErrorKind::CommandExecutionFailure {
+            cmd: format!("{:?}", cmd),
+        })
+        .set_constituent(Box::new(err))),
         Ok(result) => {
             if result.status.success() {
                 Ok(())
             } else {
-                let exit_reason = result
-                    .status
-                    .code()
-                    .map_or(String::from("process terminated by signal"), |ec| {
-                        ec.to_string()
-                    });
-                let std_out_txt = String::from_utf8_lossy(&result.stdout);
-                let std_err_txt = String::from_utf8_lossy(&result.stderr);
-                let err_msg = format!(
-                    "Command failed: cmd: {:?}, exit reason: {} stdout: {} stderr: {}",
-                    cmd, exit_reason, std_out_txt, std_err_txt
-                );
-                Err(StratisError::Error(err_msg))
+                Err(Error::new(ErrorKind::CommandFailure {
+                    cmd: format!("{:?}", cmd),
+                    output: result,
+                }))
             }
         }
     }
@@ -277,7 +266,7 @@ fn get_executable(name: &str) -> &Path {
 }
 
 /// Create a filesystem on devnode.
-pub fn create_fs(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
+pub fn create_fs(devnode: &Path, uuid: Uuid) -> Result<(), Error> {
     execute_cmd(
         Command::new(get_executable(MKFS_XFS).as_os_str())
             .arg("-f")
@@ -290,7 +279,7 @@ pub fn create_fs(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
 
 /// Use the xfs_growfs command to expand a filesystem mounted at the given
 /// mount point.
-pub fn xfs_growfs(mount_point: &Path) -> StratisResult<()> {
+pub fn xfs_growfs(mount_point: &Path) -> Result<(), Error> {
     execute_cmd(
         Command::new(get_executable(XFS_GROWFS).as_os_str())
             .arg(mount_point)
@@ -299,7 +288,7 @@ pub fn xfs_growfs(mount_point: &Path) -> StratisResult<()> {
 }
 
 /// Set a new UUID for filesystem on the devnode.
-pub fn set_uuid(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
+pub fn set_uuid(devnode: &Path, uuid: Uuid) -> Result<(), Error> {
     execute_cmd(
         Command::new(get_executable(XFS_DB).as_os_str())
             .arg("-x")
@@ -309,7 +298,7 @@ pub fn set_uuid(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
 }
 
 /// Call thin_check on a thinpool
-pub fn thin_check(devnode: &Path) -> StratisResult<()> {
+pub fn thin_check(devnode: &Path) -> Result<(), Error> {
     execute_cmd(
         Command::new(get_executable(THIN_CHECK).as_os_str())
             .arg("-q")
@@ -318,7 +307,7 @@ pub fn thin_check(devnode: &Path) -> StratisResult<()> {
 }
 
 /// Call thin_repair on a thinpool
-pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> StratisResult<()> {
+pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> Result<(), Error> {
     execute_cmd(
         Command::new(get_executable(THIN_REPAIR).as_os_str())
             .arg("-i")
@@ -329,18 +318,18 @@ pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> StratisResult<()> {
 }
 
 /// Call udevadm settle
-pub fn udev_settle() -> StratisResult<()> {
+pub fn udev_settle() -> Result<(), Error> {
     execute_cmd(Command::new(get_executable(UDEVADM).as_os_str()).arg("settle"))
 }
 
 #[cfg(test)]
-pub fn create_ext3_fs(devnode: &Path) -> StratisResult<()> {
+pub fn create_ext3_fs(devnode: &Path) -> Result<(), Error> {
     execute_cmd(Command::new("wipefs").arg("-a").arg(&devnode))?;
     execute_cmd(Command::new("mkfs.ext3").arg(&devnode))
 }
 
 #[cfg(test)]
 #[allow(dead_code)]
-pub fn xfs_repair(devnode: &Path) -> StratisResult<()> {
+pub fn xfs_repair(devnode: &Path) -> Result<(), Error> {
     execute_cmd(Command::new("xfs_repair").arg("-n").arg(&devnode))
 }

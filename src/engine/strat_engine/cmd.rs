@@ -56,9 +56,14 @@ impl std::fmt::Display for ErrorKind {
             ErrorKind::CommandExecutionFailure { cmd } => {
                 write!(f, "failed to execute cmd {}", cmd)
             }
-            ErrorKind::CommandFailure { cmd, output } => {
-                write!(f, "command {} failed: {:?}", cmd, output)
-            }
+            ErrorKind::CommandFailure { cmd, output } => write!(
+                f,
+                "command {} failed. status: {}, stdout: \"{}\", stderr:\"{}\"",
+                cmd,
+                output.status,
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            ),
         }
     }
 }

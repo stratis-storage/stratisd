@@ -27,7 +27,7 @@ const BINARIES_PATHS: [&str; 4] = ["/usr/sbin", "/sbin", "/usr/bin", "/bin"];
 
 #[derive(Debug)]
 /// Errors resulting from management of external binaries
-pub enum ErrorKind {
+pub enum CmdErrorKind {
     /// Binaries that stratisd relies on for operation not available.
     /// names is the names of all binaries not found.
     /// locations lists the locations searched.
@@ -44,19 +44,19 @@ pub enum ErrorKind {
     CommandFailure { cmd: String, output: Output },
 }
 
-impl std::fmt::Display for ErrorKind {
+impl std::fmt::Display for CmdErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ErrorKind::BinariesNotFound { names, locations } => write!(
+            CmdErrorKind::BinariesNotFound { names, locations } => write!(
                 f,
                 "executables not found: [{}], locations searched: [{}]",
                 names.join(" ,"),
                 locations.join(" ,")
             ),
-            ErrorKind::CommandExecutionFailure { cmd } => {
+            CmdErrorKind::CommandExecutionFailure { cmd } => {
                 write!(f, "failed to execute cmd {}", cmd)
             }
-            ErrorKind::CommandFailure { cmd, output } => write!(
+            CmdErrorKind::CommandFailure { cmd, output } => write!(
                 f,
                 "command {} failed. status: {}, stdout: \"{}\", stderr:\"{}\"",
                 cmd,
@@ -89,12 +89,12 @@ pub struct Error {
     // The backtrace at the site the error is returned
     backtrace: Backtrace,
 
-    // Distinguish among different errors with an ErrorKind
-    pub specifics: ErrorKind,
+    // Distinguish among different errors with an CmdErrorKind
+    pub specifics: CmdErrorKind,
 }
 
 impl Error {
-    fn new(kind: ErrorKind) -> Error {
+    fn new(kind: CmdErrorKind) -> Error {
         Error {
             backtrace: Backtrace::new(),
             source_impl: None,
@@ -152,8 +152,8 @@ impl Error {
     }
 }
 
-impl From<ErrorKind> for Error {
-    fn from(kind: ErrorKind) -> Error {
+impl From<CmdErrorKind> for Error {
+    fn from(kind: CmdErrorKind) -> Error {
         Error::new(kind)
     }
 }
@@ -232,7 +232,7 @@ pub fn verify_binaries() -> Result<(), Error> {
     if missing.is_empty() {
         Ok(())
     } else {
-        Err(Error::new(ErrorKind::BinariesNotFound {
+        Err(Error::new(CmdErrorKind::BinariesNotFound {
             names: missing,
             locations: BINARIES_PATHS.iter().map(|path| path.to_string()).collect(),
         }))
@@ -243,7 +243,7 @@ pub fn verify_binaries() -> Result<(), Error> {
 /// fails or if the command itself fails.
 fn execute_cmd(cmd: &mut Command) -> Result<(), Error> {
     match cmd.output() {
-        Err(err) => Err(Error::new(ErrorKind::CommandExecutionFailure {
+        Err(err) => Err(Error::new(CmdErrorKind::CommandExecutionFailure {
             cmd: format!("{:?}", cmd),
         })
         .set_constituent(Box::new(err))),
@@ -251,7 +251,7 @@ fn execute_cmd(cmd: &mut Command) -> Result<(), Error> {
             if result.status.success() {
                 Ok(())
             } else {
-                Err(Error::new(ErrorKind::CommandFailure {
+                Err(Error::new(CmdErrorKind::CommandFailure {
                     cmd: format!("{:?}", cmd),
                     output: result,
                 }))

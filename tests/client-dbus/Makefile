@@ -1,3 +1,5 @@
+PYTEST_OPTS = -rsx
+
 TOX=tox
 .PHONY: lint
 lint:
@@ -5,7 +7,7 @@ lint:
 
 .PHONY: dbus-tests
 dbus-tests:
-	py.test-3 ./tests/dbus
+	py.test-3 ${PYTEST_OPTS} ./tests/dbus
 
 .PHONY: fmt
 fmt:
@@ -17,7 +19,7 @@ fmt-travis:
 
 .PHONY: udev-tests
 udev-tests:
-	py.test-3 ./tests/udev
+	py.test-3 ${PYTEST_OPTS} ./tests/udev
 
 .PHONY: tests
 tests: dbus-tests udev-tests

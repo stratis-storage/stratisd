@@ -1223,8 +1223,7 @@ fn attempt_thin_repair(
         segs_to_table(device, spare_segments),
     )?;
 
-    thin_repair(&meta_dev.devnode(), &new_meta_dev.devnode())
-        .map_err(|err| crate::engine::Error::from(crate::engine::strat_engine::Error::from(err)))?;
+    thin_repair(&meta_dev.devnode(), &new_meta_dev.devnode())?;
 
     let name = meta_dev.name().to_owned();
     meta_dev.teardown(get_dm())?;

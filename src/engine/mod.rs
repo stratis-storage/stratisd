@@ -5,10 +5,9 @@
 pub use self::{
     devlinks::filesystem_mount_path,
     engine::{BlockDev, Engine, Filesystem, Pool},
-    errors::Error,
     event::{get_engine_listener_list_mut, EngineEvent, EngineListener},
     sim_engine::SimEngine,
-    strat_engine::StratEngine,
+    strat_engine::{cmd, StratEngine},
     types::{
         BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolUuid,
         Redundancy, RenameAction,
@@ -21,9 +20,8 @@ mod macros;
 mod devlinks;
 #[allow(clippy::module_inception)]
 mod engine;
-mod errors;
 mod event;
 mod sim_engine;
-pub(self) mod strat_engine;
+mod strat_engine;
 mod structures;
 mod types;

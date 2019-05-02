@@ -5,18 +5,16 @@
 mod backstore;
 #[cfg(test)]
 mod cleanup;
-pub(self) mod cmd;
+pub mod cmd;
 mod device;
 mod dm;
 mod engine;
-mod errors;
 mod names;
 mod pool;
 mod serde_structs;
 mod thinpool;
 
 pub use self::engine::StratEngine;
-pub use self::errors::Error;
 
 #[cfg(test)]
 mod tests;

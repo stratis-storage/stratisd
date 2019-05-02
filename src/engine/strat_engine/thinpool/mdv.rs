@@ -94,9 +94,7 @@ impl<'a> Drop for MountedMDV<'a> {
 impl MetadataVol {
     /// Initialize a new Metadata Volume.
     pub fn initialize(pool_uuid: PoolUuid, dev: LinearDev) -> StratisResult<MetadataVol> {
-        create_fs(&dev.devnode(), pool_uuid).map_err(|err| {
-            crate::engine::Error::from(crate::engine::strat_engine::Error::from(err))
-        })?;
+        create_fs(&dev.devnode(), pool_uuid)?;
         MetadataVol::setup(pool_uuid, dev)
     }
 

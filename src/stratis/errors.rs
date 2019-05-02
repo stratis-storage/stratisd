@@ -35,7 +35,7 @@ pub enum StratisError {
     Utf8(str::Utf8Error),
     Serde(serde_json::error::Error),
     DM(devicemapper::DmError),
-    Engine2(crate::engine::Error),
+    Cmd(crate::cmd::Error),
 
     #[cfg(feature = "dbus_enabled")]
     Dbus(dbus::Error),
@@ -53,7 +53,7 @@ impl fmt::Display for StratisError {
             StratisError::Utf8(ref err) => write!(f, "Utf8 error: {}", err),
             StratisError::Serde(ref err) => write!(f, "Serde error: {}", err),
             StratisError::DM(ref err) => write!(f, "DM error: {}", err),
-            StratisError::Engine2(ref err) => write!(f, "{}", err),
+            StratisError::Cmd(ref err) => write!(f, "{}", err),
 
             #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => {
@@ -75,7 +75,7 @@ impl Error for StratisError {
             StratisError::Utf8(ref err) => err.description(),
             StratisError::Serde(ref err) => err.description(),
             StratisError::DM(ref err) => err.description(),
-            StratisError::Engine2(ref err) => err.description(),
+            StratisError::Cmd(ref err) => err.description(),
 
             #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => err.message().unwrap_or("D-Bus Error"),
@@ -92,7 +92,7 @@ impl Error for StratisError {
             StratisError::Utf8(ref err) => Some(err),
             StratisError::Serde(ref err) => Some(err),
             StratisError::DM(ref err) => Some(err),
-            StratisError::Engine2(ref err) => Some(err),
+            StratisError::Cmd(ref err) => Some(err),
 
             #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => Some(err),
@@ -150,8 +150,8 @@ impl From<libudev::Error> for StratisError {
     }
 }
 
-impl From<crate::engine::Error> for StratisError {
-    fn from(err: crate::engine::Error) -> StratisError {
-        StratisError::Engine2(err)
+impl From<crate::cmd::Error> for StratisError {
+    fn from(err: crate::cmd::Error) -> StratisError {
+        StratisError::Cmd(err)
     }
 }

@@ -95,9 +95,7 @@ impl StratFilesystem {
                 // thinpool.
                 // TODO: Recover. But how?
             }
-            return Err(
-                crate::engine::Error::from(crate::engine::strat_engine::Error::from(err)).into(),
-            );
+            return Err(err.into());
         }
 
         Ok((
@@ -182,9 +180,7 @@ impl StratFilesystem {
                     umount(tmp_dir.path())?;
                 }
 
-                set_uuid(&thin_dev.devnode(), snapshot_fs_uuid).map_err(|err| {
-                    crate::engine::Error::from(crate::engine::strat_engine::Error::from(err))
-                })?;
+                set_uuid(&thin_dev.devnode(), snapshot_fs_uuid)?;
                 Ok(StratFilesystem {
                     thin_dev,
                     created: Utc::now(),

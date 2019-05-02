@@ -74,7 +74,7 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
         | StratisError::Dbus(_)
         | StratisError::Udev(_) => DbusErrorEnum::ERROR,
         // FIXME: This is one place to get more specific error
-        StratisError::Engine2(_) => DbusErrorEnum::ERROR,
+        StratisError::Cmd(_) => DbusErrorEnum::ERROR,
     };
     let description = match *err {
         StratisError::DM(DmError::Core(ref err)) => err.to_string(),

@@ -189,7 +189,7 @@ impl BlockDevMgr {
     }
 
     /// Get a function that maps UUIDs to Devices.
-    pub fn uuid_to_devno(&self) -> Box<Fn(DevUuid) -> Option<Device>> {
+    pub fn uuid_to_devno(&self) -> Box<dyn Fn(DevUuid) -> Option<Device>> {
         let uuid_map: HashMap<DevUuid, Device> = self
             .block_devs
             .iter()
@@ -420,7 +420,7 @@ fn initialize(
     {
         let mut add_devs = Vec::new();
         for (dev, dev_result) in dev_infos {
-            let (devnode, dev_size, ownership, mut f) = dev_result?;
+            let (devnode, dev_size, ownership, f) = dev_result?;
             if dev_size < MIN_DEV_SIZE {
                 let error_message =
                     format!("{} too small, minimum {}", devnode.display(), MIN_DEV_SIZE);

@@ -1238,7 +1238,7 @@ mod tests {
                 (Some(p_index), Some(s_index)) => {
                     // Setup should fail to find a usable Stratis BDA
                     match (p_index, s_index) {
-                        (4...19, 4...19) => {
+                        (4..=19, 4..=19) => {
                             // When we corrupt both magics then we believe that
                             // the signature is not ours and will return Ok(None)
                             prop_assert!(setup_result.is_ok() && setup_result.unwrap().is_none());

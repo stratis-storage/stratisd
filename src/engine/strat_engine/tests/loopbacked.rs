@@ -2,8 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-extern crate loopdev;
-
 use std::fs::OpenOptions;
 use std::os::unix::io::AsRawFd;
 use std::panic;
@@ -14,7 +12,7 @@ use tempfile;
 
 use devicemapper::{Bytes, Sectors, IEC};
 
-use self::loopdev::{LoopControl, LoopDevice};
+use loopdev::{LoopControl, LoopDevice};
 
 use crate::engine::strat_engine::tests::logger::init_logger;
 use crate::engine::strat_engine::tests::util::clean_up;

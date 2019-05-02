@@ -82,7 +82,7 @@ impl Error for StratisError {
         }
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         match *self {
             StratisError::Error(_) | StratisError::Engine(_, _) => None,
             StratisError::Io(ref err) => Some(err),

@@ -191,7 +191,7 @@ impl Backstore {
     ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(ref mut cache_tier) => {
-                let mut cache_device = self
+                let cache_device = self
                     .cache
                     .as_mut()
                     .expect("cache_tier.is_some() <=> self.cache.is_some()");

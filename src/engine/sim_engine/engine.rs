@@ -2,8 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-extern crate libc;
-
 use std::cell::RefCell;
 use std::collections::hash_map::RandomState;
 use std::collections::HashSet;
@@ -100,11 +98,11 @@ impl Engine for SimEngine {
         Ok(RenameAction::Renamed)
     }
 
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &Pool)> {
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {
         get_pool!(self; uuid)
     }
 
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut Pool)> {
+    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)> {
         get_mut_pool!(self; uuid)
     }
 
@@ -114,21 +112,21 @@ impl Engine for SimEngine {
         Ok(())
     }
 
-    fn pools(&self) -> Vec<(Name, PoolUuid, &Pool)> {
+    fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)> {
         self.pools
             .iter()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &Pool))
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &dyn Pool))
             .collect()
     }
 
-    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut Pool)> {
+    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)> {
         self.pools
             .iter_mut()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut Pool))
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut dyn Pool))
             .collect()
     }
 
-    fn get_eventable(&self) -> Option<&'static Eventable> {
+    fn get_eventable(&self) -> Option<&'static dyn Eventable> {
         None
     }
 

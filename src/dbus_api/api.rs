@@ -201,7 +201,7 @@ pub struct DbusConnectionData {
 
 impl DbusConnectionData {
     /// Connect a stratis engine to dbus.
-    pub fn connect(engine: Rc<RefCell<Engine>>) -> Result<DbusConnectionData, dbus::Error> {
+    pub fn connect(engine: Rc<RefCell<dyn Engine>>) -> Result<DbusConnectionData, dbus::Error> {
         let c = Connection::get_private(BusType::System)?;
         let (tree, object_path) = get_base_tree(DbusContext::new(engine));
         let dbus_context = tree.get_data().clone();
@@ -219,7 +219,7 @@ impl DbusConnectionData {
     }
 
     /// Given the UUID of a pool, register all the pertinent information with dbus.
-    pub fn register_pool(&mut self, pool_uuid: PoolUuid, pool: &mut Pool) {
+    pub fn register_pool(&mut self, pool_uuid: PoolUuid, pool: &mut dyn Pool) {
         let pool_path = create_dbus_pool(&self.context, self.path.clone(), pool_uuid, pool);
         for (_, fs_uuid, fs) in pool.filesystems_mut() {
             create_dbus_filesystem(&self.context, pool_path.clone(), fs_uuid, fs);

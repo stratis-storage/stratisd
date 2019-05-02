@@ -1,4 +1,8 @@
-DENY = "-D warnings -D future-incompatible -D unused"
+RUST_2018_IDIOMS = -D bare-trait-objects \
+		   -D ellipsis-inclusive-range-patterns \
+		   -D unused-extern-crates
+
+DENY = -D warnings -D future-incompatible -D unused ${RUST_2018_IDIOMS}
 
 TARGET ?= "x86_64-unknown-linux-gnu"
 
@@ -22,25 +26,25 @@ fmt-travis:
 
 build:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS=${DENY} \
+	RUSTFLAGS="${DENY}" \
 	cargo build --target $(TARGET)
 
 build-no-default:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS=${DENY} \
+	RUSTFLAGS="${DENY}" \
 	cargo build --no-default-features --target $(TARGET)
 
 test-loop:
-	sudo env "PATH=${PATH}" RUSTFLAGS=${DENY} RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test loop_
+	sudo env "PATH=${PATH}" RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test loop_
 
 test-real:
-	sudo env "PATH=${PATH}" RUSTFLAGS=${DENY} RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test real_
+	sudo env "PATH=${PATH}" RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test real_
 
 test-travis:
-	sudo env "PATH=${PATH}" RUSTFLAGS=${DENY} RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test travis_
+	sudo env "PATH=${PATH}" RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test travis_
 
 test:
-	RUSTFLAGS=${DENY} RUST_BACKTRACE=1 cargo test -- --skip real_ --skip loop_ --skip travis_
+	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 cargo test -- --skip real_ --skip loop_ --skip travis_
 
 docs: stratisd.8 docs-rust
 

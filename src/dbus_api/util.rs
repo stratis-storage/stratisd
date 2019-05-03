@@ -78,6 +78,7 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
     };
     let description = match *err {
         StratisError::DM(DmError::Core(ref err)) => err.to_string(),
+        StratisError::Cmd(ref err) => format!("{:?}", err),
         ref err => err.description().to_owned(),
     };
     (error as u16, description)

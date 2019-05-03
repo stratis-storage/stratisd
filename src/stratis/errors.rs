@@ -35,7 +35,7 @@ pub enum StratisError {
     Utf8(str::Utf8Error),
     Serde(serde_json::error::Error),
     DM(devicemapper::DmError),
-    Cmd(crate::cmd::Error),
+    Cmd(crate::engine::CmdError),
 
     #[cfg(feature = "dbus_enabled")]
     Dbus(dbus::Error),
@@ -150,8 +150,8 @@ impl From<libudev::Error> for StratisError {
     }
 }
 
-impl From<crate::cmd::Error> for StratisError {
-    fn from(err: crate::cmd::Error) -> StratisError {
+impl From<crate::engine::CmdError> for StratisError {
+    fn from(err: crate::engine::CmdError) -> StratisError {
         StratisError::Cmd(err)
     }
 }

@@ -24,7 +24,6 @@ extern crate matches;
 extern crate lazy_static;
 
 pub mod engine;
-pub use crate::engine::cmd;
 
 #[cfg(feature = "dbus_enabled")]
 pub mod dbus_api;

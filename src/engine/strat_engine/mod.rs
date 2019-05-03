@@ -5,7 +5,7 @@
 mod backstore;
 #[cfg(test)]
 mod cleanup;
-pub mod cmd;
+mod cmd;
 mod device;
 mod dm;
 mod engine;
@@ -14,6 +14,7 @@ mod pool;
 mod serde_structs;
 mod thinpool;
 
+pub use self::cmd::{CmdError, CmdErrorKind};
 pub use self::engine::StratEngine;
 
 #[cfg(test)]

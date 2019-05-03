@@ -78,7 +78,7 @@ enum Suberror {
 }
 
 #[derive(Debug)]
-pub struct Error {
+pub struct CmdError {
     // The source of the error, which may be an error for
     // which this error is a further explanation, i.e., a
     // constituent error, or it may simply be an error that occurred
@@ -93,9 +93,9 @@ pub struct Error {
     pub specifics: CmdErrorKind,
 }
 
-impl Error {
-    fn new(kind: CmdErrorKind) -> Error {
-        Error {
+impl CmdError {
+    fn new(kind: CmdErrorKind) -> CmdError {
+        CmdError {
             backtrace: Backtrace::new(),
             source_impl: None,
             specifics: kind,
@@ -111,26 +111,26 @@ impl Error {
 
     /// Set extension as the extension on this error.
     /// Return the head of the chain, now subsequent.
-    pub fn set_extension(self, mut extension: Error) -> Error {
+    pub fn set_extension(self, mut extension: CmdError) -> CmdError {
         extension.source_impl = Some(Suberror::Constituent(Box::new(self)));
         extension
     }
 
     /// Set subsequent as the subsequent error for this error.
     /// Return the head of the chain, now subsequent.
-    pub fn set_subsequent(self, mut subsequent: Error) -> Error {
+    pub fn set_subsequent(self, mut subsequent: CmdError) -> CmdError {
         subsequent.source_impl = Some(Suberror::Previous(Box::new(self)));
         subsequent
     }
 
     /// Set constituent as the constituent of this error.
-    pub fn set_constituent(mut self, constituent: Box<dyn std::error::Error + Send>) -> Error {
+    pub fn set_constituent(mut self, constituent: Box<dyn std::error::Error + Send>) -> CmdError {
         self.source_impl = Some(Suberror::Constituent(constituent));
         self
     }
 
     /// Set previous as the previous error.
-    pub fn set_previous(mut self, previous: Box<dyn std::error::Error + Send>) -> Error {
+    pub fn set_previous(mut self, previous: Box<dyn std::error::Error + Send>) -> CmdError {
         self.source_impl = Some(Suberror::Previous(previous));
         self
     }
@@ -152,13 +152,13 @@ impl Error {
     }
 }
 
-impl From<CmdErrorKind> for Error {
-    fn from(kind: CmdErrorKind) -> Error {
-        Error::new(kind)
+impl From<CmdErrorKind> for CmdError {
+    fn from(kind: CmdErrorKind) -> CmdError {
+        CmdError::new(kind)
     }
 }
 
-impl std::error::Error for Error {
+impl std::error::Error for CmdError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.source_impl.as_ref().map(|c| match c {
             Suberror::Previous(c) => &**c as &(dyn std::error::Error + 'static),
@@ -178,7 +178,7 @@ impl std::error::Error for Error {
 
 // Display only the message associated w/ the specifics.
 // Consider the rest to be management baggage.
-impl std::fmt::Display for Error {
+impl std::fmt::Display for CmdError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.specifics)
     }
@@ -223,7 +223,7 @@ lazy_static! {
 /// Verify that all binaries that the engine might invoke are available at some
 /// path. Return an error if any are missing. Required to be called on engine
 /// initialization.
-pub fn verify_binaries() -> Result<(), Error> {
+pub fn verify_binaries() -> Result<(), CmdError> {
     let missing: Vec<String> = BINARIES
         .iter()
         .filter(|&(_, ref path)| path.is_none())
@@ -232,7 +232,7 @@ pub fn verify_binaries() -> Result<(), Error> {
     if missing.is_empty() {
         Ok(())
     } else {
-        Err(Error::new(CmdErrorKind::BinariesNotFound {
+        Err(CmdError::new(CmdErrorKind::BinariesNotFound {
             names: missing,
             locations: BINARIES_PATHS.iter().map(|path| path.to_string()).collect(),
         }))
@@ -241,9 +241,9 @@ pub fn verify_binaries() -> Result<(), Error> {
 
 /// Invoke the specified command. Return an error if invoking the command
 /// fails or if the command itself fails.
-fn execute_cmd(cmd: &mut Command) -> Result<(), Error> {
+fn execute_cmd(cmd: &mut Command) -> Result<(), CmdError> {
     match cmd.output() {
-        Err(err) => Err(Error::new(CmdErrorKind::CommandExecutionFailure {
+        Err(err) => Err(CmdError::new(CmdErrorKind::CommandExecutionFailure {
             cmd: format!("{:?}", cmd),
         })
         .set_constituent(Box::new(err))),
@@ -251,7 +251,7 @@ fn execute_cmd(cmd: &mut Command) -> Result<(), Error> {
             if result.status.success() {
                 Ok(())
             } else {
-                Err(Error::new(CmdErrorKind::CommandFailure {
+                Err(CmdError::new(CmdErrorKind::CommandFailure {
                     cmd: format!("{:?}", cmd),
                     output: result,
                 }))
@@ -271,7 +271,7 @@ fn get_executable(name: &str) -> &Path {
 }
 
 /// Create a filesystem on devnode.
-pub fn create_fs(devnode: &Path, uuid: Uuid) -> Result<(), Error> {
+pub fn create_fs(devnode: &Path, uuid: Uuid) -> Result<(), CmdError> {
     execute_cmd(
         Command::new(get_executable(MKFS_XFS).as_os_str())
             .arg("-f")
@@ -284,7 +284,7 @@ pub fn create_fs(devnode: &Path, uuid: Uuid) -> Result<(), Error> {
 
 /// Use the xfs_growfs command to expand a filesystem mounted at the given
 /// mount point.
-pub fn xfs_growfs(mount_point: &Path) -> Result<(), Error> {
+pub fn xfs_growfs(mount_point: &Path) -> Result<(), CmdError> {
     execute_cmd(
         Command::new(get_executable(XFS_GROWFS).as_os_str())
             .arg(mount_point)
@@ -293,7 +293,7 @@ pub fn xfs_growfs(mount_point: &Path) -> Result<(), Error> {
 }
 
 /// Set a new UUID for filesystem on the devnode.
-pub fn set_uuid(devnode: &Path, uuid: Uuid) -> Result<(), Error> {
+pub fn set_uuid(devnode: &Path, uuid: Uuid) -> Result<(), CmdError> {
     execute_cmd(
         Command::new(get_executable(XFS_DB).as_os_str())
             .arg("-x")
@@ -303,7 +303,7 @@ pub fn set_uuid(devnode: &Path, uuid: Uuid) -> Result<(), Error> {
 }
 
 /// Call thin_check on a thinpool
-pub fn thin_check(devnode: &Path) -> Result<(), Error> {
+pub fn thin_check(devnode: &Path) -> Result<(), CmdError> {
     execute_cmd(
         Command::new(get_executable(THIN_CHECK).as_os_str())
             .arg("-q")
@@ -312,7 +312,7 @@ pub fn thin_check(devnode: &Path) -> Result<(), Error> {
 }
 
 /// Call thin_repair on a thinpool
-pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> Result<(), Error> {
+pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> Result<(), CmdError> {
     execute_cmd(
         Command::new(get_executable(THIN_REPAIR).as_os_str())
             .arg("-i")
@@ -323,18 +323,18 @@ pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> Result<(), Error> {
 }
 
 /// Call udevadm settle
-pub fn udev_settle() -> Result<(), Error> {
+pub fn udev_settle() -> Result<(), CmdError> {
     execute_cmd(Command::new(get_executable(UDEVADM).as_os_str()).arg("settle"))
 }
 
 #[cfg(test)]
-pub fn create_ext3_fs(devnode: &Path) -> Result<(), Error> {
+pub fn create_ext3_fs(devnode: &Path) -> Result<(), CmdError> {
     execute_cmd(Command::new("wipefs").arg("-a").arg(&devnode))?;
     execute_cmd(Command::new("mkfs.ext3").arg(&devnode))
 }
 
 #[cfg(test)]
 #[allow(dead_code)]
-pub fn xfs_repair(devnode: &Path) -> Result<(), Error> {
+pub fn xfs_repair(devnode: &Path) -> Result<(), CmdError> {
     execute_cmd(Command::new("xfs_repair").arg("-n").arg(&devnode))
 }

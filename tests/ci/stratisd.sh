@@ -65,7 +65,7 @@ then
 
     if [ ! -f  /etc/dbus-1/system.d/stratisd.conf ]
     then
-        cp $WORKSPACE/stratisd.conf /etc/dbus-1/system.d/.
+        cp $WORKSPACE/stratisd.conf /etc/dbus-1/system.d/
     fi
 
 
@@ -84,20 +84,19 @@ then
     git clone https://github.com/stratis-storage/into-dbus-python.git
     git clone https://github.com/stratis-storage/dbus-signature-pyparsing.git
 
+    for STRATIS_DEP in dbus-client-gen dbus-signature-pyparsing dbus-python-client-gen into-dbus-python
+    do
+        cd $STRATIS_DEPS_DIR/$STRATIS_DEP
+        git fetch --tags
+        LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+        echo "checking out $STRATIS_DEP $LATEST_TAG"
+        git checkout $LATEST_TAG
+    done
     # Set the PYTHONPATH to use the dependencies
     export PYTHONPATH=src:$STRATIS_DEPS_DIR/dbus-client-gen/src:$STRATIS_DEPS_DIR/dbus-python-client-gen/src:$STRATIS_DEPS_DIR/into-dbus-python/src:$STRATIS_DEPS_DIR/dbus-signature-pyparsing/src
     export STRATISD=$WORKSPACE/target/x86_64-unknown-linux-gnu/debug/stratisd
     cd $STRATIS_DEPS_DIR/dbus-client-gen
-    git fetch --tags
-        LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
-        echo "checking out $LATEST_TAG"
-        git checkout $LATEST_TAG
-    cd $STRATIS_DEPS_DIR/dbus-signature-pyparsing
-    git pull origin master
-    cd $STRATIS_DEPS_DIR/dbus-python-client-gen
-    git pull origin master
-    cd $STRATIS_DEPS_DIR/into-dbus-python
-    git pull origin master
+
     cd $WORKSPACE/tests/client-dbus
     make tests
 else

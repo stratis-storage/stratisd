@@ -63,13 +63,25 @@ class UdevAdd(unittest.TestCase):
         :param devices:  Devices to use for pool
         :return: Dbus proxy object representing pool.
         """
-        ((pool_object_path, _), _, _) = Manager.Methods.CreatePool(
-            get_object(TOP_OBJECT), {
-                'name': name,
-                'redundancy': (True, 0),
-                'devices': devices
-            })
-        return get_object(pool_object_path)
+        # We may be taking too soon to the service and the device(s) may not
+        # actually exist, retry on error.
+        error_reasons = ""
+        for _ in range(3):
+            ((pool_object_path, _), exit_code,
+             error_str) = Manager.Methods.CreatePool(
+                 get_object(TOP_OBJECT), {
+                     'name': name,
+                     'redundancy': (True, 0),
+                     'devices': devices
+                 })
+            if int(exit_code) == 0:
+                return get_object(pool_object_path)
+
+            error_reasons += "%s " % error_str
+            time.sleep(1)
+
+        raise AssertionError("Unable to create a pool %s %s reasons: %s" %
+                             (name, str(devices), error_reasons))
 
     def _device_files(self, tokens):
         """
@@ -296,6 +308,9 @@ class UdevAdd(unittest.TestCase):
             device_tokens = \
                [self._lb_mgr.create_device() for _ in range(dev_count_pool)]
 
+            # Ensure newly created block devices are in udev db.
+            self._settle()
+
             pool_name = rs(5)
             UdevAdd._create_pool(pool_name, self._device_files(device_tokens))
             pool_data[pool_name] = device_tokens
@@ -403,6 +418,9 @@ class UdevAdd(unittest.TestCase):
         device_tokens = \
            [self._lb_mgr.create_device() for _ in range(num_devices)]
 
+        # Ensure newly created block devices are in udev db.
+        self._settle()
+
         self.assertEqual(len(device_tokens), num_devices)
 
         pool_name = rs(5)
@@ -489,6 +507,9 @@ class UdevAdd(unittest.TestCase):
         # Create some pools with duplicate names
         for i in range(num_pools):
             this_pool = [self._lb_mgr.create_device() for _ in range(i + 1)]
+
+            # Ensure newly created block devices are in udev db.
+            self._settle()
 
             pool_tokens.append(this_pool)
             UdevAdd._create_pool(pool_name, self._device_files(this_pool))

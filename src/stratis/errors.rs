@@ -15,6 +15,8 @@ use uuid;
 
 use devicemapper;
 
+use super::super::engine::CmdError;
+
 pub type StratisResult<T> = Result<T, StratisError>;
 
 #[derive(Debug, Clone)]
@@ -31,6 +33,7 @@ pub enum ErrorEnum {
 pub enum StratisError {
     Error(String),
     Engine(ErrorEnum, String),
+    Cmd(CmdError),
     Io(io::Error),
     Nix(nix::Error),
     Uuid(uuid::parser::ParseError),
@@ -48,6 +51,7 @@ impl fmt::Display for StratisError {
         match *self {
             StratisError::Error(ref s) => write!(f, "Error: {}", s),
             StratisError::Engine(_, ref msg) => write!(f, "Engine error: {}", msg),
+            StratisError::Cmd(ref err) => write!(f, "Invoking an external command failed: {}", err),
             StratisError::Io(ref err) => write!(f, "IO error: {}", err),
             StratisError::Nix(ref err) => write!(f, "Nix error: {}", err),
             StratisError::Uuid(ref err) => write!(f, "Uuid error: {}", err),
@@ -69,6 +73,10 @@ impl Error for StratisError {
         match *self {
             StratisError::Error(ref s) => s,
             StratisError::Engine(_, ref msg) => msg,
+            StratisError::Cmd(ref err) => match *err {
+                CmdError::CmdFailure { ref msg, .. } => msg,
+                CmdError::ExecuteCmdFailure { ref msg, .. } => msg,
+            },
             StratisError::Io(ref err) => err.description(),
             StratisError::Nix(ref err) => err.description(),
             StratisError::Uuid(_) => "Uuid::ParseError",
@@ -85,6 +93,7 @@ impl Error for StratisError {
     fn cause(&self) -> Option<&dyn Error> {
         match *self {
             StratisError::Error(_) | StratisError::Engine(_, _) => None,
+            StratisError::Cmd(_) => None,
             StratisError::Io(ref err) => Some(err),
             StratisError::Nix(ref err) => Some(err),
             StratisError::Uuid(ref err) => Some(err),
@@ -145,5 +154,11 @@ impl From<dbus::Error> for StratisError {
 impl From<libudev::Error> for StratisError {
     fn from(err: libudev::Error) -> StratisError {
         StratisError::Udev(err)
+    }
+}
+
+impl From<CmdError> for StratisError {
+    fn from(err: CmdError) -> StratisError {
+        StratisError::Cmd(err)
     }
 }

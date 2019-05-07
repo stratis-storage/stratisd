@@ -24,6 +24,8 @@ libmount = "0.1.10"
 libudev = "0.2.0"
 lazy_static = "1.0.0"
 timerfd = "1.0.0"
+failure = "0.1.1"
+failure_derive = "0.1.1"
 
 [dependencies.uuid]
 version = "0.7"

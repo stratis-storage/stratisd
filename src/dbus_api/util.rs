@@ -61,6 +61,7 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
             ErrorEnum::Invalid => DbusErrorEnum::ERROR,
             ErrorEnum::NotFound => DbusErrorEnum::NOTFOUND,
         },
+        StratisError::Cmd(_) => DbusErrorEnum::CMD_ERROR,
         StratisError::Io(_) => DbusErrorEnum::ERROR,
         StratisError::Nix(_) => DbusErrorEnum::ERROR,
         StratisError::Uuid(_)

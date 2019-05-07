@@ -23,6 +23,7 @@ pub enum DbusErrorEnum {
     BUSY = 3,
     INTERNAL_ERROR = 4,
     NOTFOUND = 5,
+    CMD_ERROR = 6,
 }
 
 impl DbusErrorEnum {
@@ -32,6 +33,7 @@ impl DbusErrorEnum {
             DbusErrorEnum::ERROR => "A general error happened",
             DbusErrorEnum::ALREADY_EXISTS => "Already exists",
             DbusErrorEnum::BUSY => "Operation can not be performed at this time",
+            DbusErrorEnum::CMD_ERROR => "Failure when invoking an external executable",
             DbusErrorEnum::INTERNAL_ERROR => "Internal error",
             DbusErrorEnum::NOTFOUND => "Not found",
         }

@@ -15,12 +15,34 @@
 // an explicit error is returned if the executable can not be found.
 
 use std::collections::HashMap;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use uuid::Uuid;
 
 use crate::stratis::{StratisError, StratisResult};
+
+/// Error returned when execution of an external command did not succeed.
+#[derive(Debug, Fail)]
+pub enum CmdError {
+    /// The command was executed, but did not succeed.
+    #[fail(display = "{}", msg)]
+    CmdFailure {
+        msg: String,
+        cmd: String,
+        stdout: String,
+        stderr: String,
+    },
+    /// It was not possible to execute the command.
+    #[fail(display = "{}", msg)]
+    ExecuteCmdFailure {
+        msg: String,
+        cmd: String,
+        #[cause]
+        cause: io::Error,
+    },
+}
 
 /// Find the binary with the given name by looking in likely locations.
 /// Return None if no binary was found.
@@ -73,12 +95,13 @@ pub fn verify_binaries() -> StratisResult<()> {
 
 /// Invoke the specified command. Return an error if invoking the command
 /// fails or if the command itself fails.
-fn execute_cmd(cmd: &mut Command) -> StratisResult<()> {
+fn execute_cmd(cmd: &mut Command) -> Result<(), CmdError> {
     match cmd.output() {
-        Err(err) => Err(StratisError::Error(format!(
-            "Failed to execute command {:?}, err: {:?}",
-            cmd, err
-        ))),
+        Err(err) => Err(CmdError::ExecuteCmdFailure {
+            msg: format!("Failed to properly execute cmd {:?}: {}", cmd, err),
+            cmd: format!("{:?}", cmd),
+            cause: err,
+        }),
         Ok(result) => {
             if result.status.success() {
                 Ok(())
@@ -95,7 +118,12 @@ fn execute_cmd(cmd: &mut Command) -> StratisResult<()> {
                     "Command failed: cmd: {:?}, exit reason: {} stdout: {} stderr: {}",
                     cmd, exit_reason, std_out_txt, std_err_txt
                 );
-                Err(StratisError::Error(err_msg))
+                Err(CmdError::CmdFailure {
+                    msg: err_msg,
+                    cmd: format!("{:?}", cmd),
+                    stdout: std_out_txt.to_string(),
+                    stderr: std_err_txt.to_string(),
+                })
             }
         }
     }
@@ -121,6 +149,7 @@ pub fn create_fs(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
             .arg("-m")
             .arg(format!("uuid={}", uuid)),
     )
+    .map_err(|err| err.into())
 }
 
 /// Use the xfs_growfs command to expand a filesystem mounted at the given
@@ -131,6 +160,7 @@ pub fn xfs_growfs(mount_point: &Path) -> StratisResult<()> {
             .arg(mount_point)
             .arg("-d"),
     )
+    .map_err(|err| err.into())
 }
 
 /// Set a new UUID for filesystem on the devnode.
@@ -141,6 +171,7 @@ pub fn set_uuid(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
             .arg(format!("-c uuid {}", uuid))
             .arg(&devnode),
     )
+    .map_err(|err| err.into())
 }
 
 /// Call thin_check on a thinpool
@@ -150,6 +181,7 @@ pub fn thin_check(devnode: &Path) -> StratisResult<()> {
             .arg("-q")
             .arg(devnode),
     )
+    .map_err(|err| err.into())
 }
 
 /// Call thin_repair on a thinpool
@@ -161,21 +193,23 @@ pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> StratisResult<()> {
             .arg("-o")
             .arg(new_meta_dev),
     )
+    .map_err(|err| err.into())
 }
 
 /// Call udevadm settle
 pub fn udev_settle() -> StratisResult<()> {
     execute_cmd(Command::new(get_executable(UDEVADM).as_os_str()).arg("settle"))
+        .map_err(|err| err.into())
 }
 
 #[cfg(test)]
 pub fn create_ext3_fs(devnode: &Path) -> StratisResult<()> {
     execute_cmd(Command::new("wipefs").arg("-a").arg(&devnode))?;
-    execute_cmd(Command::new("mkfs.ext3").arg(&devnode))
+    execute_cmd(Command::new("mkfs.ext3").arg(&devnode)).map_err(|err| err.into())
 }
 
 #[cfg(test)]
 #[allow(dead_code)]
 pub fn xfs_repair(devnode: &Path) -> StratisResult<()> {
-    execute_cmd(Command::new("xfs_repair").arg("-n").arg(&devnode))
+    execute_cmd(Command::new("xfs_repair").arg("-n").arg(&devnode)).map_err(|err| err.into())
 }

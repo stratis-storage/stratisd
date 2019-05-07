@@ -12,6 +12,7 @@ pub use self::engine::Pool;
 pub use self::event::{get_engine_listener_list_mut, EngineEvent, EngineListener};
 
 pub use self::sim_engine::SimEngine;
+pub use self::strat_engine::CmdError;
 pub use self::strat_engine::StratEngine;
 
 pub use self::types::BlockDevState;

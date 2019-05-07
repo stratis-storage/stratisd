@@ -35,7 +35,7 @@ matrix:
         # MANDATORY TESTING USING LOWEST SUPPORTED COMPILER
         # tests
         - rust: 1.31.0
-          env: TASK=test TARGET=x86_64-unknown-linux-gnu
+          env: TASK=test
 
 
         # MANDATORY TESTING ON STABLE
@@ -58,10 +58,10 @@ matrix:
           env: TASK=docs-travis TARGET=x86_64-unknown-linux-gnu
         # test
         - rust: stable
-          env: TASK=test TARGET=x86_64-unknown-linux-gnu
+          env: TASK=test
         # destructive tests that can be run on Travis
         - rust: stable
-          env: TASK=test-travis TARGET=x86_64-unknown-linux-gnu
+          env: TASK=test-travis
           sudo: required
 
 
@@ -86,7 +86,7 @@ matrix:
         # ALLOWED FAILURES
         # Run destructive tests on rust beta, in order to be good Rustaceans
         - rust: beta
-          env: TASK=test-travis TARGET=x86_64-unknown-linux-gnu
+          env: TASK=test-travis
           sudo: required
 branches:
     only: master

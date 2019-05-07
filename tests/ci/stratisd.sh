@@ -48,10 +48,6 @@ cargo clean
 make build
 make $TARGET
 
-# 32 bit build
-rustup target add i686-unknown-linux-gnu
-TARGET=i686-unknown-linux-gnu make build
-
 # If there is a stale STRATIS_DEPS_DIR remove it
 if [ -d $STRATIS_DEPS_DIR ]
 then

@@ -38,12 +38,13 @@ use uuid::Uuid;
 use dbus::Connection;
 
 use devicemapper::Device;
+
 #[cfg(feature = "dbus_enabled")]
-use libstratis::dbus_api::{consts, prop_changed_dispatch, DbusConnectionData};
-#[cfg(feature = "dbus_enabled")]
-use libstratis::engine::{
-    get_engine_listener_list_mut, EngineEvent, EngineListener, MaybeDbusPath,
+use libstratis::{
+    dbus_api::{consts, prop_changed_dispatch, DbusConnectionData},
+    engine::{get_engine_listener_list_mut, EngineEvent, EngineListener, MaybeDbusPath},
 };
+
 use libstratis::{
     engine::{Engine, Pool, SimEngine, StratEngine},
     stratis::{buff_log, StratisError, StratisResult, VERSION},

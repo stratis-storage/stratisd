@@ -25,12 +25,12 @@ matrix:
         - rust: 1.33.0
           before_script:
               - rustup component add rustfmt
-          env: TASK=fmt-travis TARGET=x86_64-unknown-linux-gnu
+          env: TASK=fmt-travis
         # clippy
         - rust: 1.33.0
           before_script:
               - rustup component add clippy
-          env: TASK=clippy TARGET=x86_64-unknown-linux-gnu
+          env: TASK=clippy
 
         # MANDATORY TESTING USING LOWEST SUPPORTED COMPILER
         # tests

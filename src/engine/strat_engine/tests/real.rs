@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use either::Either;
 use serde_json::{from_reader, Value};
 use uuid::Uuid;
 
@@ -23,8 +24,6 @@ use crate::engine::strat_engine::{
     dm::get_dm,
     tests::{logger::init_logger, util::clean_up},
 };
-
-use either::Either;
 
 pub struct RealTestDev {
     dev: Either<PathBuf, LinearDev>,

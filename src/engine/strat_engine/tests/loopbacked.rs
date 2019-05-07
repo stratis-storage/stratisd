@@ -9,12 +9,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use loopdev::{LoopControl, LoopDevice};
 use nix;
 use tempfile;
 
 use devicemapper::{Bytes, Sectors, IEC};
-
-use loopdev::{LoopControl, LoopDevice};
 
 use crate::engine::strat_engine::tests::{logger::init_logger, util::clean_up};
 

@@ -492,12 +492,14 @@ mod tests {
 
     use devicemapper::{Bytes, IEC, SECTOR_SIZE};
 
-    use crate::engine::{devlinks, types::Redundancy};
-
-    use crate::engine::strat_engine::{
-        backstore::{find_all, get_metadata},
-        cmd,
-        tests::{loopbacked, real},
+    use crate::engine::{
+        devlinks,
+        strat_engine::{
+            backstore::{find_all, get_metadata},
+            cmd,
+            tests::{loopbacked, real},
+        },
+        types::Redundancy,
     };
 
     use super::*;

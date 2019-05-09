@@ -25,6 +25,10 @@ pub enum ErrorKind {
 
     /// An external binary was executed but it returned an error code.
     CommandFailure { cmd: String, output: Output },
+
+    /// The name specified for a stratis entity is invalid.
+    // FIXME: the reason should be its own enum.
+    InvalidName { name: String, reason: String },
 }
 
 impl std::fmt::Display for ErrorKind {
@@ -46,6 +50,11 @@ impl std::fmt::Display for ErrorKind {
                 output.status,
                 String::from_utf8_lossy(&output.stdout),
                 String::from_utf8_lossy(&output.stderr)
+            ),
+            ErrorKind::InvalidName { name, reason } => write!(
+                f,
+                "invalid name \"{}\" for a Stratis entity, reason: {}",
+                name, reason
             ),
         }
     }

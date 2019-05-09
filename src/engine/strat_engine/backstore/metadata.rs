@@ -582,7 +582,7 @@ mod mda {
                     per_region_size,
                 )))?;
                 f.read_exact(&mut hdr_buf)?;
-                Ok(MDAHeader::from_buf(&hdr_buf, per_region_size)?)
+                Ok(MDAHeader::from_buf(&hdr_buf)?)
             };
 
             // Get an MDAHeader for the given index.
@@ -743,13 +743,9 @@ mod mda {
     impl MDAHeader {
         /// Get an MDAHeader from the buffer.
         /// Return an error for a bad checksum.
-        /// Return an error if the size of the region used is too large for the given region_size.
         /// Return None if there is no MDAHeader to be read. This is detected if the
         /// timestamp region in the buffer is 0.
-        fn from_buf(
-            buf: &[u8; _MDA_REGION_HDR_SIZE],
-            region_size: Bytes,
-        ) -> StratisResult<Option<MDAHeader>> {
+        fn from_buf(buf: &[u8; _MDA_REGION_HDR_SIZE]) -> StratisResult<Option<MDAHeader>> {
             if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_castagnoli(&buf[4..]) {
                 return Err(StratisError::Engine(
                     ErrorEnum::Invalid,
@@ -779,7 +775,6 @@ mod mda {
                 0 => Ok(None),
                 secs => {
                     let used = Bytes(LittleEndian::read_u64(&buf[8..16]));
-                    check_mda_region_size(used, region_size)?;
 
                     // Signed cast is safe, highest order bit of each value
                     // read is guaranteed to be 0.
@@ -894,7 +889,6 @@ mod mda {
         use proptest::{
             collection::{self, SizeRange},
             num,
-            prelude::any,
         };
 
         use super::super::*;
@@ -940,12 +934,7 @@ mod mda {
                           // sec < 0: unwritable timestamp
                           // sec == 0: value of 0 is interpreted as no timestamp when read
                           sec in 1..UTC_TIMESTAMP_SECS_BOUND,
-                          nsec in 0..UTC_TIMESTAMP_NSECS_BOUND,
-                          region_size_ext in any::<u32>()) {
-
-                // 4 is NUM_MDA_REGIONS which is not imported from super.
-                let region_size =
-                    (MIN_MDA_SECTORS / 4usize).bytes() + Bytes(u64::from(region_size_ext));
+                          nsec in 0..UTC_TIMESTAMP_NSECS_BOUND) {
 
                 let header = MDAHeader {
                     last_updated: Utc.timestamp(sec, nsec),
@@ -953,8 +942,8 @@ mod mda {
                     data_crc: crc32::checksum_castagnoli(&data),
                 };
                 let buf = header.to_buf();
-                let mda1 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
-                let mda2 = MDAHeader::from_buf(&buf, region_size).unwrap().unwrap();
+                let mda1 = MDAHeader::from_buf(&buf).unwrap().unwrap();
+                let mda2 = MDAHeader::from_buf(&buf).unwrap().unwrap();
 
                 prop_assert_eq!(mda1.last_updated, mda2.last_updated);
                 prop_assert_eq!(mda1.used, mda2.used);
@@ -975,22 +964,7 @@ mod mda {
             };
             let mut buf = header.to_buf();
             LittleEndian::write_u32(&mut buf[..4], 0u32);
-            assert!(
-                MDAHeader::from_buf(&buf, Bytes(data.len() as u64) + MDA_REGION_HDR_SIZE).is_err()
-            );
-        }
-
-        /// Verify that too small region_size causes an error.
-        #[test]
-        fn test_from_buf_size_error() {
-            let data = [0u8; 3];
-            let header = MDAHeader {
-                last_updated: Utc::now(),
-                used: Bytes(data.len() as u64),
-                data_crc: crc32::checksum_castagnoli(&data),
-            };
-            let buf = header.to_buf();
-            assert!(MDAHeader::from_buf(&buf, MDA_REGION_HDR_SIZE).is_err());
+            assert!(MDAHeader::from_buf(&buf).is_err());
         }
     }
 }

@@ -424,12 +424,10 @@ impl MDAHeader {
 
             let checksum = crc32::checksum_castagnoli(&data_buf);
             if self.data_crc != checksum {
-                return Err(Box::new(Error::new(
-                    ErrorKind::MDAHeaderChecksumIncorrect {
-                        expected: self.data_crc,
-                        actual: checksum,
-                    },
-                )));
+                return Err(Box::new(Error::new(ErrorKind::MDADataChecksumIncorrect {
+                    expected: self.data_crc,
+                    actual: checksum,
+                })));
             }
 
             Ok(data_buf)

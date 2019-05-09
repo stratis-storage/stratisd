@@ -33,6 +33,9 @@ pub enum ErrorKind {
     /// The checksum calculated for the MDA Header does not agree with the
     /// expected value.
     MDAHeaderChecksumIncorrect { expected: u32, actual: u32 },
+
+    /// Failed to load one MDA region
+    MDARegionNotLoaded {},
 }
 
 impl std::fmt::Display for ErrorKind {
@@ -65,6 +68,7 @@ impl std::fmt::Display for ErrorKind {
                 "expected checksum for MDAHeader {} not equal to actual checksum {}",
                 expected, actual
             ),
+            ErrorKind::MDARegionNotLoaded {} => write!(f, "an MDA region could not be loaded"),
         }
     }
 }

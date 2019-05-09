@@ -29,6 +29,10 @@ pub enum ErrorKind {
     /// The name specified for a stratis entity is invalid.
     // FIXME: the reason should be its own enum.
     InvalidName { name: String, reason: String },
+
+    /// The checksum calculated for the MDA Header does not agree with the
+    /// expected value.
+    MDAHeaderChecksumIncorrect { expected: u32, actual: u32 },
 }
 
 impl std::fmt::Display for ErrorKind {
@@ -55,6 +59,11 @@ impl std::fmt::Display for ErrorKind {
                 f,
                 "invalid name \"{}\" for a Stratis entity, reason: {}",
                 name, reason
+            ),
+            ErrorKind::MDAHeaderChecksumIncorrect { expected, actual } => write!(
+                f,
+                "expected checksum for MDAHeader {} not equal to actual checksum {}",
+                expected, actual
             ),
         }
     }

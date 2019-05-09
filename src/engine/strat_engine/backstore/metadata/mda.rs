@@ -15,9 +15,12 @@ use crc::crc32;
 use devicemapper::Bytes;
 
 use crate::{
-    engine::strat_engine::{
-        backstore::metadata::sizes::{mda_size, MDADataSize, MDARegionSize, MDASize},
-        device::SyncAll,
+    engine::{
+        strat_engine::{
+            backstore::metadata::sizes::{mda_size, MDADataSize, MDARegionSize, MDASize},
+            device::SyncAll,
+        },
+        Error, ErrorKind,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -416,11 +419,13 @@ impl MDAHeader {
 
         f.read_exact(&mut data_buf)?;
 
-        if self.data_crc != crc32::checksum_castagnoli(&data_buf) {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                "MDA region data CRC".into(),
-            ));
+        let checksum = crc32::checksum_castagnoli(&data_buf);
+        if self.data_crc != checksum {
+            return Err(Error::new(ErrorKind::MDAHeaderChecksumIncorrect {
+                expected: self.data_crc,
+                actual: checksum,
+            })
+            .into());
         }
 
         Ok(data_buf)

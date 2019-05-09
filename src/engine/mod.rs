@@ -7,7 +7,7 @@ pub use self::{
     engine::{BlockDev, Engine, Filesystem, Pool},
     event::{get_engine_listener_list_mut, EngineEvent, EngineListener},
     sim_engine::SimEngine,
-    strat_engine::{CmdError, CmdErrorKind, StratEngine},
+    strat_engine::{Error, ErrorKind, StratEngine},
     types::{
         BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolUuid,
         Redundancy, RenameAction,

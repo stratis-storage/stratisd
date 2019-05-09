@@ -22,7 +22,7 @@ use std::{
 
 use uuid::Uuid;
 
-use crate::engine::strat_engine::errors::{CmdError, CmdErrorKind};
+use crate::engine::strat_engine::errors::{Error, ErrorKind};
 
 const BINARIES_PATHS: [&str; 4] = ["/usr/sbin", "/sbin", "/usr/bin", "/bin"];
 
@@ -65,7 +65,7 @@ lazy_static! {
 /// Verify that all binaries that the engine might invoke are available at some
 /// path. Return an error if any are missing. Required to be called on engine
 /// initialization.
-pub fn verify_binaries() -> Result<(), CmdError> {
+pub fn verify_binaries() -> Result<(), Error> {
     let missing: Vec<String> = BINARIES
         .iter()
         .filter(|&(_, ref path)| path.is_none())
@@ -74,7 +74,7 @@ pub fn verify_binaries() -> Result<(), CmdError> {
     if missing.is_empty() {
         Ok(())
     } else {
-        Err(CmdError::new(CmdErrorKind::BinariesNotFound {
+        Err(Error::new(ErrorKind::BinariesNotFound {
             names: missing,
             locations: BINARIES_PATHS.iter().map(|path| path.to_string()).collect(),
         }))
@@ -83,9 +83,9 @@ pub fn verify_binaries() -> Result<(), CmdError> {
 
 /// Invoke the specified command. Return an error if invoking the command
 /// fails or if the command itself fails.
-fn execute_cmd(cmd: &mut Command) -> Result<(), CmdError> {
+fn execute_cmd(cmd: &mut Command) -> Result<(), Error> {
     match cmd.output() {
-        Err(err) => Err(CmdError::new(CmdErrorKind::CommandExecutionFailure {
+        Err(err) => Err(Error::new(ErrorKind::CommandExecutionFailure {
             cmd: format!("{:?}", cmd),
         })
         .set_constituent(Box::new(err))),
@@ -93,7 +93,7 @@ fn execute_cmd(cmd: &mut Command) -> Result<(), CmdError> {
             if result.status.success() {
                 Ok(())
             } else {
-                Err(CmdError::new(CmdErrorKind::CommandFailure {
+                Err(Error::new(ErrorKind::CommandFailure {
                     cmd: format!("{:?}", cmd),
                     output: result,
                 }))
@@ -113,7 +113,7 @@ fn get_executable(name: &str) -> &Path {
 }
 
 /// Create a filesystem on devnode.
-pub fn create_fs(devnode: &Path, uuid: Uuid) -> Result<(), CmdError> {
+pub fn create_fs(devnode: &Path, uuid: Uuid) -> Result<(), Error> {
     execute_cmd(
         Command::new(get_executable(MKFS_XFS).as_os_str())
             .arg("-f")
@@ -126,7 +126,7 @@ pub fn create_fs(devnode: &Path, uuid: Uuid) -> Result<(), CmdError> {
 
 /// Use the xfs_growfs command to expand a filesystem mounted at the given
 /// mount point.
-pub fn xfs_growfs(mount_point: &Path) -> Result<(), CmdError> {
+pub fn xfs_growfs(mount_point: &Path) -> Result<(), Error> {
     execute_cmd(
         Command::new(get_executable(XFS_GROWFS).as_os_str())
             .arg(mount_point)
@@ -135,7 +135,7 @@ pub fn xfs_growfs(mount_point: &Path) -> Result<(), CmdError> {
 }
 
 /// Set a new UUID for filesystem on the devnode.
-pub fn set_uuid(devnode: &Path, uuid: Uuid) -> Result<(), CmdError> {
+pub fn set_uuid(devnode: &Path, uuid: Uuid) -> Result<(), Error> {
     execute_cmd(
         Command::new(get_executable(XFS_DB).as_os_str())
             .arg("-x")
@@ -145,7 +145,7 @@ pub fn set_uuid(devnode: &Path, uuid: Uuid) -> Result<(), CmdError> {
 }
 
 /// Call thin_check on a thinpool
-pub fn thin_check(devnode: &Path) -> Result<(), CmdError> {
+pub fn thin_check(devnode: &Path) -> Result<(), Error> {
     execute_cmd(
         Command::new(get_executable(THIN_CHECK).as_os_str())
             .arg("-q")
@@ -154,7 +154,7 @@ pub fn thin_check(devnode: &Path) -> Result<(), CmdError> {
 }
 
 /// Call thin_repair on a thinpool
-pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> Result<(), CmdError> {
+pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> Result<(), Error> {
     execute_cmd(
         Command::new(get_executable(THIN_REPAIR).as_os_str())
             .arg("-i")
@@ -165,18 +165,18 @@ pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> Result<(), CmdError>
 }
 
 /// Call udevadm settle
-pub fn udev_settle() -> Result<(), CmdError> {
+pub fn udev_settle() -> Result<(), Error> {
     execute_cmd(Command::new(get_executable(UDEVADM).as_os_str()).arg("settle"))
 }
 
 #[cfg(test)]
-pub fn create_ext3_fs(devnode: &Path) -> Result<(), CmdError> {
+pub fn create_ext3_fs(devnode: &Path) -> Result<(), Error> {
     execute_cmd(Command::new("wipefs").arg("-a").arg(&devnode))?;
     execute_cmd(Command::new("mkfs.ext3").arg(&devnode))
 }
 
 #[cfg(test)]
 #[allow(dead_code)]
-pub fn xfs_repair(devnode: &Path) -> Result<(), CmdError> {
+pub fn xfs_repair(devnode: &Path) -> Result<(), Error> {
     execute_cmd(Command::new("xfs_repair").arg("-n").arg(&devnode))
 }

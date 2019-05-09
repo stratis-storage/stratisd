@@ -9,8 +9,8 @@ use std::process::Output;
 use backtrace::Backtrace;
 
 #[derive(Debug)]
-/// Errors resulting from management of external binaries
-pub enum CmdErrorKind {
+/// The ErrorKind differentiates among different errors.
+pub enum ErrorKind {
     /// Binaries that stratisd relies on for operation not available.
     /// names is the names of all binaries not found.
     /// locations lists the locations searched.
@@ -19,27 +19,27 @@ pub enum CmdErrorKind {
         locations: Vec<String>,
     },
 
-    /// The attempt to execute the external binary failed
+    /// The attempt to execute an external binary failed
     /// cmd is a string representation of the command.
     CommandExecutionFailure { cmd: String },
 
-    /// The commmand itself failed
+    /// An external binary was executed but it returned an error code.
     CommandFailure { cmd: String, output: Output },
 }
 
-impl std::fmt::Display for CmdErrorKind {
+impl std::fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            CmdErrorKind::BinariesNotFound { names, locations } => write!(
+            ErrorKind::BinariesNotFound { names, locations } => write!(
                 f,
                 "executables not found: [{}], locations searched: [{}]",
                 names.join(" ,"),
                 locations.join(" ,")
             ),
-            CmdErrorKind::CommandExecutionFailure { cmd } => {
+            ErrorKind::CommandExecutionFailure { cmd } => {
                 write!(f, "failed to execute cmd {}", cmd)
             }
-            CmdErrorKind::CommandFailure { cmd, output } => write!(
+            ErrorKind::CommandFailure { cmd, output } => write!(
                 f,
                 "command {} failed. status: {}, stdout: \"{}\", stderr:\"{}\"",
                 cmd,
@@ -61,7 +61,7 @@ enum Suberror {
 }
 
 #[derive(Debug)]
-pub struct CmdError {
+pub struct Error {
     // The source of the error, which may be an error for
     // which this error is a further explanation, i.e., a
     // constituent error, or it may simply be an error that occurred
@@ -72,13 +72,13 @@ pub struct CmdError {
     // The backtrace at the site the error is returned
     backtrace: Backtrace,
 
-    // Distinguish among different errors with an CmdErrorKind
-    pub specifics: CmdErrorKind,
+    // Distinguish among different errors with an ErrorKind
+    pub specifics: ErrorKind,
 }
 
-impl CmdError {
-    pub fn new(kind: CmdErrorKind) -> CmdError {
-        CmdError {
+impl Error {
+    pub fn new(kind: ErrorKind) -> Error {
+        Error {
             backtrace: Backtrace::new(),
             source_impl: None,
             specifics: kind,
@@ -94,26 +94,26 @@ impl CmdError {
 
     /// Set extension as the extension on this error.
     /// Return the head of the chain, now subsequent.
-    pub fn set_extension(self, mut extension: CmdError) -> CmdError {
+    pub fn set_extension(self, mut extension: Error) -> Error {
         extension.source_impl = Some(Suberror::Constituent(Box::new(self)));
         extension
     }
 
     /// Set subsequent as the subsequent error for this error.
     /// Return the head of the chain, now subsequent.
-    pub fn set_subsequent(self, mut subsequent: CmdError) -> CmdError {
+    pub fn set_subsequent(self, mut subsequent: Error) -> Error {
         subsequent.source_impl = Some(Suberror::Previous(Box::new(self)));
         subsequent
     }
 
     /// Set constituent as the constituent of this error.
-    pub fn set_constituent(mut self, constituent: Box<dyn std::error::Error + Send>) -> CmdError {
+    pub fn set_constituent(mut self, constituent: Box<dyn std::error::Error + Send>) -> Error {
         self.source_impl = Some(Suberror::Constituent(constituent));
         self
     }
 
     /// Set previous as the previous error.
-    pub fn set_previous(mut self, previous: Box<dyn std::error::Error + Send>) -> CmdError {
+    pub fn set_previous(mut self, previous: Box<dyn std::error::Error + Send>) -> Error {
         self.source_impl = Some(Suberror::Previous(previous));
         self
     }
@@ -135,13 +135,13 @@ impl CmdError {
     }
 }
 
-impl From<CmdErrorKind> for CmdError {
-    fn from(kind: CmdErrorKind) -> CmdError {
-        CmdError::new(kind)
+impl From<ErrorKind> for Error {
+    fn from(kind: ErrorKind) -> Error {
+        Error::new(kind)
     }
 }
 
-impl std::error::Error for CmdError {
+impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         self.source_impl.as_ref().map(|c| match c {
             Suberror::Previous(c) => &**c as &(dyn std::error::Error + 'static),
@@ -161,7 +161,7 @@ impl std::error::Error for CmdError {
 
 // Display only the message associated w/ the specifics.
 // Consider the rest to be management baggage.
-impl std::fmt::Display for CmdError {
+impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.specifics)
     }

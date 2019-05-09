@@ -624,7 +624,16 @@ mod mda {
 
             let region_size = self.region_size.bytes();
             let used = Bytes(data.len() as u64);
-            check_mda_region_size(used, region_size)?;
+
+            if MDA_REGION_HDR_SIZE + used > region_size {
+                let err_msg = format!(
+                    "metadata length {} exceeds region available {}",
+                    used,
+                    // region_size > header size
+                    region_size - MDA_REGION_HDR_SIZE
+                );
+                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+            };
 
             let header = MDAHeader {
                 last_updated: *time,
@@ -839,21 +848,6 @@ mod mda {
 
             Ok(data_buf)
         }
-    }
-
-    /// Check that data size does not exceed region available.
-    /// Note that used is the amount used for metadata only.
-    fn check_mda_region_size(used: Bytes, available: Bytes) -> StratisResult<()> {
-        if MDA_REGION_HDR_SIZE + used > available {
-            let err_msg = format!(
-                "metadata length {} exceeds region available {}",
-                used,
-                // available region > header size
-                available - MDA_REGION_HDR_SIZE
-            );
-            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
-        };
-        Ok(())
     }
 
     /// Validate MDA size

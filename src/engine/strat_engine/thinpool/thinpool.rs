@@ -6,6 +6,9 @@
 
 use std;
 use std::cmp::{max, min};
+use std::thread::sleep;
+use std::time::Duration;
+
 use uuid::Uuid;
 
 use devicemapper::{
@@ -24,7 +27,7 @@ use crate::engine::structures::Table;
 use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
 
 use crate::engine::strat_engine::backstore::Backstore;
-use crate::engine::strat_engine::cmd::{thin_check, thin_repair};
+use crate::engine::strat_engine::cmd::{thin_check, thin_repair, udev_settle};
 use crate::engine::strat_engine::device::wipe_sectors;
 use crate::engine::strat_engine::dm::get_dm;
 use crate::engine::strat_engine::names::{
@@ -32,9 +35,7 @@ use crate::engine::strat_engine::names::{
 };
 use crate::engine::strat_engine::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
 
-use crate::engine::strat_engine::thinpool::filesystem::{
-    fs_settle, FilesystemStatus, StratFilesystem,
-};
+use crate::engine::strat_engine::thinpool::filesystem::{FilesystemStatus, StratFilesystem};
 use crate::engine::strat_engine::thinpool::mdv::MetadataVol;
 use crate::engine::strat_engine::thinpool::thinids::ThinDevIdPool;
 
@@ -876,7 +877,10 @@ impl ThinPool {
             StratFilesystem::initialize(pool_uuid, &self.thin_pool, size, self.id_gen.new_id()?)?;
         let name = Name::new(name.to_owned());
         if let Err(err) = self.mdv.save_fs(&name, fs_uuid, &new_filesystem) {
-            fs_settle();
+            udev_settle().unwrap_or_else(|err| {
+                warn!("{}", err);
+                sleep(Duration::from_secs(5));
+            });
             if let Err(err2) = new_filesystem.destroy(&self.thin_pool) {
                 error!(
                     "When handling failed save_fs(), fs.destroy() failed: {}",

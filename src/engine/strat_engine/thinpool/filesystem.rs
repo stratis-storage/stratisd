@@ -53,17 +53,6 @@ pub enum FilesystemStatus {
     Failed,
 }
 
-/// If we try to create a filesystem and then fail in a step after making the
-/// fs, we may need to wait for udev to get off it before we can clean it up.
-pub fn fs_settle() {
-    if let Err(err) = udev_settle() {
-        error!("udev_settle() failed: {}", err);
-        // Should never happen, but just in case, give much time to
-        // let udev finish.
-        sleep(Duration::from_secs(5));
-    }
-}
-
 impl StratFilesystem {
     /// Create a StratFilesystem on top of the given ThinDev.
     pub fn initialize(
@@ -84,7 +73,10 @@ impl StratFilesystem {
         )?;
 
         if let Err(err) = create_fs(&thin_dev.devnode(), fs_uuid) {
-            fs_settle();
+            udev_settle().unwrap_or_else(|err| {
+                warn!("{}", err);
+                sleep(Duration::from_secs(5));
+            });
             if let Err(err2) = thin_dev.destroy(get_dm(), thinpool_dev) {
                 error!(
                     "While handling create_fs error, thin_dev.destroy() failed: {}",

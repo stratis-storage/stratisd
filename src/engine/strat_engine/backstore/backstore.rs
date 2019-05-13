@@ -223,6 +223,11 @@ impl Backstore {
                 Ok(uuids)
             }
             None => {
+                // Note that variable length metadata is not stored on the
+                // cachedevs, so the mda_size can always be the minimum.
+                // If it is desired to change a cache dev to a data dev, it
+                // should be removed and then re-added in order to ensure
+                // that the MDA region is set to the correct size.
                 let bdm = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS)?;
 
                 let cache_tier = CacheTier::new(bdm)?;

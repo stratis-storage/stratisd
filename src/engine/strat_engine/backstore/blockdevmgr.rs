@@ -214,6 +214,9 @@ impl BlockDevMgr {
     pub fn add(&mut self, pool_uuid: PoolUuid, paths: &[&Path]) -> StratisResult<Vec<DevUuid>> {
         let devices = resolve_devices(paths)?;
         let current_uuids = self.block_devs.iter().map(|bd| bd.uuid()).collect();
+        // FIXME: This is a bug. If new devices are added to a pool, and the
+        // variable length metadata requires more than MIN_MDA_SECTORS, then
+        // the necessary amount must be provided or the data can not be saved.
         let bds = initialize(pool_uuid, devices, MIN_MDA_SECTORS, &current_uuids)?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);

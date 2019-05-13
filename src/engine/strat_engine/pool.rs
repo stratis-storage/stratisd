@@ -148,6 +148,9 @@ impl StratPool {
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
+        // FIXME: Initializing with the minimum MDA size is not necessarily
+        // enough. If there are enough devices specified, more space will be
+        // required.
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS)?;
 
         let thinpool = ThinPool::new(

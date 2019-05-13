@@ -505,9 +505,12 @@ mod mda {
     const _MDA_REGION_HDR_SIZE: usize = 32;
     const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
 
-    const NUM_MDA_REGIONS: usize = 4;
-    const PER_MDA_REGION_COPIES: usize = 2;
-    const NUM_PRIMARY_MDA_REGIONS: usize = NUM_MDA_REGIONS / PER_MDA_REGION_COPIES;
+    const NUM_PRIMARY_MDA_REGIONS: usize = 2;
+
+    // There are two copies of every primary MDA region, so the total number
+    // of MDA regions is twice the number of primary MDA regions.
+    const NUM_MDA_REGIONS: usize = 2 * NUM_PRIMARY_MDA_REGIONS;
+
     pub const MIN_MDA_SECTORS: Sectors = Sectors(2032);
 
     const STRAT_REGION_HDR_VERSION: u8 = 1;
@@ -594,7 +597,7 @@ mod mda {
             // If there is a failure reading the first, fall back on the
             // second. If there is a failure reading both, return an error.
             let mut get_mda = |index: usize| -> StratisResult<Option<MDAHeader>> {
-                load_a_region(index).or_else(|_| load_a_region(index + 2))
+                load_a_region(index).or_else(|_| load_a_region(index + NUM_PRIMARY_MDA_REGIONS))
             };
 
             Ok(MDARegions {
@@ -665,7 +668,7 @@ mod mda {
             // saving to one or the other region fails.
             let older_region = self.older();
             save_region(older_region)?;
-            save_region(older_region + 2)?;
+            save_region(older_region + NUM_PRIMARY_MDA_REGIONS)?;
 
             self.mdas[older_region] = Some(header);
 
@@ -699,7 +702,7 @@ mod mda {
             // TODO: Figure out if there is an action to take if the
             // first read returns an error.
             load_region(newer_region)
-                .or_else(|_| load_region(newer_region + 2))
+                .or_else(|_| load_region(newer_region + NUM_PRIMARY_MDA_REGIONS))
                 .map(Some)
         }
 

@@ -4,10 +4,12 @@
 
 // Code to handle management of a pool's thinpool device.
 
-use std;
-use std::cmp::{max, min};
-use std::thread::sleep;
-use std::time::Duration;
+use std::{
+    self,
+    cmp::{max, min},
+    thread::sleep,
+    time::Duration,
+};
 
 use uuid::Uuid;
 
@@ -17,27 +19,32 @@ use devicemapper::{
     ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
 };
 
-use crate::engine::{
-    devlinks, EngineEvent, Filesystem, FilesystemUuid, MaybeDbusPath, Name, PoolUuid, RenameAction,
+use crate::{
+    engine::{
+        devlinks,
+        event::get_engine_listener_list,
+        strat_engine::{
+            backstore::Backstore,
+            cmd::{thin_check, thin_repair, udev_settle},
+            device::wipe_sectors,
+            dm::get_dm,
+            names::{
+                format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole,
+                ThinRole,
+            },
+            serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave},
+            thinpool::{
+                filesystem::{FilesystemStatus, StratFilesystem},
+                mdv::MetadataVol,
+                thinids::ThinDevIdPool,
+            },
+        },
+        structures::Table,
+        types::{FreeSpaceState, PoolExtendState, PoolState},
+        EngineEvent, Filesystem, FilesystemUuid, MaybeDbusPath, Name, PoolUuid, RenameAction,
+    },
+    stratis::{ErrorEnum, StratisError, StratisResult},
 };
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use crate::engine::event::get_engine_listener_list;
-use crate::engine::structures::Table;
-use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
-
-use crate::engine::strat_engine::backstore::Backstore;
-use crate::engine::strat_engine::cmd::{thin_check, thin_repair, udev_settle};
-use crate::engine::strat_engine::device::wipe_sectors;
-use crate::engine::strat_engine::dm::get_dm;
-use crate::engine::strat_engine::names::{
-    format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole, ThinRole,
-};
-use crate::engine::strat_engine::serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave};
-
-use crate::engine::strat_engine::thinpool::filesystem::{FilesystemStatus, StratFilesystem};
-use crate::engine::strat_engine::thinpool::mdv::MetadataVol;
-use crate::engine::strat_engine::thinpool::thinids::ThinDevIdPool;
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
 pub const DATA_LOWATER: DataBlocks = DataBlocks(2048); // 2 GiB
@@ -1203,9 +1210,11 @@ fn attempt_thin_repair(
 
 #[cfg(test)]
 mod tests {
-    use std::fs::OpenOptions;
-    use std::io::{BufWriter, Read, Write};
-    use std::path::Path;
+    use std::{
+        fs::OpenOptions,
+        io::{BufWriter, Read, Write},
+        path::Path,
+    };
 
     use nix::mount::{mount, umount, MsFlags};
     use tempfile;
@@ -1213,10 +1222,12 @@ mod tests {
 
     use devicemapper::{Bytes, SECTOR_SIZE};
 
-    use crate::engine::strat_engine::backstore::MIN_MDA_SECTORS;
-    use crate::engine::strat_engine::cmd;
-    use crate::engine::strat_engine::device::SyncAll;
-    use crate::engine::strat_engine::tests::{loopbacked, real};
+    use crate::engine::strat_engine::{
+        backstore::MIN_MDA_SECTORS,
+        cmd,
+        device::SyncAll,
+        tests::{loopbacked, real},
+    };
 
     use crate::engine::strat_engine::thinpool::filesystem::{fs_usage, FILESYSTEM_LOWATER};
 

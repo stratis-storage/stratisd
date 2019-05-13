@@ -2,28 +2,32 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::HashMap;
-use std::iter::FromIterator;
-use std::path::{Path, PathBuf};
-use std::vec::Vec;
+use std::{
+    collections::HashMap,
+    iter::FromIterator,
+    path::{Path, PathBuf},
+    vec::Vec,
+};
 
 use serde_json;
 use uuid::Uuid;
 
 use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
-use crate::engine::{
-    BlockDev, BlockDevTier, DevUuid, Filesystem, FilesystemUuid, MaybeDbusPath, Name, Pool,
-    PoolUuid, Redundancy, RenameAction,
+use crate::{
+    engine::{
+        strat_engine::{
+            backstore::{Backstore, StratBlockDev, MIN_MDA_SECTORS},
+            names::validate_name,
+            serde_structs::{FlexDevsSave, PoolSave, Recordable},
+            thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
+        },
+        types::{FreeSpaceState, PoolExtendState, PoolState},
+        BlockDev, BlockDevTier, DevUuid, Filesystem, FilesystemUuid, MaybeDbusPath, Name, Pool,
+        PoolUuid, Redundancy, RenameAction,
+    },
+    stratis::{ErrorEnum, StratisError, StratisResult},
 };
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use crate::engine::types::{FreeSpaceState, PoolExtendState, PoolState};
-
-use crate::engine::strat_engine::backstore::{Backstore, StratBlockDev, MIN_MDA_SECTORS};
-use crate::engine::strat_engine::names::validate_name;
-use crate::engine::strat_engine::serde_structs::{FlexDevsSave, PoolSave, Recordable};
-use crate::engine::strat_engine::thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE};
 
 /// Get the index which indicates the start of unallocated space in the cap
 /// device.
@@ -478,20 +482,25 @@ impl Pool for StratPool {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::OpenOptions;
-    use std::io::{BufWriter, Read, Write};
+    use std::{
+        fs::OpenOptions,
+        io::{BufWriter, Read, Write},
+    };
 
     use nix::mount::{mount, umount, MsFlags};
     use tempfile;
 
     use devicemapper::{Bytes, IEC, SECTOR_SIZE};
 
-    use crate::engine::devlinks;
-    use crate::engine::types::Redundancy;
-
-    use crate::engine::strat_engine::backstore::{find_all, get_metadata};
-    use crate::engine::strat_engine::cmd;
-    use crate::engine::strat_engine::tests::{loopbacked, real};
+    use crate::engine::{
+        devlinks,
+        strat_engine::{
+            backstore::{find_all, get_metadata},
+            cmd,
+            tests::{loopbacked, real},
+        },
+        types::Redundancy,
+    };
 
     use super::*;
 

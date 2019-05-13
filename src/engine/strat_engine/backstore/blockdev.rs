@@ -4,22 +4,23 @@
 
 // Code to handle a single block device.
 
-use std::fs::OpenOptions;
-use std::path::PathBuf;
+use std::{fs::OpenOptions, path::PathBuf};
 
 use chrono::{DateTime, TimeZone, Utc};
 
 use devicemapper::{Device, Sectors};
 
-use crate::engine::{BlockDev, BlockDevState, DevUuid, EngineEvent, MaybeDbusPath, PoolUuid};
-use crate::stratis::StratisResult;
-
-use crate::engine::event::get_engine_listener_list;
-
-use crate::engine::strat_engine::serde_structs::{BaseBlockDevSave, Recordable};
-
-use crate::engine::strat_engine::backstore::metadata::BDA;
-use crate::engine::strat_engine::backstore::range_alloc::RangeAllocator;
+use crate::{
+    engine::{
+        event::get_engine_listener_list,
+        strat_engine::{
+            backstore::{metadata::BDA, range_alloc::RangeAllocator},
+            serde_structs::{BaseBlockDevSave, Recordable},
+        },
+        BlockDev, BlockDevState, DevUuid, EngineEvent, MaybeDbusPath, PoolUuid,
+    },
+    stratis::StratisResult,
+};
 
 #[derive(Debug)]
 pub struct StratBlockDev {

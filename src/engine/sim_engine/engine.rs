@@ -2,23 +2,25 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::cell::RefCell;
-use std::collections::hash_map::RandomState;
-use std::collections::HashSet;
-use std::iter::FromIterator;
-use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::{
+    cell::RefCell,
+    collections::{hash_map::RandomState, HashSet},
+    iter::FromIterator,
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 use devicemapper::Device;
 
-use crate::engine::{Engine, Name, Pool, PoolUuid, Redundancy, RenameAction};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use crate::engine::engine::Eventable;
-use crate::engine::structures::Table;
-
-use crate::engine::sim_engine::pool::SimPool;
-use crate::engine::sim_engine::randomization::Randomizer;
+use crate::{
+    engine::{
+        engine::Eventable,
+        sim_engine::{pool::SimPool, randomization::Randomizer},
+        structures::Table,
+        Engine, Name, Pool, PoolUuid, Redundancy, RenameAction,
+    },
+    stratis::{ErrorEnum, StratisError, StratisResult},
+};
 
 #[derive(Debug, Default)]
 pub struct SimEngine {
@@ -138,14 +140,15 @@ impl Engine for SimEngine {
 #[cfg(test)]
 mod tests {
 
-    use std;
-    use std::path::Path;
+    use std::{self, path::Path};
 
     use proptest::prelude::any;
     use uuid::Uuid;
 
-    use crate::engine::{Engine, RenameAction};
-    use crate::stratis::{ErrorEnum, StratisError};
+    use crate::{
+        engine::{Engine, RenameAction},
+        stratis::{ErrorEnum, StratisError},
+    };
 
     use super::*;
 

@@ -4,9 +4,11 @@
 
 // Functions for dealing with devices.
 
-use std::fs::{File, OpenOptions};
-use std::io::{self, BufWriter, Cursor, Seek, SeekFrom, Write};
-use std::path::Path;
+use std::{
+    fs::{File, OpenOptions},
+    io::{self, BufWriter, Cursor, Seek, SeekFrom, Write},
+    path::Path,
+};
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 

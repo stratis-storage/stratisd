@@ -15,9 +15,10 @@ mod range_alloc;
 mod setup;
 mod util;
 
-pub use self::backstore::Backstore;
-pub use self::blockdev::StratBlockDev;
-pub use self::device::blkdev_size;
-pub use self::device::is_stratis_device;
-pub use self::metadata::MIN_MDA_SECTORS;
-pub use self::setup::{find_all, get_metadata};
+pub use self::{
+    backstore::Backstore,
+    blockdev::StratBlockDev,
+    device::{blkdev_size, is_stratis_device},
+    metadata::MIN_MDA_SECTORS,
+    setup::{find_all, get_metadata},
+};

@@ -7,8 +7,10 @@
 //! `Handle::dump()`, or a `HandleGuard` can be used to dump the log when a
 //! scope is exited.
 
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::VecDeque,
+    sync::{Arc, Mutex},
+};
 
 use chrono::{DateTime, Duration, Utc};
 use log::{self, Level, Log, Metadata, MetadataBuilder, Record};

@@ -5,31 +5,38 @@
 use chrono::{DateTime, TimeZone, Utc};
 use uuid::Uuid;
 
-use std::fs::File;
-use std::io::Read;
-use std::path::{Path, PathBuf};
-use std::thread::sleep;
-use std::time::Duration;
+use std::{
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+    thread::sleep,
+    time::Duration,
+};
 
 use devicemapper::{
     Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus, IEC,
 };
 
 use libmount;
-use nix::mount::{mount, umount, MsFlags};
-use nix::sys::statvfs::statvfs;
+use nix::{
+    mount::{mount, umount, MsFlags},
+    sys::statvfs::statvfs,
+};
 use tempfile;
 
-use crate::engine::{Filesystem, FilesystemUuid, MaybeDbusPath, Name, PoolUuid};
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
-
-use crate::engine::strat_engine::cmd::{create_fs, set_uuid, udev_settle, xfs_growfs};
-use crate::engine::strat_engine::dm::get_dm;
-use crate::engine::strat_engine::names::{format_thin_ids, ThinRole};
-use crate::engine::strat_engine::serde_structs::FilesystemSave;
-use crate::engine::strat_engine::thinpool::DATA_BLOCK_SIZE;
-
-use crate::engine::strat_engine::thinpool::thinpool::DATA_LOWATER;
+use crate::{
+    engine::{
+        strat_engine::{
+            cmd::{create_fs, set_uuid, udev_settle, xfs_growfs},
+            dm::get_dm,
+            names::{format_thin_ids, ThinRole},
+            serde_structs::FilesystemSave,
+            thinpool::{thinpool::DATA_LOWATER, DATA_BLOCK_SIZE},
+        },
+        Filesystem, FilesystemUuid, MaybeDbusPath, Name, PoolUuid,
+    },
+    stratis::{ErrorEnum, StratisError, StratisResult},
+};
 
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 

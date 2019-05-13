@@ -2,20 +2,20 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::fs::OpenOptions;
-use std::os::unix::io::AsRawFd;
-use std::panic;
-use std::path::{Path, PathBuf};
+use std::{
+    fs::OpenOptions,
+    os::unix::io::AsRawFd,
+    panic,
+    path::{Path, PathBuf},
+};
 
+use loopdev::{LoopControl, LoopDevice};
 use nix;
 use tempfile;
 
 use devicemapper::{Bytes, Sectors, IEC};
 
-use loopdev::{LoopControl, LoopDevice};
-
-use crate::engine::strat_engine::tests::logger::init_logger;
-use crate::engine::strat_engine::tests::util::clean_up;
+use crate::engine::strat_engine::tests::{logger::init_logger, util::clean_up};
 
 /// Ways of specifying range of numbers of devices to use for tests.
 /// Unlike real tests, there is no AtLeast constructor, as, at least in theory

@@ -9,14 +9,12 @@ mod cmd;
 mod device;
 mod dm;
 mod engine;
-mod errors;
 mod names;
 mod pool;
 mod serde_structs;
 mod thinpool;
 
 pub use self::engine::StratEngine;
-pub use self::errors::{Error, ErrorKind};
 
 #[cfg(test)]
 mod tests;

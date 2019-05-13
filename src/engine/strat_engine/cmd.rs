@@ -22,7 +22,7 @@ use std::{
 
 use uuid::Uuid;
 
-use crate::engine::strat_engine::errors::{Error, ErrorKind};
+use crate::engine::errors::{Error, ErrorKind};
 
 const BINARIES_PATHS: [&str; 4] = ["/usr/sbin", "/sbin", "/usr/bin", "/bin"];
 

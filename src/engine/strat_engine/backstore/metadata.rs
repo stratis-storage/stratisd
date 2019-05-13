@@ -860,8 +860,8 @@ mod mda {
         }
     }
 
-    /// Validate MDA size
-    pub fn validate_mda_size(size: Sectors) -> StratisResult<()> {
+    /// Validate MDA size. Return the size if it is valid.
+    pub fn validate_mda_size(size: Sectors) -> StratisResult<Sectors> {
         if size % NUM_MDA_REGIONS != Sectors(0) {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
@@ -882,7 +882,7 @@ mod mda {
                 ),
             ));
         };
-        Ok(())
+        Ok(size)
     }
 
     #[cfg(test)]

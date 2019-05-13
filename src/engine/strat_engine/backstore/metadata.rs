@@ -456,8 +456,6 @@ impl StaticHeader {
 
         let mda_size = Sectors(LittleEndian::read_u64(&buf[96..104]));
 
-        mda::validate_mda_size(mda_size)?;
-
         Ok(Some(StaticHeader {
             pool_uuid,
             dev_uuid,

@@ -37,6 +37,9 @@ build-no-default:
 	RUSTFLAGS="${DENY}" \
 	cargo build --no-default-features ${TARGET_ARGS}
 
+release:
+	RUSTFLAGS="${DENY}" cargo build --release
+
 test-loop:
 	sudo env "PATH=${PATH}" RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test loop_
 
@@ -74,6 +77,7 @@ clippy:
 	fmt
 	fmt-travis
 	outdated
+	release
 	test
 	test-loop
 	test-real

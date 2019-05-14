@@ -636,15 +636,12 @@ mod mda {
                 ));
             }
 
-            let region_size = self.region_size.bytes();
             let used = Bytes(data.len() as u64);
-
-            if MDA_REGION_HDR_SIZE + used > region_size {
+            let max_available = self.max_data_size();
+            if used > max_available {
                 let err_msg = format!(
                     "metadata length {} exceeds region available {}",
-                    used,
-                    // region_size > header size
-                    region_size - MDA_REGION_HDR_SIZE
+                    used, max_available
                 );
                 return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
             };
@@ -657,6 +654,7 @@ mod mda {
             let hdr_buf = header.to_buf();
 
             // Write data to a region specified by index.
+            let region_size = self.region_size.bytes();
             let mut save_region = |index: usize| -> StratisResult<()> {
                 f.seek(SeekFrom::Start(MDARegions::mda_offset(
                     header_size,

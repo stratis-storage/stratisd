@@ -8,7 +8,7 @@ use std::{fs::OpenOptions, path::PathBuf};
 
 use chrono::{DateTime, TimeZone, Utc};
 
-use devicemapper::{Device, Sectors};
+use devicemapper::{Bytes, Device, Sectors};
 
 use crate::{
     engine::{
@@ -134,7 +134,7 @@ impl StratBlockDev {
 
     /// The maximum size of variable length metadata that can be accommodated.
     /// self.max_metadata_size() < self.metadata_size()
-    pub fn max_metadata_size(&self) -> Sectors {
+    pub fn max_metadata_size(&self) -> Bytes {
         self.bda.max_data_size()
     }
 

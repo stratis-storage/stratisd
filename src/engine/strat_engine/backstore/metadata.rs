@@ -221,7 +221,7 @@ impl BDA {
     }
 
     /// The maximum size of variable length metadata that can be accommodated.
-    pub fn max_data_size(&self) -> Sectors {
+    pub fn max_data_size(&self) -> Bytes {
         self.regions.max_data_size()
     }
 
@@ -531,8 +531,8 @@ mod mda {
 
         /// The maximum size of variable length metadata that this region
         /// can accommodate.
-        pub fn max_data_size(&self) -> Sectors {
-            self.region_size
+        pub fn max_data_size(&self) -> Bytes {
+            self.region_size.bytes() - MDA_REGION_HDR_SIZE
         }
 
         /// Initialize the space allotted to the MDA regions to 0.

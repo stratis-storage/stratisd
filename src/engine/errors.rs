@@ -36,6 +36,9 @@ pub enum ErrorKind {
 
     /// Failed to load one MDA region
     MDARegionNotLoaded {},
+
+    /// A specified pool name is already in use.
+    PoolNameAlreadyInUse { name: String },
 }
 
 impl std::fmt::Display for ErrorKind {
@@ -69,6 +72,9 @@ impl std::fmt::Display for ErrorKind {
                 expected, actual
             ),
             ErrorKind::MDARegionNotLoaded {} => write!(f, "an MDA region could not be loaded"),
+            ErrorKind::PoolNameAlreadyInUse { name } => {
+                write!(f, "the specified pool name \"{}\" is already in use", name)
+            }
         }
     }
 }

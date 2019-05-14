@@ -221,7 +221,7 @@ impl BDA {
     }
 
     /// The maximum size of variable length metadata that can be accommodated.
-    pub fn max_data_size(&self) -> Sectors {
+    pub fn max_data_size(&self) -> Bytes {
         self.regions.max_data_size()
     }
 
@@ -516,10 +516,16 @@ mod mda {
     const STRAT_REGION_HDR_VERSION: u8 = 1;
     const STRAT_METADATA_VERSION: u8 = 1;
 
+    /// Manages the MDA regions which hold the variable length metadata.
     #[derive(Debug)]
     pub struct MDARegions {
-        // Spec defines 4 regions, but regions 2 & 3 are duplicates of 0 and 1 respectively
+        /// The size of a single MDA region. The MDAHeader occupies the
+        /// first few bytes of its region, the rest is available for the
+        /// variable length metadata.
         region_size: Sectors,
+        /// The MDA headers which contain information about the variable
+        /// length metadata. NUM_PRIMARY_MDA_REGIONS is 2: in the general
+        /// case one is more recently written than the other.
         mdas: [Option<MDAHeader>; NUM_PRIMARY_MDA_REGIONS],
     }
 
@@ -531,8 +537,8 @@ mod mda {
 
         /// The maximum size of variable length metadata that this region
         /// can accommodate.
-        pub fn max_data_size(&self) -> Sectors {
-            self.region_size
+        pub fn max_data_size(&self) -> Bytes {
+            self.region_size.bytes() - MDA_REGION_HDR_SIZE
         }
 
         /// Initialize the space allotted to the MDA regions to 0.
@@ -630,15 +636,12 @@ mod mda {
                 ));
             }
 
-            let region_size = self.region_size.bytes();
             let used = Bytes(data.len() as u64);
-
-            if MDA_REGION_HDR_SIZE + used > region_size {
+            let max_available = self.max_data_size();
+            if used > max_available {
                 let err_msg = format!(
                     "metadata length {} exceeds region available {}",
-                    used,
-                    // region_size > header size
-                    region_size - MDA_REGION_HDR_SIZE
+                    used, max_available
                 );
                 return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
             };
@@ -651,6 +654,7 @@ mod mda {
             let hdr_buf = header.to_buf();
 
             // Write data to a region specified by index.
+            let region_size = self.region_size.bytes();
             let mut save_region = |index: usize| -> StratisResult<()> {
                 f.seek(SeekFrom::Start(MDARegions::mda_offset(
                     header_size,

@@ -326,7 +326,7 @@ impl BlockDevMgr {
             current_time
         };
 
-        let data_size = Bytes(metadata.len() as u64).sectors();
+        let data_size = Bytes(metadata.len() as u64);
         let candidates = self
             .block_devs
             .iter_mut()

@@ -45,12 +45,9 @@ fi
 cd $WORKSPACE
 rustup default 1.31.0
 cargo clean
-make build
 make $TARGET
 
-# 32 bit build
-rustup target add i686-unknown-linux-gnu
-TARGET=i686-unknown-linux-gnu make build
+make build
 
 # If there is a stale STRATIS_DEPS_DIR remove it
 if [ -d $STRATIS_DEPS_DIR ]
@@ -61,7 +58,6 @@ fi
 if [ -d $WORKSPACE/tests/client-dbus ]
 then
     echo "Running client-dbus tests"
-    export STRATISD=$WORKSPACE/target/x86_64-unknown-linux-gnu/debug/stratisd
 
     if [ ! -f  /etc/dbus-1/system.d/stratisd.conf ]
     then
@@ -94,7 +90,7 @@ then
     done
     # Set the PYTHONPATH to use the dependencies
     export PYTHONPATH=src:$STRATIS_DEPS_DIR/dbus-client-gen/src:$STRATIS_DEPS_DIR/dbus-python-client-gen/src:$STRATIS_DEPS_DIR/into-dbus-python/src:$STRATIS_DEPS_DIR/dbus-signature-pyparsing/src
-    export STRATISD=$WORKSPACE/target/x86_64-unknown-linux-gnu/debug/stratisd
+    export STRATISD=$WORKSPACE/target/debug/stratisd
     cd $STRATIS_DEPS_DIR/dbus-client-gen
 
     cd $WORKSPACE/tests/client-dbus

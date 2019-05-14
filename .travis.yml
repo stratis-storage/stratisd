@@ -25,17 +25,17 @@ matrix:
         - rust: 1.33.0
           before_script:
               - rustup component add rustfmt
-          env: TASK=fmt-travis TARGET=x86_64-unknown-linux-gnu
+          env: TASK=fmt-travis
         # clippy
         - rust: 1.33.0
           before_script:
               - rustup component add clippy
-          env: TASK=clippy TARGET=x86_64-unknown-linux-gnu
+          env: TASK=clippy
 
         # MANDATORY TESTING USING LOWEST SUPPORTED COMPILER
         # tests
         - rust: 1.31.0
-          env: TASK=test TARGET=x86_64-unknown-linux-gnu
+          env: TASK=test
 
 
         # MANDATORY TESTING ON STABLE
@@ -55,13 +55,13 @@ matrix:
             - sudo apt-get install -y gcc-multilib libdbus-1-dev:i386 libdbus-glib-1-dev:i386 libglib2.0-dev:i386 libudev-dev:i386
         # Build docs
         - rust: stable
-          env: TASK=docs-travis TARGET=x86_64-unknown-linux-gnu
+          env: TASK=docs-travis
         # test
         - rust: stable
-          env: TASK=test TARGET=x86_64-unknown-linux-gnu
+          env: TASK=test
         # destructive tests that can be run on Travis
         - rust: stable
-          env: TASK=test-travis TARGET=x86_64-unknown-linux-gnu
+          env: TASK=test-travis
           sudo: required
 
 
@@ -86,7 +86,7 @@ matrix:
         # ALLOWED FAILURES
         # Run destructive tests on rust beta, in order to be good Rustaceans
         - rust: beta
-          env: TASK=test-travis TARGET=x86_64-unknown-linux-gnu
+          env: TASK=test-travis
           sudo: required
 branches:
     only: master

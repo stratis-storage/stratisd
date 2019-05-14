@@ -516,10 +516,16 @@ mod mda {
     const STRAT_REGION_HDR_VERSION: u8 = 1;
     const STRAT_METADATA_VERSION: u8 = 1;
 
+    /// Manages the MDA regions which hold the variable length metadata.
     #[derive(Debug)]
     pub struct MDARegions {
-        // Spec defines 4 regions, but regions 2 & 3 are duplicates of 0 and 1 respectively
+        /// The size of a single MDA region. The MDAHeader occupies the
+        /// first few bytes of its region, the rest is available for the
+        /// variable length metadata.
         region_size: Sectors,
+        /// The MDA headers which contain information about the variable
+        /// length metadata. NUM_PRIMARY_MDA_REGIONS is 2: in the general
+        /// case one is more recently written than the other.
         mdas: [Option<MDAHeader>; NUM_PRIMARY_MDA_REGIONS],
     }
 

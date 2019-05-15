@@ -518,7 +518,10 @@ mod tests {
     use uuid::Uuid;
 
     use crate::engine::strat_engine::{
-        backstore::{find_all, get_metadata, MIN_MDA_SECTORS},
+        backstore::{
+            metadata::BDA_STATIC_HDR_SIZE,
+            {find_all, get_metadata, MIN_MDA_SECTORS},
+        },
         cmd,
         device::wipe_sectors,
         tests::{loopbacked, real},
@@ -586,8 +589,8 @@ mod tests {
             }
         }
 
-        // Clear out the beginning of the device and make sure we succeed now.
-        wipe_sectors(paths[index], Sectors(0), MIN_MDA_SECTORS).unwrap();
+        // Wipe the header and confirm that the devices can now be initialized.
+        wipe_sectors(paths[index], Sectors(0), BDA_STATIC_HDR_SIZE.sectors()).unwrap();
         cmd::udev_settle().unwrap();
 
         assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS).is_ok());

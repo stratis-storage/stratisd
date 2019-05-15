@@ -215,8 +215,9 @@ impl BlockDevMgr {
         let devices = resolve_devices(paths)?;
         let current_uuids = self.block_devs.iter().map(|bd| bd.uuid()).collect();
         // FIXME: This is a bug. If new devices are added to a pool, and the
-        // variable length metadata requires more than MDADataSize(Bytes(0)), then
-        // the necessary amount must be provided or the data can not be saved.
+        // variable length metadata requires more than the minimum allocated,
+        // then the necessary amount must be provided or the data can not be
+        // saved.
         let bds = initialize(
             pool_uuid,
             devices,

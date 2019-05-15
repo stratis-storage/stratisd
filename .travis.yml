@@ -36,6 +36,9 @@ matrix:
         # tests
         - rust: 1.31.0
           env: TASK=test
+        # release
+        - rust: 1.31.0
+          env: TASK=release
 
 
         # MANDATORY TESTING ON STABLE
@@ -63,6 +66,9 @@ matrix:
         - rust: stable
           env: TASK=test-travis
           sudo: required
+        # release
+        - rust: stable
+          env: TASK=release
 
 
         # MANDATORY PYTHON CHECKS

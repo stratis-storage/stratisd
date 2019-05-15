@@ -178,8 +178,10 @@ mod tests {
 
     use uuid::Uuid;
 
+    use devicemapper::Bytes;
+
     use crate::engine::strat_engine::{
-        backstore::MIN_MDA_SECTORS,
+        backstore::MDADataSize,
         tests::{loopbacked, real},
     };
 
@@ -194,7 +196,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
 
-        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MIN_MDA_SECTORS).unwrap();
+        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize(Bytes(0))).unwrap();
 
         let mut data_tier = DataTier::new(mgr);
 

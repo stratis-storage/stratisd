@@ -1223,7 +1223,7 @@ mod tests {
     use devicemapper::{Bytes, SECTOR_SIZE};
 
     use crate::engine::strat_engine::{
-        backstore::MIN_MDA_SECTORS,
+        backstore::MDADataSize,
         device::SyncAll,
         tests::{loopbacked, real},
     };
@@ -1245,7 +1245,7 @@ mod tests {
         devlinks::setup_dev_path().unwrap();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
 
-        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MDADataSize(Bytes(0))).unwrap();
 
         let mut pool = ThinPool::new(
             pool_uuid,
@@ -1287,7 +1287,8 @@ mod tests {
         devlinks::setup_dev_path().unwrap();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let (first_path, remaining_paths) = paths.split_at(1);
-        let mut backstore = Backstore::initialize(pool_uuid, &first_path, MIN_MDA_SECTORS).unwrap();
+        let mut backstore =
+            Backstore::initialize(pool_uuid, &first_path, MDADataSize(Bytes(0))).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1393,7 +1394,7 @@ mod tests {
     fn test_filesystem_snapshot(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
-        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MDADataSize(Bytes(0))).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1505,7 +1506,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
-        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MDADataSize(Bytes(0))).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1553,7 +1554,7 @@ mod tests {
     fn test_pool_setup(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
-        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MDADataSize(Bytes(0))).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1619,7 +1620,7 @@ mod tests {
     fn test_thindev_destroy(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
-        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MDADataSize(Bytes(0))).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1673,7 +1674,7 @@ mod tests {
         let start_thindev_size: Sectors;
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
-        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MDADataSize(Bytes(0))).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1765,7 +1766,7 @@ mod tests {
     fn test_suspend_resume(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
-        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MDADataSize(Bytes(0))).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1812,7 +1813,8 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
-        let mut backstore = Backstore::initialize(pool_uuid, paths2, MIN_MDA_SECTORS).unwrap();
+        let mut backstore =
+            Backstore::initialize(pool_uuid, paths2, MDADataSize(Bytes(0))).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),

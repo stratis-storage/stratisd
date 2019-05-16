@@ -1224,7 +1224,6 @@ mod tests {
 
     use crate::engine::strat_engine::{
         backstore::MIN_MDA_SECTORS,
-        cmd,
         device::SyncAll,
         tests::{loopbacked, real},
     };
@@ -1352,13 +1351,6 @@ mod tests {
             ThinPoolStatus::Error => panic!("Could not obtain status for thinpool."),
             ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working/full."),
         };
-
-        // Clear anything that may be on the remaining paths to ensure we can add them
-        // to the pool
-        for p in remaining_paths {
-            wipe_sectors(p, Sectors(0), MIN_MDA_SECTORS).unwrap();
-        }
-        cmd::udev_settle().unwrap();
 
         // Add block devices to the pool and run check() to extend
         backstore.add_datadevs(pool_uuid, &remaining_paths).unwrap();

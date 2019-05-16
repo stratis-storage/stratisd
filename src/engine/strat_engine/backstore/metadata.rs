@@ -920,7 +920,7 @@ mod mda {
         /// Verify that loading MDARegions succeeds if the regions are properly
         /// initialized.
         fn test_reading_mda_regions() {
-            let buf_length = *(BDA_STATIC_HDR_SIZE + 4usize * MIN_MDA_SECTORS.bytes()) as usize;
+            let buf_length = *(BDA_STATIC_HDR_SIZE + MIN_MDA_SECTORS.bytes()) as usize;
             let mut buf = Cursor::new(vec![0; buf_length]);
             assert!(MDARegions::load(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf).is_err());
 

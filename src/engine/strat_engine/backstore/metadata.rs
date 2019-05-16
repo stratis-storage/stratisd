@@ -520,7 +520,7 @@ mod mda {
     #[cfg(test)]
     // The minimum size allocated for a group of MDA regions.
     // NUM_MDA_REGIONS * MIN_MDA_REGION_SIZE.
-    pub const MIN_MDA_SECTORS: MDASize = MDASize(Sectors(2032));
+    const MIN_MDA_SECTORS: MDASize = MDASize(Sectors(2032));
 
     const STRAT_REGION_HDR_VERSION: u8 = 1;
     const STRAT_METADATA_VERSION: u8 = 1;

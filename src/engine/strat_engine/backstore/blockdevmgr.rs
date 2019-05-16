@@ -520,7 +520,6 @@ mod tests {
     use crate::engine::strat_engine::{
         backstore::{find_all, get_metadata, MIN_MDA_SECTORS},
         cmd,
-        device::wipe_sectors,
         tests::{loopbacked, real},
     };
 
@@ -571,6 +570,7 @@ mod tests {
     /// Verify that it is impossible to initialize a set of disks of which
     /// even one of them has a signature.  Choose the dirty disk randomly.
     fn test_fail_single_signature(paths: &[&Path]) {
+        assert!(paths.len() > 1);
         let index = rand::random::<u8>() as usize % paths.len();
 
         cmd::create_ext3_fs(paths[index]).unwrap();
@@ -586,14 +586,17 @@ mod tests {
             }
         }
 
-        // Clear out the beginning of the device and make sure we succeed now.
-        wipe_sectors(paths[index], Sectors(0), MIN_MDA_SECTORS).unwrap();
+        let clean_paths = paths
+            .iter()
+            .enumerate()
+            .filter(|(n, _)| *n != index)
+            .map(|(_, v)| *v)
+            .collect::<Vec<&Path>>();
+
+        assert!(BlockDevMgr::initialize(pool_uuid, &clean_paths, MIN_MDA_SECTORS).is_ok());
         cmd::udev_settle().unwrap();
 
-        assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS).is_ok());
-        cmd::udev_settle().unwrap();
-
-        for path in paths {
+        for path in clean_paths {
             assert_eq!(
                 pool_uuid,
                 StaticHeader::device_identifiers(
@@ -609,7 +612,7 @@ mod tests {
     #[test]
     pub fn loop_test_fail_single_signature() {
         loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_fail_single_signature,
         );
     }
@@ -617,7 +620,7 @@ mod tests {
     #[test]
     pub fn real_test_fail_single_signature() {
         real::test_with_spec(
-            &real::DeviceLimits::AtLeast(1, None, None),
+            &real::DeviceLimits::AtLeast(2, None, None),
             test_fail_single_signature,
         );
     }
@@ -625,7 +628,7 @@ mod tests {
     #[test]
     pub fn travis_test_fail_single_signature() {
         loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_fail_single_signature,
         );
     }

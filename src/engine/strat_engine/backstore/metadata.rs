@@ -515,6 +515,15 @@ mod mda {
     const STRAT_REGION_HDR_VERSION: u8 = 1;
     const STRAT_METADATA_VERSION: u8 = 1;
 
+    /// A value representing the size of the entire MDA.
+    /// It is constructed in one of two ways:
+    /// * By reading a value from a device in constructing a StaticHeader
+    /// * MDARegionSize::mda_size
+    /// Since only a valid MDASize can be constructed, only a valid MDASize
+    /// can be written. An error on reading ought to be detected by checksums.
+    /// Since MDARegionSize is always at least the minimum, the result of
+    /// MDARegionSize::mda_size is at least the minimum. The method, by
+    /// definition, constructs a valid MDASize value.
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct MDASize(pub Sectors);
 
@@ -528,6 +537,17 @@ mod mda {
         }
     }
 
+    /// A value representing the size of one MDA region.
+    /// This type is private to the metadata module.
+    /// Values of this type are created by one of two methods:
+    /// * MDASize::region_size
+    /// * MDADataSize::region_size
+    /// Since an MDADataSize is always at least the minimum required by the
+    /// design specification, MDADataSize::region_size() always yields a
+    /// value of at least the minimum required size.
+    /// Since an MDASize is always valid, and at least the minimum,
+    /// MDASize::region_size() always yields a valid and sufficiently large
+    /// region.
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct MDARegionSize(pub Sectors);
 
@@ -546,6 +566,9 @@ mod mda {
         }
     }
 
+    /// A type representing the size of the region for storing variable length
+    /// metadata. A newly created value is never less than the minimum required
+    /// by the design specification.
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct MDADataSize(Bytes);
 
@@ -567,12 +590,6 @@ mod mda {
             } else {
                 sectors
             })
-        }
-
-        #[allow(dead_code)]
-        #[cfg(test)]
-        pub fn bytes(self) -> Bytes {
-            self.0
         }
     }
 

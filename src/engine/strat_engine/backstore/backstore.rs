@@ -638,7 +638,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         let mut backstore =
-            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize(Bytes(0))).unwrap();
+            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::new(Bytes(0))).unwrap();
 
         invariant(&backstore);
 
@@ -732,7 +732,8 @@ mod tests {
         assert!(!paths.is_empty());
 
         let pool_uuid = Uuid::new_v4();
-        let mut backstore = Backstore::initialize(pool_uuid, paths, MDADataSize(Bytes(0))).unwrap();
+        let mut backstore =
+            Backstore::initialize(pool_uuid, paths, MDADataSize::new(Bytes(0))).unwrap();
 
         assert_matches!(
             backstore
@@ -797,7 +798,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
 
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths1, MDADataSize(Bytes(0))).unwrap();
+            Backstore::initialize(pool_uuid, paths1, MDADataSize::new(Bytes(0))).unwrap();
         invariant(&backstore);
 
         // Allocate space from the backstore so that the cap device is made.

@@ -258,7 +258,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
 
-        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize(Bytes(0))).unwrap();
+        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize::new(Bytes(0))).unwrap();
 
         let mut cache_tier = CacheTier::new(mgr).unwrap();
 

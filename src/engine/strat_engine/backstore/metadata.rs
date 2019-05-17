@@ -547,9 +547,10 @@ mod mda {
     }
 
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    pub struct MDADataSize(pub Bytes);
+    pub struct MDADataSize(Bytes);
 
     impl MDADataSize {
+        /// Create a new value, bounded from below by the minimum allowed.
         pub fn new(value: Bytes) -> MDADataSize {
             MDADataSize(if value > MIN_MDA_DATA_REGION_SIZE {
                 value
@@ -1071,7 +1072,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let dev_uuid = Uuid::new_v4();
         let mda_size =
-            MDADataSize(mda::MIN_MDA_DATA_REGION_SIZE + Bytes(u64::from(mda_size_factor * 4)))
+            MDADataSize::new(mda::MIN_MDA_DATA_REGION_SIZE + Bytes(u64::from(mda_size_factor * 4)))
                 .region_size()
                 .mda_size();
         let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();

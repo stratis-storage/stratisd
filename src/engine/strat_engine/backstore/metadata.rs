@@ -500,16 +500,11 @@ mod mda {
         stratis::{ErrorEnum, StratisError, StratisResult},
     };
 
-    #[cfg(test)]
     // The minimum size allocated for variable length metadata
     pub const MIN_MDA_DATA_REGION_SIZE: Bytes = Bytes(260_064);
 
     const _MDA_REGION_HDR_SIZE: usize = 32;
     const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
-
-    // The minimum size allocated for a complete MDA region
-    // MIN_MDA_DATA_REGION_SIZE + MDA_REGION_HDR_SIZE
-    const MIN_MDA_REGION_SIZE: MDARegionSize = MDARegionSize(Sectors(508));
 
     const NUM_PRIMARY_MDA_REGIONS: usize = 2;
 
@@ -556,22 +551,21 @@ mod mda {
 
     impl MDADataSize {
         pub fn new(value: Bytes) -> MDADataSize {
-            MDADataSize(value)
+            MDADataSize(if value > MIN_MDA_DATA_REGION_SIZE {
+                value
+            } else {
+                MIN_MDA_DATA_REGION_SIZE
+            })
         }
 
         pub fn region_size(self) -> MDARegionSize {
             let bytes = self.0 + MDA_REGION_HDR_SIZE;
             let sectors = bytes.sectors();
-            let min_sectors = if sectors.bytes() != bytes {
+            MDARegionSize(if sectors.bytes() != bytes {
                 sectors + Sectors(1)
             } else {
                 sectors
-            };
-            if min_sectors < MIN_MDA_REGION_SIZE.sectors() {
-                MIN_MDA_REGION_SIZE
-            } else {
-                MDARegionSize(min_sectors)
-            }
+            })
         }
 
         #[allow(dead_code)]
@@ -948,17 +942,6 @@ mod mda {
         const UTC_TIMESTAMP_NSECS_BOUND: u32 = 2_000_000_000u32;
 
         #[test]
-        /// Verify that constants have the correct relationship to each other.
-        fn test_constants() {
-            // The minimum size for a single region is the minimum for the
-            // variable length metadata + the amount required for the header.
-            assert_eq!(
-                MIN_MDA_REGION_SIZE.sectors().bytes(),
-                MIN_MDA_DATA_REGION_SIZE + MDA_REGION_HDR_SIZE
-            );
-        }
-
-        #[test]
         /// Verify that default MDAHeader is all 0s except for CRC and versions.
         fn test_default_mda_header() {
             let buf = MDAHeader::default().to_buf();
@@ -975,8 +958,12 @@ mod mda {
         /// Verify that loading MDARegions succeeds if the regions are properly
         /// initialized.
         fn test_reading_mda_regions() {
-            let buf_length =
-                *(BDA_STATIC_HDR_SIZE + MIN_MDA_REGION_SIZE.mda_size().sectors().bytes()) as usize;
+            let buf_length = *(BDA_STATIC_HDR_SIZE
+                + MDADataSize(MIN_MDA_DATA_REGION_SIZE)
+                    .region_size()
+                    .mda_size()
+                    .sectors()
+                    .bytes()) as usize;
             let mut buf = Cursor::new(vec![0; buf_length]);
             assert_matches!(
                 MDARegions::load(

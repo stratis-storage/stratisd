@@ -221,7 +221,7 @@ impl BDA {
     }
 
     /// The maximum size of variable length metadata that can be accommodated.
-    pub fn max_data_size(&self) -> Bytes {
+    pub fn max_data_size(&self) -> MDADataSize {
         self.regions.max_data_size()
     }
 
@@ -651,8 +651,8 @@ mod mda {
 
         /// The maximum size of variable length metadata that this region
         /// can accommodate.
-        pub fn max_data_size(&self) -> Bytes {
-            self.region_size.data_size().bytes()
+        pub fn max_data_size(&self) -> MDADataSize {
+            self.region_size.data_size()
         }
 
         /// Initialize the space allotted to the MDA regions to 0.
@@ -756,7 +756,7 @@ mod mda {
             }
 
             let used = Bytes(data.len() as u64);
-            let max_available = self.max_data_size();
+            let max_available = self.max_data_size().bytes();
             if used > max_available {
                 let err_msg = format!(
                     "metadata length {} exceeds region available {}",

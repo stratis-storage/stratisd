@@ -331,7 +331,7 @@ impl BlockDevMgr {
         let candidates = self
             .block_devs
             .iter_mut()
-            .filter(|b| b.max_metadata_size() >= data_size);
+            .filter(|b| b.max_metadata_size().bytes() >= data_size);
 
         // TODO: consider making selection not entirely random, i.e, ensuring
         // distribution of metadata over different paths.

@@ -651,7 +651,7 @@ mod tests {
         invariant(&backstore);
 
         assert_eq!(cache_uuids.len(), initcachepaths.len());
-        assert!(backstore.linear.is_none());
+        assert_matches!(backstore.linear, None);
 
         let cache_status = backstore
             .cache
@@ -733,10 +733,12 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
 
-        assert!(backstore
-            .request(pool_uuid, Sectors(IEC::Ki), Sectors(IEC::Mi))
-            .unwrap()
-            .is_none());
+        assert_matches!(
+            backstore
+                .request(pool_uuid, Sectors(IEC::Ki), Sectors(IEC::Mi))
+                .unwrap(),
+            None
+        );
 
         let request = Sectors(IEC::Ei);
         let modulus = Sectors(IEC::Ki);

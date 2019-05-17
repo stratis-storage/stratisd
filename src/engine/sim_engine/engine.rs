@@ -166,13 +166,13 @@ mod tests {
     #[test]
     /// When an engine has no pools, any name lookup should fail
     fn get_pool_err() {
-        assert!(SimEngine::default().get_pool(Uuid::new_v4()).is_none());
+        assert_matches!(SimEngine::default().get_pool(Uuid::new_v4()), None);
     }
 
     #[test]
     /// When an engine has no pools, destroying any pool must succeed
     fn destroy_pool_empty() {
-        assert!(SimEngine::default().destroy_pool(Uuid::new_v4()).is_ok());
+        assert_matches!(SimEngine::default().destroy_pool(Uuid::new_v4()), Ok(_));
     }
 
     #[test]
@@ -180,7 +180,7 @@ mod tests {
     fn destroy_empty_pool() {
         let mut engine = SimEngine::default();
         let uuid = engine.create_pool("name", &[], None).unwrap();
-        assert!(engine.destroy_pool(uuid).is_ok());
+        assert_matches!(engine.destroy_pool(uuid), Ok(_));
     }
 
     #[test]
@@ -190,7 +190,7 @@ mod tests {
         let uuid = engine
             .create_pool("name", &[Path::new("/s/d")], None)
             .unwrap();
-        assert!(engine.destroy_pool(uuid).is_ok());
+        assert_matches!(engine.destroy_pool(uuid), Ok(_));
     }
 
     #[test]
@@ -206,7 +206,7 @@ mod tests {
             pool.create_filesystems(uuid, pool_name, &[("test", None)])
                 .unwrap();
         }
-        assert!(engine.destroy_pool(uuid).is_err());
+        assert_matches!(engine.destroy_pool(uuid), Err(_));
     }
 
     #[test]
@@ -257,9 +257,7 @@ mod tests {
     /// Creating a pool with an impossible raid level should fail
     fn create_pool_max_u16_raid() {
         let mut engine = SimEngine::default();
-        assert!(engine
-            .create_pool("name", &[], Some(std::u16::MAX))
-            .is_err());
+        assert_matches!(engine.create_pool("name", &[], Some(std::u16::MAX)), Err(_));
     }
 
     #[test]

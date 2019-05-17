@@ -922,11 +922,14 @@ mod mda {
         fn test_reading_mda_regions() {
             let buf_length = *(BDA_STATIC_HDR_SIZE + MIN_MDA_SECTORS.bytes()) as usize;
             let mut buf = Cursor::new(vec![0; buf_length]);
-            assert!(MDARegions::load(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf).is_err());
+            assert_matches!(
+                MDARegions::load(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf),
+                Err(_)
+            );
 
             MDARegions::initialize(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf).unwrap();
             let regions = MDARegions::load(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf).unwrap();
-            assert!(regions.last_update_time().is_none());
+            assert_matches!(regions.last_update_time(), None);
         }
 
         proptest! {
@@ -969,7 +972,7 @@ mod mda {
             };
             let mut buf = header.to_buf();
             LittleEndian::write_u32(&mut buf[..4], 0u32);
-            assert!(MDAHeader::from_buf(&buf).is_err());
+            assert_matches!(MDAHeader::from_buf(&buf), Err(_));
         }
     }
 }
@@ -1107,7 +1110,7 @@ mod tests {
         bda.save_state(&timestamp1, &data, &mut buf).unwrap();
 
         // Error, because current timestamp is older than written to newer.
-        assert!(bda.save_state(&timestamp0, &data, &mut buf).is_err());
+        assert_matches!(bda.save_state(&timestamp0, &data, &mut buf), Err(_));
 
         let timestamp2 = Utc::now();
         let timestamp3 = Utc::now();
@@ -1116,7 +1119,7 @@ mod tests {
         bda.save_state(&timestamp3, &data, &mut buf).unwrap();
 
         // Error, because current timestamp is older than written to newer.
-        assert!(bda.save_state(&timestamp2, &data, &mut buf).is_err());
+        assert_matches!(bda.save_state(&timestamp2, &data, &mut buf), Err(_));
     }
 
     proptest! {
@@ -1286,7 +1289,8 @@ mod tests {
             assert_ne!(reference_buf.get_ref(), buf_newer.get_ref());
 
             let setup_result = StaticHeader::setup(&mut buf_newer);
-            assert!(setup_result.is_ok() && setup_result.unwrap().is_some());
+            assert_matches!(setup_result, Ok(_));
+            assert!(setup_result.unwrap().is_some());
 
             // We should match the reference buffer
             assert_eq!(reference_buf.get_ref(), buf_newer.get_ref());

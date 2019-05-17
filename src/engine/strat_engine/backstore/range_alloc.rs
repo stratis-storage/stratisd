@@ -376,7 +376,7 @@ mod tests {
         let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
 
         let bad_insert_ranges = [(Sectors(21), Sectors(20)), (Sectors(40), Sectors(40))];
-        assert!(allocator.insert_ranges(&bad_insert_ranges).is_err())
+        assert_matches!(allocator.insert_ranges(&bad_insert_ranges), Err(_))
     }
 
     #[test]
@@ -384,7 +384,7 @@ mod tests {
         let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
 
         let bad_insert_ranges = [(Sectors(40), Sectors(1)), (Sectors(39), Sectors(2))];
-        assert!(allocator.insert_ranges(&bad_insert_ranges).is_err())
+        assert_matches!(allocator.insert_ranges(&bad_insert_ranges), Err(_))
     }
 
     #[test]
@@ -410,9 +410,7 @@ mod tests {
         assert_eq!(request.0, Sectors(128));
         assert_eq!(request.1, &[(Sectors(0), Sectors(128))]);
 
-        assert!(allocator
-            .insert_ranges(&[(Sectors(1), Sectors(1))])
-            .is_err());
+        assert_matches!(allocator.insert_ranges(&[(Sectors(1), Sectors(1))]), Err(_));
     }
 
     #[test]
@@ -458,9 +456,10 @@ mod tests {
         let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
 
         // overflow limit range
-        assert!(allocator
-            .insert_ranges(&[(Sectors(1), Sectors(128))])
-            .is_err());
+        assert_matches!(
+            allocator.insert_ranges(&[(Sectors(1), Sectors(128))]),
+            Err(_)
+        );
     }
 
     #[test]
@@ -472,8 +471,9 @@ mod tests {
         let mut allocator = RangeAllocator::new(Sectors(MAX), &[]).unwrap();
 
         // overflow max u64
-        assert!(allocator
-            .insert_ranges(&[(Sectors(MAX), Sectors(1))])
-            .is_err());
+        assert_matches!(
+            allocator.insert_ranges(&[(Sectors(MAX), Sectors(1))]),
+            Err(_)
+        );
     }
 }

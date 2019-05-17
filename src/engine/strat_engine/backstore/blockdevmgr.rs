@@ -577,7 +577,10 @@ mod tests {
         cmd::udev_settle().unwrap();
 
         let pool_uuid = Uuid::new_v4();
-        assert!(BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS).is_err());
+        assert_matches!(
+            BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS),
+            Err(_)
+        );
         for (i, path) in paths.iter().enumerate() {
             if i == index {
                 assert_matches!(identify(path).unwrap(), DevOwnership::Theirs(_));
@@ -593,7 +596,10 @@ mod tests {
             .map(|(_, v)| *v)
             .collect::<Vec<&Path>>();
 
-        assert!(BlockDevMgr::initialize(pool_uuid, &clean_paths, MIN_MDA_SECTORS).is_ok());
+        assert_matches!(
+            BlockDevMgr::initialize(pool_uuid, &clean_paths, MIN_MDA_SECTORS),
+            Ok(_)
+        );
         cmd::udev_settle().unwrap();
 
         for path in clean_paths {
@@ -648,16 +654,19 @@ mod tests {
         let mut bd_mgr = BlockDevMgr::initialize(uuid, paths1, MIN_MDA_SECTORS).unwrap();
         cmd::udev_settle().unwrap();
 
-        assert!(BlockDevMgr::initialize(uuid2, paths1, MIN_MDA_SECTORS).is_err());
+        assert_matches!(
+            BlockDevMgr::initialize(uuid2, paths1, MIN_MDA_SECTORS),
+            Err(_)
+        );
 
         let original_length = bd_mgr.block_devs.len();
-        assert!(bd_mgr.add(uuid, paths1).is_ok());
+        assert_matches!(bd_mgr.add(uuid, paths1), Ok(_));
         assert_eq!(bd_mgr.block_devs.len(), original_length);
 
         BlockDevMgr::initialize(uuid, paths2, MIN_MDA_SECTORS).unwrap();
         cmd::udev_settle().unwrap();
 
-        assert!(bd_mgr.add(uuid, paths2).is_err());
+        assert_matches!(bd_mgr.add(uuid, paths2), Err(_));
     }
 
     #[test]

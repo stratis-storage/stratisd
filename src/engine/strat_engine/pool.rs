@@ -579,7 +579,10 @@ mod tests {
     /// space required.
     fn test_empty_pool(paths: &[&Path]) {
         assert_eq!(paths.len(), 0);
-        assert!(StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE).is_err());
+        assert_matches!(
+            StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE),
+            Err(_)
+        );
     }
 
     #[test]
@@ -608,7 +611,7 @@ mod tests {
         invariant(&pool, &name);
 
         let metadata1 = pool.record(name);
-        assert!(metadata1.backstore.cache_tier.is_none());
+        assert_matches!(metadata1.backstore.cache_tier, None);
 
         let (_, fs_uuid) = pool
             .create_filesystems(uuid, &name, &[("stratis-filesystem", None)])

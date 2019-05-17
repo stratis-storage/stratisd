@@ -602,7 +602,7 @@ mod tests {
             .collect::<Vec<&Path>>();
 
         assert_matches!(
-            BlockDevMgr::initialize(pool_uuid, paths, MDADataSize(Bytes(0))),
+            BlockDevMgr::initialize(pool_uuid, &clean_paths, MDADataSize(Bytes(0))),
             Ok(_)
         );
         cmd::udev_settle().unwrap();

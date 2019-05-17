@@ -502,7 +502,7 @@ mod mda {
 
     #[cfg(test)]
     // The minimum size allocated for variable length metadata
-    pub const MIN_MDA_DATA_REGION_SIZE: MDADataSize = MDADataSize(Bytes(260_064));
+    pub const MIN_MDA_DATA_REGION_SIZE: Bytes = Bytes(260_064);
 
     const _MDA_REGION_HDR_SIZE: usize = 32;
     const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
@@ -574,6 +574,7 @@ mod mda {
             }
         }
 
+        #[allow(dead_code)]
         #[cfg(test)]
         pub fn bytes(self) -> Bytes {
             self.0
@@ -953,7 +954,7 @@ mod mda {
             // variable length metadata + the amount required for the header.
             assert_eq!(
                 MIN_MDA_REGION_SIZE.sectors().bytes(),
-                MIN_MDA_DATA_REGION_SIZE.bytes() + MDA_REGION_HDR_SIZE
+                MIN_MDA_DATA_REGION_SIZE + MDA_REGION_HDR_SIZE
             );
         }
 
@@ -1082,11 +1083,10 @@ mod tests {
     fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
         let pool_uuid = Uuid::new_v4();
         let dev_uuid = Uuid::new_v4();
-        let mda_size = MDADataSize(
-            mda::MIN_MDA_DATA_REGION_SIZE.bytes() + Bytes(u64::from(mda_size_factor * 4)),
-        )
-        .region_size()
-        .mda_size();
+        let mda_size =
+            MDADataSize(mda::MIN_MDA_DATA_REGION_SIZE + Bytes(u64::from(mda_size_factor * 4)))
+                .region_size()
+                .mda_size();
         let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
         StaticHeader::new(
             pool_uuid,

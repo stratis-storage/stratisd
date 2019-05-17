@@ -8,13 +8,13 @@ use std::{fs::OpenOptions, path::PathBuf};
 
 use chrono::{DateTime, TimeZone, Utc};
 
-use devicemapper::{Bytes, Device, Sectors};
+use devicemapper::{Device, Sectors};
 
 use crate::{
     engine::{
         event::get_engine_listener_list,
         strat_engine::{
-            backstore::{metadata::BDA, range_alloc::RangeAllocator},
+            backstore::{metadata::BDA, range_alloc::RangeAllocator, MDADataSize},
             serde_structs::{BaseBlockDevSave, Recordable},
         },
         BlockDev, BlockDevState, DevUuid, EngineEvent, MaybeDbusPath, PoolUuid,
@@ -134,7 +134,7 @@ impl StratBlockDev {
 
     /// The maximum size of variable length metadata that can be accommodated.
     /// self.max_metadata_size() < self.metadata_size()
-    pub fn max_metadata_size(&self) -> Bytes {
+    pub fn max_metadata_size(&self) -> MDADataSize {
         self.bda.max_data_size()
     }
 

@@ -415,9 +415,10 @@ mod tests {
         let pool_name = "pool_name";
         let uuid = engine.create_pool(pool_name, &[], None).unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        assert!(pool
-            .destroy_filesystems(pool_name, &[Uuid::new_v4()])
-            .is_ok());
+        assert_matches!(
+            pool.destroy_filesystems(pool_name, &[Uuid::new_v4()]),
+            Ok(_)
+        );
     }
 
     #[test]

@@ -1286,7 +1286,8 @@ mod tests {
             assert_ne!(reference_buf.get_ref(), buf_newer.get_ref());
 
             let setup_result = StaticHeader::setup(&mut buf_newer);
-            assert!(setup_result.is_ok() && setup_result.unwrap().is_some());
+            assert_matches!(setup_result, Ok(_));
+            assert!(setup_result.unwrap().is_some());
 
             // We should match the reference buffer
             assert_eq!(reference_buf.get_ref(), buf_newer.get_ref());

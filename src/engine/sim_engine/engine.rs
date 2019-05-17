@@ -172,7 +172,7 @@ mod tests {
     #[test]
     /// When an engine has no pools, destroying any pool must succeed
     fn destroy_pool_empty() {
-        assert!(SimEngine::default().destroy_pool(Uuid::new_v4()).is_ok());
+        assert_matches!(SimEngine::default().destroy_pool(Uuid::new_v4()), Ok(_));
     }
 
     #[test]
@@ -180,7 +180,7 @@ mod tests {
     fn destroy_empty_pool() {
         let mut engine = SimEngine::default();
         let uuid = engine.create_pool("name", &[], None).unwrap();
-        assert!(engine.destroy_pool(uuid).is_ok());
+        assert_matches!(engine.destroy_pool(uuid), Ok(_));
     }
 
     #[test]
@@ -190,7 +190,7 @@ mod tests {
         let uuid = engine
             .create_pool("name", &[Path::new("/s/d")], None)
             .unwrap();
-        assert!(engine.destroy_pool(uuid).is_ok());
+        assert_matches!(engine.destroy_pool(uuid), Ok(_));
     }
 
     #[test]

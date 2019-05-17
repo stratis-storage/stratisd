@@ -263,15 +263,15 @@ mod tests {
         assert!(validate_name("\u{0}multiple\u{0}_null\u{0}").is_err());
         assert!(validate_name(&"𐌏".repeat(64)).is_err());
 
-        assert!(validate_name(&"𐌏".repeat(63)).is_ok());
-        assert!(validate_name(&'\u{10fff8}'.to_string()).is_ok());
-        assert!(validate_name("*< ? >").is_ok());
-        assert!(validate_name("...").is_ok());
-        assert!(validate_name("ok.name").is_ok());
-        assert!(validate_name("ok name with spaces").is_ok());
-        assert!(validate_name("\\\\").is_ok());
-        assert!(validate_name("\u{211D}").is_ok());
-        assert!(validate_name("☺").is_ok());
-        assert!(validate_name("ok_name").is_ok());
+        assert_matches!(validate_name(&"𐌏".repeat(63)), Ok(_));
+        assert_matches!(validate_name(&'\u{10fff8}'.to_string()), Ok(_));
+        assert_matches!(validate_name("*< ? >"), Ok(_));
+        assert_matches!(validate_name("..."), Ok(_));
+        assert_matches!(validate_name("ok.name"), Ok(_));
+        assert_matches!(validate_name("ok name with spaces"), Ok(_));
+        assert_matches!(validate_name("\\\\"), Ok(_));
+        assert_matches!(validate_name("\u{211D}"), Ok(_));
+        assert_matches!(validate_name("☺"), Ok(_));
+        assert_matches!(validate_name("ok_name"), Ok(_));
     }
 }

@@ -593,7 +593,10 @@ mod tests {
             .map(|(_, v)| *v)
             .collect::<Vec<&Path>>();
 
-        assert!(BlockDevMgr::initialize(pool_uuid, &clean_paths, MIN_MDA_SECTORS).is_ok());
+        assert_matches!(
+            BlockDevMgr::initialize(pool_uuid, &clean_paths, MIN_MDA_SECTORS),
+            Ok(_)
+        );
         cmd::udev_settle().unwrap();
 
         for path in clean_paths {
@@ -651,7 +654,7 @@ mod tests {
         assert!(BlockDevMgr::initialize(uuid2, paths1, MIN_MDA_SECTORS).is_err());
 
         let original_length = bd_mgr.block_devs.len();
-        assert!(bd_mgr.add(uuid, paths1).is_ok());
+        assert_matches!(bd_mgr.add(uuid, paths1), Ok(_));
         assert_eq!(bd_mgr.block_devs.len(), original_length);
 
         BlockDevMgr::initialize(uuid, paths2, MIN_MDA_SECTORS).unwrap();

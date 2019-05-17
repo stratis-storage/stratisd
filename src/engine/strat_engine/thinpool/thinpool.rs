@@ -1643,7 +1643,7 @@ mod tests {
         // thinpool, ::setup() will fail.
         let pool = ThinPool::setup(pool_uuid, &thinpooldevsave, &flexdevs, &backstore).unwrap();
 
-        assert!(pool.get_filesystem_by_uuid(fs_uuid).is_none());
+        assert_matches!(pool.get_filesystem_by_uuid(fs_uuid), None);
     }
 
     #[test]

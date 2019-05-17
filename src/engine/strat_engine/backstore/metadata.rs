@@ -929,7 +929,7 @@ mod mda {
 
             MDARegions::initialize(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf).unwrap();
             let regions = MDARegions::load(BDA_STATIC_HDR_SIZE, MIN_MDA_SECTORS, &mut buf).unwrap();
-            assert!(regions.last_update_time().is_none());
+            assert_matches!(regions.last_update_time(), None);
         }
 
         proptest! {

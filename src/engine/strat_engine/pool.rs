@@ -611,7 +611,7 @@ mod tests {
         invariant(&pool, &name);
 
         let metadata1 = pool.record(name);
-        assert!(metadata1.backstore.cache_tier.is_none());
+        assert_matches!(metadata1.backstore.cache_tier, None);
 
         let (_, fs_uuid) = pool
             .create_filesystems(uuid, &name, &[("stratis-filesystem", None)])

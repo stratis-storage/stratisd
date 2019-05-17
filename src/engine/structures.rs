@@ -332,11 +332,11 @@ mod tests {
         let mut thing = thing.unwrap();
         thing.1.stuff = 0;
         assert!(t.is_empty());
-        assert!(t.remove_by_name(&name).is_none());
+        assert_matches!(t.remove_by_name(&name), None);
         table_invariant(&t);
 
-        assert!(t.get_by_name(&name).is_none());
-        assert!(t.get_by_uuid(uuid).is_none());
+        assert_matches!(t.get_by_name(&name), None);
+        assert_matches!(t.get_by_uuid(uuid), None);
     }
 
     #[test]
@@ -357,7 +357,7 @@ mod tests {
         table_invariant(&t);
 
         // There was nothing previously, so displaced must be empty.
-        assert!(displaced.is_none());
+        assert_matches!(displaced, None);
 
         // t now contains the inserted thing.
         assert!(t.contains_name(&name));
@@ -398,7 +398,7 @@ mod tests {
         // There was nothing in the table before, so displaced is empty.
         let displaced = t.insert(Name::new(name.to_owned()), uuid, thing);
         table_invariant(&t);
-        assert!(displaced.is_none());
+        assert_matches!(displaced, None);
 
         // t now contains thing.
         assert!(t.contains_name(&name));
@@ -442,7 +442,7 @@ mod tests {
         // There was nothing in the table before, so displaced is empty.
         let displaced = t.insert(Name::new(name.to_owned()), uuid, thing);
         table_invariant(&t);
-        assert!(displaced.is_none());
+        assert_matches!(displaced, None);
 
         // t now contains thing.
         assert!(t.contains_name(&name));
@@ -492,7 +492,7 @@ mod tests {
         // displaced is empty.
         let displaced = t.insert(Name::new(name1.to_owned()), uuid1, thing1);
         table_invariant(&t);
-        assert!(displaced.is_none());
+        assert_matches!(displaced, None);
 
         // t now contains thing1.
         assert!(t.contains_name(&name1));
@@ -501,7 +501,7 @@ mod tests {
         // Insert second item. No conflicts, so nothing is displaced.
         let displaced = t.insert(Name::new(name2.to_owned()), uuid2, thing2);
         table_invariant(&t);
-        assert!(displaced.is_none());
+        assert_matches!(displaced, None);
 
         // t now also contains thing2.
         assert!(t.contains_name(&name2));

@@ -166,7 +166,7 @@ mod tests {
     #[test]
     /// When an engine has no pools, any name lookup should fail
     fn get_pool_err() {
-        assert!(SimEngine::default().get_pool(Uuid::new_v4()).is_none());
+        assert_matches!(SimEngine::default().get_pool(Uuid::new_v4()), None);
     }
 
     #[test]

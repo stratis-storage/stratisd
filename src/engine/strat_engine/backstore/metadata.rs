@@ -517,11 +517,6 @@ mod mda {
     // of MDA regions is twice the number of primary MDA regions.
     const NUM_MDA_REGIONS: usize = 2 * NUM_PRIMARY_MDA_REGIONS;
 
-    #[cfg(test)]
-    // The minimum size allocated for a group of MDA regions.
-    // NUM_MDA_REGIONS * MIN_MDA_REGION_SIZE.
-    const MIN_MDA_SECTORS: MDASize = MDASize(Sectors(2032));
-
     const STRAT_REGION_HDR_VERSION: u8 = 1;
     const STRAT_METADATA_VERSION: u8 = 1;
 
@@ -960,13 +955,6 @@ mod mda {
                 MIN_MDA_REGION_SIZE.sectors().bytes(),
                 MIN_MDA_DATA_REGION_SIZE.bytes() + MDA_REGION_HDR_SIZE
             );
-
-            // The minimum size for all the MDA regions is the number of
-            // regions times the minimum size for a single region.
-            assert_eq!(
-                MIN_MDA_SECTORS.sectors(),
-                NUM_MDA_REGIONS * MIN_MDA_REGION_SIZE.sectors()
-            );
         }
 
         #[test]
@@ -986,7 +974,8 @@ mod mda {
         /// Verify that loading MDARegions succeeds if the regions are properly
         /// initialized.
         fn test_reading_mda_regions() {
-            let buf_length = *(BDA_STATIC_HDR_SIZE + MIN_MDA_SECTORS.sectors().bytes()) as usize;
+            let buf_length =
+                *(BDA_STATIC_HDR_SIZE + MIN_MDA_REGION_SIZE.mda_size().sectors().bytes()) as usize;
             let mut buf = Cursor::new(vec![0; buf_length]);
             assert_matches!(
                 MDARegions::load(

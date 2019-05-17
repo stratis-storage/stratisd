@@ -579,7 +579,10 @@ mod tests {
     /// space required.
     fn test_empty_pool(paths: &[&Path]) {
         assert_eq!(paths.len(), 0);
-        assert!(StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE).is_err());
+        assert_matches!(
+            StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE),
+            Err(_)
+        );
     }
 
     #[test]

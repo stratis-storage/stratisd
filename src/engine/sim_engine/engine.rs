@@ -206,7 +206,7 @@ mod tests {
             pool.create_filesystems(uuid, pool_name, &[("test", None)])
                 .unwrap();
         }
-        assert!(engine.destroy_pool(uuid).is_err());
+        assert_matches!(engine.destroy_pool(uuid), Err(_));
     }
 
     #[test]
@@ -257,9 +257,7 @@ mod tests {
     /// Creating a pool with an impossible raid level should fail
     fn create_pool_max_u16_raid() {
         let mut engine = SimEngine::default();
-        assert!(engine
-            .create_pool("name", &[], Some(std::u16::MAX))
-            .is_err());
+        assert_matches!(engine.create_pool("name", &[], Some(std::u16::MAX)), Err(_));
     }
 
     #[test]

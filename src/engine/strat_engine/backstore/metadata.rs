@@ -560,7 +560,6 @@ mod mda {
             MDASize(self.0 * NUM_MDA_REGIONS)
         }
 
-        #[cfg(test)]
         pub fn data_size(self) -> MDADataSize {
             MDADataSize(self.0.bytes() - MDA_REGION_HDR_SIZE)
         }
@@ -591,6 +590,10 @@ mod mda {
                 sectors
             })
         }
+
+        pub fn bytes(self) -> Bytes {
+            self.0
+        }
     }
 
     /// Manages the MDA regions which hold the variable length metadata.
@@ -615,7 +618,7 @@ mod mda {
         /// The maximum size of variable length metadata that this region
         /// can accommodate.
         pub fn max_data_size(&self) -> Bytes {
-            self.region_size.sectors().bytes() - MDA_REGION_HDR_SIZE
+            self.region_size.data_size().bytes()
         }
 
         /// Initialize the space allotted to the MDA regions to 0.

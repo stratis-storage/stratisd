@@ -19,6 +19,6 @@ pub use self::{
     backstore::Backstore,
     blockdev::StratBlockDev,
     device::{blkdev_size, is_stratis_device},
-    metadata::MIN_MDA_SECTORS,
+    metadata::MDADataSize,
     setup::{find_all, get_metadata},
 };

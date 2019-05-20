@@ -21,8 +21,9 @@ use crate::{
                 blockdevmgr::{map_to_dm, BlockDevMgr},
                 cache_tier::CacheTier,
                 data_tier::DataTier,
+                metadata::MDADataSize,
                 setup::get_blockdevs,
-                StratBlockDev, MIN_MDA_SECTORS,
+                StratBlockDev,
             },
             device::wipe_sectors,
             dm::get_dm,
@@ -167,9 +168,9 @@ impl Backstore {
     pub fn initialize(
         pool_uuid: PoolUuid,
         paths: &[&Path],
-        mda_size: Sectors,
+        mda_data_size: MDADataSize,
     ) -> StratisResult<Backstore> {
-        let data_tier = DataTier::new(BlockDevMgr::initialize(pool_uuid, paths, mda_size)?);
+        let data_tier = DataTier::new(BlockDevMgr::initialize(pool_uuid, paths, mda_data_size)?);
 
         Ok(Backstore {
             data_tier,
@@ -228,7 +229,7 @@ impl Backstore {
                 // If it is desired to change a cache dev to a data dev, it
                 // should be removed and then re-added in order to ensure
                 // that the MDA region is set to the correct size.
-                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MIN_MDA_SECTORS)?;
+                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default())?;
 
                 let cache_tier = CacheTier::new(bdm)?;
 
@@ -637,7 +638,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         let mut backstore =
-            Backstore::initialize(pool_uuid, initdatapaths, MIN_MDA_SECTORS).unwrap();
+            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::default()).unwrap();
 
         invariant(&backstore);
 
@@ -731,7 +732,8 @@ mod tests {
         assert!(!paths.is_empty());
 
         let pool_uuid = Uuid::new_v4();
-        let mut backstore = Backstore::initialize(pool_uuid, paths, MIN_MDA_SECTORS).unwrap();
+        let mut backstore =
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
 
         assert_matches!(
             backstore
@@ -795,7 +797,8 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
 
-        let mut backstore = Backstore::initialize(pool_uuid, paths1, MIN_MDA_SECTORS).unwrap();
+        let mut backstore =
+            Backstore::initialize(pool_uuid, paths1, MDADataSize::default()).unwrap();
         invariant(&backstore);
 
         // Allocate space from the backstore so that the cap device is made.

@@ -12,7 +12,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 
-use devicemapper::{Bytes, CacheDev, Device, DmDevice, LinearDev, Sectors};
+use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
 
 use crate::{
     engine::{
@@ -229,7 +229,7 @@ impl Backstore {
                 // If it is desired to change a cache dev to a data dev, it
                 // should be removed and then re-added in order to ensure
                 // that the MDA region is set to the correct size.
-                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::new(Bytes(0)))?;
+                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default())?;
 
                 let cache_tier = CacheTier::new(bdm)?;
 
@@ -638,7 +638,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         let mut backstore =
-            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::new(Bytes(0))).unwrap();
+            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::default()).unwrap();
 
         invariant(&backstore);
 
@@ -733,7 +733,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::new(Bytes(0))).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
 
         assert_matches!(
             backstore
@@ -798,7 +798,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
 
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths1, MDADataSize::new(Bytes(0))).unwrap();
+            Backstore::initialize(pool_uuid, paths1, MDADataSize::default()).unwrap();
         invariant(&backstore);
 
         // Allocate space from the backstore so that the cap device is made.

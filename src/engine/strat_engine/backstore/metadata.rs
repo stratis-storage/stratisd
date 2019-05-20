@@ -591,6 +591,11 @@ mod mda {
 
     impl MDADataSize {
         /// Create a new value, bounded from below by the minimum allowed.
+        // Note that this code is dead due to GitHub issue:
+        // https://github.com/stratis-storage/stratisd/issues/754.
+        // To fix that bug it is necessary for client code to specify a
+        // size. It will use this method to do that.
+        #[allow(dead_code)]
         pub fn new(value: Bytes) -> MDADataSize {
             if value > MIN_MDA_DATA_REGION_SIZE {
                 MDADataSize(value)
@@ -997,34 +1002,16 @@ mod mda {
         /// Verify that loading MDARegions succeeds if the regions are properly
         /// initialized.
         fn test_reading_mda_regions() {
-            let buf_length = *(BDA_STATIC_HDR_SIZE
-                + MDADataSize(MIN_MDA_DATA_REGION_SIZE)
-                    .region_size()
-                    .mda_size()
-                    .sectors()
-                    .bytes()) as usize;
+            let buf_length = *(BDA_STATIC_HDR_SIZE + MDASize::default().sectors().bytes()) as usize;
             let mut buf = Cursor::new(vec![0; buf_length]);
             assert_matches!(
-                MDARegions::load(
-                    BDA_STATIC_HDR_SIZE,
-                    MDADataSize(Bytes(0)).region_size().mda_size(),
-                    &mut buf
-                ),
+                MDARegions::load(BDA_STATIC_HDR_SIZE, MDASize::default(), &mut buf),
                 Err(_)
             );
 
-            MDARegions::initialize(
-                BDA_STATIC_HDR_SIZE,
-                MDADataSize(Bytes(0)).region_size().mda_size(),
-                &mut buf,
-            )
-            .unwrap();
-            let regions = MDARegions::load(
-                BDA_STATIC_HDR_SIZE,
-                MDADataSize(Bytes(0)).region_size().mda_size(),
-                &mut buf,
-            )
-            .unwrap();
+            MDARegions::initialize(BDA_STATIC_HDR_SIZE, MDASize::default(), &mut buf).unwrap();
+            let regions =
+                MDARegions::load(BDA_STATIC_HDR_SIZE, MDASize::default(), &mut buf).unwrap();
             assert_matches!(regions.last_update_time(), None);
         }
 

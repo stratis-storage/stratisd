@@ -12,7 +12,7 @@ use std::{
 use serde_json;
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Device, DmName, DmNameBuf, Sectors};
+use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
 use crate::{
     engine::{
@@ -151,7 +151,7 @@ impl StratPool {
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be
         // required.
-        let mut backstore = Backstore::initialize(pool_uuid, paths, MDADataSize::new(Bytes(0)))?;
+        let mut backstore = Backstore::initialize(pool_uuid, paths, MDADataSize::default())?;
 
         let thinpool = ThinPool::new(
             pool_uuid,

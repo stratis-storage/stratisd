@@ -527,6 +527,12 @@ mod mda {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct MDASize(pub Sectors);
 
+    impl Default for MDASize {
+        fn default() -> MDASize {
+            MDARegionSize::default().mda_size()
+        }
+    }
+
     impl MDASize {
         pub fn sectors(self) -> Sectors {
             self.0
@@ -551,6 +557,12 @@ mod mda {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct MDARegionSize(pub Sectors);
 
+    impl Default for MDARegionSize {
+        fn default() -> MDARegionSize {
+            MDADataSize::default().region_size()
+        }
+    }
+
     impl MDARegionSize {
         pub fn sectors(self) -> Sectors {
             self.0
@@ -571,14 +583,20 @@ mod mda {
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct MDADataSize(Bytes);
 
+    impl Default for MDADataSize {
+        fn default() -> MDADataSize {
+            MDADataSize(MIN_MDA_DATA_REGION_SIZE)
+        }
+    }
+
     impl MDADataSize {
         /// Create a new value, bounded from below by the minimum allowed.
         pub fn new(value: Bytes) -> MDADataSize {
-            MDADataSize(if value > MIN_MDA_DATA_REGION_SIZE {
-                value
+            if value > MIN_MDA_DATA_REGION_SIZE {
+                MDADataSize(value)
             } else {
-                MIN_MDA_DATA_REGION_SIZE
-            })
+                MDADataSize::default()
+            }
         }
 
         pub fn region_size(self) -> MDARegionSize {

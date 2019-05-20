@@ -493,129 +493,140 @@ mod mda {
     use chrono::{DateTime, TimeZone, Utc};
     use crc::crc32;
 
-    use devicemapper::{Bytes, Sectors};
+    use devicemapper::Bytes;
 
     use crate::{
         engine::strat_engine::device::SyncAll,
         stratis::{ErrorEnum, StratisError, StratisResult},
     };
 
-    // The minimum size allocated for variable length metadata
-    pub const MIN_MDA_DATA_REGION_SIZE: Bytes = Bytes(260_064);
-
-    const _MDA_REGION_HDR_SIZE: usize = 32;
-    const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
-
-    const NUM_PRIMARY_MDA_REGIONS: usize = 2;
-
-    // There are two copies of every primary MDA region, so the total number
-    // of MDA regions is twice the number of primary MDA regions.
-    const NUM_MDA_REGIONS: usize = 2 * NUM_PRIMARY_MDA_REGIONS;
+    pub use mda_size::{MDADataSize, MDARegionSize, MDASize, MIN_MDA_DATA_REGION_SIZE};
 
     const STRAT_REGION_HDR_VERSION: u8 = 1;
     const STRAT_METADATA_VERSION: u8 = 1;
 
-    /// A value representing the size of the entire MDA.
-    /// It is constructed in one of two ways:
-    /// * By reading a value from a device in constructing a StaticHeader
-    /// * MDARegionSize::mda_size
-    /// Since only a valid MDASize can be constructed, only a valid MDASize
-    /// can be written. An error on reading ought to be detected by checksums.
-    /// Since MDARegionSize is always at least the minimum, the result of
-    /// MDARegionSize::mda_size is at least the minimum. The method, by
-    /// definition, constructs a valid MDASize value.
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    pub struct MDASize(pub Sectors);
+    /// A module which defines types for three different regions of the MDA:
+    /// * MDADataSize: the size of the region for variable length metadata
+    /// * MDARegionSize: the size a single MDA region
+    /// * MDASize: the size of the whole MDA
+    mod mda_size {
 
-    impl Default for MDASize {
-        fn default() -> MDASize {
-            MDARegionSize::default().mda_size()
-        }
-    }
+        use devicemapper::{Bytes, Sectors};
 
-    impl MDASize {
-        pub fn sectors(self) -> Sectors {
-            self.0
-        }
+        pub const _MDA_REGION_HDR_SIZE: usize = 32;
+        const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
 
-        pub fn region_size(self) -> MDARegionSize {
-            MDARegionSize(self.0 / NUM_MDA_REGIONS)
-        }
-    }
+        // The minimum size allocated for variable length metadata
+        pub const MIN_MDA_DATA_REGION_SIZE: Bytes = Bytes(260_064);
 
-    /// A value representing the size of one MDA region.
-    /// This type is private to the metadata module.
-    /// Values of this type are created by one of two methods:
-    /// * MDASize::region_size
-    /// * MDADataSize::region_size
-    /// Since an MDADataSize is always at least the minimum required by the
-    /// design specification, MDADataSize::region_size() always yields a
-    /// value of at least the minimum required size.
-    /// Since an MDASize is always valid, and at least the minimum,
-    /// MDASize::region_size() always yields a valid and sufficiently large
-    /// region.
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    pub struct MDARegionSize(pub Sectors);
+        pub const NUM_PRIMARY_MDA_REGIONS: usize = 2;
 
-    impl Default for MDARegionSize {
-        fn default() -> MDARegionSize {
-            MDADataSize::default().region_size()
-        }
-    }
+        // There are two copies of every primary MDA region, so the total number
+        // of MDA regions is twice the number of primary MDA regions.
+        pub const NUM_MDA_REGIONS: usize = 2 * NUM_PRIMARY_MDA_REGIONS;
 
-    impl MDARegionSize {
-        pub fn sectors(self) -> Sectors {
-            self.0
-        }
+        /// A value representing the size of the entire MDA.
+        /// It is constructed in one of two ways:
+        /// * By reading a value from a device in constructing a StaticHeader
+        /// * MDARegionSize::mda_size
+        /// Since only a valid MDASize can be constructed, only a valid MDASize
+        /// can be written. An error on reading ought to be detected by
+        /// checksums.
+        /// Since MDARegionSize is always at least the minimum, the result of
+        /// MDARegionSize::mda_size is at least the minimum. The method, by
+        /// definition, constructs a valid MDASize value.
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        pub struct MDASize(pub Sectors);
 
-        pub fn mda_size(self) -> MDASize {
-            MDASize(self.0 * NUM_MDA_REGIONS)
-        }
-
-        pub fn data_size(self) -> MDADataSize {
-            MDADataSize(self.0.bytes() - MDA_REGION_HDR_SIZE)
-        }
-    }
-
-    /// A type representing the size of the region for storing variable length
-    /// metadata. A newly created value is never less than the minimum required
-    /// by the design specification.
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    pub struct MDADataSize(Bytes);
-
-    impl Default for MDADataSize {
-        fn default() -> MDADataSize {
-            MDADataSize(MIN_MDA_DATA_REGION_SIZE)
-        }
-    }
-
-    impl MDADataSize {
-        /// Create a new value, bounded from below by the minimum allowed.
-        // Note that this code is dead due to GitHub issue:
-        // https://github.com/stratis-storage/stratisd/issues/754.
-        // To fix that bug it is necessary for client code to specify a
-        // size. It will use this method to do that.
-        #[allow(dead_code)]
-        pub fn new(value: Bytes) -> MDADataSize {
-            if value > MIN_MDA_DATA_REGION_SIZE {
-                MDADataSize(value)
-            } else {
-                MDADataSize::default()
+        impl Default for MDASize {
+            fn default() -> MDASize {
+                MDARegionSize::default().mda_size()
             }
         }
 
-        pub fn region_size(self) -> MDARegionSize {
-            let bytes = self.0 + MDA_REGION_HDR_SIZE;
-            let sectors = bytes.sectors();
-            MDARegionSize(if sectors.bytes() != bytes {
-                sectors + Sectors(1)
-            } else {
-                sectors
-            })
+        impl MDASize {
+            pub fn sectors(self) -> Sectors {
+                self.0
+            }
+
+            pub fn region_size(self) -> MDARegionSize {
+                MDARegionSize(self.0 / NUM_MDA_REGIONS)
+            }
         }
 
-        pub fn bytes(self) -> Bytes {
-            self.0
+        /// A value representing the size of one MDA region.
+        /// Values of this type are created by one of two methods:
+        /// * MDASize::region_size
+        /// * MDADataSize::region_size
+        /// Since an MDADataSize is always at least the minimum required by the
+        /// design specification, MDADataSize::region_size() always yields a
+        /// value of at least the minimum required size.
+        /// Since an MDASize is always valid, and at least the minimum,
+        /// MDASize::region_size() always yields a valid and sufficiently large
+        /// region.
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        pub struct MDARegionSize(pub Sectors);
+
+        impl Default for MDARegionSize {
+            fn default() -> MDARegionSize {
+                MDADataSize::default().region_size()
+            }
+        }
+
+        impl MDARegionSize {
+            pub fn sectors(self) -> Sectors {
+                self.0
+            }
+
+            pub fn mda_size(self) -> MDASize {
+                MDASize(self.0 * NUM_MDA_REGIONS)
+            }
+
+            pub fn data_size(self) -> MDADataSize {
+                MDADataSize(self.0.bytes() - MDA_REGION_HDR_SIZE)
+            }
+        }
+
+        /// A type representing the size of the region for storing variable length
+        /// metadata. A newly created value is never less than the minimum required
+        /// by the design specification.
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        pub struct MDADataSize(Bytes);
+
+        impl Default for MDADataSize {
+            fn default() -> MDADataSize {
+                MDADataSize(MIN_MDA_DATA_REGION_SIZE)
+            }
+        }
+
+        impl MDADataSize {
+            /// Create a new value, bounded from below by the minimum allowed.
+            // Note that this code is dead due to GitHub issue:
+            // https://github.com/stratis-storage/stratisd/issues/754.
+            // To fix that bug it is necessary for client code to specify a
+            // size. It will use this method to do that.
+            #[allow(dead_code)]
+            pub fn new(value: Bytes) -> MDADataSize {
+                if value > MIN_MDA_DATA_REGION_SIZE {
+                    MDADataSize(value)
+                } else {
+                    MDADataSize::default()
+                }
+            }
+
+            pub fn region_size(self) -> MDARegionSize {
+                let bytes = self.0 + MDA_REGION_HDR_SIZE;
+                let sectors = bytes.sectors();
+                MDARegionSize(if sectors.bytes() != bytes {
+                    sectors + Sectors(1)
+                } else {
+                    sectors
+                })
+            }
+
+            pub fn bytes(self) -> Bytes {
+                self.0
+            }
         }
     }
 
@@ -629,7 +640,7 @@ mod mda {
         /// The MDA headers which contain information about the variable
         /// length metadata. NUM_PRIMARY_MDA_REGIONS is 2: in the general
         /// case one is more recently written than the other.
-        mdas: [Option<MDAHeader>; NUM_PRIMARY_MDA_REGIONS],
+        mdas: [Option<MDAHeader>; mda_size::NUM_PRIMARY_MDA_REGIONS],
     }
 
     impl MDARegions {
@@ -658,7 +669,7 @@ mod mda {
 
             let region_size = mda_size.region_size();
             let region_size_bytes = region_size.sectors().bytes();
-            for region in 0..NUM_MDA_REGIONS {
+            for region in 0..mda_size::NUM_MDA_REGIONS {
                 f.seek(SeekFrom::Start(MDARegions::mda_offset(
                     header_size,
                     region,
@@ -696,7 +707,7 @@ mod mda {
             // return None. If it appears that there is metadata, but it has
             // been corrupted, return an error.
             let mut load_a_region = |index: usize| -> StratisResult<Option<MDAHeader>> {
-                let mut hdr_buf = [0u8; _MDA_REGION_HDR_SIZE];
+                let mut hdr_buf = [0u8; mda_size::_MDA_REGION_HDR_SIZE];
                 f.seek(SeekFrom::Start(MDARegions::mda_offset(
                     header_size,
                     index,
@@ -710,7 +721,8 @@ mod mda {
             // If there is a failure reading the first, fall back on the
             // second. If there is a failure reading both, return an error.
             let mut get_mda = |index: usize| -> StratisResult<Option<MDAHeader>> {
-                load_a_region(index).or_else(|_| load_a_region(index + NUM_PRIMARY_MDA_REGIONS))
+                load_a_region(index)
+                    .or_else(|_| load_a_region(index + mda_size::NUM_PRIMARY_MDA_REGIONS))
             };
 
             Ok(MDARegions {
@@ -779,7 +791,7 @@ mod mda {
             // saving to one or the other region fails.
             let older_region = self.older();
             save_region(older_region)?;
-            save_region(older_region + NUM_PRIMARY_MDA_REGIONS)?;
+            save_region(older_region + mda_size::NUM_PRIMARY_MDA_REGIONS)?;
 
             self.mdas[older_region] = Some(header);
 
@@ -805,7 +817,7 @@ mod mda {
             // It is an error if the metadata can not be found.
             let mut load_region = |index: usize| -> StratisResult<Vec<u8>> {
                 let offset = MDARegions::mda_offset(header_size, index, region_size)
-                    + _MDA_REGION_HDR_SIZE as u64;
+                    + mda_size::_MDA_REGION_HDR_SIZE as u64;
                 f.seek(SeekFrom::Start(offset))?;
                 mda.load_region(f)
             };
@@ -813,7 +825,7 @@ mod mda {
             // TODO: Figure out if there is an action to take if the
             // first read returns an error.
             load_region(newer_region)
-                .or_else(|_| load_region(newer_region + NUM_PRIMARY_MDA_REGIONS))
+                .or_else(|_| load_region(newer_region + mda_size::NUM_PRIMARY_MDA_REGIONS))
                 .map(Some)
         }
 
@@ -873,7 +885,9 @@ mod mda {
         /// Return an error for a bad checksum.
         /// Return None if there is no MDAHeader to be read. This is detected if the
         /// timestamp region in the buffer is 0.
-        fn from_buf(buf: &[u8; _MDA_REGION_HDR_SIZE]) -> StratisResult<Option<MDAHeader>> {
+        fn from_buf(
+            buf: &[u8; mda_size::_MDA_REGION_HDR_SIZE],
+        ) -> StratisResult<Option<MDAHeader>> {
             if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_castagnoli(&buf[4..]) {
                 return Err(StratisError::Engine(
                     ErrorEnum::Invalid,
@@ -918,11 +932,11 @@ mod mda {
             }
         }
 
-        fn to_buf(&self) -> [u8; _MDA_REGION_HDR_SIZE] {
+        fn to_buf(&self) -> [u8; mda_size::_MDA_REGION_HDR_SIZE] {
             // Unsigned casts are always safe, as sec and nsec values are never negative
             assert!(self.last_updated.timestamp() >= 0);
 
-            let mut buf = [0u8; _MDA_REGION_HDR_SIZE];
+            let mut buf = [0u8; mda_size::_MDA_REGION_HDR_SIZE];
 
             LittleEndian::write_u32(&mut buf[4..8], self.data_crc);
             LittleEndian::write_u64(&mut buf[8..16], *self.used as u64);
@@ -931,7 +945,7 @@ mod mda {
             buf[28] = STRAT_REGION_HDR_VERSION;
             buf[29] = STRAT_METADATA_VERSION;
 
-            let buf_crc = crc32::checksum_castagnoli(&buf[4.._MDA_REGION_HDR_SIZE]);
+            let buf_crc = crc32::checksum_castagnoli(&buf[4..mda_size::_MDA_REGION_HDR_SIZE]);
             LittleEndian::write_u32(&mut buf[..4], buf_crc);
 
             buf

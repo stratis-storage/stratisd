@@ -500,7 +500,7 @@ mod mda {
         stratis::{ErrorEnum, StratisError, StratisResult},
     };
 
-    pub use mda_size::{MDADataSize, MDARegionSize, MDASize, MIN_MDA_DATA_REGION_SIZE};
+    pub use self::mda_size::{MDADataSize, MDARegionSize, MDASize, MIN_MDA_DATA_REGION_SIZE};
 
     const STRAT_REGION_HDR_VERSION: u8 = 1;
     const STRAT_METADATA_VERSION: u8 = 1;

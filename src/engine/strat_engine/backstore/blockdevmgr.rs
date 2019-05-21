@@ -24,7 +24,6 @@ use crate::{
         strat_engine::{
             backstore::{
                 blkdev_size,
-                cleanup::wipe_blockdevs,
                 device::{identify, resolve_devices, DevOwnership},
                 metadata::{MDADataSize, BDA},
                 util::hw_lookup,
@@ -507,6 +506,29 @@ fn initialize(
         }
     }
     Ok(bds)
+}
+
+/// Wipe some blockdevs of their identifying headers.
+/// Return an error if any of the blockdevs could not be wiped.
+/// If an error occurs while wiping a blockdev, attempt to wipe all remaining.
+pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
+    let mut unerased_devnodes = Vec::new();
+
+    for bd in blockdevs {
+        let bd_devnode = bd.devnode.to_owned();
+        bd.wipe_metadata()
+            .unwrap_or_else(|_| unerased_devnodes.push(bd_devnode));
+    }
+
+    if unerased_devnodes.is_empty() {
+        Ok(())
+    } else {
+        let err_msg = format!(
+            "Failed to wipe already initialized devnodes: {:?}",
+            unerased_devnodes
+        );
+        Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+    }
 }
 
 #[cfg(test)]

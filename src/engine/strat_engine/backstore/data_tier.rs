@@ -12,8 +12,8 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr},
-                shared::metadata_to_segment,
+                blockdevmgr::{BlkDevSegment, BlockDevMgr},
+                shared::{coalesce_blkdevsegs, metadata_to_segment},
                 StratBlockDev,
             },
             serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},

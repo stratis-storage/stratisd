@@ -12,6 +12,7 @@ pub mod device;
 mod metadata;
 mod range_alloc;
 mod setup;
+mod shared;
 mod util;
 
 pub use self::{

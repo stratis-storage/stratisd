@@ -12,7 +12,8 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr, Segment},
+                blockdevmgr::{coalesce_blkdevsegs, BlkDevSegment, BlockDevMgr},
+                shared::metadata_to_segment,
                 StratBlockDev,
             },
             serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Recordable},
@@ -60,17 +61,7 @@ impl CacheTier {
 
         let uuid_to_devno = block_mgr.uuid_to_devno();
         let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
-            let parent = ld.parent;
-            let device = uuid_to_devno.get(&parent).ok_or_else(|| {
-                StratisError::Engine(
-                    ErrorEnum::NotFound,
-                    format!("missing device for UUUD {:?}", &parent),
-                )
-            })?;
-            Ok(BlkDevSegment::new(
-                parent,
-                Segment::new(*device, ld.start, ld.length),
-            ))
+            metadata_to_segment(&uuid_to_devno, &ld)
         };
 
         let meta_segments = cache_tier_save.blockdev.allocs[1]

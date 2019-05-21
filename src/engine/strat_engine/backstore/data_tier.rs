@@ -16,7 +16,7 @@ use crate::{
                 util::{coalesce_blkdevsegs, metadata_to_segment},
                 StratBlockDev,
             },
-            serde_structs::{BlockDevSave, DataTierSave, Recordable},
+            serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
         },
         BlockDevTier, DevUuid, PoolUuid,
     },
@@ -37,11 +37,14 @@ impl DataTier {
     /// previously allocated segments.
     pub fn setup(block_mgr: BlockDevMgr, data_tier_save: &DataTierSave) -> StratisResult<DataTier> {
         let uuid_to_devno = block_mgr.uuid_to_devno();
+        let mapper = |base_dev_save: &BaseDevSave| -> StratisResult<BlkDevSegment> {
+            metadata_to_segment(&uuid_to_devno, &base_dev_save)
+        };
 
-        let mut segments = Vec::new();
-        for base_dev_save in &data_tier_save.blockdev.allocs[0] {
-            segments.push(metadata_to_segment(&uuid_to_devno, &base_dev_save)?);
-        }
+        let segments = data_tier_save.blockdev.allocs[0]
+            .iter()
+            .map(&mapper)
+            .collect::<StratisResult<Vec<_>>>()?;
 
         Ok(DataTier {
             block_mgr,

@@ -16,7 +16,7 @@ use crate::{
                 util::{coalesce_blkdevsegs, metadata_to_segment},
                 StratBlockDev,
             },
-            serde_structs::{BlockDevSave, CacheTierSave, Recordable},
+            serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Recordable},
         },
         BlockDevTier, DevUuid, PoolUuid,
     },
@@ -60,16 +60,19 @@ impl CacheTier {
         }
 
         let uuid_to_devno = block_mgr.uuid_to_devno();
+        let mapper = |base_dev_save: &BaseDevSave| -> StratisResult<BlkDevSegment> {
+            metadata_to_segment(&uuid_to_devno, &base_dev_save)
+        };
 
-        let mut meta_segments = Vec::new();
-        for base_dev_save in &cache_tier_save.blockdev.allocs[1] {
-            meta_segments.push(metadata_to_segment(&uuid_to_devno, &base_dev_save)?);
-        }
+        let meta_segments = cache_tier_save.blockdev.allocs[1]
+            .iter()
+            .map(&mapper)
+            .collect::<StratisResult<Vec<_>>>()?;
 
-        let mut cache_segments = Vec::new();
-        for base_dev_save in &cache_tier_save.blockdev.allocs[0] {
-            cache_segments.push(metadata_to_segment(&uuid_to_devno, &base_dev_save)?);
-        }
+        let cache_segments = cache_tier_save.blockdev.allocs[0]
+            .iter()
+            .map(&mapper)
+            .collect::<StratisResult<Vec<_>>>()?;
 
         Ok(CacheTier {
             block_mgr,

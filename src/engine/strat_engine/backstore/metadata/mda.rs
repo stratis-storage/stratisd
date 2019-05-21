@@ -390,6 +390,30 @@ impl Default for MDAHeader {
 }
 
 impl MDAHeader {
+    /// Parse a valid MDAHeader from buf.
+    /// If the timestamp value is 0, then return None. This means that
+    /// No variable length metadata has been written, so there is no
+    /// corresponding header.
+    fn parse_buf(buf: &[u8; mda_size::_MDA_REGION_HDR_SIZE]) -> Option<MDAHeader> {
+        match LittleEndian::read_u64(&buf[16..24]) {
+            0 => None,
+            secs => {
+                let used = Bytes(LittleEndian::read_u64(&buf[8..16]));
+
+                // Signed cast is safe, highest order bit of each value
+                // read is guaranteed to be 0.
+                assert!(secs <= std::i64::MAX as u64);
+
+                let nsecs = LittleEndian::read_u32(&buf[24..28]);
+                Some(MDAHeader {
+                    used,
+                    last_updated: Utc.timestamp(secs as i64, nsecs),
+                    data_crc: LittleEndian::read_u32(&buf[4..8]),
+                })
+            }
+        }
+    }
+
     /// Get an MDAHeader from the buffer.
     /// Return an error for a bad checksum.
     /// Return None if there is no MDAHeader to be read. This is detected if the
@@ -420,23 +444,7 @@ impl MDAHeader {
             ));
         }
 
-        match LittleEndian::read_u64(&buf[16..24]) {
-            0 => Ok(None),
-            secs => {
-                let used = Bytes(LittleEndian::read_u64(&buf[8..16]));
-
-                // Signed cast is safe, highest order bit of each value
-                // read is guaranteed to be 0.
-                assert!(secs <= std::i64::MAX as u64);
-
-                let nsecs = LittleEndian::read_u32(&buf[24..28]);
-                Ok(Some(MDAHeader {
-                    used,
-                    last_updated: Utc.timestamp(secs as i64, nsecs),
-                    data_crc: LittleEndian::read_u32(&buf[4..8]),
-                }))
-            }
-        }
+        Ok(MDAHeader::parse_buf(buf))
     }
 
     fn to_buf(&self) -> [u8; mda_size::_MDA_REGION_HDR_SIZE] {

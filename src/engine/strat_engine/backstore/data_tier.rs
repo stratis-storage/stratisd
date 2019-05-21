@@ -38,7 +38,7 @@ impl DataTier {
         let uuid_to_devno = block_mgr.uuid_to_devno();
         let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
             let parent = ld.parent;
-            let device = uuid_to_devno(parent).ok_or_else(|| {
+            let device = uuid_to_devno.get(&parent).ok_or_else(|| {
                 StratisError::Engine(
                     ErrorEnum::NotFound,
                     format!("missing device for UUUD {:?}", &parent),
@@ -46,7 +46,7 @@ impl DataTier {
             })?;
             Ok(BlkDevSegment::new(
                 parent,
-                Segment::new(device, ld.start, ld.length),
+                Segment::new(*device, ld.start, ld.length),
             ))
         };
         let segments = data_tier_save.blockdev.allocs[0]

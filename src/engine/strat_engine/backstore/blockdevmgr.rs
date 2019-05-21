@@ -196,15 +196,12 @@ impl BlockDevMgr {
         ))
     }
 
-    /// Get a function that maps UUIDs to Devices.
-    pub fn uuid_to_devno(&self) -> Box<dyn Fn(DevUuid) -> Option<Device>> {
-        let uuid_map: HashMap<DevUuid, Device> = self
-            .block_devs
+    /// Get a hashmap that maps UUIDs to Devices.
+    pub fn uuid_to_devno(&self) -> HashMap<DevUuid, Device> {
+        self.block_devs
             .iter()
             .map(|bd| (bd.uuid(), *bd.device()))
-            .collect();
-
-        Box::new(move |uuid: DevUuid| -> Option<Device> { uuid_map.get(&uuid).cloned() })
+            .collect()
     }
 
     /// Add paths to self.

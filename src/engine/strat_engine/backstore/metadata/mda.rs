@@ -417,17 +417,15 @@ impl MDAHeader {
         assert!(*self.used.bytes() as u64 <= std::usize::MAX as u64);
         let mut data_buf = vec![0u8; *self.used.bytes() as usize];
 
-        || -> Result<Vec<u8>, Box<dyn std::error::Error + Send>> {
-            if let Err(err) = f.read_exact(&mut data_buf) {
-                return Err(Box::new(err));
-            }
+        || -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+            f.read_exact(&mut data_buf)?;
 
             let checksum = crc32::checksum_castagnoli(&data_buf);
             if self.data_crc != checksum {
-                return Err(Box::new(Error::new(ErrorKind::MDADataChecksumIncorrect {
+                Err(Error::new(ErrorKind::MDADataChecksumIncorrect {
                     expected: self.data_crc,
                     actual: checksum,
-                })));
+                }))?
             }
 
             Ok(data_buf)

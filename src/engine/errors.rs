@@ -83,9 +83,9 @@ impl std::fmt::Display for ErrorKind {
 /// What relation the component error has to its parent
 enum Suberror {
     /// The error occurred before the parent error
-    Previous(Box<(dyn std::error::Error + Send)>),
+    Previous(Box<(dyn std::error::Error + Send + Sync)>),
     /// The error is further explained or extended by the parent
-    Constituent(Box<(dyn std::error::Error + Send)>),
+    Constituent(Box<(dyn std::error::Error + Send + Sync)>),
 }
 
 #[derive(Debug)]
@@ -135,13 +135,16 @@ impl Error {
     }
 
     /// Set constituent as the constituent of this error.
-    pub fn set_constituent(mut self, constituent: Box<dyn std::error::Error + Send>) -> Error {
+    pub fn set_constituent(
+        mut self,
+        constituent: Box<dyn std::error::Error + Send + Sync>,
+    ) -> Error {
         self.source_impl = Some(Suberror::Constituent(constituent));
         self
     }
 
     /// Set previous as the previous error.
-    pub fn set_previous(mut self, previous: Box<dyn std::error::Error + Send>) -> Error {
+    pub fn set_previous(mut self, previous: Box<dyn std::error::Error + Send + Sync>) -> Error {
         self.source_impl = Some(Suberror::Previous(previous));
         self
     }

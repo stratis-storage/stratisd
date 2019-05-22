@@ -73,10 +73,11 @@ matrix:
 
         # MANDATORY PYTHON CHECKS
         # Run pylint, Python linter, on any Python test code
-        - language: python
+        - dist: xenial
+          language: python
           # dbus-python does not compile on higher versions of python on
-          # trusty distribution of Ubuntu.
-          python: "3.4"
+          # xenial distribution of Ubuntu.
+          python: "3.5"
           install: pip3 install -r tests/client-dbus/requirements.txt
           before_script:
               - cd tests/client-dbus

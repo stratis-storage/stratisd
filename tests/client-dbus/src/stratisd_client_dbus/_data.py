@@ -94,9 +94,6 @@ SPECS = {
 <property name="TotalPhysicalSize" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
 </property>
-<property name="TotalPhysicalUsed" type="s" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
-</property>
 <property name="Uuid" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
 </property>
@@ -130,9 +127,6 @@ SPECS = {
 </property>
 <property name="Pool" type="o" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
-</property>
-<property name="Used" type="s" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
 </property>
 <property name="Uuid" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>

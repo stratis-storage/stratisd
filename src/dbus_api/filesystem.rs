@@ -75,12 +75,6 @@ pub fn create_dbus_filesystem<'a>(
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_filesystem_created);
 
-    let used_property = f
-        .property::<&str, _>(consts::FILESYSTEM_USED_PROP, ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
-        .on_get(get_filesystem_used);
-
     let object_name = make_object_path(dbus_context);
 
     let object_path = f
@@ -93,8 +87,7 @@ pub fn create_dbus_filesystem<'a>(
                 .add_p(name_property)
                 .add_p(pool_property)
                 .add_p(uuid_property)
-                .add_p(created_property)
-                .add_p(used_property),
+                .add_p(created_property),
         );
 
     let path = object_path.get_name().to_owned();
@@ -232,17 +225,5 @@ fn get_filesystem_created(
 ) -> Result<(), MethodErr> {
     get_filesystem_property(i, p, |(_, _, fs)| {
         Ok(fs.created().to_rfc3339_opts(SecondsFormat::Secs, true))
-    })
-}
-
-/// Get the number of bytes used for any purpose on the filesystem
-fn get_filesystem_used(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-) -> Result<(), MethodErr> {
-    get_filesystem_property(i, p, |(_, _, fs)| {
-        fs.used()
-            .map(|v| (*v).to_string())
-            .map_err(|_| MethodErr::failed(&"fs used() engine call failed".to_owned()))
     })
 }

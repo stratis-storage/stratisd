@@ -15,7 +15,6 @@
 Test 'CreatePool'.
 """
 
-from stratisd_client_dbus import MOPool
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import StratisdErrors
 from stratisd_client_dbus import ObjectManager
@@ -65,15 +64,10 @@ class Create2TestCase(SimTestCase):
 
         if rc == StratisdErrors.OK:
             self.assertIsNotNone(result)
-            (pool, table) = result
+            (pool, _) = result
             self.assertEqual(pool, poolpath)
             self.assertEqual(len(all_pools), 1)
             self.assertLessEqual(len(devnodes), len(devs))
-
-            pool_info = MOPool(table)
-            self.assertLessEqual(
-                int(pool_info.TotalPhysicalUsed()), int(pool_info.TotalPhysicalSize())
-            )
         else:
             self.assertIsNone(result)
             self.assertEqual(len(all_pools), 0)

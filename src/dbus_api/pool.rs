@@ -360,26 +360,6 @@ fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
     get_pool_property(i, p, |(name, _, _)| Ok(name.to_owned()))
 }
 
-fn get_pool_total_physical_used(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-) -> Result<(), MethodErr> {
-    fn get_used((_, uuid, pool): (Name, PoolUuid, &dyn Pool)) -> Result<String, MethodErr> {
-        let err_func = |_| {
-            MethodErr::failed(&format!(
-                "no total physical size computed for pool with uuid {}",
-                uuid
-            ))
-        };
-
-        pool.total_physical_used()
-            .map(|u| Ok(format!("{}", *u)))
-            .map_err(err_func)?
-    }
-
-    get_pool_property(i, p, get_used)
-}
-
 fn get_pool_total_physical_size(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
@@ -491,12 +471,6 @@ pub fn create_dbus_pool<'a>(
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_pool_total_physical_size);
 
-    let total_physical_used_property = f
-        .property::<&str, _>("TotalPhysicalUsed", ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
-        .on_get(get_pool_total_physical_used);
-
     let uuid_property = f
         .property::<&str, _>("Uuid", ())
         .access(Access::Read)
@@ -536,7 +510,6 @@ pub fn create_dbus_pool<'a>(
                 .add_m(rename_method)
                 .add_p(name_property)
                 .add_p(total_physical_size_property)
-                .add_p(total_physical_used_property)
                 .add_p(uuid_property)
                 .add_p(state_property)
                 .add_p(space_state_property)

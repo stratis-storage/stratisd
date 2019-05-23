@@ -15,7 +15,6 @@ pub const POOL_SPACE_STATE_PROP: &str = "SpaceState";
 
 pub const FILESYSTEM_INTERFACE_NAME: &str = "org.storage.stratis1.filesystem";
 pub const FILESYSTEM_NAME_PROP: &str = "Name";
-pub const FILESYSTEM_USED_PROP: &str = "Used";
 
 pub const BLOCKDEV_INTERFACE_NAME: &str = "org.storage.stratis1.blockdev";
 pub const BLOCKDEV_STATE_PROP: &str = "State";

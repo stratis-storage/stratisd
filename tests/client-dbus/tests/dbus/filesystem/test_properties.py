@@ -78,10 +78,6 @@ class SetNameTestCase(SimTestCase):
         # I think this is also always true
         self.assertEqual(len(created), 20)
 
-        used = Filesystem.Properties.Used.Get(filesystem)
-
-        self.assertEqual(used, "12345678")
-
         devnode = Filesystem.Properties.Devnode.Get(filesystem)
 
         self.assertEqual(devnode, "/stratis/deadpool/fs")

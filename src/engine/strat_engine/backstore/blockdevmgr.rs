@@ -12,7 +12,8 @@ use std::{
 };
 
 use chrono::{DateTime, Duration, Utc};
-use rand::{seq, thread_rng};
+use rand::seq::IteratorRandom;
+use rand::thread_rng;
 use uuid::Uuid;
 
 use devicemapper::{
@@ -289,8 +290,8 @@ impl BlockDevMgr {
 
         // TODO: consider making selection not entirely random, i.e, ensuring
         // distribution of metadata over different paths.
-        let saved = seq::sample_iter(&mut thread_rng(), candidates, MAX_NUM_TO_WRITE)
-            .unwrap_or_else(|e| e)
+        let saved = candidates
+            .choose_multiple(&mut thread_rng(), MAX_NUM_TO_WRITE)
             .iter_mut()
             .fold(false, |acc, b| {
                 acc | b.save_state(&stamp_time, metadata).is_ok()

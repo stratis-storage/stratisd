@@ -4,7 +4,8 @@
 
 use std::fmt;
 
-use rand::{thread_rng, Rng, ThreadRng};
+use rand::rngs::ThreadRng;
+use rand::{thread_rng, Rng};
 
 pub struct Randomizer {
     rng: ThreadRng,
@@ -35,7 +36,7 @@ impl Randomizer {
         if self.denominator == 0 {
             false
         } else {
-            self.rng.gen_weighted_bool(self.denominator)
+            self.rng.gen::<u32>() < ::std::u32::MAX / self.denominator
         }
     }
 

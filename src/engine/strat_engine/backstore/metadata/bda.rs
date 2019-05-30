@@ -27,7 +27,7 @@ use crate::{
 };
 
 const _BDA_STATIC_HDR_SIZE: usize = 16 * SECTOR_SIZE;
-pub const BDA_STATIC_HDR_SIZE: Bytes = Bytes(_BDA_STATIC_HDR_SIZE as u64);
+const BDA_STATIC_HDR_SIZE: Bytes = Bytes(_BDA_STATIC_HDR_SIZE as u64);
 
 const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
 

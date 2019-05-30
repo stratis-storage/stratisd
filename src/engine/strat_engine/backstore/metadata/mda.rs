@@ -500,8 +500,6 @@ mod tests {
         num,
     };
 
-    use crate::engine::strat_engine::backstore::metadata::bda::BDA_STATIC_HDR_SIZE;
-
     use super::*;
 
     // 82102984128000 in decimal, approx 17 million years
@@ -525,15 +523,16 @@ mod tests {
     /// Verify that loading MDARegions succeeds if the regions are properly
     /// initialized.
     fn test_reading_mda_regions() {
-        let buf_length = *(BDA_STATIC_HDR_SIZE + MDASize::default().sectors().bytes()) as usize;
+        let offset = Bytes(100);
+        let buf_length = *(offset + MDASize::default().sectors().bytes()) as usize;
         let mut buf = Cursor::new(vec![0; buf_length]);
         assert_matches!(
-            MDARegions::load(BDA_STATIC_HDR_SIZE, MDASize::default(), &mut buf),
+            MDARegions::load(offset, MDASize::default(), &mut buf),
             Err(_)
         );
 
-        MDARegions::initialize(BDA_STATIC_HDR_SIZE, MDASize::default(), &mut buf).unwrap();
-        let regions = MDARegions::load(BDA_STATIC_HDR_SIZE, MDASize::default(), &mut buf).unwrap();
+        MDARegions::initialize(offset, MDASize::default(), &mut buf).unwrap();
+        let regions = MDARegions::load(offset, MDASize::default(), &mut buf).unwrap();
         assert_matches!(regions.last_update_time(), None);
     }
 

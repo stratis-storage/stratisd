@@ -287,11 +287,11 @@ impl MDARegions {
                 used, max_available
             );
             return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
-        };
+        }
 
         let header = MDAHeader {
             last_updated: *time,
-            used,
+            used: MetaDataSize::new(used),
             data_crc: crc32::checksum_castagnoli(data),
         };
         let hdr_buf = header.to_buf();
@@ -389,8 +389,24 @@ impl MDARegions {
         for mda in self.mda_headers.iter() {
             assert!(mda
                 .as_ref()
-                .map_or_else(|| true, |mda| mda.used != Bytes(0)));
+                .map_or_else(|| true, |mda| mda.used.bytes() != Bytes(0)));
         }
+    }
+}
+
+/// A type representing the actual size of variable length metadata written within this metadata
+/// region. This amount must never be greater than the size of the region allocated for the variable
+/// length metadata, which has `MDADataSize` type.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MetaDataSize(Bytes);
+
+impl MetaDataSize {
+    pub fn new(used: Bytes) -> MetaDataSize {
+        MetaDataSize(used)
+    }
+
+    pub fn bytes(self) -> Bytes {
+        self.0
     }
 }
 
@@ -398,8 +414,9 @@ impl MDARegions {
 pub struct MDAHeader {
     last_updated: DateTime<Utc>,
 
-    /// Size of region used for pool metadata.
-    used: Bytes,
+    /// Size of the variable length metadata last written in the corresponding MDA region.
+    /// If no variable length has been written, the size is 0 bytes.
+    used: MetaDataSize,
 
     data_crc: u32,
 }
@@ -412,7 +429,7 @@ impl Default for MDAHeader {
     fn default() -> MDAHeader {
         MDAHeader {
             last_updated: Utc.timestamp(0, 0),
-            used: Bytes(0),
+            used: MetaDataSize::new(Bytes(0)),
             data_crc: 0,
         }
     }
@@ -433,7 +450,7 @@ impl MDAHeader {
                 assert!(secs <= std::i64::MAX as u64);
 
                 Some(MDAHeader {
-                    used: Bytes(used),
+                    used: MetaDataSize::new(Bytes(used)),
                     last_updated: Utc.timestamp(secs as i64, LittleEndian::read_u32(&buf[24..28])),
                     data_crc: LittleEndian::read_u32(&buf[4..8]),
                 })
@@ -481,7 +498,7 @@ impl MDAHeader {
         let mut buf = [0u8; mda_size::_MDA_REGION_HDR_SIZE];
 
         LittleEndian::write_u32(&mut buf[4..8], self.data_crc);
-        LittleEndian::write_u64(&mut buf[8..16], *self.used as u64);
+        LittleEndian::write_u64(&mut buf[8..16], *self.used.bytes() as u64);
         LittleEndian::write_u64(&mut buf[16..24], self.last_updated.timestamp() as u64);
         LittleEndian::write_u32(&mut buf[24..28], self.last_updated.timestamp_subsec_nanos());
         buf[28] = STRAT_REGION_HDR_VERSION;
@@ -509,8 +526,8 @@ impl MDAHeader {
         // where usize is u64, which is usual. It is not absurd when
         // compiled in an environment where usize is u32.
         #![allow(clippy::absurd_extreme_comparisons)]
-        assert!(*self.used <= std::usize::MAX as u64);
-        let mut data_buf = vec![0u8; *self.used as usize];
+        assert!(*self.used.bytes() as u64 <= std::usize::MAX as u64);
+        let mut data_buf = vec![0u8; *self.used.bytes() as usize];
 
         f.read_exact(&mut data_buf)?;
 
@@ -583,7 +600,7 @@ mod tests {
 
             let header = MDAHeader {
                 last_updated: Utc.timestamp(sec, nsec),
-                used: Bytes(data.len() as u64),
+                used: MetaDataSize::new(Bytes(data.len() as u64)),
                 data_crc: crc32::checksum_castagnoli(&data),
             };
             let buf = header.to_buf();
@@ -602,9 +619,10 @@ mod tests {
     #[test]
     fn test_from_buf_crc_error() {
         let data = [0u8; 3];
+
         let header = MDAHeader {
             last_updated: Utc::now(),
-            used: Bytes(data.len() as u64),
+            used: MetaDataSize::new(Bytes(data.len() as u64)),
             data_crc: crc32::checksum_castagnoli(&data),
         };
         let mut buf = header.to_buf();

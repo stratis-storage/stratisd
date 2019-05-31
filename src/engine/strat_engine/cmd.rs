@@ -24,13 +24,15 @@ use uuid::Uuid;
 
 use crate::stratis::{StratisError, StratisResult};
 
+const BINARIES_PATHS: [&str; 4] = ["/usr/sbin", "/sbin", "/usr/bin", "/bin"];
+
 /// Find the binary with the given name by looking in likely locations.
 /// Return None if no binary was found.
 /// Search an explicit list of directories rather than the user's PATH
 /// environment variable. stratisd may be running when there is no PATH
 /// variable set.
 fn find_binary(name: &str) -> Option<PathBuf> {
-    ["/usr/sbin", "/sbin", "/usr/bin", "/bin"]
+    BINARIES_PATHS
         .iter()
         .map(|pre| [pre, name].iter().collect::<PathBuf>())
         .find(|path| path.exists())
@@ -67,8 +69,13 @@ pub fn verify_binaries() -> StratisResult<()> {
     match BINARIES.iter().find(|&(_, ref path)| path.is_none()) {
         None => Ok(()),
         Some((ref name, _)) => Err(StratisError::Error(format!(
-            "Unable to find absolute path for \"{}\"",
-            name
+            "Unable to find executable \"{}\" in any of {}",
+            name,
+            BINARIES_PATHS
+                .iter()
+                .map(|p| format!("\"{}\"", p))
+                .collect::<Vec<_>>()
+                .join(", "),
         ))),
     }
 }

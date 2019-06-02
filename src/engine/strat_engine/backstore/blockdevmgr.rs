@@ -126,7 +126,7 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParam
 #[derive(Debug)]
 pub struct BlockDevMgr {
     block_devs: Vec<StratBlockDev>,
-    last_update_time: Option<DateTime<Utc>>,
+    last_update_time: DateTime<Utc>,
 }
 
 impl BlockDevMgr {
@@ -137,7 +137,10 @@ impl BlockDevMgr {
     ) -> BlockDevMgr {
         BlockDevMgr {
             block_devs,
-            last_update_time,
+            last_update_time: match last_update_time {
+                Some(l) => l,
+                None => Utc::now(),
+            },
         }
     }
 
@@ -272,9 +275,8 @@ impl BlockDevMgr {
     /// write to.
     pub fn save_state(&mut self, metadata: &[u8]) -> StratisResult<()> {
         let current_time = Utc::now();
-        let stamp_time = if Some(current_time) <= self.last_update_time {
+        let stamp_time = if current_time <= self.last_update_time {
             self.last_update_time
-                .expect("self.last_update_time >= Some(current_time")
                 .checked_add_signed(Duration::nanoseconds(1))
                 .expect("self.last_update_time << maximum representable DateTime")
         } else {
@@ -297,7 +299,7 @@ impl BlockDevMgr {
             });
 
         if saved {
-            self.last_update_time = Some(stamp_time);
+            self.last_update_time = stamp_time;
             Ok(())
         } else {
             let err_msg = "Failed to save metadata to even one device in pool";

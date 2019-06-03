@@ -56,7 +56,7 @@ pub struct EngineListenerList {
 
 impl EngineListenerList {
     /// Create a new EngineListenerList.
-    pub fn new() -> EngineListenerList {
+    fn new() -> EngineListenerList {
         EngineListenerList {
             listeners: Vec::new(),
         }
@@ -72,12 +72,6 @@ impl EngineListenerList {
         for listener in &self.listeners {
             listener.notify(&event);
         }
-    }
-}
-
-impl Default for EngineListenerList {
-    fn default() -> EngineListenerList {
-        EngineListenerList::new()
     }
 }
 

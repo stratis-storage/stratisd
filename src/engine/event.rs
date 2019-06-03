@@ -79,7 +79,7 @@ pub fn get_engine_listener_list() -> &'static EngineListenerList {
     unsafe {
         INIT.call_once(|| ENGINE_LISTENER_LIST = Some(EngineListenerList::new()));
         match ENGINE_LISTENER_LIST {
-            Some(ref mut ell) => ell,
+            Some(ref ell) => ell,
             _ => panic!("ENGINE_LISTENER_LIST is None"),
         }
     }

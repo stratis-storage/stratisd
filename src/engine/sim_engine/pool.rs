@@ -299,10 +299,6 @@ impl Pool for SimPool {
         self.pool_state
     }
 
-    fn extend_state(&self) -> PoolExtendState {
-        self.pool_extend_state
-    }
-
     fn free_space_state(&self) -> FreeSpaceState {
         self.free_space_state
     }

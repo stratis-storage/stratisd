@@ -26,8 +26,8 @@ use crate::{
         },
         types::{
             BlockDevTier, CreateAction, DevUuid, EngineAction, FilesystemUuid, FreeSpaceState,
-            MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction,
-            SetCreateAction, SetDeleteAction,
+            MaybeDbusPath, Name, PoolState, PoolUuid, Redundancy, RenameAction, SetCreateAction,
+            SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -466,10 +466,6 @@ impl Pool for StratPool {
         self.thin_pool.state()
     }
 
-    fn extend_state(&self) -> PoolExtendState {
-        self.thin_pool.extend_state()
-    }
-
     fn free_space_state(&self) -> FreeSpaceState {
         self.thin_pool.free_space_state()
     }
@@ -503,7 +499,7 @@ mod tests {
             cmd,
             tests::{loopbacked, real},
         },
-        types::{EngineAction, Redundancy},
+        types::{EngineAction, PoolExtendState, Redundancy},
     };
 
     use super::*;

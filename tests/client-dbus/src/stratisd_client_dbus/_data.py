@@ -100,9 +100,6 @@ SPECS = {
 <property name="State" type="q" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="true"/>
 </property>
-<property name="ExtendState" type="q" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="true"/>
-</property>
 <property name="SpaceState" type="q" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="true"/>
 </property>

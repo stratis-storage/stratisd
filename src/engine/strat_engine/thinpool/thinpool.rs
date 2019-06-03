@@ -621,12 +621,8 @@ impl ThinPool {
         } else if meta_extend_failed {
             new_state = PoolExtendState::MetaFailed;
         }
-        if self.extend_state() != new_state {
+        if self.pool_extend_state != new_state {
             self.pool_extend_state = new_state;
-            get_engine_listener_list().notify(&EngineEvent::PoolExtendStateChanged {
-                dbus_path: self.get_dbus_path(),
-                state: new_state,
-            });
         }
     }
 
@@ -1005,6 +1001,7 @@ impl ThinPool {
         self.pool_state
     }
 
+    #[cfg(test)]
     pub fn extend_state(&self) -> PoolExtendState {
         self.pool_extend_state
     }

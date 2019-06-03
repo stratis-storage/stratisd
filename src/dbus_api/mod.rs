@@ -7,10 +7,11 @@ mod macros;
 
 mod api;
 mod blockdev;
-pub mod consts;
+mod consts;
+mod event_handler;
 mod filesystem;
 mod pool;
 mod types;
 mod util;
 
-pub use self::{api::DbusConnectionData, util::prop_changed_dispatch};
+pub use self::{api::DbusConnectionData, event_handler::EventHandler};

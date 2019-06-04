@@ -201,11 +201,17 @@ impl MDARegions {
         })
     }
 
-    /// Construct MDARegions from data on the disk.
-    /// Note that this method is always called in a context where a
-    /// StaticHeader has already been read. Therefore, it
-    /// constitutes an error if it is not possible to discover two
-    /// well-formed MDAHeaders for this device.
+    /// Construct an MDARegions struct from data on the disk.
+    /// The individual MDAHeaders in the struct may all be None, as it is
+    /// possible that no variable length metadata has been written to the
+    /// device on which the metadata has been written.
+    ///
+    /// Returns an error if there is an I/O error or if the MDA header data
+    /// on the device is invalid.
+    //
+    // TODO: Consider whether the return type of this method should be
+    // refined to distinguish between I/O errors and errors resulting from
+    // invalid data representing an MDA header.
     pub fn load<F>(header_size: Bytes, mda_size: MDASize, f: &mut F) -> StratisResult<MDARegions>
     where
         F: Read + Seek,

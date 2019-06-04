@@ -156,6 +156,12 @@ impl BDA {
             None => return Ok(None),
         };
 
+        // Assume that, since a valid StaticHeader was found on the device,
+        // that this implies that BDA::initialize() was succesfully executed
+        // sometime in the past. Since that is the case, valid MDA headers
+        // were written to the device. Returns an error if there is an error
+        // when loading the MDARegions, which can only be caused by an I/O
+        // error or invalid MDA headers.
         let regions = mda::MDARegions::load(BDA_STATIC_HDR_SIZE, header.mda_size, f)?;
 
         Ok(Some(BDA { header, regions }))

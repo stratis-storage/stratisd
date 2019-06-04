@@ -387,7 +387,9 @@ pub struct MDAHeader {
 }
 
 // Implementing Default explicitly because DateTime<Utc> does not implement
-// Default.
+// Default. Implement Default for MDAHeader in order to overwrite MDAHeader
+// locations with values that represent no MDAHeader but where the data has
+// the correct CRC, so can be read without an error.
 impl Default for MDAHeader {
     fn default() -> MDAHeader {
         MDAHeader {

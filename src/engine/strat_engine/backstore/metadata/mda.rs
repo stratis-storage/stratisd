@@ -402,19 +402,20 @@ impl Default for MDAHeader {
 
 impl MDAHeader {
     /// Parse a valid MDAHeader from buf.
-    /// If the timestamp value is 0, then return None. This means that
-    /// No variable length metadata has been written, so there is no
-    /// corresponding header.
+    /// If the amount used by the variable length metadata is 0, return None,
+    /// as this means that no variable length metadata has been written.
     fn parse_buf(buf: &[u8; mda_size::_MDA_REGION_HDR_SIZE]) -> Option<MDAHeader> {
-        match LittleEndian::read_u64(&buf[16..24]) {
+        match LittleEndian::read_u64(&buf[8..16]) {
             0 => None,
-            secs => {
+            used => {
+                let secs = LittleEndian::read_u64(&buf[16..24]);
+
                 // Signed cast is safe, highest order bit of each value
                 // read is guaranteed to be 0.
                 assert!(secs <= std::i64::MAX as u64);
 
                 Some(MDAHeader {
-                    used: Bytes(LittleEndian::read_u64(&buf[8..16])),
+                    used: Bytes(used),
                     last_updated: Utc.timestamp(secs as i64, LittleEndian::read_u32(&buf[24..28])),
                     data_crc: LittleEndian::read_u32(&buf[4..8]),
                 })
@@ -511,10 +512,7 @@ mod tests {
     use std::io::Cursor;
 
     use chrono::Utc;
-    use proptest::{
-        collection::{self, SizeRange},
-        num,
-    };
+    use proptest::{collection, num};
 
     use super::*;
 
@@ -558,10 +556,9 @@ mod tests {
         /// Read the mda header buffer twice.
         /// Verify that the resulting MDAHeaders have all equal components.
         /// Verify timestamp and data CRC against original values.
-        fn mda_header(ref data in collection::vec(num::u8::ANY, SizeRange::default()),
+        fn mda_header(ref data in collection::vec(num::u8::ANY, 1..100),
                       // sec < 0: unwritable timestamp
-                      // sec == 0: value of 0 is interpreted as no timestamp when read
-                      sec in 1..UTC_TIMESTAMP_SECS_BOUND,
+                      sec in 0..UTC_TIMESTAMP_SECS_BOUND,
                       nsec in 0..UTC_TIMESTAMP_NSECS_BOUND) {
 
             let header = MDAHeader {

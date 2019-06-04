@@ -34,15 +34,12 @@ use nix::{
 use timerfd::{SetTimeFlags, TimerFd, TimerState};
 use uuid::Uuid;
 
-#[cfg(feature = "dbus_enabled")]
-use dbus::Connection;
-
 use devicemapper::Device;
 
 #[cfg(feature = "dbus_enabled")]
 use libstratis::{
-    dbus_api::{consts, prop_changed_dispatch, DbusConnectionData},
-    engine::{get_engine_listener_list_mut, EngineEvent, EngineListener, MaybeDbusPath},
+    dbus_api::{DbusConnectionData, EventHandler},
+    engine::get_engine_listener_list_mut,
 };
 
 use libstratis::{
@@ -144,137 +141,6 @@ fn trylock_pid_file() -> StratisResult<File> {
                 "Daemon already running with pid: {}",
                 pid_str
             )))
-        }
-    }
-}
-
-#[cfg(feature = "dbus_enabled")]
-#[derive(Debug)]
-struct EventHandler {
-    dbus_conn: Rc<RefCell<Connection>>,
-}
-
-#[cfg(feature = "dbus_enabled")]
-impl EventHandler {
-    pub fn new(dbus_conn: Rc<RefCell<Connection>>) -> EventHandler {
-        EventHandler { dbus_conn }
-    }
-}
-
-#[cfg(feature = "dbus_enabled")]
-impl EngineListener for EventHandler {
-    fn notify(&self, event: &EngineEvent) {
-        match *event {
-            EngineEvent::BlockdevStateChanged { dbus_path, state } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
-                        consts::BLOCKDEV_STATE_PROP,
-                        state as u16,
-                        &dbus_path,
-                        consts::BLOCKDEV_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        error!(
-                            "BlockdevStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path, state as u16,
-                        );
-                    });
-                }
-            }
-            EngineEvent::FilesystemRenamed {
-                dbus_path,
-                from,
-                to,
-            } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
-                        consts::FILESYSTEM_NAME_PROP,
-                        to.to_string(),
-                        &dbus_path,
-                        consts::FILESYSTEM_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        error!(
-                            "FilesystemRenamed: {} from: {} to: {} failed to send dbus update.",
-                            dbus_path, from, to,
-                        );
-                    });
-                }
-            }
-            EngineEvent::PoolExtendStateChanged { dbus_path, state } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
-                        consts::POOL_EXTEND_STATE_PROP,
-                        state as u16,
-                        &dbus_path,
-                        consts::POOL_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        error!(
-                            "PoolExtendStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path, state as u16,
-                        );
-                    });
-                }
-            }
-            EngineEvent::PoolRenamed {
-                dbus_path,
-                from,
-                to,
-            } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
-                        consts::POOL_NAME_PROP,
-                        to.to_string(),
-                        &dbus_path,
-                        consts::POOL_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        error!(
-                            "PoolRenamed: {} from: {} to: {} failed to send dbus update.",
-                            dbus_path, from, to,
-                        );
-                    });
-                }
-            }
-            EngineEvent::PoolSpaceStateChanged { dbus_path, state } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
-                        consts::POOL_SPACE_STATE_PROP,
-                        state as u16,
-                        &dbus_path,
-                        consts::POOL_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        error!(
-                            "PoolSpaceStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path, state as u16,
-                        );
-                    });
-                }
-            }
-            EngineEvent::PoolStateChanged { dbus_path, state } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
-                        consts::POOL_STATE_PROP,
-                        state as u16,
-                        &dbus_path,
-                        consts::POOL_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        error!(
-                            "PoolStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path, state as u16,
-                        );
-                    });
-                }
-            }
         }
     }
 }

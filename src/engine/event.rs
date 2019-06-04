@@ -56,7 +56,7 @@ pub struct EngineListenerList {
 
 impl EngineListenerList {
     /// Create a new EngineListenerList.
-    pub fn new() -> EngineListenerList {
+    fn new() -> EngineListenerList {
         EngineListenerList {
             listeners: Vec::new(),
         }
@@ -67,7 +67,7 @@ impl EngineListenerList {
         self.listeners.push(listener);
     }
 
-    /// Notify a listener.
+    /// Notify all listeners of the event.
     pub fn notify(&self, event: &EngineEvent) {
         for listener in &self.listeners {
             listener.notify(&event);
@@ -75,17 +75,11 @@ impl EngineListenerList {
     }
 }
 
-impl Default for EngineListenerList {
-    fn default() -> EngineListenerList {
-        EngineListenerList::new()
-    }
-}
-
 pub fn get_engine_listener_list() -> &'static EngineListenerList {
     unsafe {
         INIT.call_once(|| ENGINE_LISTENER_LIST = Some(EngineListenerList::new()));
         match ENGINE_LISTENER_LIST {
-            Some(ref mut ell) => ell,
+            Some(ref ell) => ell,
             _ => panic!("ENGINE_LISTENER_LIST is None"),
         }
     }

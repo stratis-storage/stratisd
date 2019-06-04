@@ -170,8 +170,11 @@ impl MDARegions {
         self.region_size.data_size()
     }
 
-    /// Initialize the space allotted to the MDA regions to 0.
-    /// Return an MDARegions object with uninitialized MDAHeader objects.
+    /// Initialize the space allotted to the MDA region headers.
+    /// For each MDA region, write the data corresponding to a default
+    /// MDAHeader to the appropriate location. This default MDA header
+    /// has all zero values. The returned MDARegions struct's optional
+    /// MDAHeader structs are all None.
     pub fn initialize<F>(
         header_size: Bytes,
         mda_size: MDASize,

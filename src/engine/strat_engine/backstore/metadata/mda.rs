@@ -155,6 +155,10 @@ pub struct MDARegions {
     /// The MDA headers which contain information about the variable
     /// length metadata. NUM_PRIMARY_MDA_REGIONS is 2: in the general
     /// case one is more recently written than the other.
+    /// A value of None indicates that no variable length metadata has been
+    /// written to the MDA regions corresponding to a given MDA header.
+    /// If there is Some value, then variable length metadata has been read;
+    /// the MDA header's used field therefore can not be 0 bytes.
     mdas: [Option<MDAHeader>; mda_size::NUM_PRIMARY_MDA_REGIONS],
 }
 

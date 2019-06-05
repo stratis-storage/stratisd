@@ -378,6 +378,18 @@ impl MDARegions {
     pub fn last_update_time(&self) -> Option<&DateTime<Utc>> {
         self.mdas[self.newer()].as_ref().map(|h| &h.last_updated)
     }
+
+    #[cfg(test)]
+    /// An invariant on MDARegions structs.
+    /// 1. If an MDAHeader in the regions is not None, then its used
+    /// attribute must be greater than 0.
+    pub fn invariant(&self) {
+        for mda in self.mdas.iter() {
+            assert!(mda
+                .as_ref()
+                .map_or_else(|| true, |mda| mda.used != Bytes(0)));
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -551,6 +563,8 @@ mod tests {
 
         MDARegions::initialize(offset, MDASize::default(), &mut buf).unwrap();
         let regions = MDARegions::load(offset, MDASize::default(), &mut buf).unwrap();
+        regions.invariant();
+
         assert_matches!(regions.last_update_time(), None);
     }
 

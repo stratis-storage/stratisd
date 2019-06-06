@@ -156,6 +156,12 @@ impl BDA {
             None => return Ok(None),
         };
 
+        // Assume that, since a valid StaticHeader was found on the device,
+        // that this implies that BDA::initialize() was succesfully executed
+        // sometime in the past. Since that is the case, valid MDA headers
+        // were written to the device. Returns an error if there is an error
+        // when loading the MDARegions, which can only be caused by an I/O
+        // error or invalid MDA headers.
         let regions = mda::MDARegions::load(BDA_STATIC_HDR_SIZE, header.mda_size, f)?;
 
         Ok(Some(BDA { header, regions }))
@@ -490,12 +496,7 @@ impl fmt::Debug for StaticHeader {
 mod tests {
     use std::io::{Cursor, Write};
 
-    use proptest::{
-        collection::{vec, SizeRange},
-        num, option,
-        prelude::BoxedStrategy,
-        strategy::Strategy,
-    };
+    use proptest::{collection::vec, num, option, prelude::BoxedStrategy, strategy::Strategy};
     use uuid::Uuid;
 
     use devicemapper::{Bytes, Sectors, IEC};
@@ -644,8 +645,8 @@ mod tests {
         /// Save metadata again, and reload one more time, verifying new timestamp.
         fn check_state(
             ref sh in static_header_strategy(),
-            ref state in vec(num::u8::ANY, SizeRange::default()),
-            ref next_state in vec(num::u8::ANY, SizeRange::default())
+            ref state in vec(num::u8::ANY, 1..100),
+            ref next_state in vec(num::u8::ANY, 1..100)
         ) {
             let buf_size = *sh.mda_size.sectors().bytes() as usize + _BDA_STATIC_HDR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);

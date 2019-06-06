@@ -155,7 +155,11 @@ pub struct MDARegions {
     /// The MDA headers which contain information about the variable
     /// length metadata. NUM_PRIMARY_MDA_REGIONS is 2: in the general
     /// case one is more recently written than the other.
-    mdas: [Option<MDAHeader>; mda_size::NUM_PRIMARY_MDA_REGIONS],
+    /// A value of None indicates that no variable length metadata has been
+    /// written to the MDA regions corresponding to a given MDA header.
+    /// If there is Some value, then variable length metadata has been read;
+    /// the MDA header's used field therefore can not be 0 bytes.
+    mda_headers: [Option<MDAHeader>; mda_size::NUM_PRIMARY_MDA_REGIONS],
 }
 
 impl MDARegions {
@@ -170,8 +174,11 @@ impl MDARegions {
         self.region_size.data_size()
     }
 
-    /// Initialize the space allotted to the MDA regions to 0.
-    /// Return an MDARegions object with uninitialized MDAHeader objects.
+    /// Initialize the space allotted to the MDA region headers.
+    /// For each MDA region, write the data corresponding to a default
+    /// MDAHeader to the appropriate location. This default MDA header
+    /// has all zero values. The returned MDARegions struct's optional
+    /// MDAHeader structs are all None.
     pub fn initialize<F>(
         header_size: Bytes,
         mda_size: MDASize,
@@ -197,15 +204,21 @@ impl MDARegions {
 
         Ok(MDARegions {
             region_size,
-            mdas: [None, None],
+            mda_headers: [None, None],
         })
     }
 
-    /// Construct MDARegions from data on the disk.
-    /// Note that this method is always called in a context where a
-    /// StaticHeader has already been read. Therefore, it
-    /// constitutes an error if it is not possible to discover two
-    /// well-formed MDAHeaders for this device.
+    /// Construct an MDARegions struct from data on the disk.
+    /// The individual MDAHeaders in the struct may all be None, as it is
+    /// possible that no variable length metadata has been written to the
+    /// device on which the metadata has been written.
+    ///
+    /// Returns an error if there is an I/O error or if the MDA header data
+    /// on the device is invalid.
+    //
+    // TODO: Consider whether the return type of this method should be
+    // refined to distinguish between I/O errors and errors resulting from
+    // invalid data representing an MDA header.
     pub fn load<F>(header_size: Bytes, mda_size: MDASize, f: &mut F) -> StratisResult<MDARegions>
     where
         F: Read + Seek,
@@ -238,7 +251,7 @@ impl MDARegions {
 
         Ok(MDARegions {
             region_size,
-            mdas: [get_mda(0)?, get_mda(1)?],
+            mda_headers: [get_mda(0)?, get_mda(1)?],
         })
     }
 
@@ -304,7 +317,7 @@ impl MDARegions {
         save_region(older_region)?;
         save_region(older_region + mda_size::NUM_PRIMARY_MDA_REGIONS)?;
 
-        self.mdas[older_region] = Some(header);
+        self.mda_headers[older_region] = Some(header);
 
         Ok(())
     }
@@ -318,7 +331,7 @@ impl MDARegions {
         F: Read + Seek,
     {
         let newer_region = self.newer();
-        let mda = match self.mdas[newer_region] {
+        let mda = match self.mda_headers[newer_region] {
             None => return Ok(None),
             Some(ref mda) => mda,
         };
@@ -342,7 +355,7 @@ impl MDARegions {
 
     /// The index of the older region, or 0 if there is a tie.
     fn older(&self) -> usize {
-        match (&self.mdas[0], &self.mdas[1]) {
+        match (&self.mda_headers[0], &self.mda_headers[1]) {
             (&None, _) => 0,
             (_, &None) => 1,
             (&Some(ref mda0), &Some(ref mda1)) => match mda0.last_updated.cmp(&mda1.last_updated) {
@@ -363,7 +376,21 @@ impl MDARegions {
 
     /// The last update time for these MDA regions
     pub fn last_update_time(&self) -> Option<&DateTime<Utc>> {
-        self.mdas[self.newer()].as_ref().map(|h| &h.last_updated)
+        self.mda_headers[self.newer()]
+            .as_ref()
+            .map(|h| &h.last_updated)
+    }
+
+    #[cfg(test)]
+    /// An invariant on MDARegions structs.
+    /// 1. If an MDAHeader in the regions is not None, then its used
+    /// attribute must be greater than 0.
+    pub fn invariant(&self) {
+        for mda in self.mda_headers.iter() {
+            assert!(mda
+                .as_ref()
+                .map_or_else(|| true, |mda| mda.used != Bytes(0)));
+        }
     }
 }
 
@@ -378,7 +405,9 @@ pub struct MDAHeader {
 }
 
 // Implementing Default explicitly because DateTime<Utc> does not implement
-// Default.
+// Default. Implement Default for MDAHeader in order to overwrite MDAHeader
+// locations with values that represent no MDAHeader but where the data has
+// the correct CRC, so can be read without an error.
 impl Default for MDAHeader {
     fn default() -> MDAHeader {
         MDAHeader {
@@ -391,19 +420,20 @@ impl Default for MDAHeader {
 
 impl MDAHeader {
     /// Parse a valid MDAHeader from buf.
-    /// If the timestamp value is 0, then return None. This means that
-    /// No variable length metadata has been written, so there is no
-    /// corresponding header.
+    /// If the amount used by the variable length metadata is 0, return None,
+    /// as this means that no variable length metadata has been written.
     fn parse_buf(buf: &[u8; mda_size::_MDA_REGION_HDR_SIZE]) -> Option<MDAHeader> {
-        match LittleEndian::read_u64(&buf[16..24]) {
+        match LittleEndian::read_u64(&buf[8..16]) {
             0 => None,
-            secs => {
+            used => {
+                let secs = LittleEndian::read_u64(&buf[16..24]);
+
                 // Signed cast is safe, highest order bit of each value
                 // read is guaranteed to be 0.
                 assert!(secs <= std::i64::MAX as u64);
 
                 Some(MDAHeader {
-                    used: Bytes(LittleEndian::read_u64(&buf[8..16])),
+                    used: Bytes(used),
                     last_updated: Utc.timestamp(secs as i64, LittleEndian::read_u32(&buf[24..28])),
                     data_crc: LittleEndian::read_u32(&buf[4..8]),
                 })
@@ -500,10 +530,7 @@ mod tests {
     use std::io::Cursor;
 
     use chrono::Utc;
-    use proptest::{
-        collection::{self, SizeRange},
-        num,
-    };
+    use proptest::{collection, num};
 
     use super::*;
 
@@ -538,6 +565,8 @@ mod tests {
 
         MDARegions::initialize(offset, MDASize::default(), &mut buf).unwrap();
         let regions = MDARegions::load(offset, MDASize::default(), &mut buf).unwrap();
+        regions.invariant();
+
         assert_matches!(regions.last_update_time(), None);
     }
 
@@ -547,10 +576,9 @@ mod tests {
         /// Read the mda header buffer twice.
         /// Verify that the resulting MDAHeaders have all equal components.
         /// Verify timestamp and data CRC against original values.
-        fn mda_header(ref data in collection::vec(num::u8::ANY, SizeRange::default()),
+        fn mda_header(ref data in collection::vec(num::u8::ANY, 1..100),
                       // sec < 0: unwritable timestamp
-                      // sec == 0: value of 0 is interpreted as no timestamp when read
-                      sec in 1..UTC_TIMESTAMP_SECS_BOUND,
+                      sec in 0..UTC_TIMESTAMP_SECS_BOUND,
                       nsec in 0..UTC_TIMESTAMP_NSECS_BOUND) {
 
             let header = MDAHeader {

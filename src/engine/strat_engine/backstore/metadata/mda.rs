@@ -158,7 +158,7 @@ pub struct MDARegions {
     /// A value of None indicates that no variable length metadata has been
     /// written to the MDA regions corresponding to a given MDA header.
     /// If there is Some value, then variable length metadata has been read;
-    /// the MDA header's used attribute therefore can not be 0 bytes.
+    /// the MDA header's used field therefore can not be 0 bytes.
     mda_headers: [Option<MDAHeader>; mda_size::NUM_PRIMARY_MDA_REGIONS],
 }
 

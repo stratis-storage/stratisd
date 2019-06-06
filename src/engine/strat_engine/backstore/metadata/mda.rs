@@ -159,7 +159,7 @@ pub struct MDARegions {
     /// written to the MDA regions corresponding to a given MDA header.
     /// If there is Some value, then variable length metadata has been read;
     /// the MDA header's used field therefore can not be 0 bytes.
-    mdas: [Option<MDAHeader>; mda_size::NUM_PRIMARY_MDA_REGIONS],
+    mda_headers: [Option<MDAHeader>; mda_size::NUM_PRIMARY_MDA_REGIONS],
 }
 
 impl MDARegions {
@@ -204,7 +204,7 @@ impl MDARegions {
 
         Ok(MDARegions {
             region_size,
-            mdas: [None, None],
+            mda_headers: [None, None],
         })
     }
 
@@ -251,7 +251,7 @@ impl MDARegions {
 
         Ok(MDARegions {
             region_size,
-            mdas: [get_mda(0)?, get_mda(1)?],
+            mda_headers: [get_mda(0)?, get_mda(1)?],
         })
     }
 
@@ -317,7 +317,7 @@ impl MDARegions {
         save_region(older_region)?;
         save_region(older_region + mda_size::NUM_PRIMARY_MDA_REGIONS)?;
 
-        self.mdas[older_region] = Some(header);
+        self.mda_headers[older_region] = Some(header);
 
         Ok(())
     }
@@ -331,7 +331,7 @@ impl MDARegions {
         F: Read + Seek,
     {
         let newer_region = self.newer();
-        let mda = match self.mdas[newer_region] {
+        let mda = match self.mda_headers[newer_region] {
             None => return Ok(None),
             Some(ref mda) => mda,
         };
@@ -355,7 +355,7 @@ impl MDARegions {
 
     /// The index of the older region, or 0 if there is a tie.
     fn older(&self) -> usize {
-        match (&self.mdas[0], &self.mdas[1]) {
+        match (&self.mda_headers[0], &self.mda_headers[1]) {
             (&None, _) => 0,
             (_, &None) => 1,
             (&Some(ref mda0), &Some(ref mda1)) => match mda0.last_updated.cmp(&mda1.last_updated) {
@@ -376,7 +376,9 @@ impl MDARegions {
 
     /// The last update time for these MDA regions
     pub fn last_update_time(&self) -> Option<&DateTime<Utc>> {
-        self.mdas[self.newer()].as_ref().map(|h| &h.last_updated)
+        self.mda_headers[self.newer()]
+            .as_ref()
+            .map(|h| &h.last_updated)
     }
 
     #[cfg(test)]
@@ -384,7 +386,7 @@ impl MDARegions {
     /// 1. If an MDAHeader in the regions is not None, then its used
     /// attribute must be greater than 0.
     pub fn invariant(&self) {
-        for mda in self.mdas.iter() {
+        for mda in self.mda_headers.iter() {
             assert!(mda
                 .as_ref()
                 .map_or_else(|| true, |mda| mda.used != Bytes(0)));

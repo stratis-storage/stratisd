@@ -34,3 +34,6 @@ proptest-regression*
 
 # pytest
 .pytest_cache
+
+# cargo-vendor
+vendor

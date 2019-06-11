@@ -8,7 +8,7 @@ edition = "2018"
 dbus = {version = "0.6.4", optional = true}
 clap = "2"
 nix = "0.14"
-devicemapper = "0.27.0"
+devicemapper = { git="https://github.com/cuviper/devicemapper-rs", branch="nix-0.14" }
 crc = "1"
 byteorder = "1"
 chrono = "0.4"

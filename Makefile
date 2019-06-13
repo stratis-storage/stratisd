@@ -15,11 +15,17 @@ ${HOME}/.cargo/bin/cargo-tree:
 ${HOME}/.cargo/bin/cargo-outdated:
 	cargo install cargo-outdated
 
+${HOME}/.cargo/bin/cargo-vendor:
+	cargo install cargo-vendor
+
 tree: ${HOME}/.cargo/bin/cargo-tree
 	PATH=${HOME}/.cargo/bin:${PATH} cargo tree
 
 outdated: ${HOME}/.cargo/bin/cargo-outdated
 	PATH=${HOME}/.cargo/bin:${PATH} cargo outdated
+
+vendor: ${HOME}/.cargo/bin/cargo-vendor
+	PATH=${HOME}/.cargo/bin:${PATH} cargo vendor
 
 fmt:
 	cargo fmt
@@ -83,4 +89,4 @@ clippy:
 	test-real
 	test-travis
 	tree
-	uml-graphs
+	vendor

@@ -538,6 +538,22 @@ impl ThinPool {
                 // Update pool space state
                 self.free_space_check(
                     usage.used_data,
+                    // FIXME: current_total is a reliable amount, calculated
+                    // from information obtained from devicemapper.
+                    // However, it is not the correct amount, since it entirely
+                    // ignores the amount allocated to the metadata device,
+                    // which is also allocated from the data tier.
+                    // So it really underestimates the amount actually used.
+                    // Moreover, the value obtained from available_in_backstore
+                    // is just the difference between the blocks available
+                    // on all the data devices that the pool owns and the
+                    // number of blocks allocated from those devices.
+                    // Since stratisd currently has very few layers, all
+                    // blocks allocated from these devices are given to the
+                    // thinpool, either to its data or metadata device.
+                    // In future, as more layers are added to stratisd, this
+                    // value could either underestimate or overestimate the
+                    // space available to a very great extent.
                     current_total + sectors_to_datablocks(backstore.available_in_backstore()),
                 )?;
 

@@ -538,8 +538,7 @@ impl ThinPool {
                 // Update pool space state
                 self.free_space_check(
                     usage.used_data,
-                    current_total + sectors_to_datablocks(backstore.available_in_backstore())
-                        - usage.used_data,
+                    current_total + sectors_to_datablocks(backstore.available_in_backstore()),
                 )?;
 
                 let lowater = calc_lowater(
@@ -623,10 +622,12 @@ impl ThinPool {
 
     /// Possibly transition to a new FreeSpaceState based on usage, and invoke
     /// policies (suspension) accordingly.
+    /// used is the number of data blocks that the thin pool reports as used.
+    /// total is the total number of data blocks that could be used.
     fn free_space_check(
         &mut self,
         used: DataBlocks,
-        available: DataBlocks,
+        total: DataBlocks,
     ) -> StratisResult<FreeSpaceState> {
         // Return a value from 0 to 100 that is the percentage that "used"
         // makes up in "total".
@@ -640,7 +641,7 @@ impl ThinPool {
             val as u8
         }
 
-        let overall_used_pct = used_pct(*used, *used + *available);
+        let overall_used_pct = used_pct(*used, *total);
         info!("Data tier percent used: {}", overall_used_pct);
 
         let new_state = if overall_used_pct < SPACE_WARN_PCT {

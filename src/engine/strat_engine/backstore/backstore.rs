@@ -423,11 +423,6 @@ impl Backstore {
         }
     }
 
-    /// The current size of all the blockdevs in the data tier.
-    pub fn datatier_size(&self) -> Sectors {
-        self.data_tier.size()
-    }
-
     /// The current usable size of all the blockdevs in the data tier.
     pub fn datatier_usable_size(&self) -> Sectors {
         self.data_tier.usable_size()
@@ -538,12 +533,6 @@ impl Backstore {
                     .as_mut()
                     .and_then(|c| c.get_mut_blockdev_by_uuid(uuid))
             })
-    }
-
-    /// The number of sectors in the backstore given up to Stratis
-    /// metadata on devices in the data tier.
-    pub fn datatier_metadata_size(&self) -> Sectors {
-        self.data_tier.metadata_size()
     }
 
     /// Write the given data to the data tier's devices.

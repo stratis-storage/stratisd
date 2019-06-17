@@ -126,19 +126,6 @@ pub trait Pool: Debug {
         snapshot_name: &str,
     ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>>;
 
-    /// The total number of Sectors belonging to this pool.
-    /// There are no exclusions, so this number includes overhead sectors
-    /// of all sorts, sectors allocated for every sort of metadata by
-    /// Stratis or devicemapper and therefore not available to the user for
-    /// storing their data. There is no larger physical size number that can be
-    /// associated with a pool.
-    fn total_physical_size(&self) -> Sectors;
-
-    /// The number of Sectors in this pool that are currently in use by the
-    /// pool for some purpose, be it to store metadata, to store user data,
-    /// or to reserve for some other purpose.
-    fn total_physical_used(&self) -> StratisResult<Sectors>;
-
     /// Get all the filesystems belonging to this pool.
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)>;
 

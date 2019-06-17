@@ -13,7 +13,7 @@ use std::{
 
 use uuid::Uuid;
 
-use devicemapper::{Sectors, IEC};
+use devicemapper::Sectors;
 
 use crate::{
     engine::{
@@ -207,16 +207,6 @@ impl Pool for SimPool {
                 .expect("just inserted")
                 .1,
         )))
-    }
-
-    fn total_physical_size(&self) -> Sectors {
-        // We choose to make our pools very big, and we can change that
-        // if it is inconvenient.
-        Sectors(IEC::Ei)
-    }
-
-    fn total_physical_used(&self) -> StratisResult<Sectors> {
-        Ok(Sectors(0))
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {

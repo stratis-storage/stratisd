@@ -360,15 +360,6 @@ fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
     get_pool_property(i, p, |(name, _, _)| Ok(name.to_owned()))
 }
 
-fn get_pool_total_physical_size(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(_, _, p)| {
-        Ok(format!("{}", *p.total_physical_size()))
-    })
-}
-
 pub fn create_dbus_pool<'a>(
     dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
@@ -450,12 +441,6 @@ pub fn create_dbus_pool<'a>(
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_name);
 
-    let total_physical_size_property = f
-        .property::<&str, _>("TotalPhysicalSize", ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
-        .on_get(get_pool_total_physical_size);
-
     let uuid_property = f
         .property::<&str, _>("Uuid", ())
         .access(Access::Read)
@@ -476,7 +461,6 @@ pub fn create_dbus_pool<'a>(
                 .add_m(add_cachedevs_method)
                 .add_m(rename_method)
                 .add_p(name_property)
-                .add_p(total_physical_size_property)
                 .add_p(uuid_property),
         );
 

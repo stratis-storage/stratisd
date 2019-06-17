@@ -91,9 +91,6 @@ SPECS = {
 <property name="Name" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="true"/>
 </property>
-<property name="TotalPhysicalSize" type="s" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
-</property>
 <property name="Uuid" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
 </property>

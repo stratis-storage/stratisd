@@ -17,7 +17,7 @@ use crate::{
             backstore::{metadata::BDA, range_alloc::RangeAllocator, MDADataSize},
             serde_structs::{BaseBlockDevSave, Recordable},
         },
-        BlockDev, BlockDevState, DevUuid, EngineEvent, MaybeDbusPath, PoolUuid,
+        BlockDev, BlockDevState, DevUuid, EngineEvent, MaybeDbusPath,
     },
     stratis::StratisResult,
 };
@@ -91,18 +91,6 @@ impl StratBlockDev {
     /// The device's UUID.
     pub fn uuid(&self) -> DevUuid {
         self.bda.dev_uuid()
-    }
-
-    /// The device's pool's UUID.
-    #[allow(dead_code)]
-    pub fn pool_uuid(&self) -> PoolUuid {
-        self.bda.pool_uuid()
-    }
-
-    /// Last time metadata was written to this device.
-    #[allow(dead_code)]
-    pub fn last_update_time(&self) -> Option<&DateTime<Utc>> {
-        self.bda.last_update_time()
     }
 
     /// Find some sector ranges that could be allocated. If more

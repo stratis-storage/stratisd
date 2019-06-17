@@ -25,23 +25,6 @@ impl EventHandler {
 impl EngineListener for EventHandler {
     fn notify(&self, event: &EngineEvent) {
         match *event {
-            EngineEvent::BlockdevStateChanged { dbus_path, state } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
-                        consts::BLOCKDEV_STATE_PROP,
-                        state as u16,
-                        dbus_path,
-                        consts::BLOCKDEV_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        warn!(
-                            "BlockdevStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path, state as u16,
-                        );
-                    });
-                }
-            }
             EngineEvent::FilesystemRenamed {
                 dbus_path,
                 from,

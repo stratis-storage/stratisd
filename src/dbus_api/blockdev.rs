@@ -74,12 +74,6 @@ pub fn create_dbus_blockdev<'a>(
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_physical_size);
 
-    let state_property = f
-        .property::<u16, _>(consts::BLOCKDEV_STATE_PROP, ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::True)
-        .on_get(get_blockdev_state);
-
     let pool_property = f
         .property::<&dbus::Path, _>("Pool", ())
         .access(Access::Read)
@@ -111,7 +105,6 @@ pub fn create_dbus_blockdev<'a>(
                 .add_p(initialization_time_property)
                 .add_p(total_physical_size_property)
                 .add_p(pool_property)
-                .add_p(state_property)
                 .add_p(tier_property)
                 .add_p(user_info_property)
                 .add_p(uuid_property),
@@ -260,13 +253,6 @@ fn get_blockdev_physical_size(
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |_, p| Ok(format!("{}", *p.size())))
-}
-
-fn get_blockdev_state(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-) -> Result<(), MethodErr> {
-    get_blockdev_property(i, p, |_, p| Ok(p.state() as u16))
 }
 
 fn get_blockdev_tier(

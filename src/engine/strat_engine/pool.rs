@@ -25,9 +25,8 @@ use crate::{
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, CreateAction, DevUuid, EngineAction, FilesystemUuid, FreeSpaceState,
-            MaybeDbusPath, Name, PoolState, PoolUuid, Redundancy, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            BlockDevTier, CreateAction, DevUuid, EngineAction, FilesystemUuid, MaybeDbusPath, Name,
+            PoolState, PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -464,10 +463,6 @@ impl Pool for StratPool {
 
     fn state(&self) -> PoolState {
         self.thin_pool.state()
-    }
-
-    fn free_space_state(&self) -> FreeSpaceState {
-        self.thin_pool.free_space_state()
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {

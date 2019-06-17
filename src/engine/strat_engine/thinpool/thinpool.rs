@@ -627,13 +627,7 @@ impl ThinPool {
     }
 
     fn set_free_space_state(&mut self, new_state: FreeSpaceState) {
-        if self.free_space_state() != new_state {
-            self.free_space_state = new_state;
-            get_engine_listener_list().notify(&EngineEvent::PoolSpaceStateChanged {
-                dbus_path: self.get_dbus_path(),
-                state: new_state,
-            });
-        }
+        self.free_space_state = new_state
     }
 
     /// Possibly transition to a new FreeSpaceState based on usage, and invoke
@@ -1004,10 +998,6 @@ impl ThinPool {
     #[cfg(test)]
     pub fn extend_state(&self) -> PoolExtendState {
         self.pool_extend_state
-    }
-
-    pub fn free_space_state(&self) -> FreeSpaceState {
-        self.free_space_state
     }
 
     /// Rename a filesystem within the thin pool.

@@ -84,23 +84,6 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
-            EngineEvent::PoolSpaceStateChanged { dbus_path, state } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
-                        consts::POOL_SPACE_STATE_PROP,
-                        state as u16,
-                        dbus_path,
-                        consts::POOL_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        warn!(
-                            "PoolSpaceStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path, state as u16,
-                        );
-                    });
-                }
-            }
             EngineEvent::PoolStateChanged { dbus_path, state } => {
                 if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
                     prop_changed_dispatch(

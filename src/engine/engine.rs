@@ -16,8 +16,7 @@ use devicemapper::{Bytes, Device, Sectors};
 use crate::{
     engine::types::{
         BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
-        FreeSpaceState, MaybeDbusPath, Name, PoolState, PoolUuid, RenameAction, SetCreateAction,
-        SetDeleteAction,
+        MaybeDbusPath, Name, PoolState, PoolUuid, RenameAction, SetCreateAction, SetDeleteAction,
     },
     stratis::StratisResult,
 };
@@ -179,9 +178,6 @@ pub trait Pool: Debug {
 
     /// The current state of the Pool.
     fn state(&self) -> PoolState;
-
-    /// The current space state of the Pool.
-    fn free_space_state(&self) -> FreeSpaceState;
 
     /// Set dbus path associated with the Pool.
     fn set_dbus_path(&mut self, path: MaybeDbusPath) -> ();

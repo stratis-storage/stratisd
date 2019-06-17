@@ -16,7 +16,7 @@ use devicemapper::{Bytes, Device, Sectors};
 use crate::{
     engine::types::{
         BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
-        MaybeDbusPath, Name, PoolState, PoolUuid, RenameAction, SetCreateAction, SetDeleteAction,
+        MaybeDbusPath, Name, PoolUuid, RenameAction, SetCreateAction, SetDeleteAction,
     },
     stratis::StratisResult,
 };
@@ -175,9 +175,6 @@ pub trait Pool: Debug {
         uuid: DevUuid,
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>>;
-
-    /// The current state of the Pool.
-    fn state(&self) -> PoolState;
 
     /// Set dbus path associated with the Pool.
     fn set_dbus_path(&mut self, path: MaybeDbusPath) -> ();

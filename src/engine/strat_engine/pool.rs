@@ -26,7 +26,7 @@ use crate::{
         },
         types::{
             BlockDevTier, CreateAction, DevUuid, EngineAction, FilesystemUuid, MaybeDbusPath, Name,
-            PoolState, PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
+            PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -461,10 +461,6 @@ impl Pool for StratPool {
         Ok(result)
     }
 
-    fn state(&self) -> PoolState {
-        self.thin_pool.state()
-    }
-
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {
         self.thin_pool.set_dbus_path(path.clone());
         self.dbus_path = path
@@ -494,7 +490,7 @@ mod tests {
             cmd,
             tests::{loopbacked, real},
         },
-        types::{EngineAction, PoolExtendState, Redundancy},
+        types::{EngineAction, PoolExtendState, PoolState, Redundancy},
     };
 
     use super::*;

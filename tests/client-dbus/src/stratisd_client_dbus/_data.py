@@ -97,9 +97,6 @@ SPECS = {
 <property name="Uuid" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
 </property>
-<property name="State" type="q" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="true"/>
-</property>
 </interface>
 """,
     "org.storage.stratis1.filesystem": """

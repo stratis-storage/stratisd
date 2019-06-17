@@ -603,13 +603,7 @@ impl ThinPool {
     }
 
     fn set_state(&mut self, new_state: PoolState) {
-        if self.state() != new_state {
-            self.pool_state = new_state;
-            get_engine_listener_list().notify(&EngineEvent::PoolStateChanged {
-                dbus_path: self.get_dbus_path(),
-                state: new_state,
-            });
-        }
+        self.pool_state = new_state;
     }
 
     fn set_extend_state(&mut self, data_extend_failed: bool, meta_extend_failed: bool) {
@@ -991,6 +985,7 @@ impl ThinPool {
         }
     }
 
+    #[cfg(test)]
     pub fn state(&self) -> PoolState {
         self.pool_state
     }
@@ -1125,10 +1120,6 @@ impl ThinPool {
 
     pub fn set_dbus_path(&mut self, path: MaybeDbusPath) {
         self.dbus_path = path
-    }
-
-    fn get_dbus_path(&self) -> &MaybeDbusPath {
-        &self.dbus_path
     }
 }
 

@@ -9,7 +9,6 @@ pub const MANAGER_INTERFACE_NAME: &str = "org.storage.stratis1.Manager";
 
 pub const POOL_INTERFACE_NAME: &str = "org.storage.stratis1.pool";
 pub const POOL_NAME_PROP: &str = "Name";
-pub const POOL_STATE_PROP: &str = "State";
 
 pub const FILESYSTEM_INTERFACE_NAME: &str = "org.storage.stratis1.filesystem";
 pub const FILESYSTEM_NAME_PROP: &str = "Name";

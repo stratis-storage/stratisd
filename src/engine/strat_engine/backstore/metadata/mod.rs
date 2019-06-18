@@ -4,8 +4,6 @@
 
 mod bda;
 mod mda;
+mod static_header;
 
-pub use self::{
-    bda::{StaticHeader, BDA},
-    mda::MDADataSize,
-};
+pub use self::{bda::BDA, mda::MDADataSize, static_header::StaticHeader};

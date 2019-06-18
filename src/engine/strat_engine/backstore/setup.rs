@@ -37,6 +37,9 @@ use crate::{
 pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     let mut pool_map = HashMap::new();
 
+    // NOTE: The allow is required due to a false positive in clippy 1.35.
+    // See issue: https://github.com/rust-lang/rust-clippy/issues/4133.
+    #[allow(clippy::identity_conversion)]
     for devnode in get_stratis_block_devices()? {
         match devnode_to_devno(&devnode)? {
             None => continue,

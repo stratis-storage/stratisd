@@ -265,14 +265,6 @@ impl StaticHeader {
         }
     }
 
-    /// Retrieve the device and pool UUIDs from a stratis device.
-    pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<((PoolUuid, DevUuid))>>
-    where
-        F: Read + Seek + SyncAll,
-    {
-        StaticHeader::setup(f).map(|sh| sh.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
-    }
-
     /// Generate a buf suitable for writing to blockdev
     pub fn sigblock_to_buf(&self) -> [u8; SECTOR_SIZE] {
         let mut buf = [0u8; SECTOR_SIZE];

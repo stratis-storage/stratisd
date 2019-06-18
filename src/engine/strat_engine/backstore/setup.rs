@@ -19,10 +19,7 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                blkdev_size,
-                metadata::{StaticHeader, BDA},
-                util::get_stratis_block_devices,
-                StratBlockDev,
+                blkdev_size, metadata::BDA, util::get_stratis_block_devices, StratBlockDev,
             },
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
@@ -44,9 +41,9 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
         match devnode_to_devno(&devnode)? {
             None => continue,
             Some(devno) => {
-                if let Some((pool_uuid, _)) = StaticHeader::device_identifiers(
-                    &mut OpenOptions::new().read(true).open(&devnode)?,
-                )? {
+                if let Some((pool_uuid, _)) =
+                    BDA::device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+                {
                     pool_map
                         .entry(pool_uuid)
                         .or_insert_with(HashMap::new)

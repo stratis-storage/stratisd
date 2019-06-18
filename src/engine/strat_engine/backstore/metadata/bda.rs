@@ -7,7 +7,7 @@ use std::io::{Read, Seek, SeekFrom};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Sectors, SECTOR_SIZE};
+use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
 
 use crate::{
     engine::{
@@ -26,6 +26,8 @@ use crate::{
 
 const _BDA_STATIC_HDR_SIZE: usize = 16 * SECTOR_SIZE;
 const BDA_STATIC_HDR_SIZE: Bytes = Bytes(_BDA_STATIC_HDR_SIZE as u64);
+
+const RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
 
 #[derive(Debug)]
 pub struct BDA {
@@ -50,6 +52,7 @@ impl BDA {
             pool_uuid,
             dev_uuid,
             mda_data_size.region_size().mda_size(),
+            RESERVED_SECTORS,
             blkdev_size,
             initialization_time,
         );
@@ -194,6 +197,7 @@ mod tests {
             pool_uuid,
             dev_uuid,
             mda_size,
+            RESERVED_SECTORS,
             blkdev_size,
             Utc::now().timestamp() as u64,
         )

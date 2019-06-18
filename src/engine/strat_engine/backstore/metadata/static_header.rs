@@ -12,7 +12,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use crc::crc32;
 use uuid::Uuid;
 
-use devicemapper::{Sectors, IEC, SECTOR_SIZE};
+use devicemapper::{Sectors, SECTOR_SIZE};
 
 use crate::{
     engine::{
@@ -23,8 +23,6 @@ use crate::{
 };
 
 const _BDA_STATIC_HDR_SIZE: usize = 16 * SECTOR_SIZE;
-
-const RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
 
 const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
@@ -54,6 +52,7 @@ impl StaticHeader {
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
         mda_size: MDASize,
+        reserved_size: Sectors,
         blkdev_size: Sectors,
         initialization_time: u64,
     ) -> StaticHeader {
@@ -62,7 +61,7 @@ impl StaticHeader {
             pool_uuid,
             dev_uuid,
             mda_size,
-            reserved_size: RESERVED_SECTORS,
+            reserved_size,
             flags: 0,
             initialization_time,
         }

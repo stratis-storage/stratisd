@@ -144,8 +144,9 @@ fn calc_lowater(used: DataBlocks, data_dev_size: DataBlocks, available: DataBloc
     let total = data_dev_size + available;
 
     // Calculate #2. Calculated against total size.
-    assert!(SPACE_CRIT_PCT <= 100);
-    let low_water_for_crit = total - ((total * SPACE_CRIT_PCT) / 100u8);
+    let crit_percent_total = (total * SPACE_CRIT_PCT) / 100u8;
+    assert!(crit_percent_total < total);
+    let low_water_for_crit = total - crit_percent_total;
     assert!(DataBlocks(std::u64::MAX) - available >= DATA_LOWATER);
 
     // Compare values of #1 and #2 above to get which one is higher

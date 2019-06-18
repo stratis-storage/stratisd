@@ -49,38 +49,6 @@ enum MetadataLocation {
 }
 
 impl BDA {
-    /// Read the BDA from the device and return 2 SECTORS worth of data, one for each BDA returned
-    /// in the order of layout on disk (location 1, location 2).
-    /// Only the BDA sectors are read up from disk, zero areas are *not* read.
-    fn read<F>(f: &mut F) -> (io::Result<[u8; SECTOR_SIZE]>, io::Result<[u8; SECTOR_SIZE]>)
-    where
-        F: Read + Seek,
-    {
-        // Theory of read procedure
-        // We write the BDA in two operations with a sync in between.  The write operation
-        // could fail (loss of power) for either write leaving sector(s) with potentially hard
-        // read errors. It's best to read each of the specific BDA blocks individually, to limit
-        // the probability of hitting a read error on a non-essential sector.
-
-        let mut buf_loc_1 = [0u8; SECTOR_SIZE];
-        let mut buf_loc_2 = [0u8; SECTOR_SIZE];
-
-        /// Read a bda sector worth of data at the specified offset into buffer.
-        fn read_sector_at_offset<F>(f: &mut F, offset: usize, mut buf: &mut [u8]) -> io::Result<()>
-        where
-            F: Read + Seek,
-        {
-            f.seek(SeekFrom::Start(offset as u64))?;
-            f.read_exact(&mut buf)?;
-            Ok(())
-        }
-
-        (
-            read_sector_at_offset(f, SECTOR_SIZE, &mut buf_loc_1).map(|_| buf_loc_1),
-            read_sector_at_offset(f, 9 * SECTOR_SIZE, &mut buf_loc_2).map(|_| buf_loc_2),
-        )
-    }
-
     // Writes bda_buf according to the value of which.
     // If first location is specified, write zeroes to empty regions in the
     // first 8 sectors. If the second location is specified, writes zeroes to empty
@@ -269,6 +237,38 @@ impl StaticHeader {
         }
     }
 
+    /// Read the bytes corresponding to the two signature blocks in the static
+    /// header from the device. Return a tuple indicating the success or
+    /// failure for reading either location.
+    fn read<F>(f: &mut F) -> (io::Result<[u8; SECTOR_SIZE]>, io::Result<[u8; SECTOR_SIZE]>)
+    where
+        F: Read + Seek,
+    {
+        // Theory of read procedure
+        // We write the BDA in two operations with a sync in between.  The write operation
+        // could fail (loss of power) for either write leaving sector(s) with potentially hard
+        // read errors. It's best to read each of the specific BDA blocks individually, to limit
+        // the probability of hitting a read error on a non-essential sector.
+
+        let mut buf_loc_1 = [0u8; SECTOR_SIZE];
+        let mut buf_loc_2 = [0u8; SECTOR_SIZE];
+
+        /// Read a bda sector worth of data at the specified offset into buffer.
+        fn read_sector_at_offset<F>(f: &mut F, offset: usize, mut buf: &mut [u8]) -> io::Result<()>
+        where
+            F: Read + Seek,
+        {
+            f.seek(SeekFrom::Start(offset as u64))?;
+            f.read_exact(&mut buf)?;
+            Ok(())
+        }
+
+        (
+            read_sector_at_offset(f, SECTOR_SIZE, &mut buf_loc_1).map(|_| buf_loc_1),
+            read_sector_at_offset(f, 9 * SECTOR_SIZE, &mut buf_loc_2).map(|_| buf_loc_2),
+        )
+    }
+
     /// Try to find a valid StaticHeader on a device.
     /// Return the latest copy that validates as a Stratis BDA, however verify both
     /// copies and if one validates but one does not, re-write the one that is incorrect.  If both
@@ -284,7 +284,7 @@ impl StaticHeader {
     where
         F: Read + Seek + SyncAll,
     {
-        match BDA::read(f) {
+        match StaticHeader::read(f) {
             (Ok(buf_loc_1), Ok(buf_loc_2)) => {
                 // We read both copies without an IO error.
                 match (

@@ -49,43 +49,6 @@ enum MetadataLocation {
 }
 
 impl BDA {
-    // Writes bda_buf according to the value of which.
-    // If first location is specified, write zeroes to empty regions in the
-    // first 8 sectors. If the second location is specified, writes zeroes to empty
-    // regions in the second 8 sectors.
-    fn write<F>(f: &mut F, bda_buf: &[u8], which: MetadataLocation) -> io::Result<()>
-    where
-        F: Seek + SyncAll,
-    {
-        let zeroed = [0u8; 6 * SECTOR_SIZE];
-        f.seek(SeekFrom::Start(0))?;
-
-        // Write to a single region in the header. Zeroes the first sector,
-        // writes bda_buf to the second sector, and then zeroes the remaining
-        // six sectors.
-        fn write_region<F>(f: &mut F, bda_buf: &[u8], zeroed: &[u8]) -> io::Result<()>
-        where
-            F: Seek + SyncAll,
-        {
-            f.write_all(&zeroed[..SECTOR_SIZE])?; // Zero 1 unused sector
-            f.write_all(bda_buf)?;
-            f.write_all(&zeroed[..SECTOR_SIZE * 6])?; // Zero 6 unused sectors
-            f.sync_all()?;
-            Ok(())
-        };
-
-        if which == MetadataLocation::Both || which == MetadataLocation::First {
-            write_region(f, bda_buf, &zeroed)?;
-        } else {
-            f.seek(SeekFrom::Start(8 * SECTOR_SIZE as u64))?;
-        }
-
-        if which == MetadataLocation::Both || which == MetadataLocation::Second {
-            write_region(f, bda_buf, &zeroed)?;
-        }
-        Ok(())
-    }
-
     /// Initialize a blockdev with a Stratis BDA.
     pub fn initialize<F>(
         f: &mut F,
@@ -106,7 +69,7 @@ impl BDA {
             initialization_time,
         );
 
-        BDA::write(f, &header.sigblock_to_buf(), MetadataLocation::Both)?;
+        StaticHeader::write(f, &header.sigblock_to_buf(), MetadataLocation::Both)?;
 
         let regions = mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, f)?;
 
@@ -269,6 +232,43 @@ impl StaticHeader {
         )
     }
 
+    // Write signature block data according to the value of the which argument.
+    // If first location is specified, write zeroes to empty regions in the
+    // first 8 sectors. If the second location is specified, writes zeroes to
+    // empty regions in the second 8 sectors.
+    fn write<F>(f: &mut F, sig_buf: &[u8], which: MetadataLocation) -> io::Result<()>
+    where
+        F: Seek + SyncAll,
+    {
+        let zeroed = [0u8; 6 * SECTOR_SIZE];
+        f.seek(SeekFrom::Start(0))?;
+
+        // Write to a single region in the header. Zeroes the first sector,
+        // writes sig_buf to the second sector, and then zeroes the remaining
+        // six sectors.
+        fn write_region<F>(f: &mut F, sig_buf: &[u8], zeroed: &[u8]) -> io::Result<()>
+        where
+            F: Seek + SyncAll,
+        {
+            f.write_all(&zeroed[..SECTOR_SIZE])?; // Zero 1 unused sector
+            f.write_all(sig_buf)?;
+            f.write_all(&zeroed[..SECTOR_SIZE * 6])?; // Zero 6 unused sectors
+            f.sync_all()?;
+            Ok(())
+        };
+
+        if which == MetadataLocation::Both || which == MetadataLocation::First {
+            write_region(f, sig_buf, &zeroed)?;
+        } else {
+            f.seek(SeekFrom::Start(8 * SECTOR_SIZE as u64))?;
+        }
+
+        if which == MetadataLocation::Both || which == MetadataLocation::Second {
+            write_region(f, sig_buf, &zeroed)?;
+        }
+        Ok(())
+    }
+
     /// Try to find a valid StaticHeader on a device.
     /// Return the latest copy that validates as a Stratis BDA, however verify both
     /// copies and if one validates but one does not, re-write the one that is incorrect.  If both
@@ -303,24 +303,24 @@ impl StaticHeader {
                                 } else if loc_1.initialization_time > loc_2.initialization_time {
                                     // If the first header block is newer, overwrite second with
                                     // contents of first.
-                                    BDA::write(f, &buf_loc_1, MetadataLocation::Second)?;
+                                    StaticHeader::write(f, &buf_loc_1, MetadataLocation::Second)?;
                                     Ok(Some(loc_1))
                                 } else {
                                     // The second header block must be newer, so overwrite first
                                     // with contents of second.
-                                    BDA::write(f, &buf_loc_2, MetadataLocation::First)?;
+                                    StaticHeader::write(f, &buf_loc_2, MetadataLocation::First)?;
                                     Ok(Some(loc_2))
                                 }
                             }
                             (None, None) => Ok(None),
                             (Some(loc_1), None) => {
                                 // Copy 1 has valid Stratis BDA, copy 2 has no magic, re-write copy 2
-                                BDA::write(f, &buf_loc_1, MetadataLocation::Second)?;
+                                StaticHeader::write(f, &buf_loc_1, MetadataLocation::Second)?;
                                 Ok(Some(loc_1))
                             }
                             (None, Some(loc_2)) => {
                                 // Copy 2 has valid Stratis BDA, copy 1 has no magic, re-write copy 1
-                                BDA::write(f, &buf_loc_2, MetadataLocation::First)?;
+                                StaticHeader::write(f, &buf_loc_2, MetadataLocation::First)?;
                                 Ok(Some(loc_2))
                             }
                         }
@@ -328,7 +328,7 @@ impl StaticHeader {
                     (Ok(loc_1), Err(loc_2)) => {
                         // Re-write copy 2
                         if loc_1.is_some() {
-                            BDA::write(f, &buf_loc_1, MetadataLocation::Second)?;
+                            StaticHeader::write(f, &buf_loc_1, MetadataLocation::Second)?;
                             Ok(loc_1)
                         } else {
                             // Location 1 doesn't have a signature, but location 2 did, but it got an error,
@@ -340,7 +340,7 @@ impl StaticHeader {
                     (Err(loc_1), Ok(loc_2)) => {
                         // Re-write copy 1
                         if loc_2.is_some() {
-                            BDA::write(f, &buf_loc_2, MetadataLocation::First)?;
+                            StaticHeader::write(f, &buf_loc_2, MetadataLocation::First)?;
                             Ok(loc_2)
                         } else {
                             // Location 2 doesn't have a signature, but location 1 did, but it got an error,
@@ -361,7 +361,7 @@ impl StaticHeader {
                 match StaticHeader::sigblock_from_buf(&buf_loc_1) {
                     Ok(loc_1) => {
                         if loc_1.is_some() {
-                            BDA::write(f, &buf_loc_1, MetadataLocation::Second)?;
+                            StaticHeader::write(f, &buf_loc_1, MetadataLocation::Second)?;
                         }
                         Ok(loc_1)
                     }
@@ -378,7 +378,7 @@ impl StaticHeader {
                 match StaticHeader::sigblock_from_buf(&buf_loc_2) {
                     Ok(loc_2) => {
                         if loc_2.is_some() {
-                            BDA::write(f, &buf_loc_2, MetadataLocation::First)?;
+                            StaticHeader::write(f, &buf_loc_2, MetadataLocation::First)?;
                         }
                         Ok(loc_2)
                     }

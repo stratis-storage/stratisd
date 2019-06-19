@@ -367,7 +367,7 @@ use crate::engine::strat_engine::backstore::metadata::mda::{
 #[cfg(test)]
 /// Return a static header with random block device and MDA size.
 /// The block device is less than the minimum, for efficiency in testing.
-fn random_static_header(
+pub fn random_static_header(
     blkdev_size: u64,
     mda_size_factor: u32,
     reserved_sectors: Sectors,
@@ -390,11 +390,22 @@ fn random_static_header(
 }
 
 #[cfg(test)]
+use proptest::{prelude::BoxedStrategy, strategy::Strategy};
+
+#[cfg(test)]
+/// Make a static header strategy
+pub fn static_header_strategy() -> BoxedStrategy<StaticHeader> {
+    (0..64u64, 0..64u32, 0..64u64)
+        .prop_map(|(b, m, r)| random_static_header(b, m, Sectors(r)))
+        .boxed()
+}
+
+#[cfg(test)]
 mod tests {
     use std::io::{self, Cursor, SeekFrom, Write};
 
     use chrono::Utc;
-    use proptest::{option, prelude::BoxedStrategy, strategy::Strategy};
+    use proptest::option;
 
     use super::*;
 
@@ -411,13 +422,6 @@ mod tests {
         f.write_all(&byte_to_corrupt)?;
         f.sync_all()?;
         Ok(())
-    }
-
-    /// Make a static header strategy
-    fn static_header_strategy() -> BoxedStrategy<StaticHeader> {
-        (0..64u64, 0..64u32)
-            .prop_map(|(b, m)| random_static_header(b, m, Sectors(0)))
-            .boxed()
     }
 
     proptest! {

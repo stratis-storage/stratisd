@@ -162,41 +162,13 @@ impl BDA {
 mod tests {
     use std::io::Cursor;
 
-    use proptest::{collection::vec, num, prelude::BoxedStrategy, strategy::Strategy};
-    use uuid::Uuid;
+    use proptest::{collection::vec, num};
 
-    use devicemapper::{Bytes, Sectors, IEC};
-
-    use crate::engine::strat_engine::backstore::metadata::static_header::_BDA_STATIC_HDR_SIZE;
+    use crate::engine::strat_engine::backstore::metadata::static_header::{
+        random_static_header, static_header_strategy, _BDA_STATIC_HDR_SIZE,
+    };
 
     use super::*;
-
-    /// Return a static header with random block device and MDA size.
-    /// The block device is less than the minimum, for efficiency in testing.
-    fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
-        let pool_uuid = Uuid::new_v4();
-        let dev_uuid = Uuid::new_v4();
-        let mda_size =
-            MDADataSize::new(mda::MIN_MDA_DATA_REGION_SIZE + Bytes(u64::from(mda_size_factor * 4)))
-                .region_size()
-                .mda_size();
-        let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
-        StaticHeader::new(
-            pool_uuid,
-            dev_uuid,
-            mda_size,
-            RESERVED_SECTORS,
-            blkdev_size,
-            Utc::now().timestamp() as u64,
-        )
-    }
-
-    /// Make a static header strategy
-    fn static_header_strategy() -> BoxedStrategy<StaticHeader> {
-        (0..64u64, 0..64u32)
-            .prop_map(|(b, m)| random_static_header(b, m))
-            .boxed()
-    }
 
     proptest! {
         #[test]
@@ -257,7 +229,7 @@ mod tests {
         let data = [0u8; 3];
 
         // Construct a BDA.
-        let sh = random_static_header(0, 0);
+        let sh = random_static_header(0, 0, Sectors(0));
         let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
         let mut bda = BDA::initialize(
             &mut buf,

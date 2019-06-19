@@ -14,7 +14,7 @@ use crate::{
         strat_engine::{
             backstore::metadata::{
                 mda,
-                static_header::{MetadataLocation, StaticHeader, BDA_STATIC_HDR_SIZE},
+                static_header::{self, MetadataLocation, StaticHeader, BDA_STATIC_HDR_SIZE},
                 MDADataSize,
             },
             device::SyncAll,
@@ -67,7 +67,7 @@ impl BDA {
     where
         F: Read + Seek + SyncAll,
     {
-        let header = match StaticHeader::setup(f)? {
+        let header = match static_header::setup(f)? {
             Some(header) => header,
             None => return Ok(None),
         };
@@ -88,7 +88,7 @@ impl BDA {
     where
         F: Seek + SyncAll,
     {
-        StaticHeader::wipe(f)
+        static_header::wipe(f)
     }
 
     /// Save metadata to the disk
@@ -154,7 +154,7 @@ impl BDA {
     where
         F: Read + Seek + SyncAll,
     {
-        StaticHeader::setup(f).map(|sh| sh.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
+        static_header::setup(f).map(|sh| sh.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
     }
 }
 

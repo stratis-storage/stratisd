@@ -2,6 +2,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+/*!
+Module that manages writing, reading, and validating the BDA's static header
+region.
+
+It is implicit within this module that the static header is always exactly
+aligned with the start of the device on which the BDA is located.
+
+For that reason, all methods that read from or write to a device implicitly
+or explicitly seek to the start of the device before initiating any reading
+or writing operations.
+*/
+
 use std::{
     fmt,
     io::{self, Read, Seek, SeekFrom},

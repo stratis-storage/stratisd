@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Read, Seek};
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -91,11 +91,7 @@ impl BDA {
     where
         F: Seek + SyncAll,
     {
-        let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
-        f.seek(SeekFrom::Start(0))?;
-        f.write_all(&zeroed)?;
-        f.sync_all()?;
-        Ok(())
+        StaticHeader::wipe(f)
     }
 
     /// Save metadata to the disk
@@ -167,7 +163,7 @@ impl BDA {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{self, Cursor, Write};
+    use std::io::{self, Cursor, SeekFrom, Write};
 
     use proptest::{collection::vec, num, option, prelude::BoxedStrategy, strategy::Strategy};
     use uuid::Uuid;

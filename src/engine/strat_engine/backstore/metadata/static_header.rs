@@ -265,6 +265,18 @@ impl StaticHeader {
         }
     }
 
+    /// Write 0s on the entire extent of the static header.
+    pub fn wipe<F>(f: &mut F) -> StratisResult<()>
+    where
+        F: Seek + SyncAll,
+    {
+        let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
+        f.seek(SeekFrom::Start(0))?;
+        f.write_all(&zeroed)?;
+        f.sync_all()?;
+        Ok(())
+    }
+
     /// Generate a buf suitable for writing to blockdev
     pub fn sigblock_to_buf(&self) -> [u8; SECTOR_SIZE] {
         let mut buf = [0u8; SECTOR_SIZE];

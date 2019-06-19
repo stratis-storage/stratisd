@@ -160,9 +160,9 @@ impl BDA {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{self, Cursor, SeekFrom, Write};
+    use std::io::Cursor;
 
-    use proptest::{collection::vec, num, option, prelude::BoxedStrategy, strategy::Strategy};
+    use proptest::{collection::vec, num, prelude::BoxedStrategy, strategy::Strategy};
     use uuid::Uuid;
 
     use devicemapper::{Bytes, Sectors, IEC};
@@ -170,21 +170,6 @@ mod tests {
     use crate::engine::strat_engine::backstore::metadata::static_header::_BDA_STATIC_HDR_SIZE;
 
     use super::*;
-
-    /// Corrupt a byte at the specified position.
-    fn corrupt_byte<F>(f: &mut F, position: u64) -> io::Result<()>
-    where
-        F: Read + Seek + SyncAll,
-    {
-        let mut byte_to_corrupt = [0; 1];
-        f.seek(SeekFrom::Start(position))?;
-        f.read_exact(&mut byte_to_corrupt)?;
-        byte_to_corrupt[0] = !byte_to_corrupt[0];
-        f.seek(SeekFrom::Start(position))?;
-        f.write_all(&byte_to_corrupt)?;
-        f.sync_all()?;
-        Ok(())
-    }
 
     /// Return a static header with random block device and MDA size.
     /// The block device is less than the minimum, for efficiency in testing.
@@ -347,136 +332,4 @@ mod tests {
 
         }
     }
-
-    proptest! {
-        #[test]
-        /// Construct an arbitrary StaticHeader object.
-        /// Write it to a buffer, read it out and make sure you get the same thing.
-        fn static_header(ref sh1 in static_header_strategy()) {
-            let buf = sh1.sigblock_to_buf();
-            let sh2 = StaticHeader::sigblock_from_buf(&buf).unwrap().unwrap();
-            prop_assert_eq!(sh1.pool_uuid, sh2.pool_uuid);
-            prop_assert_eq!(sh1.dev_uuid, sh2.dev_uuid);
-            prop_assert_eq!(sh1.blkdev_size, sh2.blkdev_size);
-            prop_assert_eq!(sh1.mda_size, sh2.mda_size);
-            prop_assert_eq!(sh1.reserved_size, sh2.reserved_size);
-            prop_assert_eq!(sh1.flags, sh2.flags);
-            prop_assert_eq!(sh1.initialization_time, sh2.initialization_time);
-        }
-    }
-
-    proptest! {
-        #[test]
-        /// Verify correct reading of the static header if only one of
-        /// the two static headers is corrupted. Verify expected behavior
-        /// if both are corrupted, which varies depending on whether the
-        /// Stratis magic number or some other part of the header is corrupted.
-        fn bda_test_recovery(primary in option::of(0..SECTOR_SIZE),
-                             secondary in option::of(0..SECTOR_SIZE)) {
-            let sh = random_static_header(10000, 4);
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + _BDA_STATIC_HDR_SIZE;
-            let mut buf = Cursor::new(vec![0; buf_size]);
-            BDA::initialize(
-                &mut buf,
-                sh.pool_uuid,
-                sh.dev_uuid,
-                sh.mda_size.region_size().data_size(),
-                sh.blkdev_size,
-                Utc::now().timestamp() as u64,
-            ).unwrap();
-
-            let reference_buf = buf.clone();
-
-            if let Some(index) = primary {
-                // Corrupt primary copy
-                corrupt_byte(&mut buf, (SECTOR_SIZE + index) as u64).unwrap();
-            }
-
-            if let Some(index) = secondary {
-                // Corrupt secondary copy
-                corrupt_byte(&mut buf, (9 * SECTOR_SIZE + index) as u64).unwrap();
-            }
-
-            let setup_result = StaticHeader::setup(&mut buf);
-
-            match (primary, secondary) {
-                (Some(p_index), Some(s_index)) => {
-                    // Setup should fail to find a usable Stratis BDA
-                    match (p_index, s_index) {
-                        (4..=19, 4..=19) => {
-                            // When we corrupt both magics then we believe that
-                            // the signature is not ours and will return Ok(None)
-                            prop_assert!(setup_result.is_ok() && setup_result.unwrap().is_none());
-                        }
-                        _ => {
-                            prop_assert!(setup_result.is_err());
-                        }
-                    }
-
-                    // Check buffer, should be different
-                    prop_assert_ne!(reference_buf.get_ref(), buf.get_ref());
-
-                }
-                _ => {
-                    // Setup should work and buffer should be corrected
-                    prop_assert!(setup_result.is_ok() && setup_result.unwrap().is_some());
-
-                    // Check buffer, should be corrected.
-                    prop_assert_eq!(reference_buf.get_ref(), buf.get_ref());
-                }
-            }
-        }
-    }
-
-    #[test]
-    /// Test that we re-write the older of two BDAs if they don't match.
-    fn bda_test_rewrite_older() {
-        let sh = random_static_header(10000, 4);
-        let buf_size = *sh.mda_size.sectors().bytes() as usize + _BDA_STATIC_HDR_SIZE;
-        let mut buf = Cursor::new(vec![0; buf_size]);
-        let ts = Utc::now().timestamp() as u64;
-
-        BDA::initialize(
-            &mut buf,
-            sh.pool_uuid,
-            sh.dev_uuid,
-            sh.mda_size.region_size().data_size(),
-            sh.blkdev_size,
-            ts,
-        )
-        .unwrap();
-
-        let mut buf_newer = Cursor::new(vec![0; buf_size]);
-        BDA::initialize(
-            &mut buf_newer,
-            sh.pool_uuid,
-            sh.dev_uuid,
-            sh.mda_size.region_size().data_size(),
-            sh.blkdev_size,
-            ts + 1,
-        )
-        .unwrap();
-
-        // We should always match this reference buffer as it's the newer one.
-        let reference_buf = buf_newer.clone();
-
-        for offset in &[SECTOR_SIZE, 9 * SECTOR_SIZE] {
-            // Copy the older BDA to newer BDA buffer
-            buf.seek(SeekFrom::Start(*offset as u64)).unwrap();
-            buf_newer.seek(SeekFrom::Start(*offset as u64)).unwrap();
-            let mut sector = [0u8; SECTOR_SIZE];
-            buf.read_exact(&mut sector).unwrap();
-            buf_newer.write_all(&sector).unwrap();
-
-            assert_ne!(reference_buf.get_ref(), buf_newer.get_ref());
-
-            let setup_result = StaticHeader::setup(&mut buf_newer);
-            assert_matches!(setup_result, Ok(_));
-            assert!(setup_result.unwrap().is_some());
-
-            // We should match the reference buffer
-            assert_eq!(reference_buf.get_ref(), buf_newer.get_ref());
-        }
-    }
-
 }

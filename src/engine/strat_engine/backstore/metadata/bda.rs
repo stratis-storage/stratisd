@@ -7,14 +7,14 @@ use std::io::{Read, Seek};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
+use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
 use crate::{
     engine::{
         strat_engine::{
             backstore::metadata::{
                 mda,
-                static_header::{MetadataLocation, StaticHeader},
+                static_header::{MetadataLocation, StaticHeader, BDA_STATIC_HDR_SIZE},
                 MDADataSize,
             },
             device::SyncAll,
@@ -23,9 +23,6 @@ use crate::{
     },
     stratis::StratisResult,
 };
-
-const _BDA_STATIC_HDR_SIZE: usize = 16 * SECTOR_SIZE;
-const BDA_STATIC_HDR_SIZE: Bytes = Bytes(_BDA_STATIC_HDR_SIZE as u64);
 
 const RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
 
@@ -169,6 +166,8 @@ mod tests {
     use uuid::Uuid;
 
     use devicemapper::{Bytes, Sectors, IEC};
+
+    use crate::engine::strat_engine::backstore::metadata::static_header::_BDA_STATIC_HDR_SIZE;
 
     use super::*;
 

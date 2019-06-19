@@ -12,7 +12,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use crc::crc32;
 use uuid::Uuid;
 
-use devicemapper::{Sectors, SECTOR_SIZE};
+use devicemapper::{Bytes, Sectors, SECTOR_SIZE};
 
 use crate::{
     engine::{
@@ -22,7 +22,8 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-const _BDA_STATIC_HDR_SIZE: usize = 16 * SECTOR_SIZE;
+pub const _BDA_STATIC_HDR_SIZE: usize = 16 * SECTOR_SIZE;
+pub const BDA_STATIC_HDR_SIZE: Bytes = Bytes(_BDA_STATIC_HDR_SIZE as u64);
 
 const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 

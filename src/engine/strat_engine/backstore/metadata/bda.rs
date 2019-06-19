@@ -54,7 +54,7 @@ impl BDA {
             initialization_time,
         );
 
-        StaticHeader::write(f, &header.sigblock_to_buf(), MetadataLocation::Both)?;
+        header.write(f, MetadataLocation::Both)?;
 
         let regions = mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, f)?;
 

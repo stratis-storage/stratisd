@@ -95,33 +95,33 @@ where
                             } else if loc_1.initialization_time > loc_2.initialization_time {
                                 // If the first header block is newer, overwrite second with
                                 // contents of first.
-                                StaticHeader::write(f, &buf_loc_1, MetadataLocation::Second)?;
+                                loc_1.write(f, MetadataLocation::Second)?;
                                 Ok(Some(loc_1))
                             } else {
                                 // The second header block must be newer, so overwrite first
                                 // with contents of second.
-                                StaticHeader::write(f, &buf_loc_2, MetadataLocation::First)?;
+                                loc_2.write(f, MetadataLocation::First)?;
                                 Ok(Some(loc_2))
                             }
                         }
                         (None, None) => Ok(None),
                         (Some(loc_1), None) => {
                             // Copy 1 has valid Stratis BDA, copy 2 has no magic, re-write copy 2
-                            StaticHeader::write(f, &buf_loc_1, MetadataLocation::Second)?;
+                            loc_1.write(f, MetadataLocation::Second)?;
                             Ok(Some(loc_1))
                         }
                         (None, Some(loc_2)) => {
                             // Copy 2 has valid Stratis BDA, copy 1 has no magic, re-write copy 1
-                            StaticHeader::write(f, &buf_loc_2, MetadataLocation::First)?;
+                            loc_2.write(f, MetadataLocation::First)?;
                             Ok(Some(loc_2))
                         }
                     }
                 }
                 (Ok(loc_1), Err(loc_2)) => {
                     // Re-write copy 2
-                    if loc_1.is_some() {
-                        StaticHeader::write(f, &buf_loc_1, MetadataLocation::Second)?;
-                        Ok(loc_1)
+                    if let Some(loc_1) = loc_1 {
+                        loc_1.write(f, MetadataLocation::Second)?;
+                        Ok(Some(loc_1))
                     } else {
                         // Location 1 doesn't have a signature, but location 2 did, but it got an error,
                         // lets return the error instead as this appears to be a stratis device that
@@ -131,9 +131,9 @@ where
                 }
                 (Err(loc_1), Ok(loc_2)) => {
                     // Re-write copy 1
-                    if loc_2.is_some() {
-                        StaticHeader::write(f, &buf_loc_2, MetadataLocation::First)?;
-                        Ok(loc_2)
+                    if let Some(loc_2) = loc_2 {
+                        loc_2.write(f, MetadataLocation::First)?;
+                        Ok(Some(loc_2))
                     } else {
                         // Location 2 doesn't have a signature, but location 1 did, but it got an error,
                         // lets return the error instead as this appears to be a stratis device that
@@ -151,8 +151,8 @@ where
             // Copy 1 read OK, 2 resulted in an IO error
             match StaticHeader::sigblock_from_buf(&buf_loc_1) {
                 Ok(loc_1) => {
-                    if loc_1.is_some() {
-                        StaticHeader::write(f, &buf_loc_1, MetadataLocation::Second)?;
+                    if let Some(ref loc_1) = loc_1 {
+                        loc_1.write(f, MetadataLocation::Second)?;
                     }
                     Ok(loc_1)
                 }
@@ -168,8 +168,8 @@ where
             // Copy 2 read OK, 1 resulted in IO Error
             match StaticHeader::sigblock_from_buf(&buf_loc_2) {
                 Ok(loc_2) => {
-                    if loc_2.is_some() {
-                        StaticHeader::write(f, &buf_loc_2, MetadataLocation::First)?;
+                    if let Some(ref loc_2) = loc_2 {
+                        loc_2.write(f, MetadataLocation::First)?;
                     }
                     Ok(loc_2)
                 }
@@ -244,10 +244,12 @@ impl StaticHeader {
     /// If first location is specified, write zeroes to empty regions in the
     /// first 8 sectors. If the second location is specified, writes zeroes to
     /// empty regions in the second 8 sectors.
-    pub fn write<F>(f: &mut F, sig_buf: &[u8], which: MetadataLocation) -> io::Result<()>
+    pub fn write<F>(&self, f: &mut F, which: MetadataLocation) -> io::Result<()>
     where
         F: Seek + SyncAll,
     {
+        let sig_buf = &self.sigblock_to_buf();
+
         let zeroed = [0u8; 6 * SECTOR_SIZE];
         f.seek(SeekFrom::Start(0))?;
 
@@ -278,7 +280,7 @@ impl StaticHeader {
     }
 
     /// Generate a buf suitable for writing to blockdev
-    pub fn sigblock_to_buf(&self) -> [u8; SECTOR_SIZE] {
+    fn sigblock_to_buf(&self) -> [u8; SECTOR_SIZE] {
         let mut buf = [0u8; SECTOR_SIZE];
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size);
@@ -454,7 +456,7 @@ mod tests {
 
             let sh_now = StaticHeader { initialization_time: Utc::now().timestamp() as u64, ..sh };
 
-            StaticHeader::write(&mut buf, &sh_now.sigblock_to_buf(), MetadataLocation::Both).unwrap();
+            sh_now.write(&mut buf, MetadataLocation::Both).unwrap();
 
             let reference_buf = buf.clone();
 
@@ -513,19 +515,16 @@ mod tests {
 
         let buf_size = *sh.mda_size.sectors().bytes() as usize + _BDA_STATIC_HDR_SIZE;
         let mut buf = Cursor::new(vec![0; buf_size]);
-        StaticHeader::write(&mut buf, &sh_now.sigblock_to_buf(), MetadataLocation::Both).unwrap();
+        sh_now.write(&mut buf, MetadataLocation::Both).unwrap();
 
         let mut buf_newer = Cursor::new(vec![0; buf_size]);
         let sh_newer = StaticHeader {
             initialization_time: ts + 1,
             ..sh
         };
-        StaticHeader::write(
-            &mut buf_newer,
-            &sh_newer.sigblock_to_buf(),
-            MetadataLocation::Both,
-        )
-        .unwrap();
+        sh_newer
+            .write(&mut buf_newer, MetadataLocation::Both)
+            .unwrap();
 
         // We should always match this reference buffer as it's the newer one.
         let reference_buf = buf_newer.clone();

@@ -167,15 +167,12 @@ impl BDA {
         Ok(Some(BDA { header, regions }))
     }
 
-    /// Zero out Static Header on the blockdev. This causes it to no
-    /// longer be seen as a Stratis blockdev.
+    /// Zero out the entire static header region on the designated file.
     pub fn wipe<F>(f: &mut F) -> StratisResult<()>
     where
         F: Seek + SyncAll,
     {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
-
-        // Wiping Static Header should do it
         f.seek(SeekFrom::Start(0))?;
         f.write_all(&zeroed)?;
         f.sync_all()?;

@@ -18,7 +18,10 @@ use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::metadata::{mda, MDADataSize},
+            backstore::metadata::{
+                mda,
+                sizes::{MDADataSize, MDASize},
+            },
             device::SyncAll,
         },
         DevUuid, PoolUuid,
@@ -123,7 +126,7 @@ impl BDA {
         f: &mut F,
         pool_uuid: Uuid,
         dev_uuid: Uuid,
-        mda_data_size: mda::MDADataSize,
+        mda_data_size: MDADataSize,
         blkdev_size: Sectors,
         initialization_time: u64,
     ) -> StratisResult<BDA>
@@ -253,7 +256,7 @@ pub struct StaticHeader {
     blkdev_size: Sectors,
     pool_uuid: PoolUuid,
     dev_uuid: DevUuid,
-    mda_size: mda::MDASize,
+    mda_size: MDASize,
     reserved_size: Sectors,
     flags: u64,
     /// Seconds portion of DateTime<Utc> value.
@@ -264,7 +267,7 @@ impl StaticHeader {
     fn new(
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
-        mda_size: mda::MDASize,
+        mda_size: MDASize,
         blkdev_size: Sectors,
         initialization_time: u64,
     ) -> StaticHeader {
@@ -455,7 +458,7 @@ impl StaticHeader {
         let pool_uuid = Uuid::parse_str(from_utf8(&buf[32..64])?)?;
         let dev_uuid = Uuid::parse_str(from_utf8(&buf[64..96])?)?;
 
-        let mda_size = mda::MDASize(Sectors(LittleEndian::read_u64(&buf[96..104])));
+        let mda_size = MDASize(Sectors(LittleEndian::read_u64(&buf[96..104])));
 
         Ok(Some(StaticHeader {
             pool_uuid,
@@ -514,10 +517,11 @@ mod tests {
     fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
         let pool_uuid = Uuid::new_v4();
         let dev_uuid = Uuid::new_v4();
-        let mda_size =
-            MDADataSize::new(mda::MIN_MDA_DATA_REGION_SIZE + Bytes(u64::from(mda_size_factor * 4)))
-                .region_size()
-                .mda_size();
+        let mda_size = MDADataSize::new(
+            MDADataSize::default().bytes() + Bytes(u64::from(mda_size_factor * 4)),
+        )
+        .region_size()
+        .mda_size();
         let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
         StaticHeader::new(
             pool_uuid,

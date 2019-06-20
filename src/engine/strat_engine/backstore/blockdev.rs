@@ -15,7 +15,7 @@ use crate::{
         engine::BlockDev,
         strat_engine::{
             backstore::{
-                metadata::{disown_device, BDAExtendedSize, MDADataSize, BDA},
+                metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
                 range_alloc::RangeAllocator,
             },
             serde_structs::{BaseBlockDevSave, Recordable},
@@ -127,6 +127,12 @@ impl StratBlockDev {
     pub fn set_user_info(&mut self, user_info: Option<&str>) -> bool {
         set_blockdev_user_info!(self; user_info)
     }
+
+    pub fn size(&self) -> BlockdevSize {
+        let size = self.used.size();
+        assert_eq!(self.bda.dev_size(), size);
+        size
+    }
 }
 
 impl BlockDev for StratBlockDev {
@@ -146,12 +152,6 @@ impl BlockDev for StratBlockDev {
         // This cast will result in an incorrect, negative value starting in
         // the year 292,277,026,596. :-)
         Utc.timestamp(self.bda.initialization_time() as i64, 0)
-    }
-
-    fn size(&self) -> Sectors {
-        let size = self.used.size();
-        assert_eq!(self.bda.dev_size(), size);
-        size.sectors()
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {

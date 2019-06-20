@@ -144,9 +144,6 @@ SPECS = {
 <property name="Tier" type="q" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
 </property>
-<property name="TotalPhysicalSize" type="s" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
-</property>
 <property name="UserInfo" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
 </property>

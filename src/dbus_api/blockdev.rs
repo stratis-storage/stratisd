@@ -68,12 +68,6 @@ pub fn create_dbus_blockdev<'a>(
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_blockdev_initialization_time);
 
-    let total_physical_size_property = f
-        .property::<&str, _>("TotalPhysicalSize", ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
-        .on_get(get_blockdev_physical_size);
-
     let pool_property = f
         .property::<&dbus::Path, _>("Pool", ())
         .access(Access::Read)
@@ -103,7 +97,6 @@ pub fn create_dbus_blockdev<'a>(
                 .add_p(devnode_property)
                 .add_p(hardware_info_property)
                 .add_p(initialization_time_property)
-                .add_p(total_physical_size_property)
                 .add_p(pool_property)
                 .add_p(tier_property)
                 .add_p(user_info_property)
@@ -246,13 +239,6 @@ fn get_blockdev_initialization_time(
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |_, p| Ok(p.initialization_time().timestamp() as u64))
-}
-
-fn get_blockdev_physical_size(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-) -> Result<(), MethodErr> {
-    get_blockdev_property(i, p, |_, p| Ok(format!("{}", *p.size())))
 }
 
 fn get_blockdev_tier(

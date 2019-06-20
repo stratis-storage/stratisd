@@ -54,9 +54,6 @@ pub trait BlockDev: Debug {
     /// to the nearest second.
     fn initialization_time(&self) -> DateTime<Utc>;
 
-    /// The total size of the device, including space not usable for data.
-    fn size(&self) -> Sectors;
-
     /// Set dbus path associated with the BlockDev.
     fn set_dbus_path(&mut self, path: MaybeDbusPath) -> ();
 

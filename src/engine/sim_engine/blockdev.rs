@@ -11,8 +11,6 @@ use std::{
 use chrono::{DateTime, TimeZone, Utc};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Sectors, IEC};
-
 use crate::engine::{
     engine::BlockDev, sim_engine::randomization::Randomizer, types::MaybeDbusPath,
 };
@@ -43,10 +41,6 @@ impl BlockDev for SimDev {
 
     fn initialization_time(&self) -> DateTime<Utc> {
         Utc.timestamp(self.initialization_time as i64, 0)
-    }
-
-    fn size(&self) -> Sectors {
-        Bytes(IEC::Gi).sectors()
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {

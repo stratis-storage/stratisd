@@ -29,7 +29,7 @@ use crate::{
 const _BDA_STATIC_HDR_SIZE: usize = 16 * SECTOR_SIZE;
 const BDA_STATIC_HDR_SIZE: Bytes = Bytes(_BDA_STATIC_HDR_SIZE as u64);
 
-const MDA_RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
+const RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
 
 const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
@@ -89,7 +89,7 @@ impl BDA {
     where
         F: Seek + SyncAll,
     {
-        let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
+        let zeroed = [0u8; 6 * SECTOR_SIZE];
         f.seek(SeekFrom::Start(0))?;
 
         // Write to a single region in the header. Zeroes the first sector,
@@ -167,15 +167,12 @@ impl BDA {
         Ok(Some(BDA { header, regions }))
     }
 
-    /// Zero out Static Header on the blockdev. This causes it to no
-    /// longer be seen as a Stratis blockdev.
+    /// Zero out the entire static header region on the designated file.
     pub fn wipe<F>(f: &mut F) -> StratisResult<()>
     where
         F: Seek + SyncAll,
     {
         let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
-
-        // Wiping Static Header should do it
         f.seek(SeekFrom::Start(0))?;
         f.write_all(&zeroed)?;
         f.sync_all()?;
@@ -266,7 +263,7 @@ impl StaticHeader {
             pool_uuid,
             dev_uuid,
             mda_size,
-            reserved_size: MDA_RESERVED_SECTORS,
+            reserved_size: RESERVED_SECTORS,
             flags: 0,
             initialization_time,
         }
@@ -406,15 +403,7 @@ impl StaticHeader {
     where
         F: Read + Seek + SyncAll,
     {
-        // Using setup() as a test of ownership sets a high bar. It is
-        // not sufficient to have STRAT_MAGIC to be considered "Ours",
-        // it must also have correct CRC, no weird stuff in fields,
-        // etc!
-        match StaticHeader::setup(f) {
-            Ok(Some(sh)) => Ok(Some((sh.pool_uuid, sh.dev_uuid))),
-            Ok(None) => Ok(None),
-            Err(err) => Err(err),
-        }
+        StaticHeader::setup(f).map(|sh| sh.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
     }
 
     /// Generate a buf suitable for writing to blockdev

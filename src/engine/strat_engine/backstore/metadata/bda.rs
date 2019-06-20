@@ -403,10 +403,6 @@ impl StaticHeader {
     where
         F: Read + Seek + SyncAll,
     {
-        // Using setup() as a test of ownership sets a high bar. It is
-        // not sufficient to have STRAT_MAGIC to be considered "Ours",
-        // it must also have correct CRC, no weird stuff in fields,
-        // etc!
         match StaticHeader::setup(f) {
             Ok(Some(sh)) => Ok(Some((sh.pool_uuid, sh.dev_uuid))),
             Ok(None) => Ok(None),

@@ -403,11 +403,7 @@ impl StaticHeader {
     where
         F: Read + Seek + SyncAll,
     {
-        match StaticHeader::setup(f) {
-            Ok(Some(sh)) => Ok(Some((sh.pool_uuid, sh.dev_uuid))),
-            Ok(None) => Ok(None),
-            Err(err) => Err(err),
-        }
+        StaticHeader::setup(f).map(|sh| sh.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
     }
 
     /// Generate a buf suitable for writing to blockdev

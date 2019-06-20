@@ -89,7 +89,7 @@ impl BDA {
     where
         F: Seek + SyncAll,
     {
-        let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
+        let zeroed = [0u8; 6 * SECTOR_SIZE];
         f.seek(SeekFrom::Start(0))?;
 
         // Write to a single region in the header. Zeroes the first sector,

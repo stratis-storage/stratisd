@@ -389,11 +389,16 @@ impl MDARegions {
     /// An invariant on MDARegions structs.
     /// 1. If an MDAHeader in the regions is not None, then its used
     /// attribute must be greater than 0.
+    /// 2. If an MDAHeader in the regions is not None, then its used
+    /// attribute must be no greater than the region allocated for it.
     pub fn invariant(&self) {
+        let space_for_data = self.region_size.data_size().bytes();
         for mda in self.mda_headers.iter() {
-            assert!(mda
-                .as_ref()
-                .map_or_else(|| true, |mda| mda.used.bytes() != Bytes(0)));
+            if let Some(mda) = mda {
+                let data_len = mda.used.bytes();
+                assert_ne!(data_len, Bytes(0));
+                assert!(data_len <= space_for_data);
+            }
         }
     }
 }

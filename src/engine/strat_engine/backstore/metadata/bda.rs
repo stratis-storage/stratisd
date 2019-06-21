@@ -20,7 +20,7 @@ use crate::{
         strat_engine::{
             backstore::metadata::{
                 mda,
-                sizes::{static_header_size, MDADataSize, MDASize},
+                sizes::{static_header_size, BDAExtendedSize, MDADataSize, MDASize},
             },
             device::SyncAll,
         },
@@ -237,7 +237,7 @@ impl BDA {
 
     /// The number of sectors the BDA itself occupies.
     pub fn size(&self) -> Sectors {
-        self.header.mda_size.bda_size().sectors() + self.header.reserved_size
+        self.header.bda_extended_size().sectors()
     }
 
     /// The maximum size of variable length metadata that can be accommodated.
@@ -290,6 +290,10 @@ impl StaticHeader {
             flags: 0,
             initialization_time,
         }
+    }
+
+    pub fn bda_extended_size(&self) -> BDAExtendedSize {
+        BDAExtendedSize::new(self.mda_size.bda_size().sectors() + self.reserved_size)
     }
 
     /// Try to find a valid StaticHeader on a device.
@@ -725,7 +729,7 @@ mod tests {
 
             if let Some(index) = primary {
                 // Corrupt primary copy
-                corrupt_byte(&mut buf, (static_header_sectors::FIRST_SIGBLOCK_START_SECTORS * SECTOR_SIZE + index) as u64).unwrap();
+                corrupt_byte(&mut buf, (static_header_size::FIRST_SIGBLOCK_START_SECTORS * SECTOR_SIZE + index) as u64).unwrap();
             }
 
             if let Some(index) = secondary {

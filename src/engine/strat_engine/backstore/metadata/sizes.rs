@@ -2,7 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-pub use self::mda_size::{MDADataSize, MDARegionSize, MDASize};
+pub use self::{
+    bda_size::BDAExtendedSize,
+    mda_size::{MDADataSize, MDARegionSize, MDASize},
+};
 
 /// A module which defines constants and types related to static header sizes.
 pub mod static_header_size {
@@ -162,6 +165,20 @@ pub mod bda_size {
     impl BDASize {
         pub fn new(value: Sectors) -> BDASize {
             BDASize(value)
+        }
+
+        pub fn sectors(self) -> Sectors {
+            self.0
+        }
+    }
+
+    /// The size of the whole BDA + reserved space.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub struct BDAExtendedSize(Sectors);
+
+    impl BDAExtendedSize {
+        pub fn new(value: Sectors) -> BDAExtendedSize {
+            BDAExtendedSize(value)
         }
 
         pub fn sectors(self) -> Sectors {

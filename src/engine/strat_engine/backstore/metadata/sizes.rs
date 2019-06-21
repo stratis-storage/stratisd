@@ -5,10 +5,14 @@
 pub use self::{
     bda_size::BDAExtendedSize,
     mda_size::{MDADataSize, MDARegionSize, MDASize},
+    static_header_size::{StaticHeaderSize, STATIC_HEADER_SIZE},
 };
 
 /// A module which defines constants and types related to static header sizes.
 pub mod static_header_size {
+
+    use devicemapper::Sectors;
+
     pub const PRE_SIGBLOCK_PADDING_SECTORS: usize = 1;
     const SIGBLOCK_SECTORS: usize = 1;
     pub const POST_SIGBLOCK_PADDING_SECTORS: usize = 6;
@@ -19,6 +23,19 @@ pub mod static_header_size {
     pub const FIRST_SIGBLOCK_START_SECTORS: usize = PRE_SIGBLOCK_PADDING_SECTORS;
     pub const SECOND_SIGBLOCK_START_SECTORS: usize =
         SIGBLOCK_REGION_SECTORS + PRE_SIGBLOCK_PADDING_SECTORS;
+
+    /// Type for the unique static header size which is a constant.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub struct StaticHeaderSize(Sectors);
+
+    pub const STATIC_HEADER_SIZE: StaticHeaderSize =
+        StaticHeaderSize(Sectors(STATIC_HEADER_SECTORS as u64));
+
+    impl StaticHeaderSize {
+        pub fn sectors(self) -> Sectors {
+            self.0
+        }
+    }
 }
 
 /// A module which defines types for three different regions of the MDA:

@@ -13,14 +13,16 @@ use chrono::{DateTime, Utc};
 use crc::crc32;
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
+use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
 use crate::{
     engine::{
         strat_engine::{
             backstore::metadata::{
                 mda,
-                sizes::{static_header_size, BDAExtendedSize, MDADataSize, MDASize},
+                sizes::{
+                    static_header_size, BDAExtendedSize, MDADataSize, MDASize, STATIC_HEADER_SIZE,
+                },
             },
             device::SyncAll,
         },
@@ -30,7 +32,6 @@ use crate::{
 };
 
 const _BDA_STATIC_HDR_SIZE: usize = static_header_size::STATIC_HEADER_SECTORS * SECTOR_SIZE;
-const BDA_STATIC_HDR_SIZE: Bytes = Bytes(_BDA_STATIC_HDR_SIZE as u64);
 
 const RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
 
@@ -153,7 +154,8 @@ impl BDA {
 
         BDA::write(f, &header.sigblock_to_buf(), MetadataLocation::Both)?;
 
-        let regions = mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, f)?;
+        let regions =
+            mda::MDARegions::initialize(STATIC_HEADER_SIZE.sectors().bytes(), header.mda_size, f)?;
 
         Ok(BDA { header, regions })
     }
@@ -175,7 +177,8 @@ impl BDA {
         // were written to the device. Returns an error if there is an error
         // when loading the MDARegions, which can only be caused by an I/O
         // error or invalid MDA headers.
-        let regions = mda::MDARegions::load(BDA_STATIC_HDR_SIZE, header.mda_size, f)?;
+        let regions =
+            mda::MDARegions::load(STATIC_HEADER_SIZE.sectors().bytes(), header.mda_size, f)?;
 
         Ok(Some(BDA { header, regions }))
     }
@@ -203,7 +206,7 @@ impl BDA {
         F: Seek + SyncAll,
     {
         self.regions
-            .save_state(BDA_STATIC_HDR_SIZE, time, metadata, f)
+            .save_state(STATIC_HEADER_SIZE.sectors().bytes(), time, metadata, f)
     }
 
     /// Read latest metadata from the disk
@@ -211,7 +214,8 @@ impl BDA {
     where
         F: Read + Seek,
     {
-        self.regions.load_state(BDA_STATIC_HDR_SIZE, &mut f)
+        self.regions
+            .load_state(STATIC_HEADER_SIZE.sectors().bytes(), &mut f)
     }
 
     /// The time when the most recent metadata was written to the BDA,

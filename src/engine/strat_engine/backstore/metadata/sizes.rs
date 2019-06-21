@@ -12,6 +12,10 @@ pub mod static_header_size {
     const SIGBLOCK_REGION_SECTORS: usize =
         PRE_SIGBLOCK_PADDING_SECTORS + SIGBLOCK_SECTORS + POST_SIGBLOCK_PADDING_SECTORS;
     pub const STATIC_HEADER_SECTORS: usize = 2 * SIGBLOCK_REGION_SECTORS;
+
+    pub const FIRST_SIGBLOCK_START_SECTORS: usize = PRE_SIGBLOCK_PADDING_SECTORS;
+    pub const SECOND_SIGBLOCK_START_SECTORS: usize =
+        SIGBLOCK_REGION_SECTORS + PRE_SIGBLOCK_PADDING_SECTORS;
 }
 
 /// A module which defines types for three different regions of the MDA:

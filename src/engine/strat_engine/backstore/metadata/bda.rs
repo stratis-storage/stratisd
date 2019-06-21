@@ -79,8 +79,18 @@ impl BDA {
         }
 
         (
-            read_sector_at_offset(f, SECTOR_SIZE, &mut buf_loc_1).map(|_| buf_loc_1),
-            read_sector_at_offset(f, 9 * SECTOR_SIZE, &mut buf_loc_2).map(|_| buf_loc_2),
+            read_sector_at_offset(
+                f,
+                static_header_size::FIRST_SIGBLOCK_START_SECTORS * SECTOR_SIZE,
+                &mut buf_loc_1,
+            )
+            .map(|_| buf_loc_1),
+            read_sector_at_offset(
+                f,
+                static_header_size::SECOND_SIGBLOCK_START_SECTORS * SECTOR_SIZE,
+                &mut buf_loc_2,
+            )
+            .map(|_| buf_loc_2),
         )
     }
 
@@ -715,12 +725,12 @@ mod tests {
 
             if let Some(index) = primary {
                 // Corrupt primary copy
-                corrupt_byte(&mut buf, (SECTOR_SIZE + index) as u64).unwrap();
+                corrupt_byte(&mut buf, (static_header_sectors::FIRST_SIGBLOCK_START_SECTORS * SECTOR_SIZE + index) as u64).unwrap();
             }
 
             if let Some(index) = secondary {
                 // Corrupt secondary copy
-                corrupt_byte(&mut buf, (9 * SECTOR_SIZE + index) as u64).unwrap();
+                corrupt_byte(&mut buf, (static_header_size::SECOND_SIGBLOCK_START_SECTORS * SECTOR_SIZE + index) as u64).unwrap();
             }
 
             let setup_result = StaticHeader::setup(&mut buf);
@@ -786,7 +796,10 @@ mod tests {
         // We should always match this reference buffer as it's the newer one.
         let reference_buf = buf_newer.clone();
 
-        for offset in &[SECTOR_SIZE, 9 * SECTOR_SIZE] {
+        for offset in &[
+            static_header_size::FIRST_SIGBLOCK_START_SECTORS * SECTOR_SIZE,
+            static_header_size::SECOND_SIGBLOCK_START_SECTORS * SECTOR_SIZE,
+        ] {
             // Copy the older BDA to newer BDA buffer
             buf.seek(SeekFrom::Start(*offset as u64)).unwrap();
             buf_newer.seek(SeekFrom::Start(*offset as u64)).unwrap();

@@ -237,7 +237,7 @@ impl BDA {
 
     /// The number of sectors the BDA itself occupies.
     pub fn size(&self) -> Sectors {
-        BDA_STATIC_HDR_SIZE.sectors() + self.header.mda_size.sectors() + self.header.reserved_size
+        self.header.mda_size.bda_size().sectors() + self.header.reserved_size
     }
 
     /// The maximum size of variable length metadata that can be accommodated.

@@ -65,6 +65,12 @@ pub mod mda_size {
         pub fn region_size(self) -> MDARegionSize {
             MDARegionSize(self.0 / NUM_MDA_REGIONS)
         }
+
+        pub fn bda_size(self) -> super::bda_size::BDASize {
+            super::bda_size::BDASize::new(
+                self.0 + Sectors(super::static_header_size::STATIC_HEADER_SECTORS as u64),
+            )
+        }
     }
 
     /// A value representing the size of one MDA region.
@@ -138,6 +144,27 @@ pub mod mda_size {
         }
 
         pub fn bytes(self) -> Bytes {
+            self.0
+        }
+    }
+}
+
+/// A module which defines constants and types related to BDA sizes.
+pub mod bda_size {
+
+    use devicemapper::Sectors;
+
+    /// Defines the size of the whole BDA which does not not include reserved
+    /// space.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub struct BDASize(Sectors);
+
+    impl BDASize {
+        pub fn new(value: Sectors) -> BDASize {
+            BDASize(value)
+        }
+
+        pub fn sectors(self) -> Sectors {
             self.0
         }
     }

@@ -20,7 +20,7 @@ use crate::{
         strat_engine::{
             backstore::metadata::{
                 mda,
-                sizes::{MDADataSize, MDASize},
+                sizes::{static_header_size, MDADataSize, MDASize},
             },
             device::SyncAll,
         },
@@ -29,7 +29,7 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-const _BDA_STATIC_HDR_SIZE: usize = 16 * SECTOR_SIZE;
+const _BDA_STATIC_HDR_SIZE: usize = static_header_size::STATIC_HEADER_SECTORS * SECTOR_SIZE;
 const BDA_STATIC_HDR_SIZE: Bytes = Bytes(_BDA_STATIC_HDR_SIZE as u64);
 
 const RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
@@ -92,19 +92,19 @@ impl BDA {
     where
         F: Seek + SyncAll,
     {
-        let zeroed = [0u8; 6 * SECTOR_SIZE];
+        let zeroed = [0u8; static_header_size::POST_SIGBLOCK_PADDING_SECTORS * SECTOR_SIZE];
         f.seek(SeekFrom::Start(0))?;
 
-        // Write to a single region in the header. Zeroes the first sector,
-        // writes bda_buf to the second sector, and then zeroes the remaining
-        // six sectors.
+        // Write to a static header region in the static header.
         fn write_region<F>(f: &mut F, bda_buf: &[u8], zeroed: &[u8]) -> io::Result<()>
         where
             F: Seek + SyncAll,
         {
-            f.write_all(&zeroed[..SECTOR_SIZE])?; // Zero 1 unused sector
+            f.write_all(&zeroed[..static_header_size::PRE_SIGBLOCK_PADDING_SECTORS * SECTOR_SIZE])?;
             f.write_all(bda_buf)?;
-            f.write_all(&zeroed[..SECTOR_SIZE * 6])?; // Zero 6 unused sectors
+            f.write_all(
+                &zeroed[..static_header_size::POST_SIGBLOCK_PADDING_SECTORS * SECTOR_SIZE],
+            )?;
             f.sync_all()?;
             Ok(())
         };

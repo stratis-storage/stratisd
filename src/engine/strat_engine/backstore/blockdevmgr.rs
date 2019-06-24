@@ -499,7 +499,7 @@ mod tests {
         tests::{loopbacked, real},
     };
 
-    use crate::engine::strat_engine::backstore::metadata::StaticHeader;
+    use crate::engine::strat_engine::backstore::metadata::BDA;
 
     use super::*;
 
@@ -582,12 +582,10 @@ mod tests {
         for path in clean_paths {
             assert_eq!(
                 pool_uuid,
-                StaticHeader::device_identifiers(
-                    &mut OpenOptions::new().read(true).open(path).unwrap(),
-                )
-                .unwrap()
-                .unwrap()
-                .0
+                BDA::device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
+                    .unwrap()
+                    .unwrap()
+                    .0
             );
         }
     }
@@ -748,12 +746,10 @@ mod tests {
         for path in paths {
             assert_eq!(
                 pool_uuid,
-                StaticHeader::device_identifiers(
-                    &mut OpenOptions::new().read(true).open(path).unwrap(),
-                )
-                .unwrap()
-                .unwrap()
-                .0
+                BDA::device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
+                    .unwrap()
+                    .unwrap()
+                    .0
             );
         }
 
@@ -761,10 +757,8 @@ mod tests {
 
         for path in paths {
             assert_eq!(
-                StaticHeader::device_identifiers(
-                    &mut OpenOptions::new().read(true).open(path).unwrap(),
-                )
-                .unwrap(),
+                BDA::device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
+                    .unwrap(),
                 None
             );
         }

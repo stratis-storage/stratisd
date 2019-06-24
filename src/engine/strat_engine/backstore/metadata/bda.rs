@@ -236,6 +236,16 @@ impl BDA {
     pub fn initialization_time(&self) -> u64 {
         self.header.initialization_time
     }
+
+    /// Get a Stratis pool UUID and device UUID from any device.
+    /// If there is an error while obtaining these values return the error.
+    /// If the device does not appear to be a Stratis device, return None.
+    pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<((PoolUuid, DevUuid))>>
+    where
+        F: Read + Seek + SyncAll,
+    {
+        StaticHeader::setup(f).map(|sh| sh.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
+    }
 }
 
 #[derive(Eq, PartialEq)]
@@ -398,14 +408,6 @@ impl StaticHeader {
         }
     }
 
-    /// Retrieve the device and pool UUIDs from a stratis device.
-    pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<((PoolUuid, DevUuid))>>
-    where
-        F: Read + Seek + SyncAll,
-    {
-        StaticHeader::setup(f).map(|sh| sh.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
-    }
-
     /// Generate a buf suitable for writing to blockdev
     fn sigblock_to_buf(&self) -> [u8; SECTOR_SIZE] {
         let mut buf = [0u8; SECTOR_SIZE];
@@ -544,7 +546,7 @@ mod tests {
         fn test_ownership(ref sh in static_header_strategy()) {
             let buf_size = *sh.mda_size.sectors().bytes() as usize + _BDA_STATIC_HDR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
-            prop_assert!(StaticHeader::device_identifiers(&mut buf).unwrap().is_none());
+            prop_assert!(BDA::device_identifiers(&mut buf).unwrap().is_none());
 
             BDA::initialize(
                 &mut buf,
@@ -555,13 +557,13 @@ mod tests {
                 Utc::now().timestamp() as u64,
             ).unwrap();
 
-            prop_assert!(StaticHeader::device_identifiers(&mut buf)
+            prop_assert!(BDA::device_identifiers(&mut buf)
                          .unwrap()
                          .map(|(t_p, t_d)| t_p == sh.pool_uuid && t_d == sh.dev_uuid)
                          .unwrap_or(false));
 
             BDA::wipe(&mut buf).unwrap();
-            prop_assert!(StaticHeader::device_identifiers(&mut buf).unwrap().is_none());
+            prop_assert!(BDA::device_identifiers(&mut buf).unwrap().is_none());
         }
     }
 

@@ -126,7 +126,9 @@ impl BDA {
         if which == MetadataLocation::Both || which == MetadataLocation::First {
             write_region(f, bda_buf, &zeroed)?;
         } else {
-            f.seek(SeekFrom::Start(8 * SECTOR_SIZE as u64))?;
+            f.seek(SeekFrom::Start(
+                (static_header_size::SIGBLOCK_REGION_SECTORS * SECTOR_SIZE) as u64,
+            ))?;
         }
 
         if which == MetadataLocation::Both || which == MetadataLocation::Second {

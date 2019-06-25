@@ -16,7 +16,7 @@ pub mod static_header_size {
     pub const PRE_SIGBLOCK_PADDING_SECTORS: usize = 1;
     pub const SIGBLOCK_SECTORS: usize = 1;
     pub const POST_SIGBLOCK_PADDING_SECTORS: usize = 6;
-    const SIGBLOCK_REGION_SECTORS: usize =
+    pub const SIGBLOCK_REGION_SECTORS: usize =
         PRE_SIGBLOCK_PADDING_SECTORS + SIGBLOCK_SECTORS + POST_SIGBLOCK_PADDING_SECTORS;
     pub const STATIC_HEADER_SECTORS: usize = 2 * SIGBLOCK_REGION_SECTORS;
 

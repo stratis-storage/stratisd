@@ -54,7 +54,12 @@ impl BDA {
     /// Read the BDA from the device and return 2 SECTORS worth of data, one for each BDA returned
     /// in the order of layout on disk (location 1, location 2).
     /// Only the BDA sectors are read up from disk, zero areas are *not* read.
-    fn read<F>(f: &mut F) -> (io::Result<[u8; SECTOR_SIZE]>, io::Result<[u8; SECTOR_SIZE]>)
+    fn read<F>(
+        f: &mut F,
+    ) -> (
+        io::Result<[u8; static_header_size::SIGBLOCK_SECTORS * SECTOR_SIZE]>,
+        io::Result<[u8; static_header_size::SIGBLOCK_SECTORS * SECTOR_SIZE]>,
+    )
     where
         F: Read + Seek,
     {
@@ -64,8 +69,8 @@ impl BDA {
         // read errors. It's best to read each of the specific BDA blocks individually, to limit
         // the probability of hitting a read error on a non-essential sector.
 
-        let mut buf_loc_1 = [0u8; SECTOR_SIZE];
-        let mut buf_loc_2 = [0u8; SECTOR_SIZE];
+        let mut buf_loc_1 = [0u8; static_header_size::SIGBLOCK_SECTORS * SECTOR_SIZE];
+        let mut buf_loc_2 = [0u8; static_header_size::SIGBLOCK_SECTORS * SECTOR_SIZE];
 
         /// Read a bda sector worth of data at the specified offset into buffer.
         fn read_sector_at_offset<F>(f: &mut F, offset: usize, mut buf: &mut [u8]) -> io::Result<()>
@@ -428,8 +433,8 @@ impl StaticHeader {
     }
 
     /// Generate a buf suitable for writing to blockdev
-    fn sigblock_to_buf(&self) -> [u8; SECTOR_SIZE] {
-        let mut buf = [0u8; SECTOR_SIZE];
+    fn sigblock_to_buf(&self) -> [u8; static_header_size::SIGBLOCK_SECTORS * SECTOR_SIZE] {
+        let mut buf = [0u8; static_header_size::SIGBLOCK_SECTORS * SECTOR_SIZE];
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size);
         buf[28] = STRAT_SIGBLOCK_VERSION;
@@ -439,7 +444,8 @@ impl StaticHeader {
         LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size);
         LittleEndian::write_u64(&mut buf[120..128], self.initialization_time);
 
-        let hdr_crc = crc32::checksum_castagnoli(&buf[4..SECTOR_SIZE]);
+        let hdr_crc =
+            crc32::checksum_castagnoli(&buf[4..static_header_size::SIGBLOCK_SECTORS * SECTOR_SIZE]);
         LittleEndian::write_u32(&mut buf[..4], hdr_crc);
         buf
     }
@@ -447,13 +453,17 @@ impl StaticHeader {
     /// Build a StaticHeader from a SECTOR_SIZE buf that was read from
     /// a blockdev.
     fn sigblock_from_buf(buf: &[u8]) -> StratisResult<Option<StaticHeader>> {
-        assert_eq!(buf.len(), SECTOR_SIZE);
+        assert_eq!(
+            buf.len(),
+            static_header_size::SIGBLOCK_SECTORS * SECTOR_SIZE
+        );
 
         if &buf[4..20] != STRAT_MAGIC {
             return Ok(None);
         }
 
-        let crc = crc32::checksum_castagnoli(&buf[4..SECTOR_SIZE]);
+        let crc =
+            crc32::checksum_castagnoli(&buf[4..static_header_size::SIGBLOCK_SECTORS * SECTOR_SIZE]);
         if crc != LittleEndian::read_u32(&buf[..4]) {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
@@ -713,8 +723,8 @@ mod tests {
         /// the two static headers is corrupted. Verify expected behavior
         /// if both are corrupted, which varies depending on whether the
         /// Stratis magic number or some other part of the header is corrupted.
-        fn bda_test_recovery(primary in option::of(0..SECTOR_SIZE),
-                             secondary in option::of(0..SECTOR_SIZE)) {
+        fn bda_test_recovery(primary in option::of(0..static_header_size::SIGBLOCK_SECTORS * SECTOR_SIZE),
+                             secondary in option::of(0..static_header_size::SIGBLOCK_SECTORS * SECTOR_SIZE)) {
             let sh = random_static_header(10000, 4);
             let buf_size = *sh.mda_size.sectors().bytes() as usize + static_header_size::STATIC_HEADER_SECTORS * SECTOR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
@@ -810,7 +820,7 @@ mod tests {
             // Copy the older BDA to newer BDA buffer
             buf.seek(SeekFrom::Start(*offset as u64)).unwrap();
             buf_newer.seek(SeekFrom::Start(*offset as u64)).unwrap();
-            let mut sector = [0u8; SECTOR_SIZE];
+            let mut sector = [0u8; static_header_size::SIGBLOCK_SECTORS * SECTOR_SIZE];
             buf.read_exact(&mut sector).unwrap();
             buf_newer.write_all(&sector).unwrap();
 

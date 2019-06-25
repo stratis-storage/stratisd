@@ -251,7 +251,7 @@ impl BDA {
     }
 
     /// The number of sectors the BDA itself occupies.
-    pub fn size(&self) -> BDAExtendedSize {
+    pub fn extended_size(&self) -> BDAExtendedSize {
         self.header.bda_extended_size()
     }
 

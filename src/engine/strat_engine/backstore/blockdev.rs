@@ -61,7 +61,7 @@ impl StratBlockDev {
         user_info: Option<String>,
         hardware_info: Option<String>,
     ) -> StratisResult<StratBlockDev> {
-        let mut segments = vec![(Sectors(0), bda.size().sectors())];
+        let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(upper_segments);
         let allocator = RangeAllocator::new(bda.dev_size(), &segments)?;
 
@@ -114,7 +114,7 @@ impl StratBlockDev {
     // ALL SIZE METHODS (except size(), which is in BlockDev impl.)
     /// The number of Sectors on this device used by Stratis for metadata
     pub fn metadata_size(&self) -> BDAExtendedSize {
-        self.bda.size()
+        self.bda.extended_size()
     }
 
     /// The number of Sectors on this device not allocated for any purpose.

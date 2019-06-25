@@ -164,7 +164,7 @@ impl BlockDev for StratBlockDev {
 
     fn state(&self) -> BlockDevState {
         // TODO: Implement support for other BlockDevStates
-        if self.used.used() > self.bda.size().sectors() {
+        if self.used.used() > self.metadata_size().sectors() {
             BlockDevState::InUse
         } else {
             BlockDevState::NotInUse

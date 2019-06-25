@@ -31,8 +31,6 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-const _BDA_STATIC_HDR_SIZE: usize = static_header_size::STATIC_HEADER_SECTORS * SECTOR_SIZE;
-
 const RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
 
 const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
@@ -188,7 +186,7 @@ impl BDA {
     where
         F: Seek + SyncAll,
     {
-        let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
+        let zeroed = [0u8; static_header_size::STATIC_HEADER_SECTORS * SECTOR_SIZE];
         f.seek(SeekFrom::Start(0))?;
         f.write_all(&zeroed)?;
         f.sync_all()?;
@@ -566,7 +564,7 @@ mod tests {
         /// Wipe the BDA.
         /// Verify that the buffer is again unowned.
         fn test_ownership(ref sh in static_header_strategy()) {
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + _BDA_STATIC_HDR_SIZE;
+            let buf_size = *sh.mda_size.sectors().bytes() as usize + static_header_size::STATIC_HEADER_SECTORS * SECTOR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
             prop_assert!(BDA::device_identifiers(&mut buf).unwrap().is_none());
 
@@ -595,7 +593,7 @@ mod tests {
         /// Initialize a BDA.
         /// Verify that the last update time is None.
         fn empty_bda(ref sh in static_header_strategy()) {
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + _BDA_STATIC_HDR_SIZE;
+            let buf_size = *sh.mda_size.sectors().bytes() as usize + static_header_size::STATIC_HEADER_SECTORS * SECTOR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
             let bda = BDA::initialize(
                 &mut buf,
@@ -661,7 +659,7 @@ mod tests {
             ref state in vec(num::u8::ANY, 1..100),
             ref next_state in vec(num::u8::ANY, 1..100)
         ) {
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + _BDA_STATIC_HDR_SIZE;
+            let buf_size = *sh.mda_size.sectors().bytes() as usize + static_header_size::STATIC_HEADER_SECTORS * SECTOR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
             let mut bda = BDA::initialize(
                 &mut buf,
@@ -718,7 +716,7 @@ mod tests {
         fn bda_test_recovery(primary in option::of(0..SECTOR_SIZE),
                              secondary in option::of(0..SECTOR_SIZE)) {
             let sh = random_static_header(10000, 4);
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + _BDA_STATIC_HDR_SIZE;
+            let buf_size = *sh.mda_size.sectors().bytes() as usize + static_header_size::STATIC_HEADER_SECTORS * SECTOR_SIZE;
             let mut buf = Cursor::new(vec![0; buf_size]);
             BDA::initialize(
                 &mut buf,
@@ -776,7 +774,8 @@ mod tests {
     /// Test that we re-write the older of two BDAs if they don't match.
     fn bda_test_rewrite_older() {
         let sh = random_static_header(10000, 4);
-        let buf_size = *sh.mda_size.sectors().bytes() as usize + _BDA_STATIC_HDR_SIZE;
+        let buf_size = *sh.mda_size.sectors().bytes() as usize
+            + static_header_size::STATIC_HEADER_SECTORS * SECTOR_SIZE;
         let mut buf = Cursor::new(vec![0; buf_size]);
         let ts = Utc::now().timestamp() as u64;
 

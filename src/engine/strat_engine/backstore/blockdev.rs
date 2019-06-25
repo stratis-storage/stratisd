@@ -14,7 +14,10 @@ use crate::{
     engine::{
         event::get_engine_listener_list,
         strat_engine::{
-            backstore::{metadata::BDA, range_alloc::RangeAllocator, MDADataSize},
+            backstore::{
+                metadata::{BDAExtendedSize, MDADataSize, BDA},
+                range_alloc::RangeAllocator,
+            },
             serde_structs::{BaseBlockDevSave, Recordable},
         },
         BlockDev, BlockDevState, DevUuid, EngineEvent, MaybeDbusPath,
@@ -58,7 +61,7 @@ impl StratBlockDev {
         user_info: Option<String>,
         hardware_info: Option<String>,
     ) -> StratisResult<StratBlockDev> {
-        let mut segments = vec![(Sectors(0), bda.size())];
+        let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(upper_segments);
         let allocator = RangeAllocator::new(bda.dev_size(), &segments)?;
 
@@ -110,8 +113,8 @@ impl StratBlockDev {
 
     // ALL SIZE METHODS (except size(), which is in BlockDev impl.)
     /// The number of Sectors on this device used by Stratis for metadata
-    pub fn metadata_size(&self) -> Sectors {
-        self.bda.size()
+    pub fn metadata_size(&self) -> BDAExtendedSize {
+        self.bda.extended_size()
     }
 
     /// The number of Sectors on this device not allocated for any purpose.
@@ -161,7 +164,7 @@ impl BlockDev for StratBlockDev {
 
     fn state(&self) -> BlockDevState {
         // TODO: Implement support for other BlockDevStates
-        if self.used.used() > self.bda.size() {
+        if self.used.used() > self.metadata_size().sectors() {
             BlockDevState::InUse
         } else {
             BlockDevState::NotInUse

@@ -13,12 +13,18 @@ use chrono::{DateTime, Utc};
 use crc::crc32;
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
+use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
 use crate::{
     engine::{
         strat_engine::{
-            backstore::metadata::{mda, MDADataSize},
+            backstore::metadata::{
+                mda,
+                sizes::{
+                    static_header_size, BDAExtendedSize, MDADataSize, MDASize, ReservedSize,
+                    STATIC_HEADER_SIZE,
+                },
+            },
             device::SyncAll,
         },
         DevUuid, PoolUuid,
@@ -26,14 +32,18 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-const _BDA_STATIC_HDR_SIZE: usize = 16 * SECTOR_SIZE;
-const BDA_STATIC_HDR_SIZE: Bytes = Bytes(_BDA_STATIC_HDR_SIZE as u64);
-
 const RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
 
 const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
 const STRAT_SIGBLOCK_VERSION: u8 = 1;
+
+// Transform a constant in sectors to a constant in bytes
+macro_rules! bytes {
+    ($number:expr) => {
+        $number * SECTOR_SIZE
+    };
+}
 
 #[derive(Debug)]
 pub struct BDA {
@@ -52,7 +62,12 @@ impl BDA {
     /// Read the BDA from the device and return 2 SECTORS worth of data, one for each BDA returned
     /// in the order of layout on disk (location 1, location 2).
     /// Only the BDA sectors are read up from disk, zero areas are *not* read.
-    fn read<F>(f: &mut F) -> (io::Result<[u8; SECTOR_SIZE]>, io::Result<[u8; SECTOR_SIZE]>)
+    fn read<F>(
+        f: &mut F,
+    ) -> (
+        io::Result<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>,
+        io::Result<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>,
+    )
     where
         F: Read + Seek,
     {
@@ -62,8 +77,8 @@ impl BDA {
         // read errors. It's best to read each of the specific BDA blocks individually, to limit
         // the probability of hitting a read error on a non-essential sector.
 
-        let mut buf_loc_1 = [0u8; SECTOR_SIZE];
-        let mut buf_loc_2 = [0u8; SECTOR_SIZE];
+        let mut buf_loc_1 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
+        let mut buf_loc_2 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
 
         /// Read a bda sector worth of data at the specified offset into buffer.
         fn read_sector_at_offset<F>(f: &mut F, offset: usize, mut buf: &mut [u8]) -> io::Result<()>
@@ -76,8 +91,18 @@ impl BDA {
         }
 
         (
-            read_sector_at_offset(f, SECTOR_SIZE, &mut buf_loc_1).map(|_| buf_loc_1),
-            read_sector_at_offset(f, 9 * SECTOR_SIZE, &mut buf_loc_2).map(|_| buf_loc_2),
+            read_sector_at_offset(
+                f,
+                bytes!(static_header_size::FIRST_SIGBLOCK_START_SECTORS),
+                &mut buf_loc_1,
+            )
+            .map(|_| buf_loc_1),
+            read_sector_at_offset(
+                f,
+                bytes!(static_header_size::SECOND_SIGBLOCK_START_SECTORS),
+                &mut buf_loc_2,
+            )
+            .map(|_| buf_loc_2),
         )
     }
 
@@ -89,19 +114,17 @@ impl BDA {
     where
         F: Seek + SyncAll,
     {
-        let zeroed = [0u8; 6 * SECTOR_SIZE];
+        let zeroed = [0u8; bytes!(static_header_size::POST_SIGBLOCK_PADDING_SECTORS)];
         f.seek(SeekFrom::Start(0))?;
 
-        // Write to a single region in the header. Zeroes the first sector,
-        // writes bda_buf to the second sector, and then zeroes the remaining
-        // six sectors.
+        // Write to a static header region in the static header.
         fn write_region<F>(f: &mut F, bda_buf: &[u8], zeroed: &[u8]) -> io::Result<()>
         where
             F: Seek + SyncAll,
         {
-            f.write_all(&zeroed[..SECTOR_SIZE])?; // Zero 1 unused sector
+            f.write_all(&zeroed[..bytes!(static_header_size::PRE_SIGBLOCK_PADDING_SECTORS)])?;
             f.write_all(bda_buf)?;
-            f.write_all(&zeroed[..SECTOR_SIZE * 6])?; // Zero 6 unused sectors
+            f.write_all(&zeroed[..bytes!(static_header_size::POST_SIGBLOCK_PADDING_SECTORS)])?;
             f.sync_all()?;
             Ok(())
         };
@@ -109,7 +132,9 @@ impl BDA {
         if which == MetadataLocation::Both || which == MetadataLocation::First {
             write_region(f, bda_buf, &zeroed)?;
         } else {
-            f.seek(SeekFrom::Start(8 * SECTOR_SIZE as u64))?;
+            f.seek(SeekFrom::Start(
+                bytes!(static_header_size::SIGBLOCK_REGION_SECTORS) as u64,
+            ))?;
         }
 
         if which == MetadataLocation::Both || which == MetadataLocation::Second {
@@ -123,7 +148,7 @@ impl BDA {
         f: &mut F,
         pool_uuid: Uuid,
         dev_uuid: Uuid,
-        mda_data_size: mda::MDADataSize,
+        mda_data_size: MDADataSize,
         blkdev_size: Sectors,
         initialization_time: u64,
     ) -> StratisResult<BDA>
@@ -140,7 +165,8 @@ impl BDA {
 
         BDA::write(f, &header.sigblock_to_buf(), MetadataLocation::Both)?;
 
-        let regions = mda::MDARegions::initialize(BDA_STATIC_HDR_SIZE, header.mda_size, f)?;
+        let regions =
+            mda::MDARegions::initialize(STATIC_HEADER_SIZE.sectors().bytes(), header.mda_size, f)?;
 
         Ok(BDA { header, regions })
     }
@@ -162,7 +188,8 @@ impl BDA {
         // were written to the device. Returns an error if there is an error
         // when loading the MDARegions, which can only be caused by an I/O
         // error or invalid MDA headers.
-        let regions = mda::MDARegions::load(BDA_STATIC_HDR_SIZE, header.mda_size, f)?;
+        let regions =
+            mda::MDARegions::load(STATIC_HEADER_SIZE.sectors().bytes(), header.mda_size, f)?;
 
         Ok(Some(BDA { header, regions }))
     }
@@ -172,7 +199,7 @@ impl BDA {
     where
         F: Seek + SyncAll,
     {
-        let zeroed = [0u8; _BDA_STATIC_HDR_SIZE];
+        let zeroed = [0u8; bytes!(static_header_size::STATIC_HEADER_SECTORS)];
         f.seek(SeekFrom::Start(0))?;
         f.write_all(&zeroed)?;
         f.sync_all()?;
@@ -190,7 +217,7 @@ impl BDA {
         F: Seek + SyncAll,
     {
         self.regions
-            .save_state(BDA_STATIC_HDR_SIZE, time, metadata, f)
+            .save_state(STATIC_HEADER_SIZE.sectors().bytes(), time, metadata, f)
     }
 
     /// Read latest metadata from the disk
@@ -198,7 +225,8 @@ impl BDA {
     where
         F: Read + Seek,
     {
-        self.regions.load_state(BDA_STATIC_HDR_SIZE, &mut f)
+        self.regions
+            .load_state(STATIC_HEADER_SIZE.sectors().bytes(), &mut f)
     }
 
     /// The time when the most recent metadata was written to the BDA,
@@ -223,8 +251,8 @@ impl BDA {
     }
 
     /// The number of sectors the BDA itself occupies.
-    pub fn size(&self) -> Sectors {
-        BDA_STATIC_HDR_SIZE.sectors() + self.header.mda_size.sectors() + self.header.reserved_size
+    pub fn extended_size(&self) -> BDAExtendedSize {
+        self.header.bda_extended_size()
     }
 
     /// The maximum size of variable length metadata that can be accommodated.
@@ -253,8 +281,8 @@ pub struct StaticHeader {
     blkdev_size: Sectors,
     pool_uuid: PoolUuid,
     dev_uuid: DevUuid,
-    mda_size: mda::MDASize,
-    reserved_size: Sectors,
+    mda_size: MDASize,
+    reserved_size: ReservedSize,
     flags: u64,
     /// Seconds portion of DateTime<Utc> value.
     initialization_time: u64,
@@ -264,7 +292,7 @@ impl StaticHeader {
     fn new(
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
-        mda_size: mda::MDASize,
+        mda_size: MDASize,
         blkdev_size: Sectors,
         initialization_time: u64,
     ) -> StaticHeader {
@@ -273,10 +301,14 @@ impl StaticHeader {
             pool_uuid,
             dev_uuid,
             mda_size,
-            reserved_size: RESERVED_SECTORS,
+            reserved_size: ReservedSize::new(RESERVED_SECTORS),
             flags: 0,
             initialization_time,
         }
+    }
+
+    pub fn bda_extended_size(&self) -> BDAExtendedSize {
+        BDAExtendedSize::new(self.mda_size.bda_size().sectors() + self.reserved_size.sectors())
     }
 
     /// Try to find a valid StaticHeader on a device.
@@ -409,32 +441,36 @@ impl StaticHeader {
     }
 
     /// Generate a buf suitable for writing to blockdev
-    fn sigblock_to_buf(&self) -> [u8; SECTOR_SIZE] {
-        let mut buf = [0u8; SECTOR_SIZE];
+    fn sigblock_to_buf(&self) -> [u8; bytes!(static_header_size::SIGBLOCK_SECTORS)] {
+        let mut buf = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size);
         buf[28] = STRAT_SIGBLOCK_VERSION;
         buf[32..64].clone_from_slice(self.pool_uuid.to_simple_ref().to_string().as_bytes());
         buf[64..96].clone_from_slice(self.dev_uuid.to_simple_ref().to_string().as_bytes());
         LittleEndian::write_u64(&mut buf[96..104], *self.mda_size.sectors());
-        LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size);
+        LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size.sectors());
         LittleEndian::write_u64(&mut buf[120..128], self.initialization_time);
 
-        let hdr_crc = crc32::checksum_castagnoli(&buf[4..SECTOR_SIZE]);
+        let hdr_crc =
+            crc32::checksum_castagnoli(&buf[4..bytes!(static_header_size::SIGBLOCK_SECTORS)]);
         LittleEndian::write_u32(&mut buf[..4], hdr_crc);
         buf
     }
 
-    /// Build a StaticHeader from a SECTOR_SIZE buf that was read from
-    /// a blockdev.
+    /// Parse a buffer to a StaticHeader.
+    /// Return None if no stratis magic number found.
+    /// Return an error if stored checksum and calculated checksum do not
+    /// match.
+    /// Return an error if the version number is not expected.
     fn sigblock_from_buf(buf: &[u8]) -> StratisResult<Option<StaticHeader>> {
-        assert_eq!(buf.len(), SECTOR_SIZE);
+        assert_eq!(buf.len(), bytes!(static_header_size::SIGBLOCK_SECTORS));
 
         if &buf[4..20] != STRAT_MAGIC {
             return Ok(None);
         }
 
-        let crc = crc32::checksum_castagnoli(&buf[4..SECTOR_SIZE]);
+        let crc = crc32::checksum_castagnoli(&buf[4..bytes!(static_header_size::SIGBLOCK_SECTORS)]);
         if crc != LittleEndian::read_u32(&buf[..4]) {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
@@ -455,14 +491,14 @@ impl StaticHeader {
         let pool_uuid = Uuid::parse_str(from_utf8(&buf[32..64])?)?;
         let dev_uuid = Uuid::parse_str(from_utf8(&buf[64..96])?)?;
 
-        let mda_size = mda::MDASize(Sectors(LittleEndian::read_u64(&buf[96..104])));
+        let mda_size = MDASize(Sectors(LittleEndian::read_u64(&buf[96..104])));
 
         Ok(Some(StaticHeader {
             pool_uuid,
             dev_uuid,
             blkdev_size,
             mda_size,
-            reserved_size: Sectors(LittleEndian::read_u64(&buf[104..112])),
+            reserved_size: ReservedSize::new(Sectors(LittleEndian::read_u64(&buf[104..112]))),
             flags: 0,
             initialization_time: LittleEndian::read_u64(&buf[120..128]),
         }))
@@ -514,10 +550,11 @@ mod tests {
     fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
         let pool_uuid = Uuid::new_v4();
         let dev_uuid = Uuid::new_v4();
-        let mda_size =
-            MDADataSize::new(mda::MIN_MDA_DATA_REGION_SIZE + Bytes(u64::from(mda_size_factor * 4)))
-                .region_size()
-                .mda_size();
+        let mda_size = MDADataSize::new(
+            MDADataSize::default().bytes() + Bytes(u64::from(mda_size_factor * 4)),
+        )
+        .region_size()
+        .mda_size();
         let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
         StaticHeader::new(
             pool_uuid,
@@ -544,7 +581,7 @@ mod tests {
         /// Wipe the BDA.
         /// Verify that the buffer is again unowned.
         fn test_ownership(ref sh in static_header_strategy()) {
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + _BDA_STATIC_HDR_SIZE;
+            let buf_size = *sh.mda_size.sectors().bytes() as usize + bytes!(static_header_size::STATIC_HEADER_SECTORS);
             let mut buf = Cursor::new(vec![0; buf_size]);
             prop_assert!(BDA::device_identifiers(&mut buf).unwrap().is_none());
 
@@ -573,7 +610,7 @@ mod tests {
         /// Initialize a BDA.
         /// Verify that the last update time is None.
         fn empty_bda(ref sh in static_header_strategy()) {
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + _BDA_STATIC_HDR_SIZE;
+            let buf_size = *sh.mda_size.sectors().bytes() as usize + bytes!(static_header_size::STATIC_HEADER_SECTORS);
             let mut buf = Cursor::new(vec![0; buf_size]);
             let bda = BDA::initialize(
                 &mut buf,
@@ -639,7 +676,7 @@ mod tests {
             ref state in vec(num::u8::ANY, 1..100),
             ref next_state in vec(num::u8::ANY, 1..100)
         ) {
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + _BDA_STATIC_HDR_SIZE;
+            let buf_size = *sh.mda_size.sectors().bytes() as usize + bytes!(static_header_size::STATIC_HEADER_SECTORS);
             let mut buf = Cursor::new(vec![0; buf_size]);
             let mut bda = BDA::initialize(
                 &mut buf,
@@ -693,10 +730,10 @@ mod tests {
         /// the two static headers is corrupted. Verify expected behavior
         /// if both are corrupted, which varies depending on whether the
         /// Stratis magic number or some other part of the header is corrupted.
-        fn bda_test_recovery(primary in option::of(0..SECTOR_SIZE),
-                             secondary in option::of(0..SECTOR_SIZE)) {
+        fn bda_test_recovery(primary in option::of(0..bytes!(static_header_size::SIGBLOCK_SECTORS)),
+                             secondary in option::of(0..bytes!(static_header_size::SIGBLOCK_SECTORS))) {
             let sh = random_static_header(10000, 4);
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + _BDA_STATIC_HDR_SIZE;
+            let buf_size = *sh.mda_size.sectors().bytes() as usize + bytes!(static_header_size::STATIC_HEADER_SECTORS);
             let mut buf = Cursor::new(vec![0; buf_size]);
             BDA::initialize(
                 &mut buf,
@@ -711,12 +748,12 @@ mod tests {
 
             if let Some(index) = primary {
                 // Corrupt primary copy
-                corrupt_byte(&mut buf, (SECTOR_SIZE + index) as u64).unwrap();
+                corrupt_byte(&mut buf, (bytes!(static_header_size::FIRST_SIGBLOCK_START_SECTORS) + index) as u64).unwrap();
             }
 
             if let Some(index) = secondary {
                 // Corrupt secondary copy
-                corrupt_byte(&mut buf, (9 * SECTOR_SIZE + index) as u64).unwrap();
+                corrupt_byte(&mut buf, (bytes!(static_header_size::SECOND_SIGBLOCK_START_SECTORS) + index) as u64).unwrap();
             }
 
             let setup_result = StaticHeader::setup(&mut buf);
@@ -754,7 +791,8 @@ mod tests {
     /// Test that we re-write the older of two BDAs if they don't match.
     fn bda_test_rewrite_older() {
         let sh = random_static_header(10000, 4);
-        let buf_size = *sh.mda_size.sectors().bytes() as usize + _BDA_STATIC_HDR_SIZE;
+        let buf_size = *sh.mda_size.sectors().bytes() as usize
+            + bytes!(static_header_size::STATIC_HEADER_SECTORS);
         let mut buf = Cursor::new(vec![0; buf_size]);
         let ts = Utc::now().timestamp() as u64;
 
@@ -782,11 +820,14 @@ mod tests {
         // We should always match this reference buffer as it's the newer one.
         let reference_buf = buf_newer.clone();
 
-        for offset in &[SECTOR_SIZE, 9 * SECTOR_SIZE] {
+        for offset in &[
+            bytes!(static_header_size::FIRST_SIGBLOCK_START_SECTORS),
+            bytes!(static_header_size::SECOND_SIGBLOCK_START_SECTORS),
+        ] {
             // Copy the older BDA to newer BDA buffer
             buf.seek(SeekFrom::Start(*offset as u64)).unwrap();
             buf_newer.seek(SeekFrom::Start(*offset as u64)).unwrap();
-            let mut sector = [0u8; SECTOR_SIZE];
+            let mut sector = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
             buf.read_exact(&mut sector).unwrap();
             buf_newer.write_all(&sector).unwrap();
 

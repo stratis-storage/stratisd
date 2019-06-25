@@ -342,7 +342,10 @@ impl BlockDevMgr {
     /// The number of sectors given over to Stratis metadata
     /// self.size() - self.metadata_size() >= self.avail_space()
     pub fn metadata_size(&self) -> Sectors {
-        self.block_devs.iter().map(|bd| bd.metadata_size()).sum()
+        self.block_devs
+            .iter()
+            .map(|bd| bd.metadata_size().sectors())
+            .sum()
     }
 }
 

@@ -4,5 +4,9 @@
 
 mod bda;
 mod mda;
+mod sizes;
 
-pub use self::{bda::BDA, mda::MDADataSize};
+pub use self::{
+    bda::BDA,
+    sizes::{BDAExtendedSize, MDADataSize},
+};

@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 pub use self::{
-    bda_size::BDAExtendedSize,
+    bda_size::{BDAExtendedSize, ReservedSize},
     mda_size::{MDADataSize, MDARegionSize, MDASize},
     static_header_size::{StaticHeaderSize, STATIC_HEADER_SIZE},
 };
@@ -196,6 +196,20 @@ pub mod bda_size {
     impl BDAExtendedSize {
         pub fn new(value: Sectors) -> BDAExtendedSize {
             BDAExtendedSize(value)
+        }
+
+        pub fn sectors(self) -> Sectors {
+            self.0
+        }
+    }
+
+    /// The reserved space located immediately after the BDA proper.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    pub struct ReservedSize(Sectors);
+
+    impl ReservedSize {
+        pub fn new(value: Sectors) -> ReservedSize {
+            ReservedSize(value)
         }
 
         pub fn sectors(self) -> Sectors {

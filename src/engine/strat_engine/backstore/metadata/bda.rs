@@ -21,7 +21,8 @@ use crate::{
             backstore::metadata::{
                 mda,
                 sizes::{
-                    static_header_size, BDAExtendedSize, MDADataSize, MDASize, STATIC_HEADER_SIZE,
+                    static_header_size, BDAExtendedSize, MDADataSize, MDASize, ReservedSize,
+                    STATIC_HEADER_SIZE,
                 },
             },
             device::SyncAll,
@@ -276,7 +277,7 @@ pub struct StaticHeader {
     pool_uuid: PoolUuid,
     dev_uuid: DevUuid,
     mda_size: MDASize,
-    reserved_size: Sectors,
+    reserved_size: ReservedSize,
     flags: u64,
     /// Seconds portion of DateTime<Utc> value.
     initialization_time: u64,
@@ -295,14 +296,14 @@ impl StaticHeader {
             pool_uuid,
             dev_uuid,
             mda_size,
-            reserved_size: RESERVED_SECTORS,
+            reserved_size: ReservedSize::new(RESERVED_SECTORS),
             flags: 0,
             initialization_time,
         }
     }
 
     pub fn bda_extended_size(&self) -> BDAExtendedSize {
-        BDAExtendedSize::new(self.mda_size.bda_size().sectors() + self.reserved_size)
+        BDAExtendedSize::new(self.mda_size.bda_size().sectors() + self.reserved_size.sectors())
     }
 
     /// Try to find a valid StaticHeader on a device.
@@ -443,7 +444,7 @@ impl StaticHeader {
         buf[32..64].clone_from_slice(self.pool_uuid.to_simple_ref().to_string().as_bytes());
         buf[64..96].clone_from_slice(self.dev_uuid.to_simple_ref().to_string().as_bytes());
         LittleEndian::write_u64(&mut buf[96..104], *self.mda_size.sectors());
-        LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size);
+        LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size.sectors());
         LittleEndian::write_u64(&mut buf[120..128], self.initialization_time);
 
         let hdr_crc =
@@ -493,7 +494,7 @@ impl StaticHeader {
             dev_uuid,
             blkdev_size,
             mda_size,
-            reserved_size: Sectors(LittleEndian::read_u64(&buf[104..112])),
+            reserved_size: ReservedSize::new(Sectors(LittleEndian::read_u64(&buf[104..112]))),
             flags: 0,
             initialization_time: LittleEndian::read_u64(&buf[120..128]),
         }))

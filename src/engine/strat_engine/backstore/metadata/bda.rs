@@ -327,111 +327,101 @@ impl StaticHeader {
         F: Read + Seek + SyncAll,
     {
         match BDA::read(f) {
-            (Ok(buf_loc_1), Ok(buf_loc_2)) => {
-                // We read both copies without an IO error.
-                match (
-                    StaticHeader::sigblock_from_buf(&buf_loc_1),
-                    StaticHeader::sigblock_from_buf(&buf_loc_2),
-                ) {
-                    (Ok(loc_1), Ok(loc_2)) => {
-                        match (loc_1, loc_2) {
-                            (Some(loc_1), Some(loc_2)) => {
-                                if loc_1 == loc_2 {
-                                    Ok(Some(loc_1))
-                                } else if loc_1.initialization_time == loc_2.initialization_time {
-                                    // Inexplicable disagreement among static headers
-                                    let err_str = "Appeared to be a Stratis device, but signature blocks disagree.";
-                                    Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
-                                } else if loc_1.initialization_time > loc_2.initialization_time {
-                                    // If the first header block is newer, overwrite second with
-                                    // contents of first.
-                                    BDA::write(f, &buf_loc_1, MetadataLocation::Second)?;
-                                    Ok(Some(loc_1))
-                                } else {
-                                    // The second header block must be newer, so overwrite first
-                                    // with contents of second.
-                                    BDA::write(f, &buf_loc_2, MetadataLocation::First)?;
-                                    Ok(Some(loc_2))
-                                }
-                            }
-                            (None, None) => Ok(None),
-                            (Some(loc_1), None) => {
-                                // Copy 1 has valid Stratis BDA, copy 2 has no magic, re-write copy 2
-                                BDA::write(f, &buf_loc_1, MetadataLocation::Second)?;
-                                Ok(Some(loc_1))
-                            }
-                            (None, Some(loc_2)) => {
-                                // Copy 2 has valid Stratis BDA, copy 1 has no magic, re-write copy 1
-                                BDA::write(f, &buf_loc_2, MetadataLocation::First)?;
-                                Ok(Some(loc_2))
-                            }
-                        }
-                    }
-                    (Ok(loc_1), Err(loc_2)) => {
-                        // Re-write copy 2
-                        if loc_1.is_some() {
+            // We read both copies without an IO error.
+            (Ok(buf_loc_1), Ok(buf_loc_2)) => match (
+                StaticHeader::sigblock_from_buf(&buf_loc_1),
+                StaticHeader::sigblock_from_buf(&buf_loc_2),
+            ) {
+                (Ok(loc_1), Ok(loc_2)) => match (loc_1, loc_2) {
+                    (Some(loc_1), Some(loc_2)) => {
+                        if loc_1 == loc_2 {
+                            Ok(Some(loc_1))
+                        } else if loc_1.initialization_time == loc_2.initialization_time {
+                            // Inexplicable disagreement among static headers
+                            let err_str =
+                                "Appeared to be a Stratis device, but signature blocks disagree.";
+                            Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
+                        } else if loc_1.initialization_time > loc_2.initialization_time {
+                            // If the first header block is newer, overwrite second with
+                            // contents of first.
                             BDA::write(f, &buf_loc_1, MetadataLocation::Second)?;
-                            Ok(loc_1)
+                            Ok(Some(loc_1))
                         } else {
-                            // Location 1 doesn't have a signature, but location 2 did, but it got an error,
-                            // lets return the error instead as this appears to be a stratis device that
-                            // has gotten in a bad state.
-                            Err(loc_2)
-                        }
-                    }
-                    (Err(loc_1), Ok(loc_2)) => {
-                        // Re-write copy 1
-                        if loc_2.is_some() {
+                            // The second header block must be newer, so overwrite first
+                            // with contents of second.
                             BDA::write(f, &buf_loc_2, MetadataLocation::First)?;
-                            Ok(loc_2)
-                        } else {
-                            // Location 2 doesn't have a signature, but location 1 did, but it got an error,
-                            // lets return the error instead as this appears to be a stratis device that
-                            // has gotten in a bad state.
-                            Err(loc_1)
+                            Ok(Some(loc_2))
                         }
                     }
-                    (Err(_), Err(_)) => {
-                        let err_str =
-                            "Appeared to be a Stratis device, but no valid sigblock found";
-                        Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
+                    (None, None) => Ok(None),
+                    (Some(loc_1), None) => {
+                        // Copy 1 has valid Stratis BDA, copy 2 has no magic, re-write copy 2
+                        BDA::write(f, &buf_loc_1, MetadataLocation::Second)?;
+                        Ok(Some(loc_1))
                     }
-                }
-            }
-            (Ok(buf_loc_1), Err(_)) => {
-                // Copy 1 read OK, 2 resulted in an IO error
-                match StaticHeader::sigblock_from_buf(&buf_loc_1) {
-                    Ok(loc_1) => {
-                        if loc_1.is_some() {
-                            BDA::write(f, &buf_loc_1, MetadataLocation::Second)?;
-                        }
+                    (None, Some(loc_2)) => {
+                        // Copy 2 has valid Stratis BDA, copy 1 has no magic, re-write copy 1
+                        BDA::write(f, &buf_loc_2, MetadataLocation::First)?;
+                        Ok(Some(loc_2))
+                    }
+                },
+                (Ok(loc_1), Err(loc_2)) => {
+                    if loc_1.is_some() {
+                        BDA::write(f, &buf_loc_1, MetadataLocation::Second)?;
                         Ok(loc_1)
-                    }
-                    Err(e) => {
-                        // Unable to determine if location 2 has a signature, but location 1 did,
-                        // but it got an error, lets return the error instead as this appears to
-                        // be a stratis device that has gotten in a bad state.
-                        Err(e)
+                    } else {
+                        // Location 1 doesn't have a signature, but location 2 did, but it got an error,
+                        // lets return the error instead as this appears to be a stratis device that
+                        // has gotten in a bad state.
+                        Err(loc_2)
                     }
                 }
-            }
-            (Err(_), Ok(buf_loc_2)) => {
-                // Copy 2 read OK, 1 resulted in IO Error
-                match StaticHeader::sigblock_from_buf(&buf_loc_2) {
-                    Ok(loc_2) => {
-                        if loc_2.is_some() {
-                            BDA::write(f, &buf_loc_2, MetadataLocation::First)?;
-                        }
+                (Err(loc_1), Ok(loc_2)) => {
+                    if loc_2.is_some() {
+                        BDA::write(f, &buf_loc_2, MetadataLocation::First)?;
                         Ok(loc_2)
-                    }
-                    Err(e) => {
-                        // Unable to determine if location 1 has a signature, but location 2 did,
-                        // but it got an error, lets return the error instead as this appears to
-                        // be a stratis device that has gotten in a bad state.
-                        Err(e)
+                    } else {
+                        // Location 2 doesn't have a signature, but location 1 did, but it got an error,
+                        // lets return the error instead as this appears to be a stratis device that
+                        // has gotten in a bad state.
+                        Err(loc_1)
                     }
                 }
-            }
+                (Err(_), Err(_)) => {
+                    let err_str = "Appeared to be a Stratis device, but no valid sigblock found";
+                    Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
+                }
+            },
+            // Copy 1 read OK, 2 resulted in an IO error
+            (Ok(buf_loc_1), Err(_)) => match StaticHeader::sigblock_from_buf(&buf_loc_1) {
+                Ok(loc_1) => {
+                    if loc_1.is_some() {
+                        BDA::write(f, &buf_loc_1, MetadataLocation::Second)?;
+                    }
+                    Ok(loc_1)
+                }
+                Err(e) => {
+                    // Unable to determine if location 2 has a signature, but location 1 did,
+                    // but it got an error, lets return the error instead as this appears to
+                    // be a stratis device that has gotten in a bad state.
+                    Err(e)
+                }
+            },
+            // Copy 2 read OK, 1 resulted in IO Error
+            (Err(_), Ok(buf_loc_2)) => match StaticHeader::sigblock_from_buf(&buf_loc_2) {
+                Ok(loc_2) => {
+                    if loc_2.is_some() {
+                        BDA::write(f, &buf_loc_2, MetadataLocation::First)?;
+                    }
+                    Ok(loc_2)
+                }
+                Err(e) => {
+                    // Unable to determine if location 1 has a signature, but location 2 did,
+                    // but it got an error, lets return the error instead as this appears to
+                    // be a stratis device that has gotten in a bad state.
+                    Err(e)
+                }
+            },
             (Err(_), Err(_)) => {
                 // Unable to read the device at all.
                 let err_str = "Unable to read data at sigblock locations.";

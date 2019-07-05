@@ -1,4 +1,4 @@
-PYTEST_OPTS = -rsx
+PYTEST_OPTS = --verbose
 
 TOX=tox
 .PHONY: lint

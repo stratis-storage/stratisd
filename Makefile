@@ -18,6 +18,9 @@ ${HOME}/.cargo/bin/cargo-outdated:
 ${HOME}/.cargo/bin/cargo-vendor:
 	cargo install cargo-vendor
 
+${HOME}/.cargo/bin/cargo-license:
+	cargo install cargo-license
+
 tree: ${HOME}/.cargo/bin/cargo-tree
 	PATH=${HOME}/.cargo/bin:${PATH} cargo tree
 
@@ -26,6 +29,9 @@ outdated: ${HOME}/.cargo/bin/cargo-outdated
 
 vendor: ${HOME}/.cargo/bin/cargo-vendor
 	PATH=${HOME}/.cargo/bin:${PATH} cargo vendor
+
+license: ${HOME}/.cargo/bin/cargo-license
+	PATH=${HOME}/.cargo/bin:${PATH} cargo license
 
 fmt:
 	cargo fmt
@@ -82,6 +88,7 @@ clippy:
 	docs-travis
 	fmt
 	fmt-travis
+	license
 	outdated
 	release
 	test

@@ -126,7 +126,7 @@ impl BDA {
             initialization_time,
         );
 
-        StaticHeader::write(f, &header.sigblock_to_buf(), MetadataLocation::Both)?;
+        header.write(f, MetadataLocation::Both)?;
 
         let regions =
             mda::MDARegions::initialize(STATIC_HEADER_SIZE.sectors().bytes(), header.mda_size, f)?;
@@ -274,10 +274,11 @@ impl StaticHeader {
     // If first location is specified, write zeroes to empty regions in the
     // first 8 sectors. If the second location is specified, writes zeroes to empty
     // regions in the second 8 sectors.
-    fn write<F>(f: &mut F, signature_block: &[u8], which: MetadataLocation) -> io::Result<()>
+    fn write<F>(&self, f: &mut F, which: MetadataLocation) -> io::Result<()>
     where
         F: Seek + SyncAll,
     {
+        let signature_block = self.sigblock_to_buf();
         let zeroed = [0u8; bytes!(static_header_size::POST_SIGBLOCK_PADDING_SECTORS)];
         f.seek(SeekFrom::Start(0))?;
 
@@ -287,14 +288,14 @@ impl StaticHeader {
             F: Seek + SyncAll,
         {
             f.write_all(&zeroed[..bytes!(static_header_size::PRE_SIGBLOCK_PADDING_SECTORS)])?;
-            f.write_all(signature_block)?;
+            f.write_all(&signature_block)?;
             f.write_all(&zeroed[..bytes!(static_header_size::POST_SIGBLOCK_PADDING_SECTORS)])?;
             f.sync_all()?;
             Ok(())
         };
 
         if which == MetadataLocation::Both || which == MetadataLocation::First {
-            write_region(f, signature_block, &zeroed)?;
+            write_region(f, &signature_block, &zeroed)?;
         } else {
             f.seek(SeekFrom::Start(
                 bytes!(static_header_size::SIGBLOCK_REGION_SECTORS) as u64,
@@ -302,7 +303,7 @@ impl StaticHeader {
         }
 
         if which == MetadataLocation::Both || which == MetadataLocation::Second {
-            write_region(f, signature_block, &zeroed)?;
+            write_region(f, &signature_block, &zeroed)?;
         }
         Ok(())
     }
@@ -344,31 +345,31 @@ impl StaticHeader {
                         } else if loc_1.initialization_time > loc_2.initialization_time {
                             // If the first header block is newer, overwrite second with
                             // contents of first.
-                            StaticHeader::write(f, &buf_loc_1, MetadataLocation::Second)?;
+                            loc_1.write(f, MetadataLocation::Second)?;
                             Ok(Some(loc_1))
                         } else {
                             // The second header block must be newer, so overwrite first
                             // with contents of second.
-                            StaticHeader::write(f, &buf_loc_2, MetadataLocation::First)?;
+                            loc_2.write(f, MetadataLocation::First)?;
                             Ok(Some(loc_2))
                         }
                     }
                     (None, None) => Ok(None),
                     (Some(loc_1), None) => {
                         // Copy 1 has valid Stratis BDA, copy 2 has no magic, re-write copy 2
-                        StaticHeader::write(f, &buf_loc_1, MetadataLocation::Second)?;
+                        loc_1.write(f, MetadataLocation::Second)?;
                         Ok(Some(loc_1))
                     }
                     (None, Some(loc_2)) => {
                         // Copy 2 has valid Stratis BDA, copy 1 has no magic, re-write copy 1
-                        StaticHeader::write(f, &buf_loc_2, MetadataLocation::First)?;
+                        loc_2.write(f, MetadataLocation::First)?;
                         Ok(Some(loc_2))
                     }
                 },
                 (Ok(loc_1), Err(loc_2)) => {
-                    if loc_1.is_some() {
-                        StaticHeader::write(f, &buf_loc_1, MetadataLocation::Second)?;
-                        Ok(loc_1)
+                    if let Some(loc_1) = loc_1 {
+                        loc_1.write(f, MetadataLocation::Second)?;
+                        Ok(Some(loc_1))
                     } else {
                         // Location 1 doesn't have a signature, but location 2 did, but it got an error,
                         // lets return the error instead as this appears to be a stratis device that
@@ -377,9 +378,9 @@ impl StaticHeader {
                     }
                 }
                 (Err(loc_1), Ok(loc_2)) => {
-                    if loc_2.is_some() {
-                        StaticHeader::write(f, &buf_loc_2, MetadataLocation::First)?;
-                        Ok(loc_2)
+                    if let Some(loc_2) = loc_2 {
+                        loc_2.write(f, MetadataLocation::First)?;
+                        Ok(Some(loc_2))
                     } else {
                         // Location 2 doesn't have a signature, but location 1 did, but it got an error,
                         // lets return the error instead as this appears to be a stratis device that
@@ -395,8 +396,8 @@ impl StaticHeader {
             // Copy 1 read OK, 2 resulted in an IO error
             (Ok(buf_loc_1), Err(_)) => match StaticHeader::sigblock_from_buf(&buf_loc_1) {
                 Ok(loc_1) => {
-                    if loc_1.is_some() {
-                        StaticHeader::write(f, &buf_loc_1, MetadataLocation::Second)?;
+                    if let Some(ref loc_1) = loc_1 {
+                        loc_1.write(f, MetadataLocation::Second)?;
                     }
                     Ok(loc_1)
                 }
@@ -410,8 +411,8 @@ impl StaticHeader {
             // Copy 2 read OK, 1 resulted in IO Error
             (Err(_), Ok(buf_loc_2)) => match StaticHeader::sigblock_from_buf(&buf_loc_2) {
                 Ok(loc_2) => {
-                    if loc_2.is_some() {
-                        StaticHeader::write(f, &buf_loc_2, MetadataLocation::First)?;
+                    if let Some(ref loc_2) = loc_2 {
+                        loc_2.write(f, MetadataLocation::First)?;
                     }
                     Ok(loc_2)
                 }

@@ -327,12 +327,13 @@ impl StaticHeader {
     where
         F: Read + Seek + SyncAll,
     {
-        match BDA::read(f) {
+        let (maybe_buf_1, maybe_buf_2) = BDA::read(f);
+        match (
+            maybe_buf_1.map(|buf| StaticHeader::sigblock_from_buf(&buf)),
+            maybe_buf_2.map(|buf| StaticHeader::sigblock_from_buf(&buf)),
+        ) {
             // We read both copies without an IO error.
-            (Ok(buf_loc_1), Ok(buf_loc_2)) => match (
-                StaticHeader::sigblock_from_buf(&buf_loc_1),
-                StaticHeader::sigblock_from_buf(&buf_loc_2),
-            ) {
+            (Ok(buf_loc_1), Ok(buf_loc_2)) => match (buf_loc_1, buf_loc_2) {
                 (Ok(loc_1), Ok(loc_2)) => match (loc_1, loc_2) {
                     (Some(loc_1), Some(loc_2)) => {
                         if loc_1 == loc_2 {
@@ -394,7 +395,7 @@ impl StaticHeader {
                 }
             },
             // Copy 1 read OK, 2 resulted in an IO error
-            (Ok(buf_loc_1), Err(_)) => match StaticHeader::sigblock_from_buf(&buf_loc_1) {
+            (Ok(buf_loc_1), Err(_)) => match buf_loc_1 {
                 Ok(loc_1) => {
                     if let Some(ref loc_1) = loc_1 {
                         loc_1.write(f, MetadataLocation::Second)?;
@@ -409,7 +410,7 @@ impl StaticHeader {
                 }
             },
             // Copy 2 read OK, 1 resulted in IO Error
-            (Err(_), Ok(buf_loc_2)) => match StaticHeader::sigblock_from_buf(&buf_loc_2) {
+            (Err(_), Ok(buf_loc_2)) => match buf_loc_2 {
                 Ok(loc_2) => {
                     if let Some(ref loc_2) = loc_2 {
                         loc_2.write(f, MetadataLocation::First)?;

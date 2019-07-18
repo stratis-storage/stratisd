@@ -8,7 +8,7 @@ mod blockdev;
 mod blockdevmgr;
 mod cache_tier;
 mod data_tier;
-pub mod device;
+mod device;
 mod metadata;
 mod range_alloc;
 mod setup;
@@ -18,7 +18,7 @@ mod util;
 pub use self::{
     backstore::Backstore,
     blockdev::StratBlockDev,
-    device::{blkdev_size, is_stratis_device},
+    device::is_stratis_device,
     metadata::MDADataSize,
     setup::{find_all, get_metadata},
 };

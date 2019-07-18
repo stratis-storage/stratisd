@@ -12,13 +12,13 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
+                blockdev::StratBlockDev,
                 blockdevmgr::{BlkDevSegment, BlockDevMgr},
                 shared::{coalesce_blkdevsegs, metadata_to_segment},
-                StratBlockDev,
             },
             serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
         },
-        BlockDevTier, DevUuid, PoolUuid,
+        types::{BlockDevTier, DevUuid, PoolUuid},
     },
     stratis::StratisResult,
 };

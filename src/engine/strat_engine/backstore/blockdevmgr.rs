@@ -21,17 +21,18 @@ use devicemapper::{
 
 use crate::{
     engine::{
+        engine::BlockDev,
         strat_engine::{
             backstore::{
-                blkdev_size,
                 device::{identify, resolve_devices, DevOwnership},
                 metadata::{MDADataSize, BDA},
                 util::hw_lookup,
                 StratBlockDev,
             },
+            device::blkdev_size,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
-        BlockDev, DevUuid, PoolUuid,
+        types::{DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

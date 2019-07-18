@@ -27,7 +27,7 @@ use crate::{
             },
             device::SyncAll,
         },
-        DevUuid, PoolUuid,
+        types::{DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

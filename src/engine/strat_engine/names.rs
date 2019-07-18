@@ -12,7 +12,7 @@ use std::{
 use devicemapper::{DmNameBuf, DmUuidBuf};
 
 use crate::{
-    engine::{FilesystemUuid, PoolUuid},
+    engine::types::{FilesystemUuid, PoolUuid},
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 

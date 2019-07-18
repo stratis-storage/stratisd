@@ -22,9 +22,11 @@ use crate::{
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
-        types::{FreeSpaceState, PoolExtendState, PoolState},
-        BlockDev, BlockDevTier, DevUuid, Filesystem, FilesystemUuid, MaybeDbusPath, Name, Pool,
-        PoolUuid, Redundancy, RenameAction,
+        types::{
+            BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name,
+            PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction,
+        },
+        BlockDev, Filesystem, Pool,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

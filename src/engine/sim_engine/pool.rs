@@ -17,11 +17,13 @@ use devicemapper::{Sectors, IEC};
 
 use crate::{
     engine::{
+        engine::{BlockDev, Filesystem, Pool},
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
         structures::Table,
-        types::{FreeSpaceState, PoolExtendState, PoolState},
-        BlockDev, BlockDevTier, DevUuid, Filesystem, FilesystemUuid, MaybeDbusPath, Name, Pool,
-        PoolUuid, Redundancy, RenameAction,
+        types::{
+            BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name,
+            PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction,
+        },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

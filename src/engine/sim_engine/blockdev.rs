@@ -14,7 +14,9 @@ use uuid::Uuid;
 use devicemapper::{Bytes, Sectors, IEC};
 
 use crate::engine::{
-    sim_engine::randomization::Randomizer, BlockDev, BlockDevState, MaybeDbusPath,
+    engine::BlockDev,
+    sim_engine::randomization::Randomizer,
+    types::{BlockDevState, MaybeDbusPath},
 };
 
 #[derive(Debug)]

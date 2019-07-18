@@ -14,10 +14,10 @@ use devicemapper::Device;
 
 use crate::{
     engine::{
-        engine::Eventable,
+        engine::{Engine, Eventable, Pool},
         sim_engine::{pool::SimPool, randomization::Randomizer},
         structures::Table,
-        Engine, Name, Pool, PoolUuid, Redundancy, RenameAction,
+        types::{Name, PoolUuid, Redundancy, RenameAction},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

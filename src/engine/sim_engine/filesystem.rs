@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use devicemapper::Bytes;
 
 use crate::{
-    engine::{Filesystem, MaybeDbusPath},
+    engine::{types::MaybeDbusPath, Filesystem},
     stratis::StratisResult,
 };
 

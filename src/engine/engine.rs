@@ -14,10 +14,9 @@ use uuid::Uuid;
 use devicemapper::{Bytes, Device, Sectors};
 
 use crate::{
-    engine::{
-        types::{FreeSpaceState, PoolExtendState, PoolState},
-        BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolUuid,
-        RenameAction,
+    engine::types::{
+        BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name,
+        PoolExtendState, PoolState, PoolUuid, RenameAction,
     },
     stratis::StratisResult,
 };

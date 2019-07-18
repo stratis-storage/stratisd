@@ -13,9 +13,8 @@ use std::{
 
 use crate::{
     engine::{
-        engine::DEV_PATH,
+        engine::{Pool, DEV_PATH},
         types::{Name, PoolUuid},
-        Pool,
     },
     stratis::StratisResult,
 };

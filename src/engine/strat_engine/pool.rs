@@ -16,6 +16,7 @@ use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
 use crate::{
     engine::{
+        engine::{BlockDev, Filesystem, Pool},
         strat_engine::{
             backstore::{Backstore, MDADataSize, StratBlockDev},
             names::validate_name,
@@ -26,7 +27,6 @@ use crate::{
             BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name,
             PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction,
         },
-        BlockDev, Filesystem, Pool,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

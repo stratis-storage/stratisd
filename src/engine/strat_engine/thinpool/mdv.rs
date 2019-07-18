@@ -26,7 +26,7 @@ use crate::{
             cmd::create_fs, dm::get_dm, serde_structs::FilesystemSave,
             thinpool::filesystem::StratFilesystem,
         },
-        FilesystemUuid, Name, PoolUuid,
+        types::{FilesystemUuid, Name, PoolUuid},
     },
     stratis::StratisResult,
 };

@@ -26,6 +26,7 @@ use tempfile;
 
 use crate::{
     engine::{
+        engine::Filesystem,
         strat_engine::{
             cmd::{create_fs, set_uuid, udev_settle, xfs_growfs},
             dm::get_dm,
@@ -33,7 +34,7 @@ use crate::{
             serde_structs::FilesystemSave,
             thinpool::{thinpool::DATA_LOWATER, DATA_BLOCK_SIZE},
         },
-        Filesystem, FilesystemUuid, MaybeDbusPath, Name, PoolUuid,
+        types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

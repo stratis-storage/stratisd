@@ -16,15 +16,17 @@ use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 
 use crate::{
     engine::{
+        engine::{BlockDev, Filesystem, Pool},
         strat_engine::{
             backstore::{Backstore, MDADataSize, StratBlockDev},
             names::validate_name,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
-        types::{FreeSpaceState, PoolExtendState, PoolState},
-        BlockDev, BlockDevTier, DevUuid, Filesystem, FilesystemUuid, MaybeDbusPath, Name, Pool,
-        PoolUuid, Redundancy, RenameAction,
+        types::{
+            BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name,
+            PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction,
+        },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

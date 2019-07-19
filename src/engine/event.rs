@@ -7,9 +7,8 @@ use std::{
     sync::{Once, ONCE_INIT},
 };
 
-use crate::engine::{
-    types::{BlockDevState, FreeSpaceState, PoolExtendState, PoolState},
-    MaybeDbusPath,
+use crate::engine::types::{
+    BlockDevState, FreeSpaceState, MaybeDbusPath, PoolExtendState, PoolState,
 };
 
 static INIT: Once = ONCE_INIT;

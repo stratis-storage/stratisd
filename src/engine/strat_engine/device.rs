@@ -7,12 +7,24 @@
 use std::{
     fs::{File, OpenOptions},
     io::{self, BufWriter, Cursor, Seek, SeekFrom, Write},
+    os::unix::prelude::AsRawFd,
     path::Path,
 };
 
-use devicemapper::{Sectors, IEC, SECTOR_SIZE};
+use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
 
-use crate::stratis::StratisResult;
+use crate::stratis::{StratisError, StratisResult};
+
+ioctl_read!(blkgetsize64, 0x12, 114, u64);
+
+pub fn blkdev_size(file: &File) -> StratisResult<Bytes> {
+    let mut val: u64 = 0;
+
+    match unsafe { blkgetsize64(file.as_raw_fd(), &mut val) } {
+        Err(x) => Err(StratisError::Nix(x)),
+        Ok(_) => Ok(Bytes(val)),
+    }
+}
 
 /// The SyncAll trait unifies the File type with other types that do
 /// not implement sync_all(). The purpose is to allow testing of methods

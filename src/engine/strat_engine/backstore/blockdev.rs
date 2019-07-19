@@ -12,7 +12,8 @@ use devicemapper::{Device, Sectors};
 
 use crate::{
     engine::{
-        event::get_engine_listener_list,
+        engine::BlockDev,
+        event::{get_engine_listener_list, EngineEvent},
         strat_engine::{
             backstore::{
                 metadata::{BDAExtendedSize, MDADataSize, BDA},
@@ -20,7 +21,7 @@ use crate::{
             },
             serde_structs::{BaseBlockDevSave, Recordable},
         },
-        BlockDev, BlockDevState, DevUuid, EngineEvent, MaybeDbusPath,
+        types::{BlockDevState, DevUuid, MaybeDbusPath},
     },
     stratis::StratisResult,
 };

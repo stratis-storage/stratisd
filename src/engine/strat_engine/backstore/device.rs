@@ -4,33 +4,17 @@
 
 // Functions for dealing with devices.
 
-use std::{
-    collections::HashMap,
-    fs::{File, OpenOptions},
-    os::unix::prelude::AsRawFd,
-    path::Path,
-};
+use std::{collections::HashMap, fs::OpenOptions, path::Path};
 
-use devicemapper::{devnode_to_devno, Bytes, Device};
+use devicemapper::{devnode_to_devno, Device};
 
 use crate::{
     engine::{
         strat_engine::backstore::{metadata::BDA, util::get_udev_block_device},
-        DevUuid, PoolUuid,
+        types::{DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
-
-ioctl_read!(blkgetsize64, 0x12, 114, u64);
-
-pub fn blkdev_size(file: &File) -> StratisResult<Bytes> {
-    let mut val: u64 = 0;
-
-    match unsafe { blkgetsize64(file.as_raw_fd(), &mut val) } {
-        Err(x) => Err(StratisError::Nix(x)),
-        Ok(_) => Ok(Bytes(val)),
-    }
-}
 
 /// Resolve a list of Paths of some sort to a set of unique Devices.
 /// Return an IOError if there was a problem resolving any particular device.

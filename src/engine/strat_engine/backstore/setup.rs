@@ -18,12 +18,11 @@ use devicemapper::{devnode_to_devno, Device, Sectors};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{
-                blkdev_size, metadata::BDA, util::get_stratis_block_devices, StratBlockDev,
-            },
+            backstore::{blockdev::StratBlockDev, metadata::BDA, util::get_stratis_block_devices},
+            device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
-        BlockDevTier, DevUuid, PoolUuid,
+        types::{BlockDevTier, DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

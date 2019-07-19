@@ -10,7 +10,7 @@ use nix::mount::{umount2, MntFlags};
 use devicemapper::{DevId, DmOptions};
 
 use crate::engine::strat_engine::{
-    cmd,
+    cmd::udev_settle,
     dm::{get_dm, get_dm_init},
 };
 
@@ -71,7 +71,7 @@ fn dm_stratis_devices_remove() -> Result<()> {
     }
 
     || -> Result<()> {
-        cmd::udev_settle().unwrap();
+        udev_settle().unwrap();
         get_dm_init().map_err(|err| Error::with_chain(err, "Unable to initialize DM"))?;
         do_while_progress().and_then(|remain| {
             if !remain.is_empty() {

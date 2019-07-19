@@ -19,8 +19,7 @@ use devicemapper::{
 };
 
 use crate::engine::strat_engine::{
-    backstore::blkdev_size,
-    device::wipe_sectors,
+    device::{blkdev_size, wipe_sectors},
     dm::get_dm,
     tests::{logger::init_logger, util::clean_up},
 };

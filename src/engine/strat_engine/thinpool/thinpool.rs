@@ -22,7 +22,8 @@ use devicemapper::{
 use crate::{
     engine::{
         devlinks,
-        event::get_engine_listener_list,
+        engine::Filesystem,
+        event::{get_engine_listener_list, EngineEvent},
         strat_engine::{
             backstore::Backstore,
             cmd::{thin_check, thin_repair, udev_settle},
@@ -40,8 +41,10 @@ use crate::{
             },
         },
         structures::Table,
-        types::{FreeSpaceState, PoolExtendState, PoolState},
-        EngineEvent, Filesystem, FilesystemUuid, MaybeDbusPath, Name, PoolUuid, RenameAction,
+        types::{
+            FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState, PoolState,
+            PoolUuid, RenameAction,
+        },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

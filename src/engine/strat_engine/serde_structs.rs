@@ -16,7 +16,7 @@ use serde::Serialize;
 
 use devicemapper::{Sectors, ThinDevId};
 
-use crate::engine::{DevUuid, FilesystemUuid};
+use crate::engine::types::{DevUuid, FilesystemUuid};
 
 /// Implements saving struct data to a serializable form. The form should be
 /// sufficient, in conjunction with the environment, to reconstruct the

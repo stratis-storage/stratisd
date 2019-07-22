@@ -11,6 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use chrono::{DateTime, Utc};
 use serde_json;
 
 use devicemapper::{devnode_to_devno, Device, Sectors};
@@ -60,7 +61,7 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
 pub fn get_metadata(
     pool_uuid: PoolUuid,
     devnodes: &HashMap<Device, PathBuf>,
-) -> StratisResult<Option<PoolSave>> {
+) -> StratisResult<Option<(DateTime<Utc>, PoolSave)>> {
     // Get pairs of device nodes and matching BDAs
     // If no BDA, or BDA UUID does not match pool UUID, skip.
     // If there is an error reading the BDA, error. There could have been
@@ -97,6 +98,7 @@ pub fn get_metadata(
         .iter()
         .filter(|&&(_, ref bda)| bda.last_update_time() == Some(most_recent_time))
     {
+        let timestamp = bda.last_update_time();
         let poolsave = OpenOptions::new()
             .read(true)
             .open(devnode)
@@ -105,8 +107,8 @@ pub fn get_metadata(
             .and_then(|opt| opt)
             .and_then(|data| serde_json::from_slice(&data).ok());
 
-        if poolsave.is_some() {
-            return Ok(poolsave);
+        if let (Some(ts), Some(psave)) = (timestamp, poolsave) {
+            return Ok(Some((*ts, psave)));
         }
     }
 

@@ -677,13 +677,7 @@ mod tests {
         let devices = &pools[&uuid];
 
         let (timestamp, metadata) = get_metadata(uuid, &devices).unwrap().unwrap();
-        let (name, pool) = StratPool::setup(
-            uuid,
-            &devices,
-            timestamp,
-            &metadata
-        )
-        .unwrap();
+        let (name, pool) = StratPool::setup(uuid, &devices, timestamp, &metadata).unwrap();
         invariant(&pool, &name);
 
         let mut buf = [0u8; 10];

@@ -9,6 +9,7 @@ use std::{
     vec::Vec,
 };
 
+use chrono::{DateTime, Utc};
 use serde_json;
 use uuid::Uuid;
 
@@ -191,9 +192,10 @@ impl StratPool {
     pub fn setup(
         uuid: PoolUuid,
         devnodes: &HashMap<Device, PathBuf>,
+        timestamp: DateTime<Utc>,
         metadata: &PoolSave,
     ) -> StratisResult<(Name, StratPool)> {
-        let mut backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, None)?;
+        let mut backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, timestamp)?;
         let mut thinpool = ThinPool::setup(
             uuid,
             &metadata.thinpool_dev,
@@ -542,8 +544,8 @@ mod tests {
         assert_eq!(pools.len(), 2);
         let devnodes1 = &pools[&uuid1];
         let devnodes2 = &pools[&uuid2];
-        let pool_save1 = get_metadata(uuid1, devnodes1).unwrap().unwrap();
-        let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
+        let (_, pool_save1) = get_metadata(uuid1, devnodes1).unwrap().unwrap();
+        let (_, pool_save2) = get_metadata(uuid2, devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
 
@@ -555,8 +557,8 @@ mod tests {
         assert_eq!(pools.len(), 2);
         let devnodes1 = &pools[&uuid1];
         let devnodes2 = &pools[&uuid2];
-        let pool_save1 = get_metadata(uuid1, devnodes1).unwrap().unwrap();
-        let pool_save2 = get_metadata(uuid2, devnodes2).unwrap().unwrap();
+        let (_, pool_save1) = get_metadata(uuid1, devnodes1).unwrap().unwrap();
+        let (_, pool_save2) = get_metadata(uuid2, devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
     }
@@ -673,12 +675,9 @@ mod tests {
         let pools = find_all().unwrap();
         assert_eq!(pools.len(), 1);
         let devices = &pools[&uuid];
-        let (name, pool) = StratPool::setup(
-            uuid,
-            &devices,
-            &get_metadata(uuid, &devices).unwrap().unwrap(),
-        )
-        .unwrap();
+
+        let (timestamp, metadata) = get_metadata(uuid, &devices).unwrap().unwrap();
+        let (name, pool) = StratPool::setup(uuid, &devices, timestamp, &metadata).unwrap();
         invariant(&pool, &name);
 
         let mut buf = [0u8; 10];

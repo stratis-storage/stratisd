@@ -11,6 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use chrono::{DateTime, Utc};
 use serde_json;
 
 use devicemapper::{devnode_to_devno, Device, Sectors};
@@ -60,7 +61,7 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
 pub fn get_metadata(
     pool_uuid: PoolUuid,
     devnodes: &HashMap<Device, PathBuf>,
-) -> StratisResult<Option<PoolSave>> {
+) -> StratisResult<Option<(DateTime<Utc>, PoolSave)>> {
     // Get pairs of device nodes and matching BDAs
     // If no BDA, or BDA UUID does not match pool UUID, skip.
     // If there is an error reading the BDA, error. There could have been
@@ -93,28 +94,27 @@ pub fn get_metadata(
     // Try to read from all available devnodes that could contain most
     // recent metadata. In the event of errors, continue to try until all are
     // exhausted.
-    for &(devnode, ref bda) in bdas
-        .iter()
-        .filter(|&&(_, ref bda)| bda.last_update_time() == Some(most_recent_time))
-    {
-        let poolsave = OpenOptions::new()
-            .read(true)
-            .open(devnode)
-            .ok()
-            .and_then(|mut f| bda.load_state(&mut f).ok())
-            .and_then(|opt| opt)
-            .and_then(|data| serde_json::from_slice(&data).ok());
-
-        if poolsave.is_some() {
-            return Ok(poolsave);
-        }
-    }
-
-    // If no data has yet returned, we have an error. That is, we should have
-    // some metadata, because we have a most recent time, but we failed to
-    // get any.
-    let err_str = "timestamp indicates data was written, but no data successfully read";
-    Err(StratisError::Engine(ErrorEnum::NotFound, err_str.into()))
+    bdas.iter()
+        .filter_map(|&(devnode, ref bda)| {
+            if bda.last_update_time() == Some(most_recent_time) {
+                OpenOptions::new()
+                    .read(true)
+                    .open(devnode)
+                    .ok()
+                    .and_then(|mut f| bda.load_state(&mut f).unwrap_or(None))
+                    .and_then(|data| serde_json::from_slice(&data).ok())
+            } else {
+                None
+            }
+        })
+        .next()
+        .ok_or_else(|| {
+            StratisError::Engine(
+                ErrorEnum::NotFound,
+                "timestamp indicates data was written, but no data successfully read".into(),
+            )
+        })
+        .map(|psave| Some((*most_recent_time, psave)))
 }
 
 /// Get all the blockdevs corresponding to this pool that can be obtained from

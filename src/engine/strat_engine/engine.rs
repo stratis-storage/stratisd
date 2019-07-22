@@ -58,7 +58,7 @@ pub fn setup_pool(
         format!("(pool UUID: {}, devnodes: {})", pool_uuid, dev_paths)
     };
 
-    let metadata = get_metadata(pool_uuid, devices)?.ok_or_else(|| {
+    let (timestamp, metadata) = get_metadata(pool_uuid, devices)?.ok_or_else(|| {
         let err_msg = format!("no metadata found for {}", info_string());
         StratisError::Engine(ErrorEnum::NotFound, err_msg)
     })?;
@@ -82,7 +82,7 @@ pub fn setup_pool(
             Err(StratisError::Engine(ErrorEnum::Error, err_msg))
         })
         .and_then(|_| {
-            StratPool::setup(pool_uuid, devices, &metadata).or_else(|e| {
+            StratPool::setup(pool_uuid, devices, timestamp, &metadata).or_else(|e| {
                 let err_msg = format!(
                     "failed to set up pool for {}: reason: {:?}",
                     info_string(),

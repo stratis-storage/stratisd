@@ -4,6 +4,7 @@
 
 pub use self::{
     bda_size::{BDAExtendedSize, ReservedSize},
+    blkdev_size::BlockdevSize,
     mda_size::{MDADataSize, MDARegionSize, MDASize},
     static_header_size::{StaticHeaderSize, STATIC_HEADER_SIZE},
 };
@@ -210,6 +211,26 @@ pub mod bda_size {
     impl ReservedSize {
         pub fn new(value: Sectors) -> ReservedSize {
             ReservedSize(value)
+        }
+
+        pub fn sectors(self) -> Sectors {
+            self.0
+        }
+    }
+}
+
+// A module which defines types identifying sizes relating to individual
+// block devices.
+pub mod blkdev_size {
+    use devicemapper::Sectors;
+
+    #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+    /// The total size of one entire block device belonging to Stratis.
+    pub struct BlockdevSize(Sectors);
+
+    impl BlockdevSize {
+        pub fn new(value: Sectors) -> BlockdevSize {
+            BlockdevSize(value)
         }
 
         pub fn sectors(self) -> Sectors {

@@ -25,7 +25,7 @@ use crate::{
         strat_engine::{
             backstore::{
                 device::{identify, resolve_devices, DevOwnership},
-                metadata::{MDADataSize, BDA},
+                metadata::{BlockdevSize, MDADataSize, BDA},
                 util::hw_lookup,
                 StratBlockDev,
             },
@@ -441,7 +441,7 @@ fn initialize(
             pool_uuid,
             Uuid::new_v4(),
             mda_data_size,
-            dev_size.sectors(),
+            BlockdevSize::new(dev_size.sectors()),
             Utc::now().timestamp() as u64,
         );
         if let Ok(bda) = bda {

@@ -588,7 +588,7 @@ mod tests {
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
     use crate::engine::strat_engine::{
-        backstore::{find_all, setup::get_metadata},
+        backstore::find_all,
         cmd,
         tests::{loopbacked, real},
     };
@@ -818,8 +818,7 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = &map[&pool_uuid];
-        let (timestamp, _) = get_metadata(pool_uuid, map).unwrap().unwrap();
-        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, timestamp).unwrap();
+        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, Utc::now()).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();
@@ -831,8 +830,7 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = &map[&pool_uuid];
-        let (timestamp, _) = get_metadata(pool_uuid, map).unwrap().unwrap();
-        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, timestamp).unwrap();
+        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, Utc::now()).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();

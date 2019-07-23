@@ -94,22 +94,25 @@ pub fn get_metadata(
     // Try to read from all available devnodes that could contain most
     // recent metadata. In the event of errors, continue to try until all are
     // exhausted.
-    for &(devnode, ref bda) in bdas
+    let poolsave = bdas
         .iter()
-        .filter(|&&(_, ref bda)| bda.last_update_time() == Some(most_recent_time))
-    {
-        let timestamp = bda.last_update_time();
-        let poolsave = OpenOptions::new()
-            .read(true)
-            .open(devnode)
-            .ok()
-            .and_then(|mut f| bda.load_state(&mut f).ok())
-            .and_then(|opt| opt)
-            .and_then(|data| serde_json::from_slice(&data).ok());
+        .filter_map(|&(devnode, ref bda)| {
+            if bda.last_update_time() == Some(most_recent_time) {
+                OpenOptions::new()
+                    .read(true)
+                    .open(devnode)
+                    .ok()
+                    .and_then(|mut f| bda.load_state(&mut f).ok())
+                    .and_then(|opt| opt)
+                    .and_then(|data| serde_json::from_slice(&data).ok())
+            } else {
+                None
+            }
+        })
+        .next();
 
-        if let (Some(ts), Some(psave)) = (timestamp, poolsave) {
-            return Ok(Some((*ts, psave)));
-        }
+    if let Some(psave) = poolsave {
+        return Ok(Some((*most_recent_time, psave)));
     }
 
     // If no data has yet returned, we have an error. That is, we should have

@@ -195,7 +195,7 @@ impl StratPool {
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
     ) -> StratisResult<(Name, StratPool)> {
-        let mut backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, Some(timestamp))?;
+        let mut backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, timestamp)?;
         let mut thinpool = ThinPool::setup(
             uuid,
             &metadata.thinpool_dev,

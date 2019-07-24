@@ -21,13 +21,13 @@ use crate::{
             backstore::metadata::{
                 mda,
                 sizes::{
-                    static_header_size, BDAExtendedSize, BlockdevSize, MDADataSize, MDASize,
-                    ReservedSize, STATIC_HEADER_SIZE,
+                    static_header_size, BDAExtendedSize, MDADataSize, MDASize, ReservedSize,
+                    STATIC_HEADER_SIZE,
                 },
             },
             device::SyncAll,
         },
-        types::{DevUuid, PoolUuid},
+        types::{BlockdevSize, DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

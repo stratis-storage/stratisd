@@ -12,6 +12,8 @@ pub type DevUuid = Uuid;
 pub type FilesystemUuid = Uuid;
 pub type PoolUuid = Uuid;
 
+pub use self::blkdev_size::BlockdevSize;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum RenameAction {
     Identity,
@@ -124,5 +126,25 @@ impl Borrow<str> for Name {
 impl fmt::Display for Name {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+// A module which defines types identifying sizes relating to individual
+// block devices.
+pub mod blkdev_size {
+    use devicemapper::Sectors;
+
+    #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+    /// The total size of one entire block device belonging to Stratis.
+    pub struct BlockdevSize(Sectors);
+
+    impl BlockdevSize {
+        pub fn new(value: Sectors) -> BlockdevSize {
+            BlockdevSize(value)
+        }
+
+        pub fn sectors(self) -> Sectors {
+            self.0
+        }
     }
 }

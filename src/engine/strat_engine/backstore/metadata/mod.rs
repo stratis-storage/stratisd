@@ -8,5 +8,5 @@ mod sizes;
 
 pub use self::{
     bda::BDA,
-    sizes::{BDAExtendedSize, BlockdevSize, MDADataSize},
+    sizes::{BDAExtendedSize, MDADataSize},
 };

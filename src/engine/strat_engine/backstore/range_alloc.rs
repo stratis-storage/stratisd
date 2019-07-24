@@ -13,7 +13,7 @@ use std::{
 use devicemapper::Sectors;
 
 use crate::{
-    engine::strat_engine::backstore::metadata::BlockdevSize,
+    engine::types::BlockdevSize,
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 

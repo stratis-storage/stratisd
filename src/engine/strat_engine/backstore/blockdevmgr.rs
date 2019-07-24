@@ -25,14 +25,14 @@ use crate::{
         strat_engine::{
             backstore::{
                 device::{identify, resolve_devices, DevOwnership},
-                metadata::{BlockdevSize, MDADataSize, BDA},
+                metadata::{MDADataSize, BDA},
                 util::hw_lookup,
                 StratBlockDev,
             },
             device::blkdev_size,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
-        types::{DevUuid, PoolUuid},
+        types::{BlockdevSize, DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

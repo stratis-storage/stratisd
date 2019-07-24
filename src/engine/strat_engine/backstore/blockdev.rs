@@ -159,8 +159,8 @@ impl BlockDev for StratBlockDev {
 
     fn size(&self) -> Sectors {
         let size = self.used.size();
-        assert_eq!(self.bda.dev_size().sectors(), size);
-        size
+        assert_eq!(self.bda.dev_size(), size);
+        size.sectors()
     }
 
     fn state(&self) -> BlockDevState {

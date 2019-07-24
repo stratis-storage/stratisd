@@ -40,8 +40,8 @@ impl RangeAllocator {
     }
 
     /// The maximum allocation from this manager
-    pub fn size(&self) -> Sectors {
-        self.limit
+    pub fn size(&self) -> BlockdevSize {
+        BlockdevSize::new(self.limit)
     }
 
     fn check_for_overflow(&self, off: Sectors, len: Sectors) -> StratisResult<()> {

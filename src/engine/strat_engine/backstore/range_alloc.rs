@@ -13,7 +13,7 @@ use std::{
 use devicemapper::Sectors;
 
 use crate::{
-    engine::types::BlockdevSize,
+    engine::types::{BlockdevFreeSize, BlockdevSize},
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
@@ -192,8 +192,8 @@ impl RangeAllocator {
     }
 
     /// Available sectors
-    pub fn available(&self) -> Sectors {
-        self.limit - self.used()
+    pub fn available(&self) -> BlockdevFreeSize {
+        BlockdevFreeSize::new(self.limit - self.used())
     }
 
     /// Allocated sectors
@@ -271,29 +271,29 @@ mod tests {
         let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
         assert_eq!(allocator.used(), Sectors(0));
-        assert_eq!(allocator.available(), Sectors(128));
+        assert_eq!(allocator.available().sectors(), Sectors(128));
 
         allocator
             .insert_ranges(&[(Sectors(10), Sectors(100))])
             .unwrap();
 
         assert_eq!(allocator.used(), Sectors(100));
-        assert_eq!(allocator.available(), Sectors(28));
+        assert_eq!(allocator.available().sectors(), Sectors(28));
 
         let request = allocator.request(Sectors(50));
         assert_eq!(request.0, Sectors(28));
         assert_eq!(allocator.used(), Sectors(128));
-        assert_eq!(allocator.available(), Sectors(0));
+        assert_eq!(allocator.available().sectors(), Sectors(0));
         assert_eq!(request.1.len(), 2);
 
         let good_remove_ranges = [(Sectors(21), Sectors(20)), (Sectors(41), Sectors(40))];
         allocator.remove_ranges(&good_remove_ranges);
         assert_eq!(allocator.used(), Sectors(68));
-        assert_eq!(allocator.available(), Sectors(60));
+        assert_eq!(allocator.available().sectors(), Sectors(60));
 
         let available = allocator.available();
-        allocator.request(available);
-        assert_eq!(allocator.available(), Sectors(0));
+        allocator.request(available.sectors());
+        assert_eq!(allocator.available().sectors(), Sectors(0));
     }
 
     #[test]

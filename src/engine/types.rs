@@ -12,7 +12,7 @@ pub type DevUuid = Uuid;
 pub type FilesystemUuid = Uuid;
 pub type PoolUuid = Uuid;
 
-pub use self::blkdev_size::BlockdevSize;
+pub use self::blkdev_size::{BlockdevFreeSize, BlockdevSize};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum RenameAction {
@@ -141,6 +141,20 @@ pub mod blkdev_size {
     impl BlockdevSize {
         pub fn new(value: Sectors) -> BlockdevSize {
             BlockdevSize(value)
+        }
+
+        pub fn sectors(self) -> Sectors {
+            self.0
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+    /// The amount on a single blockdev that remains to be allocated.
+    pub struct BlockdevFreeSize(Sectors);
+
+    impl BlockdevFreeSize {
+        pub fn new(value: Sectors) -> BlockdevFreeSize {
+            BlockdevFreeSize(value)
         }
 
         pub fn sectors(self) -> Sectors {

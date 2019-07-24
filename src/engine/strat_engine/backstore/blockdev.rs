@@ -21,7 +21,7 @@ use crate::{
             },
             serde_structs::{BaseBlockDevSave, Recordable},
         },
-        types::{BlockDevState, BlockdevSize, DevUuid, MaybeDbusPath},
+        types::{BlockDevState, BlockdevFreeSize, BlockdevSize, DevUuid, MaybeDbusPath},
     },
     stratis::StratisResult,
 };
@@ -120,7 +120,7 @@ impl StratBlockDev {
 
     /// The number of Sectors on this device not allocated for any purpose.
     /// self.size() - self.metadata_size() >= self.available()
-    pub fn available(&self) -> Sectors {
+    pub fn available(&self) -> BlockdevFreeSize {
         self.used.available()
     }
 

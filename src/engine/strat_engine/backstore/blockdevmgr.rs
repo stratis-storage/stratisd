@@ -330,7 +330,10 @@ impl BlockDevMgr {
 
     /// The number of sectors not allocated for any purpose.
     pub fn avail_space(&self) -> Sectors {
-        self.block_devs.iter().map(|bd| bd.available()).sum()
+        self.block_devs
+            .iter()
+            .map(|bd| bd.available().sectors())
+            .sum()
     }
 
     /// The current size of all the blockdevs.

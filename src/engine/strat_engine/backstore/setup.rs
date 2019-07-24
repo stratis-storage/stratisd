@@ -94,8 +94,7 @@ pub fn get_metadata(
     // Try to read from all available devnodes that could contain most
     // recent metadata. In the event of errors, continue to try until all are
     // exhausted.
-    let poolsave = bdas
-        .iter()
+    bdas.iter()
         .filter_map(|&(devnode, ref bda)| {
             if bda.last_update_time() == Some(most_recent_time) {
                 OpenOptions::new()
@@ -109,17 +108,12 @@ pub fn get_metadata(
                 None
             }
         })
-        .next();
-
-    if let Some(psave) = poolsave {
-        return Ok(Some((*most_recent_time, psave)));
-    }
-
-    // If no data has yet returned, we have an error. That is, we should have
-    // some metadata, because we have a most recent time, but we failed to
-    // get any.
-    let err_str = "timestamp indicates data was written, but no data successfully read";
-    Err(StratisError::Engine(ErrorEnum::NotFound, err_str.into()))
+        .next()
+        .ok_or(StratisError::Engine(
+            ErrorEnum::NotFound,
+            "timestamp indicates data was written, but no data successfully read".into(),
+        ))
+        .map(|psave| Some((*most_recent_time, psave)))
 }
 
 /// Get all the blockdevs corresponding to this pool that can be obtained from

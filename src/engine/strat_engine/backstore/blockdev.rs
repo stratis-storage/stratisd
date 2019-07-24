@@ -21,7 +21,7 @@ use crate::{
             },
             serde_structs::{BaseBlockDevSave, Recordable},
         },
-        types::{BlockDevState, DevUuid, MaybeDbusPath},
+        types::{BlockDevState, BlockdevSize, DevUuid, MaybeDbusPath},
     },
     stratis::StratisResult,
 };
@@ -157,10 +157,10 @@ impl BlockDev for StratBlockDev {
         Utc.timestamp(self.bda.initialization_time() as i64, 0)
     }
 
-    fn size(&self) -> Sectors {
+    fn size(&self) -> BlockdevSize {
         let size = self.used.size();
         assert_eq!(self.bda.dev_size(), size);
-        size.sectors()
+        size
     }
 
     fn state(&self) -> BlockDevState {

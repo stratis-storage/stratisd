@@ -11,12 +11,12 @@ use std::{
 use chrono::{DateTime, TimeZone, Utc};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Sectors, IEC};
+use devicemapper::{Bytes, IEC};
 
 use crate::engine::{
     engine::BlockDev,
     sim_engine::randomization::Randomizer,
-    types::{BlockDevState, MaybeDbusPath},
+    types::{BlockDevState, BlockdevSize, MaybeDbusPath},
 };
 
 #[derive(Debug)]
@@ -47,8 +47,8 @@ impl BlockDev for SimDev {
         Utc.timestamp(self.initialization_time as i64, 0)
     }
 
-    fn size(&self) -> Sectors {
-        Bytes(IEC::Gi).sectors()
+    fn size(&self) -> BlockdevSize {
+        BlockdevSize::new(Bytes(IEC::Gi).sectors())
     }
 
     fn state(&self) -> BlockDevState {

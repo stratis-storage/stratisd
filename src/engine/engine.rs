@@ -15,8 +15,8 @@ use devicemapper::{Bytes, Device, Sectors};
 
 use crate::{
     engine::types::{
-        BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name,
-        PoolExtendState, PoolState, PoolUuid, RenameAction,
+        BlockDevState, BlockDevTier, BlockdevSize, DevUuid, FilesystemUuid, FreeSpaceState,
+        MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid, RenameAction,
     },
     stratis::StratisResult,
 };
@@ -55,7 +55,7 @@ pub trait BlockDev: Debug {
     fn initialization_time(&self) -> DateTime<Utc>;
 
     /// The total size of the device, including space not usable for data.
-    fn size(&self) -> Sectors;
+    fn size(&self) -> BlockdevSize;
 
     /// The current state of the blockdev.
     fn state(&self) -> BlockDevState;

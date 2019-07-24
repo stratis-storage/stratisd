@@ -8,12 +8,7 @@ use rand;
 
 use std::path::PathBuf;
 
-use devicemapper::Bytes;
-
-use crate::{
-    engine::{types::MaybeDbusPath, Filesystem},
-    stratis::StratisResult,
-};
+use crate::engine::{types::MaybeDbusPath, Filesystem};
 
 #[derive(Debug)]
 pub struct SimFilesystem {
@@ -41,10 +36,6 @@ impl Filesystem for SimFilesystem {
 
     fn created(&self) -> DateTime<Utc> {
         self.created
-    }
-
-    fn used(&self) -> StratisResult<Bytes> {
-        Ok(Bytes(12_345_678))
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {

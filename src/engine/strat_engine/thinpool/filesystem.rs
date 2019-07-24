@@ -314,23 +314,6 @@ impl Filesystem for StratFilesystem {
         self.created
     }
 
-    fn used(&self) -> StratisResult<Bytes> {
-        match self.thin_dev.status(get_dm())? {
-            ThinStatus::Working(wk_status) => Ok(wk_status.nr_mapped_sectors.bytes()),
-            ThinStatus::Error => {
-                let error_msg = format!(
-                    "Unable to get status for filesystem thin device {}",
-                    self.thin_dev.device()
-                );
-                Err(StratisError::Engine(ErrorEnum::Error, error_msg))
-            }
-            ThinStatus::Fail => {
-                let error_msg = format!("ThinDev {} is in a failed state", self.thin_dev.device());
-                Err(StratisError::Engine(ErrorEnum::Error, error_msg))
-            }
-        }
-    }
-
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {
         self.dbus_path = path
     }

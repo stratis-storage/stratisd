@@ -11,7 +11,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Device, Sectors};
+use devicemapper::{Device, Sectors};
 
 use crate::{
     engine::types::{
@@ -29,9 +29,6 @@ pub trait Filesystem: Debug {
 
     /// When the filesystem was created.
     fn created(&self) -> DateTime<Utc>;
-
-    /// The amount of data stored on the filesystem, including overhead.
-    fn used(&self) -> StratisResult<Bytes>;
 
     /// Set dbus path associated with the Pool.
     fn set_dbus_path(&mut self, path: MaybeDbusPath) -> ();

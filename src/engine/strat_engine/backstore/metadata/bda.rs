@@ -21,8 +21,8 @@ use crate::{
             backstore::metadata::{
                 mda,
                 sizes::{
-                    static_header_size, BDAExtendedSize, MDADataSize, MDASize, ReservedSize,
-                    STATIC_HEADER_SIZE,
+                    static_header_size, BDAExtendedSize, BlockdevSize, MDADataSize, MDASize,
+                    ReservedSize, STATIC_HEADER_SIZE,
                 },
             },
             device::SyncAll,
@@ -112,7 +112,7 @@ impl BDA {
         pool_uuid: Uuid,
         dev_uuid: Uuid,
         mda_data_size: MDADataSize,
-        blkdev_size: Sectors,
+        blkdev_size: BlockdevSize,
         initialization_time: u64,
     ) -> StratisResult<BDA>
     where
@@ -209,7 +209,7 @@ impl BDA {
     }
 
     /// The size of the device.
-    pub fn dev_size(&self) -> Sectors {
+    pub fn dev_size(&self) -> BlockdevSize {
         self.header.blkdev_size
     }
 
@@ -241,7 +241,7 @@ impl BDA {
 
 #[derive(Eq, PartialEq)]
 pub struct StaticHeader {
-    blkdev_size: Sectors,
+    blkdev_size: BlockdevSize,
     pool_uuid: PoolUuid,
     dev_uuid: DevUuid,
     mda_size: MDASize,
@@ -256,7 +256,7 @@ impl StaticHeader {
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
         mda_size: MDASize,
-        blkdev_size: Sectors,
+        blkdev_size: BlockdevSize,
         initialization_time: u64,
     ) -> StaticHeader {
         StaticHeader {
@@ -436,7 +436,7 @@ impl StaticHeader {
     fn sigblock_to_buf(&self) -> [u8; bytes!(static_header_size::SIGBLOCK_SECTORS)] {
         let mut buf = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
         buf[4..20].clone_from_slice(STRAT_MAGIC);
-        LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size);
+        LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size.sectors());
         buf[28] = STRAT_SIGBLOCK_VERSION;
         buf[32..64].clone_from_slice(self.pool_uuid.to_simple_ref().to_string().as_bytes());
         buf[64..96].clone_from_slice(self.dev_uuid.to_simple_ref().to_string().as_bytes());
@@ -470,7 +470,7 @@ impl StaticHeader {
             ));
         }
 
-        let blkdev_size = Sectors(LittleEndian::read_u64(&buf[20..28]));
+        let blkdev_size = BlockdevSize::new(Sectors(LittleEndian::read_u64(&buf[20..28])));
 
         let version = buf[28];
         if version != STRAT_SIGBLOCK_VERSION {
@@ -552,7 +552,7 @@ mod tests {
             pool_uuid,
             dev_uuid,
             mda_size,
-            blkdev_size,
+            BlockdevSize::new(blkdev_size),
             Utc::now().timestamp() as u64,
         )
     }
@@ -624,7 +624,7 @@ mod tests {
 
         // Construct a BDA.
         let sh = random_static_header(0, 0);
-        let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+        let mut buf = Cursor::new(vec![0; *sh.blkdev_size.sectors().bytes() as usize]);
         let mut bda = BDA::initialize(
             &mut buf,
             sh.pool_uuid,
@@ -639,7 +639,7 @@ mod tests {
         let timestamp1 = Utc::now();
         assert_ne!(timestamp0, timestamp1);
 
-        let mut buf = Cursor::new(vec![0; *sh.blkdev_size.bytes() as usize]);
+        let mut buf = Cursor::new(vec![0; *sh.blkdev_size.sectors().bytes() as usize]);
         bda.save_state(&timestamp1, &data, &mut buf).unwrap();
 
         // Error, because current timestamp is older than written to newer.

@@ -189,7 +189,7 @@ pub fn get_blockdevs(
         // device could not be obtained.
         blkdev_size(&OpenOptions::new().read(true).open(devnode)?).and_then(|actual_size| {
             let actual_size_sectors = actual_size.sectors();
-            let recorded_size = bda.dev_size();
+            let recorded_size = bda.dev_size().sectors();
             if actual_size_sectors < recorded_size {
                 let err_msg = format!(
                     "Stratis device with device number {}, devnode {}, pool UUID {} and device UUID {} had recorded size ({}), but actual size is less at ({})",

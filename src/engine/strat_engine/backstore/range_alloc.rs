@@ -12,7 +12,10 @@ use std::{
 
 use devicemapper::Sectors;
 
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::{
+    engine::strat_engine::backstore::metadata::BlockdevSize,
+    stratis::{ErrorEnum, StratisError, StratisResult},
+};
 
 #[derive(Debug)]
 pub struct RangeAllocator {
@@ -25,11 +28,11 @@ impl RangeAllocator {
     /// ranges marked as used.
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
-        limit: Sectors,
+        limit: BlockdevSize,
         initial_used: &[(Sectors, Sectors)],
     ) -> StratisResult<RangeAllocator> {
         let mut allocator = RangeAllocator {
-            limit,
+            limit: limit.sectors(),
             used: BTreeMap::new(),
         };
         allocator.insert_ranges(initial_used)?;
@@ -37,8 +40,8 @@ impl RangeAllocator {
     }
 
     /// The maximum allocation from this manager
-    pub fn size(&self) -> Sectors {
-        self.limit
+    pub fn size(&self) -> BlockdevSize {
+        BlockdevSize::new(self.limit)
     }
 
     fn check_for_overflow(&self, off: Sectors, len: Sectors) -> StratisResult<()> {
@@ -265,7 +268,7 @@ mod tests {
     /// 8. Verify that number of available sectors is 60, used is 68.
     /// 9. Request all available, then verify that nothing is left.
     fn test_allocator_allocations() {
-        let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
+        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
         assert_eq!(allocator.used(), Sectors(0));
         assert_eq!(allocator.available(), Sectors(128));
@@ -301,7 +304,7 @@ mod tests {
             (Sectors(10), Sectors(10)),
             (Sectors(30), Sectors(10)),
         ];
-        let allocator = RangeAllocator::new(Sectors(128), &ranges).unwrap();
+        let allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &ranges).unwrap();
         let used = allocator.used_ranges();
         assert_eq!(used.len(), 1);
         assert_eq!(used[0], (Sectors(10), Sectors(30)));
@@ -310,7 +313,7 @@ mod tests {
     #[test]
     /// Verify insert_ranges properly coalesces adjacent allocations.
     fn test_allocator_insert_ranges_contig() {
-        let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
+        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
         allocator
             .insert_ranges(&[(Sectors(20), Sectors(10))])
@@ -334,7 +337,7 @@ mod tests {
     /// 3. Removing a range from the middle of an existing range
     /// 4. Removing an entire range
     fn test_allocator_remove_ranges_contig() {
-        let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
+        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
         allocator
             .insert_ranges(&[(Sectors(20), Sectors(20))])
@@ -368,12 +371,12 @@ mod tests {
     fn test_max_allocator_range() {
         use std::u64::MAX;
 
-        RangeAllocator::new(Sectors(MAX), &[]).unwrap();
+        RangeAllocator::new(BlockdevSize::new(Sectors(MAX)), &[]).unwrap();
     }
 
     #[test]
     fn test_allocator_insert_prev_overlap() {
-        let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
+        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
         let bad_insert_ranges = [(Sectors(21), Sectors(20)), (Sectors(40), Sectors(40))];
         assert_matches!(allocator.insert_ranges(&bad_insert_ranges), Err(_))
@@ -381,7 +384,7 @@ mod tests {
 
     #[test]
     fn test_allocator_insert_next_overlap() {
-        let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
+        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
         let bad_insert_ranges = [(Sectors(40), Sectors(1)), (Sectors(39), Sectors(2))];
         assert_matches!(allocator.insert_ranges(&bad_insert_ranges), Err(_))
@@ -392,7 +395,7 @@ mod tests {
     /// Verify that remove_ranges() panics if ranges to be removed share
     /// elements.
     fn test_allocator_failures_alloc_overlap() {
-        let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
+        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
         let _request = allocator.request(Sectors(128));
 
@@ -404,7 +407,7 @@ mod tests {
     /// Verify that insert_ranges() errors when all sectors have already been
     /// allocated.
     fn test_allocator_failures_range_overwrite() {
-        let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
+        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
         let request = allocator.request(Sectors(128));
         assert_eq!(request.0, Sectors(128));
@@ -418,7 +421,7 @@ mod tests {
     /// Verify that remove_ranges() panics when an element at the
     /// beginning of the specified range is not in use.
     fn test_allocator_failures_removing_unused_beginning() {
-        let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
+        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
         allocator
             .insert_ranges(&[(Sectors(20), Sectors(20))])
@@ -431,7 +434,7 @@ mod tests {
     /// Verify that remove_ranges() panics when an element at the
     /// end of the specified range is not in use.
     fn test_allocator_failures_removing_unused_end() {
-        let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
+        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
         allocator
             .insert_ranges(&[(Sectors(20), Sectors(20))])
@@ -444,7 +447,7 @@ mod tests {
     /// Verify that remove_ranges() panics when the entire specified
     /// range is not in use.
     fn test_allocator_failures_removing_unused() {
-        let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
+        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
         allocator.remove_ranges(&[(Sectors(39), Sectors(2))]);
     }
@@ -453,7 +456,7 @@ mod tests {
     /// Verify that insert_ranges() errors when an element outside the range
     /// limit is requested.
     fn test_allocator_failures_overflow_limit() {
-        let mut allocator = RangeAllocator::new(Sectors(128), &[]).unwrap();
+        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
         // overflow limit range
         assert_matches!(
@@ -468,7 +471,7 @@ mod tests {
     fn test_allocator_failures_overflow_max() {
         use std::u64::MAX;
 
-        let mut allocator = RangeAllocator::new(Sectors(MAX), &[]).unwrap();
+        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(MAX)), &[]).unwrap();
 
         // overflow max u64
         assert_matches!(

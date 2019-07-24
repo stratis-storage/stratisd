@@ -101,18 +101,19 @@ pub fn get_metadata(
                     .read(true)
                     .open(devnode)
                     .ok()
-                    .and_then(|mut f| bda.load_state(&mut f).ok())
-                    .and_then(|opt| opt)
+                    .and_then(|mut f| bda.load_state(&mut f).unwrap_or(None))
                     .and_then(|data| serde_json::from_slice(&data).ok())
             } else {
                 None
             }
         })
         .next()
-        .ok_or(StratisError::Engine(
-            ErrorEnum::NotFound,
-            "timestamp indicates data was written, but no data successfully read".into(),
-        ))
+        .ok_or_else(|| {
+            StratisError::Engine(
+                ErrorEnum::NotFound,
+                "timestamp indicates data was written, but no data successfully read".into(),
+            )
+        })
         .map(|psave| Some((*most_recent_time, psave)))
 }
 

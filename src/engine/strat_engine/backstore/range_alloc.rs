@@ -139,11 +139,9 @@ impl RangeAllocator {
 
     #[allow(dead_code)]
     /// Mark ranges previously marked as used as now unused.
-    fn remove_ranges(&mut self, to_free: &[(Sectors, Sectors)]) {
+    fn remove_ranges(&mut self, to_free: &[(Sectors, Sectors)]) -> StratisResult<()> {
         for &(off, len) in to_free {
-            // TODO: when this method goes into use, fix it so that it returns
-            // an StratisResult, make this a try!.
-            self.check_for_overflow(off, len).unwrap();
+            self.check_for_overflow(off, len)?;
 
             let maybe_prev = self
                 .used
@@ -189,6 +187,7 @@ impl RangeAllocator {
                 }
             }
         }
+        Ok(())
     }
 
     /// Available sectors
@@ -287,7 +286,7 @@ mod tests {
         assert_eq!(request.1.len(), 2);
 
         let good_remove_ranges = [(Sectors(21), Sectors(20)), (Sectors(41), Sectors(40))];
-        allocator.remove_ranges(&good_remove_ranges);
+        allocator.remove_ranges(&good_remove_ranges).unwrap();
         assert_eq!(allocator.used(), Sectors(68));
         assert_eq!(allocator.available(), Sectors(60));
 
@@ -343,23 +342,31 @@ mod tests {
             .insert_ranges(&[(Sectors(20), Sectors(20))])
             .unwrap();
 
-        allocator.remove_ranges(&[(Sectors(20), Sectors(3))]);
+        allocator
+            .remove_ranges(&[(Sectors(20), Sectors(3))])
+            .unwrap();
         let used = allocator.used_ranges();
         assert_eq!(used.len(), 1);
         assert_eq!(used[0], (Sectors(23), Sectors(17)));
 
-        allocator.remove_ranges(&[(Sectors(36), Sectors(4))]);
+        allocator
+            .remove_ranges(&[(Sectors(36), Sectors(4))])
+            .unwrap();
         let used = allocator.used_ranges();
         assert_eq!(used.len(), 1);
         assert_eq!(used[0], (Sectors(23), Sectors(13)));
 
-        allocator.remove_ranges(&[(Sectors(24), Sectors(2))]);
+        allocator
+            .remove_ranges(&[(Sectors(24), Sectors(2))])
+            .unwrap();
         let used = allocator.used_ranges();
         assert_eq!(used.len(), 2);
         assert_eq!(used[0], (Sectors(23), Sectors(1)));
         assert_eq!(used[1], (Sectors(26), Sectors(10)));
 
-        allocator.remove_ranges(&[(Sectors(26), Sectors(10))]);
+        allocator
+            .remove_ranges(&[(Sectors(26), Sectors(10))])
+            .unwrap();
         let used = allocator.used_ranges();
         assert_eq!(used.len(), 1);
         assert_eq!(used[0], (Sectors(23), Sectors(1)));
@@ -400,7 +407,7 @@ mod tests {
         let _request = allocator.request(Sectors(128));
 
         let bad_remove_ranges = [(Sectors(21), Sectors(20)), (Sectors(40), Sectors(40))];
-        allocator.remove_ranges(&bad_remove_ranges);
+        allocator.remove_ranges(&bad_remove_ranges).unwrap();
     }
 
     #[test]
@@ -426,7 +433,9 @@ mod tests {
         allocator
             .insert_ranges(&[(Sectors(20), Sectors(20))])
             .unwrap();
-        allocator.remove_ranges(&[(Sectors(19), Sectors(2))]);
+        allocator
+            .remove_ranges(&[(Sectors(19), Sectors(2))])
+            .unwrap();
     }
 
     #[test]
@@ -439,7 +448,9 @@ mod tests {
         allocator
             .insert_ranges(&[(Sectors(20), Sectors(20))])
             .unwrap();
-        allocator.remove_ranges(&[(Sectors(39), Sectors(2))]);
+        allocator
+            .remove_ranges(&[(Sectors(39), Sectors(2))])
+            .unwrap();
     }
 
     #[test]
@@ -449,7 +460,9 @@ mod tests {
     fn test_allocator_failures_removing_unused() {
         let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
-        allocator.remove_ranges(&[(Sectors(39), Sectors(2))]);
+        allocator
+            .remove_ranges(&[(Sectors(39), Sectors(2))])
+            .unwrap();
     }
 
     #[test]

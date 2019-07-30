@@ -327,6 +327,68 @@ impl StaticHeader {
     where
         F: Read + Seek + SyncAll,
     {
+        // Action taken when one sigblock is interpreted as invalid.
+        //
+        // If the other sigblock is interpreted as a Stratis header, attempts repair
+        // of the invalid sigblock, returning an error if that fails, otherwise returning
+        // the valid sigblock.
+        //
+        // In all other cases, return the error associated with the invalid sigblock.
+        fn ok_err_static_header_handling<F>(
+            f: &mut F,
+            maybe_sh: Option<StaticHeader>,
+            sh_error: StratisError,
+            repair_location: MetadataLocation,
+        ) -> StratisResult<Option<StaticHeader>>
+        where
+            F: Read + Seek + SyncAll,
+        {
+            if let Some(sh) = maybe_sh {
+                write_header(f, sh, repair_location)
+            } else {
+                Err(sh_error)
+            }
+        }
+
+        // Action taken when there was an I/O error reading the other sigblock.
+        //
+        // * If this sigblock region is interpreted as having no siglblock, it returns None.
+        // * If this sigblock region has a valid sigblock, attempts repair of the other
+        //   sigblock region with the valid sigblock, returning the valid sigblock
+        //   if the repair succeeds, otherwise returning an error.
+        // * If this sigblock appears to be invalid, return the error encountered when
+        //   reading the sigblock.
+        fn copy_ok_err_handling<F>(
+            f: &mut F,
+            maybe_sh: StratisResult<Option<StaticHeader>>,
+            repair_location: MetadataLocation,
+        ) -> StratisResult<Option<StaticHeader>>
+        where
+            F: Read + Seek + SyncAll,
+        {
+            match maybe_sh {
+                Ok(loc) => {
+                    if let Some(ref sh) = loc {
+                        sh.write(f, repair_location)?;
+                    }
+                    Ok(loc)
+                }
+                Err(e) => Err(e),
+            }
+        }
+
+        fn write_header<F>(
+            f: &mut F,
+            sh: StaticHeader,
+            repair_location: MetadataLocation,
+        ) -> StratisResult<Option<StaticHeader>>
+        where
+            F: Read + Seek + SyncAll,
+        {
+            sh.write(f, repair_location)?;
+            Ok(Some(sh))
+        }
+
         let (maybe_buf_1, maybe_buf_2) = BDA::read(f);
         match (
             maybe_buf_1.map(|buf| StaticHeader::sigblock_from_buf(&buf)),
@@ -346,48 +408,22 @@ impl StaticHeader {
                         } else if loc_1.initialization_time > loc_2.initialization_time {
                             // If the first header block is newer, overwrite second with
                             // contents of first.
-                            loc_1.write(f, MetadataLocation::Second)?;
-                            Ok(Some(loc_1))
+                            write_header(f, loc_1, MetadataLocation::Second)
                         } else {
                             // The second header block must be newer, so overwrite first
                             // with contents of second.
-                            loc_2.write(f, MetadataLocation::First)?;
-                            Ok(Some(loc_2))
+                            write_header(f, loc_2, MetadataLocation::First)
                         }
                     }
                     (None, None) => Ok(None),
-                    (Some(loc_1), None) => {
-                        // Copy 1 has valid Stratis BDA, copy 2 has no magic, re-write copy 2
-                        loc_1.write(f, MetadataLocation::Second)?;
-                        Ok(Some(loc_1))
-                    }
-                    (None, Some(loc_2)) => {
-                        // Copy 2 has valid Stratis BDA, copy 1 has no magic, re-write copy 1
-                        loc_2.write(f, MetadataLocation::First)?;
-                        Ok(Some(loc_2))
-                    }
+                    (Some(loc_1), None) => write_header(f, loc_1, MetadataLocation::Second),
+                    (None, Some(loc_2)) => write_header(f, loc_2, MetadataLocation::First),
                 },
                 (Ok(loc_1), Err(loc_2)) => {
-                    if let Some(loc_1) = loc_1 {
-                        loc_1.write(f, MetadataLocation::Second)?;
-                        Ok(Some(loc_1))
-                    } else {
-                        // Location 1 doesn't have a signature, but location 2 did, but it got an error,
-                        // lets return the error instead as this appears to be a stratis device that
-                        // has gotten in a bad state.
-                        Err(loc_2)
-                    }
+                    ok_err_static_header_handling(f, loc_1, loc_2, MetadataLocation::Second)
                 }
                 (Err(loc_1), Ok(loc_2)) => {
-                    if let Some(loc_2) = loc_2 {
-                        loc_2.write(f, MetadataLocation::First)?;
-                        Ok(Some(loc_2))
-                    } else {
-                        // Location 2 doesn't have a signature, but location 1 did, but it got an error,
-                        // lets return the error instead as this appears to be a stratis device that
-                        // has gotten in a bad state.
-                        Err(loc_1)
-                    }
+                    ok_err_static_header_handling(f, loc_2, loc_1, MetadataLocation::First)
                 }
                 (Err(_), Err(_)) => {
                     let err_str = "Appeared to be a Stratis device, but no valid sigblock found";
@@ -395,35 +431,9 @@ impl StaticHeader {
                 }
             },
             // Copy 1 read OK, 2 resulted in an IO error
-            (Ok(buf_loc_1), Err(_)) => match buf_loc_1 {
-                Ok(loc_1) => {
-                    if let Some(ref loc_1) = loc_1 {
-                        loc_1.write(f, MetadataLocation::Second)?;
-                    }
-                    Ok(loc_1)
-                }
-                Err(e) => {
-                    // Unable to determine if location 2 has a signature, but location 1 did,
-                    // but it got an error, lets return the error instead as this appears to
-                    // be a stratis device that has gotten in a bad state.
-                    Err(e)
-                }
-            },
+            (Ok(buf_loc_1), Err(_)) => copy_ok_err_handling(f, buf_loc_1, MetadataLocation::Second),
             // Copy 2 read OK, 1 resulted in IO Error
-            (Err(_), Ok(buf_loc_2)) => match buf_loc_2 {
-                Ok(loc_2) => {
-                    if let Some(ref loc_2) = loc_2 {
-                        loc_2.write(f, MetadataLocation::First)?;
-                    }
-                    Ok(loc_2)
-                }
-                Err(e) => {
-                    // Unable to determine if location 1 has a signature, but location 2 did,
-                    // but it got an error, lets return the error instead as this appears to
-                    // be a stratis device that has gotten in a bad state.
-                    Err(e)
-                }
-            },
+            (Err(_), Ok(buf_loc_2)) => copy_ok_err_handling(f, buf_loc_2, MetadataLocation::First),
             (Err(_), Err(_)) => {
                 // Unable to read the device at all.
                 let err_str = "Unable to read data at sigblock locations.";

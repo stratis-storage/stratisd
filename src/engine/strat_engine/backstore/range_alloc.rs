@@ -2,13 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    cmp::min,
-    collections::{
-        BTreeMap,
-        Bound::{Included, Unbounded},
-    },
-};
+use std::{cmp::min, collections::BTreeMap};
 
 use devicemapper::Sectors;
 
@@ -137,60 +131,6 @@ impl RangeAllocator {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    /// Mark ranges previously marked as used as now unused.
-    fn remove_ranges(&mut self, to_free: &[(Sectors, Sectors)]) {
-        for &(off, len) in to_free {
-            // TODO: when this method goes into use, fix it so that it returns
-            // an StratisResult, make this a try!.
-            self.check_for_overflow(off, len).unwrap();
-
-            let maybe_prev = self
-                .used
-                .range((Unbounded, Included(off)))
-                .rev()
-                .next()
-                .map(|(k, v)| (*k, *v));
-
-            let (prev_off, prev_len) = match maybe_prev {
-                Some(range) => range,
-                None => panic!("Existing matching allocated range not found"),
-            };
-
-            assert!(
-                prev_off + prev_len >= off + len,
-                "must not extend past existing range"
-            );
-
-            // switch based on if the to-remove range starts or ends
-            // at the same point as the existing range
-            match (prev_off == off, prev_off + prev_len == off + len) {
-                (true, true) => {
-                    // Exactly matches existing range
-                    self.used.remove(&prev_off);
-                }
-                (true, false) => {
-                    // A tail segment remains
-                    self.used.remove(&prev_off).expect("must exist");
-                    self.used.insert(prev_off + len, prev_len - len);
-                }
-                (false, true) => {
-                    // Head segment remains
-                    *self.used.get_mut(&prev_off).expect("must exist") = prev_len - len;
-                }
-                (false, false) => {
-                    // Head and tail segments both remain
-                    let prev_end = prev_off + prev_len;
-                    let tail_off = off + len;
-                    let tail_len = prev_end - tail_off;
-                    let head_len = prev_len - len - tail_len;
-                    *self.used.get_mut(&prev_off).expect("must exist") = head_len;
-                    self.used.insert(tail_off, tail_len);
-                }
-            }
-        }
-    }
-
     /// Available sectors
     pub fn available(&self) -> Sectors {
         self.limit - self.used()
@@ -286,11 +226,6 @@ mod tests {
         assert_eq!(allocator.available(), Sectors(0));
         assert_eq!(request.1.len(), 2);
 
-        let good_remove_ranges = [(Sectors(21), Sectors(20)), (Sectors(41), Sectors(40))];
-        allocator.remove_ranges(&good_remove_ranges);
-        assert_eq!(allocator.used(), Sectors(68));
-        assert_eq!(allocator.available(), Sectors(60));
-
         let available = allocator.available();
         allocator.request(available);
         assert_eq!(allocator.available(), Sectors(0));
@@ -331,41 +266,6 @@ mod tests {
     }
 
     #[test]
-    /// Verify remove_ranges properly handles different cases.
-    /// 1. Removing a range from the start of an existing range
-    /// 2. Removing a range from the end of an existing range
-    /// 3. Removing a range from the middle of an existing range
-    /// 4. Removing an entire range
-    fn test_allocator_remove_ranges_contig() {
-        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
-
-        allocator
-            .insert_ranges(&[(Sectors(20), Sectors(20))])
-            .unwrap();
-
-        allocator.remove_ranges(&[(Sectors(20), Sectors(3))]);
-        let used = allocator.used_ranges();
-        assert_eq!(used.len(), 1);
-        assert_eq!(used[0], (Sectors(23), Sectors(17)));
-
-        allocator.remove_ranges(&[(Sectors(36), Sectors(4))]);
-        let used = allocator.used_ranges();
-        assert_eq!(used.len(), 1);
-        assert_eq!(used[0], (Sectors(23), Sectors(13)));
-
-        allocator.remove_ranges(&[(Sectors(24), Sectors(2))]);
-        let used = allocator.used_ranges();
-        assert_eq!(used.len(), 2);
-        assert_eq!(used[0], (Sectors(23), Sectors(1)));
-        assert_eq!(used[1], (Sectors(26), Sectors(10)));
-
-        allocator.remove_ranges(&[(Sectors(26), Sectors(10))]);
-        let used = allocator.used_ranges();
-        assert_eq!(used.len(), 1);
-        assert_eq!(used[0], (Sectors(23), Sectors(1)));
-    }
-
-    #[test]
     /// Verify that the largest possible limit may be used for the
     /// allocator.
     fn test_max_allocator_range() {
@@ -391,19 +291,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    /// Verify that remove_ranges() panics if ranges to be removed share
-    /// elements.
-    fn test_allocator_failures_alloc_overlap() {
-        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
-
-        let _request = allocator.request(Sectors(128));
-
-        let bad_remove_ranges = [(Sectors(21), Sectors(20)), (Sectors(40), Sectors(40))];
-        allocator.remove_ranges(&bad_remove_ranges);
-    }
-
-    #[test]
     /// Verify that insert_ranges() errors when all sectors have already been
     /// allocated.
     fn test_allocator_failures_range_overwrite() {
@@ -414,42 +301,6 @@ mod tests {
         assert_eq!(request.1, &[(Sectors(0), Sectors(128))]);
 
         assert_matches!(allocator.insert_ranges(&[(Sectors(1), Sectors(1))]), Err(_));
-    }
-
-    #[test]
-    #[should_panic]
-    /// Verify that remove_ranges() panics when an element at the
-    /// beginning of the specified range is not in use.
-    fn test_allocator_failures_removing_unused_beginning() {
-        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
-
-        allocator
-            .insert_ranges(&[(Sectors(20), Sectors(20))])
-            .unwrap();
-        allocator.remove_ranges(&[(Sectors(19), Sectors(2))]);
-    }
-
-    #[test]
-    #[should_panic]
-    /// Verify that remove_ranges() panics when an element at the
-    /// end of the specified range is not in use.
-    fn test_allocator_failures_removing_unused_end() {
-        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
-
-        allocator
-            .insert_ranges(&[(Sectors(20), Sectors(20))])
-            .unwrap();
-        allocator.remove_ranges(&[(Sectors(39), Sectors(2))]);
-    }
-
-    #[test]
-    #[should_panic]
-    /// Verify that remove_ranges() panics when the entire specified
-    /// range is not in use.
-    fn test_allocator_failures_removing_unused() {
-        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
-
-        allocator.remove_ranges(&[(Sectors(39), Sectors(2))]);
     }
 
     #[test]

@@ -44,7 +44,7 @@ class AddDataDevsTestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        ((poolpath, _), _, _) = Manager.Methods.CreatePool(
+        ((_, (poolpath, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": []},
         )
@@ -61,8 +61,11 @@ class AddDataDevsTestCase(SimTestCase):
         blockdevs1 = blockdevs(props={"Pool": pool}).search(managed_objects)
         self.assertEqual(list(blockdevs1), [])
 
-        (result, rc, _) = Pool.Methods.AddDataDevs(self._pool_object, {"devices": []})
+        ((is_some, result), rc, _) = Pool.Methods.AddDataDevs(
+            self._pool_object, {"devices": []}
+        )
 
+        self.assertFalse(is_some)
         self.assertEqual(result, [])
         self.assertEqual(rc, StratisdErrors.OK)
 
@@ -84,7 +87,7 @@ class AddDataDevsTestCase(SimTestCase):
         blockdevs1 = blockdevs(props={"Pool": pool}).search(managed_objects)
         self.assertEqual(list(blockdevs1), [])
 
-        (result, rc, _) = Pool.Methods.AddDataDevs(
+        ((is_some, result), rc, _) = Pool.Methods.AddDataDevs(
             self._pool_object, {"devices": _DEVICE_STRATEGY()}
         )
 
@@ -92,8 +95,10 @@ class AddDataDevsTestCase(SimTestCase):
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
 
         if rc == StratisdErrors.OK:
+            self.assertTrue(is_some)
             self.assertGreater(num_devices_added, 0)
         else:
+            self.assertFalse(is_some)
             self.assertEqual(num_devices_added, 0)
 
         blockdev_object_paths = frozenset(result)

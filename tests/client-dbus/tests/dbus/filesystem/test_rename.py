@@ -45,7 +45,7 @@ class SetNameTestCase(SimTestCase):
         super().setUp()
         self._fs_name = "fs"
         self._proxy = get_object(TOP_OBJECT)
-        ((self._pool_object_path, _), _, _) = Manager.Methods.CreatePool(
+        ((_, (self._pool_object_path, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {
                 "name": self._POOLNAME,
@@ -54,7 +54,7 @@ class SetNameTestCase(SimTestCase):
             },
         )
         self._pool_object = get_object(self._pool_object_path)
-        (created, _, _) = Pool.Methods.CreateFilesystems(
+        ((_, created), _, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": [self._fs_name]}
         )
         self._filesystem_object_path = created[0][0]
@@ -65,12 +65,13 @@ class SetNameTestCase(SimTestCase):
         Test rename to same name.
         """
         filesystem = get_object(self._filesystem_object_path)
-        (result, rc, _) = Filesystem.Methods.SetName(
+        ((is_some, result), rc, _) = Filesystem.Methods.SetName(
             filesystem, {"name": self._fs_name}
         )
 
         self.assertEqual(rc, StratisdErrors.OK)
-        self.assertFalse(result)
+        self.assertFalse(is_some)
+        self.assertEqual(result, "0" * 32)
 
     def testNewName(self):
         """

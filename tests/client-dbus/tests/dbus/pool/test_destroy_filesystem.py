@@ -44,7 +44,7 @@ class DestroyFSTestCase(SimTestCase):
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY()
-        ((poolpath, _), _, _) = Manager.Methods.CreatePool(
+        ((_, (poolpath, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
         )
@@ -57,11 +57,11 @@ class DestroyFSTestCase(SimTestCase):
         list should always succeed, and it should not decrease the
         number of volumes.
         """
-        (result, rc, _) = Pool.Methods.DestroyFilesystems(
+        ((_, result_changed), rc, _) = Pool.Methods.DestroyFilesystems(
             self._pool_object, {"filesystems": []}
         )
 
-        self.assertEqual(len(result), 0)
+        self.assertEqual(len(result_changed), 0)
         self.assertEqual(rc, StratisdErrors.OK)
 
         result = filesystems().search(
@@ -74,11 +74,11 @@ class DestroyFSTestCase(SimTestCase):
         Test calling with a non-existant object path. This should succeed,
         because at the end the filesystem is not there.
         """
-        (result, rc, _) = Pool.Methods.DestroyFilesystems(
+        ((_, result), rc, _) = Pool.Methods.DestroyFilesystems(
             self._pool_object, {"filesystems": ["/"]}
         )
-        self.assertEqual(rc, StratisdErrors.OK)
         self.assertEqual(len(result), 0)
+        self.assertEqual(rc, StratisdErrors.OK)
 
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
@@ -101,12 +101,12 @@ class DestroyFSTestCase1(SimTestCase):
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY()
-        ((self._poolpath, _), _, _) = Manager.Methods.CreatePool(
+        ((_, (self._poolpath, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
         )
         self._pool_object = get_object(self._poolpath)
-        (self._filesystems, _, _) = Pool.Methods.CreateFilesystems(
+        ((_, self._filesystems), _, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": [(self._VOLNAME, "", None)]}
         )
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
@@ -117,10 +117,11 @@ class DestroyFSTestCase1(SimTestCase):
         should always succeed.
         """
         fs_object_path = self._filesystems[0][0]
-        (result, rc, _) = Pool.Methods.DestroyFilesystems(
+        ((is_some, result), rc, _) = Pool.Methods.DestroyFilesystems(
             self._pool_object, {"filesystems": [fs_object_path]}
         )
 
+        self.assertTrue(is_some)
         self.assertEqual(len(result), 1)
         self.assertEqual(rc, StratisdErrors.OK)
 
@@ -136,10 +137,11 @@ class DestroyFSTestCase1(SimTestCase):
         returned.
         """
         fs_object_path = self._filesystems[0][0]
-        (result, rc, _) = Pool.Methods.DestroyFilesystems(
+        ((is_some, result), rc, _) = Pool.Methods.DestroyFilesystems(
             self._pool_object, {"filesystems": [fs_object_path, "/"]}
         )
 
+        self.assertTrue(is_some)
         self.assertEqual(len(result), 1)
         self.assertEqual(rc, StratisdErrors.OK)
 

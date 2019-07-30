@@ -69,7 +69,11 @@ class UdevAdd(unittest.TestCase):
         # actually exist, retry on error.
         error_reasons = ""
         for _ in range(3):
-            ((pool_object_path, _), exit_code, error_str) = Manager.Methods.CreatePool(
+            (
+                (_, (pool_object_path, _)),
+                exit_code,
+                error_str,
+            ) = Manager.Methods.CreatePool(
                 get_object(TOP_OBJECT),
                 {"name": name, "redundancy": (True, 0), "devices": devices},
             )

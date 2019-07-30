@@ -15,8 +15,9 @@ use devicemapper::{Bytes, Device, Sectors};
 
 use crate::{
     engine::types::{
-        BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name,
-        PoolExtendState, PoolState, PoolUuid, RenameAction,
+        BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
+        FreeSpaceState, MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid, RenameAction,
+        SetCreateAction,
     },
     stratis::StratisResult,
 };
@@ -78,7 +79,7 @@ pub trait Pool: Debug {
         pool_uuid: PoolUuid,
         pool_name: &str,
         specs: &[(&'b str, Option<Sectors>)],
-    ) -> StratisResult<Vec<(&'b str, FilesystemUuid)>>;
+    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>>;
 
     /// Adds blockdevs specified by paths to pool.
     /// Returns a list of uuids corresponding to devices actually added.
@@ -117,7 +118,7 @@ pub trait Pool: Debug {
         pool_name: &str,
         uuid: FilesystemUuid,
         new_name: &str,
-    ) -> StratisResult<RenameAction>;
+    ) -> StratisResult<RenameAction<FilesystemUuid>>;
 
     /// Snapshot filesystem
     /// Create a CoW snapshot of the origin
@@ -202,7 +203,7 @@ pub trait Engine: Debug {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-    ) -> StratisResult<PoolUuid>;
+    ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Evaluate a device node & devicemapper::Device to see if it's a valid
     /// stratis device.  If all the devices are present in the pool and the pool isn't already
@@ -216,13 +217,17 @@ pub trait Engine: Debug {
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.
     /// Returns true if some action was necessary, otherwise false.
-    fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<bool>;
+    fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>>;
 
     /// Rename pool with uuid to new_name.
     /// Raises an error if the mapping can't be applied because
     /// new_name is already in use.
     /// Returns true if it was necessary to perform an action, false if not.
-    fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction>;
+    fn rename_pool(
+        &mut self,
+        uuid: PoolUuid,
+        new_name: &str,
+    ) -> StratisResult<RenameAction<PoolUuid>>;
 
     /// Find the pool designated by uuid.
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)>;

@@ -26,7 +26,8 @@ use crate::{
             pool::{check_metadata, StratPool},
         },
         structures::Table,
-        Engine, EngineEvent, Name, Pool, PoolUuid, Redundancy, RenameAction,
+        types::{CreateAction, DeleteAction, RenameAction},
+        Engine, EngineEvent, Name, Pool, PoolUuid, Redundancy,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -174,21 +175,22 @@ impl Engine for StratEngine {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-    ) -> StratisResult<PoolUuid> {
+    ) -> StratisResult<CreateAction<PoolUuid>> {
         let redundancy = calculate_redundancy!(redundancy);
 
         validate_name(name)?;
 
-        if self.pools.contains_name(name) {
-            return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.into()));
+        match self.pools.get_by_name(name) {
+            None => {
+                let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy)?;
+
+                let name = Name::new(name.to_owned());
+                devlinks::pool_added(&name);
+                self.pools.insert(name, uuid, pool);
+                Ok(CreateAction::Created(uuid))
+            }
+            Some((uuid, _)) => Ok(CreateAction::Identity(uuid)),
         }
-
-        let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy)?;
-
-        let name = Name::new(name.to_owned());
-        devlinks::pool_added(&name);
-        self.pools.insert(name, uuid, pool);
-        Ok(uuid)
     }
 
     /// Evaluate a device node & devicemapper::Device to see if it's a valid
@@ -266,7 +268,7 @@ impl Engine for StratEngine {
         Ok(pool_uuid)
     }
 
-    fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<bool> {
+    fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
             if pool.has_filesystems() {
                 return Err(StratisError::Engine(
@@ -275,7 +277,7 @@ impl Engine for StratEngine {
                 ));
             };
         } else {
-            return Ok(false);
+            return Ok(DeleteAction::Identity(uuid));
         }
 
         let (pool_name, mut pool) = self
@@ -288,11 +290,15 @@ impl Engine for StratEngine {
             Err(err)
         } else {
             devlinks::pool_removed(&pool_name);
-            Ok(true)
+            Ok(DeleteAction::Deleted(uuid))
         }
     }
 
-    fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction> {
+    fn rename_pool(
+        &mut self,
+        uuid: PoolUuid,
+        new_name: &str,
+    ) -> StratisResult<RenameAction<PoolUuid>> {
         validate_name(new_name)?;
         let old_name = rename_pool_pre!(self; uuid; new_name);
 
@@ -314,7 +320,7 @@ impl Engine for StratEngine {
 
             self.pools.insert(new_name.clone(), uuid, pool);
             devlinks::pool_renamed(&old_name, &new_name);
-            Ok(RenameAction::Renamed)
+            Ok(RenameAction::Renamed(uuid))
         }
     }
 
@@ -382,6 +388,8 @@ mod test {
 
     use crate::engine::strat_engine::tests::{loopbacked, real};
 
+    use crate::engine::types::EngineActions;
+
     use super::*;
 
     /// Verify that a pool rename causes the pool metadata to get the new name.
@@ -389,12 +397,16 @@ mod test {
         let mut engine = StratEngine::initialize().unwrap();
 
         let name1 = "name1";
-        let uuid1 = engine.create_pool(&name1, paths, None).unwrap();
+        let uuid1 = engine
+            .create_pool(&name1, paths, None)
+            .unwrap()
+            .changed()
+            .unwrap();
 
         let name2 = "name2";
         let action = engine.rename_pool(uuid1, name2).unwrap();
 
-        assert_eq!(action, RenameAction::Renamed);
+        assert_eq!(action, RenameAction::Renamed(uuid1));
         engine.teardown().unwrap();
 
         let engine = StratEngine::initialize().unwrap();
@@ -435,10 +447,18 @@ mod test {
         let mut engine = StratEngine::initialize().unwrap();
 
         let name1 = "name1";
-        let uuid1 = engine.create_pool(&name1, paths1, None).unwrap();
+        let uuid1 = engine
+            .create_pool(&name1, paths1, None)
+            .unwrap()
+            .changed()
+            .unwrap();
 
         let name2 = "name2";
-        let uuid2 = engine.create_pool(&name2, paths2, None).unwrap();
+        let uuid2 = engine
+            .create_pool(&name2, paths2, None)
+            .unwrap()
+            .changed()
+            .unwrap();
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());

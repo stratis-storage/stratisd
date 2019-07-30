@@ -1019,7 +1019,7 @@ impl ThinPool {
         pool_name: &str,
         uuid: FilesystemUuid,
         new_name: &str,
-    ) -> StratisResult<RenameAction> {
+    ) -> StratisResult<RenameAction<Uuid>> {
         let old_name = rename_filesystem_pre!(self; uuid; new_name);
         let new_name = Name::new(new_name.to_owned());
 
@@ -1040,7 +1040,7 @@ impl ThinPool {
             });
             self.filesystems.insert(new_name.clone(), uuid, filesystem);
             devlinks::filesystem_renamed(pool_name, &old_name, &new_name);
-            Ok(RenameAction::Renamed)
+            Ok(RenameAction::Renamed(uuid))
         }
     }
 
@@ -1549,7 +1549,7 @@ mod tests {
             .unwrap();
 
         let action = pool.rename_filesystem(pool_name, fs_uuid, name2).unwrap();
-        assert_eq!(action, RenameAction::Renamed);
+        assert_matches!(action, RenameAction::Renamed(_));
         let flexdevs: FlexDevsSave = pool.record();
         let thinpoolsave: ThinPoolDevSave = pool.record();
         pool.teardown().unwrap();

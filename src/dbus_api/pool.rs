@@ -28,7 +28,7 @@ use crate::{
             msg_string_ok,
         },
     },
-    engine::{BlockDevTier, MaybeDbusPath, Name, Pool, RenameAction},
+    engine::{BlockDevTier, EngineActions, MaybeDbusPath, Name, Pool, RenameAction},
 };
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -40,7 +40,8 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let default_return: Vec<(dbus::Path, &str)> = Vec::new();
+    let default_return: (bool, Vec<(dbus::Path, &str)>, Vec<&str>) =
+        (false, Vec::new(), Vec::new());
 
     if filesystems.count() > 1 {
         let error_message = "only 1 filesystem per request allowed";
@@ -65,10 +66,17 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             .collect::<Vec<(&str, Option<Sectors>)>>(),
     );
 
-    let msg = match result {
-        Ok(ref infos) => {
-            let return_value = infos
-                .iter()
+    let (infos_changed, infos_unchanged) = match result {
+        Ok(created_set) => created_set.destructure(),
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
+        }
+    };
+
+    let return_value_changed = match infos_changed {
+        Some(ref i) => {
+            i.iter()
                 .map(|&(name, uuid)| {
                     (
                         // FIXME: To avoid this expect, modify create_filesystem
@@ -85,16 +93,20 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                         name,
                     )
                 })
-                .collect::<Vec<_>>();
-
-            return_message.append3(return_value, msg_code_ok(), msg_string_ok())
+                .collect::<Vec<_>>()
         }
-        Err(err) => {
-            let (rc, rs) = engine_to_dbus_err_tuple(&err);
-            return_message.append3(default_return, rc, rs)
-        }
+        None => Vec::new(),
     };
-    Ok(vec![msg])
+    let return_value_unchanged = match infos_unchanged {
+        Some(ref i) => i.iter().map(|&(name, _)| name).collect::<Vec<_>>(),
+        None => Vec::new(),
+    };
+
+    Ok(vec![return_message.append3(
+        (true, return_value_changed, return_value_unchanged),
+        msg_code_ok(),
+        msg_string_ok(),
+    )])
 }
 
 fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -264,7 +276,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let default_return = false;
+    let default_return = (false, false, uuid_to_string!(Uuid::nil()));
 
     let pool_path = m
         .tree
@@ -278,12 +290,20 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .rename_pool(pool_uuid, new_name)
     {
         Ok(RenameAction::NoSource) => {
-            let error_message = format!("engine doesn't know about pool {}", &pool_uuid);
+            let error_message = format!("engine doesn't know about pool {}", pool_uuid);
             let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);
             return_message.append3(default_return, rc, rs)
         }
-        Ok(RenameAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),
-        Ok(RenameAction::Renamed) => return_message.append3(true, msg_code_ok(), msg_string_ok()),
+        Ok(RenameAction::Identity(uuid)) => return_message.append3(
+            (true, false, uuid_to_string!(uuid)),
+            msg_code_ok(),
+            msg_string_ok(),
+        ),
+        Ok(RenameAction::Renamed(uuid)) => return_message.append3(
+            (true, true, uuid_to_string!(uuid)),
+            msg_code_ok(),
+            msg_string_ok(),
+        ),
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)
@@ -385,7 +405,7 @@ pub fn create_dbus_pool<'a>(
     let create_filesystems_method = f
         .method("CreateFilesystems", (), create_filesystems)
         .in_arg(("specs", "as"))
-        .out_arg(("filesystems", "a(os)"))
+        .out_arg(("filesystems", "ba(os)as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
@@ -413,7 +433,7 @@ pub fn create_dbus_pool<'a>(
     let rename_method = f
         .method("SetName", (), rename_pool)
         .in_arg(("name", "s"))
-        .out_arg(("action", "b"))
+        .out_arg(("result", "bbs"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

@@ -37,7 +37,7 @@ pub fn create_dbus_filesystem<'a>(
     let rename_method = f
         .method("SetName", (), rename_filesystem)
         .in_arg(("name", "s"))
-        .out_arg(("action", "b"))
+        .out_arg(("result", "bbs"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
@@ -108,7 +108,7 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let default_return = false;
+    let default_return = (false, false, uuid_to_string!(Uuid::nil()));
 
     let filesystem_path = m
         .tree
@@ -131,10 +131,16 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);
             return_message.append3(default_return, rc, rs)
         }
-        Ok(RenameAction::Identity) => {
-            return_message.append3(default_return, msg_code_ok(), msg_string_ok())
-        }
-        Ok(RenameAction::Renamed) => return_message.append3(true, msg_code_ok(), msg_string_ok()),
+        Ok(RenameAction::Identity(uuid)) => return_message.append3(
+            (true, false, uuid_to_string!(uuid)),
+            msg_code_ok(),
+            msg_string_ok(),
+        ),
+        Ok(RenameAction::Renamed(uuid)) => return_message.append3(
+            (true, true, uuid_to_string!(uuid)),
+            msg_code_ok(),
+            msg_string_ok(),
+        ),
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)

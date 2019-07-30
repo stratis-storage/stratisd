@@ -26,7 +26,7 @@ use crate::{
             engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, tuple_to_option,
         },
     },
-    engine::{Engine, Pool, PoolUuid},
+    engine::{Engine, EngineActions, Pool, PoolUuid},
     stratis::VERSION,
 };
 
@@ -47,25 +47,33 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let return_message = message.method_return();
 
-    let default_return: (dbus::Path, Vec<dbus::Path>) = (dbus::Path::default(), Vec::new());
+    let default_return: (bool, bool, (dbus::Path, Vec<dbus::Path>)) =
+        (false, false, (dbus::Path::default(), Vec::new()));
 
     let msg = match result {
-        Ok(pool_uuid) => {
-            let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+        Ok(pool_uuid_action) => {
+            let changed_uuid = pool_uuid_action.changed();
+            let (changed, pool_obj, block_objs) = match changed_uuid {
+                Some(uuid) => {
+                    let (_, pool) = get_mut_pool!(engine; uuid; default_return; return_message);
 
-            let pool_object_path: dbus::Path =
-                create_dbus_pool(dbus_context, object_path.clone(), pool_uuid, pool);
+                    let pool_object_path: dbus::Path =
+                        create_dbus_pool(dbus_context, object_path.clone(), uuid, pool);
 
-            let bd_object_paths = pool
-                .blockdevs_mut()
-                .into_iter()
-                .map(|(uuid, bd)| {
-                    create_dbus_blockdev(dbus_context, pool_object_path.clone(), uuid, bd)
-                })
-                .collect::<Vec<_>>();
+                    let bd_object_paths = pool
+                        .blockdevs_mut()
+                        .into_iter()
+                        .map(|(uuid, bd)| {
+                            create_dbus_blockdev(dbus_context, pool_object_path.clone(), uuid, bd)
+                        })
+                        .collect::<Vec<_>>();
 
+                    (true, vec![pool_object_path], bd_object_paths)
+                }
+                None => (false, Vec::new(), Vec::new()),
+            };
             return_message.append3(
-                (pool_object_path, bd_object_paths),
+                (true, changed, (pool_obj, block_objs)),
                 msg_code_ok(),
                 msg_string_ok(),
             )
@@ -86,7 +94,7 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let dbus_context = m.tree.get_data();
 
-    let default_return = false;
+    let default_return = (false, false, uuid_to_string!(PoolUuid::nil()));
     let return_message = message.method_return();
 
     let pool_uuid = match m.tree.get(&object_path) {
@@ -101,12 +109,17 @@ fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     };
 
     let msg = match dbus_context.engine.borrow_mut().destroy_pool(pool_uuid) {
-        Ok(action) => {
+        Ok(delete_action) => {
+            let (changed, uuid) = (delete_action.is_changed(), delete_action.into_inner());
             dbus_context
                 .actions
                 .borrow_mut()
                 .push_remove(&object_path, m.tree);
-            return_message.append3(action, msg_code_ok(), msg_string_ok())
+            return_message.append3(
+                (true, changed, uuid_to_string!(uuid)),
+                msg_code_ok(),
+                msg_string_ok(),
+            )
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
@@ -155,14 +168,29 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
         .in_arg(("name", "s"))
         .in_arg(("redundancy", "(bq)"))
         .in_arg(("devices", "as"))
-        .out_arg(("result", "(oao)"))
+        // In order from left to right:
+        // b: true if result contains usable data
+        //    false if all other fields should be ignored
+        // b: true if an action was performed
+        // o: Object path of newly created pool
+        // ao: Object paths of block devices associated with newly created pool
+        //
+        // Rust representation: (bool, bool, (dbus::Path, Vec<dbus::Path>))
+        .out_arg(("result", "bb(oao)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
     let destroy_pool_method = f
         .method("DestroyPool", (), destroy_pool)
         .in_arg(("pool", "o"))
-        .out_arg(("action", "b"))
+        // In order from left to right:
+        // b: true if result contains usable data
+        //    false if all other fields should be ignored
+        // b: true if an action was performed
+        // s: String representation of pool UUID that was destroyed
+        //
+        // Rust representation: (bool, bool, &str)
+        .out_arg(("result", "bbs"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

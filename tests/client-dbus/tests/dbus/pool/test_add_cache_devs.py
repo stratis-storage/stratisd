@@ -44,7 +44,7 @@ class AddCacheDevsTestCase1(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        ((poolpath, _), _, _) = Manager.Methods.CreatePool(
+        ((_, (poolpath, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": []},
         )
@@ -58,8 +58,11 @@ class AddCacheDevsTestCase1(SimTestCase):
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (pool, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
 
-        (result, rc, _) = Pool.Methods.AddCacheDevs(self._pool_object, {"devices": []})
+        ((is_some, result), rc, _) = Pool.Methods.AddCacheDevs(
+            self._pool_object, {"devices": []}
+        )
 
+        self.assertFalse(is_some)
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
 
@@ -77,7 +80,7 @@ class AddCacheDevsTestCase1(SimTestCase):
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (pool, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
 
-        (result, rc, _) = Pool.Methods.AddCacheDevs(
+        ((is_some, result), rc, _) = Pool.Methods.AddCacheDevs(
             self._pool_object, {"devices": _DEVICE_STRATEGY()}
         )
 
@@ -85,16 +88,18 @@ class AddCacheDevsTestCase1(SimTestCase):
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
 
         if rc == StratisdErrors.OK:
+            self.assertTrue(is_some)
             self.assertGreater(num_devices_added, 0)
         else:
+            self.assertFalse(is_some)
             self.assertEqual(num_devices_added, 0)
 
-        blockdev_object_paths = frozenset(result)
+        blockdev_paths = frozenset(result)
 
         # blockdevs exported on the D-Bus are exactly those added
         blockdevs2 = list(blockdevs(props={"Pool": pool}).search(managed_objects))
-        blockdevs2_object_paths = frozenset([op for (op, _) in blockdevs2])
-        self.assertEqual(blockdevs2_object_paths, blockdev_object_paths)
+        blockdevs2_paths = frozenset([op for (op, _) in blockdevs2])
+        self.assertEqual(blockdevs2_paths, blockdev_paths)
 
         # no duplicates in the object paths
         self.assertEqual(len(blockdevs2), num_devices_added)
@@ -121,7 +126,7 @@ class AddCacheDevsTestCase2(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        ((poolpath, devpaths), _, _) = Manager.Methods.CreatePool(
+        ((_, (poolpath, devs)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {
                 "name": self._POOLNAME,
@@ -130,7 +135,7 @@ class AddCacheDevsTestCase2(SimTestCase):
             },
         )
         self._pool_object = get_object(poolpath)
-        self._devpaths = frozenset(devpaths)
+        self._devpaths = frozenset([devpath for devpath in devs])
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testEmptyDevs(self):
@@ -145,8 +150,11 @@ class AddCacheDevsTestCase2(SimTestCase):
         blockdevs2 = blockdevs(props={"Pool": pool, "Tier": 1}).search(managed_objects)
         self.assertEqual(list(blockdevs2), [])
 
-        (result, rc, _) = Pool.Methods.AddCacheDevs(self._pool_object, {"devices": []})
+        ((is_some, result), rc, _) = Pool.Methods.AddCacheDevs(
+            self._pool_object, {"devices": []}
+        )
 
+        self.assertFalse(is_some)
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
 
@@ -163,7 +171,7 @@ class AddCacheDevsTestCase2(SimTestCase):
 
         blockdevs1 = blockdevs(props={"Pool": pool, "Tier": 0}).search(managed_objects)
         self.assertEqual(self._devpaths, frozenset(op for (op, _) in blockdevs1))
-        (result, rc, _) = Pool.Methods.AddCacheDevs(
+        ((is_some, result), rc, _) = Pool.Methods.AddCacheDevs(
             self._pool_object, {"devices": _DEVICE_STRATEGY()}
         )
 
@@ -171,8 +179,10 @@ class AddCacheDevsTestCase2(SimTestCase):
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
 
         if rc == StratisdErrors.OK:
+            self.assertTrue(is_some)
             self.assertGreater(num_devices_added, 0)
         else:
+            self.assertFalse(is_some)
             self.assertEqual(num_devices_added, 0)
 
         blockdev_object_paths = frozenset(result)

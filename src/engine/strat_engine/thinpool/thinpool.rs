@@ -42,8 +42,8 @@ use crate::{
         },
         structures::Table,
         types::{
-            FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState, PoolState,
-            PoolUuid, RenameAction,
+            DeleteAction, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState,
+            PoolState, PoolUuid, RenameAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -978,7 +978,7 @@ impl ThinPool {
         &mut self,
         pool_name: &str,
         uuid: FilesystemUuid,
-    ) -> StratisResult<()> {
+    ) -> StratisResult<DeleteAction<FilesystemUuid>> {
         match self.filesystems.remove_by_uuid(uuid) {
             Some((fs_name, mut fs)) => match fs.destroy(&self.thin_pool) {
                 Ok(_) => {
@@ -990,14 +990,14 @@ impl ThinPool {
                                err);
                     }
                     devlinks::filesystem_removed(pool_name, &fs_name);
-                    Ok(())
+                    Ok(DeleteAction::Deleted(uuid))
                 }
                 Err(err) => {
                     self.filesystems.insert(fs_name, uuid, fs);
                     Err(err)
                 }
             },
-            None => Ok(()),
+            None => Ok(DeleteAction::Identity),
         }
     }
 
@@ -1019,7 +1019,7 @@ impl ThinPool {
         pool_name: &str,
         uuid: FilesystemUuid,
         new_name: &str,
-    ) -> StratisResult<RenameAction> {
+    ) -> StratisResult<RenameAction<Uuid>> {
         let old_name = rename_filesystem_pre!(self; uuid; new_name);
         let new_name = Name::new(new_name.to_owned());
 
@@ -1040,7 +1040,7 @@ impl ThinPool {
             });
             self.filesystems.insert(new_name.clone(), uuid, filesystem);
             devlinks::filesystem_renamed(pool_name, &old_name, &new_name);
-            Ok(RenameAction::Renamed)
+            Ok(RenameAction::Renamed(uuid))
         }
     }
 
@@ -1549,7 +1549,7 @@ mod tests {
             .unwrap();
 
         let action = pool.rename_filesystem(pool_name, fs_uuid, name2).unwrap();
-        assert_eq!(action, RenameAction::Renamed);
+        assert_matches!(action, RenameAction::Renamed(_));
         let flexdevs: FlexDevsSave = pool.record();
         let thinpoolsave: ThinPoolDevSave = pool.record();
         pool.teardown().unwrap();

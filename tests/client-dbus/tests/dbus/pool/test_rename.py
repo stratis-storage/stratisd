@@ -43,7 +43,7 @@ class SetNameTestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        ((self._pool_object_path, _), _, _) = Manager.Methods.CreatePool(
+        ((_, (self._pool_object_path, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {
                 "name": self._POOLNAME,
@@ -58,12 +58,12 @@ class SetNameTestCase(SimTestCase):
         """
         Test rename to same name.
         """
-        (result, rc, _) = Pool.Methods.SetName(
+        ((is_some, _), rc, _) = Pool.Methods.SetName(
             self._pool_object, {"name": self._POOLNAME}
         )
 
         self.assertEqual(rc, StratisdErrors.OK)
-        self.assertFalse(result)
+        self.assertFalse(is_some)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         result = next(
@@ -79,9 +79,11 @@ class SetNameTestCase(SimTestCase):
         """
         new_name = "new"
 
-        (result, rc, _) = Pool.Methods.SetName(self._pool_object, {"name": new_name})
+        ((is_some, _), rc, _) = Pool.Methods.SetName(
+            self._pool_object, {"name": new_name}
+        )
 
-        self.assertTrue(result)
+        self.assertTrue(is_some)
         self.assertEqual(rc, StratisdErrors.OK)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})

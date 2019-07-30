@@ -21,8 +21,9 @@ use crate::{
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
         structures::Table,
         types::{
-            BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name,
-            PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction,
+            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath,
+            Name, PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction, SetCreateAction,
+            SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -89,27 +90,20 @@ impl Pool for SimPool {
         _pool_uuid: PoolUuid,
         _pool_name: &str,
         specs: &[(&'b str, Option<Sectors>)],
-    ) -> StratisResult<Vec<(&'b str, FilesystemUuid)>> {
+    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
         let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
+        let mut result = Vec::new();
         for name in names.keys() {
-            if self.filesystems.contains_name(name) {
-                return Err(StratisError::Engine(
-                    ErrorEnum::AlreadyExists,
-                    name.to_string(),
-                ));
+            if !self.filesystems.contains_name(name) {
+                let uuid = Uuid::new_v4();
+                let new_filesystem = SimFilesystem::new();
+                self.filesystems
+                    .insert(Name::new((&**name).to_owned()), uuid, new_filesystem);
+                result.push((*name, uuid));
             }
         }
 
-        let mut result = Vec::new();
-        for name in names.keys() {
-            let uuid = Uuid::new_v4();
-            let new_filesystem = SimFilesystem::new();
-            self.filesystems
-                .insert(Name::new((&**name).to_owned()), uuid, new_filesystem);
-            result.push((*name, uuid));
-        }
-
-        Ok(result)
+        Ok(SetCreateAction::new(result))
     }
 
     fn add_blockdevs(
@@ -118,21 +112,31 @@ impl Pool for SimPool {
         _pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-    ) -> StratisResult<Vec<DevUuid>> {
+    ) -> StratisResult<SetCreateAction<DevUuid>> {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
+
         let device_pairs: Vec<_> = devices
             .iter()
             .map(|p| SimDev::new(Rc::clone(&self.rdm), p))
             .collect();
-        let ret_uuids = device_pairs.iter().map(|&(uuid, _)| uuid).collect();
 
         let the_vec = match tier {
             BlockDevTier::Cache => &mut self.cache_devs,
             BlockDevTier::Data => &mut self.block_devs,
         };
 
-        the_vec.extend(device_pairs);
-        Ok(ret_uuids)
+        let filter: Vec<_> = the_vec.values().map(|d| d.devnode()).collect();
+        let filtered_device_pairs: Vec<_> = device_pairs
+            .into_iter()
+            .filter(|(_, sd)| !filter.contains(&sd.devnode()))
+            .collect();
+
+        let ret_uuids = filtered_device_pairs
+            .iter()
+            .map(|&(uuid, _)| uuid)
+            .collect();
+        the_vec.extend(filtered_device_pairs);
+        Ok(SetCreateAction::new(ret_uuids))
     }
 
     fn destroy(&mut self) -> StratisResult<()> {
@@ -144,14 +148,14 @@ impl Pool for SimPool {
         &'a mut self,
         _pool_name: &str,
         fs_uuids: &[FilesystemUuid],
-    ) -> StratisResult<Vec<FilesystemUuid>> {
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid>> {
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
             if self.filesystems.remove_by_uuid(uuid).is_some() {
                 removed.push(uuid);
             }
         }
-        Ok(removed)
+        Ok(SetDeleteAction::new(removed))
     }
 
     fn rename_filesystem(
@@ -159,7 +163,7 @@ impl Pool for SimPool {
         _pool_name: &str,
         uuid: FilesystemUuid,
         new_name: &str,
-    ) -> StratisResult<RenameAction> {
+    ) -> StratisResult<RenameAction<FilesystemUuid>> {
         rename_filesystem_pre!(self; uuid; new_name);
 
         let (_, filesystem) = self
@@ -170,7 +174,7 @@ impl Pool for SimPool {
         self.filesystems
             .insert(Name::new(new_name.to_owned()), uuid, filesystem);
 
-        Ok(RenameAction::Renamed)
+        Ok(RenameAction::Renamed(uuid))
     }
 
     fn snapshot_filesystem(
@@ -179,12 +183,11 @@ impl Pool for SimPool {
         _pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<(FilesystemUuid, &mut dyn Filesystem)> {
+    ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>> {
         if self.filesystems.contains_name(snapshot_name) {
-            return Err(StratisError::Engine(
-                ErrorEnum::AlreadyExists,
-                snapshot_name.to_string(),
-            ));
+            let identity: StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>> =
+                Ok(CreateAction::Identity);
+            return identity;
         }
 
         let uuid = Uuid::new_v4();
@@ -199,13 +202,13 @@ impl Pool for SimPool {
         };
         self.filesystems
             .insert(Name::new(snapshot_name.to_owned()), uuid, snapshot);
-        Ok((
+        Ok(CreateAction::Created((
             uuid,
             self.filesystems
                 .get_mut_by_uuid(uuid)
                 .expect("just inserted")
                 .1,
-        ))
+        )))
     }
 
     fn total_physical_size(&self) -> Sectors {
@@ -325,6 +328,8 @@ mod tests {
 
     use crate::engine::sim_engine::SimEngine;
 
+    use crate::engine::types::EngineActions;
+
     use super::*;
 
     #[test]
@@ -332,7 +337,11 @@ mod tests {
     fn rename_empty() {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine.create_pool(pool_name, &[], None).unwrap();
+        let uuid = engine
+            .create_pool(pool_name, &[], None)
+            .unwrap()
+            .changed()
+            .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert!(
             match pool.rename_filesystem(pool_name, Uuid::new_v4(), "new_name") {
@@ -347,16 +356,21 @@ mod tests {
     fn rename_happens() {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine.create_pool(pool_name, &[], None).unwrap();
+        let uuid = engine
+            .create_pool(pool_name, &[], None)
+            .unwrap()
+            .changed()
+            .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         let infos = pool
             .create_filesystems(uuid, pool_name, &[("old_name", None)])
+            .unwrap()
+            .changed()
             .unwrap();
-        assert!(
-            match pool.rename_filesystem(pool_name, infos[0].1, "new_name") {
-                Ok(RenameAction::Renamed) => true,
-                _ => false,
-            }
+        assert_matches!(
+            pool.rename_filesystem(pool_name, infos[0].1, "new_name")
+                .unwrap(),
+            RenameAction::Renamed(_)
         );
     }
 
@@ -367,10 +381,16 @@ mod tests {
         let new_name = "new_name";
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine.create_pool(pool_name, &[], None).unwrap();
+        let uuid = engine
+            .create_pool(pool_name, &[], None)
+            .unwrap()
+            .changed()
+            .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         let results = pool
             .create_filesystems(uuid, pool_name, &[(old_name, None), (new_name, None)])
+            .unwrap()
+            .changed()
             .unwrap();
         let old_uuid = results.iter().find(|x| x.0 == old_name).unwrap().1;
         assert!(
@@ -387,7 +407,11 @@ mod tests {
         let new_name = "new_name";
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine.create_pool(pool_name, &[], None).unwrap();
+        let uuid = engine
+            .create_pool(pool_name, &[], None)
+            .unwrap()
+            .changed()
+            .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert!(
             match pool.rename_filesystem(pool_name, Uuid::new_v4(), new_name) {
@@ -402,10 +426,14 @@ mod tests {
     fn destroy_fs_empty() {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine.create_pool(pool_name, &[], None).unwrap();
+        let uuid = engine
+            .create_pool(pool_name, &[], None)
+            .unwrap()
+            .changed()
+            .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert!(match pool.destroy_filesystems(pool_name, &[]) {
-            Ok(names) => names.is_empty(),
+            Ok(uuids) => !uuids.is_changed(),
             _ => false,
         });
     }
@@ -415,7 +443,11 @@ mod tests {
     fn destroy_fs_some() {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine.create_pool(pool_name, &[], None).unwrap();
+        let uuid = engine
+            .create_pool(pool_name, &[], None)
+            .unwrap()
+            .changed()
+            .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert_matches!(
             pool.destroy_filesystems(pool_name, &[Uuid::new_v4()]),
@@ -428,18 +460,22 @@ mod tests {
     fn destroy_fs_any() {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine.create_pool(pool_name, &[], None).unwrap();
+        let uuid = engine
+            .create_pool(pool_name, &[], None)
+            .unwrap()
+            .changed()
+            .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         let fs_results = pool
             .create_filesystems(uuid, pool_name, &[("fs_name", None)])
+            .unwrap()
+            .changed()
             .unwrap();
         let fs_uuid = fs_results[0].1;
-        assert!(
-            match pool.destroy_filesystems(pool_name, &[fs_uuid, Uuid::new_v4()]) {
-                Ok(filesystems) => filesystems == vec![fs_uuid],
-                _ => false,
-            }
-        );
+        assert!(match pool.destroy_filesystems(pool_name, &[fs_uuid]) {
+            Ok(filesystems) => filesystems == SetDeleteAction::new(vec![fs_uuid]),
+            _ => false,
+        });
     }
 
     #[test]
@@ -447,12 +483,14 @@ mod tests {
     fn create_fs_none() {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine.create_pool(pool_name, &[], None).unwrap();
+        let uuid = engine
+            .create_pool(pool_name, &[], None)
+            .unwrap()
+            .changed()
+            .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        assert!(match pool.create_filesystems(uuid, pool_name, &[]) {
-            Ok(names) => names.is_empty(),
-            _ => false,
-        });
+        let fs = pool.create_filesystems(uuid, pool_name, &[]).unwrap();
+        assert!(fs.changed().is_none())
     }
 
     #[test]
@@ -460,14 +498,20 @@ mod tests {
     fn create_fs_some() {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine.create_pool(pool_name, &[], None).unwrap();
+        let uuid = engine
+            .create_pool(pool_name, &[], None)
+            .unwrap()
+            .changed()
+            .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        assert!(
-            match pool.create_filesystems(uuid, pool_name, &[("name", None)]) {
-                Ok(names) => (names.len() == 1) & (names[0].0 == "name"),
-                _ => false,
-            }
-        );
+        assert!(match pool
+            .create_filesystems(uuid, pool_name, &[("name", None)])
+            .ok()
+            .and_then(|fs| fs.changed())
+        {
+            Some(names) => (names.len() == 1) & (names[0].0 == "name"),
+            _ => false,
+        });
     }
 
     #[test]
@@ -476,16 +520,18 @@ mod tests {
         let fs_name = "fs_name";
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine.create_pool(pool_name, &[], None).unwrap();
+        let uuid = engine
+            .create_pool(pool_name, &[], None)
+            .unwrap()
+            .changed()
+            .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         pool.create_filesystems(uuid, pool_name, &[(fs_name, None)])
             .unwrap();
-        assert!(
-            match pool.create_filesystems(uuid, pool_name, &[(fs_name, None)]) {
-                Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
-                _ => false,
-            }
-        );
+        let set_create_action = pool
+            .create_filesystems(uuid, pool_name, &[(fs_name, None)])
+            .unwrap();
+        assert!(set_create_action.changed_ref().is_none());
     }
 
     #[test]
@@ -494,28 +540,40 @@ mod tests {
         let fs_name = "fs_name";
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine.create_pool(pool_name, &[], None).unwrap();
+        let uuid = engine
+            .create_pool(pool_name, &[], None)
+            .unwrap()
+            .changed()
+            .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        assert!(
-            match pool.create_filesystems(uuid, pool_name, &[(fs_name, None), (fs_name, None)]) {
-                Ok(names) => (names.len() == 1) & (names[0].0 == fs_name),
-                _ => false,
-            }
-        );
+        assert!(match pool
+            .create_filesystems(uuid, pool_name, &[(fs_name, None), (fs_name, None)])
+            .ok()
+            .and_then(|fs| fs.changed())
+        {
+            Some(names) => (names.len() == 1) & (names[0].0 == fs_name),
+            _ => false,
+        });
     }
 
     #[test]
     /// Adding a list of devices to an empty pool should yield list.
     fn add_device_empty() {
         let mut engine = SimEngine::default();
-        let uuid = engine.create_pool("pool_name", &[], None).unwrap();
+        let uuid = engine
+            .create_pool("pool_name", &[], None)
+            .unwrap()
+            .changed()
+            .unwrap();
         let (pool_name, pool) = engine.get_mut_pool(uuid).unwrap();
         let devices = [Path::new("/s/a"), Path::new("/s/b")];
-        assert!(
-            match pool.add_blockdevs(uuid, &*pool_name, &devices, BlockDevTier::Data) {
-                Ok(devs) => devs.len() == devices.len(),
-                _ => false,
-            }
-        );
+        assert!(match pool
+            .add_blockdevs(uuid, &*pool_name, &devices, BlockDevTier::Data)
+            .ok()
+            .and_then(|c| c.changed())
+        {
+            Some(devs) => devs.len() == devices.len(),
+            _ => false,
+        });
     }
 }

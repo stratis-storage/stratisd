@@ -25,8 +25,9 @@ use crate::{
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name,
-            PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction,
+            BlockDevTier, CreateAction, DevUuid, EngineActions, FilesystemUuid, FreeSpaceState,
+            MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction,
+            SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -283,28 +284,25 @@ impl Pool for StratPool {
         pool_uuid: PoolUuid,
         pool_name: &str,
         specs: &[(&'b str, Option<Sectors>)],
-    ) -> StratisResult<Vec<(&'b str, FilesystemUuid)>> {
+    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
         let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
-        for name in names.keys() {
-            validate_name(name)?;
-            if self.thin_pool.get_mut_filesystem_by_name(*name).is_some() {
-                return Err(StratisError::Engine(
-                    ErrorEnum::AlreadyExists,
-                    name.to_string(),
-                ));
-            }
-        }
+
+        names.iter().fold(Ok(()), |res, (name, _)| {
+            res.and_then(|()| validate_name(name))
+        })?;
 
         // TODO: Roll back on filesystem initialization failure.
         let mut result = Vec::new();
         for (name, size) in names {
-            let fs_uuid = self
-                .thin_pool
-                .create_filesystem(pool_uuid, pool_name, name, size)?;
-            result.push((name, fs_uuid));
+            if self.thin_pool.get_mut_filesystem_by_name(name).is_none() {
+                let fs_uuid = self
+                    .thin_pool
+                    .create_filesystem(pool_uuid, pool_name, name, size)?;
+                result.push((name, fs_uuid));
+            }
         }
 
-        Ok(result)
+        Ok(SetCreateAction::new(result))
     }
 
     fn add_blockdevs(
@@ -313,7 +311,7 @@ impl Pool for StratPool {
         pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-    ) -> StratisResult<Vec<DevUuid>> {
+    ) -> StratisResult<SetCreateAction<DevUuid>> {
         let bdev_info = if tier == BlockDevTier::Cache {
             // If adding cache devices, must suspend the pool, since the cache
             // must be augmeneted with the new devices.
@@ -321,7 +319,7 @@ impl Pool for StratPool {
             let bdev_info = self.backstore.add_cachedevs(pool_uuid, paths)?;
             self.thin_pool.set_device(self.backstore.device().expect("Since thin pool exists, space must have been allocated from the backstore, so backstore must have a cap device"))?;
             self.thin_pool.resume()?;
-            Ok(bdev_info)
+            Ok(SetCreateAction::new(bdev_info))
         } else {
             // If just adding data devices, no need to suspend the pool.
             // No action will be taken on the DM devices.
@@ -334,7 +332,7 @@ impl Pool for StratPool {
             // so that it can satisfy the allocation request where
             // previously it could not. Run check() in case that is true.
             self.thin_pool.check(pool_uuid, &mut self.backstore)?;
-            Ok(bdev_info)
+            Ok(SetCreateAction::new(bdev_info))
         };
         self.write_metadata(pool_name)?;
         bdev_info
@@ -350,14 +348,19 @@ impl Pool for StratPool {
         &'a mut self,
         pool_name: &str,
         fs_uuids: &[FilesystemUuid],
-    ) -> StratisResult<Vec<FilesystemUuid>> {
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid>> {
         let mut removed = Vec::new();
+        let mut asserted = Vec::new();
         for &uuid in fs_uuids {
-            self.thin_pool.destroy_filesystem(pool_name, uuid)?;
-            removed.push(uuid);
+            let changed = self.thin_pool.destroy_filesystem(pool_name, uuid)?;
+            if changed.is_changed() {
+                removed.push(uuid);
+            } else {
+                asserted.push(uuid);
+            }
         }
 
-        Ok(removed)
+        Ok(SetDeleteAction::new(removed))
     }
 
     fn rename_filesystem(
@@ -365,7 +368,7 @@ impl Pool for StratPool {
         pool_name: &str,
         uuid: FilesystemUuid,
         new_name: &str,
-    ) -> StratisResult<RenameAction> {
+    ) -> StratisResult<RenameAction<FilesystemUuid>> {
         validate_name(new_name)?;
         self.thin_pool.rename_filesystem(pool_name, uuid, new_name)
     }
@@ -376,7 +379,7 @@ impl Pool for StratPool {
         pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<(FilesystemUuid, &mut dyn Filesystem)> {
+    ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>> {
         validate_name(snapshot_name)?;
 
         if self
@@ -384,14 +387,12 @@ impl Pool for StratPool {
             .get_filesystem_by_name(snapshot_name)
             .is_some()
         {
-            return Err(StratisError::Engine(
-                ErrorEnum::AlreadyExists,
-                snapshot_name.to_string(),
-            ));
+            return Ok(CreateAction::Identity);
         }
 
         self.thin_pool
             .snapshot_filesystem(pool_uuid, pool_name, origin_uuid, snapshot_name)
+            .map(CreateAction::Created)
     }
 
     fn total_physical_size(&self) -> Sectors {
@@ -506,7 +507,7 @@ mod tests {
             cmd,
             tests::{loopbacked, real},
         },
-        types::Redundancy,
+        types::{EngineActions, Redundancy},
     };
 
     use super::*;
@@ -620,7 +621,8 @@ mod tests {
         let (_, fs_uuid) = pool
             .create_filesystems(uuid, &name, &[("stratis-filesystem", None)])
             .unwrap()
-            .pop()
+            .changed()
+            .and_then(|mut fs| fs.pop())
             .unwrap();
         invariant(&pool, &name);
 
@@ -735,7 +737,8 @@ mod tests {
         let (_, fs_uuid) = pool
             .create_filesystems(pool_uuid, &name, &[(&fs_name, None)])
             .unwrap()
-            .pop()
+            .changed()
+            .and_then(|mut fs| fs.pop())
             .expect("just created one");
 
         let devnode = pool.get_filesystem(fs_uuid).unwrap().1.devnode();

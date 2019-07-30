@@ -127,7 +127,7 @@ class Destroy3TestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        ((poolpath, _), _, _) = Manager.Methods.CreatePool(
+        ((_, (poolpath, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {
                 "name": self._POOLNAME,
@@ -145,9 +145,9 @@ class Destroy3TestCase(SimTestCase):
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (pool, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
 
-        (result, rc, _) = Manager.Methods.DestroyPool(self._proxy, {"pool": pool})
+        ((is_some, _), rc, _) = Manager.Methods.DestroyPool(self._proxy, {"pool": pool})
         self.assertEqual(rc, StratisdErrors.BUSY)
-        self.assertEqual(result, False)
+        self.assertFalse(is_some)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (pool1, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
@@ -181,10 +181,10 @@ class Destroy4TestCase(SimTestCase):
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (pool, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
 
-        (result, rc, _) = Manager.Methods.DestroyPool(self._proxy, {"pool": pool})
+        ((is_some, _), rc, _) = Manager.Methods.DestroyPool(self._proxy, {"pool": pool})
 
         self.assertEqual(rc, StratisdErrors.OK)
-        self.assertEqual(result, True)
+        self.assertTrue(is_some)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         self.assertIsNone(

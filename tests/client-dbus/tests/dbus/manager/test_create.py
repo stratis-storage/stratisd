@@ -52,7 +52,7 @@ class Create2TestCase(SimTestCase):
         If rc is OK, then pool must exist.
         """
         devs = _DEVICE_STRATEGY()
-        ((poolpath, devnodes), rc, _) = Manager.Methods.CreatePool(
+        ((_, (poolpath, devnodes)), rc, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": devs},
         )
@@ -121,7 +121,7 @@ class Create3TestCase(SimTestCase):
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
 
-        (_, rc, _) = Manager.Methods.CreatePool(
+        ((is_some, _), rc, _) = Manager.Methods.CreatePool(
             self._proxy,
             {
                 "name": self._POOLNAME,
@@ -129,8 +129,8 @@ class Create3TestCase(SimTestCase):
                 "devices": _DEVICE_STRATEGY(),
             },
         )
-        expected_rc = StratisdErrors.ALREADY_EXISTS
-        self.assertEqual(rc, expected_rc)
+        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertFalse(is_some)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         pools2 = list(pools().search(managed_objects))

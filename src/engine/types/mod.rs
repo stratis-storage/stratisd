@@ -4,6 +4,11 @@
 
 use std::{borrow::Borrow, fmt, ops::Deref, rc::Rc};
 
+mod actions;
+pub use crate::engine::types::actions::{
+    CreateAction, DeleteAction, EngineActions, RenameAction, SetCreateAction, SetDeleteAction,
+};
+
 #[cfg(feature = "dbus_enabled")]
 use dbus;
 use uuid::Uuid;
@@ -11,13 +16,6 @@ use uuid::Uuid;
 pub type DevUuid = Uuid;
 pub type FilesystemUuid = Uuid;
 pub type PoolUuid = Uuid;
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum RenameAction {
-    Identity,
-    NoSource,
-    Renamed,
-}
 
 /// A DM pool operates in 4 modes.  See drivers/md/dm-thin.c (enum pool_mode).
 /// The 4 modes map to Running, OutOfDataSpace, ReadOnly and Failed - in degrading

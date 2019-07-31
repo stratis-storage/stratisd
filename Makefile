@@ -44,6 +44,11 @@ build:
 	RUSTFLAGS="${DENY}" \
 	cargo build ${TARGET_ARGS}
 
+build-tests:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo test --no-run ${TARGET_ARGS}
+
 build-no-default:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \

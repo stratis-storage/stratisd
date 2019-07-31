@@ -62,6 +62,10 @@ Once toolchain and other dependencies are in place, run `make build` to build, a
 `stratisd` executable in `./target/x86_64-unknown-linux-gnu/debug` as root.
 Pass the `--help` option for more information on additional developer options.
 
+##### Building tests
+The Makefile provides a target, build-tests which allows compiling the
+tests without running any of them, as a convenience to developers.
+
 ##### Secondary dependencies
 The rust library dbus-rs has an external dependency on the C dbus library
 [dbus development library](https://www.freedesktop.org/wiki/Software/dbus/).

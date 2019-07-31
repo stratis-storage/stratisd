@@ -119,10 +119,10 @@ impl Backstore {
         pool_uuid: PoolUuid,
         backstore_save: &BackstoreSave,
         devnodes: &HashMap<Device, PathBuf>,
-        last_update_time: Option<DateTime<Utc>>,
+        last_update_time: DateTime<Utc>,
     ) -> StratisResult<Backstore> {
         let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
-        let block_mgr = BlockDevMgr::new(datadevs, last_update_time);
+        let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time));
         let data_tier = DataTier::setup(block_mgr, &backstore_save.data_tier)?;
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
         let origin = LinearDev::setup(
@@ -133,7 +133,7 @@ impl Backstore {
         )?;
 
         let (cache_tier, cache, origin) = if !cachedevs.is_empty() {
-            let block_mgr = BlockDevMgr::new(cachedevs, last_update_time);
+            let block_mgr = BlockDevMgr::new(cachedevs, Some(last_update_time));
             match backstore_save.cache_tier {
                 Some(ref cache_tier_save) => {
                     let cache_tier = CacheTier::setup(block_mgr, &cache_tier_save)?;
@@ -818,7 +818,7 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = &map[&pool_uuid];
-        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
+        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, Utc::now()).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();
@@ -830,7 +830,7 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = &map[&pool_uuid];
-        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, None).unwrap();
+        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, Utc::now()).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();

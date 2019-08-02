@@ -106,7 +106,5 @@ fn stratis_filesystems_unmount() -> Result<()> {
 /// "stratis_testing" and then it tries to remove any device mapper tables which are also stratis
 /// created.
 pub fn clean_up() -> Result<()> {
-    stratis_filesystems_unmount()?;
-    dm_stratis_devices_remove()?;
-    Ok(())
+    stratis_filesystems_unmount().and_then(|_| dm_stratis_devices_remove())
 }

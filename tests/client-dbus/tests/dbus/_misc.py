@@ -58,7 +58,6 @@ class _Service():
         """
         Stop the stratisd simulator and daemon.
         """
-        # pylint: disable=no-member
         self._stratisd.terminate()
         self._stratisd.wait()
 

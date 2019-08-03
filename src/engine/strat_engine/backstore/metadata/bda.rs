@@ -248,9 +248,8 @@ impl StaticHeader {
         where
             F: Read + Seek,
         {
-            f.seek(SeekFrom::Start(offset as u64))?;
-            f.read_exact(&mut buf)?;
-            Ok(())
+            f.seek(SeekFrom::Start(offset as u64))
+                .and_then(|_| f.read_exact(&mut buf))
         }
 
         (

@@ -223,9 +223,15 @@ impl StaticHeader {
         }
     }
 
-    /// Read the BDA from the device and return 2 SECTORS worth of data, one for each BDA returned
-    /// in the order of layout on disk (location 1, location 2).
-    /// Only the BDA sectors are read up from disk, zero areas are *not* read.
+    /// Read the data at both signature block locations.
+    ///
+    /// Return the data from each location as an array of bytes
+    /// or an error if the read fails. The values are returned
+    /// in the same order in which they occur on the device.
+    ///
+    /// Read the contents of each signature block separately,
+    /// as this increases the probability that at least one read
+    /// will not fail.
     fn read<F>(
         f: &mut F,
     ) -> (
@@ -235,16 +241,9 @@ impl StaticHeader {
     where
         F: Read + Seek,
     {
-        // Theory of read procedure
-        // We write the BDA in two operations with a sync in between.  The write operation
-        // could fail (loss of power) for either write leaving sector(s) with potentially hard
-        // read errors. It's best to read each of the specific BDA blocks individually, to limit
-        // the probability of hitting a read error on a non-essential sector.
-
         let mut buf_loc_1 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
         let mut buf_loc_2 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
 
-        /// Read a bda sector worth of data at the specified offset into buffer.
         fn read_sector_at_offset<F>(f: &mut F, offset: usize, mut buf: &mut [u8]) -> io::Result<()>
         where
             F: Read + Seek,

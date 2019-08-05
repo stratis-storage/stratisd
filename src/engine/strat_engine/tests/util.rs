@@ -14,10 +14,6 @@ use crate::engine::strat_engine::{
     dm::{get_dm, get_dm_init},
 };
 
-// For an explanation see:
-// https://github.com/rust-lang-nursery/error-chain/issues/254.
-// FIXME: Drop dependence on error-chain entirely.
-#[allow(deprecated)]
 mod cleanup_errors {
     use libmount;
     use nix;
@@ -110,7 +106,5 @@ fn stratis_filesystems_unmount() -> Result<()> {
 /// "stratis_testing" and then it tries to remove any device mapper tables which are also stratis
 /// created.
 pub fn clean_up() -> Result<()> {
-    stratis_filesystems_unmount()?;
-    dm_stratis_devices_remove()?;
-    Ok(())
+    stratis_filesystems_unmount().and_then(|_| dm_stratis_devices_remove())
 }

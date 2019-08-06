@@ -59,53 +59,6 @@ enum MetadataLocation {
 }
 
 impl BDA {
-    /// Read the BDA from the device and return 2 SECTORS worth of data, one for each BDA returned
-    /// in the order of layout on disk (location 1, location 2).
-    /// Only the BDA sectors are read up from disk, zero areas are *not* read.
-    fn read<F>(
-        f: &mut F,
-    ) -> (
-        io::Result<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>,
-        io::Result<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>,
-    )
-    where
-        F: Read + Seek,
-    {
-        // Theory of read procedure
-        // We write the BDA in two operations with a sync in between.  The write operation
-        // could fail (loss of power) for either write leaving sector(s) with potentially hard
-        // read errors. It's best to read each of the specific BDA blocks individually, to limit
-        // the probability of hitting a read error on a non-essential sector.
-
-        let mut buf_loc_1 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
-        let mut buf_loc_2 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
-
-        /// Read a bda sector worth of data at the specified offset into buffer.
-        fn read_sector_at_offset<F>(f: &mut F, offset: usize, mut buf: &mut [u8]) -> io::Result<()>
-        where
-            F: Read + Seek,
-        {
-            f.seek(SeekFrom::Start(offset as u64))?;
-            f.read_exact(&mut buf)?;
-            Ok(())
-        }
-
-        (
-            read_sector_at_offset(
-                f,
-                bytes!(static_header_size::FIRST_SIGBLOCK_START_SECTORS),
-                &mut buf_loc_1,
-            )
-            .map(|_| buf_loc_1),
-            read_sector_at_offset(
-                f,
-                bytes!(static_header_size::SECOND_SIGBLOCK_START_SECTORS),
-                &mut buf_loc_2,
-            )
-            .map(|_| buf_loc_2),
-        )
-    }
-
     /// Initialize a blockdev with a Stratis BDA.
     pub fn initialize<F>(
         f: &mut F,
@@ -270,6 +223,51 @@ impl StaticHeader {
         }
     }
 
+    /// Read the data at both signature block locations.
+    ///
+    /// Return the data from each location as an array of bytes
+    /// or an error if the read fails. The values are returned
+    /// in the same order in which they occur on the device.
+    ///
+    /// Read the contents of each signature block separately,
+    /// as this increases the probability that at least one read
+    /// will not fail.
+    fn read<F>(
+        f: &mut F,
+    ) -> (
+        io::Result<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>,
+        io::Result<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>,
+    )
+    where
+        F: Read + Seek,
+    {
+        let mut buf_loc_1 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
+        let mut buf_loc_2 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
+
+        fn read_sector_at_offset<F>(f: &mut F, offset: usize, mut buf: &mut [u8]) -> io::Result<()>
+        where
+            F: Read + Seek,
+        {
+            f.seek(SeekFrom::Start(offset as u64))
+                .and_then(|_| f.read_exact(&mut buf))
+        }
+
+        (
+            read_sector_at_offset(
+                f,
+                bytes!(static_header_size::FIRST_SIGBLOCK_START_SECTORS),
+                &mut buf_loc_1,
+            )
+            .map(|_| buf_loc_1),
+            read_sector_at_offset(
+                f,
+                bytes!(static_header_size::SECOND_SIGBLOCK_START_SECTORS),
+                &mut buf_loc_2,
+            )
+            .map(|_| buf_loc_2),
+        )
+    }
+
     // Writes signature_block according to the value of which.
     // If first location is specified, write zeroes to empty regions in the
     // first 8 sectors. If the second location is specified, writes zeroes to empty
@@ -389,7 +387,7 @@ impl StaticHeader {
             Ok(Some(sh))
         }
 
-        let (maybe_buf_1, maybe_buf_2) = BDA::read(f);
+        let (maybe_buf_1, maybe_buf_2) = StaticHeader::read(f);
         match (
             maybe_buf_1.map(|buf| StaticHeader::sigblock_from_buf(&buf)),
             maybe_buf_2.map(|buf| StaticHeader::sigblock_from_buf(&buf)),

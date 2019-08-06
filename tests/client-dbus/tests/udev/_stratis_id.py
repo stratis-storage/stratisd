@@ -25,7 +25,7 @@ BS = 512
 FIRST_COPY_OFFSET = BS
 SECOND_COPY_OFFSET = BS * 9
 SB_AREA_SIZE = 16 * BS
-STRATIS_MAGIC = b'!Stra0tis\x86\xff\x02^Arh'
+STRATIS_MAGIC = b"!Stra0tis\x86\xff\x02^Arh"
 
 MAGIC_OFFSET = 4
 MAGIC_LEN = len(STRATIS_MAGIC)
@@ -37,17 +37,17 @@ def _valid_stratis_sb(buf):
     :param buf: Byte buffer starting at Stratis block offset
     :return: None or named tuple
     """
-    if buf[MAGIC_OFFSET:MAGIC_OFFSET + MAGIC_LEN] == STRATIS_MAGIC:
+    if buf[MAGIC_OFFSET : MAGIC_OFFSET + MAGIC_LEN] == STRATIS_MAGIC:
         # Verify CRC
-        if crc(buf[MAGIC_OFFSET:BS]) == \
-                struct.unpack_from('<L', buf, 0)[0]:
+        if crc(buf[MAGIC_OFFSET:BS]) == struct.unpack_from("<L", buf, 0)[0]:
             super_block = namedtuple(
-                "StratisSuperblock", "CRC32C MAGIC SECTORS RESERVED POOL_UUID "
+                "StratisSuperblock",
+                "CRC32C MAGIC SECTORS RESERVED POOL_UUID "
                 "DEV_UUID, MDA_SIZE, RESERVED_SIZE, FLAGS, "
-                "INITIALIZATION_TIME")
+                "INITIALIZATION_TIME",
+            )
 
-            return super_block._make(
-                struct.unpack_from("<L16sQ4s32s32sQQQQ", buf))
+            return super_block._make(struct.unpack_from("<L16sQ4s32s32sQQQQ", buf))
     return None
 
 
@@ -58,14 +58,15 @@ def stratis_signature(block_device):
     :return: None if not Stratis, else named tuple
     """
     try:
-        with open(block_device, 'r+b') as h:
+        with open(block_device, "r+b") as h:
             buf = h.read(SB_AREA_SIZE)
     # pylint: disable=bare-except
     except:
         return None
 
-    return _valid_stratis_sb(buf[FIRST_COPY_OFFSET:]) or \
-        _valid_stratis_sb(buf[SECOND_COPY_OFFSET:])
+    return _valid_stratis_sb(buf[FIRST_COPY_OFFSET:]) or _valid_stratis_sb(
+        buf[SECOND_COPY_OFFSET:]
+    )
 
 
 def _hex_dump(data):
@@ -78,15 +79,19 @@ def _hex_dump(data):
     remain = len(data) % 16
     ll = 0
     for _ in range(full):
-        slc = data[ll:ll + 16]
-        print("0x%08x: %-47s  %s" % (ll, " ".join(
-            format(x, '02x') for x in slc), str(slc)))
+        slc = data[ll : ll + 16]
+        print(
+            "0x%08x: %-47s  %s"
+            % (ll, " ".join(format(x, "02x") for x in slc), str(slc))
+        )
         ll += 16
 
     if remain > 0:
         slc = data[ll:]
-        print("0x%08x: %-47s  %s" % (ll, " ".join(
-            format(x, '02x') for x in slc), str(slc)))
+        print(
+            "0x%08x: %-47s  %s"
+            % (ll, " ".join(format(x, "02x") for x in slc), str(slc))
+        )
 
 
 def dump_stratis_signature_area(block_device):
@@ -96,14 +101,16 @@ def dump_stratis_signature_area(block_device):
     :return: None if not Stratis, else named tuple
     """
     try:
-        with open(block_device, 'r+b') as h:
+        with open(block_device, "r+b") as h:
             buf = h.read(SB_AREA_SIZE)
             print("Stratis superblock area for %s" % block_device)
             _hex_dump(buf)
     # pylint: disable=broad-except
     except BaseException as e:
-        print("Error reading up the super block area on %s reason: %s" %
-              (block_device, str(e)))
+        print(
+            "Error reading up the super block area on %s reason: %s"
+            % (block_device, str(e))
+        )
 
 
 if __name__ == "__main__":

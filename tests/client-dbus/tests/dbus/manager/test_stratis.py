@@ -37,7 +37,7 @@ class StratisTestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testStratisVersion(self):
         """
@@ -61,7 +61,7 @@ class StratisTestCase2(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testArguments(self):
         """
@@ -87,6 +87,6 @@ class StratisTestCase2(SimTestCase):
         by incorrect type of argument.
         """
         with self.assertRaises(DPClientInvalidArgError):
-            ObjectManager.Methods.GetManagedObjects(self._proxy, {'bogus': 2})
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {"bogus": 2})
         with self.assertRaises(DPClientInvalidArgError):
-            Manager.Methods.DestroyPool(self._proxy, {'pool': 2})
+            Manager.Methods.DestroyPool(self._proxy, {"pool": 2})

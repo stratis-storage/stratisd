@@ -38,7 +38,8 @@ class Destroy1TestCase(SimTestCase):
 
     'destroy' should always succeed on an empty database.
     """
-    _POOLNAME = 'deadpool'
+
+    _POOLNAME = "deadpool"
 
     def setUp(self):
         """
@@ -46,26 +47,21 @@ class Destroy1TestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testExecution(self):
         """
         Destroy should succeed since there is nothing to pass to DestroyPool.
         """
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        pool = next(
-            pools(props={
-                'Name': self._POOLNAME
-            }).search(managed_objects),
-            None)
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        pool = next(pools(props={"Name": self._POOLNAME}).search(managed_objects), None)
         self.assertIsNone(pool)
 
     def testBogusObjectPath(self):
         """
         Success should occur on a bogus object path.
         """
-        (_, rc, _) = Manager.Methods.DestroyPool(self._proxy, {'pool': "/"})
+        (_, rc, _) = Manager.Methods.DestroyPool(self._proxy, {"pool": "/"})
         self.assertEqual(rc, StratisdErrors.OK)
 
 
@@ -74,7 +70,8 @@ class Destroy2TestCase(SimTestCase):
     Test 'destroy' on database which contains the given pool and an unknown
     number of devices.
     """
-    _POOLNAME = 'deadpool'
+
+    _POOLNAME = "deadpool"
 
     def setUp(self):
         """
@@ -84,39 +81,30 @@ class Destroy2TestCase(SimTestCase):
         self._proxy = get_object(TOP_OBJECT)
         self._devices = _DEVICE_STRATEGY()
         Manager.Methods.CreatePool(
-            self._proxy, {
-                'name': self._POOLNAME,
-                'redundancy': (True, 0),
-                'devices': self._devices
-            })
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+            self._proxy,
+            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devices},
+        )
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testExecution(self):
         """
         The pool was just created, so it must always be possible to destroy it.
         """
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool1, _) = next(
-            pools(props={
-                'Name': self._POOLNAME
-            }).search(managed_objects))
-        blockdevs1 = blockdevs(props={'Pool': pool1}).search(managed_objects)
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        (pool1, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
+        blockdevs1 = blockdevs(props={"Pool": pool1}).search(managed_objects)
         self.assertEqual(
             frozenset(MOBlockDev(b).Devnode() for (_, b) in blockdevs1),
-            frozenset(d for d in self._devices))
+            frozenset(d for d in self._devices),
+        )
 
-        (result, rc, _) = \
-                Manager.Methods.DestroyPool(self._proxy, {'pool': pool1})
+        (result, rc, _) = Manager.Methods.DestroyPool(self._proxy, {"pool": pool1})
 
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        blockdevs2 = blockdevs(props={'Pool': pool1}).search(managed_objects)
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        blockdevs2 = blockdevs(props={"Pool": pool1}).search(managed_objects)
         pool2 = next(
-            pools(props={
-                'Name': self._POOLNAME
-            }).search(managed_objects),
-            None)
+            pools(props={"Name": self._POOLNAME}).search(managed_objects), None
+        )
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertIsNone(pool2)
@@ -128,8 +116,9 @@ class Destroy3TestCase(SimTestCase):
     """
     Test 'destroy' on database which contains the given pool and a volume.
     """
-    _POOLNAME = 'deadpool'
-    _VOLNAME = 'vol'
+
+    _POOLNAME = "deadpool"
+    _VOLNAME = "vol"
 
     def setUp(self):
         """
@@ -139,37 +128,29 @@ class Destroy3TestCase(SimTestCase):
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
-            self._proxy, {
-                'name': self._POOLNAME,
-                'redundancy': (True, 0),
-                'devices': _DEVICE_STRATEGY(),
-            })
-        Pool.Methods.CreateFilesystems(
-            get_object(poolpath), {'specs': [self._VOLNAME]})
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+            self._proxy,
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 0),
+                "devices": _DEVICE_STRATEGY(),
+            },
+        )
+        Pool.Methods.CreateFilesystems(get_object(poolpath), {"specs": [self._VOLNAME]})
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testExecution(self):
         """
         This should fail since the pool has a filesystem on it.
         """
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool, _) = next(
-            pools(props={
-                'Name': self._POOLNAME
-            }).search(managed_objects))
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        (pool, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
 
-        (result, rc, _) = \
-           Manager.Methods.DestroyPool(self._proxy, {'pool': pool})
+        (result, rc, _) = Manager.Methods.DestroyPool(self._proxy, {"pool": pool})
         self.assertEqual(rc, StratisdErrors.BUSY)
         self.assertEqual(result, False)
 
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool1, _) = next(
-            pools(props={
-                'Name': self._POOLNAME
-            }).search(managed_objects))
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        (pool1, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
         self.assertEqual(pool, pool1)
 
 
@@ -177,7 +158,8 @@ class Destroy4TestCase(SimTestCase):
     """
     Test 'destroy' on database which contains the given pool with no devices.
     """
-    _POOLNAME = 'deadpool'
+
+    _POOLNAME = "deadpool"
 
     def setUp(self):
         """
@@ -185,36 +167,26 @@ class Destroy4TestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        Manager.Methods.CreatePool(self._proxy, {
-            'name': self._POOLNAME,
-            'redundancy': (True, 0),
-            'devices': []
-        })
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+        Manager.Methods.CreatePool(
+            self._proxy,
+            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": []},
+        )
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testExecution(self):
         """
         The pool was just created and has no devices. It should always be
         possible to destroy it.
         """
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool, _) = next(
-            pools(props={
-                'Name': self._POOLNAME
-            }).search(managed_objects))
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        (pool, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
 
-        (result, rc, _) = \
-           Manager.Methods.DestroyPool(self._proxy, {'pool': pool})
+        (result, rc, _) = Manager.Methods.DestroyPool(self._proxy, {"pool": pool})
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertEqual(result, True)
 
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         self.assertIsNone(
-            next(
-                pools(props={
-                    'Name': self._POOLNAME
-                }).search(managed_objects),
-                None))
+            next(pools(props={"Name": self._POOLNAME}).search(managed_objects), None)
+        )

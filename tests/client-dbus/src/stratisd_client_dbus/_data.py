@@ -16,16 +16,14 @@ XML interface specifications.
 """
 
 SPECS = {
-    "org.freedesktop.DBus.ObjectManager":
-    """
+    "org.freedesktop.DBus.ObjectManager": """
 <interface name="org.freedesktop.DBus.ObjectManager">
 <method name="GetManagedObjects">
 <arg name="objpath_interfaces_and_properties" type="a{oa{sa{sv}}}" direction="out"/>
 </method>
 </interface>
 """,
-    "org.storage.stratis1.Manager":
-    """
+    "org.storage.stratis1.Manager": """
 <interface name="org.storage.stratis1.Manager">
 <method name="ConfigureSimulator">
 <arg name="denominator" type="u" direction="in"/>
@@ -51,8 +49,7 @@ SPECS = {
 </property>
 </interface>
 """,
-    "org.storage.stratis1.pool":
-    """
+    "org.storage.stratis1.pool": """
 <interface name="org.storage.stratis1.pool">
 <method name="AddCacheDevs">
 <arg name="devices" type="as" direction="in"/>
@@ -114,8 +111,7 @@ SPECS = {
 </property>
 </interface>
 """,
-    "org.storage.stratis1.filesystem":
-    """
+    "org.storage.stratis1.filesystem": """
 <interface name="org.storage.stratis1.filesystem">
 <method name="SetName">
 <arg name="name" type="s" direction="in"/>
@@ -143,8 +139,7 @@ SPECS = {
 </property>
 </interface>
 """,
-    "org.storage.stratis1.blockdev":
-    """
+    "org.storage.stratis1.blockdev": """
 <interface name="org.storage.stratis1.blockdev">
 <method name="SetUserInfo">
 <arg name="id" type="s" direction="in"/>
@@ -180,5 +175,5 @@ SPECS = {
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
 </property>
 </interface>
-"""
+""",
 }

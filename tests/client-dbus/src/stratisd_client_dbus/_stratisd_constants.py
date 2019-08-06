@@ -22,6 +22,7 @@ class StratisdErrors(IntEnum):
     """
     Stratisd Errors
     """
+
     OK = 0
     ERROR = 1
 

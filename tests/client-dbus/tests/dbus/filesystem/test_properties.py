@@ -33,26 +33,29 @@ class SetNameTestCase(SimTestCase):
     Set up a pool with a name and one filesystem.
     """
 
-    _POOLNAME = 'deadpool'
+    _POOLNAME = "deadpool"
 
     def setUp(self):
         """
         Start the stratisd daemon with the simulator.
         """
         super().setUp()
-        self._fs_name = 'fs'
+        self._fs_name = "fs"
         self._proxy = get_object(TOP_OBJECT)
         ((self._pool_object_path, _), _, _) = Manager.Methods.CreatePool(
-            self._proxy, {
-                'name': self._POOLNAME,
-                'redundancy': (True, 0),
-                'devices': _DEVICE_STRATEGY(),
-            })
+            self._proxy,
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 0),
+                "devices": _DEVICE_STRATEGY(),
+            },
+        )
         self._pool_object = get_object(self._pool_object_path)
         (created, _, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {'specs': [self._fs_name]})
+            self._pool_object, {"specs": [self._fs_name]}
+        )
         self._filesystem_object_path = created[0][0]
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testProps(self):
         """

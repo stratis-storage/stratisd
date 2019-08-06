@@ -36,34 +36,38 @@ class SetNameTestCase(SimTestCase):
     Set up a pool with a name and one filesystem.
     """
 
-    _POOLNAME = 'deadpool'
+    _POOLNAME = "deadpool"
 
     def setUp(self):
         """
         Start the stratisd daemon with the simulator.
         """
         super().setUp()
-        self._fs_name = 'fs'
+        self._fs_name = "fs"
         self._proxy = get_object(TOP_OBJECT)
         ((self._pool_object_path, _), _, _) = Manager.Methods.CreatePool(
-            self._proxy, {
-                'name': self._POOLNAME,
-                'redundancy': (True, 0),
-                'devices': _DEVICE_STRATEGY(),
-            })
+            self._proxy,
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 0),
+                "devices": _DEVICE_STRATEGY(),
+            },
+        )
         self._pool_object = get_object(self._pool_object_path)
         (created, _, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {'specs': [self._fs_name]})
+            self._pool_object, {"specs": [self._fs_name]}
+        )
         self._filesystem_object_path = created[0][0]
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testNullMapping(self):
         """
         Test rename to same name.
         """
         filesystem = get_object(self._filesystem_object_path)
-        (result, rc, _) = Filesystem.Methods.SetName(filesystem,
-                                                     {'name': self._fs_name})
+        (result, rc, _) = Filesystem.Methods.SetName(
+            filesystem, {"name": self._fs_name}
+        )
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertFalse(result)
@@ -73,23 +77,18 @@ class SetNameTestCase(SimTestCase):
         Test rename to new name.
         """
         filesystem = get_object(self._filesystem_object_path)
-        (result, rc, _) = Filesystem.Methods.SetName(filesystem,
-                                                     {'name': "new"})
+        (result, rc, _) = Filesystem.Methods.SetName(filesystem, {"name": "new"})
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertTrue(result)
 
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (fs_object_path, _) = next(
-            filesystems(props={
-                'Name': 'new'
-            }).search(managed_objects))
+            filesystems(props={"Name": "new"}).search(managed_objects)
+        )
         self.assertEqual(self._filesystem_object_path, fs_object_path)
 
         fs_object_path = next(
-            filesystems(props={
-                'Name': self._fs_name
-            }).search(managed_objects),
-            None)
+            filesystems(props={"Name": self._fs_name}).search(managed_objects), None
+        )
         self.assertIsNone(fs_object_path)

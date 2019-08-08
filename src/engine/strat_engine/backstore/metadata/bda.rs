@@ -568,7 +568,7 @@ mod tests {
         fn test_ownership(ref sh in static_header_strategy()) {
             let buf_size = *sh.mda_size.sectors().bytes() as usize + bytes!(static_header_size::STATIC_HEADER_SECTORS);
             let mut buf = Cursor::new(vec![0; buf_size]);
-            prop_assert!(device_identifiers(&mut buf).unwrap().is_none());
+            prop_assert!(StaticHeader::setup(&mut buf).unwrap().is_none());
 
             BDA::initialize(
                 &mut buf,
@@ -579,13 +579,13 @@ mod tests {
                 Utc::now().timestamp() as u64,
             ).unwrap();
 
-            prop_assert!(device_identifiers(&mut buf)
+            prop_assert!(StaticHeader::setup(&mut buf)
                          .unwrap()
-                         .map(|(t_p, t_d)| t_p == sh.pool_uuid && t_d == sh.dev_uuid)
+                         .map(|new_sh| new_sh.pool_uuid == sh.pool_uuid && new_sh.dev_uuid == sh.dev_uuid)
                          .unwrap_or(false));
 
             BDA::wipe(&mut buf).unwrap();
-            prop_assert!(device_identifiers(&mut buf).unwrap().is_none());
+            prop_assert!(StaticHeader::setup(&mut buf).unwrap().is_none());
         }
     }
 

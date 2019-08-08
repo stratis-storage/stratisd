@@ -25,7 +25,7 @@ use crate::{
         strat_engine::{
             backstore::{
                 device::{identify, resolve_devices, DevOwnership},
-                metadata::{BlockdevSize, MDADataSize, BDA},
+                metadata::{disown_device, BlockdevSize, MDADataSize, BDA},
                 util::hw_lookup,
                 StratBlockDev,
             },
@@ -458,7 +458,7 @@ fn initialize(
             bds.push(blockdev);
         } else {
             // TODO: check the return values and update state machine on failure
-            let _ = BDA::wipe(&mut f);
+            let _ = disown_device(&mut f);
             let _ = wipe_blockdevs(&bds);
 
             return Err(bda.unwrap_err());

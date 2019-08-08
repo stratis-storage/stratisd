@@ -48,6 +48,14 @@ where
     StaticHeader::setup(f).map(|sh| sh.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
 }
 
+/// Wrapper around `StaticHeader::wipe`.
+pub fn disown_device<F>(f: &mut F) -> StratisResult<()>
+where
+    F: Seek + SyncAll,
+{
+    StaticHeader::wipe(f)
+}
+
 // Transform a constant in sectors to a constant in bytes
 macro_rules! bytes {
     ($number:expr) => {
@@ -118,18 +126,6 @@ impl BDA {
             mda::MDARegions::load(STATIC_HEADER_SIZE.sectors().bytes(), header.mda_size, f)?;
 
         Ok(Some(BDA { header, regions }))
-    }
-
-    /// Zero out the entire static header region on the designated file.
-    pub fn wipe<F>(f: &mut F) -> StratisResult<()>
-    where
-        F: Seek + SyncAll,
-    {
-        let zeroed = [0u8; bytes!(static_header_size::STATIC_HEADER_SECTORS)];
-        f.seek(SeekFrom::Start(0))?;
-        f.write_all(&zeroed)?;
-        f.sync_all()?;
-        Ok(())
     }
 
     /// Save metadata to the disk
@@ -503,6 +499,18 @@ impl StaticHeader {
             initialization_time: LittleEndian::read_u64(&buf[120..128]),
         }))
     }
+
+    /// Zero out the entire static header region on the designated file.
+    pub fn wipe<F>(f: &mut F) -> StratisResult<()>
+    where
+        F: Seek + SyncAll,
+    {
+        let zeroed = [0u8; bytes!(static_header_size::STATIC_HEADER_SECTORS)];
+        f.seek(SeekFrom::Start(0))?;
+        f.write_all(&zeroed)?;
+        f.sync_all()?;
+        Ok(())
+    }
 }
 
 impl fmt::Debug for StaticHeader {
@@ -584,7 +592,7 @@ mod tests {
                          .map(|new_sh| new_sh.pool_uuid == sh.pool_uuid && new_sh.dev_uuid == sh.dev_uuid)
                          .unwrap_or(false));
 
-            BDA::wipe(&mut buf).unwrap();
+            disown_device(&mut buf).unwrap();
             prop_assert!(StaticHeader::setup(&mut buf).unwrap().is_none());
         }
     }

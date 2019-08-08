@@ -458,7 +458,7 @@ fn initialize(
             bds.push(blockdev);
         } else {
             // TODO: check the return values and update state machine on failure
-            let _ = BDA::wipe(&mut f);
+            let _ = disown_device(&mut f);
             let _ = wipe_blockdevs(&bds);
 
             return Err(bda.unwrap_err());
@@ -503,7 +503,7 @@ mod tests {
         tests::{loopbacked, real},
     };
 
-    use crate::engine::strat_engine::backstore::metadata::{device_identifiers, BDA};
+    use crate::engine::strat_engine::backstore::metadata::device_identifiers;
 
     use super::*;
 

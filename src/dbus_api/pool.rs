@@ -138,10 +138,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 dbus_context.actions.borrow_mut().push_remove(op, m.tree);
             }
 
-            let return_value: Vec<String> = uuids
-                .iter()
-                .map(|n| n.to_simple_ref().to_string())
-                .collect();
+            let return_value: Vec<String> = uuids.iter().map(|n| uuid_to_string!(n)).collect();
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())
         }
         Err(err) => {

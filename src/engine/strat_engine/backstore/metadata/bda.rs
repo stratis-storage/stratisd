@@ -744,11 +744,19 @@ mod tests {
             sh.write(&mut buf, MetadataLocation::Both).unwrap();
 
             if let Some(index) = primary {
-                corrupt_byte(&mut buf, (bytes!(static_header_size::FIRST_SIGBLOCK_START_SECTORS) + index) as u64).unwrap();
+                corrupt_byte(
+                    &mut buf,
+                    (bytes!(static_header_size::FIRST_SIGBLOCK_START_SECTORS) + index) as u64,
+                )
+                .unwrap();
             }
 
             if let Some(index) = secondary {
-                corrupt_byte(&mut buf, (bytes!(static_header_size::SECOND_SIGBLOCK_START_SECTORS) + index) as u64).unwrap();
+                corrupt_byte(
+                    &mut buf,
+                    (bytes!(static_header_size::SECOND_SIGBLOCK_START_SECTORS) + index) as u64,
+                )
+                .unwrap();
             }
 
             let setup_result = StaticHeader::setup(&mut buf);

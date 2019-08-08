@@ -25,7 +25,7 @@ use crate::{
         strat_engine::{
             backstore::{
                 device::{identify, resolve_devices, DevOwnership},
-                metadata::{BlockdevSize, MDADataSize, BDA},
+                metadata::{disown_device, BlockdevSize, MDADataSize, BDA},
                 util::hw_lookup,
                 StratBlockDev,
             },
@@ -503,7 +503,7 @@ mod tests {
         tests::{loopbacked, real},
     };
 
-    use crate::engine::strat_engine::backstore::metadata::BDA;
+    use crate::engine::strat_engine::backstore::metadata::{device_identifiers, BDA};
 
     use super::*;
 
@@ -586,7 +586,7 @@ mod tests {
         for path in clean_paths {
             assert_eq!(
                 pool_uuid,
-                BDA::device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
+                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
                     .unwrap()
                     .unwrap()
                     .0
@@ -750,7 +750,7 @@ mod tests {
         for path in paths {
             assert_eq!(
                 pool_uuid,
-                BDA::device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
+                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
                     .unwrap()
                     .unwrap()
                     .0
@@ -761,7 +761,7 @@ mod tests {
 
         for path in paths {
             assert_eq!(
-                BDA::device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
+                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
                     .unwrap(),
                 None
             );

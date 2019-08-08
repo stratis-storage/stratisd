@@ -314,5 +314,4 @@ mod tests {
             Ok(RenameAction::NoSource)
         );
     }
-
 }

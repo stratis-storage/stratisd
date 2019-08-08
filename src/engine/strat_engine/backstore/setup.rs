@@ -19,7 +19,10 @@ use devicemapper::{devnode_to_devno, Device, Sectors};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{blockdev::StratBlockDev, metadata::BDA, util::get_stratis_block_devices},
+            backstore::{
+                blockdev::StratBlockDev, metadata::device_identifiers, metadata::BDA,
+                util::get_stratis_block_devices,
+            },
             device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
@@ -42,7 +45,7 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
             None => continue,
             Some(devno) => {
                 if let Some((pool_uuid, _)) =
-                    BDA::device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+                    device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
                 {
                     pool_map
                         .entry(pool_uuid)

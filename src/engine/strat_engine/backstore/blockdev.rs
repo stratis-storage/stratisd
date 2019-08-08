@@ -16,7 +16,7 @@ use crate::{
         event::{get_engine_listener_list, EngineEvent},
         strat_engine::{
             backstore::{
-                metadata::{BDAExtendedSize, MDADataSize, BDA},
+                metadata::{disown_device, BDAExtendedSize, MDADataSize, BDA},
                 range_alloc::RangeAllocator,
             },
             serde_structs::{BaseBlockDevSave, Recordable},
@@ -84,7 +84,7 @@ impl StratBlockDev {
 
     pub fn wipe_metadata(&self) -> StratisResult<()> {
         let mut f = OpenOptions::new().write(true).open(&self.devnode)?;
-        BDA::wipe(&mut f)
+        disown_device(&mut f)
     }
 
     pub fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> StratisResult<()> {

@@ -20,7 +20,8 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                blockdev::StratBlockDev, metadata::device_identifiers, metadata::BDA,
+                blockdev::StratBlockDev,
+                metadata::{device_identifiers, BDA},
                 util::get_stratis_block_devices,
             },
             device::blkdev_size,

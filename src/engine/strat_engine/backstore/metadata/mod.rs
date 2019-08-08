@@ -7,7 +7,6 @@ mod mda;
 mod sizes;
 
 pub use self::{
-    bda::device_identifiers,
-    bda::BDA,
+    bda::{device_identifiers, disown_device, BDA},
     sizes::{BDAExtendedSize, BlockdevSize, MDADataSize},
 };

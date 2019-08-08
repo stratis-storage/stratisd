@@ -38,6 +38,16 @@ const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
 const STRAT_SIGBLOCK_VERSION: u8 = 1;
 
+/// Get a Stratis pool UUID and device UUID from any device.
+/// If there is an error while obtaining these values return the error.
+/// If the device does not appear to be a Stratis device, return None.
+pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<((PoolUuid, DevUuid))>>
+where
+    F: Read + Seek + SyncAll,
+{
+    StaticHeader::setup(f).map(|sh| sh.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
+}
+
 // Transform a constant in sectors to a constant in bytes
 macro_rules! bytes {
     ($number:expr) => {
@@ -179,16 +189,6 @@ impl BDA {
     /// Timestamp when the device was initialized.
     pub fn initialization_time(&self) -> u64 {
         self.header.initialization_time
-    }
-
-    /// Get a Stratis pool UUID and device UUID from any device.
-    /// If there is an error while obtaining these values return the error.
-    /// If the device does not appear to be a Stratis device, return None.
-    pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<((PoolUuid, DevUuid))>>
-    where
-        F: Read + Seek + SyncAll,
-    {
-        StaticHeader::setup(f).map(|sh| sh.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
     }
 }
 
@@ -568,7 +568,7 @@ mod tests {
         fn test_ownership(ref sh in static_header_strategy()) {
             let buf_size = *sh.mda_size.sectors().bytes() as usize + bytes!(static_header_size::STATIC_HEADER_SECTORS);
             let mut buf = Cursor::new(vec![0; buf_size]);
-            prop_assert!(BDA::device_identifiers(&mut buf).unwrap().is_none());
+            prop_assert!(device_identifiers(&mut buf).unwrap().is_none());
 
             BDA::initialize(
                 &mut buf,
@@ -579,13 +579,13 @@ mod tests {
                 Utc::now().timestamp() as u64,
             ).unwrap();
 
-            prop_assert!(BDA::device_identifiers(&mut buf)
+            prop_assert!(device_identifiers(&mut buf)
                          .unwrap()
                          .map(|(t_p, t_d)| t_p == sh.pool_uuid && t_d == sh.dev_uuid)
                          .unwrap_or(false));
 
             BDA::wipe(&mut buf).unwrap();
-            prop_assert!(BDA::device_identifiers(&mut buf).unwrap().is_none());
+            prop_assert!(device_identifiers(&mut buf).unwrap().is_none());
         }
     }
 

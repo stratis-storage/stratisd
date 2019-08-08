@@ -730,29 +730,22 @@ mod tests {
         /// the two static headers is corrupted. Verify expected behavior
         /// if both are corrupted, which varies depending on whether the
         /// Stratis magic number or some other part of the header is corrupted.
-        fn bda_test_recovery(primary in option::of(0..bytes!(static_header_size::SIGBLOCK_SECTORS)),
+        fn test_corrupted_sigblock_recovery(primary in option::of(0..bytes!(static_header_size::SIGBLOCK_SECTORS)),
                              secondary in option::of(0..bytes!(static_header_size::SIGBLOCK_SECTORS))) {
             let sh = random_static_header(10000, 4);
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + bytes!(static_header_size::STATIC_HEADER_SECTORS);
-            let mut buf = Cursor::new(vec![0; buf_size]);
-            BDA::initialize(
-                &mut buf,
-                sh.pool_uuid,
-                sh.dev_uuid,
-                sh.mda_size.region_size().data_size(),
-                sh.blkdev_size,
-                Utc::now().timestamp() as u64,
-            ).unwrap();
+            let buf_size = bytes!(static_header_size::STATIC_HEADER_SECTORS);
 
-            let reference_buf = buf.clone();
+            let mut reference_buf = Cursor::new(vec![0; buf_size]);
+            sh.write(&mut reference_buf, MetadataLocation::Both).unwrap();
+
+            let mut buf = Cursor::new(vec![0; buf_size]);
+            sh.write(&mut buf, MetadataLocation::Both).unwrap();
 
             if let Some(index) = primary {
-                // Corrupt primary copy
                 corrupt_byte(&mut buf, (bytes!(static_header_size::FIRST_SIGBLOCK_START_SECTORS) + index) as u64).unwrap();
             }
 
             if let Some(index) = secondary {
-                // Corrupt secondary copy
                 corrupt_byte(&mut buf, (bytes!(static_header_size::SECOND_SIGBLOCK_START_SECTORS) + index) as u64).unwrap();
             }
 
@@ -760,27 +753,27 @@ mod tests {
 
             match (primary, secondary) {
                 (Some(p_index), Some(s_index)) => {
-                    // Setup should fail to find a usable Stratis BDA
                     match (p_index, s_index) {
+                        // Both magic locations are corrupted, conclusion is
+                        // that this is not a Stratis static header.
                         (4..=19, 4..=19) => {
-                            // When we corrupt both magics then we believe that
-                            // the signature is not ours and will return Ok(None)
-                            prop_assert!(setup_result.is_ok() && setup_result.unwrap().is_none());
+                            prop_assert!(setup_result.is_ok());
+                            prop_assert_eq!(setup_result.unwrap(), None);
                         }
+                        // Both sigblocks were corrupted, but at least one
+                        // was recognized as a Stratis sigblock.
                         _ => {
                             prop_assert!(setup_result.is_err());
                         }
                     }
-
-                    // Check buffer, should be different
+                    // No healing was attempted.
                     prop_assert_ne!(reference_buf.get_ref(), buf.get_ref());
 
                 }
+                // Only one header was corrupted, so the other was healed.
                 _ => {
-                    // Setup should work and buffer should be corrected
-                    prop_assert!(setup_result.is_ok() && setup_result.unwrap().is_some());
-
-                    // Check buffer, should be corrected.
+                    prop_assert!(setup_result.is_ok());
+                    prop_assert_eq!(setup_result.unwrap(), Some(sh));
                     prop_assert_eq!(reference_buf.get_ref(), buf.get_ref());
                 }
             }

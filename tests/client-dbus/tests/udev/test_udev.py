@@ -36,7 +36,7 @@ from ._loopback import LoopBackDevices
 from ._dm import remove_stratis_setup, _get_stratis_devices
 from ._stratis_id import stratis_signature, dump_stratis_signature_area
 
-_STRATISD = os.environ['STRATISD']
+_STRATISD = os.environ["STRATISD"]
 
 
 def rs(l):
@@ -45,14 +45,16 @@ def rs(l):
     :param l: Length of random part of string
     :return: String
     """
-    return 'stratis_{0}'.format(''.join(
-        random.choice(string.ascii_uppercase) for _ in range(l)))
+    return "stratis_{0}".format(
+        "".join(random.choice(string.ascii_uppercase) for _ in range(l))
+    )
 
 
 class UdevAdd(unittest.TestCase):
     """
     Test udev add event support.
     """
+
     lib_blk_id = True
 
     @staticmethod
@@ -67,21 +69,20 @@ class UdevAdd(unittest.TestCase):
         # actually exist, retry on error.
         error_reasons = ""
         for _ in range(3):
-            ((pool_object_path, _), exit_code,
-             error_str) = Manager.Methods.CreatePool(
-                 get_object(TOP_OBJECT), {
-                     'name': name,
-                     'redundancy': (True, 0),
-                     'devices': devices
-                 })
+            ((pool_object_path, _), exit_code, error_str) = Manager.Methods.CreatePool(
+                get_object(TOP_OBJECT),
+                {"name": name, "redundancy": (True, 0), "devices": devices},
+            )
             if int(exit_code) == 0:
                 return get_object(pool_object_path)
 
             error_reasons += "%s " % error_str
             time.sleep(1)
 
-        raise AssertionError("Unable to create a pool %s %s reasons: %s" %
-                             (name, str(devices), error_reasons))
+        raise AssertionError(
+            "Unable to create a pool %s %s reasons: %s"
+            % (name, str(devices), error_reasons)
+        )
 
     def _device_files(self, tokens):
         """
@@ -120,9 +121,10 @@ class UdevAdd(unittest.TestCase):
         :return:
         """
         managed_objects = ObjectManager.Methods.GetManagedObjects(
-            get_object(TOP_OBJECT), {})
+            get_object(TOP_OBJECT), {}
+        )
 
-        selector = {} if name is None else {'Name': name}
+        selector = {} if name is None else {"Name": name}
         return list(pools(props=selector).search(managed_objects))
 
     def _start_service(self):
@@ -144,7 +146,7 @@ class UdevAdd(unittest.TestCase):
             assert _get_stratis_devices() == []
 
             dbus_interface_present = False
-            self._service = subprocess.Popen([_STRATISD, '--debug'])
+            self._service = subprocess.Popen([_STRATISD, "--debug"])
 
             limit = time.time() + 120.0
             while time.time() <= limit:
@@ -194,7 +196,7 @@ class UdevAdd(unittest.TestCase):
         """
         # What is the best way to ensure we wait long enough for
         # the event to be done, this seems to work for now.
-        subprocess.check_call(['udevadm', 'settle'])
+        subprocess.check_call(["udevadm", "settle"])
         time.sleep(2)
 
     @staticmethod
@@ -206,8 +208,7 @@ class UdevAdd(unittest.TestCase):
                signatures
         :return: None
         """
-        print("We expect Stratis signatures on %d device(s)" %
-              len(expected_paths))
+        print("We expect Stratis signatures on %d device(s)" % len(expected_paths))
         for d in expected_paths:
             signature = stratis_signature(d)
             print("%s shows signature check of %s" % (d, signature))
@@ -218,7 +219,7 @@ class UdevAdd(unittest.TestCase):
                 dump_stratis_signature_area(d)
 
         print("Udev db dump of all block devices")
-        for d in context.list_devices(subsystem='block'):
+        for d in context.list_devices(subsystem="block"):
             for k, v in d.items():
                 print("%s:%s" % (k, str(v)))
             print("")
@@ -240,8 +241,9 @@ class UdevAdd(unittest.TestCase):
         end_time = start + 10
 
         while UdevAdd.lib_blk_id and time.time() < end_time:
-            found = sum(1 for _ in context.list_devices(
-                subsystem='block', ID_FS_TYPE='stratis'))
+            found = sum(
+                1 for _ in context.list_devices(subsystem="block", ID_FS_TYPE="stratis")
+            )
             if found == num_expected:
                 break
             time.sleep(1)
@@ -251,7 +253,7 @@ class UdevAdd(unittest.TestCase):
         # we find a stratis disk now, we will set the flag UdevAdd.lib_blk_id to
         # false so we don't waste so much time checking the udev db.
         if found != num_expected and found == 0:
-            for blk_dev in context.list_devices(subsystem='block'):
+            for blk_dev in context.list_devices(subsystem="block"):
                 if "DEVNAME" in blk_dev:
                     if stratis_signature(blk_dev["DEVNAME"]):
                         UdevAdd.lib_blk_id = False
@@ -268,7 +270,7 @@ class UdevAdd(unittest.TestCase):
         Walk the process table looking for executable 'name', returns pid if one
         found, else return None
         """
-        for p in [pid for pid in os.listdir('/proc') if pid.isdigit()]:
+        for p in [pid for pid in os.listdir("/proc") if pid.isdigit()]:
             try:
                 exe_name = os.readlink(os.path.join("/proc/", p, "exe"))
             except OSError:
@@ -278,10 +280,7 @@ class UdevAdd(unittest.TestCase):
         return None
 
     # pylint: disable=too-many-locals
-    def _test_driver(self,
-                     number_of_pools,
-                     dev_count_pool,
-                     some_existing=False):
+    def _test_driver(self, number_of_pools, dev_count_pool, some_existing=False):
         """
         We want to test 1..N number of devices in the following scenarios:
 
@@ -305,8 +304,9 @@ class UdevAdd(unittest.TestCase):
 
         # Create the pools
         for _ in range(number_of_pools):
-            device_tokens = \
-               [self._lb_mgr.create_device() for _ in range(dev_count_pool)]
+            device_tokens = [
+                self._lb_mgr.create_device() for _ in range(dev_count_pool)
+            ]
 
             # Ensure newly created block devices are in udev db.
             self._settle()
@@ -320,7 +320,8 @@ class UdevAdd(unittest.TestCase):
         self._stop_service_remove_dm_tables()
 
         UdevAdd._expected_stratis_block_devices(
-            dev_count_pool * number_of_pools, expected_stratis_devices)
+            dev_count_pool * number_of_pools, expected_stratis_devices
+        )
 
         self._start_service()
 
@@ -344,8 +345,9 @@ class UdevAdd(unittest.TestCase):
         # isn't assembled until complete
         pool_names = pool_data.keys()
 
-        activation_sequence = \
-           [pool_data[p][i] for i in range(dev_count_pool) for p in pool_names]
+        activation_sequence = [
+            pool_data[p][i] for i in range(dev_count_pool) for p in pool_names
+        ]
 
         # Add all but the last device for each pool
         running_count = 0
@@ -356,8 +358,7 @@ class UdevAdd(unittest.TestCase):
             running_count += 1
             running_devices.extend(self._device_files([device_token]))
 
-            UdevAdd._expected_stratis_block_devices(running_count,
-                                                    running_devices)
+            UdevAdd._expected_stratis_block_devices(running_count, running_devices)
 
             if some_existing:
                 self._stop_service_remove_dm_tables()
@@ -372,7 +373,8 @@ class UdevAdd(unittest.TestCase):
             self._lb_mgr.hotplug(device_token)
 
         UdevAdd._expected_stratis_block_devices(
-            number_of_pools * dev_count_pool, expected_stratis_devices)
+            number_of_pools * dev_count_pool, expected_stratis_devices
+        )
 
         self._settle()
         self.assertEqual(len(UdevAdd._get_pools()), number_of_pools)
@@ -415,8 +417,7 @@ class UdevAdd(unittest.TestCase):
         result = UdevAdd._get_pools()
         self.assertEqual(len(result), 0)
 
-        device_tokens = \
-           [self._lb_mgr.create_device() for _ in range(num_devices)]
+        device_tokens = [self._lb_mgr.create_device() for _ in range(num_devices)]
 
         # Ensure newly created block devices are in udev db.
         self._settle()
@@ -431,7 +432,8 @@ class UdevAdd(unittest.TestCase):
         self._stop_service_remove_dm_tables()
 
         UdevAdd._expected_stratis_block_devices(
-            num_devices, self._device_files(device_tokens))
+            num_devices, self._device_files(device_tokens)
+        )
 
         self._start_service()
 
@@ -455,7 +457,8 @@ class UdevAdd(unittest.TestCase):
 
         self._settle()
         UdevAdd._expected_stratis_block_devices(
-            num_devices, self._device_files(device_tokens))
+            num_devices, self._device_files(device_tokens)
+        )
 
         self.assertEqual(len(UdevAdd._get_pools()), 1)
 
@@ -466,7 +469,8 @@ class UdevAdd(unittest.TestCase):
 
         self._settle()
         UdevAdd._expected_stratis_block_devices(
-            num_devices, self._device_files(device_tokens))
+            num_devices, self._device_files(device_tokens)
+        )
 
         self.assertEqual(len(UdevAdd._get_pools()), 1)
 
@@ -552,7 +556,7 @@ class UdevAdd(unittest.TestCase):
 
             # Change the active pool name to be unique
             for p in current_pools:
-                Pool.Methods.SetName(get_object(p[0]), {'name': rs(10)})
+                Pool.Methods.SetName(get_object(p[0]), {"name": rs(10)})
 
             # Generate synthetic add events
             for add_index in range(num_pools):
@@ -561,7 +565,6 @@ class UdevAdd(unittest.TestCase):
 
             self._settle()
             UdevAdd._expected_stratis_block_devices(plugged, devices_plugged)
-            self.assertEqual(
-                len(UdevAdd._get_pools()), existing_pool_count + 1)
+            self.assertEqual(len(UdevAdd._get_pools()), existing_pool_count + 1)
 
         self.assertEqual(len(UdevAdd._get_pools()), num_pools)

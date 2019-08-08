@@ -35,7 +35,7 @@ class DestroyFSTestCase(SimTestCase):
     Test with an empty pool.
     """
 
-    _POOLNAME = 'deadpool'
+    _POOLNAME = "deadpool"
 
     def setUp(self):
         """
@@ -45,13 +45,11 @@ class DestroyFSTestCase(SimTestCase):
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
-            self._proxy, {
-                'name': self._POOLNAME,
-                'redundancy': (True, 0),
-                'devices': self._devs
-            })
+            self._proxy,
+            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
+        )
         self._pool_object = get_object(poolpath)
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testDestroyNone(self):
         """
@@ -60,13 +58,15 @@ class DestroyFSTestCase(SimTestCase):
         number of volumes.
         """
         (result, rc, _) = Pool.Methods.DestroyFilesystems(
-            self._pool_object, {'filesystems': []})
+            self._pool_object, {"filesystems": []}
+        )
 
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
 
         result = filesystems().search(
-            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        )
         self.assertEqual(len([x for x in result]), 0)
 
     def testDestroyOne(self):
@@ -75,12 +75,14 @@ class DestroyFSTestCase(SimTestCase):
         because at the end the filesystem is not there.
         """
         (result, rc, _) = Pool.Methods.DestroyFilesystems(
-            self._pool_object, {'filesystems': ['/']})
+            self._pool_object, {"filesystems": ["/"]}
+        )
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertEqual(len(result), 0)
 
         result = filesystems().search(
-            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        )
         self.assertEqual(len([x for x in result]), 0)
 
 
@@ -89,8 +91,8 @@ class DestroyFSTestCase1(SimTestCase):
     Make a filesystem for the pool.
     """
 
-    _POOLNAME = 'deadpool'
-    _VOLNAME = 'thunk'
+    _POOLNAME = "deadpool"
+    _VOLNAME = "thunk"
 
     def setUp(self):
         """
@@ -100,15 +102,14 @@ class DestroyFSTestCase1(SimTestCase):
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY()
         ((self._poolpath, _), _, _) = Manager.Methods.CreatePool(
-            self._proxy, {
-                'name': self._POOLNAME,
-                'redundancy': (True, 0),
-                'devices': self._devs
-            })
+            self._proxy,
+            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
+        )
         self._pool_object = get_object(self._poolpath)
         (self._filesystems, _, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {'specs': [(self._VOLNAME, '', None)]})
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+            self._pool_object, {"specs": [(self._VOLNAME, "", None)]}
+        )
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testDestroyOne(self):
         """
@@ -117,13 +118,15 @@ class DestroyFSTestCase1(SimTestCase):
         """
         fs_object_path = self._filesystems[0][0]
         (result, rc, _) = Pool.Methods.DestroyFilesystems(
-            self._pool_object, {'filesystems': [fs_object_path]})
+            self._pool_object, {"filesystems": [fs_object_path]}
+        )
 
         self.assertEqual(len(result), 1)
         self.assertEqual(rc, StratisdErrors.OK)
 
         result = filesystems().search(
-            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        )
         self.assertEqual(len([x for x in result]), 0)
 
     def testDestroyTwo(self):
@@ -134,11 +137,13 @@ class DestroyFSTestCase1(SimTestCase):
         """
         fs_object_path = self._filesystems[0][0]
         (result, rc, _) = Pool.Methods.DestroyFilesystems(
-            self._pool_object, {'filesystems': [fs_object_path, "/"]})
+            self._pool_object, {"filesystems": [fs_object_path, "/"]}
+        )
 
         self.assertEqual(len(result), 1)
         self.assertEqual(rc, StratisdErrors.OK)
 
         result = filesystems().search(
-            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        )
         self.assertEqual(len([x for x in result]), 0)

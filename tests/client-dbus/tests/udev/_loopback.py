@@ -20,10 +20,10 @@ import subprocess
 import tempfile
 import uuid
 
-_LOSETUP_BIN = os.getenv('STRATIS_LOSETUP_BIN', "/usr/sbin/losetup")
+_LOSETUP_BIN = os.getenv("STRATIS_LOSETUP_BIN", "/usr/sbin/losetup")
 
 
-class LoopBackDevices():
+class LoopBackDevices:
     """
     Class for creating and managing loop back devices which are needed for
     specific types of udev event testing.
@@ -34,7 +34,7 @@ class LoopBackDevices():
         Class constructor which creates a temporary directory to store backing
         file in.
         """
-        self.dir = tempfile.mkdtemp('_stratis_loop_back')
+        self.dir = tempfile.mkdtemp("_stratis_loop_back")
         self.count = 0
         self.devices = {}
 
@@ -48,15 +48,14 @@ class LoopBackDevices():
         :return: opaque handle, done as device representing block device will
                  change.
         """
-        backing_file = os.path.join(self.dir, 'block_device_%d' % self.count)
+        backing_file = os.path.join(self.dir, "block_device_%d" % self.count)
         self.count += 1
 
-        with open(backing_file, 'ab') as bd:
+        with open(backing_file, "ab") as bd:
             # Sparse file, so go big (1 TiB)
-            bd.truncate(1024**4)
+            bd.truncate(1024 ** 4)
 
-        result = subprocess.check_output(
-            [_LOSETUP_BIN, '-f', '--show', backing_file])
+        result = subprocess.check_output([_LOSETUP_BIN, "-f", "--show", backing_file])
         device = str.strip(result.decode("utf-8"))
         token = uuid.uuid4()
         self.devices[token] = (device, backing_file)
@@ -70,7 +69,7 @@ class LoopBackDevices():
         """
         if token in self.devices:
             (device, backing_file) = self.devices[token]
-            subprocess.check_call([_LOSETUP_BIN, '-d', device])
+            subprocess.check_call([_LOSETUP_BIN, "-d", device])
             self.devices[token] = (None, backing_file)
 
     def generate_udev_add_event(self, token):
@@ -98,7 +97,8 @@ class LoopBackDevices():
             (_, backing_file) = self.devices[token]
 
             result = subprocess.check_output(
-                [_LOSETUP_BIN, '-f', '--show', backing_file])
+                [_LOSETUP_BIN, "-f", "--show", backing_file]
+            )
             device = str.strip(result.decode("utf-8"))
             self.devices[token] = (device, backing_file)
 
@@ -120,7 +120,7 @@ class LoopBackDevices():
         """
         for (device, backing_file) in self.devices.values():
             if device is not None:
-                subprocess.check_call([_LOSETUP_BIN, '-d', device])
+                subprocess.check_call([_LOSETUP_BIN, "-d", device])
             os.remove(backing_file)
 
         self.devices = {}

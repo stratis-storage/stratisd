@@ -24,9 +24,9 @@ from dbus_python_client_gen import make_class
 
 from ._data import SPECS
 
-_POOL_SPEC = ET.fromstring(SPECS['org.storage.stratis1.pool'])
-_FILESYSTEM_SPEC = ET.fromstring(SPECS['org.storage.stratis1.filesystem'])
-_BLOCKDEV_SPEC = ET.fromstring(SPECS['org.storage.stratis1.blockdev'])
+_POOL_SPEC = ET.fromstring(SPECS["org.storage.stratis1.pool"])
+_FILESYSTEM_SPEC = ET.fromstring(SPECS["org.storage.stratis1.filesystem"])
+_BLOCKDEV_SPEC = ET.fromstring(SPECS["org.storage.stratis1.blockdev"])
 
 pools = mo_query_builder(_POOL_SPEC)
 filesystems = mo_query_builder(_FILESYSTEM_SPEC)
@@ -37,12 +37,13 @@ MOBlockDev = managed_object_class("MOBlockDev", _BLOCKDEV_SPEC)
 
 TIME_OUT = 120  # In seconds
 
-ObjectManager = make_class("ObjectManager",
-                           ET.fromstring(
-                               SPECS['org.freedesktop.DBus.ObjectManager']),
-                           TIME_OUT)
-Manager = make_class("Manager",
-                     ET.fromstring(SPECS['org.storage.stratis1.Manager']),
-                     TIME_OUT)
+ObjectManager = make_class(
+    "ObjectManager",
+    ET.fromstring(SPECS["org.freedesktop.DBus.ObjectManager"]),
+    TIME_OUT,
+)
+Manager = make_class(
+    "Manager", ET.fromstring(SPECS["org.storage.stratis1.Manager"]), TIME_OUT
+)
 Filesystem = make_class("Filesystem", _FILESYSTEM_SPEC, TIME_OUT)
 Pool = make_class("Pool", _POOL_SPEC, TIME_OUT)

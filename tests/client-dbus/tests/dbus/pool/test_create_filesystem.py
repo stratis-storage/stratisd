@@ -37,7 +37,7 @@ class CreateFSTestCase(SimTestCase):
     Test with an empty pool.
     """
 
-    _POOLNAME = 'deadpool'
+    _POOLNAME = "deadpool"
 
     def setUp(self):
         """
@@ -47,13 +47,11 @@ class CreateFSTestCase(SimTestCase):
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
-            self._proxy, {
-                'name': self._POOLNAME,
-                'redundancy': (True, 0),
-                'devices': self._devs
-            })
+            self._proxy,
+            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
+        )
         self._pool_object = get_object(poolpath)
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testCreate(self):
         """
@@ -62,13 +60,15 @@ class CreateFSTestCase(SimTestCase):
         number of volumes.
         """
         (result, rc, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {'specs': []})
+            self._pool_object, {"specs": []}
+        )
 
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
 
         result = filesystems().search(
-            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        )
         self.assertEqual(len([x for x in result]), 0)
 
     @unittest.skip("skip until creating multiple filesystems is supported")
@@ -79,7 +79,8 @@ class CreateFSTestCase(SimTestCase):
         new_name = "name"
 
         (result, rc, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {'specs': [new_name, new_name]})
+            self._pool_object, {"specs": [new_name, new_name]}
+        )
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertEqual(len(result), 1)
@@ -88,7 +89,8 @@ class CreateFSTestCase(SimTestCase):
         self.assertEqual(fs_name, new_name)
 
         result = filesystems().search(
-            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        )
         self.assertEqual(len([x for x in result]), 1)
 
 
@@ -97,8 +99,8 @@ class CreateFSTestCase1(SimTestCase):
     Make a filesystem for the pool.
     """
 
-    _POOLNAME = 'deadpool'
-    _VOLNAME = 'thunk'
+    _POOLNAME = "deadpool"
+    _VOLNAME = "thunk"
 
     def setUp(self):
         """
@@ -108,15 +110,12 @@ class CreateFSTestCase1(SimTestCase):
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
-            self._proxy, {
-                'name': self._POOLNAME,
-                'redundancy': (True, 0),
-                'devices': self._devs
-            })
+            self._proxy,
+            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
+        )
         self._pool_object = get_object(poolpath)
-        Pool.Methods.CreateFilesystems(self._pool_object,
-                                       {'specs': [self._VOLNAME]})
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+        Pool.Methods.CreateFilesystems(self._pool_object, {"specs": [self._VOLNAME]})
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testCreate(self):
         """
@@ -125,13 +124,15 @@ class CreateFSTestCase1(SimTestCase):
         fail, and no additional volume should be created.
         """
         (result, rc, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {'specs': [self._VOLNAME]})
+            self._pool_object, {"specs": [self._VOLNAME]}
+        )
 
         self.assertEqual(rc, StratisdErrors.ALREADY_EXISTS)
         self.assertEqual(len(result), 0)
 
         result = filesystems().search(
-            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        )
         self.assertEqual(len([x for x in result]), 1)
 
     def testCreateOne(self):
@@ -142,7 +143,8 @@ class CreateFSTestCase1(SimTestCase):
         new_name = "newname"
 
         (result, rc, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {'specs': [new_name]})
+            self._pool_object, {"specs": [new_name]}
+        )
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertEqual(len(result), 1)
@@ -151,7 +153,8 @@ class CreateFSTestCase1(SimTestCase):
         self.assertEqual(fs_name, new_name)
 
         result = filesystems().search(
-            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        )
         self.assertEqual(len([x for x in result]), 2)
 
     @unittest.skip("skip until creating multiple filesystems is supported")
@@ -162,13 +165,15 @@ class CreateFSTestCase1(SimTestCase):
         fail, and no additional volume should be created.
         """
         (result, rc, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {'specs': [self._VOLNAME, "newname"]})
+            self._pool_object, {"specs": [self._VOLNAME, "newname"]}
+        )
 
         self.assertEqual(rc, StratisdErrors.ALREADY_EXISTS)
         self.assertEqual(len(result), 0)
 
         result = filesystems().search(
-            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        )
         self.assertEqual(len([x for x in result]), 1)
 
     def testCreateMultiple(self):
@@ -178,11 +183,13 @@ class CreateFSTestCase1(SimTestCase):
         multiple volume support is added back - this test should be removed.
         """
         (result, rc, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {'specs': ["a", "b"]})
+            self._pool_object, {"specs": ["a", "b"]}
+        )
 
         self.assertEqual(rc, StratisdErrors.ERROR)
         self.assertEqual(len(result), 0)
 
         result = filesystems().search(
-            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        )
         self.assertEqual(len([x for x in result]), 1)

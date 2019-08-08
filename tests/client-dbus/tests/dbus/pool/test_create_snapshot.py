@@ -35,9 +35,9 @@ class CreateSnapshotTestCase(SimTestCase):
     Test with an empty pool.
     """
 
-    _POOLNAME = 'deadpool'
-    _VOLNAME = 'some_fs'
-    _SNAPSHOTNAME = 'ss_fs'
+    _POOLNAME = "deadpool"
+    _VOLNAME = "some_fs"
+    _SNAPSHOTNAME = "ss_fs"
 
     def setUp(self):
         """
@@ -47,16 +47,15 @@ class CreateSnapshotTestCase(SimTestCase):
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY()
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
-            self._proxy, {
-                'name': self._POOLNAME,
-                'redundancy': (True, 0),
-                'devices': self._devs
-            })
+            self._proxy,
+            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
+        )
         self._pool_object = get_object(poolpath)
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
         (fs_objects, rc, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {'specs': [self._VOLNAME]})
+            self._pool_object, {"specs": [self._VOLNAME]}
+        )
 
         self.assertEqual(rc, StratisdErrors.OK)
 
@@ -71,16 +70,16 @@ class CreateSnapshotTestCase(SimTestCase):
         """
 
         (ss_object_path, rc, _) = Pool.Methods.SnapshotFilesystem(
-            self._pool_object, {
-                'origin': self._fs_object_path,
-                'snapshot_name': self._SNAPSHOTNAME
-            })
+            self._pool_object,
+            {"origin": self._fs_object_path, "snapshot_name": self._SNAPSHOTNAME},
+        )
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertNotEqual(ss_object_path, "/")
 
         result = filesystems().search(
-            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        )
         self.assertEqual(len([x for x in result]), 2)
 
     def testDuplicateSnapshotName(self):
@@ -89,23 +88,22 @@ class CreateSnapshotTestCase(SimTestCase):
         """
 
         (ss_object_path, rc, _) = Pool.Methods.SnapshotFilesystem(
-            self._pool_object, {
-                'origin': self._fs_object_path,
-                'snapshot_name': self._SNAPSHOTNAME
-            })
+            self._pool_object,
+            {"origin": self._fs_object_path, "snapshot_name": self._SNAPSHOTNAME},
+        )
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertNotEqual(ss_object_path, "/")
 
         (ss_object_path_dupe_name, rc, _) = Pool.Methods.SnapshotFilesystem(
-            self._pool_object, {
-                'origin': self._fs_object_path,
-                'snapshot_name': self._SNAPSHOTNAME
-            })
+            self._pool_object,
+            {"origin": self._fs_object_path, "snapshot_name": self._SNAPSHOTNAME},
+        )
 
         self.assertEqual(rc, StratisdErrors.ALREADY_EXISTS)
         self.assertEqual(ss_object_path_dupe_name, "/")
 
         result = filesystems().search(
-            ObjectManager.Methods.GetManagedObjects(self._proxy, {}))
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        )
         self.assertEqual(len([x for x in result]), 2)

@@ -18,7 +18,7 @@ Functionality pertaining to device mapper
 import os
 import subprocess
 
-_DM_BIN = os.getenv('STRATIS_DMSETUP_BIN', "/usr/sbin/dmsetup")
+_DM_BIN = os.getenv("STRATIS_DMSETUP_BIN", "/usr/sbin/dmsetup")
 
 
 def _get_stratis_devices():
@@ -26,9 +26,9 @@ def _get_stratis_devices():
     Return a list of stratis DM devices
     :return: A list of stratis DM devices
     """
-    output = subprocess.check_output([_DM_BIN, 'ls'])
+    output = subprocess.check_output([_DM_BIN, "ls"])
     decoded = output.decode("utf-8")
-    return [l for l in decoded.split() if l.startswith('stratis-')]
+    return [l for l in decoded.split() if l.startswith("stratis-")]
 
 
 def _remove_device(device):
@@ -37,8 +37,7 @@ def _remove_device(device):
     :param device: The device to remove
     :return: True if device was removed, else False
     """
-    return_code = subprocess.call(
-        [_DM_BIN, 'remove', device], stderr=subprocess.PIPE)
+    return_code = subprocess.call([_DM_BIN, "remove", device], stderr=subprocess.PIPE)
     return return_code == 0
 
 
@@ -64,5 +63,5 @@ def remove_stratis_setup():
                 devices.remove(dev)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     remove_stratis_setup()

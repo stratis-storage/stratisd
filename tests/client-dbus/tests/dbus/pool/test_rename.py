@@ -35,7 +35,7 @@ class SetNameTestCase(SimTestCase):
     Set up a pool with a name.
     """
 
-    _POOLNAME = 'deadpool'
+    _POOLNAME = "deadpool"
 
     def setUp(self):
         """
@@ -44,31 +44,31 @@ class SetNameTestCase(SimTestCase):
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         ((self._pool_object_path, _), _, _) = Manager.Methods.CreatePool(
-            self._proxy, {
-                'name': self._POOLNAME,
-                'redundancy': (True, 0),
-                'devices': _DEVICE_STRATEGY()
-            })
+            self._proxy,
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 0),
+                "devices": _DEVICE_STRATEGY(),
+            },
+        )
         self._pool_object = get_object(self._pool_object_path)
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testNullMapping(self):
         """
         Test rename to same name.
         """
-        (result, rc, _) = Pool.Methods.SetName(self._pool_object,
-                                               {'name': self._POOLNAME})
+        (result, rc, _) = Pool.Methods.SetName(
+            self._pool_object, {"name": self._POOLNAME}
+        )
 
         self.assertEqual(rc, StratisdErrors.OK)
         self.assertFalse(result)
 
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         result = next(
-            pools(props={
-                'Name': self._POOLNAME
-            }).search(managed_objects),
-            None)
+            pools(props={"Name": self._POOLNAME}).search(managed_objects), None
+        )
         self.assertIsNotNone(result)
         (pool, _) = result
         self.assertEqual(pool, self._pool_object_path)
@@ -79,24 +79,16 @@ class SetNameTestCase(SimTestCase):
         """
         new_name = "new"
 
-        (result, rc, _) = Pool.Methods.SetName(self._pool_object,
-                                               {'name': new_name})
+        (result, rc, _) = Pool.Methods.SetName(self._pool_object, {"name": new_name})
 
         self.assertTrue(result)
         self.assertEqual(rc, StratisdErrors.OK)
 
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         self.assertIsNone(
-            next(
-                pools(props={
-                    'Name': self._POOLNAME
-                }).search(managed_objects),
-                None))
-        result = next(
-            pools(props={
-                'Name': new_name
-            }).search(managed_objects), None)
+            next(pools(props={"Name": self._POOLNAME}).search(managed_objects), None)
+        )
+        result = next(pools(props={"Name": new_name}).search(managed_objects), None)
         self.assertIsNotNone(result)
         (pool, _) = result
         self.assertEqual(pool, self._pool_object_path)

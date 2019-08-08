@@ -36,7 +36,7 @@ class AddCacheDevsTestCase1(SimTestCase):
     Test adding cachedevs to a pool which is initially empty.
     """
 
-    _POOLNAME = 'deadpool'
+    _POOLNAME = "deadpool"
 
     def setUp(self):
         """
@@ -45,34 +45,26 @@ class AddCacheDevsTestCase1(SimTestCase):
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         ((poolpath, _), _, _) = Manager.Methods.CreatePool(
-            self._proxy, {
-                'name': self._POOLNAME,
-                'redundancy': (True, 0),
-                'devices': []
-            })
+            self._proxy,
+            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": []},
+        )
         self._pool_object = get_object(poolpath)
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testEmptyDevs(self):
         """
         Adding an empty list of cache devs should have no effect.
         """
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool, _) = next(
-            pools(props={
-                'Name': self._POOLNAME
-            }).search(managed_objects))
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        (pool, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
 
-        (result, rc, _) = Pool.Methods.AddCacheDevs(self._pool_object,
-                                                    {'devices': []})
+        (result, rc, _) = Pool.Methods.AddCacheDevs(self._pool_object, {"devices": []})
 
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
 
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        blockdevs2 = blockdevs(props={'Pool': pool}).search(managed_objects)
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        blockdevs2 = blockdevs(props={"Pool": pool}).search(managed_objects)
         self.assertEqual(list(blockdevs2), [])
 
         blockdevs3 = blockdevs().search(managed_objects)
@@ -82,19 +74,15 @@ class AddCacheDevsTestCase1(SimTestCase):
         """
         Adding a non-empty list of cache devs should succeed.
         """
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool, _) = next(
-            pools(props={
-                'Name': self._POOLNAME
-            }).search(managed_objects))
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        (pool, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
 
         (result, rc, _) = Pool.Methods.AddCacheDevs(
-            self._pool_object, {'devices': _DEVICE_STRATEGY()})
+            self._pool_object, {"devices": _DEVICE_STRATEGY()}
+        )
 
         num_devices_added = len(result)
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
 
         if rc == StratisdErrors.OK:
             self.assertGreater(num_devices_added, 0)
@@ -104,10 +92,7 @@ class AddCacheDevsTestCase1(SimTestCase):
         blockdev_object_paths = frozenset(result)
 
         # blockdevs exported on the D-Bus are exactly those added
-        blockdevs2 = list(
-            blockdevs(props={
-                'Pool': pool
-            }).search(managed_objects))
+        blockdevs2 = list(blockdevs(props={"Pool": pool}).search(managed_objects))
         blockdevs2_object_paths = frozenset([op for (op, _) in blockdevs2])
         self.assertEqual(blockdevs2_object_paths, blockdev_object_paths)
 
@@ -119,10 +104,7 @@ class AddCacheDevsTestCase1(SimTestCase):
         self.assertEqual(len(list(blockdevs3)), num_devices_added)
 
         # There are no datadevs belonging to this pool
-        blockdevs4 = blockdevs(props={
-            'Pool': pool,
-            'Tier': 0
-        }).search(managed_objects)
+        blockdevs4 = blockdevs(props={"Pool": pool, "Tier": 0}).search(managed_objects)
         self.assertEqual(list(blockdevs4), [])
 
 
@@ -131,7 +113,7 @@ class AddCacheDevsTestCase2(SimTestCase):
     Test adding devices to a pool which has some data devices.
     """
 
-    _POOLNAME = 'deadpool'
+    _POOLNAME = "deadpool"
 
     def setUp(self):
         """
@@ -140,73 +122,53 @@ class AddCacheDevsTestCase2(SimTestCase):
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         ((poolpath, devpaths), _, _) = Manager.Methods.CreatePool(
-            self._proxy, {
-                'name': self._POOLNAME,
-                'redundancy': (True, 0),
-                'devices': _DEVICE_STRATEGY()
-            })
+            self._proxy,
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 0),
+                "devices": _DEVICE_STRATEGY(),
+            },
+        )
         self._pool_object = get_object(poolpath)
         self._devpaths = frozenset(devpaths)
-        Manager.Methods.ConfigureSimulator(self._proxy, {'denominator': 8})
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testEmptyDevs(self):
         """
         Adding an empty list of cache devs should have no effect.
         """
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool, _) = next(
-            pools(props={
-                'Name': self._POOLNAME
-            }).search(managed_objects))
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        (pool, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
 
-        blockdevs1 = blockdevs(props={
-            'Pool': pool,
-            'Tier': 0
-        }).search(managed_objects)
-        self.assertEqual(self._devpaths, frozenset(
-            op for (op, _) in blockdevs1))
-        blockdevs2 = blockdevs(props={
-            'Pool': pool,
-            'Tier': 1
-        }).search(managed_objects)
+        blockdevs1 = blockdevs(props={"Pool": pool, "Tier": 0}).search(managed_objects)
+        self.assertEqual(self._devpaths, frozenset(op for (op, _) in blockdevs1))
+        blockdevs2 = blockdevs(props={"Pool": pool, "Tier": 1}).search(managed_objects)
         self.assertEqual(list(blockdevs2), [])
 
-        (result, rc, _) = Pool.Methods.AddCacheDevs(self._pool_object,
-                                                    {'devices': []})
+        (result, rc, _) = Pool.Methods.AddCacheDevs(self._pool_object, {"devices": []})
 
         self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
 
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        blockdevs3 = blockdevs(props={'Pool': pool}).search(managed_objects)
-        self.assertEqual(
-            frozenset(op for (op, _) in blockdevs3), self._devpaths)
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        blockdevs3 = blockdevs(props={"Pool": pool}).search(managed_objects)
+        self.assertEqual(frozenset(op for (op, _) in blockdevs3), self._devpaths)
 
     def testSomeDevs(self):
         """
         Adding a non-empty list of cache devs should succeed.
         """
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool, _) = next(
-            pools(props={
-                'Name': self._POOLNAME
-            }).search(managed_objects))
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        (pool, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
 
-        blockdevs1 = blockdevs(props={
-            'Pool': pool,
-            'Tier': 0
-        }).search(managed_objects)
-        self.assertEqual(self._devpaths, frozenset(
-            op for (op, _) in blockdevs1))
+        blockdevs1 = blockdevs(props={"Pool": pool, "Tier": 0}).search(managed_objects)
+        self.assertEqual(self._devpaths, frozenset(op for (op, _) in blockdevs1))
         (result, rc, _) = Pool.Methods.AddCacheDevs(
-            self._pool_object, {'devices': _DEVICE_STRATEGY()})
+            self._pool_object, {"devices": _DEVICE_STRATEGY()}
+        )
 
         num_devices_added = len(result)
-        managed_objects = \
-           ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
 
         if rc == StratisdErrors.OK:
             self.assertGreater(num_devices_added, 0)
@@ -217,25 +179,18 @@ class AddCacheDevsTestCase2(SimTestCase):
 
         # cache blockdevs exported on the D-Bus are exactly those added
         blockdevs2 = list(
-            blockdevs(props={
-                'Pool': pool,
-                'Tier': 1
-            }).search(managed_objects))
-        self.assertEqual(
-            frozenset(op for (op, _) in blockdevs2), blockdev_object_paths)
+            blockdevs(props={"Pool": pool, "Tier": 1}).search(managed_objects)
+        )
+        self.assertEqual(frozenset(op for (op, _) in blockdevs2), blockdev_object_paths)
 
         # no duplicates in the object paths
         self.assertEqual(len(blockdevs2), num_devices_added)
 
         # There are no blockdevs but for those in this pool
-        blockdevs3 = blockdevs(props={'Pool': pool}).search(managed_objects)
+        blockdevs3 = blockdevs(props={"Pool": pool}).search(managed_objects)
         blockdevs4 = blockdevs().search(managed_objects)
         self.assertEqual(len(list(blockdevs3)), len(list(blockdevs4)))
 
         # The number of datadevs has remained the same
-        blockdevs5 = blockdevs(props={
-            'Pool': pool,
-            'Tier': 0
-        }).search(managed_objects)
-        self.assertEqual(
-            frozenset(op for (op, _) in blockdevs5), self._devpaths)
+        blockdevs5 = blockdevs(props={"Pool": pool, "Tier": 0}).search(managed_objects)
+        self.assertEqual(frozenset(op for (op, _) in blockdevs5), self._devpaths)

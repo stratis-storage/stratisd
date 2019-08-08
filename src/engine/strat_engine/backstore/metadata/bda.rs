@@ -530,21 +530,6 @@ mod tests {
 
     use super::*;
 
-    /// Corrupt a byte at the specified position.
-    fn corrupt_byte<F>(f: &mut F, position: u64) -> io::Result<()>
-    where
-        F: Read + Seek + SyncAll,
-    {
-        let mut byte_to_corrupt = [0; 1];
-        f.seek(SeekFrom::Start(position))?;
-        f.read_exact(&mut byte_to_corrupt)?;
-        byte_to_corrupt[0] = !byte_to_corrupt[0];
-        f.seek(SeekFrom::Start(position))?;
-        f.write_all(&byte_to_corrupt)?;
-        f.sync_all()?;
-        Ok(())
-    }
-
     /// Return a static header with random block device and MDA size.
     /// The block device is less than the minimum, for efficiency in testing.
     fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
@@ -732,6 +717,21 @@ mod tests {
         /// Stratis magic number or some other part of the header is corrupted.
         fn test_corrupted_sigblock_recovery(primary in option::of(0..bytes!(static_header_size::SIGBLOCK_SECTORS)),
                              secondary in option::of(0..bytes!(static_header_size::SIGBLOCK_SECTORS))) {
+            // Corrupt a byte at the specified position.
+            fn corrupt_byte<F>(f: &mut F, position: u64) -> io::Result<()>
+            where
+                F: Read + Seek + SyncAll,
+            {
+                let mut byte_to_corrupt = [0; 1];
+                f.seek(SeekFrom::Start(position))?;
+                f.read_exact(&mut byte_to_corrupt)?;
+                byte_to_corrupt[0] = !byte_to_corrupt[0];
+                f.seek(SeekFrom::Start(position))?;
+                f.write_all(&byte_to_corrupt)?;
+                f.sync_all()?;
+                Ok(())
+            }
+
             let sh = random_static_header(10000, 4);
             let buf_size = bytes!(static_header_size::STATIC_HEADER_SECTORS);
 

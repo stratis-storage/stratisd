@@ -521,7 +521,7 @@ impl fmt::Debug for StaticHeader {
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Cursor, Write};
+    use std::io::Cursor;
 
     use proptest::{collection::vec, num, option, prelude::BoxedStrategy, strategy::Strategy};
     use uuid::Uuid;
@@ -788,58 +788,66 @@ mod tests {
     }
 
     #[test]
-    /// Test that we re-write the older of two BDAs if they don't match.
-    fn bda_test_rewrite_older() {
+    /// Test that the newer sigblock is copied to the older sigblock's location
+    /// if the sigblock's timestamps don't match but they are otherwise
+    /// identical.
+    fn test_rewrite_older_sigblock() {
         let sh = random_static_header(10000, 4);
-        let buf_size = *sh.mda_size.sectors().bytes() as usize
-            + bytes!(static_header_size::STATIC_HEADER_SECTORS);
-        let mut buf = Cursor::new(vec![0; buf_size]);
+
         let ts = Utc::now().timestamp() as u64;
-
-        BDA::initialize(
-            &mut buf,
+        let sh_older =
+            StaticHeader::new(sh.pool_uuid, sh.dev_uuid, sh.mda_size, sh.blkdev_size, ts);
+        let sh_newer = StaticHeader::new(
             sh.pool_uuid,
             sh.dev_uuid,
-            sh.mda_size.region_size().data_size(),
-            sh.blkdev_size,
-            ts,
-        )
-        .unwrap();
-
-        let mut buf_newer = Cursor::new(vec![0; buf_size]);
-        BDA::initialize(
-            &mut buf_newer,
-            sh.pool_uuid,
-            sh.dev_uuid,
-            sh.mda_size.region_size().data_size(),
+            sh.mda_size,
             sh.blkdev_size,
             ts + 1,
-        )
-        .unwrap();
+        );
+        assert_ne!(sh_older, sh_newer);
 
-        // We should always match this reference buffer as it's the newer one.
-        let reference_buf = buf_newer.clone();
+        let buf_size = bytes!(static_header_size::STATIC_HEADER_SECTORS);
 
-        for offset in &[
-            bytes!(static_header_size::FIRST_SIGBLOCK_START_SECTORS),
-            bytes!(static_header_size::SECOND_SIGBLOCK_START_SECTORS),
-        ] {
-            // Copy the older BDA to newer BDA buffer
-            buf.seek(SeekFrom::Start(*offset as u64)).unwrap();
-            buf_newer.seek(SeekFrom::Start(*offset as u64)).unwrap();
-            let mut sector = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
-            buf.read_exact(&mut sector).unwrap();
-            buf_newer.write_all(&sector).unwrap();
+        let mut reference_buf = Cursor::new(vec![0; buf_size]);
+        sh_newer
+            .write(&mut reference_buf, MetadataLocation::Both)
+            .unwrap();
 
-            assert_ne!(reference_buf.get_ref(), buf_newer.get_ref());
+        // Test that StaticHeader::setup succeeds by writing the older
+        // signature block to the specified older location and the newer
+        // sigblock to the specified newer location and then calling
+        // StaticHeader::setup. StaticHeader::setup should return without
+        // error with the newer sigblock. As a side-effect, it should have
+        // overwritten the location of the older sigblock with the value of
+        // the newer sigblock.
+        let test_rewrite = |sh_older: &StaticHeader,
+                            sh_newer: &StaticHeader,
+                            older_location: MetadataLocation,
+                            newer_location: MetadataLocation| {
+            let mut buf = Cursor::new(vec![0; buf_size]);
+            sh_older.write(&mut buf, older_location).unwrap();
+            sh_newer.write(&mut buf, newer_location).unwrap();
+            assert_ne!(buf.get_ref(), reference_buf.get_ref());
+            assert_eq!(
+                StaticHeader::setup(&mut buf).unwrap().as_ref(),
+                Some(sh_newer)
+            );
+            assert_eq!(buf.get_ref(), reference_buf.get_ref());
+        };
 
-            let setup_result = StaticHeader::setup(&mut buf_newer);
-            assert_matches!(setup_result, Ok(_));
-            assert!(setup_result.unwrap().is_some());
+        test_rewrite(
+            &sh_older,
+            &sh_newer,
+            MetadataLocation::First,
+            MetadataLocation::Second,
+        );
 
-            // We should match the reference buffer
-            assert_eq!(reference_buf.get_ref(), buf_newer.get_ref());
-        }
+        test_rewrite(
+            &sh_older,
+            &sh_newer,
+            MetadataLocation::Second,
+            MetadataLocation::First,
+        );
     }
 
 }

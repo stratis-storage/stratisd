@@ -82,7 +82,7 @@ matrix:
           env: TASK=lint
         # Format any Python test code using yapf
         - language: python
-          python: "3.6"
+          python: "3.7"
           install: pip3 install -r tests/client-dbus/requirements.txt
           before_script:
               - cd tests/client-dbus

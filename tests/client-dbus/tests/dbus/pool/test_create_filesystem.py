@@ -150,7 +150,8 @@ class CreateFSTestCase1(SimTestCase):
         )
 
         self.assertEqual(rc, StratisdErrors.OK)
-        assert(use_result, "CreateFilesystems reported that results should not be used when they are valid")
+        assert use_result,
+               "CreateFilesystems reported that results should not be used when they are valid"
         self.assertEqual(len(changed_result), 1)
         self.assertEqual(len(unchanged_result), 0)
 
@@ -192,7 +193,8 @@ class CreateFSTestCase1(SimTestCase):
         )
 
         self.assertEqual(rc, StratisdErrors.ERROR)
-        assert(not use_result, "DBus did not indicate that there was an error using multiple filesystems")
+        assert not use_result,
+               "DBus did not indicate that there was an error using multiple filesystems"
         self.assertEqual(len(changed_result), 0)
         self.assertEqual(len(unchanged_result), 0)
 

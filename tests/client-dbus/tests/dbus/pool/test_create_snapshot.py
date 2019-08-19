@@ -53,13 +53,13 @@ class CreateSnapshotTestCase(SimTestCase):
         self._pool_object = get_object(poolpath)
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
-        ((_, (fs_objects_changed, fs_objects_unchanged)), rc, _) = Pool.Methods.CreateFilesystems(
+        ((_, fs_objects), rc, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": [self._VOLNAME]}
         )
 
         self.assertEqual(rc, StratisdErrors.OK)
 
-        fs_object_path = fs_objects_changed[0][0]
+        fs_object_path = fs_objects[0][0]
         self.assertNotEqual(fs_object_path, "/")
 
         self._fs_object_path = fs_object_path

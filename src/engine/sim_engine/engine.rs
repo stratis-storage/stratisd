@@ -40,7 +40,7 @@ impl Engine for SimEngine {
         let redundancy = calculate_redundancy!(redundancy);
 
         match self.pools.get_by_name(name) {
-            Some((pool_uuid, _)) => Ok(CreateAction::Identity(pool_uuid)),
+            Some(_) => Ok(CreateAction::Identity),
             None => {
                 let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
                 let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
@@ -78,7 +78,7 @@ impl Engine for SimEngine {
                 ));
             };
         } else {
-            return Ok(DeleteAction::Identity(uuid));
+            return Ok(DeleteAction::Identity);
         }
         self.pools
             .remove_by_uuid(uuid)
@@ -252,7 +252,7 @@ mod tests {
             .unwrap();
         assert_matches!(
             engine.create_pool(name, &[], None),
-            Ok(CreateAction::Identity(_))
+            Ok(CreateAction::Identity)
         );
     }
 
@@ -301,7 +301,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             engine.rename_pool(uuid, name).unwrap(),
-            RenameAction::Identity(uuid)
+            RenameAction::Identity
         );
     }
 

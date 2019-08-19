@@ -25,8 +25,9 @@ use crate::{
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name,
-            PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction, SetCreateAction,
+            BlockDevTier, DevUuid, EngineActions, FilesystemUuid, FreeSpaceState, MaybeDbusPath,
+            Name, PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction, SetCreateAction,
+            SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -292,23 +293,16 @@ impl Pool for StratPool {
 
         // TODO: Roll back on filesystem initialization failure.
         let mut result = Vec::new();
-        let mut unchanged_result = Vec::new();
         for (name, size) in names {
             if self.thin_pool.get_mut_filesystem_by_name(name).is_none() {
                 let fs_uuid = self
                     .thin_pool
                     .create_filesystem(pool_uuid, pool_name, name, size)?;
                 result.push((name, fs_uuid));
-            } else {
-                let uuid = match self.thin_pool.get_filesystem_by_name(name) {
-                    Some((uuid, _)) => uuid,
-                    None => unreachable!("Filesystem must be in thinpool to reach this code"),
-                };
-                unchanged_result.push((name, uuid));
             }
         }
 
-        Ok(SetCreateAction::new(result, unchanged_result))
+        Ok(SetCreateAction::new(result))
     }
 
     fn add_blockdevs(
@@ -354,14 +348,19 @@ impl Pool for StratPool {
         &'a mut self,
         pool_name: &str,
         fs_uuids: &[FilesystemUuid],
-    ) -> StratisResult<Vec<FilesystemUuid>> {
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid>> {
         let mut removed = Vec::new();
+        let mut asserted = Vec::new();
         for &uuid in fs_uuids {
-            self.thin_pool.destroy_filesystem(pool_name, uuid)?;
-            removed.push(uuid);
+            let changed = self.thin_pool.destroy_filesystem(pool_name, uuid)?;
+            if changed.is_changed() {
+                removed.push(uuid);
+            } else {
+                asserted.push(uuid);
+            }
         }
 
-        Ok(removed)
+        Ok(SetDeleteAction::new(removed))
     }
 
     fn rename_filesystem(

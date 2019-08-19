@@ -44,7 +44,7 @@ class AddDataDevsTestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        ((poolpath, _), _, _) = Manager.Methods.CreatePool(
+        ((_, (_, (poolpath, _))), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": []},
         )

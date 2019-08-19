@@ -189,7 +189,7 @@ impl Engine for StratEngine {
                 self.pools.insert(name, uuid, pool);
                 Ok(CreateAction::Created(uuid))
             }
-            Some((uuid, _)) => Ok(CreateAction::Identity(uuid)),
+            Some(_) => Ok(CreateAction::Identity),
         }
     }
 
@@ -277,7 +277,7 @@ impl Engine for StratEngine {
                 ));
             };
         } else {
-            return Ok(DeleteAction::Identity(uuid));
+            return Ok(DeleteAction::Identity);
         }
 
         let (pool_name, mut pool) = self

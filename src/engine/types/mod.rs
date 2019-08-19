@@ -5,7 +5,7 @@
 use std::{borrow::Borrow, fmt, ops::Deref, rc::Rc};
 
 mod actions;
-pub use actions::{
+pub use crate::engine::types::actions::{
     CreateAction, DeleteAction, EngineActions, RenameAction, SetCreateAction, SetDeleteAction,
 };
 

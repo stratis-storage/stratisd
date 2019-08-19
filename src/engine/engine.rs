@@ -17,7 +17,7 @@ use crate::{
     engine::types::{
         BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
         FreeSpaceState, MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid, RenameAction,
-        SetCreateAction,
+        SetCreateAction, SetDeleteAction,
     },
     stratis::StratisResult,
 };
@@ -106,7 +106,7 @@ pub trait Pool: Debug {
         &'a mut self,
         pool_name: &str,
         fs_uuids: &[FilesystemUuid],
-    ) -> StratisResult<Vec<FilesystemUuid>>;
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid>>;
 
     /// Rename filesystem
     /// Rename pool with uuid to new_name.

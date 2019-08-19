@@ -34,13 +34,13 @@ SPECS = {
 <arg name="name" type="s" direction="in"/>
 <arg name="redundancy" type="(bq)" direction="in"/>
 <arg name="devices" type="as" direction="in"/>
-<arg name="result" type="bb(oao)" direction="out"/>
+<arg name="result" type="(s(b(oao)))" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
 </method>
 <method name="DestroyPool">
 <arg name="pool" type="o" direction="in"/>
-<arg name="result" type="bbs" direction="out"/>
+<arg name="result" type="(b(sb))" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
 </method>
@@ -65,19 +65,19 @@ SPECS = {
 </method>
 <method name="CreateFilesystems">
 <arg name="specs" type="as" direction="in"/>
-<arg name="filesystems" type="ba(os)" direction="out"/>
+<arg name="results" type="(b(a(os)a(ss)))" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
 </method>
 <method name="DestroyFilesystems">
-<arg name="filesystems" type="ao" direction="in"/>
-<arg name="results" type="as" direction="out"/>
+<arg name="filesystems" type="as" direction="in"/>
+<arg name="results" type="(b((as)(as)))" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
 </method>
 <method name="SetName">
 <arg name="name" type="s" direction="in"/>
-<arg name="action" type="b" direction="out"/>
+<arg name="result" type="(bbs)" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
 </method>

@@ -7,6 +7,7 @@ use std::{collections::HashMap, path::Path, vec::Vec};
 use dbus::{
     self,
     arg::{Array, IterAppend},
+    stdintf::org_freedesktop_dbus::ObjectManager,
     tree::{
         Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
     },
@@ -40,8 +41,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let default_return: (bool, Vec<(dbus::Path, &str)>, Vec<&str>) =
-        (false, Vec::new(), Vec::new());
+    let default_return: (bool, Vec<(dbus::Path, &str, String)>) = (false, Vec::new());
 
     if filesystems.count() > 1 {
         let error_message = "only 1 filesystem per request allowed";
@@ -66,17 +66,18 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             .collect::<Vec<(&str, Option<Sectors>)>>(),
     );
 
-    let (infos_changed, infos_unchanged) = match result {
-        Ok(created_set) => created_set.destructure(),
+    let infos = match result {
+        Ok(created_set) => created_set.changed(),
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
 
-    let return_value_changed = match infos_changed {
+    let return_value = match infos {
         Some(ref i) => {
-            i.iter()
+            let v = i
+                .iter()
                 .map(|&(name, uuid)| {
                     (
                         // FIXME: To avoid this expect, modify create_filesystem
@@ -91,19 +92,17 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                 .1,
                         ),
                         name,
+                        uuid_to_string!(uuid),
                     )
                 })
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>();
+            (true, v)
         }
-        None => Vec::new(),
-    };
-    let return_value_unchanged = match infos_unchanged {
-        Some(ref i) => i.iter().map(|&(name, _)| name).collect::<Vec<_>>(),
-        None => Vec::new(),
+        None => default_return,
     };
 
     Ok(vec![return_message.append3(
-        (true, return_value_changed, return_value_unchanged),
+        (true, return_value),
         msg_code_ok(),
         msg_string_ok(),
     )])
@@ -113,12 +112,15 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let filesystems: Array<dbus::Path<'static>, _> = get_next_arg(&mut iter, 0)?;
+    let filesystem_uuids_str: Array<&str, _> = get_next_arg(&mut iter, 0)?;
+    let filesystem_uuids: Vec<Uuid> = filesystem_uuids_str
+        .filter_map(|uuid| Uuid::parse_str(uuid).ok())
+        .collect();
 
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let default_return: Vec<&str> = Vec::new();
+    let default_return: (bool, Vec<String>) = (false, Vec::new());
 
     let pool_path = m
         .tree
@@ -129,29 +131,41 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let mut filesystem_map: HashMap<Uuid, dbus::Path<'static>> = HashMap::new();
-    for op in filesystems {
-        if let Some(filesystem_path) = m.tree.get(&op) {
-            let filesystem_uuid = get_data!(filesystem_path; default_return; return_message).uuid;
-            filesystem_map.insert(filesystem_uuid, op);
-        }
+    let filesystem_map: HashMap<Uuid, dbus::Path<'static>> = HashMap::new();
+    let conn = dbus::Connection::get_private(dbus::BusType::System)?;
+    let conn_path = conn.with_path("org.storage.stratis1", m.path.get_name(), 5000);
+    for (op, intfs_props) in conn_path.get_managed_objects()?.iter() {
+        println!(
+            "{}: UUID: {:?}",
+            op,
+            intfs_props
+                .get("org.storage.stratis1.filesystem")
+                .unwrap()
+                .get("Uuid")
+                .unwrap()
+        );
     }
 
-    let result = pool.destroy_filesystems(
-        &pool_name,
-        &filesystem_map.keys().cloned().collect::<Vec<Uuid>>(),
-    );
+    let result = pool.destroy_filesystems(&pool_name, &filesystem_uuids);
     let msg = match result {
-        Ok(ref uuids) => {
-            for uuid in uuids {
-                let op = filesystem_map
-                    .get(uuid)
-                    .expect("'uuids' is a subset of filesystem_map.keys()");
-                dbus_context.actions.borrow_mut().push_remove(op, m.tree);
+        Ok(uuids) => {
+            // Only get changed values here as non-existant filesystems will have been filtered out
+            // before calling destroy_filesystems
+            let changed = uuids.changed();
+            if let Some(ref uuids) = changed {
+                for uuid in uuids {
+                    let op = filesystem_map
+                        .get(uuid)
+                        .expect("'uuids' is a subset of filesystem_map.keys()");
+                    dbus_context.actions.borrow_mut().push_remove(op, m.tree);
+                }
             }
 
-            let return_value: Vec<String> = uuids.iter().map(|n| uuid_to_string!(n)).collect();
-            return_message.append3(return_value, msg_code_ok(), msg_string_ok())
+            let uuid_vec: Vec<String> = match changed {
+                Some(v) => v.iter().map(|n| uuid_to_string!(n)).collect(),
+                None => Vec::new(),
+            };
+            return_message.append3((true, uuid_vec), msg_code_ok(), msg_string_ok())
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
@@ -276,7 +290,7 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let default_return = (false, false, uuid_to_string!(Uuid::nil()));
+    let default_return = (false, uuid_to_string!(Uuid::nil()));
 
     let pool_path = m
         .tree
@@ -294,8 +308,8 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);
             return_message.append3(default_return, rc, rs)
         }
-        Ok(RenameAction::Identity(uuid)) => return_message.append3(
-            (true, false, uuid_to_string!(uuid)),
+        Ok(RenameAction::Identity) => return_message.append3(
+            (false, uuid_to_string!(Uuid::nil())),
             msg_code_ok(),
             msg_string_ok(),
         ),
@@ -405,14 +419,14 @@ pub fn create_dbus_pool<'a>(
     let create_filesystems_method = f
         .method("CreateFilesystems", (), create_filesystems)
         .in_arg(("specs", "as"))
-        .out_arg(("filesystems", "ba(os)as"))
+        .out_arg(("results", "(ba(oss))"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
     let destroy_filesystems_method = f
         .method("DestroyFilesystems", (), destroy_filesystems)
-        .in_arg(("filesystems", "ao"))
-        .out_arg(("results", "as"))
+        .in_arg(("filesystems", "as"))
+        .out_arg(("results", "(b((as)(as)))"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
@@ -433,7 +447,11 @@ pub fn create_dbus_pool<'a>(
     let rename_method = f
         .method("SetName", (), rename_pool)
         .in_arg(("name", "s"))
-        .out_arg(("result", "bbs"))
+        // b: false if UUID is the null UUID
+        // s: UUID in string format
+        //
+        // Rust representation: (bool, String)
+        .out_arg(("result", "(bs)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

@@ -46,7 +46,7 @@ class CreateFSTestCase(SimTestCase):
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY()
-        ((poolpath, _), _, _) = Manager.Methods.CreatePool(
+        ((_, (_, (poolpath, _))), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
         )
@@ -59,11 +59,12 @@ class CreateFSTestCase(SimTestCase):
         list should always succeed, and it should not increase the
         number of volumes.
         """
-        (result, rc, _) = Pool.Methods.CreateFilesystems(
+        ((_, (changed_result, unchanged_result)), rc, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": []}
         )
 
-        self.assertEqual(len(result), 0)
+        self.assertEqual(len(changed_result), 0)
+        self.assertEqual(len(unchanged_result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
 
         result = filesystems().search(
@@ -109,7 +110,7 @@ class CreateFSTestCase1(SimTestCase):
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY()
-        ((poolpath, _), _, _) = Manager.Methods.CreatePool(
+        ((_, (_, (poolpath, _))), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
         )
@@ -121,14 +122,16 @@ class CreateFSTestCase1(SimTestCase):
         """
         Test calling by specifying a volume name. Because there is already
         a volume with the given name, the creation of the new volume should
-        fail, and no additional volume should be created.
+        return the volume information as unchanged, and no additional volume
+        should be created.
         """
-        (result, rc, _) = Pool.Methods.CreateFilesystems(
+        ((_, (changed_result, unchanged_result)), rc, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": [self._VOLNAME]}
         )
 
-        self.assertEqual(rc, StratisdErrors.ALREADY_EXISTS)
-        self.assertEqual(len(result), 0)
+        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(len(changed_result), 0)
+        self.assertEqual(len(unchanged_result), 1)
 
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
@@ -142,14 +145,16 @@ class CreateFSTestCase1(SimTestCase):
         """
         new_name = "newname"
 
-        (result, rc, _) = Pool.Methods.CreateFilesystems(
+        ((use_result, (changed_result, unchanged_result)), rc, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": [new_name]}
         )
 
         self.assertEqual(rc, StratisdErrors.OK)
-        self.assertEqual(len(result), 1)
+        assert(use_result, "CreateFilesystems reported that results should not be used when they are valid")
+        self.assertEqual(len(changed_result), 1)
+        self.assertEqual(len(unchanged_result), 0)
 
-        (_, fs_name) = result[0]
+        (_, fs_name) = changed_result[0]
         self.assertEqual(fs_name, new_name)
 
         result = filesystems().search(
@@ -182,12 +187,14 @@ class CreateFSTestCase1(SimTestCase):
         volume names are not supported due to possible d-bus timeouts.  When
         multiple volume support is added back - this test should be removed.
         """
-        (result, rc, _) = Pool.Methods.CreateFilesystems(
+        ((use_result, (changed_result, unchanged_result)), rc, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": ["a", "b"]}
         )
 
         self.assertEqual(rc, StratisdErrors.ERROR)
-        self.assertEqual(len(result), 0)
+        assert(not use_result, "DBus did not indicate that there was an error using multiple filesystems")
+        self.assertEqual(len(changed_result), 0)
+        self.assertEqual(len(unchanged_result), 0)
 
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})

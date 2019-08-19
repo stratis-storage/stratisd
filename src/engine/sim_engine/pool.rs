@@ -23,6 +23,7 @@ use crate::{
         types::{
             BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name,
             PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction, SetCreateAction,
+            SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -91,7 +92,6 @@ impl Pool for SimPool {
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
         let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
-        let mut unchanged_result = Vec::new();
         let mut result = Vec::new();
         for name in names.keys() {
             if !self.filesystems.contains_name(name) {
@@ -100,16 +100,10 @@ impl Pool for SimPool {
                 self.filesystems
                     .insert(Name::new((&**name).to_owned()), uuid, new_filesystem);
                 result.push((*name, uuid));
-            } else {
-                let (uuid, _) = self
-                    .filesystems
-                    .get_by_name(name)
-                    .expect("Can only reach this code if name is in filesystems table");
-                unchanged_result.push((*name, uuid));
             }
         }
 
-        Ok(SetCreateAction::new(result, unchanged_result))
+        Ok(SetCreateAction::new(result))
     }
 
     fn add_blockdevs(
@@ -144,14 +138,14 @@ impl Pool for SimPool {
         &'a mut self,
         _pool_name: &str,
         fs_uuids: &[FilesystemUuid],
-    ) -> StratisResult<Vec<FilesystemUuid>> {
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid>> {
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
             if self.filesystems.remove_by_uuid(uuid).is_some() {
                 removed.push(uuid);
             }
         }
-        Ok(removed)
+        Ok(SetDeleteAction::new(removed))
     }
 
     fn rename_filesystem(
@@ -430,7 +424,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert!(match pool.destroy_filesystems(pool_name, &[]) {
-            Ok(names) => names.is_empty(),
+            Ok(uuids) => !uuids.is_changed(),
             _ => false,
         });
     }
@@ -469,12 +463,10 @@ mod tests {
             .changed()
             .unwrap();
         let fs_uuid = fs_results[0].1;
-        assert!(
-            match pool.destroy_filesystems(pool_name, &[fs_uuid, Uuid::new_v4()]) {
-                Ok(filesystems) => filesystems == vec![fs_uuid],
-                _ => false,
-            }
-        );
+        assert!(match pool.destroy_filesystems(pool_name, &[fs_uuid]) {
+            Ok(filesystems) => filesystems == SetDeleteAction::new(vec![fs_uuid]),
+            _ => false,
+        });
     }
 
     #[test]
@@ -530,7 +522,6 @@ mod tests {
         let set_create_action = pool
             .create_filesystems(uuid, pool_name, &[(fs_name, None)])
             .unwrap();
-        assert!(set_create_action.unchanged_ref().unwrap().len() == 1);
         assert!(set_create_action.changed_ref().is_none());
     }
 

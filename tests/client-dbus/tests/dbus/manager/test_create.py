@@ -52,7 +52,7 @@ class Create2TestCase(SimTestCase):
         If rc is OK, then pool must exist.
         """
         devs = _DEVICE_STRATEGY()
-        ((poolpath, devnodes), rc, _) = Manager.Methods.CreatePool(
+        ((_, _, (poolpath, devnodes)), rc, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": devs},
         )

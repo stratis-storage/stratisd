@@ -38,7 +38,7 @@ macro_rules! rename_filesystem_pre {
         };
 
         if &*old_name == $new_name {
-            return Ok(RenameAction::Identity($uuid));
+            return Ok(RenameAction::Identity);
         }
 
         if $s.filesystems.contains_name($new_name) {
@@ -59,7 +59,7 @@ macro_rules! rename_pool_pre {
         };
 
         if &*old_name == $new_name {
-            return Ok(RenameAction::Identity($uuid));
+            return Ok(RenameAction::Identity);
         }
 
         if $s.pools.contains_name($new_name) {

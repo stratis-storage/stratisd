@@ -42,8 +42,8 @@ use crate::{
         },
         structures::Table,
         types::{
-            FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState, PoolState,
-            PoolUuid, RenameAction,
+            DeleteAction, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState,
+            PoolState, PoolUuid, RenameAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -978,7 +978,7 @@ impl ThinPool {
         &mut self,
         pool_name: &str,
         uuid: FilesystemUuid,
-    ) -> StratisResult<()> {
+    ) -> StratisResult<DeleteAction<FilesystemUuid>> {
         match self.filesystems.remove_by_uuid(uuid) {
             Some((fs_name, mut fs)) => match fs.destroy(&self.thin_pool) {
                 Ok(_) => {
@@ -990,14 +990,14 @@ impl ThinPool {
                                err);
                     }
                     devlinks::filesystem_removed(pool_name, &fs_name);
-                    Ok(())
+                    Ok(DeleteAction::Deleted(uuid))
                 }
                 Err(err) => {
                     self.filesystems.insert(fs_name, uuid, fs);
                     Err(err)
                 }
             },
-            None => Ok(()),
+            None => Ok(DeleteAction::Identity),
         }
     }
 

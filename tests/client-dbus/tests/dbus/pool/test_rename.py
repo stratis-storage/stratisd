@@ -43,7 +43,7 @@ class SetNameTestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        ((self._pool_object_path, _), _, _) = Manager.Methods.CreatePool(
+        ((_, _, (self._pool_object_path, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {
                 "name": self._POOLNAME,

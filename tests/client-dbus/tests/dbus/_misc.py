@@ -22,6 +22,8 @@ import subprocess
 import time
 import unittest
 
+import psutil
+
 _STRATISD = os.environ["STRATISD"]
 
 
@@ -62,21 +64,32 @@ class _Service:
         self._stratisd.terminate()
         self._stratisd.wait()
 
+    def cleanup(self):
+        """
+        Stop the daemon if it has been started.
+        """
+        if hasattr(self, "_stratisd"):
+            self.tearDown()
+
 
 class SimTestCase(unittest.TestCase):
     """
     A SimTestCase must always start and stop stratisd (simulator vesion).
     """
 
+    @classmethod
+    def setUpClass(cls):
+        """
+        Assert that there are no other stratisd processes running.
+        """
+        assert not any(
+            psutil.Process(p).name() == "stratisd" for p in psutil.pids()
+        ), "Evidently a stratisd process is already running."
+
     def setUp(self):
         """
         Start the stratisd daemon with the simulator.
         """
         self._service = _Service()
+        self.addCleanup(self._service.cleanup)
         self._service.setUp()
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()

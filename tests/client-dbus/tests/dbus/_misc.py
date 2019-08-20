@@ -22,6 +22,8 @@ import subprocess
 import time
 import unittest
 
+import psutil
+
 _STRATISD = os.environ["STRATISD"]
 
 
@@ -74,6 +76,15 @@ class SimTestCase(unittest.TestCase):
     """
     A SimTestCase must always start and stop stratisd (simulator vesion).
     """
+
+    @classmethod
+    def setUpClass(cls):
+        """
+        Assert that there are no other stratisd processes running.
+        """
+        assert not any(
+            psutil.Process(p).name() == "stratisd" for p in psutil.pids()
+        ), "Evidently a stratisd process is already running."
 
     def setUp(self):
         """

@@ -44,7 +44,7 @@ class AddCacheDevsTestCase1(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        ((_, (_, (poolpath, _))), _, _) = Manager.Methods.CreatePool(
+        ((_, (poolpath, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": []},
         )
@@ -89,12 +89,12 @@ class AddCacheDevsTestCase1(SimTestCase):
         else:
             self.assertEqual(num_devices_added, 0)
 
-        blockdev_object_paths = frozenset(result)
+        blockdev_uuids = frozenset(result)
 
         # blockdevs exported on the D-Bus are exactly those added
         blockdevs2 = list(blockdevs(props={"Pool": pool}).search(managed_objects))
-        blockdevs2_object_paths = frozenset([op for (op, _) in blockdevs2])
-        self.assertEqual(blockdevs2_object_paths, blockdev_object_paths)
+        blockdevs2_uuids = frozenset([data['org.storage.stratis1.blockdev']['Uuid'] for (_, data) in blockdevs2])
+        self.assertEqual(blockdevs2_uuids, blockdev_uuids)
 
         # no duplicates in the object paths
         self.assertEqual(len(blockdevs2), num_devices_added)
@@ -121,7 +121,7 @@ class AddCacheDevsTestCase2(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        ((_, (_, (poolpath, devpaths))), _, _) = Manager.Methods.CreatePool(
+        ((_, (poolpath, devs)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {
                 "name": self._POOLNAME,
@@ -130,7 +130,7 @@ class AddCacheDevsTestCase2(SimTestCase):
             },
         )
         self._pool_object = get_object(poolpath)
-        self._devpaths = frozenset(devpaths)
+        self._devuuids = frozenset([devuuid for devuuid in devs])
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testEmptyDevs(self):
@@ -141,7 +141,7 @@ class AddCacheDevsTestCase2(SimTestCase):
         (pool, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
 
         blockdevs1 = blockdevs(props={"Pool": pool, "Tier": 0}).search(managed_objects)
-        self.assertEqual(self._devpaths, frozenset(op for (op, _) in blockdevs1))
+        self.assertEqual(self._devuuids, frozenset(op for (op, _) in blockdevs1))
         blockdevs2 = blockdevs(props={"Pool": pool, "Tier": 1}).search(managed_objects)
         self.assertEqual(list(blockdevs2), [])
 
@@ -152,7 +152,7 @@ class AddCacheDevsTestCase2(SimTestCase):
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         blockdevs3 = blockdevs(props={"Pool": pool}).search(managed_objects)
-        self.assertEqual(frozenset(op for (op, _) in blockdevs3), self._devpaths)
+        self.assertEqual(frozenset(op for (op, _) in blockdevs3), self._devuuids)
 
     def testSomeDevs(self):
         """
@@ -162,7 +162,7 @@ class AddCacheDevsTestCase2(SimTestCase):
         (pool, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
 
         blockdevs1 = blockdevs(props={"Pool": pool, "Tier": 0}).search(managed_objects)
-        self.assertEqual(self._devpaths, frozenset(op for (op, _) in blockdevs1))
+        self.assertEqual(self._devuuids, frozenset(op for (op, _) in blockdevs1))
         (result, rc, _) = Pool.Methods.AddCacheDevs(
             self._pool_object, {"devices": _DEVICE_STRATEGY()}
         )
@@ -193,4 +193,4 @@ class AddCacheDevsTestCase2(SimTestCase):
 
         # The number of datadevs has remained the same
         blockdevs5 = blockdevs(props={"Pool": pool, "Tier": 0}).search(managed_objects)
-        self.assertEqual(frozenset(op for (op, _) in blockdevs5), self._devpaths)
+        self.assertEqual(frozenset(data['org.storage.stratis1.blockdev']['Uuid'] for (_, data) in blockdevs5), self._devuuids)

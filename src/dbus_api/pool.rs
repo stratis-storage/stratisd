@@ -7,7 +7,6 @@ use std::{collections::HashMap, path::Path, vec::Vec};
 use dbus::{
     self,
     arg::{Array, IterAppend},
-    stdintf::org_freedesktop_dbus::ObjectManager,
     tree::{
         Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
     },
@@ -41,7 +40,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let default_return: (bool, Vec<(dbus::Path, &str, String)>) = (false, Vec::new());
+    let default_return: (bool, Vec<(dbus::Path, &str)>) = (false, Vec::new());
 
     if filesystems.count() > 1 {
         let error_message = "only 1 filesystem per request allowed";
@@ -79,10 +78,10 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let v = i
                 .iter()
                 .map(|&(name, uuid)| {
+                    // FIXME: To avoid this expect, modify create_filesystem
+                    // so that it returns a mutable reference to the
+                    // filesystem created.
                     (
-                        // FIXME: To avoid this expect, modify create_filesystem
-                        // so that it returns a mutable reference to the
-                        // filesystem created.
                         create_dbus_filesystem(
                             dbus_context,
                             object_path.clone(),
@@ -92,7 +91,6 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                                 .1,
                         ),
                         name,
-                        uuid_to_string!(uuid),
                     )
                 })
                 .collect::<Vec<_>>();
@@ -102,7 +100,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     };
 
     Ok(vec![return_message.append3(
-        (true, return_value),
+        return_value,
         msg_code_ok(),
         msg_string_ok(),
     )])
@@ -112,10 +110,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let filesystem_uuids_str: Array<&str, _> = get_next_arg(&mut iter, 0)?;
-    let filesystem_uuids: Vec<Uuid> = filesystem_uuids_str
-        .filter_map(|uuid| Uuid::parse_str(uuid).ok())
-        .collect();
+    let filesystem_paths: Array<dbus::Path, _> = get_next_arg(&mut iter, 0)?;
 
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
@@ -131,22 +126,18 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let filesystem_map: HashMap<Uuid, dbus::Path<'static>> = HashMap::new();
-    let conn = dbus::Connection::get_private(dbus::BusType::System)?;
-    let conn_path = conn.with_path("org.storage.stratis1", m.path.get_name(), 5000);
-    for (op, intfs_props) in conn_path.get_managed_objects()?.iter() {
-        println!(
-            "{}: UUID: {:?}",
-            op,
-            intfs_props
-                .get("org.storage.stratis1.filesystem")
-                .unwrap()
-                .get("Uuid")
-                .unwrap()
-        );
+    let mut filesystem_map: HashMap<Uuid, dbus::Path<'static>> = HashMap::new();
+    for op in filesystem_paths.filter_map(|path| m.tree.get(&path)) {
+        let uuid_option = op.get_data().as_ref().map(|d| d.uuid);
+        if let Some(ref uuid) = uuid_option {
+            filesystem_map.insert(*uuid, op.get_name().clone());
+        }
     }
 
-    let result = pool.destroy_filesystems(&pool_name, &filesystem_uuids);
+    let result = pool.destroy_filesystems(
+        &pool_name,
+        &filesystem_map.keys().copied().collect::<Vec<_>>(),
+    );
     let msg = match result {
         Ok(uuids) => {
             // Only get changed values here as non-existant filesystems will have been filtered out
@@ -308,13 +299,11 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);
             return_message.append3(default_return, rc, rs)
         }
-        Ok(RenameAction::Identity) => return_message.append3(
-            (false, uuid_to_string!(Uuid::nil())),
-            msg_code_ok(),
-            msg_string_ok(),
-        ),
+        Ok(RenameAction::Identity) => {
+            return_message.append3(default_return, msg_code_ok(), msg_string_ok())
+        }
         Ok(RenameAction::Renamed(uuid)) => return_message.append3(
-            (true, true, uuid_to_string!(uuid)),
+            (true, uuid_to_string!(uuid)),
             msg_code_ok(),
             msg_string_ok(),
         ),
@@ -419,20 +408,31 @@ pub fn create_dbus_pool<'a>(
     let create_filesystems_method = f
         .method("CreateFilesystems", (), create_filesystems)
         .in_arg(("specs", "as"))
-        .out_arg(("results", "(ba(oss))"))
+        // b: true if filesystems were created
+        // a(os): Array of tuples with object paths and names
+        //
+        // Rust representation: (bool, Vec<(dbus::Path, String)>)
+        .out_arg(("results", "(ba(os))"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
     let destroy_filesystems_method = f
         .method("DestroyFilesystems", (), destroy_filesystems)
-        .in_arg(("filesystems", "as"))
-        .out_arg(("results", "(b((as)(as)))"))
+        .in_arg(("filesystems", "ao"))
+        // b: true if filesystems were destroyed
+        // as: Array of UUIDs of destroyed filesystems
+        //
+        // Rust representation: (bool, Vec<String>)
+        .out_arg(("results", "(bas)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
     let add_blockdevs_method = f
         .method("AddDataDevs", (), add_datadevs)
         .in_arg(("devices", "as"))
+        // ao: Array of object paths of created data devices
+        //
+        // Rust representation: (bool, Vec<dbus::path>)
         .out_arg(("results", "ao"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
@@ -440,6 +440,9 @@ pub fn create_dbus_pool<'a>(
     let add_cachedevs_method = f
         .method("AddCacheDevs", (), add_cachedevs)
         .in_arg(("devices", "as"))
+        // ao: Array of object paths of created cache devices
+        //
+        // Rust representation: (bool, Vec<dbus::path>)
         .out_arg(("results", "ao"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
@@ -447,8 +450,8 @@ pub fn create_dbus_pool<'a>(
     let rename_method = f
         .method("SetName", (), rename_pool)
         .in_arg(("name", "s"))
-        // b: false if UUID is the null UUID
-        // s: UUID in string format
+        // b: false if no pool was renamed
+        // s: UUID of renamed pool
         //
         // Rust representation: (bool, String)
         .out_arg(("result", "(bs)"))

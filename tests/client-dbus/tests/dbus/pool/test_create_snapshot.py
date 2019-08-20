@@ -46,7 +46,7 @@ class CreateSnapshotTestCase(SimTestCase):
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY()
-        ((_, (_, (poolpath, _))), _, _) = Manager.Methods.CreatePool(
+        ((_, ((poolpath, _), _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
         )

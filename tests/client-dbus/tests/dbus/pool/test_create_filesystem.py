@@ -46,7 +46,7 @@ class CreateFSTestCase(SimTestCase):
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY()
-        ((_, (_, (poolpath, _))), _, _) = Manager.Methods.CreatePool(
+        ((_, ((poolpath, _), _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
         )
@@ -59,12 +59,10 @@ class CreateFSTestCase(SimTestCase):
         list should always succeed, and it should not increase the
         number of volumes.
         """
-        ((_, (changed_result, unchanged_result)), rc, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {"specs": []}
-        )
+        ((is_some, result), rc, _) = Pool.Methods.CreateFilesystems(self._pool_object, {"specs": []})
 
-        self.assertEqual(len(changed_result), 0)
-        self.assertEqual(len(unchanged_result), 0)
+        self.assertEqual(is_some, False)
+        self.assertEqual(len(result), 0)
         self.assertEqual(rc, StratisdErrors.OK)
 
         result = filesystems().search(
@@ -79,12 +77,13 @@ class CreateFSTestCase(SimTestCase):
         """
         new_name = "name"
 
-        (result, rc, _) = Pool.Methods.CreateFilesystems(
+        ((is_some, result), rc, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": [new_name, new_name]}
         )
 
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(is_some, True)
         self.assertEqual(len(result), 1)
+        self.assertEqual(rc, StratisdErrors.OK)
 
         (_, fs_name) = result[0]
         self.assertEqual(fs_name, new_name)
@@ -110,7 +109,7 @@ class CreateFSTestCase1(SimTestCase):
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY()
-        ((_, (_, (poolpath, _))), _, _) = Manager.Methods.CreatePool(
+        ((_, ((poolpath, _), _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
         )
@@ -125,13 +124,16 @@ class CreateFSTestCase1(SimTestCase):
         return the volume information as unchanged, and no additional volume
         should be created.
         """
-        ((_, (changed_result, unchanged_result)), rc, _) = Pool.Methods.CreateFilesystems(
+        (
+            (is_some, result),
+            rc,
+            _,
+        ) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": [self._VOLNAME]}
         )
 
         self.assertEqual(rc, StratisdErrors.OK)
-        self.assertEqual(len(changed_result), 0)
-        self.assertEqual(len(unchanged_result), 1)
+        self.assertEqual(len(result), 0)
 
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
@@ -145,17 +147,17 @@ class CreateFSTestCase1(SimTestCase):
         """
         new_name = "newname"
 
-        ((use_result, (changed_result, unchanged_result)), rc, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {"specs": [new_name]}
-        )
+        (
+            (is_some, result),
+            rc,
+            _,
+        ) = Pool.Methods.CreateFilesystems(self._pool_object, {"specs": [new_name]})
 
         self.assertEqual(rc, StratisdErrors.OK)
-        assert use_result, \
-               "CreateFilesystems reported that results should not be used when they are valid"
-        self.assertEqual(len(changed_result), 1)
-        self.assertEqual(len(unchanged_result), 0)
+        self.assertEqual(is_some, True)
+        self.assertEqual(len(result), 1)
 
-        (_, fs_name) = changed_result[0]
+        (_, fs_name, _) = result[0]
         self.assertEqual(fs_name, new_name)
 
         result = filesystems().search(
@@ -167,15 +169,16 @@ class CreateFSTestCase1(SimTestCase):
     def testCreateWithConflict(self):
         """
         Test calling by specifying several volumes. Because there is already
-        a volume with the given name, the creation of the new volumes should
-        fail, and no additional volume should be created.
+        a volume with the given name, only the new volumes should be created
+        and the command should succeed.
         """
-        (result, rc, _) = Pool.Methods.CreateFilesystems(
+        ((is_some, result), rc, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": [self._VOLNAME, "newname"]}
         )
 
-        self.assertEqual(rc, StratisdErrors.ALREADY_EXISTS)
-        self.assertEqual(len(result), 0)
+        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0][1], "newname")
 
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
@@ -188,15 +191,15 @@ class CreateFSTestCase1(SimTestCase):
         volume names are not supported due to possible d-bus timeouts.  When
         multiple volume support is added back - this test should be removed.
         """
-        ((use_result, (changed_result, unchanged_result)), rc, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {"specs": ["a", "b"]}
-        )
+        (
+            (is_some, result),
+            rc,
+            _,
+        ) = Pool.Methods.CreateFilesystems(self._pool_object, {"specs": ["a", "b"]})
 
         self.assertEqual(rc, StratisdErrors.ERROR)
-        assert not use_result, \
-               "DBus did not indicate that there was an error using multiple filesystems"
-        self.assertEqual(len(changed_result), 0)
-        self.assertEqual(len(unchanged_result), 0)
+        self.assertEqual(is_some, False)
+        self.assertEqual(len(result), 0)
 
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})

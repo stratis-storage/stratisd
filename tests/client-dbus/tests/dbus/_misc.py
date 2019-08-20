@@ -62,6 +62,13 @@ class _Service:
         self._stratisd.terminate()
         self._stratisd.wait()
 
+    def cleanup(self):
+        """
+        Stop the daemon if it has been started.
+        """
+        if hasattr(self, "_stratisd"):
+            self.tearDown()
+
 
 class SimTestCase(unittest.TestCase):
     """
@@ -73,10 +80,5 @@ class SimTestCase(unittest.TestCase):
         Start the stratisd daemon with the simulator.
         """
         self._service = _Service()
+        self.addCleanup(self._service.cleanup)
         self._service.setUp()
-
-    def tearDown(self):
-        """
-        Stop the stratisd simulator and daemon.
-        """
-        self._service.tearDown()

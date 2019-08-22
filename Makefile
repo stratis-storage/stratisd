@@ -18,6 +18,9 @@ ${HOME}/.cargo/bin/cargo-outdated:
 ${HOME}/.cargo/bin/cargo-license:
 	cargo install cargo-license
 
+${HOME}/.cargo/bin/cargo-bloat:
+	cargo install cargo-bloat
+
 tree: ${HOME}/.cargo/bin/cargo-tree
 	PATH=${HOME}/.cargo/bin:${PATH} cargo tree
 
@@ -26,6 +29,10 @@ outdated: ${HOME}/.cargo/bin/cargo-outdated
 
 license: ${HOME}/.cargo/bin/cargo-license
 	PATH=${HOME}/.cargo/bin:${PATH} cargo license
+
+bloat: ${HOME}/.cargo/bin/cargo-bloat
+	PATH=${HOME}/.cargo/bin:${PATH} cargo bloat --release
+	PATH=${HOME}/.cargo/bin:${PATH} cargo bloat --release --crates
 
 fmt:
 	cargo fmt
@@ -80,6 +87,7 @@ clippy:
 	cargo clippy --all-targets --all-features -- -D warnings
 
 .PHONY:
+	bloat
 	build
 	clippy
 	docs

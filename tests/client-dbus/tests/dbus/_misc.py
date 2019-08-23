@@ -82,9 +82,13 @@ class SimTestCase(unittest.TestCase):
         """
         Assert that there are no other stratisd processes running.
         """
-        assert not any(
-            psutil.Process(p).name() == "stratisd" for p in psutil.pids()
-        ), "Evidently a stratisd process is already running."
+        for pid in psutil.pids():
+            try:
+                assert psutil.Process(pid).name() != "stratisd", (
+                    "Evidently a stratisd process with process id %u is running" % pid
+                )
+            except psutil.NoSuchProcess:
+                pass
 
     def setUp(self):
         """

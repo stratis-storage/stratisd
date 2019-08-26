@@ -200,7 +200,7 @@ impl CacheTier {
     pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
         self.block_mgr
             .get_blockdev_by_uuid(uuid)
-            .and_then(|bd| Some((BlockDevTier::Cache, bd)))
+            .map(|bd| (BlockDevTier::Cache, bd))
     }
 
     /// Lookup a mutable blockdev by its Stratis UUID.
@@ -210,7 +210,7 @@ impl CacheTier {
     ) -> Option<(BlockDevTier, &mut StratBlockDev)> {
         self.block_mgr
             .get_mut_blockdev_by_uuid(uuid)
-            .and_then(|bd| Some((BlockDevTier::Cache, bd)))
+            .map(|bd| (BlockDevTier::Cache, bd))
     }
 }
 

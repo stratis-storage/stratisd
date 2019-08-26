@@ -6,7 +6,7 @@
 
 use std::{
     os::unix::io::{AsRawFd, RawFd},
-    sync::{Once, ONCE_INIT},
+    sync::Once,
 };
 
 use devicemapper::{DmResult, DM};
@@ -16,7 +16,7 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-static INIT: Once = ONCE_INIT;
+static INIT: Once = Once::new();
 static mut DM_CONTEXT: Option<DmResult<DM>> = None;
 
 pub fn get_dm_init() -> StratisResult<&'static DM> {

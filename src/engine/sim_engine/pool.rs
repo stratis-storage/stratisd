@@ -74,11 +74,11 @@ impl SimPool {
         let cache_devs = &mut self.cache_devs;
         self.block_devs
             .get_mut(&uuid)
-            .and_then(|bd| Some((BlockDevTier::Data, bd)))
+            .map(|bd| (BlockDevTier::Data, bd))
             .or_else(move || {
                 cache_devs
                     .get_mut(&uuid)
-                    .and_then(|bd| Some((BlockDevTier::Cache, bd)))
+                    .map(|bd| (BlockDevTier::Cache, bd))
             })
     }
 }
@@ -263,11 +263,11 @@ impl Pool for SimPool {
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)> {
         self.block_devs
             .get(&uuid)
-            .and_then(|bd| Some((BlockDevTier::Data, bd as &dyn BlockDev)))
+            .map(|bd| (BlockDevTier::Data, bd as &dyn BlockDev))
             .or_else(move || {
                 self.cache_devs
                     .get(&uuid)
-                    .and_then(|bd| Some((BlockDevTier::Cache, bd as &dyn BlockDev)))
+                    .map(|bd| (BlockDevTier::Cache, bd as &dyn BlockDev))
             })
     }
 

@@ -42,14 +42,14 @@ pub fn get_udev_block_device(
         .scan_devices()?
         .filter(|dev| dev.is_initialized())
         .find(|x| x.devnode().map_or(false, |d| canonical == d))
-        .and_then(|dev| Some(device_as_map(&dev)));
+        .map(|dev| device_as_map(&dev));
     Ok(result)
 }
 
 /// Lookup the WWN from the udev db using the device node eg. /dev/sda
 pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<String>> {
     let dev = get_udev_block_device(dev_node_search)?;
-    Ok(dev.and_then(|dev| dev.get("ID_WWN").and_then(|i| Some(i.clone()))))
+    Ok(dev.and_then(|dev| dev.get("ID_WWN").cloned()))
 }
 
 /// Collect paths for all the block devices which are not individual multipath paths and which

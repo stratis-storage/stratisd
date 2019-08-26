@@ -22,7 +22,7 @@ env_logger="0.5"
 libc = "0.2.47"
 libmount = "0.1.13"
 libudev = "0.2.0"
-lazy_static = "1.0.0"
+lazy_static = "1.4.0"
 timerfd = "1.0.0"
 
 [dependencies.uuid]

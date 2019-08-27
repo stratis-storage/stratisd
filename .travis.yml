@@ -89,10 +89,11 @@ matrix:
           env: TASK=fmt-travis
 
         # ALLOWED FAILURES
-        # Run destructive tests on rust beta, in order to be good Rustaceans
+        # Run clippy on rust beta, in order to be good Rustaceans
         - rust: beta
-          env: TASK=test-travis
-          sudo: required
+          before_script:
+              - rustup component add clippy
+          env: TASK=clippy
 branches:
     only: master
 

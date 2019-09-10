@@ -11,10 +11,7 @@ use std::{
 
 use devicemapper::{DmNameBuf, DmUuidBuf};
 
-use crate::{
-    engine::types::{FilesystemUuid, PoolUuid},
-    stratis::{ErrorEnum, StratisError, StratisResult},
-};
+use crate::engine::{Error, ErrorKind, FilesystemUuid, PoolUuid};
 
 const FORMAT_VERSION: u16 = 1;
 
@@ -187,52 +184,59 @@ pub fn format_backstore_ids(pool_uuid: PoolUuid, role: CacheRole) -> (DmNameBuf,
 }
 
 /// Validate a path for use as a Pool or Filesystem name.
-pub fn validate_name(name: &str) -> StratisResult<()> {
-    let name_path = Path::new(name);
+pub fn validate_name(name: &str) -> Result<(), Error> {
     if name.contains('\u{0}') {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name contains NULL characters : {}", name),
-        ));
+        return Err(Error::new(ErrorKind::InvalidName {
+            name: name.to_owned(),
+            reason: "Name contains NULL characters".to_owned(),
+        }));
     }
-    if name_path.components().count() != 1 {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name is a path with 0 or more than 1 components : {}", name),
-        ));
-    }
-    if name_path.is_absolute() {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name is an absolute path : {}", name),
-        ));
-    }
+
     if name == "." || name == ".." {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name is . or .. : {}", name),
-        ));
+        return Err(Error::new(ErrorKind::InvalidName {
+            name: name.to_owned(),
+            reason: "Name is . or ..".to_owned(),
+        }));
     }
+
     // Linux has a maximum filename length of 255 bytes
     if name.len() > 255 {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name has more than 255 characters : {}", name),
-        ));
+        return Err(Error::new(ErrorKind::InvalidName {
+            name: name.to_owned(),
+            reason: "Name has more than 255 characters".to_owned(),
+        }));
     }
 
     if name.len() != name.trim().len() {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name contains leading or trailing space : {}", name),
-        ));
+        return Err(Error::new(ErrorKind::InvalidName {
+            name: name.to_owned(),
+            reason: "Name contains a leading or trailing space".to_owned(),
+        }));
     }
+
     if name.chars().any(|c| c.is_control()) {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name contains control characters : {}", name),
-        ));
+        return Err(Error::new(ErrorKind::InvalidName {
+            name: name.to_owned(),
+            reason: "Name contains control characters".to_owned(),
+        }));
     }
+
+    let name_path = Path::new(name);
+
+    if name_path.components().count() != 1 {
+        return Err(Error::new(ErrorKind::InvalidName {
+            name: name.to_owned(),
+            reason: "Name is a path with 0 or more than 1 components".to_owned(),
+        }));
+    }
+
+    if name_path.is_absolute() {
+        return Err(Error::new(ErrorKind::InvalidName {
+            name: name.to_owned(),
+            reason: "Name is an absolute path".to_owned(),
+        }));
+    }
+
     Ok(())
 }
 

@@ -15,9 +15,12 @@ use crc::crc32;
 use devicemapper::Bytes;
 
 use crate::{
-    engine::strat_engine::{
-        backstore::metadata::sizes::{mda_size, MDADataSize, MDARegionSize, MDASize},
-        device::SyncAll,
+    engine::{
+        strat_engine::{
+            backstore::metadata::sizes::{mda_size, MDADataSize, MDARegionSize, MDASize},
+            device::SyncAll,
+        },
+        Error, ErrorKind,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -223,7 +226,7 @@ impl MDARegions {
             let offset = MDARegions::mda_offset(header_size, index, region_size)
                 + mda_size::_MDA_REGION_HDR_SIZE as u64;
             f.seek(SeekFrom::Start(offset))?;
-            mda.load_region(f)
+            mda.load_region(f).map_err(|err| err.into())
         };
 
         // TODO: Figure out if there is an action to take if the
@@ -399,7 +402,7 @@ impl MDAHeader {
     /// Return an error if the data can not be read, since the existence
     /// of the MDAHeader implies that the data must be available.
     // MDAHeader cannot seek because it doesn't know which region it's in
-    fn load_region<F>(&self, f: &mut F) -> StratisResult<Vec<u8>>
+    fn load_region<F>(&self, f: &mut F) -> Result<Vec<u8>, Error>
     where
         F: Read,
     {
@@ -414,16 +417,20 @@ impl MDAHeader {
         assert!(*self.used.bytes() as u64 <= std::usize::MAX as u64);
         let mut data_buf = vec![0u8; *self.used.bytes() as usize];
 
-        f.read_exact(&mut data_buf)?;
+        || -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+            f.read_exact(&mut data_buf)?;
 
-        if self.data_crc != crc32::checksum_castagnoli(&data_buf) {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                "MDA region data CRC".into(),
-            ));
-        }
+            let checksum = crc32::checksum_castagnoli(&data_buf);
+            if self.data_crc != checksum {
+                Err(Error::new(ErrorKind::MDADataChecksumIncorrect {
+                    expected: self.data_crc,
+                    actual: checksum,
+                }))?
+            }
 
-        Ok(data_buf)
+            Ok(data_buf)
+        }()
+        .map_err(|err| Error::new(ErrorKind::MDARegionNotLoaded {}).set_constituent(err))
     }
 }
 

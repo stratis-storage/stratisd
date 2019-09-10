@@ -15,6 +15,7 @@ use devicemapper::Device;
 use crate::{
     engine::{
         engine::{Engine, Eventable, Pool},
+        errors::{Error, ErrorKind},
         sim_engine::{pool::SimPool, randomization::Randomizer},
         structures::Table,
         types::{Name, PoolUuid, Redundancy, RenameAction},
@@ -40,7 +41,10 @@ impl Engine for SimEngine {
         let redundancy = calculate_redundancy!(redundancy);
 
         if self.pools.contains_name(name) {
-            return Err(StratisError::Engine(ErrorEnum::AlreadyExists, name.into()));
+            return Err(Error::new(ErrorKind::PoolNameAlreadyInUse {
+                name: name.to_owned(),
+            })
+            .into());
         }
 
         let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
@@ -232,7 +236,10 @@ mod tests {
             .unwrap();
         assert_matches!(
             engine.create_pool(name, &[], None),
-            Err(StratisError::Engine(ErrorEnum::AlreadyExists, _))
+            Err(StratisError::Internal(Error {
+                specifics: ErrorKind::PoolNameAlreadyInUse { name: _name },
+                ..
+            }))
         );
     }
 

@@ -95,7 +95,7 @@ impl StratFilesystem {
                 // thinpool.
                 // TODO: Recover. But how?
             }
-            return Err(err);
+            return Err(err.into());
         }
 
         Ok((

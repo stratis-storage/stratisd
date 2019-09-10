@@ -129,7 +129,7 @@ class Create3TestCase(SimTestCase):
                 "devices": _DEVICE_STRATEGY(),
             },
         )
-        expected_rc = StratisdErrors.ALREADY_EXISTS
+        expected_rc = StratisdErrors.ERROR
         self.assertEqual(rc, expected_rc)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})

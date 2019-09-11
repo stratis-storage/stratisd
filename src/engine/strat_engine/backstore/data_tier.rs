@@ -130,7 +130,7 @@ impl DataTier {
     pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
         self.block_mgr
             .get_blockdev_by_uuid(uuid)
-            .and_then(|bd| Some((BlockDevTier::Data, bd)))
+            .map(|bd| (BlockDevTier::Data, bd))
     }
 
     /// Lookup a mutable blockdev by its Stratis UUID.
@@ -140,7 +140,7 @@ impl DataTier {
     ) -> Option<(BlockDevTier, &mut StratBlockDev)> {
         self.block_mgr
             .get_mut_blockdev_by_uuid(uuid)
-            .and_then(|bd| Some((BlockDevTier::Data, bd)))
+            .map(|bd| (BlockDevTier::Data, bd))
     }
 
     /// Get the blockdevs belonging to this tier

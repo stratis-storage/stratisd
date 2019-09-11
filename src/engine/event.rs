@@ -2,16 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    fmt::Debug,
-    sync::{Once, ONCE_INIT},
-};
+use std::{fmt::Debug, sync::Once};
 
 use crate::engine::types::{
     BlockDevState, FreeSpaceState, MaybeDbusPath, PoolExtendState, PoolState,
 };
 
-static INIT: Once = ONCE_INIT;
+static INIT: Once = Once::new();
 static mut ENGINE_LISTENER_LIST: Option<EngineListenerList> = None;
 
 #[derive(Debug, Clone)]

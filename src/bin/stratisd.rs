@@ -10,8 +10,6 @@ extern crate log;
 use std::{
     cell::RefCell,
     env,
-    fs::{File, OpenOptions},
-    io::{ErrorKind, Read, Write},
     os::unix::io::{AsRawFd, RawFd},
     path::PathBuf,
     process::exit,
@@ -21,15 +19,15 @@ use std::{
 use chrono::Duration;
 use clap::{App, Arg, ArgMatches};
 use env_logger::Builder;
-use libc::pid_t;
 use log::LevelFilter;
 use nix::{
-    fcntl::{flock, FlockArg},
+    errno::Errno,
     sys::{
         signal::{self, SigSet},
         signalfd::{SfdFlags, SignalFd},
+        socket::{bind, socket, AddressFamily, SockAddr, SockFlag, SockType, UnixAddr},
     },
-    unistd::getpid,
+    unistd::{close, Uid},
 };
 use timerfd::{SetTimeFlags, TimerFd, TimerState};
 use uuid::Uuid;
@@ -47,7 +45,7 @@ use libstratis::{
     stratis::{buff_log, StratisError, StratisResult, VERSION},
 };
 
-const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
+const STRATISD_SOCKET_ADDR: &[u8] = b"org.storage.stratis1";
 
 /// Interval at which to have stratisd dump its state
 const DEFAULT_STATE_DUMP_MINUTES: i64 = 10;
@@ -102,47 +100,37 @@ fn initialize_log(debug: bool) -> buff_log::Handle<env_logger::Logger> {
     }
 }
 
-/// To ensure only one instance of stratisd runs at a time, acquire an
-/// exclusive lock. Return an error if lock attempt fails.
-fn trylock_pid_file() -> StratisResult<File> {
-    let mut f = match OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(STRATISD_PID_PATH)
-    {
-        Ok(f) => f,
-        Err(e) => {
-            if e.kind() == ErrorKind::PermissionDenied {
-                return Err(StratisError::Error(
-                    "Must be running as root in order to start daemon.".to_string(),
-                ));
-            }
-            return Err(e.into());
-        }
-    };
-    match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
-        Ok(_) => {
-            f.write_all(format!("{}\n", getpid()).as_bytes())?;
-            Ok(f)
-        }
-        Err(_) => {
-            let mut buf = String::new();
-            f.read_to_string(&mut buf)?;
-            // pidfile is supposed to contain pid of holder. But you never
-            // know so be paranoid.
-            let pid_str = buf
-                .split_whitespace()
-                .next()
-                .and_then(|s| s.parse::<pid_t>().ok())
-                .map(|pid| format!("{}", pid))
-                .unwrap_or_else(|| "<unknown>".into());
-            Err(StratisError::Error(format!(
-                "Daemon already running with pid: {}",
-                pid_str
-            )))
-        }
+/// To ensure only one instance of stratisd runs at a time, create a socket
+/// with a specified abstract namespace path. Return an error if socket creation
+/// attempt fails.
+fn try_abstract_socket() -> StratisResult<RawFd> {
+    if !Uid::effective().is_root() {
+        return Err(StratisError::Error(
+            "Must be running as root in order to start daemon.".to_string(),
+        ));
     }
+    let sock_fd = socket(
+        AddressFamily::Unix,
+        SockType::Stream,
+        SockFlag::empty(),
+        None,
+    )
+    .map_err(|e| {
+        StratisError::Error(format!(
+            "Failed to create socket and test if process is already running: {}",
+            e
+        ))
+    })?;
+    bind(sock_fd, &SockAddr::Unix(match UnixAddr::new_abstract(STRATISD_SOCKET_ADDR) {
+        Ok(ua) => ua,
+        Err(_) => unreachable!("The abstract path for the unix PID lock socket is static and should work - please report this as a bug"),
+    })).map_err(|e| {
+        match e {
+            nix::Error::Sys(Errno::EADDRINUSE) => StratisError::Error("Daemon already running".to_string()),
+            _ => StratisError::Error(format!("Failed to create PID lock socket: {}", e)),
+        }
+    })?;
+    Ok(sock_fd)
 }
 
 // Conditionally compiled support for a D-Bus interface.
@@ -511,19 +499,24 @@ fn main() {
 
     // Using a let-expression here so that the scope of the lock file
     // is the rest of the block.
-    let lock_file = trylock_pid_file();
-
-    let result = {
-        match lock_file {
-            Err(err) => Err(err),
-            Ok(_) => {
-                let log_handle = initialize_log(matches.is_present("debug"));
-                run(&matches, &log_handle)
-            }
+    let socket = match try_abstract_socket() {
+        Ok(fd) => fd,
+        Err(e) => {
+            print_err(&e);
+            exit(1);
         }
     };
 
-    if let Err(err) = result {
+    let log_handle = initialize_log(matches.is_present("debug"));
+    let result = run(&matches, &log_handle);
+
+    if let Err(err) = close(socket) {
+        print_err(&StratisError::Error(format!(
+            "Failed to clean up process lock socket: {}",
+            err
+        )));
+        exit(1);
+    } else if let Err(err) = result {
         print_err(&err);
         exit(1);
     } else {

@@ -1,0 +1,62 @@
+stratisd 1.0.6 (UNRELEASED)
+===========================
+Recommended Rust toolchain version: 1.37
+Lowest supported Rust toolchain version: 1.36
+Python auto-formatter: black (18.9b0)
+
+New minimum Rust crate requirements:
+  - error_chain: 0.12.1
+  - lazy_static: 1.4.0
+
+- Fix a bug in writing metadata after setup when current time is set back:
+  https://github.com/stratis-storage/stratisd/issues/1509
+  https://github.com/stratis-storage/stratisd/pull/1595
+
+- Change a message level from info to debug and improve the message text:
+  https://github.com/stratis-storage/stratisd/issues/1485
+  https://github.com/stratis-storage/stratisd/pull/1558
+
+- Metadata refactoring to improve encapsulation and clarity and to use
+  types to distinguish among the sizes of different metadata regions:
+  https://github.com/stratis-storage/stratisd/issues/1573
+  https://github.com/stratis-storage/stratisd/pull/1569
+  https://github.com/stratis-storage/stratisd/pull/1571
+  https://github.com/stratis-storage/stratisd/pull/1570
+  https://github.com/stratis-storage/stratisd/pull/1574
+  https://github.com/stratis-storage/stratisd/pull/1572
+  https://github.com/stratis-storage/stratisd/pull/1576
+  https://github.com/stratis-storage/stratisd/pull/1581
+  https://github.com/stratis-storage/stratisd/pull/1585
+  https://github.com/stratis-storage/stratisd/pull/1589
+  https://github.com/stratis-storage/stratisd/pull/1599
+  https://github.com/stratis-storage/stratisd/pull/1606
+  https://github.com/stratis-storage/stratisd/pull/1608
+
+- Use types to distinguish among sizes:
+  https://github.com/stratis-storage/stratisd/pull/1591
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/1621
+  https://github.com/stratis-storage/stratisd/pull/1625
+  https://github.com/stratis-storage/stratisd/pull/1624
+  https://github.com/stratis-storage/stratisd/pull/1623
+  https://github.com/stratis-storage/stratisd/pull/1622
+  https://github.com/stratis-storage/stratisd/pull/1618
+  https://github.com/stratis-storage/stratisd/pull/1617
+  https://github.com/stratis-storage/stratisd/pull/1615
+  https://github.com/stratis-storage/stratisd/pull/1613
+  https://github.com/stratis-storage/stratisd/pull/1610
+  https://github.com/stratis-storage/stratisd/pull/1609
+  https://github.com/stratis-storage/stratisd/pull/1605
+  https://github.com/stratis-storage/stratisd/pull/1604
+  https://github.com/stratis-storage/stratisd/pull/1603
+  https://github.com/stratis-storage/stratisd/pull/1600
+  https://github.com/stratis-storage/stratisd/pull/1598
+  https://github.com/stratis-storage/stratisd/pull/1593
+  https://github.com/stratis-storage/stratisd/pull/1588
+  https://github.com/stratis-storage/stratisd/pull/1587
+  https://github.com/stratis-storage/stratisd/pull/1580
+  https://github.com/stratis-storage/stratisd/pull/1577
+  https://github.com/stratis-storage/stratisd/pull/1566
+  https://github.com/stratis-storage/stratisd/pull/1565
+  https://github.com/stratis-storage/stratisd/pull/1563

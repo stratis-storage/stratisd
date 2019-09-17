@@ -121,14 +121,13 @@ fn try_abstract_socket() -> StratisResult<RawFd> {
             e
         ))
     })?;
-    bind(sock_fd, &SockAddr::Unix(match UnixAddr::new_abstract(STRATISD_SOCKET_ADDR) {
+    let unix_addr = match UnixAddr::new_abstract(STRATISD_SOCKET_ADDR) {
         Ok(ua) => ua,
-        Err(_) => unreachable!("The abstract path for the unix PID lock socket is static and should work - please report this as a bug"),
-    })).map_err(|e| {
-        match e {
-            nix::Error::Sys(Errno::EADDRINUSE) => StratisError::Error("Daemon already running".to_string()),
-            _ => StratisError::Error(format!("Failed to create PID lock socket: {}", e)),
-        }
+        Err(_) => unreachable!("STRATISD_SOCKET_ADDR is a valid socket address name"),
+    };
+    bind(sock_fd, &SockAddr::Unix(unix_addr)).map_err(|e| match e {
+        nix::Error::Sys(Errno::EADDRINUSE) => StratisError::Error("Daemon already running".to_string()),
+        _ => StratisError::Error(format!("Failed to create PID lock socket: {}", e)),
     })?;
     Ok(sock_fd)
 }
@@ -497,8 +496,6 @@ fn main() {
         )
         .get_matches();
 
-    // Using a let-expression here so that the scope of the lock file
-    // is the rest of the block.
     let socket = match try_abstract_socket() {
         Ok(fd) => fd,
         Err(e) => {

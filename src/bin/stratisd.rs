@@ -126,7 +126,9 @@ fn try_abstract_socket() -> StratisResult<RawFd> {
         Err(_) => unreachable!("STRATISD_SOCKET_ADDR is a valid socket address name"),
     };
     bind(sock_fd, &SockAddr::Unix(unix_addr)).map_err(|e| match e {
-        nix::Error::Sys(Errno::EADDRINUSE) => StratisError::Error("Daemon already running".to_string()),
+        nix::Error::Sys(Errno::EADDRINUSE) => {
+            StratisError::Error("Daemon already running".to_string())
+        }
         _ => StratisError::Error(format!("Failed to create PID lock socket: {}", e)),
     })?;
     Ok(sock_fd)

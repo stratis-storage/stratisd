@@ -47,7 +47,7 @@ use libstratis::{
     stratis::{buff_log, StratisError, StratisResult, VERSION},
 };
 
-const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
+const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
 
 /// Interval at which to have stratisd dump its state
 const DEFAULT_STATE_DUMP_MINUTES: i64 = 10;
@@ -118,7 +118,10 @@ fn trylock_pid_file() -> StratisResult<File> {
                     "Must be running as root in order to start daemon.".to_string(),
                 ));
             }
-            return Err(e.into());
+            return Err(StratisError::Error(format!(
+                "Failed to create the stratisd PID file at {}: {}",
+                STRATISD_PID_PATH, e
+            )));
         }
     };
     match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {

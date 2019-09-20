@@ -11,7 +11,7 @@ use std::{
     cell::RefCell,
     env,
     fs::{File, OpenOptions},
-    io::{ErrorKind, Read, Write},
+    io::{Read, Write},
     os::unix::io::{AsRawFd, RawFd},
     path::PathBuf,
     process::exit,
@@ -113,13 +113,8 @@ fn trylock_pid_file() -> StratisResult<File> {
     {
         Ok(f) => f,
         Err(e) => {
-            if e.kind() == ErrorKind::PermissionDenied {
-                return Err(StratisError::Error(
-                    "Must be running as root in order to start daemon.".to_string(),
-                ));
-            }
             return Err(StratisError::Error(format!(
-                "Failed to create the stratisd PID file at {}: {}",
+                "Failed to create or open the stratisd PID file at {}: {}",
                 STRATISD_PID_PATH, e
             )));
         }

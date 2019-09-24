@@ -75,8 +75,8 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     };
 
     let return_value = match infos {
-        Some(ref i) => {
-            let v = i
+        Some(ref newly_created_filesystems) => {
+            let v = newly_created_filesystems
                 .iter()
                 .map(|&(name, uuid)| {
                     // FIXME: To avoid this expect, modify create_filesystem

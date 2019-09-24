@@ -111,7 +111,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let filesystem_paths: Array<dbus::Path, _> = get_next_arg(&mut iter, 0)?;
+    let filesystems: Array<dbus::Path<'static>, _> = get_next_arg(&mut iter, 0)?;
 
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
@@ -127,14 +127,13 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = filesystem_paths
-        .filter_map(|path| m.tree.get(&path))
-        .filter_map(|op| {
-            op.get_data()
-                .as_ref()
-                .map(|d| (d.uuid, op.get_name().clone()))
-        })
-        .collect();
+    let mut filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = HashMap::new();
+    for op in filesystems {
+        if let Some(filesystem_path) = m.tree.get(&op) {
+            let filesystem_uuid = get_data!(filesystem_path; default_return; return_message).uuid;
+            filesystem_map.insert(filesystem_uuid, op);
+        }
+    }
 
     let result = pool.destroy_filesystems(
         &pool_name,
@@ -144,18 +143,20 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(uuids) => {
             // Only get changed values here as non-existant filesystems will have been filtered out
             // before calling destroy_filesystems
-            let changed = uuids.changed();
-            if let Some(ref uuids) = changed {
-                for uuid in uuids {
+            let uuid_vec: Vec<String> = if let Some(ref changed_uuids) = uuids.changed() {
+                for uuid in changed_uuids {
                     let op = filesystem_map
                         .get(uuid)
                         .expect("'uuids' is a subset of filesystem_map.keys()");
                     dbus_context.actions.borrow_mut().push_remove(op, m.tree);
                 }
-            }
-
-            let uuid_vec: Vec<String> =
-                changed.map_or_else(Vec::new, |v| v.iter().map(|n| uuid_to_string!(n)).collect());
+                changed_uuids
+                    .iter()
+                    .map(|uuid| uuid_to_string!(uuid))
+                    .collect()
+            } else {
+                Vec::new()
+            };
             return_message.append3((true, uuid_vec), msg_code_ok(), msg_string_ok())
         }
         Err(err) => {

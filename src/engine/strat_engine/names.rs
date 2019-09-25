@@ -217,7 +217,7 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
     if name.len() > 255 {
         return Err(StratisError::Engine(
             ErrorEnum::Invalid,
-            format!("Name has more than 255 characters : {}", name),
+            format!("Name has more than 255 bytes : {}", name),
         ));
     }
 

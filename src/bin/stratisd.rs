@@ -11,7 +11,7 @@ use std::{
     cell::RefCell,
     env,
     fs::{File, OpenOptions},
-    io::{ErrorKind, Read, Write},
+    io::{Read, Write},
     os::unix::io::{AsRawFd, RawFd},
     path::PathBuf,
     process::exit,
@@ -47,7 +47,7 @@ use libstratis::{
     stratis::{buff_log, StratisError, StratisResult, VERSION},
 };
 
-const STRATISD_PID_PATH: &str = "/var/run/stratisd.pid";
+const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
 
 /// Interval at which to have stratisd dump its state
 const DEFAULT_STATE_DUMP_MINUTES: i64 = 10;
@@ -113,12 +113,10 @@ fn trylock_pid_file() -> StratisResult<File> {
     {
         Ok(f) => f,
         Err(e) => {
-            if e.kind() == ErrorKind::PermissionDenied {
-                return Err(StratisError::Error(
-                    "Must be running as root in order to start daemon.".to_string(),
-                ));
-            }
-            return Err(e.into());
+            return Err(StratisError::Error(format!(
+                "Failed to create or open the stratisd PID file at {}: {}",
+                STRATISD_PID_PATH, e
+            )));
         }
     };
     match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {

@@ -127,13 +127,15 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let mut filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = HashMap::new();
-    for op in filesystems {
-        if let Some(filesystem_path) = m.tree.get(&op) {
-            let filesystem_uuid = get_data!(filesystem_path; default_return; return_message).uuid;
-            filesystem_map.insert(filesystem_uuid, op);
-        }
-    }
+    let filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = filesystems
+        .filter_map(|path| {
+            m.tree.get(&path).and_then(|op| {
+                op.get_data()
+                    .as_ref()
+                    .map(|d| (d.uuid, op.get_name().clone()))
+            })
+        })
+        .collect();
 
     let result = pool.destroy_filesystems(
         &pool_name,

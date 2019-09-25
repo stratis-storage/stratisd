@@ -58,7 +58,7 @@ class Create2TestCase(SimTestCase):
         )
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        all_pools = [x for x in pools().search(managed_objects)]
+        all_pools = list(pools().search(managed_objects))
         result = next(
             pools(props={"Name": self._POOLNAME}).search(managed_objects), None
         )
@@ -133,7 +133,7 @@ class Create3TestCase(SimTestCase):
         self.assertEqual(rc, expected_rc)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        pools2 = [x for x in pools().search(managed_objects)]
+        pools2 = list(pools().search(managed_objects))
         pool = next(pools(props={"Name": self._POOLNAME}).search(managed_objects), None)
 
         self.assertIsNotNone(pool)

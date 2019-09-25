@@ -69,7 +69,7 @@ class CreateFSTestCase(SimTestCase):
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
-        self.assertEqual(len([x for x in result]), 0)
+        self.assertEqual(len(list(result)), 0)
 
     @unittest.skip("skip until creating multiple filesystems is supported")
     def testDuplicateSpecs(self):
@@ -91,7 +91,7 @@ class CreateFSTestCase(SimTestCase):
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
-        self.assertEqual(len([x for x in result]), 1)
+        self.assertEqual(len(list(result)), 1)
 
 
 class CreateFSTestCase1(SimTestCase):
@@ -133,7 +133,7 @@ class CreateFSTestCase1(SimTestCase):
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
-        self.assertEqual(len([x for x in result]), 1)
+        self.assertEqual(len(list(result)), 1)
 
     def testCreateOne(self):
         """
@@ -155,7 +155,7 @@ class CreateFSTestCase1(SimTestCase):
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
-        self.assertEqual(len([x for x in result]), 2)
+        self.assertEqual(len(list(result)), 2)
 
     @unittest.skip("skip until creating multiple filesystems is supported")
     def testCreateWithConflict(self):
@@ -174,7 +174,7 @@ class CreateFSTestCase1(SimTestCase):
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
-        self.assertEqual(len([x for x in result]), 1)
+        self.assertEqual(len(list(result)), 1)
 
     def testCreateMultiple(self):
         """
@@ -192,4 +192,4 @@ class CreateFSTestCase1(SimTestCase):
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
-        self.assertEqual(len([x for x in result]), 1)
+        self.assertEqual(len(list(result)), 1)

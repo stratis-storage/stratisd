@@ -67,7 +67,7 @@ class DestroyFSTestCase(SimTestCase):
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
-        self.assertEqual(len([x for x in result]), 0)
+        self.assertEqual(len(list(result)), 0)
 
     def testDestroyOne(self):
         """
@@ -83,7 +83,7 @@ class DestroyFSTestCase(SimTestCase):
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
-        self.assertEqual(len([x for x in result]), 0)
+        self.assertEqual(len(list(result)), 0)
 
 
 class DestroyFSTestCase1(SimTestCase):
@@ -127,7 +127,7 @@ class DestroyFSTestCase1(SimTestCase):
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
-        self.assertEqual(len([x for x in result]), 0)
+        self.assertEqual(len(list(result)), 0)
 
     def testDestroyTwo(self):
         """
@@ -146,4 +146,4 @@ class DestroyFSTestCase1(SimTestCase):
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
-        self.assertEqual(len([x for x in result]), 0)
+        self.assertEqual(len(list(result)), 0)

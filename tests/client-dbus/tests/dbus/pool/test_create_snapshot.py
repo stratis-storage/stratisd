@@ -80,7 +80,7 @@ class CreateSnapshotTestCase(SimTestCase):
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
-        self.assertEqual(len([x for x in result]), 2)
+        self.assertEqual(len(list(result)), 2)
 
     def testDuplicateSnapshotName(self):
         """
@@ -106,4 +106,4 @@ class CreateSnapshotTestCase(SimTestCase):
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
-        self.assertEqual(len([x for x in result]), 2)
+        self.assertEqual(len(list(result)), 2)

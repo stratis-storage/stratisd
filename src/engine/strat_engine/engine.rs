@@ -38,7 +38,7 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 /// being set up.
 /// Precondition: every device in devices has already been determined to belong
 /// to the pool with pool_uuid.
-pub fn setup_pool(
+fn setup_pool(
     pool_uuid: PoolUuid,
     devices: &HashMap<Device, PathBuf>,
     pools: &Table<StratPool>,

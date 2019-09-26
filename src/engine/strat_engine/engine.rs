@@ -198,7 +198,7 @@ impl Engine for StratEngine {
     /// Returns an error if the status of the block device can not be evaluated.
     /// Logs a warning if the block devices appears to be a Stratis block
     /// device and no pool is set up.
-    fn block_evaluate_5(
+    fn block_evaluate(
         &mut self,
         device: Device,
         dev_node: PathBuf,

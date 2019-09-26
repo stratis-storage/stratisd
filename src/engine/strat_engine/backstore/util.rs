@@ -74,7 +74,7 @@ fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
 }
 
 /// Retrieve all the block devices on the system that have a Stratis signature.
-pub fn get_stratis_block_devices_5() -> StratisResult<Vec<PathBuf>> {
+pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
     let context = libudev::Context::new()?;
     let mut enumerator = libudev::Enumerator::new(&context)?;
     enumerator.match_subsystem("block")?;

@@ -9,6 +9,10 @@ lint:
 dbus-tests:
 	py.test-3 ${PYTEST_OPTS} ./tests/dbus
 
+.PHONY: misc-tests
+misc-tests:
+	py.test-3 ${PYTEST_OPTS} ./tests/misc
+
 .PHONY: fmt
 fmt:
 	black .
@@ -22,4 +26,4 @@ udev-tests:
 	py.test-3 ${PYTEST_OPTS} ./tests/udev
 
 .PHONY: tests
-tests: dbus-tests udev-tests
+tests: dbus-tests misc-tests udev-tests

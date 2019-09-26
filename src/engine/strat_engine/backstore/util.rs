@@ -11,7 +11,7 @@ use std::{
 
 use libudev;
 
-use crate::{engine::strat_engine::backstore::is_stratis_device, stratis::StratisResult};
+use crate::{engine::strat_engine::backstore::is_stratis_device_4, stratis::StratisResult};
 
 /// Takes a libudev device entry and returns the properties as a HashMap.
 fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
@@ -74,7 +74,7 @@ fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
 }
 
 /// Retrieve all the block devices on the system that have a Stratis signature.
-pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
+pub fn get_stratis_block_devices_5() -> StratisResult<Vec<PathBuf>> {
     let context = libudev::Context::new()?;
     let mut enumerator = libudev::Enumerator::new(&context)?;
     enumerator.match_subsystem("block")?;
@@ -102,7 +102,7 @@ pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
 
         Ok(get_all_empty_devices()?
             .into_iter()
-            .filter(|x| is_stratis_device(&x).unwrap_or(None).is_some())
+            .filter(|x| is_stratis_device_4(&x).unwrap_or(None).is_some())
             .collect())
     } else {
         Ok(devices)

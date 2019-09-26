@@ -22,7 +22,7 @@ use crate::{
                 cache_tier::CacheTier,
                 data_tier::DataTier,
                 metadata::MDADataSize,
-                setup::get_blockdevs,
+                setup::get_blockdevs_3,
                 StratBlockDev,
             },
             device::wipe_sectors,
@@ -115,13 +115,13 @@ impl Backstore {
     /// Postcondition:
     /// self.linear.is_some() XOR self.cache.is_some()
     /// self.cache.is_some() <=> self.cache_tier.is_some()
-    pub fn setup(
+    pub fn setup_4(
         pool_uuid: PoolUuid,
         backstore_save: &BackstoreSave,
         devnodes: &HashMap<Device, PathBuf>,
         last_update_time: DateTime<Utc>,
     ) -> StratisResult<Backstore> {
-        let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
+        let (datadevs, cachedevs) = get_blockdevs_3(pool_uuid, backstore_save, devnodes)?;
         let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time));
         let data_tier = DataTier::setup(block_mgr, &backstore_save.data_tier)?;
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);

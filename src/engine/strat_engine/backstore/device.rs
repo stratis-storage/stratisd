@@ -69,14 +69,14 @@ fn signature(device: &HashMap<String, String>) -> String {
 }
 
 /// Determine what a block device is used for.
-pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
+pub fn identify_3(devnode: &Path) -> StratisResult<DevOwnership> {
     if let Some(device) = get_udev_block_device(devnode)? {
         if empty(&device) {
             // The device is either really empty or we are running on a distribution that hasn't
             // picked up the latest libblkid, lets read down to the device and find out for sure.
             // TODO: At some point in the future we can remove this and just return Unowned.
             if let Some((pool_uuid, device_uuid)) =
-                BDA::device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+                BDA::device_identifiers_2(&mut OpenOptions::new().read(true).open(&devnode)?)?
             {
                 Ok(DevOwnership::Ours(pool_uuid, device_uuid))
             } else {
@@ -90,7 +90,7 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
         } else if device.contains_key("ID_FS_TYPE") && device["ID_FS_TYPE"] == "stratis" {
             // Device is ours, but we don't get everything we need from udev db, lets go to disk.
             if let Some((pool_uuid, device_uuid)) =
-                BDA::device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+                BDA::device_identifiers_2(&mut OpenOptions::new().read(true).open(&devnode)?)?
             {
                 Ok(DevOwnership::Ours(pool_uuid, device_uuid))
             } else {
@@ -117,8 +117,8 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
 
 /// Determine if devnode is a Stratis device. Return the device's Stratis
 /// pool UUID if it belongs to Stratis.
-pub fn is_stratis_device(devnode: &Path) -> StratisResult<Option<(PoolUuid, DevUuid)>> {
-    match identify(devnode)? {
+pub fn is_stratis_device_4(devnode: &Path) -> StratisResult<Option<(PoolUuid, DevUuid)>> {
+    match identify_3(devnode)? {
         DevOwnership::Ours(pool_uuid, dev_uuid) => Ok(Some((pool_uuid, dev_uuid))),
         _ => Ok(None),
     }

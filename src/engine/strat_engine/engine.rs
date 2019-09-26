@@ -19,7 +19,7 @@ use crate::{
         engine::Eventable,
         event::get_engine_listener_list,
         strat_engine::{
-            backstore::{find_all, get_metadata, is_stratis_device},
+            backstore::{find_all_3, get_metadata_3, is_stratis_device_4},
             cmd::verify_binaries,
             dm::{get_dm, get_dm_init},
             names::validate_name,
@@ -38,7 +38,7 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 /// being set up.
 /// Precondition: every device in devices has already been determined to belong
 /// to the pool with pool_uuid.
-pub fn setup_pool(
+pub fn setup_pool_4(
     pool_uuid: PoolUuid,
     devices: &HashMap<Device, PathBuf>,
     pools: &Table<StratPool>,
@@ -58,7 +58,7 @@ pub fn setup_pool(
         format!("(pool UUID: {}, devnodes: {})", pool_uuid, dev_paths)
     };
 
-    let (timestamp, metadata) = get_metadata(pool_uuid, devices)?.ok_or_else(|| {
+    let (timestamp, metadata) = get_metadata_3(pool_uuid, devices)?.ok_or_else(|| {
         let err_msg = format!("no metadata found for {}", info_string());
         StratisError::Engine(ErrorEnum::NotFound, err_msg)
     })?;
@@ -82,7 +82,7 @@ pub fn setup_pool(
             Err(StratisError::Engine(ErrorEnum::Error, err_msg))
         })
         .and_then(|_| {
-            StratPool::setup(pool_uuid, devices, timestamp, &metadata).or_else(|e| {
+            StratPool::setup_5(pool_uuid, devices, timestamp, &metadata).or_else(|e| {
                 let err_msg = format!(
                     "failed to set up pool for {}: reason: {:?}",
                     info_string(),
@@ -134,12 +134,12 @@ impl StratEngine {
 
         devlinks::setup_dev_path()?;
 
-        let pools = find_all()?;
+        let pools = find_all_3()?;
 
         let mut table = Table::default();
         let mut incomplete_pools = HashMap::new();
         for (pool_uuid, devices) in pools {
-            match setup_pool(pool_uuid, &devices, &table) {
+            match setup_pool_4(pool_uuid, &devices, &table) {
                 Ok((pool_name, pool)) => {
                     table.insert(pool_name, pool_uuid, pool);
                 }
@@ -198,12 +198,12 @@ impl Engine for StratEngine {
     /// Returns an error if the status of the block device can not be evaluated.
     /// Logs a warning if the block devices appears to be a Stratis block
     /// device and no pool is set up.
-    fn block_evaluate(
+    fn block_evaluate_5(
         &mut self,
         device: Device,
         dev_node: PathBuf,
     ) -> StratisResult<Option<PoolUuid>> {
-        let pool_uuid = if let Some((pool_uuid, device_uuid)) = is_stratis_device(&dev_node)? {
+        let pool_uuid = if let Some((pool_uuid, device_uuid)) = is_stratis_device_4(&dev_node)? {
             if self.pools.contains_uuid(pool_uuid) {
                 // We can get udev events for devices that are already in the pool.  Lets check
                 // to see if this block device is already in this existing pool.  If it is, then all
@@ -248,7 +248,7 @@ impl Engine for StratEngine {
                     .or_else(|| Some(HashMap::new()))
                     .expect("We just retrieved or created a HashMap");
                 devices.insert(device, dev_node);
-                match setup_pool(pool_uuid, &devices, &self.pools) {
+                match setup_pool_4(pool_uuid, &devices, &self.pools) {
                     Ok((pool_name, pool)) => {
                         self.pools.insert(pool_name, pool_uuid, pool);
                         Some(pool_uuid)

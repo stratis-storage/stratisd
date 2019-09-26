@@ -24,7 +24,7 @@ use crate::{
         engine::BlockDev,
         strat_engine::{
             backstore::{
-                device::{identify, resolve_devices, DevOwnership},
+                device::{identify_3, resolve_devices, DevOwnership},
                 metadata::{BlockdevSize, MDADataSize, BDA},
                 util::hw_lookup,
                 StratBlockDev,
@@ -372,7 +372,7 @@ fn initialize(
     fn dev_info(devnode: &Path) -> StratisResult<(&Path, Bytes, DevOwnership, File)> {
         let f = OpenOptions::new().read(true).write(true).open(&devnode)?;
         let dev_size = blkdev_size(&f)?;
-        let ownership = identify(devnode)?;
+        let ownership = identify_3(devnode)?;
 
         Ok((devnode, dev_size, ownership, f))
     }

@@ -18,7 +18,7 @@ mod util;
 pub use self::{
     backstore::Backstore,
     blockdev::StratBlockDev,
-    device::is_stratis_device,
+    device::is_stratis_device_4,
     metadata::MDADataSize,
-    setup::{find_all, get_metadata},
+    setup::{find_all_3, get_metadata_3},
 };

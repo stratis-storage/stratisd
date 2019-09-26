@@ -89,11 +89,11 @@ impl BDA {
 
     /// Load a BDA on initial setup of a device.
     /// Returns None if no BDA appears to exist.
-    pub fn load<F>(f: &mut F) -> StratisResult<Option<BDA>>
+    pub fn load_2<F>(f: &mut F) -> StratisResult<Option<BDA>>
     where
         F: Read + Seek + SyncAll,
     {
-        let header = match StaticHeader::setup(f)? {
+        let header = match StaticHeader::setup_1(f)? {
             Some(header) => header,
             None => return Ok(None),
         };
@@ -184,11 +184,11 @@ impl BDA {
     /// Get a Stratis pool UUID and device UUID from any device.
     /// If there is an error while obtaining these values return the error.
     /// If the device does not appear to be a Stratis device, return None.
-    pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<((PoolUuid, DevUuid))>>
+    pub fn device_identifiers_2<F>(f: &mut F) -> StratisResult<Option<((PoolUuid, DevUuid))>>
     where
         F: Read + Seek + SyncAll,
     {
-        StaticHeader::setup(f).map(|sh| sh.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
+        StaticHeader::setup_1(f).map(|sh| sh.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
     }
 }
 
@@ -321,7 +321,7 @@ impl StaticHeader {
     /// Return an error if the sigblocks differ in some unaccountable way.
     /// Returns an error if a write intended to repair an ill-formed,
     /// unreadable, or stale signature block failed.
-    fn setup<F>(f: &mut F) -> StratisResult<Option<StaticHeader>>
+    fn setup_1<F>(f: &mut F) -> StratisResult<Option<StaticHeader>>
     where
         F: Read + Seek + SyncAll,
     {

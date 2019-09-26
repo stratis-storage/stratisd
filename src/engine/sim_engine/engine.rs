@@ -58,7 +58,7 @@ impl Engine for SimEngine {
         Ok(pool_uuid)
     }
 
-    fn block_evaluate(
+    fn block_evaluate_5(
         &mut self,
         device: Device,
         dev_node: PathBuf,

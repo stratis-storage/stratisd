@@ -19,7 +19,9 @@ use devicemapper::{devnode_to_devno, Device, Sectors};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{blockdev::StratBlockDev, metadata::BDA, util::get_stratis_block_devices},
+            backstore::{
+                blockdev::StratBlockDev, metadata::BDA, util::get_stratis_block_devices_5,
+            },
             device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
@@ -31,15 +33,15 @@ use crate::{
 /// Find all Stratis devices.
 ///
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
-pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
+pub fn find_all_3() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     let mut pool_map = HashMap::new();
 
-    for devnode in get_stratis_block_devices()? {
+    for devnode in get_stratis_block_devices_5()? {
         match devnode_to_devno(&devnode)? {
             None => continue,
             Some(devno) => {
                 if let Some((pool_uuid, _)) =
-                    BDA::device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+                    BDA::device_identifiers_2(&mut OpenOptions::new().read(true).open(&devnode)?)?
                 {
                     pool_map
                         .entry(pool_uuid)
@@ -55,7 +57,7 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
 /// Get the most recent metadata from a set of Devices for a given pool UUID.
 /// Returns None if no metadata found for this pool.
 #[allow(clippy::implicit_hasher)]
-pub fn get_metadata(
+pub fn get_metadata_3(
     pool_uuid: PoolUuid,
     devnodes: &HashMap<Device, PathBuf>,
 ) -> StratisResult<Option<(DateTime<Utc>, PoolSave)>> {
@@ -66,7 +68,7 @@ pub fn get_metadata(
     // the newest metadata.
     let mut bdas = Vec::new();
     for devnode in devnodes.values() {
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
+        let bda = BDA::load_2(&mut OpenOptions::new().read(true).open(devnode)?)?;
         if let Some(bda) = bda {
             if bda.pool_uuid() == pool_uuid {
                 bdas.push((devnode, bda));
@@ -125,7 +127,7 @@ pub fn get_metadata(
 /// Precondition: Every device in devnodes has already been determined to
 /// belong to the pool with the specified pool uuid.
 #[allow(clippy::implicit_hasher)]
-pub fn get_blockdevs(
+pub fn get_blockdevs_3(
     pool_uuid: PoolUuid,
     backstore_save: &BackstoreSave,
     devnodes: &HashMap<Device, PathBuf>,
@@ -246,7 +248,7 @@ pub fn get_blockdevs(
 
     let (mut datadevs, mut cachedevs): (Vec<StratBlockDev>, Vec<StratBlockDev>) = (vec![], vec![]);
     for (device, devnode) in devnodes {
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?.ok_or_else(|| {
+        let bda = BDA::load_2(&mut OpenOptions::new().read(true).open(devnode)?)?.ok_or_else(|| {
             StratisError::Engine(ErrorEnum::NotFound,
                                                  format!("Device {} with devnode {} was previously determined to belong to pool with uuid {} but no BDA was found",
                                                  device,

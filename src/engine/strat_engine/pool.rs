@@ -189,13 +189,13 @@ impl StratPool {
     /// Precondition: every device in devnodes has already been determined
     /// to belong to the pool with the specified uuid.
     /// Precondition: A metadata verification step has already been run.
-    pub fn setup(
+    pub fn setup_5(
         uuid: PoolUuid,
         devnodes: &HashMap<Device, PathBuf>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
     ) -> StratisResult<(Name, StratPool)> {
-        let mut backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, timestamp)?;
+        let mut backstore = Backstore::setup_4(uuid, &metadata.backstore, devnodes, timestamp)?;
         let mut thinpool = ThinPool::setup(
             uuid,
             &metadata.thinpool_dev,

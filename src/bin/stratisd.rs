@@ -275,7 +275,7 @@ impl<'a> UdevMonitor<'a> {
                 let new_pool_uuid = device.devnode().and_then(|devnode| {
                     device.devnum().and_then(|devnum| {
                         engine
-                            .block_evaluate(Device::from(devnum), PathBuf::from(devnode))
+                            .block_evaluate_5(Device::from(devnum), PathBuf::from(devnode))
                             .unwrap_or(None)
                     })
                 });

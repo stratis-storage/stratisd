@@ -21,6 +21,9 @@ ${HOME}/.cargo/bin/cargo-license:
 ${HOME}/.cargo/bin/cargo-bloat:
 	cargo install cargo-bloat
 
+${HOME}/.cargo/bin/cargo-audit:
+	cargo install cargo-audit
+
 tree: ${HOME}/.cargo/bin/cargo-tree
 	PATH=${HOME}/.cargo/bin:${PATH} cargo tree
 
@@ -33,6 +36,9 @@ license: ${HOME}/.cargo/bin/cargo-license
 bloat: ${HOME}/.cargo/bin/cargo-bloat
 	PATH=${HOME}/.cargo/bin:${PATH} cargo bloat --release
 	PATH=${HOME}/.cargo/bin:${PATH} cargo bloat --release --crates
+
+audit: ${HOME}/.cargo/bin/cargo-audit
+	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D
 
 fmt:
 	cargo fmt
@@ -87,6 +93,7 @@ clippy:
 	cargo clippy --all-targets --all-features -- -D warnings
 
 .PHONY:
+	audit
 	bloat
 	build
 	clippy

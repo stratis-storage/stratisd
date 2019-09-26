@@ -18,6 +18,8 @@ matrix:
     allow_failures:
         # Allow beta tasks to fail
         - rust: beta
+        # Allow audit task to fail
+        - env: TASK=audit
     include:
 
         # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
@@ -94,6 +96,12 @@ matrix:
           before_script:
               - rustup component add clippy
           env: TASK=clippy
+        # Run audit on Rust stable.  Make it an allowed failure, because:
+        # * It takes 9 minutes, the longest of any task.
+        # * It should be an advisory, and should not gate our development.
+        - rust: stable
+          env: TASK=audit
+
 branches:
     only: master
 

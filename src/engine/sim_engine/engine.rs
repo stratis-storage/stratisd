@@ -17,7 +17,7 @@ use crate::{
         engine::{Engine, Eventable, Pool},
         shared::create_pool_idempotent_or_err,
         sim_engine::{pool::SimPool, randomization::Randomizer},
-        structures::Table,
+        structures::{Table, Threaded},
         types::{CreateAction, DeleteAction, Name, PoolUuid, RenameAction},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -25,7 +25,7 @@ use crate::{
 
 #[derive(Debug, Default)]
 pub struct SimEngine {
-    pools: Table<SimPool>,
+    pools: Table<Threaded<SimPool>>,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
@@ -41,7 +41,9 @@ impl Engine for SimEngine {
         let redundancy = calculate_redundancy!(redundancy);
 
         match self.pools.get_by_name(name) {
-            Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
+            Some((_, pool)) => {
+                pool.read_with_and_then(|p| create_pool_idempotent_or_err(p, name, blockdev_paths))
+            }
             None => {
                 let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
                 let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
@@ -53,7 +55,7 @@ impl Engine for SimEngine {
                 }
 
                 self.pools
-                    .insert(Name::new(name.to_owned()), pool_uuid, pool);
+                    .insert(Name::new(name.to_owned()), pool_uuid, Threaded::new(pool));
 
                 Ok(CreateAction::Created(pool_uuid))
             }
@@ -72,12 +74,13 @@ impl Engine for SimEngine {
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
-            if pool.has_filesystems() {
+            if pool.read_with_map(|p| p.has_filesystems())? {
                 return Err(StratisError::Engine(
                     ErrorEnum::Busy,
                     "filesystems remaining on pool".into(),
                 ));
-            };
+            } else {
+            }
         } else {
             return Ok(DeleteAction::Identity);
         }
@@ -85,7 +88,7 @@ impl Engine for SimEngine {
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pool.get_by_uuid() returned a value")
             .1
-            .destroy()?;
+            .write_with_and_then(|p| p.destroy())?;
         Ok(DeleteAction::Deleted(uuid))
     }
 
@@ -106,12 +109,8 @@ impl Engine for SimEngine {
         Ok(RenameAction::Renamed(uuid))
     }
 
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Threaded<dyn Pool>)> {
         get_pool!(self; uuid)
-    }
-
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)> {
-        get_mut_pool!(self; uuid)
     }
 
     /// Set properties of the simulator
@@ -120,17 +119,10 @@ impl Engine for SimEngine {
         Ok(())
     }
 
-    fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)> {
+    fn pools(&self) -> Vec<(Name, PoolUuid, Threaded<dyn Pool>)> {
         self.pools
             .iter()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &dyn Pool))
-            .collect()
-    }
-
-    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)> {
-        self.pools
-            .iter_mut()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut dyn Pool))
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, Threaded::from(pool)))
             .collect()
     }
 
@@ -219,8 +211,8 @@ mod tests {
             .changed()
             .unwrap();
         {
-            let pool = engine.get_mut_pool(uuid).unwrap().1;
-            pool.create_filesystems(uuid, pool_name, &[("test", None)])
+            let pool = engine.get_pool(uuid).unwrap().1;
+            pool.write_with_and_then(|p| p.create_filesystems(uuid, pool_name, &[("test", None)]))
                 .unwrap();
         }
         assert_matches!(engine.destroy_pool(uuid), Err(_));
@@ -238,7 +230,12 @@ mod tests {
             .ok()
             .and_then(|uuid| uuid.changed())
         {
-            Some(uuid) => engine.get_pool(uuid).unwrap().1.blockdevs().is_empty(),
+            Some(uuid) => engine
+                .get_pool(uuid)
+                .unwrap()
+                .1
+                .read_with_map(|p| p.blockdevs().is_empty())
+                .unwrap(),
             _ => false,
         });
     }
@@ -282,7 +279,14 @@ mod tests {
                 .create_pool("name", &devices, None)
                 .unwrap()
                 .changed()
-                .map(|uuid| engine.get_pool(uuid).unwrap().1.blockdevs().len()),
+                .map(|uuid| {
+                    engine
+                        .get_pool(uuid)
+                        .unwrap()
+                        .1
+                        .read_with_map(|p| p.blockdevs().len())
+                        .unwrap()
+                }),
             Some(1)
         );
     }

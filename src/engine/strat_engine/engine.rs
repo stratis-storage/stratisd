@@ -27,7 +27,7 @@ use crate::{
             pool::{check_metadata, StratPool},
             udev::block_device_ownership,
         },
-        structures::Table,
+        structures::{Table, Threaded},
         types::{CreateAction, DeleteAction, RenameAction},
         Engine, EngineEvent, Name, Pool, PoolUuid,
     },
@@ -44,7 +44,7 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 fn setup_pool(
     pool_uuid: PoolUuid,
     devices: &HashMap<Device, PathBuf>,
-    pools: &Table<StratPool>,
+    pools: &Table<Threaded<StratPool>>,
 ) -> StratisResult<(Name, StratPool)> {
     // FIXME: In this method, various errors are assembled from various
     // sources and combined into strings, so that they
@@ -102,7 +102,7 @@ fn setup_pool(
 
 #[derive(Debug)]
 pub struct StratEngine {
-    pools: Table<StratPool>,
+    pools: Table<Threaded<StratPool>>,
 
     // Map of stratis devices that have been found but one or more stratis block devices are missing
     // which prevents the associated pools from being setup.
@@ -144,7 +144,7 @@ impl StratEngine {
         for (pool_uuid, devices) in pools {
             match setup_pool(pool_uuid, &devices, &table) {
                 Ok((pool_name, pool)) => {
-                    table.insert(pool_name, pool_uuid, pool);
+                    table.insert(pool_name, pool_uuid, Threaded::new(pool));
                 }
                 Err(err) => {
                     warn!("no pool set up, reason: {:?}", err);
@@ -183,13 +183,15 @@ impl Engine for StratEngine {
         validate_name(name)?;
 
         match self.pools.get_by_name(name) {
-            Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
+            Some((_, pool)) => {
+                pool.read_with_and_then(|p| create_pool_idempotent_or_err(p, name, blockdev_paths))
+            }
             None => {
                 let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy)?;
 
                 let name = Name::new(name.to_owned());
                 devlinks::pool_added(&name);
-                self.pools.insert(name, uuid, pool);
+                self.pools.insert(name, uuid, Threaded::new(pool));
                 Ok(CreateAction::Created(uuid))
             }
         }
@@ -219,11 +221,13 @@ impl Engine for StratEngine {
                 // TODO: Handle the case where we have found a device for an already active pool
                 // ref. https://github.com/stratis-storage/stratisd/issues/748
 
-                let (name, pool) = self
+                let (name, locked_pool) = self
                     .pools
                     .get_by_uuid(pool_uuid)
                     .expect("pools.contains_uuid(pool_uuid)");
 
+                let pool_lock = locked_pool.read()?;
+                let pool = &*pool_lock;
                 match pool.get_strat_blockdev(device_uuid) {
                     None => {
                         error!(
@@ -257,7 +261,7 @@ impl Engine for StratEngine {
                 devices.insert(device, dev_node);
                 match setup_pool(pool_uuid, &devices, &self.pools) {
                     Ok((pool_name, pool)) => {
-                        self.pools.insert(pool_name, pool_uuid, pool);
+                        self.pools.insert(pool_name, pool_uuid, Threaded::new(pool));
                         Some(pool_uuid)
                     }
                     Err(err) => {
@@ -275,7 +279,7 @@ impl Engine for StratEngine {
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
-            if pool.has_filesystems() {
+            if pool.read_with_map(|p| p.has_filesystems())? {
                 return Err(StratisError::Engine(
                     ErrorEnum::Busy,
                     "filesystems remaining on pool".into(),
@@ -285,12 +289,12 @@ impl Engine for StratEngine {
             return Ok(DeleteAction::Identity);
         }
 
-        let (pool_name, mut pool) = self
+        let (pool_name, pool) = self
             .pools
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
-        if let Err(err) = pool.destroy() {
+        if let Err(err) = pool.write_with_and_then(|p| p.destroy()) {
             self.pools.insert(pool_name, uuid, pool);
             Err(err)
         } else {
@@ -307,21 +311,25 @@ impl Engine for StratEngine {
         validate_name(new_name)?;
         let old_name = rename_pool_pre_idem!(self; uuid; new_name);
 
-        let (_, mut pool) = self
+        let (_, pool) = self
             .pools
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
         let new_name = Name::new(new_name.to_owned());
-        if let Err(err) = pool.write_metadata(&new_name) {
+        if let Err(err) = pool.write_with_and_then(|p| p.write_metadata(&new_name)) {
             self.pools.insert(old_name, uuid, pool);
             Err(err)
         } else {
-            get_engine_listener_list().notify(&EngineEvent::PoolRenamed {
-                dbus_path: pool.get_dbus_path(),
-                from: &*old_name,
-                to: &*new_name,
-            });
+            {
+                let pool_lock = pool.read()?;
+                let pool_ref = &*pool_lock;
+                get_engine_listener_list().notify(&EngineEvent::PoolRenamed {
+                    dbus_path: pool_ref.get_dbus_path(),
+                    from: &*old_name,
+                    to: &*new_name,
+                });
+            }
 
             self.pools.insert(new_name.clone(), uuid, pool);
             devlinks::pool_renamed(&old_name, &new_name);
@@ -329,29 +337,18 @@ impl Engine for StratEngine {
         }
     }
 
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Threaded<dyn Pool>)> {
         get_pool!(self; uuid)
-    }
-
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)> {
-        get_mut_pool!(self; uuid)
     }
 
     fn configure_simulator(&mut self, _denominator: u32) -> StratisResult<()> {
         Ok(()) // we're not the simulator and not configurable, so just say ok
     }
 
-    fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)> {
+    fn pools(&self) -> Vec<(Name, PoolUuid, Threaded<dyn Pool>)> {
         self.pools
             .iter()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &dyn Pool))
-            .collect()
-    }
-
-    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)> {
-        self.pools
-            .iter_mut()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut dyn Pool))
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, Threaded::from(pool)))
             .collect()
     }
 
@@ -372,9 +369,9 @@ impl Engine for StratEngine {
             .collect();
 
         for (pool_name, pool_uuid, pool) in &mut self.pools {
-            for dm_name in pool.get_eventing_dev_names(*pool_uuid) {
+            for dm_name in pool.read_with_map(|p| p.get_eventing_dev_names(*pool_uuid))? {
                 if device_list.get(&dm_name) > self.watched_dev_last_event_nrs.get(&dm_name) {
-                    pool.event_on(*pool_uuid, pool_name, &dm_name)?;
+                    pool.write_with_and_then(|p| p.event_on(*pool_uuid, pool_name, &dm_name))?;
                 }
             }
         }

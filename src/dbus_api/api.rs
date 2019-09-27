@@ -54,19 +54,25 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(pool_uuid_action) => {
             let results = match pool_uuid_action {
                 CreateAction::Created(uuid) => {
-                    let (_, pool) = get_mut_pool!(engine; uuid; default_return; return_message);
+                    let (_, pool) = get_pool!(engine; uuid; default_return; return_message);
 
-                    let pool_object_path: dbus::Path =
-                        create_dbus_pool(dbus_context, object_path.clone(), uuid, pool);
+                    let (pool_object_path, bd_object_paths) = stratis_to_method_err!(pool
+                        .write_with_map(|p| {
+                            let dbus_pool =
+                                create_dbus_pool(dbus_context, object_path.clone(), uuid, p);
 
-                    let bd_paths = pool
-                        .blockdevs_mut()
-                        .into_iter()
-                        .map(|(uuid, bd)| {
-                            create_dbus_blockdev(dbus_context, pool_object_path.clone(), uuid, bd)
-                        })
-                        .collect::<Vec<_>>();
-                    (true, (pool_object_path, bd_paths))
+                            let blockdevs = p
+                                .blockdevs_mut()
+                                .into_iter()
+                                .map(|(uuid, bd)| {
+                                    create_dbus_blockdev(dbus_context, dbus_pool.clone(), uuid, bd)
+                                })
+                                .collect::<Vec<_>>();
+
+                            (dbus_pool, blockdevs)
+                        }))?;
+
+                    (true, (pool_object_path, bd_object_paths))
                 }
                 CreateAction::Identity => default_return,
             };

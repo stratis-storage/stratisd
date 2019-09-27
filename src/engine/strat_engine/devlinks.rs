@@ -14,6 +14,7 @@ use std::{
 use crate::{
     engine::{
         engine::{Pool, DEV_PATH},
+        structures::Threaded,
         types::{Name, PoolUuid},
     },
     stratis::StratisResult,
@@ -71,7 +72,9 @@ pub fn setup_pool_devlinks(pool_name: &str, pool: &dyn Pool) {
 /// config. Clear out any directory or file that doesn't correspond to a pool.
 // Don't just remove everything in case there are processes
 // (e.g. user shells) with the current working directory within the tree.
-pub fn cleanup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, &'a dyn Pool)>>(pools: I) {
+pub fn cleanup_devlinks<'a, I: Iterator<Item = &'a (Name, PoolUuid, Threaded<dyn Pool>)>>(
+    pools: I,
+) {
     if let Err(err) = || -> StratisResult<()> {
         let mut existing_dirs = fs::read_dir(DEV_PATH)?
             .map(|dir_e| {

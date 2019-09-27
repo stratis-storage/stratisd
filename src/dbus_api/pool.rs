@@ -57,10 +57,13 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let engine = dbus_context.engine.borrow();
+    let (pool_name, pool) = get_pool!(engine; pool_uuid; default_return; return_message);
 
-    let result = pool.create_filesystems(
+    let mut pool_lock = stratis_to_method_err!(pool.write())?;
+    let pool_ref = &mut *pool_lock;
+
+    let result = pool_ref.create_filesystems(
         pool_uuid,
         &pool_name,
         &filesystems
@@ -89,7 +92,8 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                             dbus_context,
                             object_path.clone(),
                             uuid,
-                            pool.get_mut_filesystem(uuid)
+                            pool_ref
+                                .get_mut_filesystem(uuid)
                                 .expect("just inserted by create_filesystems")
                                 .1,
                         ),
@@ -126,8 +130,8 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let engine = dbus_context.engine.borrow();
+    let (pool_name, pool) = get_pool!(engine; pool_uuid; default_return; return_message);
 
     let filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = filesystems
         .filter_map(|path| {
@@ -139,10 +143,12 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         })
         .collect();
 
-    let result = pool.destroy_filesystems(
-        &pool_name,
-        &filesystem_map.keys().cloned().collect::<Vec<_>>(),
-    );
+    let result = pool.write_with_and_then(|p| {
+        p.destroy_filesystems(
+            &pool_name,
+            &filesystem_map.keys().cloned().collect::<Vec<_>>(),
+        )
+    });
     let msg = match result {
         Ok(uuids) => {
             // Only get changed values here as non-existant filesystems will have been filtered out
@@ -198,10 +204,14 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     };
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let engine = dbus_context.engine.borrow();
+    let (pool_name, pool) = get_pool!(engine; pool_uuid; default_return; return_message);
 
-    let msg = match pool.snapshot_filesystem(pool_uuid, &pool_name, fs_uuid, snapshot_name) {
+    let mut pool_lock = stratis_to_method_err!(pool.write())?;
+    let pool_ref = &mut *pool_lock;
+    let snapshot_return =
+        pool_ref.snapshot_filesystem(pool_uuid, &pool_name, fs_uuid, snapshot_name);
+    let msg = match snapshot_return {
         Ok(CreateAction::Created((uuid, fs))) => {
             let fs_object_path: dbus::Path =
                 create_dbus_filesystem(dbus_context, object_path.clone(), uuid, fs);
@@ -236,12 +246,15 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> Meth
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let engine = dbus_context.engine.borrow();
+    let (pool_name, pool) = get_pool!(engine; pool_uuid; default_return; return_message);
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
-    let result = pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, tier);
+    let mut pool_lock = stratis_to_method_err!(pool.write())?;
+    let pool_ref = &mut *pool_lock;
+
+    let result = pool_ref.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, tier);
     let msg = match result.map(|bds| bds.changed()) {
         Ok(Some(uuids)) => {
             let return_value = uuids
@@ -254,7 +267,8 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> Meth
                         dbus_context,
                         object_path.clone(),
                         *uuid,
-                        pool.get_mut_blockdev(*uuid)
+                        pool_ref
+                            .get_mut_blockdev(*uuid)
                             .expect("just inserted by add_blockdevs")
                             .1,
                     )
@@ -350,7 +364,9 @@ where
         .get_pool(pool_uuid)
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
 
-    closure((pool_name, pool_uuid, pool))
+    let pool_lock = pool.read().map_err(|e| e.to_string())?;
+    let pool_ref = &*pool_lock;
+    closure((pool_name, pool_uuid, pool_ref))
 }
 
 /// Get a pool property and place it on the D-Bus. The property is

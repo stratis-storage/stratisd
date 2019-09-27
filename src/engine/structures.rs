@@ -6,11 +6,15 @@ use std::{
     collections::{hash_map, HashMap},
     fmt,
     iter::IntoIterator,
+    sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
 use uuid::Uuid;
 
-use crate::engine::types::Name;
+use crate::{
+    engine::{engine::Pool, types::Name},
+    stratis::{StratisError, StratisResult},
+};
 
 /// Map UUID and name to T items.
 pub struct Table<T> {
@@ -260,6 +264,80 @@ impl<T> Table<T> {
             }
             // nothing ejected
             (None, None) => None,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Threaded<T: ?Sized> {
+    inner: Arc<RwLock<T>>,
+}
+
+impl<T> Clone for Threaded<T> {
+    fn clone(&self) -> Self {
+        Threaded {
+            inner: Arc::clone(&self.inner),
+        }
+    }
+}
+
+impl<T> Threaded<T> {
+    pub fn new(t: T) -> Self {
+        Threaded {
+            inner: Arc::new(RwLock::new(t)),
+        }
+    }
+}
+
+impl<T: ?Sized> Threaded<T> {
+    pub fn read(&self) -> StratisResult<RwLockReadGuard<'_, T>> {
+        self.inner
+            .read()
+            .map_err(|e| StratisError::Error(format!("Failed to acquire read lock: {}", e)))
+    }
+
+    pub fn write(&self) -> StratisResult<RwLockWriteGuard<'_, T>> {
+        self.inner
+            .write()
+            .map_err(|e| StratisError::Error(format!("Failed to acquire write lock: {}", e)))
+    }
+
+    pub fn read_with_and_then<R, F>(&self, mut f: F) -> StratisResult<R>
+    where
+        F: FnMut(&T) -> StratisResult<R>,
+    {
+        f(&*self.read()?)
+    }
+
+    pub fn read_with_map<R, F>(&self, mut f: F) -> StratisResult<R>
+    where
+        F: FnMut(&T) -> R,
+    {
+        Ok(f(&*self.read()?))
+    }
+
+    pub fn write_with_and_then<R, F>(&self, mut f: F) -> StratisResult<R>
+    where
+        F: FnMut(&mut T) -> StratisResult<R>,
+    {
+        f(&mut *self.write()?)
+    }
+
+    pub fn write_with_map<R, F>(&self, mut f: F) -> StratisResult<R>
+    where
+        F: FnMut(&mut T) -> R,
+    {
+        Ok(f(&mut *self.write()?))
+    }
+}
+
+impl<'a, T: 'static> From<&'a Threaded<T>> for Threaded<dyn Pool>
+where
+    T: Pool,
+{
+    fn from(t: &'a Threaded<T>) -> Self {
+        Threaded {
+            inner: Arc::clone(&t.inner) as Arc<RwLock<dyn Pool>>,
         }
     }
 }
@@ -535,5 +613,29 @@ mod tests {
         assert_eq!(t.get_by_uuid(uuid3).unwrap().1.stuff, thing_key3);
         assert_eq!(t.get_by_name(name3).unwrap().1.stuff, thing_key3);
         assert_eq!(t.len(), 1);
+    }
+
+    #[test]
+    fn test_threaded() {
+        let t = Threaded::new(0u8);
+        {
+            let mut wlock = t.write().unwrap();
+            let reference = &mut *wlock;
+            *reference = 1;
+        }
+
+        {
+            let rlock = t.read().unwrap();
+            let reference = &*rlock;
+            assert_eq!(*reference, 1);
+        }
+
+        t.write_with_map(|i| {
+            *i = 2;
+        })
+        .unwrap();
+
+        let i = t.read_with_map(|i| *i + 1).unwrap();
+        assert_eq!(i, 3);
     }
 }

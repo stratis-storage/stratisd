@@ -156,11 +156,12 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_path = get_parent!(m; blockdev_data; default_return; return_message);
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let engine = dbus_context.engine.borrow();
+    let (pool_name, pool) = get_pool!(engine; pool_uuid; default_return; return_message);
 
-    let result =
-        pool.set_blockdev_user_info(&pool_name, blockdev_data.uuid, tuple_to_option(new_id_spec));
+    let result = stratis_to_method_err!(pool.write_with_map(|p| {
+        p.set_blockdev_user_info(&pool_name, blockdev_data.uuid, tuple_to_option(new_id_spec))
+    }))?;
 
     let msg = match result {
         Ok(RenameAction::NoSource) => {
@@ -266,7 +267,9 @@ where
     let (_, pool) = engine
         .get_pool(pool_uuid)
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
-    let (tier, blockdev) = pool
+    let pool_lock = pool.read().map_err(|e| e.to_string())?;
+    let pool_ref = &*pool_lock;
+    let (tier, blockdev) = pool_ref
         .get_blockdev(blockdev_data.uuid)
         .ok_or_else(|| format!("no blockdev with uuid {}", blockdev_data.uuid))?;
     closure(tier, blockdev)

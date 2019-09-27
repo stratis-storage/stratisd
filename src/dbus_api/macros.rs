@@ -31,9 +31,9 @@ macro_rules! get_parent {
 }
 
 /// Macro for early return with Ok dbus message on failure to get mutable pool.
-macro_rules! get_mut_pool {
+macro_rules! get_pool {
     ($engine:ident; $uuid:ident; $default:expr; $message:expr) => {
-        if let Some(pool) = $engine.get_mut_pool($uuid) {
+        if let Some(pool) = $engine.get_pool($uuid) {
             pool
         } else {
             let message = format!("engine does not know about pool with uuid {}", $uuid);
@@ -47,5 +47,17 @@ macro_rules! get_mut_pool {
 macro_rules! uuid_to_string {
     ($uuid:expr) => {
         $uuid.to_simple_ref().to_string()
+    };
+}
+
+// Macro for turning a lock acquisition failure into a MethodErr
+macro_rules! stratis_to_method_err {
+    ($result:expr) => {
+        $result.map_err(|e| {
+            dbus::tree::MethodErr::failed(&format!(
+                "Failed operation on unlocked resource failed: {}",
+                e
+            ))
+        })
     };
 }

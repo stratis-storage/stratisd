@@ -14,9 +14,12 @@ use uuid::Uuid;
 use devicemapper::{Bytes, Device, Sectors};
 
 use crate::{
-    engine::types::{
-        BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name,
-        PoolExtendState, PoolState, PoolUuid, RenameAction,
+    engine::{
+        structures::Threaded,
+        types::{
+            BlockDevState, BlockDevTier, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath,
+            Name, PoolExtendState, PoolState, PoolUuid, RenameAction,
+        },
     },
     stratis::StratisResult,
 };
@@ -225,20 +228,14 @@ pub trait Engine: Debug {
     fn rename_pool(&mut self, uuid: PoolUuid, new_name: &str) -> StratisResult<RenameAction>;
 
     /// Find the pool designated by uuid.
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)>;
-
-    /// Get a mutable referent to the pool designated by uuid.
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)>;
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Threaded<dyn Pool>)>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.
     fn configure_simulator(&mut self, denominator: u32) -> StratisResult<()>;
 
     /// Get all pools belonging to this engine.
-    fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)>;
-
-    /// Get mutable references to all pools belonging to this engine.
-    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)>;
+    fn pools(&self) -> Vec<(Name, PoolUuid, Threaded<dyn Pool>)>;
 
     /// If the engine would like to include an event in the message loop, it
     /// may return an Eventable from this method.

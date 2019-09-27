@@ -191,8 +191,9 @@ impl MaybeDbusSupport {
                     let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
                     get_engine_listener_list_mut().register_listener(event_handler);
                     // Register all the pools with dbus
-                    for (_, pool_uuid, pool) in engine.borrow_mut().pools_mut() {
-                        handle.register_pool(pool_uuid, pool)
+                    for (_, pool_uuid, pool) in engine.borrow_mut().pools() {
+                        pool.write_with_map(|p| handle.register_pool(pool_uuid, p))
+                            .expect("No threads started yet");
                     }
                     self.handle = Some(handle);
                 }
@@ -278,9 +279,12 @@ impl<'a> UdevMonitor<'a> {
                 });
                 if let Some(pool_uuid) = new_pool_uuid {
                     let (_, pool) = engine
-                        .get_mut_pool(pool_uuid)
+                        .get_pool(pool_uuid)
                         .expect("block_evaluate() returned a pool UUID, pool must be available");
-                    dbus_support.register_pool(pool_uuid, pool);
+                    pool.write_with_map(|p| {
+                        dbus_support.register_pool(pool_uuid, p);
+                    })
+                    .expect("No threads started yet");
                 }
             }
         }

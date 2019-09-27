@@ -51,18 +51,23 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match result {
         Ok(pool_uuid) => {
-            let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+            let (_, pool) = get_pool!(engine; pool_uuid; default_return; return_message);
 
-            let pool_object_path: dbus::Path =
-                create_dbus_pool(dbus_context, object_path.clone(), pool_uuid, pool);
+            let (pool_object_path, bd_object_paths) =
+                stratis_to_method_err!(pool.write_with_map(|p| {
+                    let dbus_pool =
+                        create_dbus_pool(dbus_context, object_path.clone(), pool_uuid, p);
 
-            let bd_object_paths = pool
-                .blockdevs_mut()
-                .into_iter()
-                .map(|(uuid, bd)| {
-                    create_dbus_blockdev(dbus_context, pool_object_path.clone(), uuid, bd)
-                })
-                .collect::<Vec<_>>();
+                    let blockdevs = p
+                        .blockdevs_mut()
+                        .into_iter()
+                        .map(|(uuid, bd)| {
+                            create_dbus_blockdev(dbus_context, dbus_pool.clone(), uuid, bd)
+                        })
+                        .collect::<Vec<_>>();
+
+                    (dbus_pool, blockdevs)
+                }))?;
 
             return_message.append3(
                 (pool_object_path, bd_object_paths),

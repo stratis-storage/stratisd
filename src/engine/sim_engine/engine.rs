@@ -16,7 +16,7 @@ use crate::{
     engine::{
         engine::{Engine, Eventable, Pool},
         sim_engine::{pool::SimPool, randomization::Randomizer},
-        structures::Table,
+        structures::{Table, Threaded},
         types::{Name, PoolUuid, Redundancy, RenameAction},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -24,7 +24,7 @@ use crate::{
 
 #[derive(Debug, Default)]
 pub struct SimEngine {
-    pools: Table<SimPool>,
+    pools: Table<Threaded<SimPool>>,
     rdm: Rc<RefCell<Randomizer>>,
 }
 
@@ -53,7 +53,7 @@ impl Engine for SimEngine {
         }
 
         self.pools
-            .insert(Name::new(name.to_owned()), pool_uuid, pool);
+            .insert(Name::new(name.to_owned()), pool_uuid, Threaded::new(pool));
 
         Ok(pool_uuid)
     }
@@ -70,12 +70,14 @@ impl Engine for SimEngine {
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<bool> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
-            if pool.has_filesystems() {
+            if pool.read_with_map(|p| p.has_filesystems())? {
                 return Err(StratisError::Engine(
                     ErrorEnum::Busy,
                     "filesystems remaining on pool".into(),
                 ));
-            };
+            } else {
+
+            }
         } else {
             return Ok(false);
         }
@@ -83,7 +85,7 @@ impl Engine for SimEngine {
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pool.get_by_uuid() returned a value")
             .1
-            .destroy()?;
+            .write_with_and_then(|p| p.destroy())?;
         Ok(true)
     }
 
@@ -100,12 +102,8 @@ impl Engine for SimEngine {
         Ok(RenameAction::Renamed)
     }
 
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Threaded<dyn Pool>)> {
         get_pool!(self; uuid)
-    }
-
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)> {
-        get_mut_pool!(self; uuid)
     }
 
     /// Set properties of the simulator
@@ -114,17 +112,10 @@ impl Engine for SimEngine {
         Ok(())
     }
 
-    fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)> {
+    fn pools(&self) -> Vec<(Name, PoolUuid, Threaded<dyn Pool>)> {
         self.pools
             .iter()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &dyn Pool))
-            .collect()
-    }
-
-    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)> {
-        self.pools
-            .iter_mut()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut dyn Pool))
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, Threaded::from(pool)))
             .collect()
     }
 
@@ -202,8 +193,8 @@ mod tests {
             .create_pool(pool_name, &[Path::new("/s/d")], None)
             .unwrap();
         {
-            let pool = engine.get_mut_pool(uuid).unwrap().1;
-            pool.create_filesystems(uuid, pool_name, &[("test", None)])
+            let pool = engine.get_pool(uuid).unwrap().1;
+            pool.write_with_and_then(|p| p.create_filesystems(uuid, pool_name, &[("test", None)]))
                 .unwrap();
         }
         assert_matches!(engine.destroy_pool(uuid), Err(_));
@@ -217,7 +208,12 @@ mod tests {
         let mut engine = SimEngine::default();
         engine.create_pool(name, &[], None).unwrap();
         assert!(match engine.create_pool(name, &[], None) {
-            Ok(uuid) => engine.get_pool(uuid).unwrap().1.blockdevs().is_empty(),
+            Ok(uuid) => engine
+                .get_pool(uuid)
+                .unwrap()
+                .1
+                .read_with_map(|p| p.blockdevs().is_empty())
+                .unwrap(),
             Err(_) => false,
         });
     }
@@ -247,8 +243,8 @@ mod tests {
                 .get_pool(uuid)
                 .unwrap()
                 .1
-                .blockdevs()
-                .len()),
+                .read_with_map(|p| p.blockdevs().len())
+                .unwrap()),
             Ok(1)
         );
     }

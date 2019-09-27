@@ -142,10 +142,11 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_path = get_parent!(m; blockdev_data; default_return; return_message);
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let engine = dbus_context.engine.borrow();
+    let (pool_name, pool) = get_pool!(engine; pool_uuid; default_return; return_message);
 
-    let result = pool.set_blockdev_user_info(&pool_name, blockdev_data.uuid, new_id);
+    let result = stratis_to_method_err!(pool
+        .write_with_map(|p| { p.set_blockdev_user_info(&pool_name, blockdev_data.uuid, new_id) }))?;
 
     let msg = match result {
         Ok(id_changed) => return_message.append3(id_changed, msg_code_ok(), msg_string_ok()),
@@ -200,7 +201,10 @@ where
     let (_, pool) = engine.get_pool(pool_uuid).ok_or_else(|| {
         MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))
     })?;
-    let (tier, blockdev) = pool.get_blockdev(blockdev_data.uuid).ok_or_else(|| {
+
+    let pool_lock = stratis_to_method_err!(pool.read())?;
+    let pool_ref = &*pool_lock;
+    let (tier, blockdev) = pool_ref.get_blockdev(blockdev_data.uuid).ok_or_else(|| {
         MethodErr::failed(&format!("no blockdev with uuid {}", blockdev_data.uuid))
     })?;
     i.append(getter(tier, blockdev)?);

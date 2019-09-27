@@ -6,7 +6,7 @@ it change without notice, but it may also be entirely removed without notice.
 
 Testing
 -------
-The existing tests are divided into two categories:
+The existing tests are divided into three categories:
 
 * Tests that exercise the stratisd D-Bus layer using the sim engine. These
   tests test basic functionality of the D-Bus methods. The effect these
@@ -16,6 +16,9 @@ The existing tests are divided into two categories:
 * Tests that exercise the stratisd udev functionality using the real engine.
   These tests have a more significant effect on the environment as they
   construct loopbacked devices, place signatures on them, and so forth.
+
+* Tests that do miscellaneous things, and do not interact with the D-Bus in
+  a regular way.
 
 It is necessary to run all these tests as root, since root permissions are
 required to start stratisd.
@@ -35,6 +38,9 @@ To run only the D-Bus tests: ::
 
 To run only the udev tests: ::
    > make udev-tests
+
+To run only the miscellaneous tests: ::
+   > make misc-tests
 
 Contributing
 ------------

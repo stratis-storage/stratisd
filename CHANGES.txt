@@ -1,5 +1,5 @@
-stratisd 1.0.6 (UNRELEASED)
-===========================
+stratisd 1.0.6
+==============
 Recommended Rust toolchain version: 1.37
 Lowest supported Rust toolchain version: 1.36
 Python auto-formatter: black (18.9b0)
@@ -11,6 +11,10 @@ New minimum Rust crate requirements:
 - Fix a bug in writing metadata after setup when current time is set back:
   https://github.com/stratis-storage/stratisd/issues/1509
   https://github.com/stratis-storage/stratisd/pull/1595
+
+- Specify PID file with /run/stratisd.pid instead of /var/run/stratisd.pid:
+  https://github.com/stratis-storage/stratisd/issues/1630
+  https://github.com/stratis-storage/stratisd/pull/1632
 
 - Change a message level from info to debug and improve the message text:
   https://github.com/stratis-storage/stratisd/issues/1485
@@ -36,6 +40,12 @@ New minimum Rust crate requirements:
   https://github.com/stratis-storage/stratisd/pull/1591
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/1643
+  https://github.com/stratis-storage/stratisd/pull/1636
+  https://github.com/stratis-storage/stratisd/pull/1639
+  https://github.com/stratis-storage/stratisd/pull/1641
+  https://github.com/stratis-storage/stratisd/pull/1633
+  https://github.com/stratis-storage/stratisd/pull/1635
   https://github.com/stratis-storage/stratisd/pull/1621
   https://github.com/stratis-storage/stratisd/pull/1625
   https://github.com/stratis-storage/stratisd/pull/1624

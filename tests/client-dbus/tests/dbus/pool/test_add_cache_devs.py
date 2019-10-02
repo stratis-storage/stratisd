@@ -126,7 +126,7 @@ class AddCacheDevsTestCase2(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        ((_, (poolpath, devs)), _, _) = Manager.Methods.CreatePool(
+        ((_, (poolpath, devpaths)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {
                 "name": self._POOLNAME,
@@ -135,7 +135,7 @@ class AddCacheDevsTestCase2(SimTestCase):
             },
         )
         self._pool_object = get_object(poolpath)
-        self._devpaths = frozenset([devpath for devpath in devs])
+        self._devpaths = frozenset(devpaths)
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testEmptyDevs(self):

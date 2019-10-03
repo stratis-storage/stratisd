@@ -454,13 +454,12 @@ impl Pool for StratPool {
         pool_name: &str,
         uuid: DevUuid,
         user_info: Option<&str>,
-    ) -> StratisResult<bool> {
-        if self.backstore.set_blockdev_user_info(uuid, user_info)? {
+    ) -> StratisResult<RenameAction<DevUuid>> {
+        let result = self.backstore.set_blockdev_user_info(uuid, user_info);
+        if let RenameAction::Renamed(_) = result {
             self.write_metadata(pool_name)?;
-            Ok(true)
-        } else {
-            Ok(false)
         }
+        Ok(result)
     }
 
     fn state(&self) -> PoolState {

@@ -175,7 +175,7 @@ pub trait Pool: Debug {
         pool_name: &str,
         uuid: DevUuid,
         user_info: Option<&str>,
-    ) -> StratisResult<bool>;
+    ) -> StratisResult<RenameAction<DevUuid>>;
 
     /// The current state of the Pool.
     fn state(&self) -> PoolState;

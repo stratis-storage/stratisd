@@ -22,7 +22,7 @@ use crate::{
             msg_code_ok, msg_string_ok,
         },
     },
-    engine::{BlockDev, BlockDevTier, MaybeDbusPath},
+    engine::{BlockDev, BlockDevTier, DevUuid, MaybeDbusPath, RenameAction},
 };
 
 pub fn create_dbus_blockdev<'a>(
@@ -36,7 +36,11 @@ pub fn create_dbus_blockdev<'a>(
     let set_userid_method = f
         .method("SetUserInfo", (), set_user_info)
         .in_arg(("id", "s"))
-        .out_arg(("changed", "b"))
+        // b: false if no change to the user info
+        // s: UUID of the changed device
+        //
+        // Rust representation: (bool, String)
+        .out_arg(("changed", "(bs)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
@@ -131,7 +135,7 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let default_return = false;
+    let default_return = (false, uuid_to_string!(DevUuid::nil()));
 
     let blockdev_path = m
         .tree
@@ -148,7 +152,22 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let result = pool.set_blockdev_user_info(&pool_name, blockdev_data.uuid, new_id);
 
     let msg = match result {
-        Ok(id_changed) => return_message.append3(id_changed, msg_code_ok(), msg_string_ok()),
+        Ok(RenameAction::NoSource) => {
+            let error_message = format!(
+                "pool doesn't know about block device {}",
+                blockdev_data.uuid
+            );
+            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);
+            return_message.append3(default_return, rc, rs)
+        }
+        Ok(RenameAction::Renamed(uuid)) => return_message.append3(
+            (true, uuid_to_string!(uuid)),
+            msg_code_ok(),
+            msg_string_ok(),
+        ),
+        Ok(RenameAction::Identity) => {
+            return_message.append3(default_return, msg_code_ok(), msg_string_ok())
+        }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)

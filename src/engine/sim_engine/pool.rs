@@ -282,16 +282,17 @@ impl Pool for SimPool {
         _pool_name: &str,
         uuid: DevUuid,
         user_info: Option<&str>,
-    ) -> StratisResult<bool> {
-        self.get_mut_blockdev_internal(uuid).map_or_else(
-            || {
-                Err(StratisError::Engine(
-                    ErrorEnum::NotFound,
-                    format!("No blockdev for uuid {} found", uuid),
-                ))
+    ) -> StratisResult<RenameAction<DevUuid>> {
+        Ok(self.get_mut_blockdev_internal(uuid).map_or_else(
+            || RenameAction::NoSource,
+            |(_, b)| {
+                if b.set_user_info(user_info) {
+                    RenameAction::Renamed(uuid)
+                } else {
+                    RenameAction::Identity
+                }
             },
-            |(_, b)| Ok(b.set_user_info(user_info)),
-        )
+        ))
     }
 
     fn state(&self) -> PoolState {

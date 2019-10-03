@@ -185,9 +185,7 @@ impl Pool for SimPool {
         snapshot_name: &str,
     ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>> {
         if self.filesystems.contains_name(snapshot_name) {
-            let identity: StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>> =
-                Ok(CreateAction::Identity);
-            return identity;
+            return Ok(CreateAction::Identity);
         }
 
         let uuid = Uuid::new_v4();

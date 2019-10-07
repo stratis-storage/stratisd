@@ -1,7 +1,6 @@
 pub trait EngineAction {
     type Return;
 
-    fn is_changed(&self) -> bool;
     fn changed(self) -> Option<Self::Return>;
 }
 
@@ -13,13 +12,6 @@ pub enum CreateAction<T> {
 
 impl<T> EngineAction for CreateAction<T> {
     type Return = T;
-
-    fn is_changed(&self) -> bool {
-        match *self {
-            CreateAction::Identity => false,
-            _ => true,
-        }
-    }
 
     fn changed(self) -> Option<T> {
         match self {
@@ -43,10 +35,6 @@ impl<T> SetCreateAction<T> {
 impl<T> EngineAction for SetCreateAction<T> {
     type Return = Vec<T>;
 
-    fn is_changed(&self) -> bool {
-        !self.changed.is_empty()
-    }
-
     fn changed(self) -> Option<Vec<T>> {
         if self.changed.is_empty() {
             None
@@ -66,13 +54,6 @@ pub enum RenameAction<T> {
 impl<T> EngineAction for RenameAction<T> {
     type Return = T;
 
-    fn is_changed(&self) -> bool {
-        match *self {
-            RenameAction::Renamed(_) => true,
-            _ => false,
-        }
-    }
-
     fn changed(self) -> Option<T> {
         match self {
             RenameAction::Renamed(t) => Some(t),
@@ -89,13 +70,6 @@ pub enum DeleteAction<T> {
 
 impl<T> EngineAction for DeleteAction<T> {
     type Return = T;
-
-    fn is_changed(&self) -> bool {
-        match *self {
-            DeleteAction::Deleted(_) => true,
-            _ => false,
-        }
-    }
 
     fn changed(self) -> Option<T> {
         match self {

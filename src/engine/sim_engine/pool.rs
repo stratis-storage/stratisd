@@ -431,10 +431,10 @@ mod tests {
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        assert!(match pool.destroy_filesystems(pool_name, &[]) {
-            Ok(uuids) => !uuids.is_changed(),
-            _ => false,
-        });
+        assert_eq!(
+            pool.destroy_filesystems(pool_name, &[]).unwrap().changed(),
+            None
+        );
     }
 
     #[test]

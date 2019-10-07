@@ -530,7 +530,7 @@ mod tests {
         let set_create_action = pool
             .create_filesystems(uuid, pool_name, &[(fs_name, None)])
             .unwrap();
-        assert!(set_create_action.changed_ref().is_none());
+        assert!(set_create_action.changed().is_none());
     }
 
     #[test]

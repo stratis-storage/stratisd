@@ -3,7 +3,6 @@ pub trait EngineAction {
 
     fn is_changed(&self) -> bool;
     fn changed(self) -> Option<Self::Return>;
-    fn changed_ref(&self) -> Option<&Self::Return>;
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -25,13 +24,6 @@ impl<T> EngineAction for CreateAction<T> {
     fn changed(self) -> Option<T> {
         match self {
             CreateAction::Created(t) => Some(t),
-            _ => None,
-        }
-    }
-
-    fn changed_ref(&self) -> Option<&T> {
-        match *self {
-            CreateAction::Created(ref t) => Some(t),
             _ => None,
         }
     }
@@ -62,14 +54,6 @@ impl<T> EngineAction for SetCreateAction<T> {
             Some(self.changed)
         }
     }
-
-    fn changed_ref(&self) -> Option<&Vec<T>> {
-        if self.changed.is_empty() {
-            None
-        } else {
-            Some(&self.changed)
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -95,13 +79,6 @@ impl<T> EngineAction for RenameAction<T> {
             _ => None,
         }
     }
-
-    fn changed_ref(&self) -> Option<&T> {
-        match *self {
-            RenameAction::Renamed(ref t) => Some(t),
-            _ => None,
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -123,13 +100,6 @@ impl<T> EngineAction for DeleteAction<T> {
     fn changed(self) -> Option<T> {
         match self {
             DeleteAction::Deleted(t) => Some(t),
-            _ => None,
-        }
-    }
-
-    fn changed_ref(&self) -> Option<&T> {
-        match *self {
-            DeleteAction::Deleted(ref t) => Some(t),
             _ => None,
         }
     }

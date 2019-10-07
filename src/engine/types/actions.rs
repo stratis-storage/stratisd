@@ -1,4 +1,4 @@
-pub trait EngineActions {
+pub trait EngineAction {
     type Return;
 
     fn is_changed(&self) -> bool;
@@ -12,7 +12,7 @@ pub enum CreateAction<T> {
     Created(T),
 }
 
-impl<T> EngineActions for CreateAction<T> {
+impl<T> EngineAction for CreateAction<T> {
     type Return = T;
 
     fn is_changed(&self) -> bool {
@@ -48,7 +48,7 @@ impl<T> SetCreateAction<T> {
     }
 }
 
-impl<T> EngineActions for SetCreateAction<T> {
+impl<T> EngineAction for SetCreateAction<T> {
     type Return = Vec<T>;
 
     fn is_changed(&self) -> bool {
@@ -79,7 +79,7 @@ pub enum RenameAction<T> {
     NoSource,
 }
 
-impl<T> EngineActions for RenameAction<T> {
+impl<T> EngineAction for RenameAction<T> {
     type Return = T;
 
     fn is_changed(&self) -> bool {
@@ -110,7 +110,7 @@ pub enum DeleteAction<T> {
     Deleted(T),
 }
 
-impl<T> EngineActions for DeleteAction<T> {
+impl<T> EngineAction for DeleteAction<T> {
     type Return = T;
 
     fn is_changed(&self) -> bool {

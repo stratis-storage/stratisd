@@ -327,7 +327,7 @@ mod tests {
 
     use crate::engine::sim_engine::SimEngine;
 
-    use crate::engine::types::EngineActions;
+    use crate::engine::types::EngineAction;
 
     use super::*;
 

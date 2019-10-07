@@ -27,7 +27,7 @@ use crate::{
         },
     },
     engine::{
-        BlockDevTier, CreateAction, EngineActions, FilesystemUuid, MaybeDbusPath, Name, Pool,
+        BlockDevTier, CreateAction, EngineAction, FilesystemUuid, MaybeDbusPath, Name, Pool,
         PoolUuid, RenameAction,
     },
 };

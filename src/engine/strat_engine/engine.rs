@@ -388,7 +388,7 @@ mod test {
 
     use crate::engine::strat_engine::tests::{loopbacked, real};
 
-    use crate::engine::types::EngineActions;
+    use crate::engine::types::EngineAction;
 
     use super::*;
 

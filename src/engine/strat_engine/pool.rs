@@ -25,7 +25,7 @@ use crate::{
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, CreateAction, DevUuid, EngineActions, FilesystemUuid, FreeSpaceState,
+            BlockDevTier, CreateAction, DevUuid, EngineAction, FilesystemUuid, FreeSpaceState,
             MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction,
             SetCreateAction, SetDeleteAction,
         },
@@ -503,7 +503,7 @@ mod tests {
             cmd,
             tests::{loopbacked, real},
         },
-        types::{EngineActions, Redundancy},
+        types::{EngineAction, Redundancy},
     };
 
     use super::*;

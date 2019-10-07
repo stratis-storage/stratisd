@@ -9,7 +9,7 @@ pub use self::{
     sim_engine::SimEngine,
     strat_engine::StratEngine,
     types::{
-        BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, EngineActions,
+        BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, EngineAction,
         FilesystemUuid, MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
         SetDeleteAction,
     },

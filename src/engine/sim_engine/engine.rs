@@ -152,7 +152,7 @@ mod tests {
 
     use crate::{
         engine::{
-            types::{EngineActions, RenameAction},
+            types::{EngineAction, RenameAction},
             Engine,
         },
         stratis::{ErrorEnum, StratisError},

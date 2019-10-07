@@ -57,7 +57,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                     let (_, pool) = get_pool!(engine; uuid; default_return; return_message);
 
                     let (pool_object_path, bd_object_paths) = stratis_to_method_err!(pool
-                        .write_with_map(|p| {
+                        .write_map(|p| {
                             let dbus_pool =
                                 create_dbus_pool(dbus_context, object_path.clone(), uuid, p);
 

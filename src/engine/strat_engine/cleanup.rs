@@ -16,7 +16,7 @@ use crate::{
 pub fn teardown_pools(pools: Table<Threaded<StratPool>>) -> StratisResult<()> {
     let mut untorndown_pools = Vec::new();
     for (_, uuid, pool) in pools {
-        pool.write_with_and_then(|p| p.teardown())
+        pool.write_and_then(|p| p.teardown())
             .unwrap_or_else(|_| untorndown_pools.push(uuid));
     }
     if untorndown_pools.is_empty() {

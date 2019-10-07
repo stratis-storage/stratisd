@@ -330,8 +330,8 @@ mod tests {
             .changed()
             .unwrap();
         let pool = engine.get_pool(uuid).unwrap().1;
-        let pool_result = pool
-            .write_with_and_then(|p| p.rename_filesystem(pool_name, Uuid::new_v4(), "new_name"));
+        let pool_result =
+            pool.write_and_then(|p| p.rename_filesystem(pool_name, Uuid::new_v4(), "new_name"));
         assert!(match pool_result {
             Ok(RenameAction::NoSource) => true,
             _ => false,
@@ -350,12 +350,12 @@ mod tests {
             .unwrap();
         let pool = engine.get_pool(uuid).unwrap().1;
         let infos = pool
-            .write_with_and_then(|p| p.create_filesystems(uuid, pool_name, &[("old_name", None)]))
+            .write_and_then(|p| p.create_filesystems(uuid, pool_name, &[("old_name", None)]))
             .unwrap()
             .changed()
             .unwrap();
         let pool_result = pool
-            .write_with_and_then(|p| p.rename_filesystem(pool_name, infos[0].1, "new_name"))
+            .write_and_then(|p| p.rename_filesystem(pool_name, infos[0].1, "new_name"))
             .unwrap();
         assert!(match pool_result {
             RenameAction::Renamed(_) => true,
@@ -377,7 +377,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_pool(uuid).unwrap().1;
         let results = pool
-            .write_with_and_then(|p| {
+            .write_and_then(|p| {
                 p.create_filesystems(uuid, pool_name, &[(old_name, None), (new_name, None)])
             })
             .unwrap();
@@ -389,7 +389,7 @@ mod tests {
             .unwrap()
             .1;
         let pool_result =
-            pool.write_with_and_then(|p| p.rename_filesystem(pool_name, old_uuid, new_name));
+            pool.write_and_then(|p| p.rename_filesystem(pool_name, old_uuid, new_name));
         assert!(match pool_result {
             Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
             _ => false,
@@ -409,7 +409,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_pool(uuid).unwrap().1;
         let pool_result =
-            pool.write_with_and_then(|p| p.rename_filesystem(pool_name, Uuid::new_v4(), new_name));
+            pool.write_and_then(|p| p.rename_filesystem(pool_name, Uuid::new_v4(), new_name));
         assert!(match pool_result {
             Ok(RenameAction::NoSource) => true,
             _ => false,
@@ -427,7 +427,7 @@ mod tests {
             .changed()
             .unwrap();
         let pool = engine.get_pool(uuid).unwrap().1;
-        let pool_result = pool.write_with_and_then(|p| p.destroy_filesystems(pool_name, &[]));
+        let pool_result = pool.write_and_then(|p| p.destroy_filesystems(pool_name, &[]));
         assert!(match pool_result {
             Ok(uuids) => !uuids.is_changed(),
             _ => false,
@@ -446,7 +446,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_pool(uuid).unwrap().1;
         assert_matches!(
-            pool.write_with_and_then(|p| { p.destroy_filesystems(pool_name, &[Uuid::new_v4()]) }),
+            pool.write_and_then(|p| { p.destroy_filesystems(pool_name, &[Uuid::new_v4()]) }),
             Ok(_)
         );
     }
@@ -463,13 +463,13 @@ mod tests {
             .unwrap();
         let pool = engine.get_pool(uuid).unwrap().1;
         let fs_results = pool
-            .write_with_and_then(|p| p.create_filesystems(uuid, pool_name, &[("fs_name", None)]))
+            .write_and_then(|p| p.create_filesystems(uuid, pool_name, &[("fs_name", None)]))
             .unwrap()
             .changed()
             .unwrap();
         let fs_uuid = fs_results[0].1;
-        let pool_result = pool
-            .write_with_and_then(|p| p.destroy_filesystems(pool_name, &[fs_uuid, Uuid::new_v4()]));
+        let pool_result =
+            pool.write_and_then(|p| p.destroy_filesystems(pool_name, &[fs_uuid, Uuid::new_v4()]));
         assert!(match pool_result {
             Ok(filesystems) => filesystems == SetDeleteAction::new(vec![fs_uuid]),
             _ => false,
@@ -487,7 +487,7 @@ mod tests {
             .changed()
             .unwrap();
         let pool = engine.get_pool(uuid).unwrap().1;
-        let pool_result = pool.write_with_and_then(|p| p.create_filesystems(uuid, pool_name, &[]));
+        let pool_result = pool.write_and_then(|p| p.create_filesystems(uuid, pool_name, &[]));
         assert!(!pool_result.unwrap().is_changed())
     }
 
@@ -503,7 +503,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_pool(uuid).unwrap().1;
         let pool_result = pool
-            .write_with_and_then(|p| p.create_filesystems(uuid, pool_name, &[("name", None)]))
+            .write_and_then(|p| p.create_filesystems(uuid, pool_name, &[("name", None)]))
             .unwrap();
         assert!(match pool_result.changed() {
             Some(names) => (names.len()) == 1 && (names[0].0 == "name"),
@@ -523,10 +523,10 @@ mod tests {
             .changed()
             .unwrap();
         let pool = engine.get_pool(uuid).unwrap().1;
-        pool.write_with_and_then(|p| p.create_filesystems(uuid, pool_name, &[(fs_name, None)]))
+        pool.write_and_then(|p| p.create_filesystems(uuid, pool_name, &[(fs_name, None)]))
             .unwrap();
         let pool_result = pool
-            .write_with_and_then(|p| p.create_filesystems(uuid, pool_name, &[(fs_name, None)]))
+            .write_and_then(|p| p.create_filesystems(uuid, pool_name, &[(fs_name, None)]))
             .unwrap();
         assert!(!pool_result.is_changed());
     }
@@ -544,7 +544,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_pool(uuid).unwrap().1;
         let pool_result = pool
-            .write_with_and_then(|p| {
+            .write_and_then(|p| {
                 p.create_filesystems(uuid, pool_name, &[(fs_name, None), (fs_name, None)])
             })
             .unwrap();
@@ -566,9 +566,7 @@ mod tests {
         let (pool_name, pool) = engine.get_pool(uuid).unwrap();
         let devices = [Path::new("/s/a"), Path::new("/s/b")];
         let pool_result = pool
-            .write_with_and_then(|p| {
-                p.add_blockdevs(uuid, &*pool_name, &devices, BlockDevTier::Data)
-            })
+            .write_and_then(|p| p.add_blockdevs(uuid, &*pool_name, &devices, BlockDevTier::Data))
             .unwrap();
         assert!(match pool_result.changed() {
             Some(devs) => devs.len() == devices.len(),

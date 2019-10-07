@@ -42,7 +42,7 @@ impl Engine for SimEngine {
 
         match self.pools.get_by_name(name) {
             Some((_, pool)) => {
-                pool.read_with_and_then(|p| create_pool_idempotent_or_err(p, name, blockdev_paths))
+                pool.read_and_then(|p| create_pool_idempotent_or_err(p, name, blockdev_paths))
             }
             None => {
                 let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
@@ -74,7 +74,7 @@ impl Engine for SimEngine {
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
-            if pool.read_with_map(|p| p.has_filesystems())? {
+            if pool.read_map(|p| p.has_filesystems())? {
                 return Err(StratisError::Engine(
                     ErrorEnum::Busy,
                     "filesystems remaining on pool".into(),
@@ -88,7 +88,7 @@ impl Engine for SimEngine {
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pool.get_by_uuid() returned a value")
             .1
-            .write_with_and_then(|p| p.destroy())?;
+            .write_and_then(|p| p.destroy())?;
         Ok(DeleteAction::Deleted(uuid))
     }
 
@@ -212,7 +212,7 @@ mod tests {
             .unwrap();
         {
             let pool = engine.get_pool(uuid).unwrap().1;
-            pool.write_with_and_then(|p| p.create_filesystems(uuid, pool_name, &[("test", None)]))
+            pool.write_and_then(|p| p.create_filesystems(uuid, pool_name, &[("test", None)]))
                 .unwrap();
         }
         assert_matches!(engine.destroy_pool(uuid), Err(_));
@@ -234,7 +234,7 @@ mod tests {
                 .get_pool(uuid)
                 .unwrap()
                 .1
-                .read_with_map(|p| p.blockdevs().is_empty())
+                .read_map(|p| p.blockdevs().is_empty())
                 .unwrap(),
             _ => false,
         });
@@ -284,7 +284,7 @@ mod tests {
                         .get_pool(uuid)
                         .unwrap()
                         .1
-                        .read_with_map(|p| p.blockdevs().len())
+                        .read_map(|p| p.blockdevs().len())
                         .unwrap()
                 }),
             Some(1)

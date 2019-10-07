@@ -192,7 +192,7 @@ impl MaybeDbusSupport {
                     get_engine_listener_list_mut().register_listener(event_handler);
                     // Register all the pools with dbus
                     for (_, pool_uuid, pool) in engine.borrow_mut().pools() {
-                        pool.write_with_map(|p| handle.register_pool(pool_uuid, p))
+                        pool.write_map(|p| handle.register_pool(pool_uuid, p))
                             .expect("No threads started yet");
                     }
                     self.handle = Some(handle);
@@ -281,7 +281,7 @@ impl<'a> UdevMonitor<'a> {
                     let (_, pool) = engine
                         .get_pool(pool_uuid)
                         .expect("block_evaluate() returned a pool UUID, pool must be available");
-                    pool.write_with_map(|p| {
+                    pool.write_map(|p| {
                         dbus_support.register_pool(pool_uuid, p);
                     })
                     .expect("No threads started yet");

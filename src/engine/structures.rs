@@ -9,6 +9,7 @@ use std::{
     sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard},
 };
 
+use tokio::prelude::future::Future;
 use uuid::Uuid;
 
 use crate::{
@@ -273,14 +274,6 @@ pub struct Threaded<T: ?Sized> {
     inner: Arc<RwLock<T>>,
 }
 
-impl<T> Clone for Threaded<T> {
-    fn clone(&self) -> Self {
-        Threaded {
-            inner: Arc::clone(&self.inner),
-        }
-    }
-}
-
 impl<T> Threaded<T> {
     pub fn new(t: T) -> Self {
         Threaded {
@@ -290,10 +283,51 @@ impl<T> Threaded<T> {
 }
 
 impl<T: ?Sized> Threaded<T> {
+    pub fn clone(t: &Threaded<T>) -> Self {
+        Threaded {
+            inner: Arc::clone(&t.inner),
+        }
+    }
+
     pub fn read(&self) -> StratisResult<RwLockReadGuard<'_, T>> {
         self.inner
             .read()
             .map_err(|e| StratisError::Error(format!("Failed to acquire read lock: {}", e)))
+    }
+
+    pub fn read_map<R, F>(&self, mut f: F) -> StratisResult<R>
+    where
+        F: FnMut(&T) -> R,
+    {
+        Ok(f(&*self.read()?))
+    }
+
+    pub fn read_and_then<R, F>(&self, mut f: F) -> StratisResult<R>
+    where
+        F: FnMut(&T) -> StratisResult<R>,
+    {
+        f(&*self.read()?)
+    }
+
+    pub fn threaded_read<R, F>(&self, mut f: F) -> StratisResult<R>
+    where
+        T: 'static + Send + Sync,
+        R: 'static + Send,
+        F: 'static + Send + FnMut(&T) -> StratisResult<R>,
+    {
+        let reference = Threaded::clone(self);
+        let (send, recv) = tokio::sync::oneshot::channel();
+        tokio::spawn(tokio::prelude::future::lazy(move || {
+            send.send(f(&*reference.read().map_err(|e| {
+                println!("{}", e);
+            })?))
+            .map_err(|_| {
+                println!("Failed to send result to main thread");
+            })
+        }));
+        recv.wait()
+            .map_err(|e| StratisError::Error(format!("Failed to receive thread exit info: {}", e)))
+            .and_then(|r| r)
     }
 
     pub fn write(&self) -> StratisResult<RwLockWriteGuard<'_, T>> {
@@ -302,32 +336,39 @@ impl<T: ?Sized> Threaded<T> {
             .map_err(|e| StratisError::Error(format!("Failed to acquire write lock: {}", e)))
     }
 
-    pub fn read_with_and_then<R, F>(&self, mut f: F) -> StratisResult<R>
+    pub fn write_map<R, F>(&self, mut f: F) -> StratisResult<R>
     where
-        F: FnMut(&T) -> StratisResult<R>,
+        F: FnMut(&mut T) -> R,
     {
-        f(&*self.read()?)
+        Ok(f(&mut *self.write()?))
     }
 
-    pub fn read_with_map<R, F>(&self, mut f: F) -> StratisResult<R>
-    where
-        F: FnMut(&T) -> R,
-    {
-        Ok(f(&*self.read()?))
-    }
-
-    pub fn write_with_and_then<R, F>(&self, mut f: F) -> StratisResult<R>
+    pub fn write_and_then<R, F>(&self, mut f: F) -> StratisResult<R>
     where
         F: FnMut(&mut T) -> StratisResult<R>,
     {
         f(&mut *self.write()?)
     }
 
-    pub fn write_with_map<R, F>(&self, mut f: F) -> StratisResult<R>
+    pub fn threaded_write<R, F>(&self, mut f: F) -> StratisResult<R>
     where
-        F: FnMut(&mut T) -> R,
+        T: 'static + Send + Sync,
+        R: 'static + Send,
+        F: 'static + Send + FnMut(&mut T) -> StratisResult<R>,
     {
-        Ok(f(&mut *self.write()?))
+        let reference = Threaded::clone(self);
+        let (send, recv) = tokio::sync::oneshot::channel();
+        tokio::spawn(tokio::prelude::future::lazy(move || {
+            send.send(f(&mut *reference.write().map_err(|e| {
+                println!("{}", e);
+            })?))
+            .map_err(|_| {
+                println!("Failed to send result to main thread");
+            })
+        }));
+        recv.wait()
+            .map_err(|e| StratisError::Error(format!("Failed to receive thread exit info: {}", e)))
+            .and_then(|r| r)
     }
 }
 
@@ -634,12 +675,12 @@ mod tests {
             assert_eq!(*reference, 1);
         }
 
-        t.write_with_map(|i| {
+        t.write_map(|i| {
             *i = 2;
         })
         .unwrap();
 
-        let i = t.read_with_map(|i| *i + 1).unwrap();
+        let i = t.read_map(|i| *i + 1).unwrap();
         assert_eq!(i, 3);
     }
 }

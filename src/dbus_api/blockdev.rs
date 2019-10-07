@@ -145,8 +145,9 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let engine = dbus_context.engine.borrow();
     let (pool_name, pool) = get_pool!(engine; pool_uuid; default_return; return_message);
 
-    let result = stratis_to_method_err!(pool
-        .write_with_map(|p| { p.set_blockdev_user_info(&pool_name, blockdev_data.uuid, new_id) }))?;
+    let result =
+        stratis_to_method_err!(pool
+            .write_map(|p| { p.set_blockdev_user_info(&pool_name, blockdev_data.uuid, new_id) }))?;
 
     let msg = match result {
         Ok(id_changed) => return_message.append3(id_changed, msg_code_ok(), msg_string_ok()),

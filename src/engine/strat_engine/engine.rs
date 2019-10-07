@@ -270,7 +270,7 @@ impl Engine for StratEngine {
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<bool> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
-            if pool.read_with_map(|p| p.has_filesystems())? {
+            if pool.read_map(|p| p.has_filesystems())? {
                 return Err(StratisError::Engine(
                     ErrorEnum::Busy,
                     "filesystems remaining on pool".into(),
@@ -285,7 +285,7 @@ impl Engine for StratEngine {
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
-        if let Err(err) = pool.write_with_and_then(|p| p.destroy()) {
+        if let Err(err) = pool.write_and_then(|p| p.destroy()) {
             self.pools.insert(pool_name, uuid, pool);
             Err(err)
         } else {
@@ -304,7 +304,7 @@ impl Engine for StratEngine {
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
         let new_name = Name::new(new_name.to_owned());
-        if let Err(err) = pool.write_with_and_then(|p| p.write_metadata(&new_name)) {
+        if let Err(err) = pool.write_and_then(|p| p.write_metadata(&new_name)) {
             self.pools.insert(old_name, uuid, pool);
             Err(err)
         } else {
@@ -356,9 +356,9 @@ impl Engine for StratEngine {
             .collect();
 
         for (pool_name, pool_uuid, pool) in &mut self.pools {
-            for dm_name in pool.read_with_map(|p| p.get_eventing_dev_names(*pool_uuid))? {
+            for dm_name in pool.read_map(|p| p.get_eventing_dev_names(*pool_uuid))? {
                 if device_list.get(&dm_name) > self.watched_dev_last_event_nrs.get(&dm_name) {
-                    pool.write_with_and_then(|p| p.event_on(*pool_uuid, pool_name, &dm_name))?;
+                    pool.write_and_then(|p| p.event_on(*pool_uuid, pool_name, &dm_name))?;
                 }
             }
         }

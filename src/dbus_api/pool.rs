@@ -129,7 +129,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     }
 
-    let result = pool.write_with_and_then(|p| {
+    let result = pool.write_and_then(|p| {
         p.destroy_filesystems(
             &pool_name,
             &filesystem_map.keys().cloned().collect::<Vec<Uuid>>(),

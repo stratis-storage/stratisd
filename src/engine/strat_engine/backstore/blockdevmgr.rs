@@ -27,7 +27,7 @@ use crate::{
                 blockdev::StratBlockDev,
                 device::{identify, resolve_devices, DevOwnership},
                 metadata::{disown_device, BlockdevSize, MDADataSize, BDA},
-                udev::hw_lookup,
+                udev::{get_udev_property, udev_block_device_apply},
             },
             device::blkdev_size,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
@@ -445,15 +445,16 @@ fn initialize(
             Utc::now().timestamp() as u64,
         );
         if let Ok(bda) = bda {
-            let hw_id = match hw_lookup(devnode) {
-                Ok(id) => id,
-                // TODO: Consider logging if no hardware ID obtained. If
-                // logging distinguish between non-existant ID, which is a
-                // normal situation, and failure to obtain the ID due to an
-                // error in decoding the ID or failure to locate the udev
-                // entry for this devnode, which is not normal.
-                Err(_) => None,
-            };
+            let hw_id =
+                match udev_block_device_apply(devnode, |dev| get_udev_property(dev, "ID_WWN")) {
+                    Ok(Some(Some(Ok(id)))) => Some(id),
+                    // TODO: Consider logging if no hardware ID obtained. If
+                    // logging distinguish between non-existant ID, which is a
+                    // normal situation, and failure to obtain the ID due to an
+                    // error in decoding the ID or failure to locate the udev
+                    // entry for this devnode, which is not normal.
+                    _ => None,
+                };
 
             // FIXME: The expect is only provisionally true.
             // The dev_size is at least MIN_DEV_SIZE, but the size of the

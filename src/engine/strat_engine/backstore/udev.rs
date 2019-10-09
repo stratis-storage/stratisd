@@ -5,13 +5,60 @@
 //! udev-related methods
 use std::{
     collections::HashMap,
+    ffi::OsStr,
     fs,
     path::{Path, PathBuf},
 };
 
 use libudev;
 
-use crate::stratis::StratisResult;
+use crate::stratis::{StratisError, StratisResult};
+
+/// Get a udev property with the given name for the given device.
+/// Returns None if no udev property found for the given property name.
+/// Returns an error if the value of the property can not be converted to
+/// a string using the standard conversion for this OS.
+pub fn get_udev_property<T: AsRef<OsStr>>(
+    device: &libudev::Device,
+    property_name: T,
+) -> Option<StratisResult<String>>
+where
+    T: std::fmt::Display,
+{
+    device
+        .property_value(&property_name)
+        .map(|value| match value.to_str() {
+            Some(value) => Ok(value.into()),
+            None => Err(StratisError::Error(format!(
+                "Unable to convert udev property value with key {} belonging to device {} to a string",
+                property_name,
+                device.devnode().map_or("<unknown>".into(), |x| x.to_string_lossy().into_owned())
+            ))),
+        })
+}
+
+/// Locate a udev block device with the specified devnode and apply a function
+/// to that device, returning the result.
+/// Treat an uninitialized device as if it does not exist.
+/// This approach is necessitated by the libudev lifetimes, which do not allow
+/// returning anything directly obtained from the enumerator value created in
+/// the method itself.
+pub fn udev_block_device_apply<F, U>(devnode: &Path, f: F) -> StratisResult<Option<U>>
+where
+    F: FnOnce(&libudev::Device) -> U,
+{
+    let context = libudev::Context::new()?;
+    let mut enumerator = libudev::Enumerator::new(&context)?;
+    enumerator.match_subsystem("block")?;
+
+    let canonical = fs::canonicalize(devnode)?;
+
+    Ok(enumerator
+        .scan_devices()?
+        .filter(|x| x.is_initialized())
+        .find(|x| x.devnode().map_or(false, |d| canonical == d))
+        .map(|d| f(&d)))
+}
 
 /// Takes a libudev device entry and returns the properties as a HashMap.
 fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
@@ -44,12 +91,6 @@ pub fn get_udev_block_device(
         .find(|x| x.devnode().map_or(false, |d| canonical == d))
         .map(|dev| device_as_map(&dev));
     Ok(result)
-}
-
-/// Lookup the WWN from the udev db using the device node eg. /dev/sda
-pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<String>> {
-    let dev = get_udev_block_device(dev_node_search)?;
-    Ok(dev.and_then(|dev| dev.get("ID_WWN").cloned()))
 }
 
 /// Collect paths for all the block devices which are not individual multipath paths and which

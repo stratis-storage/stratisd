@@ -22,7 +22,7 @@ use crate::{
             backstore::{
                 blockdev::StratBlockDev,
                 metadata::{device_identifiers, BDA},
-                util::get_stratis_block_devices,
+                udev::get_stratis_block_devices,
             },
             device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},

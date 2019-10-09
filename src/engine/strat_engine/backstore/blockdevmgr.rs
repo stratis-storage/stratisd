@@ -27,7 +27,7 @@ use crate::{
                 blockdev::StratBlockDev,
                 device::{identify, resolve_devices, DevOwnership},
                 metadata::{disown_device, BlockdevSize, MDADataSize, BDA},
-                util::hw_lookup,
+                udev::hw_lookup,
             },
             device::blkdev_size,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},

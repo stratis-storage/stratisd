@@ -18,6 +18,8 @@ matrix:
     allow_failures:
         # Allow beta tasks to fail
         - rust: beta
+        # Allow nightly tasks to fail
+        - rust: nightly
         # Allow audit task to fail
         - env: TASK=audit
     include:
@@ -101,6 +103,11 @@ matrix:
         # * It should be an advisory, and should not gate our development.
         - rust: stable
           env: TASK=audit
+        # Run inspect on Rust nightly to have a quick and easy way to see
+        # desugared stratisd source. This might help our understanding of
+        # our ever more sugared source.
+        - rust: nightly
+          env: TASK=inspect
 
 branches:
     only: master

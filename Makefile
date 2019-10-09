@@ -24,6 +24,9 @@ ${HOME}/.cargo/bin/cargo-bloat:
 ${HOME}/.cargo/bin/cargo-audit:
 	cargo install cargo-audit
 
+${HOME}/.cargo/bin/cargo-inspect:
+	cargo install cargo-inspect
+
 tree: ${HOME}/.cargo/bin/cargo-tree
 	PATH=${HOME}/.cargo/bin:${PATH} cargo tree
 
@@ -39,6 +42,9 @@ bloat: ${HOME}/.cargo/bin/cargo-bloat
 
 audit: ${HOME}/.cargo/bin/cargo-audit
 	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D
+
+inspect: ${HOME}/.cargo/bin/cargo-inspect
+	PATH=${HOME}/.cargo/bin:${PATH} cargo inspect
 
 fmt:
 	cargo fmt
@@ -102,6 +108,7 @@ clippy:
 	docs-travis
 	fmt
 	fmt-travis
+	inspect
 	license
 	outdated
 	release

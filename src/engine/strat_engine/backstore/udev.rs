@@ -49,42 +49,23 @@ fn must_ignore(device: &libudev::Device) -> bool {
     multipath_member(device)
 }
 
-/// If the expression is true, then it seems that no other system is
-/// known to udev to claim this device.
-/// Note from mulhern: I have no idea myself why this particular expression
-/// should be correct. I was told that the original source was dlehman.
-/// WARNING: This method can be relied on only if ID_* udev
-/// properties have been properly set by the time they are read.
-fn unclaimed(device: &libudev::Device) -> bool {
-    (get_udev_property(device, "ID_PART_TABLE_TYPE").is_none()
-        || get_udev_property(device, "ID_PART_ENTRY_DISK").is_some())
-        && get_udev_property(device, "ID_FS_USAGE").is_none()
-}
-
 /// Categories for devices.
-pub enum UdevOwnership {
+pub enum Ownership {
     /// A member of a multipath device.
     MultipathMember,
     /// A Stratis device.
     StratisDevice,
-    /// Apparently unowned.
-    Unowned,
-    /// Not apparently unowned, so presumably owned by another.
-    /// Note that this is the default case, when all others are eliminated.
-    OwnedByOther,
 }
 
 /// Identify a device based solely on its udev information.
 #[allow(dead_code)]
-pub fn identify(device: &libudev::Device) -> UdevOwnership {
+pub fn identify(device: &libudev::Device) -> Option<Ownership> {
     if multipath_member(device) {
-        UdevOwnership::MultipathMember
+        Some(Ownership::MultipathMember)
     } else if stratis_device(device) {
-        UdevOwnership::StratisDevice
-    } else if unclaimed(device) {
-        UdevOwnership::Unowned
+        Some(Ownership::StratisDevice)
     } else {
-        UdevOwnership::OwnedByOther
+        None
     }
 }
 

@@ -19,6 +19,75 @@ use crate::{
     stratis::{StratisError, StratisResult},
 };
 
+/// Returns true if udev indicates that the device belongs to Stratis, else
+/// false. If there is any ambiguity, returns false.
+/// This may happen if there was a failure to interpret a udev value that
+/// was set.
+fn stratis_device(device: &libudev::Device) -> bool {
+    get_udev_property(device, "ID_FS_TYPE")
+        .map_or(false, |v| v.map(|v| v == "stratis").unwrap_or(false))
+}
+
+/// Returns true if udev indicates that the device is a multipath member
+/// device, else false. If there is any ambiguity, return true.
+/// This may happen if there was a failure to interpret a udev value that
+/// was set.
+/// WARNING: This method can be relied on only if DM_MULTIPATH* udev
+/// properties have been properly set by the time this property is read.
+fn multipath_member(device: &libudev::Device) -> bool {
+    get_udev_property(device, "DM_MULTIPATH_DEVICE_PATH")
+        .map_or(false, |v| v.map(|v| v == "1").unwrap_or(true))
+}
+
+/// Devices that _must_ be ignored. Such a device may have Stratis metadata
+/// on, but must _not_  be incorporated into stratisd hierarchy. The only
+/// example of such a thing right now is a metadata member device.
+/// WARNING: This method can be relied on only if DM_MULTIPATH* udev
+/// properties have been properly set by the time this property is read.
+#[allow(dead_code)]
+fn must_ignore(device: &libudev::Device) -> bool {
+    multipath_member(device)
+}
+
+/// If the expression is true, then it seems that no other system is
+/// known to udev to claim this device.
+/// Note from mulhern: I have no idea myself why this particular expression
+/// should be correct. I was told that the original source was dlehman.
+/// WARNING: This method can be relied on only if ID_* udev
+/// properties have been properly set by the time they are read.
+fn unclaimed(device: &libudev::Device) -> bool {
+    (get_udev_property(device, "ID_PART_TABLE_TYPE").is_none()
+        || get_udev_property(device, "ID_PART_ENTRY_DISK").is_some())
+        && get_udev_property(device, "ID_FS_USAGE").is_none()
+}
+
+/// Categories for devices.
+pub enum UdevOwnership {
+    /// A member of a multipath device.
+    MultipathMember,
+    /// A Stratis device.
+    StratisDevice,
+    /// Apparently unowned.
+    Unowned,
+    /// Not apparently unowned, so presumably owned by another.
+    /// Note that this is the default case, when all others are eliminated.
+    OwnedByOther,
+}
+
+/// Identify a device based solely on its udev information.
+#[allow(dead_code)]
+pub fn identify(device: &libudev::Device) -> UdevOwnership {
+    if multipath_member(device) {
+        UdevOwnership::MultipathMember
+    } else if stratis_device(device) {
+        UdevOwnership::StratisDevice
+    } else if unclaimed(device) {
+        UdevOwnership::Unowned
+    } else {
+        UdevOwnership::OwnedByOther
+    }
+}
+
 /// Get a udev property with the given name for the given device.
 /// Returns None if no udev property found for the given property name.
 /// Returns an error if the value of the property can not be converted to

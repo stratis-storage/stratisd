@@ -12,8 +12,6 @@ use dbus::{
     Message,
 };
 
-use uuid::Uuid;
-
 use crate::{
     dbus_api::{
         consts,
@@ -23,13 +21,15 @@ use crate::{
             msg_code_ok, msg_string_ok,
         },
     },
-    engine::{filesystem_mount_path, Filesystem, MaybeDbusPath, Name, RenameAction},
+    engine::{
+        filesystem_mount_path, Filesystem, FilesystemUuid, MaybeDbusPath, Name, RenameAction,
+    },
 };
 
 pub fn create_dbus_filesystem<'a>(
     dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
-    uuid: Uuid,
+    uuid: FilesystemUuid,
     filesystem: &mut dyn Filesystem,
 ) -> dbus::Path<'a> {
     let f = Factory::new_fn();
@@ -37,7 +37,11 @@ pub fn create_dbus_filesystem<'a>(
     let rename_method = f
         .method("SetName", (), rename_filesystem)
         .in_arg(("name", "s"))
-        .out_arg(("action", "b"))
+        // b: true if UUID of changed resource has been returned
+        // s: UUID of changed resource
+        //
+        // Rust representation: (bool, String)
+        .out_arg(("result", "(bs)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
@@ -108,7 +112,7 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let default_return = false;
+    let default_return = (false, uuid_to_string!(FilesystemUuid::nil()));
 
     let filesystem_path = m
         .tree
@@ -134,7 +138,11 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(RenameAction::Identity) => {
             return_message.append3(default_return, msg_code_ok(), msg_string_ok())
         }
-        Ok(RenameAction::Renamed) => return_message.append3(true, msg_code_ok(), msg_string_ok()),
+        Ok(RenameAction::Renamed(uuid)) => return_message.append3(
+            (true, uuid_to_string!(uuid)),
+            msg_code_ok(),
+            msg_string_ok(),
+        ),
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)

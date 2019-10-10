@@ -12,6 +12,8 @@ use std::{
 
 use libudev;
 
+use devicemapper::Device;
+
 use crate::{
     engine::strat_engine::backstore::identify,
     stratis::{StratisError, StratisResult},
@@ -57,6 +59,18 @@ where
         .scan_devices()?
         .find(|x| x.devnode().map_or(false, |d| devnode == d))
         .map(|d| f(&d)))
+}
+
+/// Obtain a devicemapper Device and the devnode from a libudev Device.
+/// Returns None if the device node or the device number, used to construct
+/// the devicemapper device, can not be otained from libudev.
+#[allow(dead_code)]
+pub fn get_device_and_devnode(device: &libudev::Device) -> Option<(Device, PathBuf)> {
+    device.devnode().and_then(|devnode| {
+        device
+            .devnum()
+            .and_then(|devnum| Some((Device::from(devnum), PathBuf::from(devnode))))
+    })
 }
 
 /// Takes a libudev device entry and returns the properties as a HashMap.

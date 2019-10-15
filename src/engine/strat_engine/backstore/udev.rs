@@ -144,10 +144,7 @@ pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
     Ok(enumerator
         .scan_devices()?
         .filter(|dev| dev.is_initialized())
-        .filter(|dev| {
-            dev.property_value("DM_MULTIPATH_DEVICE_PATH")
-                .map_or(true, |v| v != "1")
-        })
+        .filter(|dev| !multipath_member(dev))
         .filter_map(|i| i.devnode().map(|d| d.into()))
         .collect())
 }

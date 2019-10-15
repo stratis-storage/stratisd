@@ -14,10 +14,7 @@ use libudev;
 
 use devicemapper::Device;
 
-use crate::{
-    engine::strat_engine::backstore::identify,
-    stratis::{StratisError, StratisResult},
-};
+use crate::stratis::{StratisError, StratisResult};
 
 /// Returns true if udev indicates that the device belongs to Stratis, else
 /// false. If there is any ambiguity, returns false.
@@ -137,6 +134,24 @@ fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
     rc
 }
 
+/// Retrieve all the block devices on the system that have a Stratis signature.
+pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
+    let context = libudev::Context::new()?;
+    let mut enumerator = libudev::Enumerator::new(&context)?;
+    enumerator.match_subsystem("block")?;
+    enumerator.match_property("ID_FS_TYPE", "stratis")?;
+
+    Ok(enumerator
+        .scan_devices()?
+        .filter(|dev| dev.is_initialized())
+        .filter(|dev| {
+            dev.property_value("DM_MULTIPATH_DEVICE_PATH")
+                .map_or(true, |v| v != "1")
+        })
+        .filter_map(|i| i.devnode().map(|d| d.into()))
+        .collect())
+}
+
 /// Common function used to retrieve the udev db entry for a block device as a HashMap when found
 pub fn get_udev_block_device(
     dev_node_search: &Path,
@@ -154,65 +169,4 @@ pub fn get_udev_block_device(
         .find(|x| x.devnode().map_or(false, |d| canonical == d))
         .map(|dev| device_as_map(&dev));
     Ok(result)
-}
-
-/// Collect paths for all the block devices which are not individual multipath paths and which
-/// appear to be empty from a udev perspective.
-fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
-    let context = libudev::Context::new()?;
-    let mut enumerator = libudev::Enumerator::new(&context)?;
-    enumerator.match_subsystem("block")?;
-
-    Ok(enumerator
-        .scan_devices()?
-        .filter(|dev| dev.is_initialized())
-        .filter(|dev| {
-            dev.property_value("DM_MULTIPATH_DEVICE_PATH")
-                .map_or(true, |v| v != "1")
-                && !((dev.property_value("ID_PART_TABLE_TYPE").is_some()
-                    && dev.property_value("ID_PART_ENTRY_DISK").is_none())
-                    || dev.property_value("ID_FS_USAGE").is_some())
-        })
-        .filter_map(|i| i.devnode().map(|d| d.into()))
-        .collect())
-}
-
-/// Retrieve all the block devices on the system that have a Stratis signature.
-pub fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
-    let context = libudev::Context::new()?;
-    let mut enumerator = libudev::Enumerator::new(&context)?;
-    enumerator.match_subsystem("block")?;
-    enumerator.match_property("ID_FS_TYPE", "stratis")?;
-
-    let devices: Vec<PathBuf> = enumerator
-        .scan_devices()?
-        .filter(|dev| dev.is_initialized())
-        .filter(|dev| {
-            dev.property_value("DM_MULTIPATH_DEVICE_PATH")
-                .map_or(true, |v| v != "1")
-        })
-        .filter_map(|i| i.devnode().map(|d| d.into()))
-        .collect();
-
-    if devices.is_empty() {
-        // We have found no Stratis devices, possible reasons are:
-        // 1. We really don't have any
-        // 2. We have some, but libblkid is too old to support Stratis, thus we appear empty
-        // 3. We ran this code at early boot before we have any udev db entries which are complete
-        //    or are complete but fall into reasons 1 & 2 above
-        //
-        // In this case we will get all the block devices which have complete udev db block device
-        // entries and appear "empty" and go out to disk and check them!
-
-        Ok(get_all_empty_devices()?
-            .into_iter()
-            .filter(|x| {
-                identify(x)
-                    .map(|ownership| ownership.stratis_identifiers().is_some())
-                    .unwrap_or(false)
-            })
-            .collect())
-    } else {
-        Ok(devices)
-    }
 }

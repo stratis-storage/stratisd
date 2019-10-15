@@ -286,7 +286,7 @@ impl StaticHeader {
             F: Seek + SyncAll,
         {
             f.write_all(&zeroed[..bytes!(static_header_size::PRE_SIGBLOCK_PADDING_SECTORS)])?;
-            f.write_all(&signature_block)?;
+            f.write_all(signature_block)?;
             f.write_all(&zeroed[..bytes!(static_header_size::POST_SIGBLOCK_PADDING_SECTORS)])?;
             f.sync_all()?;
             Ok(())
@@ -672,7 +672,7 @@ mod tests {
                 Utc::now().timestamp() as u64,
             ).unwrap();
             let current_time = Utc::now();
-            bda.save_state(&current_time, &state, &mut buf).unwrap();
+            bda.save_state(&current_time, state, &mut buf).unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();
             prop_assert!(bda.last_update_time().map(|t| t == &current_time).unwrap_or(false));
             prop_assert!(loaded_state.map(|s| &s == state).unwrap_or(false));
@@ -683,7 +683,7 @@ mod tests {
             prop_assert!(bda.last_update_time().map(|t| t == &current_time).unwrap_or(false));
 
             let current_time = Utc::now();
-            bda.save_state(&current_time, &next_state, &mut buf)
+            bda.save_state(&current_time, next_state, &mut buf)
                 .unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();
             prop_assert!(loaded_state.map(|s| &s == next_state).unwrap_or(false));

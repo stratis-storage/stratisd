@@ -38,7 +38,7 @@ impl DataTier {
     pub fn setup(block_mgr: BlockDevMgr, data_tier_save: &DataTierSave) -> StratisResult<DataTier> {
         let uuid_to_devno = block_mgr.uuid_to_devno();
         let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
-            metadata_to_segment(&uuid_to_devno, &ld)
+            metadata_to_segment(&uuid_to_devno, ld)
         };
         let segments = data_tier_save.blockdev.allocs[0]
             .iter()

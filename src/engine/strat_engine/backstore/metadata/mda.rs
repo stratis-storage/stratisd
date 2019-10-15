@@ -486,7 +486,7 @@ mod tests {
             let header = MDAHeader {
                 last_updated: Utc.timestamp(sec, nsec),
                 used: MetaDataSize::new(Bytes(data.len() as u64)),
-                data_crc: crc32::checksum_castagnoli(&data),
+                data_crc: crc32::checksum_castagnoli(data),
             };
             let buf = header.to_buf();
             let mda1 = MDAHeader::from_buf(&buf).unwrap().unwrap();

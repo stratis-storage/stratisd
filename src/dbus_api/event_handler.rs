@@ -31,7 +31,7 @@ impl EngineListener for EventHandler {
                         &self.dbus_conn.borrow(),
                         consts::BLOCKDEV_STATE_PROP,
                         state as u16,
-                        &dbus_path,
+                        dbus_path,
                         consts::BLOCKDEV_INTERFACE_NAME,
                     )
                     .unwrap_or_else(|()| {
@@ -52,7 +52,7 @@ impl EngineListener for EventHandler {
                         &self.dbus_conn.borrow(),
                         consts::FILESYSTEM_NAME_PROP,
                         to.to_string(),
-                        &dbus_path,
+                        dbus_path,
                         consts::FILESYSTEM_INTERFACE_NAME,
                     )
                     .unwrap_or_else(|()| {
@@ -69,7 +69,7 @@ impl EngineListener for EventHandler {
                         &self.dbus_conn.borrow(),
                         consts::POOL_EXTEND_STATE_PROP,
                         state as u16,
-                        &dbus_path,
+                        dbus_path,
                         consts::POOL_INTERFACE_NAME,
                     )
                     .unwrap_or_else(|()| {
@@ -90,7 +90,7 @@ impl EngineListener for EventHandler {
                         &self.dbus_conn.borrow(),
                         consts::POOL_NAME_PROP,
                         to.to_string(),
-                        &dbus_path,
+                        dbus_path,
                         consts::POOL_INTERFACE_NAME,
                     )
                     .unwrap_or_else(|()| {
@@ -107,7 +107,7 @@ impl EngineListener for EventHandler {
                         &self.dbus_conn.borrow(),
                         consts::POOL_SPACE_STATE_PROP,
                         state as u16,
-                        &dbus_path,
+                        dbus_path,
                         consts::POOL_INTERFACE_NAME,
                     )
                     .unwrap_or_else(|()| {
@@ -124,7 +124,7 @@ impl EngineListener for EventHandler {
                         &self.dbus_conn.borrow(),
                         consts::POOL_STATE_PROP,
                         state as u16,
-                        &dbus_path,
+                        dbus_path,
                         consts::POOL_INTERFACE_NAME,
                     )
                     .unwrap_or_else(|()| {

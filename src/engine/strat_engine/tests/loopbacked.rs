@@ -92,7 +92,7 @@ pub fn test_with_spec<F>(limits: &DeviceLimits, test: F)
 where
     F: Fn(&[&Path]) -> () + panic::RefUnwindSafe,
 {
-    let counts = get_device_counts(&limits);
+    let counts = get_device_counts(limits);
 
     init_logger();
 

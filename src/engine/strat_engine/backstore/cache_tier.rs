@@ -61,7 +61,7 @@ impl CacheTier {
 
         let uuid_to_devno = block_mgr.uuid_to_devno();
         let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
-            metadata_to_segment(&uuid_to_devno, &ld)
+            metadata_to_segment(&uuid_to_devno, ld)
         };
 
         let meta_segments = cache_tier_save.blockdev.allocs[1]

@@ -120,7 +120,7 @@ impl StratFilesystem {
             &dm_name,
             Some(&dm_uuid),
             fssave.size,
-            &thinpool_dev,
+            thinpool_dev,
             fssave.thin_id,
         )?;
         Ok(StratFilesystem {
@@ -203,7 +203,7 @@ impl StratFilesystem {
         match self.thin_dev.status(get_dm())? {
             ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.mount_points()?.first() {
-                    let (fs_total_bytes, fs_total_used_bytes) = fs_usage(&mount_point)?;
+                    let (fs_total_bytes, fs_total_used_bytes) = fs_usage(mount_point)?;
                     let free_bytes = fs_total_bytes - fs_total_used_bytes;
                     if free_bytes.sectors() < FILESYSTEM_LOWATER {
                         let mut table = self.thin_dev.table().table.clone();
@@ -212,7 +212,7 @@ impl StratFilesystem {
                         if self.thin_dev.set_table(get_dm(), table).is_err() {
                             return Ok((FilesystemStatus::ThinDevExtendFailed, false));
                         }
-                        if xfs_growfs(&mount_point).is_err() {
+                        if xfs_growfs(mount_point).is_err() {
                             return Ok((FilesystemStatus::XfsGrowFailed, true));
                         }
                         return Ok((FilesystemStatus::Good, true));

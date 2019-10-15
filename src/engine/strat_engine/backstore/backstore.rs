@@ -137,7 +137,7 @@ impl Backstore {
             let block_mgr = BlockDevMgr::new(cachedevs, Some(last_update_time));
             match backstore_save.cache_tier {
                 Some(ref cache_tier_save) => {
-                    let cache_tier = CacheTier::setup(block_mgr, &cache_tier_save)?;
+                    let cache_tier = CacheTier::setup(block_mgr, cache_tier_save)?;
 
                     let cache_device = make_cache(pool_uuid, &cache_tier, origin, false)?;
                     (Some(cache_tier), Some(cache_device), None)
@@ -820,7 +820,7 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = &map[&pool_uuid];
-        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, Utc::now()).unwrap();
+        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, map, Utc::now()).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();
@@ -832,7 +832,7 @@ mod tests {
         cmd::udev_settle().unwrap();
         let map = find_all().unwrap();
         let map = &map[&pool_uuid];
-        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, &map, Utc::now()).unwrap();
+        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, map, Utc::now()).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();

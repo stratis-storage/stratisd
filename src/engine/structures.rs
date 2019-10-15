@@ -317,14 +317,10 @@ mod tests {
 
         let uuid = Uuid::new_v4();
         let name = "name";
-        t.insert(
-            Name::new(name.to_owned()),
-            uuid,
-            TestThing::new(&name, uuid),
-        );
+        t.insert(Name::new(name.to_owned()), uuid, TestThing::new(name, uuid));
         table_invariant(&t);
 
-        assert!(t.get_by_name(&name).is_some());
+        assert!(t.get_by_name(name).is_some());
         assert!(t.get_by_uuid(uuid).is_some());
         let thing = t.remove_by_uuid(uuid);
         table_invariant(&t);
@@ -332,10 +328,10 @@ mod tests {
         let mut thing = thing.unwrap();
         thing.1.stuff = 0;
         assert!(t.is_empty());
-        assert_matches!(t.remove_by_name(&name), None);
+        assert_matches!(t.remove_by_name(name), None);
         table_invariant(&t);
 
-        assert_matches!(t.get_by_name(&name), None);
+        assert_matches!(t.get_by_name(name), None);
         assert_matches!(t.get_by_uuid(uuid), None);
     }
 
@@ -351,7 +347,7 @@ mod tests {
 
         let uuid = Uuid::new_v4();
         let name = "name";
-        let thing = TestThing::new(&name, uuid);
+        let thing = TestThing::new(name, uuid);
         let thing_key = thing.stuff;
         let displaced = t.insert(Name::new(name.to_owned()), uuid, thing);
         table_invariant(&t);
@@ -360,12 +356,12 @@ mod tests {
         assert_matches!(displaced, None);
 
         // t now contains the inserted thing.
-        assert!(t.contains_name(&name));
+        assert!(t.contains_name(name));
         assert!(t.contains_uuid(uuid));
         assert_eq!(t.get_by_uuid(uuid).unwrap().1.stuff, thing_key);
 
         // Add another thing with the same keys.
-        let thing2 = TestThing::new(&name, uuid);
+        let thing2 = TestThing::new(name, uuid);
         let thing_key2 = thing2.stuff;
         let displaced = t.insert(Name::new(name.to_owned()), uuid, thing2);
         table_invariant(&t);
@@ -377,7 +373,7 @@ mod tests {
         assert_eq!(displaced_item[0].1, uuid);
 
         // But it contains a thing with the same keys.
-        assert!(t.contains_name(&name));
+        assert!(t.contains_name(name));
         assert!(t.contains_uuid(uuid));
         assert_eq!(t.get_by_uuid(uuid).unwrap().1.stuff, thing_key2);
         assert_eq!(t.len(), 1);
@@ -392,7 +388,7 @@ mod tests {
 
         let uuid = Uuid::new_v4();
         let name = "name";
-        let thing = TestThing::new(&name, uuid);
+        let thing = TestThing::new(name, uuid);
         let thing_key = thing.stuff;
 
         // There was nothing in the table before, so displaced is empty.
@@ -401,12 +397,12 @@ mod tests {
         assert_matches!(displaced, None);
 
         // t now contains thing.
-        assert!(t.contains_name(&name));
+        assert!(t.contains_name(name));
         assert!(t.contains_uuid(uuid));
 
         // Insert new item with different UUID.
         let uuid2 = Uuid::new_v4();
-        let thing2 = TestThing::new(&name, uuid2);
+        let thing2 = TestThing::new(name, uuid2);
         let thing_key2 = thing2.stuff;
         let displaced = t.insert(Name::new(name.to_owned()), uuid2, thing2);
         table_invariant(&t);
@@ -419,11 +415,11 @@ mod tests {
         assert_eq!(displaced_item[0].2.stuff, thing_key);
 
         // The table contains the new item and has no memory of the old.
-        assert!(t.contains_name(&name));
+        assert!(t.contains_name(name));
         assert!(t.contains_uuid(uuid2));
         assert!(!t.contains_uuid(uuid));
         assert_eq!(t.get_by_uuid(uuid2).unwrap().1.stuff, thing_key2);
-        assert_eq!(t.get_by_name(&name).unwrap().1.stuff, thing_key2);
+        assert_eq!(t.get_by_name(name).unwrap().1.stuff, thing_key2);
         assert_eq!(t.len(), 1);
     }
 
@@ -436,7 +432,7 @@ mod tests {
 
         let uuid = Uuid::new_v4();
         let name = "name";
-        let thing = TestThing::new(&name, uuid);
+        let thing = TestThing::new(name, uuid);
         let thing_key = thing.stuff;
 
         // There was nothing in the table before, so displaced is empty.
@@ -445,12 +441,12 @@ mod tests {
         assert_matches!(displaced, None);
 
         // t now contains thing.
-        assert!(t.contains_name(&name));
+        assert!(t.contains_name(name));
         assert!(t.contains_uuid(uuid));
 
         // Insert new item with different UUID.
         let name2 = "name2";
-        let thing2 = TestThing::new(&name2, uuid);
+        let thing2 = TestThing::new(name2, uuid);
         let thing_key2 = thing2.stuff;
         let displaced = t.insert(Name::new(name2.to_owned()), uuid, thing2);
         table_invariant(&t);
@@ -467,7 +463,7 @@ mod tests {
         assert!(t.contains_name(name2));
         assert!(!t.contains_name(name));
         assert_eq!(t.get_by_uuid(uuid).unwrap().1.stuff, thing_key2);
-        assert_eq!(t.get_by_name(&name2).unwrap().1.stuff, thing_key2);
+        assert_eq!(t.get_by_name(name2).unwrap().1.stuff, thing_key2);
         assert_eq!(t.len(), 1);
     }
 
@@ -480,12 +476,12 @@ mod tests {
 
         let uuid1 = Uuid::new_v4();
         let name1 = "name1";
-        let thing1 = TestThing::new(&name1, uuid1);
+        let thing1 = TestThing::new(name1, uuid1);
         let thing_key1 = thing1.stuff;
 
         let uuid2 = Uuid::new_v4();
         let name2 = "name2";
-        let thing2 = TestThing::new(&name2, uuid2);
+        let thing2 = TestThing::new(name2, uuid2);
         let thing_key2 = thing2.stuff;
 
         // Insert first item. There was nothing in the table before, so
@@ -495,7 +491,7 @@ mod tests {
         assert_matches!(displaced, None);
 
         // t now contains thing1.
-        assert!(t.contains_name(&name1));
+        assert!(t.contains_name(name1));
         assert!(t.contains_uuid(uuid1));
 
         // Insert second item. No conflicts, so nothing is displaced.
@@ -504,14 +500,14 @@ mod tests {
         assert_matches!(displaced, None);
 
         // t now also contains thing2.
-        assert!(t.contains_name(&name2));
+        assert!(t.contains_name(name2));
         assert!(t.contains_uuid(uuid2));
 
         // Create a third thing with the uuid of one and the name of the
         // other.
         let uuid3 = uuid1;
         let name3 = name2;
-        let thing3 = TestThing::new(&name3, uuid3);
+        let thing3 = TestThing::new(name3, uuid3);
         let thing_key3 = thing3.stuff;
 
         // Insert third item.
@@ -537,7 +533,7 @@ mod tests {
         assert!(t.contains_uuid(uuid3));
         assert!(t.contains_name(name3));
         assert_eq!(t.get_by_uuid(uuid3).unwrap().1.stuff, thing_key3);
-        assert_eq!(t.get_by_name(&name3).unwrap().1.stuff, thing_key3);
+        assert_eq!(t.get_by_name(name3).unwrap().1.stuff, thing_key3);
         assert_eq!(t.len(), 1);
     }
 }

@@ -66,9 +66,9 @@ lazy_static! {
 /// path. Return an error if any are missing. Required to be called on engine
 /// initialization.
 pub fn verify_binaries() -> StratisResult<()> {
-    match BINARIES.iter().find(|&(_, ref path)| path.is_none()) {
+    match BINARIES.iter().find(|&(_, path)| path.is_none()) {
         None => Ok(()),
-        Some((ref name, _)) => Err(StratisError::Error(format!(
+        Some((name, _)) => Err(StratisError::Error(format!(
             "Unable to find executable \"{}\" in any of {}",
             name,
             BINARIES_PATHS
@@ -126,7 +126,7 @@ pub fn create_fs(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
         Command::new(get_executable(MKFS_XFS).as_os_str())
             .arg("-f")
             .arg("-q")
-            .arg(&devnode)
+            .arg(devnode)
             .arg("-m")
             .arg(format!("uuid={}", uuid)),
     )
@@ -148,7 +148,7 @@ pub fn set_uuid(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
         Command::new(get_executable(XFS_DB).as_os_str())
             .arg("-x")
             .arg(format!("-c uuid {}", uuid))
-            .arg(&devnode),
+            .arg(devnode),
     )
 }
 
@@ -179,12 +179,12 @@ pub fn udev_settle() -> StratisResult<()> {
 
 #[cfg(test)]
 pub fn create_ext3_fs(devnode: &Path) -> StratisResult<()> {
-    execute_cmd(Command::new("wipefs").arg("-a").arg(&devnode))?;
-    execute_cmd(Command::new("mkfs.ext3").arg(&devnode))
+    execute_cmd(Command::new("wipefs").arg("-a").arg(devnode))?;
+    execute_cmd(Command::new("mkfs.ext3").arg(devnode))
 }
 
 #[cfg(test)]
 #[allow(dead_code)]
 pub fn xfs_repair(devnode: &Path) -> StratisResult<()> {
-    execute_cmd(Command::new("xfs_repair").arg("-n").arg(&devnode))
+    execute_cmd(Command::new("xfs_repair").arg("-n").arg(devnode))
 }

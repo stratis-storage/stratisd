@@ -72,7 +72,7 @@ fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
 /// ensures that the flex devs metadata lists are all non-empty.
 pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
     let flex_devs = &metadata.flex_devs;
-    let next = next_index(&flex_devs);
+    let next = next_index(flex_devs);
     let allocated_from_cap = metadata.backstore.cap.allocs[0].1;
 
     if allocated_from_cap != next {
@@ -525,14 +525,14 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let name1 = "name1";
-        let (uuid1, mut pool1) = StratPool::initialize(&name1, paths1, Redundancy::NONE).unwrap();
-        invariant(&pool1, &name1);
+        let (uuid1, mut pool1) = StratPool::initialize(name1, paths1, Redundancy::NONE).unwrap();
+        invariant(&pool1, name1);
 
         let metadata1 = pool1.record(name1);
 
         let name2 = "name2";
-        let (uuid2, mut pool2) = StratPool::initialize(&name2, paths2, Redundancy::NONE).unwrap();
-        invariant(&pool2, &name2);
+        let (uuid2, mut pool2) = StratPool::initialize(name2, paths2, Redundancy::NONE).unwrap();
+        invariant(&pool2, name2);
 
         let metadata2 = pool2.record(name2);
 
@@ -607,20 +607,20 @@ mod tests {
 
         let name = "stratis-test-pool";
         devlinks::cleanup_devlinks(Vec::new().into_iter());
-        let (uuid, mut pool) = StratPool::initialize(&name, paths2, Redundancy::NONE).unwrap();
-        devlinks::pool_added(&name);
-        invariant(&pool, &name);
+        let (uuid, mut pool) = StratPool::initialize(name, paths2, Redundancy::NONE).unwrap();
+        devlinks::pool_added(name);
+        invariant(&pool, name);
 
         let metadata1 = pool.record(name);
         assert_matches!(metadata1.backstore.cache_tier, None);
 
         let (_, fs_uuid) = pool
-            .create_filesystems(uuid, &name, &[("stratis-filesystem", None)])
+            .create_filesystems(uuid, name, &[("stratis-filesystem", None)])
             .unwrap()
             .changed()
             .and_then(|mut fs| fs.pop())
             .unwrap();
-        invariant(&pool, &name);
+        invariant(&pool, name);
 
         let tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
@@ -647,9 +647,9 @@ mod tests {
                 .unwrap();
         }
 
-        pool.add_blockdevs(uuid, &name, paths1, BlockDevTier::Cache)
+        pool.add_blockdevs(uuid, name, paths1, BlockDevTier::Cache)
             .unwrap();
-        invariant(&pool, &name);
+        invariant(&pool, name);
 
         let metadata2 = pool.record(name);
         assert!(metadata2.backstore.cache_tier.is_some());
@@ -674,8 +674,8 @@ mod tests {
         assert_eq!(pools.len(), 1);
         let devices = &pools[&uuid];
 
-        let (timestamp, metadata) = get_metadata(uuid, &devices).unwrap().unwrap();
-        let (name, pool) = StratPool::setup(uuid, &devices, timestamp, &metadata).unwrap();
+        let (timestamp, metadata) = get_metadata(uuid, devices).unwrap().unwrap();
+        let (name, pool) = StratPool::setup(uuid, devices, timestamp, &metadata).unwrap();
         invariant(&pool, &name);
 
         let mut buf = [0u8; 10];
@@ -725,13 +725,13 @@ mod tests {
 
         let name = "stratis-test-pool";
         devlinks::cleanup_devlinks(Vec::new().into_iter());
-        let (pool_uuid, mut pool) = StratPool::initialize(&name, paths1, Redundancy::NONE).unwrap();
-        devlinks::pool_added(&name);
-        invariant(&pool, &name);
+        let (pool_uuid, mut pool) = StratPool::initialize(name, paths1, Redundancy::NONE).unwrap();
+        devlinks::pool_added(name);
+        invariant(&pool, name);
 
         let fs_name = "stratis_test_filesystem";
         let (_, fs_uuid) = pool
-            .create_filesystems(pool_uuid, &name, &[(&fs_name, None)])
+            .create_filesystems(pool_uuid, name, &[(fs_name, None)])
             .unwrap()
             .changed()
             .and_then(|mut fs| fs.pop())
@@ -765,7 +765,7 @@ mod tests {
                 }
             }
 
-            pool.add_blockdevs(pool_uuid, &name, paths2, BlockDevTier::Data)
+            pool.add_blockdevs(pool_uuid, name, paths2, BlockDevTier::Data)
                 .unwrap();
             assert_matches!(pool.thin_pool.extend_state(), PoolExtendState::Good);
             assert_matches!(pool.thin_pool.state(), PoolState::Running);

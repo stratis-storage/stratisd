@@ -219,7 +219,7 @@ where
         })
         .collect();
 
-    let runs = get_device_runs(&limits, &dev_sizes);
+    let runs = get_device_runs(limits, &dev_sizes);
 
     assert!(!runs.is_empty());
 

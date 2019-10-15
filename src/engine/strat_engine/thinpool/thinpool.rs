@@ -590,7 +590,7 @@ impl ThinPool {
         for (name, uuid, fs) in self.filesystems.iter_mut() {
             let (fs_status, save_mdv) = fs.check()?;
             if save_mdv {
-                if let Err(e) = self.mdv.save_fs(name, *uuid, &fs) {
+                if let Err(e) = self.mdv.save_fs(name, *uuid, fs) {
                     error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}", 
                                 uuid, name, pool_uuid, e);
                 }
@@ -1313,7 +1313,7 @@ mod tests {
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let (first_path, remaining_paths) = paths.split_at(1);
         let mut backstore =
-            Backstore::initialize(pool_uuid, &first_path, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, first_path, MDADataSize::default()).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1323,7 +1323,7 @@ mod tests {
         .unwrap();
 
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name);
+        devlinks::pool_added(pool_name);
         let fs_uuid = pool
             .create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
             .unwrap();
@@ -1379,7 +1379,7 @@ mod tests {
         };
 
         // Add block devices to the pool and run check() to extend
-        backstore.add_datadevs(pool_uuid, &remaining_paths).unwrap();
+        backstore.add_datadevs(pool_uuid, remaining_paths).unwrap();
         pool.check(pool_uuid, &mut backstore).unwrap();
         // Verify the pool is back in a Good state
         match pool.thin_pool.status(get_dm()).unwrap() {
@@ -1430,7 +1430,7 @@ mod tests {
         .unwrap();
 
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name);
+        devlinks::pool_added(pool_name);
         let fs_uuid = pool
             .create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
             .unwrap();
@@ -1543,9 +1543,9 @@ mod tests {
         .unwrap();
 
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name);
+        devlinks::pool_added(pool_name);
         let fs_uuid = pool
-            .create_filesystem(pool_uuid, pool_name, &name1, None)
+            .create_filesystem(pool_uuid, pool_name, name1, None)
             .unwrap();
 
         let action = pool.rename_filesystem(pool_name, fs_uuid, name2).unwrap();
@@ -1592,7 +1592,7 @@ mod tests {
         .unwrap();
 
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name);
+        devlinks::pool_added(pool_name);
         let fs_uuid = pool
             .create_filesystem(pool_uuid, pool_name, "fsname", None)
             .unwrap();
@@ -1658,10 +1658,10 @@ mod tests {
         )
         .unwrap();
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name);
+        devlinks::pool_added(pool_name);
         let fs_name = "stratis_test_filesystem";
         let fs_uuid = pool
-            .create_filesystem(pool_uuid, pool_name, &fs_name, None)
+            .create_filesystem(pool_uuid, pool_name, fs_name, None)
             .unwrap();
         pool.destroy_filesystem(pool_name, fs_uuid).unwrap();
         let flexdevs: FlexDevsSave = pool.record();
@@ -1718,7 +1718,7 @@ mod tests {
         let fs_size = FILESYSTEM_LOWATER + Bytes(IEC::Mi).sectors();
 
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name);
+        devlinks::pool_added(pool_name);
         let fs_name = "stratis_test_filesystem";
         let fs_uuid = pool
             .create_filesystem(pool_uuid, pool_name, fs_name, Some(fs_size))
@@ -1757,10 +1757,10 @@ mod tests {
                 break;
             }
         }
-        let (orig_fs_total_bytes, _) = fs_usage(&tmp_dir.path()).unwrap();
+        let (orig_fs_total_bytes, _) = fs_usage(tmp_dir.path()).unwrap();
         // Simulate handling a DM event by running a pool check.
         pool.check(pool_uuid, &mut backstore).unwrap();
-        let (fs_total_bytes, _) = fs_usage(&tmp_dir.path()).unwrap();
+        let (fs_total_bytes, _) = fs_usage(tmp_dir.path()).unwrap();
         assert!(fs_total_bytes > orig_fs_total_bytes);
         umount(tmp_dir.path()).unwrap();
 
@@ -1807,7 +1807,7 @@ mod tests {
         .unwrap();
 
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name);
+        devlinks::pool_added(pool_name);
         pool.create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
             .unwrap();
 
@@ -1855,7 +1855,7 @@ mod tests {
         .unwrap();
 
         let pool_name = "stratis_test_pool";
-        devlinks::pool_added(&pool_name);
+        devlinks::pool_added(pool_name);
         let fs_uuid = pool
             .create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
             .unwrap();

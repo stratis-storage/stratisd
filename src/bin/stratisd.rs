@@ -182,7 +182,7 @@ impl MaybeDbusSupport {
         engine: &Rc<RefCell<dyn Engine>>,
     ) -> Option<&mut DbusConnectionData> {
         if self.handle.is_none() {
-            match libstratis::dbus_api::DbusConnectionData::connect(Rc::clone(&engine)) {
+            match libstratis::dbus_api::DbusConnectionData::connect(Rc::clone(engine)) {
                 Err(_err) => {
                     warn!("D-Bus API is not available");
                 }
@@ -437,7 +437,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
 
     let eventable = engine.borrow().get_eventable();
 
-    if let Some(ref evt) = eventable {
+    if let Some(evt) = eventable {
         fds.push(libc::pollfd {
             fd: evt.get_pollable_fd(),
             revents: 0,
@@ -459,7 +459,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         }
 
         if fds[FD_INDEX_SIGNALFD].revents != 0 {
-            match process_signal(&mut sfd, &buff_log) {
+            match process_signal(&mut sfd, buff_log) {
                 Ok(should_exit) => {
                     if should_exit {
                         return Ok(());
@@ -475,7 +475,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
             log_engine_state(&*engine.borrow());
         }
 
-        if let Some(ref evt) = eventable {
+        if let Some(evt) = eventable {
             if fds[FD_INDEX_ENGINE].revents != 0 {
                 evt.clear_event()?;
                 engine.borrow_mut().evented()?;

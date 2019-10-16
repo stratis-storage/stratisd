@@ -1,3 +1,21 @@
+stratisd 2.0.0 (UNRELEASED)
+===========================
+Recommended Rust toolchain version: 1.38
+Lowest supported Rust toolchain version: 1.37
+Python auto-formatter: black (18.9b0)
+
+- Make D-Bus API and engine operations idempotent:
+  https://github.com/stratis-storage/project/issues/51
+  https://github.com/stratis-storage/stratisd/pull/1651
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/1658
+  https://github.com/stratis-storage/stratisd/pull/1657
+  https://github.com/stratis-storage/stratisd/pull/1655
+  https://github.com/stratis-storage/stratisd/pull/1626
+  https://github.com/stratis-storage/stratisd/pull/1514
+
+
 stratisd 1.0.6
 ==============
 Recommended Rust toolchain version: 1.37

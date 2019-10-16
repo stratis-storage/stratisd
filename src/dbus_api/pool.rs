@@ -6,7 +6,7 @@ use std::{collections::HashMap, path::Path, vec::Vec};
 
 use dbus::{
     self,
-    arg::{Array, IterAppend},
+    arg::{Array, IterAppend, RefArg, Variant},
     tree::{
         Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
     },
@@ -360,48 +360,53 @@ fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
     get_pool_property(i, p, |(name, _, _)| Ok(name.to_owned()))
 }
 
-fn get_pool_total_physical_used(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-) -> Result<(), MethodErr> {
-    fn get_used((_, uuid, pool): (Name, PoolUuid, &dyn Pool)) -> Result<String, MethodErr> {
-        let err_func = |_| {
-            MethodErr::failed(&format!(
-                "no total physical size computed for pool with uuid {}",
-                uuid
-            ))
-        };
+fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let object_path = &m.path;
+    let dbus_context = m.tree.get_data();
+    let engine = dbus_context.engine.borrow();
 
-        pool.total_physical_used()
-            .map(|u| Ok(format!("{}", *u)))
-            .map_err(err_func)?
-    }
+    let default_return: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = HashMap::new();
+    let return_message = message.method_return();
 
-    get_pool_property(i, p, get_used)
-}
+    let uuid = get_data!(object_path; default_return; return_message).uuid;
+    let (_, pool) = get_pool!(engine; uuid; default_return; return_message);
 
-fn get_pool_total_physical_size(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(_, _, p)| {
-        Ok(format!("{}", *p.total_physical_size()))
-    })
-}
+    let (tpu_success, total_physical_used) = match pool.total_physical_used() {
+        Ok(sectors) => (true, format!("{}", sectors)),
+        Err(e) => (false, format!("{}", e)),
+    };
 
-fn get_pool_state(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(_, _, pool)| Ok(pool.state() as u16))
-}
+    let mut return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = HashMap::new();
+    return_value.insert(
+        consts::POOL_TOTAL_SIZE_PROP.to_string(),
+        (
+            true,
+            Variant(Box::new(format!("{}", pool.total_physical_size()))),
+        ),
+    );
+    return_value.insert(
+        consts::POOL_TOTAL_USED_PROP.to_string(),
+        (tpu_success, Variant(Box::new(total_physical_used))),
+    );
+    return_value.insert(
+        consts::POOL_STATE_PROP.to_string(),
+        (true, Variant(Box::new(pool.state() as u16))),
+    );
+    return_value.insert(
+        consts::POOL_EXTEND_STATE_PROP.to_string(),
+        (true, Variant(Box::new(pool.extend_state() as u16))),
+    );
+    return_value.insert(
+        consts::POOL_SPACE_STATE_PROP.to_string(),
+        (true, Variant(Box::new(pool.free_space_state() as u16))),
+    );
 
-fn get_pool_extend_state(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(_, _, pool)| Ok(pool.extend_state() as u16))
-}
-
-fn get_space_state(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(_, _, pool)| Ok(pool.free_space_state() as u16))
+    Ok(vec![return_message.append3(
+        return_value,
+        msg_code_ok(),
+        msg_string_ok(),
+    )])
 }
 
 pub fn create_dbus_pool<'a>(
@@ -485,41 +490,21 @@ pub fn create_dbus_pool<'a>(
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_name);
 
-    let total_physical_size_property = f
-        .property::<&str, _>("TotalPhysicalSize", ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
-        .on_get(get_pool_total_physical_size);
-
-    let total_physical_used_property = f
-        .property::<&str, _>("TotalPhysicalUsed", ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
-        .on_get(get_pool_total_physical_used);
-
     let uuid_property = f
         .property::<&str, _>("Uuid", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid);
 
-    let state_property = f
-        .property::<u16, _>(consts::POOL_STATE_PROP, ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::True)
-        .on_get(get_pool_state);
-
-    let extend_state_property = f
-        .property::<u16, _>(consts::POOL_EXTEND_STATE_PROP, ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::True)
-        .on_get(get_pool_extend_state);
-
-    let space_state_property = f
-        .property::<u16, _>(consts::POOL_SPACE_STATE_PROP, ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::True)
-        .on_get(get_space_state);
+    let get_all_properties_method = f
+        .method("GetAllProperties", (), get_all_properties)
+        // b: true if filesystems were created
+        // a(os): Array of tuples with object paths and names
+        //
+        // Rust representation: (bool, Vec<(dbus::Path, String)>)
+        .out_arg(("results", "(ba(os))"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
     let object_name = make_object_path(dbus_context);
 
@@ -535,12 +520,11 @@ pub fn create_dbus_pool<'a>(
                 .add_m(add_cachedevs_method)
                 .add_m(rename_method)
                 .add_p(name_property)
-                .add_p(total_physical_size_property)
-                .add_p(total_physical_used_property)
-                .add_p(uuid_property)
-                .add_p(state_property)
-                .add_p(space_state_property)
-                .add_p(extend_state_property),
+                .add_p(uuid_property),
+        )
+        .add(
+            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
+                .add_m(get_all_properties_method),
         );
 
     let path = object_path.get_name().to_owned();

@@ -23,6 +23,21 @@ SPECS = {
 </method>
 </interface>
 """,
+    "org.storage.stratis1.FetchProperties": """
+<interface name="org.storage.stratis1.FetchProperties>
+<method name="GetAllProperties">
+<arg name="property_hash" type="a{s(bv)}" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="GetProperties">
+<arg name="properties" type="as" direction="in"/>
+<arg name="property_hash" type="a{s(bv)}" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+</interface>
+""",
     "org.storage.stratis1.Manager": """
 <interface name="org.storage.stratis1.Manager">
 <method name="ConfigureSimulator">

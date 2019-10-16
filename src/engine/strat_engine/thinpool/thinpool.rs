@@ -603,13 +603,7 @@ impl ThinPool {
     }
 
     fn set_state(&mut self, new_state: PoolState) {
-        if self.state() != new_state {
-            self.pool_state = new_state;
-            get_engine_listener_list().notify(&EngineEvent::PoolStateChanged {
-                dbus_path: self.get_dbus_path(),
-                state: new_state,
-            });
-        }
+        self.pool_state = new_state;
     }
 
     fn set_extend_state(&mut self, data_extend_failed: bool, meta_extend_failed: bool) {
@@ -621,23 +615,11 @@ impl ThinPool {
         } else if meta_extend_failed {
             new_state = PoolExtendState::MetaFailed;
         }
-        if self.extend_state() != new_state {
-            self.pool_extend_state = new_state;
-            get_engine_listener_list().notify(&EngineEvent::PoolExtendStateChanged {
-                dbus_path: self.get_dbus_path(),
-                state: new_state,
-            });
-        }
+        self.pool_extend_state = new_state;
     }
 
     fn set_free_space_state(&mut self, new_state: FreeSpaceState) {
-        if self.free_space_state() != new_state {
-            self.free_space_state = new_state;
-            get_engine_listener_list().notify(&EngineEvent::PoolSpaceStateChanged {
-                dbus_path: self.get_dbus_path(),
-                state: new_state,
-            });
-        }
+        self.free_space_state = new_state;
     }
 
     /// Possibly transition to a new FreeSpaceState based on usage, and invoke
@@ -825,36 +807,6 @@ impl ThinPool {
         result
     }
 
-    /// The number of physical sectors in use, that is, unavailable for storage
-    /// of additional user data, by this pool.
-    // This includes all the sectors being held as spares for the meta device,
-    // all the sectors allocated to the meta data device, and all the sectors
-    // in use on the data device.
-    pub fn total_physical_used(&self) -> StratisResult<Sectors> {
-        let data_dev_used = match self.thin_pool.status(get_dm())? {
-            ThinPoolStatus::Working(ref status) => datablocks_to_sectors(status.usage.used_data),
-            ThinPoolStatus::Error => {
-                let err_msg = format!(
-                    "Devicemapper could not obtain status for devicemapper thin pool device {}",
-                    self.thin_pool.device(),
-                );
-                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
-            }
-            ThinPoolStatus::Fail => {
-                let err_msg = "thin pool failed, could not obtain usage";
-                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
-            }
-        };
-
-        let spare_total = self.segments.meta_spare_segments.iter().map(|s| s.1).sum();
-
-        let meta_dev_total = self.thin_pool.meta_dev().size();
-
-        let mdv_total = self.segments.mdv_segments.iter().map(|s| s.1).sum();
-
-        Ok(data_dev_used + spare_total + meta_dev_total + mdv_total)
-    }
-
     pub fn get_filesystem_by_uuid(&self, uuid: FilesystemUuid) -> Option<(Name, &StratFilesystem)> {
         self.filesystems.get_by_uuid(uuid)
     }
@@ -1001,16 +953,14 @@ impl ThinPool {
         }
     }
 
+    #[cfg(test)]
     pub fn state(&self) -> PoolState {
         self.pool_state
     }
 
+    #[cfg(test)]
     pub fn extend_state(&self) -> PoolExtendState {
         self.pool_extend_state
-    }
-
-    pub fn free_space_state(&self) -> FreeSpaceState {
-        self.free_space_state
     }
 
     /// Rename a filesystem within the thin pool.
@@ -1138,10 +1088,6 @@ impl ThinPool {
 
     pub fn set_dbus_path(&mut self, path: MaybeDbusPath) {
         self.dbus_path = path
-    }
-
-    fn get_dbus_path(&self) -> &MaybeDbusPath {
-        &self.dbus_path
     }
 }
 

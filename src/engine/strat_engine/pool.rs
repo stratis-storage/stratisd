@@ -25,9 +25,8 @@ use crate::{
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, CreateAction, DevUuid, EngineAction, FilesystemUuid, FreeSpaceState,
-            MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction,
-            SetCreateAction, SetDeleteAction,
+            BlockDevTier, CreateAction, DevUuid, EngineAction, FilesystemUuid, MaybeDbusPath, Name,
+            PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -396,12 +395,6 @@ impl Pool for StratPool {
         self.backstore.datatier_size()
     }
 
-    fn total_physical_used(&self) -> StratisResult<Sectors> {
-        self.thin_pool
-            .total_physical_used()
-            .and_then(|v| Ok(v + self.backstore.datatier_metadata_size()))
-    }
-
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {
         self.thin_pool.filesystems()
     }
@@ -462,18 +455,6 @@ impl Pool for StratPool {
         Ok(result)
     }
 
-    fn state(&self) -> PoolState {
-        self.thin_pool.state()
-    }
-
-    fn extend_state(&self) -> PoolExtendState {
-        self.thin_pool.extend_state()
-    }
-
-    fn free_space_state(&self) -> FreeSpaceState {
-        self.thin_pool.free_space_state()
-    }
-
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {
         self.thin_pool.set_dbus_path(path.clone());
         self.dbus_path = path
@@ -503,7 +484,7 @@ mod tests {
             cmd,
             tests::{loopbacked, real},
         },
-        types::{EngineAction, Redundancy},
+        types::{EngineAction, PoolExtendState, PoolState, Redundancy},
     };
 
     use super::*;

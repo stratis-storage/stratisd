@@ -215,10 +215,6 @@ impl Pool for SimPool {
         Sectors(IEC::Ei)
     }
 
-    fn total_physical_used(&self) -> StratisResult<Sectors> {
-        Ok(Sectors(0))
-    }
-
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {
         self.filesystems
             .iter()
@@ -293,18 +289,6 @@ impl Pool for SimPool {
                 }
             },
         ))
-    }
-
-    fn state(&self) -> PoolState {
-        self.pool_state
-    }
-
-    fn extend_state(&self) -> PoolExtendState {
-        self.pool_extend_state
-    }
-
-    fn free_space_state(&self) -> FreeSpaceState {
-        self.free_space_state
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {

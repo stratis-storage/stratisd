@@ -4,40 +4,22 @@
 
 use std::{fmt::Debug, sync::Once};
 
-use crate::engine::types::{
-    BlockDevState, FreeSpaceState, MaybeDbusPath, PoolExtendState, PoolState,
-};
+use crate::engine::types::MaybeDbusPath;
 
 static INIT: Once = Once::new();
 static mut ENGINE_LISTENER_LIST: Option<EngineListenerList> = None;
 
 #[derive(Debug, Clone)]
 pub enum EngineEvent<'a> {
-    BlockdevStateChanged {
-        dbus_path: &'a MaybeDbusPath,
-        state: BlockDevState,
-    },
     FilesystemRenamed {
         dbus_path: &'a MaybeDbusPath,
         from: &'a str,
         to: &'a str,
     },
-    PoolExtendStateChanged {
-        dbus_path: &'a MaybeDbusPath,
-        state: PoolExtendState,
-    },
     PoolRenamed {
         dbus_path: &'a MaybeDbusPath,
         from: &'a str,
         to: &'a str,
-    },
-    PoolSpaceStateChanged {
-        dbus_path: &'a MaybeDbusPath,
-        state: FreeSpaceState,
-    },
-    PoolStateChanged {
-        dbus_path: &'a MaybeDbusPath,
-        state: PoolState,
     },
 }
 

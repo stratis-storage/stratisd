@@ -540,12 +540,6 @@ impl Backstore {
             })
     }
 
-    /// The number of sectors in the backstore given up to Stratis
-    /// metadata on devices in the data tier.
-    pub fn datatier_metadata_size(&self) -> Sectors {
-        self.data_tier.metadata_size()
-    }
-
     /// Write the given data to the data tier's devices.
     pub fn save_state(&mut self, metadata: &[u8]) -> StratisResult<()> {
         self.data_tier.save_state(metadata)

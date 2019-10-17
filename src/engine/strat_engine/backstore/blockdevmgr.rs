@@ -475,7 +475,7 @@ pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
 
     for bd in blockdevs {
         let bd_devnode = bd.devnode.to_owned();
-        bd.wipe_metadata()
+        bd.disown()
             .unwrap_or_else(|_| unerased_devnodes.push(bd_devnode));
     }
 

@@ -82,9 +82,9 @@ impl StratBlockDev {
         &self.dev
     }
 
-    pub fn wipe_metadata(&self) -> StratisResult<()> {
-        let mut f = OpenOptions::new().write(true).open(&self.devnode)?;
-        disown_device(&mut f)
+    /// Remove information that identifies this device as belonging to Stratis
+    pub fn disown(&self) -> StratisResult<()> {
+        disown_device(&mut OpenOptions::new().write(true).open(&self.devnode)?)
     }
 
     pub fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> StratisResult<()> {

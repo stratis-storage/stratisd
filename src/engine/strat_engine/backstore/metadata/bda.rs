@@ -569,23 +569,16 @@ mod tests {
         #[test]
         /// Construct an arbitrary StaticHeader object.
         /// Verify that the "memory buffer" is unowned.
-        /// Initialize a BDA.
+        /// Initialize a static header.
         /// Verify that Stratis buffer validates.
-        /// Wipe the BDA.
+        /// Wipe the static header.
         /// Verify that the buffer is again unowned.
         fn test_ownership(ref sh in static_header_strategy()) {
             let buf_size = *sh.mda_size.sectors().bytes() as usize + bytes!(static_header_size::STATIC_HEADER_SECTORS);
             let mut buf = Cursor::new(vec![0; buf_size]);
             prop_assert!(StaticHeader::setup(&mut buf).unwrap().is_none());
 
-            BDA::initialize(
-                &mut buf,
-                sh.pool_uuid,
-                sh.dev_uuid,
-                sh.mda_size.region_size().data_size(),
-                sh.blkdev_size,
-                Utc::now().timestamp() as u64,
-            ).unwrap();
+            sh.write(&mut buf, MetadataLocation::Both).unwrap();
 
             prop_assert!(StaticHeader::setup(&mut buf)
                          .unwrap()

@@ -372,35 +372,54 @@ fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let uuid = get_data!(object_path; default_return; return_message).uuid;
     let (_, pool) = get_pool!(engine; uuid; default_return; return_message);
 
-    let (tpu_success, total_physical_used) = match pool.total_physical_used() {
-        Ok(sectors) => (true, format!("{}", sectors)),
-        Err(e) => (false, format!("{}", e)),
-    };
-
     let mut return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = HashMap::new();
     return_value.insert(
         consts::POOL_TOTAL_SIZE_PROP.to_string(),
         (
             true,
-            Variant(Box::new(format!("{}", pool.total_physical_size()))),
+            Variant(Box::new(pool.total_physical_size().to_string())),
         ),
     );
-    return_value.insert(
-        consts::POOL_TOTAL_USED_PROP.to_string(),
-        (tpu_success, Variant(Box::new(total_physical_used))),
-    );
-    return_value.insert(
-        consts::POOL_STATE_PROP.to_string(),
-        (true, Variant(Box::new(pool.state() as u16))),
-    );
-    return_value.insert(
-        consts::POOL_EXTEND_STATE_PROP.to_string(),
-        (true, Variant(Box::new(pool.extend_state() as u16))),
-    );
-    return_value.insert(
-        consts::POOL_SPACE_STATE_PROP.to_string(),
-        (true, Variant(Box::new(pool.free_space_state() as u16))),
-    );
+
+    Ok(vec![return_message.append3(
+        return_value,
+        msg_code_ok(),
+        msg_string_ok(),
+    )])
+}
+
+fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+    let object_path = &m.path;
+    let dbus_context = m.tree.get_data();
+    let engine = dbus_context.engine.borrow();
+    let properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
+
+    let default_return: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = HashMap::new();
+    let return_message = message.method_return();
+
+    let uuid = get_data!(object_path; default_return; return_message).uuid;
+    let (_, pool) = get_pool!(engine; uuid; default_return; return_message);
+
+    let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
+        .map(|prop| match prop.as_str() {
+            consts::POOL_TOTAL_SIZE_PROP => (
+                prop,
+                (
+                    true,
+                    Variant(Box::new(pool.total_physical_size().to_string()) as Box<dyn RefArg>),
+                ),
+            ),
+            _ => (
+                prop,
+                (
+                    false,
+                    Variant(Box::new("Not found".to_string()) as Box<dyn RefArg>),
+                ),
+            ),
+        })
+        .collect();
 
     Ok(vec![return_message.append3(
         return_value,
@@ -498,11 +517,24 @@ pub fn create_dbus_pool<'a>(
 
     let get_all_properties_method = f
         .method("GetAllProperties", (), get_all_properties)
-        // b: true if filesystems were created
-        // a(os): Array of tuples with object paths and names
-        //
-        // Rust representation: (bool, Vec<(dbus::Path, String)>)
-        .out_arg(("results", "(ba(os))"))
+        // a{s(bv)}: Dictionary of property names to tuples
+        // In the tuple:
+        // b: Indicates whether the property value fetched was successful
+        // v: If b is true, represents the value for the given property
+        //    If b is false, represents the error returned when fetching the property
+        .out_arg(("results", "a{s(bv)}"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
+
+    let get_properties_method = f
+        .method("GetProperties", (), get_properties)
+        .in_arg(("properties", "as"))
+        // a{s(bv)}: Dictionary of property names to tuples
+        // In the tuple:
+        // b: Indicates whether the property value fetched was successful
+        // v: If b is true, represents the value for the given property
+        //    If b is false, represents the error returned when fetching the property
+        .out_arg(("results", "a{s(bv)}"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
@@ -524,7 +556,8 @@ pub fn create_dbus_pool<'a>(
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
-                .add_m(get_all_properties_method),
+                .add_m(get_all_properties_method)
+                .add_m(get_properties_method),
         );
 
     let path = object_path.get_name().to_owned();

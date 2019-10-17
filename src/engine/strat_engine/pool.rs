@@ -396,12 +396,6 @@ impl Pool for StratPool {
         self.backstore.datatier_size()
     }
 
-    fn total_physical_used(&self) -> StratisResult<Sectors> {
-        self.thin_pool
-            .total_physical_used()
-            .and_then(|v| Ok(v + self.backstore.datatier_metadata_size()))
-    }
-
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {
         self.thin_pool.filesystems()
     }

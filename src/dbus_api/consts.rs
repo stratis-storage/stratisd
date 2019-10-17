@@ -14,8 +14,8 @@ pub const POOL_NAME_PROP: &str = "Name";
 pub const POOL_STATE_PROP: &str = "State";
 pub const POOL_EXTEND_STATE_PROP: &str = "ExtendState";
 pub const POOL_SPACE_STATE_PROP: &str = "SpaceState";
+
 pub const POOL_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";
-pub const POOL_TOTAL_USED_PROP: &str = "TotalPhysicalUsed";
 
 pub const FILESYSTEM_INTERFACE_NAME: &str = "org.storage.stratis1.filesystem";
 pub const FILESYSTEM_NAME_PROP: &str = "Name";

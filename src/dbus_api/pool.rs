@@ -20,7 +20,7 @@ use crate::{
         blockdev::create_dbus_blockdev,
         consts,
         filesystem::create_dbus_filesystem,
-        types::{DbusContext, DbusErrorEnum, OPContext, TData},
+        types::{DbusContext, DbusErrorEnum, OPContext, PropertyReturn, TData},
         util::{
             engine_to_dbus_err_tuple, get_next_arg, get_uuid, make_object_path, msg_code_ok,
             msg_string_ok,
@@ -396,30 +396,33 @@ fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let engine = dbus_context.engine.borrow();
     let properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
 
-    let default_return: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = HashMap::new();
+    let default_return: HashMap<String, PropertyReturn> = HashMap::new();
     let return_message = message.method_return();
 
     let uuid = get_data!(object_path; default_return; return_message).uuid;
     let (_, pool) = get_pool!(engine; uuid; default_return; return_message);
 
-    let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
-        .map(|prop| match prop.as_str() {
-            consts::POOL_TOTAL_SIZE_PROP => (
-                prop,
-                (
-                    true,
-                    Variant(Box::new(pool.total_physical_size().to_string()) as Box<dyn RefArg>),
+    let return_value: HashMap<String, PropertyReturn> =
+        properties
+            .map(|prop| match prop.as_str() {
+                consts::POOL_TOTAL_SIZE_PROP => (
+                    prop,
+                    (
+                        true,
+                        (
+                            true,
+                            Variant(
+                                Box::new(pool.total_physical_size().to_string()) as Box<dyn RefArg>
+                            ),
+                        ),
+                    ),
                 ),
-            ),
-            _ => (
-                prop,
-                (
-                    false,
-                    Variant(Box::new("Not found".to_string()) as Box<dyn RefArg>),
+                _ => (
+                    prop,
+                    (false, (false, Variant(Box::new(0) as Box<dyn RefArg>))),
                 ),
-            ),
-        })
-        .collect();
+            })
+            .collect();
 
     Ok(vec![return_message.append3(
         return_value,
@@ -529,12 +532,13 @@ pub fn create_dbus_pool<'a>(
     let get_properties_method = f
         .method("GetProperties", (), get_properties)
         .in_arg(("properties", "as"))
-        // a{s(bv)}: Dictionary of property names to tuples
+        // a{s(b(bv))}: Dictionary of property names to tuples
         // In the tuple:
+        // b: false indicates that the property does not exist for this DBus type
         // b: Indicates whether the property value fetched was successful
         // v: If b is true, represents the value for the given property
         //    If b is false, represents the error returned when fetching the property
-        .out_arg(("results", "a{s(bv)}"))
+        .out_arg(("results", "a{s(b(bv))}"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

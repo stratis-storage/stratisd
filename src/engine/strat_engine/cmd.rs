@@ -120,16 +120,19 @@ fn get_executable(name: &str) -> &Path {
         .expect("verify_binaries() was previously called and returned no error")
 }
 
-/// Create a filesystem on devnode.
-pub fn create_fs(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
-    execute_cmd(
-        Command::new(get_executable(MKFS_XFS).as_os_str())
-            .arg("-f")
-            .arg("-q")
-            .arg(devnode)
-            .arg("-m")
-            .arg(format!("uuid={}", uuid)),
-    )
+/// Create a filesystem on devnode. If uuid specified, set the UUID of the
+/// filesystem on creation.
+pub fn create_fs(devnode: &Path, uuid: Option<Uuid>) -> StratisResult<()> {
+    let mut command = Command::new(get_executable(MKFS_XFS).as_os_str());
+    command.arg("-f");
+    command.arg("-q");
+    command.arg(devnode);
+
+    if let Some(uuid) = uuid {
+        command.arg("-m");
+        command.arg(format!("uuid={}", uuid));
+    }
+    execute_cmd(&mut command)
 }
 
 /// Use the xfs_growfs command to expand a filesystem mounted at the given
@@ -175,12 +178,6 @@ pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> StratisResult<()> {
 /// Call udevadm settle
 pub fn udev_settle() -> StratisResult<()> {
     execute_cmd(Command::new(get_executable(UDEVADM).as_os_str()).arg("settle"))
-}
-
-#[cfg(test)]
-pub fn create_ext3_fs(devnode: &Path) -> StratisResult<()> {
-    execute_cmd(Command::new("wipefs").arg("-a").arg(devnode))?;
-    execute_cmd(Command::new("mkfs.ext3").arg(devnode))
 }
 
 #[cfg(test)]

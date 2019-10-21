@@ -137,14 +137,14 @@ mod test {
 
     /// Verify that the device is not stratis by creating a device with XFS fs.
     fn test_other_ownership(paths: &[&Path]) {
-        cmd::create_ext3_fs(paths[0]).unwrap();
+        cmd::create_fs(paths[0], None).unwrap();
 
         cmd::udev_settle().unwrap();
 
         match identify(paths[0]).unwrap() {
             DevOwnership::Theirs(identity) => {
                 assert!(identity.contains("ID_FS_USAGE=filesystem"));
-                assert!(identity.contains("ID_FS_TYPE=ext3"));
+                assert!(identity.contains("ID_FS_TYPE=xfs"));
                 assert!(identity.contains("ID_FS_UUID"));
             }
             // This must fail, and will give a helpful error message

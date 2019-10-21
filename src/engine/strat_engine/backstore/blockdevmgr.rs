@@ -554,7 +554,7 @@ mod tests {
         assert!(paths.len() > 1);
         let index = rand::random::<u8>() as usize % paths.len();
 
-        cmd::create_ext3_fs(paths[index]).unwrap();
+        cmd::create_fs(paths[index], None).unwrap();
         cmd::udev_settle().unwrap();
 
         let pool_uuid = Uuid::new_v4();

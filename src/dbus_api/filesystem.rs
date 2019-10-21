@@ -2,20 +2,23 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::collections::HashMap;
+
 use chrono::SecondsFormat;
 use dbus::{
     self,
-    arg::IterAppend,
+    arg::{Array, IterAppend, RefArg, Variant},
     tree::{
         Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
+        Tree,
     },
-    Message,
+    Message, Path,
 };
 
 use crate::{
     dbus_api::{
         consts,
-        types::{DbusContext, DbusErrorEnum, OPContext, TData},
+        types::{DbusContext, DbusErrorEnum, OPContext, PropertyReturn, TData},
         util::{
             engine_to_dbus_err_tuple, get_next_arg, get_parent, get_uuid, make_object_path,
             msg_code_ok, msg_string_ok,
@@ -24,7 +27,81 @@ use crate::{
     engine::{
         filesystem_mount_path, Filesystem, FilesystemUuid, MaybeDbusPath, Name, RenameAction,
     },
+    stratis::{StratisError, StratisResult},
 };
+
+fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let object_path = &m.path;
+
+    let return_message = message.method_return();
+
+    let mut return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = HashMap::new();
+
+    let fs_used_result = filesystem_operation(m.tree, object_path.get_name(), |(_, _, fs)| {
+        fs.used()
+            .map(|u| u.to_string())
+            .map_err(|ref e| StratisError::Error(e.to_string()))
+    });
+    let (fs_used_success, fs_used_prop) = match fs_used_result {
+        Ok(fs_used) => (true, Variant(Box::new(fs_used) as Box<dyn RefArg>)),
+        Err(e) => (false, Variant(Box::new(e.to_string()) as Box<dyn RefArg>)),
+    };
+
+    return_value.insert(
+        consts::FILESYSTEM_USED_PROP.to_string(),
+        (fs_used_success, fs_used_prop),
+    );
+
+    Ok(vec![return_message.append3(
+        return_value,
+        msg_code_ok(),
+        msg_string_ok(),
+    )])
+}
+
+fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+    let object_path = &m.path;
+    let dbus_context = m.tree.get_data();
+    let engine = dbus_context.engine.borrow();
+    let properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
+
+    let default_return: HashMap<String, PropertyReturn> = HashMap::new();
+    let return_message = message.method_return();
+
+    let uuid = get_data!(object_path; default_return; return_message).uuid;
+    let (_, pool) = get_pool!(engine; uuid; default_return; return_message);
+
+    let return_value: HashMap<String, PropertyReturn> =
+        properties
+            .map(|prop| match prop.as_str() {
+                consts::POOL_TOTAL_SIZE_PROP => (
+                    prop,
+                    (
+                        true,
+                        (
+                            true,
+                            Variant(
+                                Box::new(pool.total_physical_size().to_string()) as Box<dyn RefArg>
+                            ),
+                        ),
+                    ),
+                ),
+                _ => (
+                    prop,
+                    (false, (false, Variant(Box::new(0) as Box<dyn RefArg>))),
+                ),
+            })
+            .collect();
+
+    Ok(vec![return_message.append3(
+        return_value,
+        msg_code_ok(),
+        msg_string_ok(),
+    )])
+}
 
 pub fn create_dbus_filesystem<'a>(
     dbus_context: &DbusContext,
@@ -75,11 +152,29 @@ pub fn create_dbus_filesystem<'a>(
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_filesystem_created);
 
-    let used_property = f
-        .property::<&str, _>(consts::FILESYSTEM_USED_PROP, ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
-        .on_get(get_filesystem_used);
+    let get_all_properties_method = f
+        .method("GetAllProperties", (), get_all_properties)
+        // a{s(bv)}: Dictionary of property names to tuples
+        // In the tuple:
+        // b: Indicates whether the property value fetched was successful
+        // v: If b is true, represents the value for the given property
+        //    If b is false, represents the error returned when fetching the property
+        .out_arg(("results", "a{s(bv)}"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
+
+    let get_properties_method = f
+        .method("GetProperties", (), get_properties)
+        .in_arg(("properties", "as"))
+        // a{s(b(bv))}: Dictionary of property names to tuples
+        // In the tuple:
+        // b: false indicates that the property does not exist for this DBus type
+        // b: Indicates whether the property value fetched was successful
+        // v: If b is true, represents the value for the given property
+        //    If b is false, represents the error returned when fetching the property
+        .out_arg(("results", "a{s(b(bv))}"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"));
 
     let object_name = make_object_path(dbus_context);
 
@@ -93,8 +188,12 @@ pub fn create_dbus_filesystem<'a>(
                 .add_p(name_property)
                 .add_p(pool_property)
                 .add_p(uuid_property)
-                .add_p(created_property)
-                .add_p(used_property),
+                .add_p(created_property),
+        )
+        .add(
+            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
+                .add_m(get_all_properties_method)
+                .add_m(get_properties_method),
         );
 
     let path = object_path.get_name().to_owned();
@@ -152,6 +251,55 @@ fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
+/// Get execute a given closure providing a filesystem object and return
+/// the calculated value
+fn filesystem_operation<F, R>(
+    tree: &Tree<MTFn<TData>, TData>,
+    object_path: &Path<'static>,
+    closure: F,
+) -> StratisResult<R>
+where
+    F: Fn((Name, Name, &dyn Filesystem)) -> StratisResult<R>,
+    R: dbus::arg::Append,
+{
+    let dbus_context = tree.get_data();
+
+    let filesystem_path = tree
+        .get(object_path)
+        .expect("tree must contain implicit argument");
+
+    let filesystem_data = filesystem_path
+        .get_data()
+        .as_ref()
+        .ok_or_else(|| StratisError::Error(format!("no data for object path {}", object_path)))?;
+
+    let pool_path = tree.get(&filesystem_data.parent).ok_or_else(|| {
+        StratisError::Error(format!(
+            "no path for parent object path {}",
+            &filesystem_data.parent
+        ))
+    })?;
+
+    let pool_uuid = pool_path
+        .get_data()
+        .as_ref()
+        .ok_or_else(|| StratisError::Error(format!("no data for object path {}", object_path)))?
+        .uuid;
+
+    let engine = dbus_context.engine.borrow();
+    let (pool_name, pool) = engine.get_pool(pool_uuid).ok_or_else(|| {
+        StratisError::Error(format!("no pool corresponding to uuid {}", &pool_uuid))
+    })?;
+    let filesystem_uuid = filesystem_data.uuid;
+    let (fs_name, fs) = pool.get_filesystem(filesystem_uuid).ok_or_else(|| {
+        StratisError::Error(format!(
+            "no name for filesystem with uuid {}",
+            &filesystem_uuid
+        ))
+    })?;
+    closure((pool_name, fs_name, fs))
+}
+
 /// Get a filesystem property and place it on the D-Bus. The property is
 /// found by means of the getter method which takes a reference to a
 /// Filesystem and obtains the property from the filesystem.
@@ -161,47 +309,14 @@ fn get_filesystem_property<F, R>(
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn((Name, Name, &dyn Filesystem)) -> Result<R, MethodErr>,
+    F: Fn((Name, Name, &dyn Filesystem)) -> StratisResult<R>,
     R: dbus::arg::Append,
 {
-    let dbus_context = p.tree.get_data();
     let object_path = p.path.get_name();
 
-    let filesystem_path = p
-        .tree
-        .get(object_path)
-        .expect("tree must contain implicit argument");
-
-    let filesystem_data = filesystem_path
-        .get_data()
-        .as_ref()
-        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
-
-    let pool_path = p.tree.get(&filesystem_data.parent).ok_or_else(|| {
-        MethodErr::failed(&format!(
-            "no path for parent object path {}",
-            &filesystem_data.parent
-        ))
-    })?;
-
-    let pool_uuid = pool_path
-        .get_data()
-        .as_ref()
-        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?
-        .uuid;
-
-    let engine = dbus_context.engine.borrow();
-    let (pool_name, pool) = engine.get_pool(pool_uuid).ok_or_else(|| {
-        MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))
-    })?;
-    let filesystem_uuid = filesystem_data.uuid;
-    let (fs_name, fs) = pool.get_filesystem(filesystem_uuid).ok_or_else(|| {
-        MethodErr::failed(&format!(
-            "no name for filesystem with uuid {}",
-            &filesystem_uuid
-        ))
-    })?;
-    i.append(getter((pool_name, fs_name, fs))?);
+    i.append(
+        filesystem_operation(p.tree, object_path, getter).map_err(|ref e| MethodErr::failed(e))?,
+    );
     Ok(())
 }
 
@@ -232,17 +347,5 @@ fn get_filesystem_created(
 ) -> Result<(), MethodErr> {
     get_filesystem_property(i, p, |(_, _, fs)| {
         Ok(fs.created().to_rfc3339_opts(SecondsFormat::Secs, true))
-    })
-}
-
-/// Get the number of bytes used for any purpose on the filesystem
-fn get_filesystem_used(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-) -> Result<(), MethodErr> {
-    get_filesystem_property(i, p, |(_, _, fs)| {
-        fs.used()
-            .map(|v| (*v).to_string())
-            .map_err(|_| MethodErr::failed(&"fs used() engine call failed".to_owned()))
     })
 }

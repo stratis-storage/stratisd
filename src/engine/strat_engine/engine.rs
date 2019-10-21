@@ -19,7 +19,7 @@ use crate::{
         engine::Eventable,
         event::get_engine_listener_list,
         strat_engine::{
-            backstore::{find_all, get_metadata, is_stratis_device},
+            backstore::{find_all, get_metadata, identify},
             cmd::verify_binaries,
             dm::{get_dm, get_dm_init},
             names::validate_name,
@@ -205,7 +205,8 @@ impl Engine for StratEngine {
         device: Device,
         dev_node: PathBuf,
     ) -> StratisResult<Option<PoolUuid>> {
-        let pool_uuid = if let Some((pool_uuid, device_uuid)) = is_stratis_device(&dev_node)? {
+        let stratis_identifiers = identify(&dev_node)?.stratis_identifiers();
+        let pool_uuid = if let Some((pool_uuid, device_uuid)) = stratis_identifiers {
             if self.pools.contains_uuid(pool_uuid) {
                 // We can get udev events for devices that are already in the pool.  Lets check
                 // to see if this block device is already in this existing pool.  If it is, then all

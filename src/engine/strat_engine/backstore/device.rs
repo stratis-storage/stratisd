@@ -43,6 +43,15 @@ pub enum DevOwnership {
     Theirs(String), // String is something useful to give back to end user about what's on device
 }
 
+impl DevOwnership {
+    pub fn stratis_identifiers(&self) -> Option<(PoolUuid, DevUuid)> {
+        match self {
+            DevOwnership::Ours(pool_uuid, dev_uuid) => Some((*pool_uuid, *dev_uuid)),
+            _ => None,
+        }
+    }
+}
+
 /// Returns true if a device has no signature and is not one of the paths of a multipath device,
 /// yes this is a bit convoluted.  Logic gleaned from blivet library.
 fn empty(device: &HashMap<String, String>) -> bool {
@@ -115,15 +124,6 @@ pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
     }
 }
 
-/// Determine if devnode is a Stratis device. Return the device's Stratis
-/// pool UUID if it belongs to Stratis.
-pub fn is_stratis_device(devnode: &Path) -> StratisResult<Option<(PoolUuid, DevUuid)>> {
-    match identify(devnode)? {
-        DevOwnership::Ours(pool_uuid, dev_uuid) => Ok(Some((pool_uuid, dev_uuid))),
-        _ => Ok(None),
-    }
-}
-
 #[cfg(test)]
 mod test {
     use std::path::Path;
@@ -141,8 +141,6 @@ mod test {
 
         cmd::udev_settle().unwrap();
 
-        assert_eq!(is_stratis_device(paths[0]).unwrap(), None);
-
         match identify(paths[0]).unwrap() {
             DevOwnership::Theirs(identity) => {
                 assert!(identity.contains("ID_FS_USAGE=filesystem"));
@@ -158,7 +156,6 @@ mod test {
     fn test_empty(paths: &[&Path]) {
         cmd::udev_settle().unwrap();
         assert_matches!(identify(paths[0]).unwrap(), DevOwnership::Unowned);
-        assert_eq!(is_stratis_device(paths[0]).unwrap(), None);
     }
 
     #[test]

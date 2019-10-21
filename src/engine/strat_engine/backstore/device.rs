@@ -152,7 +152,7 @@ mod test {
         }
     }
 
-    /// Test a blank device and ensure it comes up as device::Usage::Unowned
+    /// Verify that identify() recognizes a blank device as unowned
     fn test_empty(paths: &[&Path]) {
         cmd::udev_settle().unwrap();
         assert_matches!(identify(paths[0]).unwrap(), DevOwnership::Unowned);

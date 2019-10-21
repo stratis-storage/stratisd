@@ -64,37 +64,32 @@ fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
     let object_path = &m.path;
-    let dbus_context = m.tree.get_data();
-    let engine = dbus_context.engine.borrow();
     let properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
 
-    let default_return: HashMap<String, PropertyReturn> = HashMap::new();
     let return_message = message.method_return();
 
-    let uuid = get_data!(object_path; default_return; return_message).uuid;
-    let (_, pool) = get_pool!(engine; uuid; default_return; return_message);
+    let return_value: HashMap<String, PropertyReturn> = properties
+        .map(|prop| match prop.as_str() {
+            consts::FILESYSTEM_USED_PROP => {
+                let fs_used_result =
+                    filesystem_operation(m.tree, object_path.get_name(), |(_, _, fs)| {
+                        fs.used()
+                            .map(|u| u.to_string())
+                            .map_err(|ref e| StratisError::Error(e.to_string()))
+                    });
+                let (fs_used_success, fs_used_prop) = match fs_used_result {
+                    Ok(fs_used) => (true, Variant(Box::new(fs_used) as Box<dyn RefArg>)),
+                    Err(e) => (false, Variant(Box::new(e.to_string()) as Box<dyn RefArg>)),
+                };
 
-    let return_value: HashMap<String, PropertyReturn> =
-        properties
-            .map(|prop| match prop.as_str() {
-                consts::POOL_TOTAL_SIZE_PROP => (
-                    prop,
-                    (
-                        true,
-                        (
-                            true,
-                            Variant(
-                                Box::new(pool.total_physical_size().to_string()) as Box<dyn RefArg>
-                            ),
-                        ),
-                    ),
-                ),
-                _ => (
-                    prop,
-                    (false, (false, Variant(Box::new(0) as Box<dyn RefArg>))),
-                ),
-            })
-            .collect();
+                (prop, (true, (fs_used_success, fs_used_prop)))
+            }
+            _ => (
+                prop,
+                (false, (false, Variant(Box::new(0) as Box<dyn RefArg>))),
+            ),
+        })
+        .collect();
 
     Ok(vec![return_message.append3(
         return_value,

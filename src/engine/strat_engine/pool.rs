@@ -32,9 +32,6 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-#[cfg(test)]
-use crate::engine::types::{PoolExtendState, PoolState};
-
 /// Get the index which indicates the start of unallocated space in the cap
 /// device.
 /// NOTE: Since segments are always allocated to each flex dev in order, the
@@ -487,7 +484,7 @@ mod tests {
             cmd,
             tests::{loopbacked, real},
         },
-        types::{EngineAction, Redundancy},
+        types::{EngineAction, PoolExtendState, PoolState, Redundancy},
     };
 
     use super::*;

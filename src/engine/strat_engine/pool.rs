@@ -25,13 +25,15 @@ use crate::{
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, CreateAction, DevUuid, EngineAction, FilesystemUuid, FreeSpaceState,
-            MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction,
-            SetCreateAction, SetDeleteAction,
+            BlockDevTier, CreateAction, DevUuid, EngineAction, FilesystemUuid, MaybeDbusPath, Name,
+            PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
+
+#[cfg(test)]
+use crate::engine::types::{PoolExtendState, PoolState};
 
 /// Get the index which indicates the start of unallocated space in the cap
 /// device.
@@ -454,18 +456,6 @@ impl Pool for StratPool {
             self.write_metadata(pool_name)?;
         }
         Ok(result)
-    }
-
-    fn state(&self) -> PoolState {
-        self.thin_pool.state()
-    }
-
-    fn extend_state(&self) -> PoolExtendState {
-        self.thin_pool.extend_state()
-    }
-
-    fn free_space_state(&self) -> FreeSpaceState {
-        self.thin_pool.free_space_state()
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {

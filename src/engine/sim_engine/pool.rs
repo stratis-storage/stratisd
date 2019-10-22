@@ -291,18 +291,6 @@ impl Pool for SimPool {
         ))
     }
 
-    fn state(&self) -> PoolState {
-        self.pool_state
-    }
-
-    fn extend_state(&self) -> PoolExtendState {
-        self.pool_extend_state
-    }
-
-    fn free_space_state(&self) -> FreeSpaceState {
-        self.free_space_state
-    }
-
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {
         self.dbus_path = path
     }

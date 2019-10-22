@@ -79,10 +79,9 @@ class SetNameTestCase(SimTestCase):
         # I think this is also always true
         self.assertEqual(len(created), 20)
 
-        (hash_result, _, _) = FetchProperties.Methods.GetProperties(
+        (used_success, used) = FetchProperties.Methods.GetProperties(
             filesystem, {"properties": ["Used"]}
-        )
-        (used_success, used) = hash_result["Used"]
+        )["Used"]
 
         self.assertEqual(used_success, True)
         self.assertEqual(used, "12345678 bytes")

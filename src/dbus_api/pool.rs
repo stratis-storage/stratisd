@@ -397,11 +397,7 @@ fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         (total_size_success, total_size_prop),
     );
 
-    Ok(vec![return_message.append3(
-        return_value,
-        msg_code_ok(),
-        msg_string_ok(),
-    )])
+    Ok(vec![return_message.append1(return_value)])
 }
 
 fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -535,9 +531,7 @@ pub fn create_dbus_pool<'a>(
         // b: Indicates whether the property value fetched was successful
         // v: If b is true, represents the value for the given property
         //    If b is false, represents the error returned when fetching the property
-        .out_arg(("results", "a{s(bv)}"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
+        .out_arg(("results", "a{s(bv)}"));
 
     let get_properties_method = f
         .method("GetProperties", (), get_properties)
@@ -547,9 +541,7 @@ pub fn create_dbus_pool<'a>(
         // b: Indicates whether the property value fetched was successful
         // v: If b is true, represents the value for the given property
         //    If b is false, represents the error returned when fetching the property
-        .out_arg(("results", "a{s(bv)}"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
+        .out_arg(("results", "a{s(bv)}"));
 
     let object_name = make_object_path(dbus_context);
 

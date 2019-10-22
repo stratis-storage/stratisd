@@ -28,7 +28,6 @@ use crate::{
     engine::{
         filesystem_mount_path, Filesystem, FilesystemUuid, MaybeDbusPath, Name, RenameAction,
     },
-    stratis::{StratisError, StratisResult},
 };
 
 fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -42,11 +41,14 @@ fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let fs_used_result = filesystem_operation(m.tree, object_path.get_name(), |(_, _, fs)| {
         fs.used()
             .map(|u| u.to_string())
-            .map_err(|ref e| StratisError::Error(e.to_string()))
+            .map_err(|e| MethodErr::failed(&e))
     });
     let (fs_used_success, fs_used_prop) = match fs_used_result {
         Ok(fs_used) => (true, Variant(Box::new(fs_used) as Box<dyn RefArg>)),
-        Err(e) => (false, Variant(Box::new(e.to_string()) as Box<dyn RefArg>)),
+        Err(e) => (
+            false,
+            Variant(Box::new(format!("{}: {}", e.errorname(), e.description())) as Box<dyn RefArg>),
+        ),
     };
 
     return_value.insert(
@@ -77,11 +79,15 @@ fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                     filesystem_operation(m.tree, object_path.get_name(), |(_, _, fs)| {
                         fs.used()
                             .map(|u| u.to_string())
-                            .map_err(|ref e| StratisError::Error(e.to_string()))
+                            .map_err(|e| MethodErr::failed(&e))
                     });
                 let (fs_used_success, fs_used_prop) = match fs_used_result {
                     Ok(fs_used) => (true, Variant(Box::new(fs_used) as Box<dyn RefArg>)),
-                    Err(e) => (false, Variant(Box::new(e.to_string()) as Box<dyn RefArg>)),
+                    Err(e) => (
+                        false,
+                        Variant(Box::new(format!("{}: {}", e.errorname(), e.description()))
+                            as Box<dyn RefArg>),
+                    ),
                 };
 
                 Some((prop, (fs_used_success, fs_used_prop)))
@@ -250,9 +256,9 @@ fn filesystem_operation<F, R>(
     tree: &Tree<MTFn<TData>, TData>,
     object_path: &Path<'static>,
     closure: F,
-) -> StratisResult<R>
+) -> Result<R, MethodErr>
 where
-    F: Fn((Name, Name, &dyn Filesystem)) -> StratisResult<R>,
+    F: Fn((Name, Name, &dyn Filesystem)) -> Result<R, MethodErr>,
     R: dbus::arg::Append,
 {
     let dbus_context = tree.get_data();
@@ -264,10 +270,10 @@ where
     let filesystem_data = filesystem_path
         .get_data()
         .as_ref()
-        .ok_or_else(|| StratisError::Error(format!("no data for object path {}", object_path)))?;
+        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
     let pool_path = tree.get(&filesystem_data.parent).ok_or_else(|| {
-        StratisError::Error(format!(
+        MethodErr::failed(&format!(
             "no path for parent object path {}",
             &filesystem_data.parent
         ))
@@ -276,16 +282,16 @@ where
     let pool_uuid = pool_path
         .get_data()
         .as_ref()
-        .ok_or_else(|| StratisError::Error(format!("no data for object path {}", object_path)))?
+        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?
         .uuid;
 
     let engine = dbus_context.engine.borrow();
     let (pool_name, pool) = engine.get_pool(pool_uuid).ok_or_else(|| {
-        StratisError::Error(format!("no pool corresponding to uuid {}", &pool_uuid))
+        MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))
     })?;
     let filesystem_uuid = filesystem_data.uuid;
     let (fs_name, fs) = pool.get_filesystem(filesystem_uuid).ok_or_else(|| {
-        StratisError::Error(format!(
+        MethodErr::failed(&format!(
             "no name for filesystem with uuid {}",
             &filesystem_uuid
         ))
@@ -302,14 +308,12 @@ fn get_filesystem_property<F, R>(
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn((Name, Name, &dyn Filesystem)) -> StratisResult<R>,
+    F: Fn((Name, Name, &dyn Filesystem)) -> Result<R, MethodErr>,
     R: dbus::arg::Append,
 {
     let object_path = p.path.get_name();
 
-    i.append(
-        filesystem_operation(p.tree, object_path, getter).map_err(|ref e| MethodErr::failed(e))?,
-    );
+    i.append(filesystem_operation(p.tree, object_path, getter)?);
     Ok(())
 }
 

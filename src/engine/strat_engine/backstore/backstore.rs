@@ -18,12 +18,12 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
+                blockdev::StratBlockDev,
                 blockdevmgr::{map_to_dm, BlockDevMgr},
                 cache_tier::CacheTier,
                 data_tier::DataTier,
                 metadata::MDADataSize,
                 setup::get_blockdevs,
-                StratBlockDev,
             },
             device::wipe_sectors,
             dm::get_dm,

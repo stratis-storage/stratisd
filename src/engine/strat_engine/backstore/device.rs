@@ -10,7 +10,10 @@ use devicemapper::{devnode_to_devno, Device};
 
 use crate::{
     engine::{
-        strat_engine::backstore::{metadata::device_identifiers, udev::get_udev_block_device},
+        strat_engine::backstore::{
+            metadata::device_identifiers,
+            udev::{device_as_map, udev_block_device_apply},
+        },
         types::{DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -79,7 +82,7 @@ fn signature(device: &HashMap<String, String>) -> String {
 
 /// Determine what a block device is used for.
 pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
-    if let Some(device) = get_udev_block_device(devnode)? {
+    if let Some(device) = udev_block_device_apply(devnode, device_as_map)? {
         if empty(&device) {
             // The device is either really empty or we are running on a distribution that hasn't
             // picked up the latest libblkid, lets read down to the device and find out for sure.

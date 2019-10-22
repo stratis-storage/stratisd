@@ -61,7 +61,7 @@ where
 }
 
 /// Takes a libudev device entry and returns the properties as a HashMap.
-fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
+pub fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
     let rc: HashMap<_, _> = device
         .properties()
         .map(|i| {
@@ -72,11 +72,6 @@ fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
         })
         .collect();
     rc
-}
-
-/// Common function used to retrieve the udev db entry for a block device as a HashMap when found
-pub fn get_udev_block_device(devnode: &Path) -> StratisResult<Option<HashMap<String, String>>> {
-    udev_block_device_apply(devnode, device_as_map)
 }
 
 /// Collect paths for all the block devices which are not individual multipath paths and which

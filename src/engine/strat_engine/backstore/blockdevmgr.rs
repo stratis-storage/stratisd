@@ -447,7 +447,12 @@ fn initialize(
         if let Ok(bda) = bda {
             let hw_id = match hw_lookup(devnode) {
                 Ok(id) => id,
-                Err(_) => None, // TODO: Log this failure so that it can be addressed.
+                // TODO: Consider logging if no hardware ID obtained. If
+                // logging distinguish between non-existant ID, which is a
+                // normal situation, and failure to obtain the ID due to an
+                // error in decoding the ID or failure to locate the udev
+                // entry for this devnode, which is not normal.
+                Err(_) => None,
             };
 
             // FIXME: The expect is only provisionally true.

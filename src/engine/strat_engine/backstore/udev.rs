@@ -75,22 +75,8 @@ fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
 }
 
 /// Common function used to retrieve the udev db entry for a block device as a HashMap when found
-pub fn get_udev_block_device(
-    dev_node_search: &Path,
-) -> StratisResult<Option<HashMap<String, String>>> {
-    let context = libudev::Context::new()?;
-    let mut enumerator = libudev::Enumerator::new(&context)?;
-    enumerator.match_subsystem("block")?;
-
-    // Get canonical form to ensure we do correct lookup in udev db
-    let canonical = fs::canonicalize(dev_node_search)?;
-
-    let result = enumerator
-        .scan_devices()?
-        .filter(|dev| dev.is_initialized())
-        .find(|x| x.devnode().map_or(false, |d| canonical == d))
-        .map(|dev| device_as_map(&dev));
-    Ok(result)
+pub fn get_udev_block_device(devnode: &Path) -> StratisResult<Option<HashMap<String, String>>> {
+    udev_block_device_apply(devnode, device_as_map)
 }
 
 /// Collect paths for all the block devices which are not individual multipath paths and which

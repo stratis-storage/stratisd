@@ -23,7 +23,7 @@ use crate::{
                 blockdev::StratBlockDev,
                 device::identify,
                 metadata::{device_identifiers, BDA},
-                udev::get_all_empty_devices,
+                udev::{get_all_empty_devices, stratis_enumerator},
             },
             device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
@@ -36,9 +36,7 @@ use crate::{
 /// Retrieve all the block devices on the system that have a Stratis signature.
 fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
     let context = libudev::Context::new()?;
-    let mut enumerator = libudev::Enumerator::new(&context)?;
-    enumerator.match_subsystem("block")?;
-    enumerator.match_property("ID_FS_TYPE", "stratis")?;
+    let mut enumerator = stratis_enumerator(&context)?;
 
     let devices: Vec<PathBuf> = enumerator
         .scan_devices()?

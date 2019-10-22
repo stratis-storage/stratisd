@@ -44,6 +44,14 @@ fn block_enumerator(context: &libudev::Context) -> StratisResult<libudev::Enumer
     Ok(enumerator)
 }
 
+/// Make an enumerator for enumerating only Stratis block devices
+pub fn stratis_enumerator(context: &libudev::Context) -> StratisResult<libudev::Enumerator> {
+    let mut enumerator = libudev::Enumerator::new(context)?;
+    enumerator.match_subsystem("block")?;
+    enumerator.match_property("ID_FS_TYPE", "stratis")?;
+    Ok(enumerator)
+}
+
 /// Locate a udev block device with the specified devnode and apply a function
 /// to that device, returning the result.
 /// Treat an uninitialized device as if it does not exist.

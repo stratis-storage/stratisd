@@ -14,11 +14,12 @@ use dbus::{
     },
     Message, Path,
 };
+use itertools::Itertools;
 
 use crate::{
     dbus_api::{
         consts,
-        types::{DbusContext, DbusErrorEnum, OPContext, PropertyReturn, TData},
+        types::{DbusContext, DbusErrorEnum, OPContext, TData},
         util::{
             engine_to_dbus_err_tuple, get_next_arg, get_parent, get_uuid, make_object_path,
             msg_code_ok, msg_string_ok,
@@ -68,8 +69,9 @@ fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let return_message = message.method_return();
 
-    let return_value: HashMap<String, PropertyReturn> = properties
-        .map(|prop| match prop.as_str() {
+    let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
+        .unique()
+        .filter_map(|prop| match prop.as_str() {
             consts::FILESYSTEM_USED_PROP => {
                 let fs_used_result =
                     filesystem_operation(m.tree, object_path.get_name(), |(_, _, fs)| {
@@ -82,12 +84,9 @@ fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                     Err(e) => (false, Variant(Box::new(e.to_string()) as Box<dyn RefArg>)),
                 };
 
-                (prop, (true, (fs_used_success, fs_used_prop)))
+                Some((prop, (fs_used_success, fs_used_prop)))
             }
-            _ => (
-                prop,
-                (false, (false, Variant(Box::new(0) as Box<dyn RefArg>))),
-            ),
+            _ => None,
         })
         .collect();
 
@@ -161,13 +160,12 @@ pub fn create_dbus_filesystem<'a>(
     let get_properties_method = f
         .method("GetProperties", (), get_properties)
         .in_arg(("properties", "as"))
-        // a{s(b(bv))}: Dictionary of property names to tuples
+        // a{s(bv)}: Dictionary of property names to tuples
         // In the tuple:
-        // b: false indicates that the property does not exist for this DBus type
         // b: Indicates whether the property value fetched was successful
         // v: If b is true, represents the value for the given property
         //    If b is false, represents the error returned when fetching the property
-        .out_arg(("results", "a{s(b(bv))}"))
+        .out_arg(("results", "a{s(bv)}"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

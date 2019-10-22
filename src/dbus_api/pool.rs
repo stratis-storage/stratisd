@@ -9,18 +9,19 @@ use dbus::{
     arg::{Array, IterAppend, RefArg, Variant},
     tree::{
         Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
+        Tree,
     },
     Message,
 };
-
 use devicemapper::Sectors;
+use itertools::Itertools;
 
 use crate::{
     dbus_api::{
         blockdev::create_dbus_blockdev,
         consts,
         filesystem::create_dbus_filesystem,
-        types::{DbusContext, DbusErrorEnum, OPContext, PropertyReturn, TData},
+        types::{DbusContext, DbusErrorEnum, OPContext, TData},
         util::{
             engine_to_dbus_err_tuple, get_next_arg, get_uuid, make_object_path, msg_code_ok,
             msg_string_ok,
@@ -322,22 +323,18 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-/// Get a pool property and place it on the D-Bus. The property is
-/// found by means of the getter method which takes a reference to a
-/// Pool and obtains the property from the pool.
-fn get_pool_property<F, R>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-    getter: F,
-) -> Result<(), MethodErr>
+fn pool_operation<F, R>(
+    tree: &Tree<MTFn<TData>, TData>,
+    object_path: &dbus::Path<'static>,
+    closure: F,
+) -> Result<R, MethodErr>
 where
     F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, MethodErr>,
     R: dbus::arg::Append,
 {
-    let dbus_context = p.tree.get_data();
-    let object_path = p.path.get_name();
-    let pool_path = p
-        .tree
+    let dbus_context = tree.get_data();
+
+    let pool_path = tree
         .get(object_path)
         .expect("implicit argument must be in tree");
 
@@ -352,7 +349,24 @@ where
         MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))
     })?;
 
-    i.append(getter((pool_name, pool_uuid, pool))?);
+    closure((pool_name, pool_uuid, pool))
+}
+
+/// Get a pool property and place it on the D-Bus. The property is
+/// found by means of the getter method which takes a reference to a
+/// Pool and obtains the property from the pool.
+fn get_pool_property<F, R>(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+    getter: F,
+) -> Result<(), MethodErr>
+where
+    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, MethodErr>,
+    R: dbus::arg::Append,
+{
+    let object_path = p.path.get_name();
+
+    i.append(pool_operation(p.tree, object_path, getter)?);
     Ok(())
 }
 
@@ -363,22 +377,24 @@ fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
 fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let object_path = &m.path;
-    let dbus_context = m.tree.get_data();
-    let engine = dbus_context.engine.borrow();
 
-    let default_return: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = HashMap::new();
     let return_message = message.method_return();
 
-    let uuid = get_data!(object_path; default_return; return_message).uuid;
-    let (_, pool) = get_pool!(engine; uuid; default_return; return_message);
+    let total_size_result = pool_operation(m.tree, object_path.get_name(), |(_, _, pool)| {
+        Ok(pool.total_physical_size().to_string())
+    });
+    let (total_size_success, total_size_prop) = match total_size_result {
+        Ok(size) => (true, Variant(Box::new(size) as Box<dyn RefArg>)),
+        Err(e) => (
+            false,
+            Variant(Box::new(format!("{}: {}", e.errorname(), e.description())) as Box<dyn RefArg>),
+        ),
+    };
 
     let mut return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = HashMap::new();
     return_value.insert(
         consts::POOL_TOTAL_SIZE_PROP.to_string(),
-        (
-            true,
-            Variant(Box::new(pool.total_physical_size().to_string())),
-        ),
+        (total_size_success, total_size_prop),
     );
 
     Ok(vec![return_message.append3(
@@ -392,37 +408,31 @@ fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
     let object_path = &m.path;
-    let dbus_context = m.tree.get_data();
-    let engine = dbus_context.engine.borrow();
     let properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
 
-    let default_return: HashMap<String, PropertyReturn> = HashMap::new();
     let return_message = message.method_return();
 
-    let uuid = get_data!(object_path; default_return; return_message).uuid;
-    let (_, pool) = get_pool!(engine; uuid; default_return; return_message);
-
-    let return_value: HashMap<String, PropertyReturn> =
-        properties
-            .map(|prop| match prop.as_str() {
-                consts::POOL_TOTAL_SIZE_PROP => (
-                    prop,
-                    (
-                        true,
-                        (
-                            true,
-                            Variant(
-                                Box::new(pool.total_physical_size().to_string()) as Box<dyn RefArg>
-                            ),
-                        ),
+    let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
+        .unique()
+        .filter_map(|prop| match prop.as_str() {
+            consts::POOL_TOTAL_SIZE_PROP => {
+                let total_size_result =
+                    pool_operation(m.tree, object_path.get_name(), |(_, _, pool)| {
+                        Ok(pool.total_physical_size().to_string())
+                    });
+                let (total_size_success, total_size_prop) = match total_size_result {
+                    Ok(size) => (true, Variant(Box::new(size) as Box<dyn RefArg>)),
+                    Err(e) => (
+                        false,
+                        Variant(Box::new(format!("{}: {}", e.errorname(), e.description()))
+                            as Box<dyn RefArg>),
                     ),
-                ),
-                _ => (
-                    prop,
-                    (false, (false, Variant(Box::new(0) as Box<dyn RefArg>))),
-                ),
-            })
-            .collect();
+                };
+                Some((prop, (total_size_success, total_size_prop)))
+            }
+            _ => None,
+        })
+        .collect();
 
     Ok(vec![return_message.append3(
         return_value,
@@ -532,13 +542,12 @@ pub fn create_dbus_pool<'a>(
     let get_properties_method = f
         .method("GetProperties", (), get_properties)
         .in_arg(("properties", "as"))
-        // a{s(b(bv))}: Dictionary of property names to tuples
+        // a{s(bv)}: Dictionary of property names to tuples
         // In the tuple:
-        // b: false indicates that the property does not exist for this DBus type
         // b: Indicates whether the property value fetched was successful
         // v: If b is true, represents the value for the given property
         //    If b is false, represents the error returned when fetching the property
-        .out_arg(("results", "a{s(b(bv))}"))
+        .out_arg(("results", "a{s(bv)}"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 

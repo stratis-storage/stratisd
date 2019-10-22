@@ -32,7 +32,7 @@ SPECS = {
 </method>
 <method name="GetProperties">
 <arg name="properties" type="as" direction="in"/>
-<arg name="property_hash" type="a{s(b(bv))}" direction="out"/>
+<arg name="property_hash" type="a{s(bv)}" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
 </method>

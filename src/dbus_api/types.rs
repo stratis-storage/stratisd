@@ -9,7 +9,6 @@ use std::{
 };
 
 use dbus::{
-    arg::{RefArg, Variant},
     tree::{DataType, MTFn, ObjectPath, Tree},
     Path,
 };
@@ -17,8 +16,6 @@ use dbus::{
 use uuid::Uuid;
 
 use crate::engine::Engine;
-
-pub type PropertyReturn = (bool, (bool, Variant<Box<dyn RefArg>>));
 
 #[derive(Clone, Copy, Debug)]
 #[allow(non_camel_case_types)]

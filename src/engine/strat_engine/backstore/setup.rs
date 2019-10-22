@@ -12,6 +12,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use libudev;
 use serde_json;
 
 use devicemapper::{devnode_to_devno, Device, Sectors};
@@ -21,8 +22,9 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
+                device::identify,
                 metadata::{device_identifiers, BDA},
-                udev::get_stratis_block_devices,
+                udev::get_all_empty_devices,
             },
             device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
@@ -31,6 +33,46 @@ use crate::{
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
+
+/// Retrieve all the block devices on the system that have a Stratis signature.
+fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
+    let context = libudev::Context::new()?;
+    let mut enumerator = libudev::Enumerator::new(&context)?;
+    enumerator.match_subsystem("block")?;
+    enumerator.match_property("ID_FS_TYPE", "stratis")?;
+
+    let devices: Vec<PathBuf> = enumerator
+        .scan_devices()?
+        .filter(|dev| dev.is_initialized())
+        .filter(|dev| {
+            dev.property_value("DM_MULTIPATH_DEVICE_PATH")
+                .map_or(true, |v| v != "1")
+        })
+        .filter_map(|i| i.devnode().map(|d| d.into()))
+        .collect();
+
+    if devices.is_empty() {
+        // We have found no Stratis devices, possible reasons are:
+        // 1. We really don't have any
+        // 2. We have some, but libblkid is too old to support Stratis, thus we appear empty
+        // 3. We ran this code at early boot before we have any udev db entries which are complete
+        //    or are complete but fall into reasons 1 & 2 above
+        //
+        // In this case we will get all the block devices which have complete udev db block device
+        // entries and appear "empty" and go out to disk and check them!
+
+        Ok(get_all_empty_devices()?
+            .into_iter()
+            .filter(|x| {
+                identify(x)
+                    .map(|ownership| ownership.stratis_identifiers().is_some())
+                    .unwrap_or(false)
+            })
+            .collect())
+    } else {
+        Ok(devices)
+    }
+}
 
 /// Find all Stratis devices.
 ///

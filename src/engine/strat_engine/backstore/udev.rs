@@ -52,6 +52,25 @@ pub fn stratis_enumerator(context: &libudev::Context) -> StratisResult<libudev::
     Ok(enumerator)
 }
 
+/// Apply f to the device that has the specified devnode if found using the
+/// given enumerator. Return an error if the devnode can not be canonicalized.
+/// Omit uninitialized devices.
+fn udev_device_apply<F, U>(
+    enumerator: &mut libudev::Enumerator,
+    devnode: &Path,
+    f: F,
+) -> StratisResult<Option<U>>
+where
+    F: FnOnce(&libudev::Device) -> U,
+{
+    let canonical = fs::canonicalize(devnode)?;
+    Ok(enumerator
+        .scan_devices()?
+        .filter(|x| x.is_initialized())
+        .find(|x| x.devnode().map_or(false, |d| canonical == d))
+        .map(|d| f(&d)))
+}
+
 /// Locate a udev block device with the specified devnode and apply a function
 /// to that device, returning the result.
 /// Treat an uninitialized device as if it does not exist.
@@ -62,15 +81,9 @@ pub fn udev_block_device_apply<F, U>(devnode: &Path, f: F) -> StratisResult<Opti
 where
     F: FnOnce(&libudev::Device) -> U,
 {
-    let canonical = fs::canonicalize(devnode)?;
-
     let context = libudev::Context::new()?;
     let mut enumerator = block_enumerator(&context)?;
-    Ok(enumerator
-        .scan_devices()?
-        .filter(|x| x.is_initialized())
-        .find(|x| x.devnode().map_or(false, |d| canonical == d))
-        .map(|d| f(&d)))
+    udev_device_apply(&mut enumerator, devnode, f)
 }
 
 /// Takes a libudev device entry and returns the properties as a HashMap.

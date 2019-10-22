@@ -37,6 +37,13 @@ where
         })
 }
 
+/// Make an enumerator for enumerating block devices
+fn block_enumerator(context: &libudev::Context) -> StratisResult<libudev::Enumerator> {
+    let mut enumerator = libudev::Enumerator::new(context)?;
+    enumerator.match_subsystem("block")?;
+    Ok(enumerator)
+}
+
 /// Locate a udev block device with the specified devnode and apply a function
 /// to that device, returning the result.
 /// Treat an uninitialized device as if it does not exist.
@@ -48,8 +55,7 @@ where
     F: FnOnce(&libudev::Device) -> U,
 {
     let context = libudev::Context::new()?;
-    let mut enumerator = libudev::Enumerator::new(&context)?;
-    enumerator.match_subsystem("block")?;
+    let mut enumerator = block_enumerator(&context)?;
 
     let canonical = fs::canonicalize(devnode)?;
 
@@ -78,8 +84,7 @@ pub fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
 /// appear to be empty from a udev perspective.
 pub fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
     let context = libudev::Context::new()?;
-    let mut enumerator = libudev::Enumerator::new(&context)?;
-    enumerator.match_subsystem("block")?;
+    let mut enumerator = block_enumerator(&context)?;
 
     Ok(enumerator
         .scan_devices()?

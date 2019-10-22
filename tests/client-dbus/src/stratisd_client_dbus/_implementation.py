@@ -45,5 +45,10 @@ ObjectManager = make_class(
 Manager = make_class(
     "Manager", ET.fromstring(SPECS["org.storage.stratis1.Manager"]), TIME_OUT
 )
+FetchProperties = make_class(
+    "FetchProperties",
+    ET.fromstring(SPECS["org.storage.stratis1.FetchProperties"]),
+    TIME_OUT,
+)
 Filesystem = make_class("Filesystem", _FILESYSTEM_SPEC, TIME_OUT)
 Pool = make_class("Pool", _POOL_SPEC, TIME_OUT)

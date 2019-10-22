@@ -24,7 +24,7 @@ SPECS = {
 </interface>
 """,
     "org.storage.stratis1.FetchProperties": """
-<interface name="org.storage.stratis1.FetchProperties>
+<interface name="org.storage.stratis1.FetchProperties">
 <method name="GetAllProperties">
 <arg name="property_hash" type="a{s(bv)}" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>

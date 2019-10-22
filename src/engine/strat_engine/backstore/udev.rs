@@ -62,11 +62,10 @@ pub fn udev_block_device_apply<F, U>(devnode: &Path, f: F) -> StratisResult<Opti
 where
     F: FnOnce(&libudev::Device) -> U,
 {
-    let context = libudev::Context::new()?;
-    let mut enumerator = block_enumerator(&context)?;
-
     let canonical = fs::canonicalize(devnode)?;
 
+    let context = libudev::Context::new()?;
+    let mut enumerator = block_enumerator(&context)?;
     Ok(enumerator
         .scan_devices()?
         .filter(|x| x.is_initialized())

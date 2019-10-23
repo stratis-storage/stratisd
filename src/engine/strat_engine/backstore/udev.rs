@@ -17,6 +17,15 @@ pub fn block_enumerator(context: &libudev::Context) -> libudev::Result<libudev::
     Ok(enumerator)
 }
 
+/// Make an enumerator for enumerating stratis block devices. Return an error
+/// if there was any udev-related error.
+pub fn stratis_enumerator(context: &libudev::Context) -> libudev::Result<libudev::Enumerator> {
+    let mut enumerator = libudev::Enumerator::new(context)?;
+    enumerator.match_subsystem("block")?;
+    enumerator.match_property("ID_FS_TYPE", "stratis")?;
+    Ok(enumerator)
+}
+
 /// Takes a libudev device entry and returns the properties as a HashMap.
 fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
     let rc: HashMap<_, _> = device

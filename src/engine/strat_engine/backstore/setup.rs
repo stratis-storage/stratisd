@@ -24,7 +24,7 @@ use crate::{
                 blockdev::StratBlockDev,
                 device::identify,
                 metadata::{device_identifiers, BDA},
-                udev::{block_enumerator, stratis_enumerator},
+                udev::{block_enumerator, is_multipath_member, is_unclaimed, stratis_enumerator},
             },
             device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
@@ -43,10 +43,7 @@ fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
         enumerator
             .scan_devices()?
             .filter(|dev| dev.is_initialized())
-            .filter(|dev| {
-                dev.property_value("DM_MULTIPATH_DEVICE_PATH")
-                    .map_or(true, |v| v != "1")
-            })
+            .filter(|dev| !is_multipath_member(dev).unwrap_or(true))
             .filter_map(|i| i.devnode().map(|d| d.into()))
             .collect::<Vec<PathBuf>>()
     };
@@ -65,13 +62,7 @@ fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
         Ok(enumerator
             .scan_devices()?
             .filter(|dev| dev.is_initialized())
-            .filter(|dev| {
-                dev.property_value("DM_MULTIPATH_DEVICE_PATH")
-                    .map_or(true, |v| v != "1")
-                    && !((dev.property_value("ID_PART_TABLE_TYPE").is_some()
-                        && dev.property_value("ID_PART_ENTRY_DISK").is_none())
-                        || dev.property_value("ID_FS_USAGE").is_some())
-            })
+            .filter(|dev| !is_multipath_member(dev).unwrap_or(true) && is_unclaimed(dev))
             .filter_map(|dev| dev.devnode().map(|d| d.to_owned()))
             .filter(|devnode| {
                 identify(devnode)

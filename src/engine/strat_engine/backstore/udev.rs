@@ -3,11 +3,11 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! udev-related methods
-use std::{collections::HashMap, fs, path::Path};
+use std::{collections::HashMap, ffi::OsStr, fs, path::Path};
 
 use libudev;
 
-use crate::stratis::StratisResult;
+use crate::stratis::{StratisError, StratisResult};
 
 /// Make an enumerator for enumerating block devices. Return an error if there
 /// was any udev-related error.
@@ -24,6 +24,50 @@ pub fn stratis_enumerator(context: &libudev::Context) -> libudev::Result<libudev
     enumerator.match_subsystem("block")?;
     enumerator.match_property("ID_FS_TYPE", "stratis")?;
     Ok(enumerator)
+}
+
+/// Get a udev property with the given name for the given device.
+/// Returns None if no udev property found for the given property name.
+/// Returns an error if the value of the property can not be converted to
+/// a string using the standard conversion for this OS.
+fn get_udev_property<T: AsRef<OsStr>>(
+    device: &libudev::Device,
+    property_name: T,
+) -> Option<StratisResult<String>>
+where
+    T: std::fmt::Display,
+{
+    device
+        .property_value(&property_name)
+        .map(|value| match value.to_str() {
+            Some(value) => Ok(value.into()),
+            None => Err(StratisError::Error(format!(
+                "Unable to convert udev property value with key {} belonging to device {} to a string",
+                property_name,
+                device.devnode().map_or("<unknown>".into(), |x| x.to_string_lossy().into_owned())
+            ))),
+        })
+}
+
+/// Returns true if udev indicates that the device is a multipath member
+/// device, else false. Returns an error on a failure to interpret the
+/// value.
+pub fn is_multipath_member(device: &libudev::Device) -> StratisResult<bool> {
+    match get_udev_property(device, "DM_MULTIPATH_DEVICE_PATH") {
+        None => Ok(false),
+        Some(Ok(value)) => Ok(value == "1"),
+        Some(Err(err)) => Err(err),
+    }
+}
+
+/// If the expression is true, then it seems that no other system is
+/// known to udev to claim this device.
+/// Note from mulhern: I have no idea myself why this particular expression
+/// should be correct. I was told that the original source was dlehman.
+pub fn is_unclaimed(device: &libudev::Device) -> bool {
+    (get_udev_property(device, "ID_PART_TABLE_TYPE").is_none()
+        || get_udev_property(device, "ID_PART_ENTRY_DISK").is_some())
+        && get_udev_property(device, "ID_FS_USAGE").is_none()
 }
 
 /// Takes a libudev device entry and returns the properties as a HashMap.

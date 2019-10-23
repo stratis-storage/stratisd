@@ -2,15 +2,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::collections::HashMap;
+
 use dbus::{
     self,
-    arg::IterAppend,
+    arg::{Array, IterAppend, RefArg, Variant},
     tree::{
         Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
+        Tree,
     },
-    Message,
+    Message, Path,
 };
-
+use itertools::Itertools;
 use uuid::Uuid;
 
 use crate::{
@@ -68,18 +71,6 @@ pub fn create_dbus_blockdev<'a>(
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_blockdev_initialization_time);
 
-    let total_physical_size_property = f
-        .property::<&str, _>("TotalPhysicalSize", ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
-        .on_get(get_blockdev_physical_size);
-
-    let state_property = f
-        .property::<u16, _>(consts::BLOCKDEV_STATE_PROP, ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::True)
-        .on_get(get_blockdev_state);
-
     let pool_property = f
         .property::<&dbus::Path, _>("Pool", ())
         .access(Access::Read)
@@ -98,6 +89,25 @@ pub fn create_dbus_blockdev<'a>(
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_tier);
 
+    let get_all_properties_method = f
+        .method("GetAllProperties", (), get_all_properties)
+        // a{s(bv)}: Dictionary of property names to tuples
+        // In the tuple:
+        // b: Indicates whether the property value fetched was successful
+        // v: If b is true, represents the value for the given property
+        //    If b is false, represents the error returned when fetching the property
+        .out_arg(("results", "a{s(bv)}"));
+
+    let get_properties_method = f
+        .method("GetProperties", (), get_properties)
+        .in_arg(("properties", "as"))
+        // a{s(bv)}: Dictionary of property names to tuples
+        // In the tuple:
+        // b: Indicates whether the property value fetched was successful
+        // v: If b is true, represents the value for the given property
+        //    If b is false, represents the error returned when fetching the property
+        .out_arg(("results", "a{s(bv)}"));
+
     let object_name = make_object_path(dbus_context);
 
     let object_path = f
@@ -109,12 +119,15 @@ pub fn create_dbus_blockdev<'a>(
                 .add_p(devnode_property)
                 .add_p(hardware_info_property)
                 .add_p(initialization_time_property)
-                .add_p(total_physical_size_property)
                 .add_p(pool_property)
-                .add_p(state_property)
                 .add_p(tier_property)
                 .add_p(user_info_property)
                 .add_p(uuid_property),
+        )
+        .add(
+            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
+                .add_m(get_all_properties_method)
+                .add_m(get_properties_method),
         );
 
     let path = object_path.get_name().to_owned();
@@ -177,23 +190,77 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-/// Get a blockdev property and place it on the D-Bus. The property is
-/// found by means of the getter method which takes a reference to a
-/// blockdev and obtains the property from the blockdev.
-fn get_blockdev_property<F, R>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-    getter: F,
-) -> Result<(), MethodErr>
+fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let object_path = &m.path;
+
+    let return_message = message.method_return();
+
+    let mut return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = HashMap::new();
+
+    let bd_size_result = blockdev_operation(m.tree, object_path.get_name(), |_, bd| Ok(*bd.size()));
+    let (bd_size_success, bd_size_prop) = match bd_size_result {
+        Ok(bd_size) => (true, Variant(Box::new(bd_size) as Box<dyn RefArg>)),
+        Err(e) => (
+            false,
+            Variant(Box::new(format!("{}: {}", e.errorname(), e.description())) as Box<dyn RefArg>),
+        ),
+    };
+
+    return_value.insert(
+        "TotalPhysicalSize".to_string(),
+        (bd_size_success, bd_size_prop),
+    );
+
+    Ok(vec![return_message.append1(return_value)])
+}
+
+fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+    let object_path = &m.path;
+    let properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
+
+    let return_message = message.method_return();
+
+    let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
+        .unique()
+        .filter_map(|prop| match prop.as_str() {
+            "TotalPhysicalSize" => {
+                let bd_size_result =
+                    blockdev_operation(m.tree, object_path.get_name(), |_, bd| Ok(*bd.size()));
+                let (bd_size_success, bd_size_prop) = match bd_size_result {
+                    Ok(bd_size) => (true, Variant(Box::new(bd_size) as Box<dyn RefArg>)),
+                    Err(e) => (
+                        false,
+                        Variant(Box::new(format!("{}: {}", e.errorname(), e.description()))
+                            as Box<dyn RefArg>),
+                    ),
+                };
+
+                Some((prop, (bd_size_success, bd_size_prop)))
+            }
+            _ => None,
+        })
+        .collect();
+
+    Ok(vec![return_message.append1(return_value)])
+}
+
+/// Perform an operation on a `BlockDev` object for a given
+/// DBus implicit argument that is a block device
+fn blockdev_operation<F, R>(
+    tree: &Tree<MTFn<TData>, TData>,
+    object_path: &Path<'static>,
+    closure: F,
+) -> Result<R, MethodErr>
 where
     F: Fn(BlockDevTier, &dyn BlockDev) -> Result<R, MethodErr>,
     R: dbus::arg::Append,
 {
-    let dbus_context = p.tree.get_data();
-    let object_path = p.path.get_name();
+    let dbus_context = tree.get_data();
 
-    let blockdev_path = p
-        .tree
+    let blockdev_path = tree
         .get(object_path)
         .expect("tree must contain implicit argument");
 
@@ -202,7 +269,7 @@ where
         .as_ref()
         .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
-    let pool_path = p.tree.get(&blockdev_data.parent).ok_or_else(|| {
+    let pool_path = tree.get(&blockdev_data.parent).ok_or_else(|| {
         MethodErr::failed(&format!(
             "no path for parent object path {}",
             &blockdev_data.parent
@@ -222,7 +289,23 @@ where
     let (tier, blockdev) = pool.get_blockdev(blockdev_data.uuid).ok_or_else(|| {
         MethodErr::failed(&format!("no blockdev with uuid {}", blockdev_data.uuid))
     })?;
-    i.append(getter(tier, blockdev)?);
+    closure(tier, blockdev)
+}
+
+/// Get a blockdev property and place it on the D-Bus. The property is
+/// found by means of the getter method which takes a reference to a
+/// blockdev and obtains the property from the blockdev.
+fn get_blockdev_property<F, R>(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+    getter: F,
+) -> Result<(), MethodErr>
+where
+    F: Fn(BlockDevTier, &dyn BlockDev) -> Result<R, MethodErr>,
+    R: dbus::arg::Append,
+{
+    let object_path = p.path.get_name();
+    i.append(blockdev_operation(p.tree, object_path, getter)?);
     Ok(())
 }
 
@@ -253,20 +336,6 @@ fn get_blockdev_initialization_time(
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |_, p| Ok(p.initialization_time().timestamp() as u64))
-}
-
-fn get_blockdev_physical_size(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-) -> Result<(), MethodErr> {
-    get_blockdev_property(i, p, |_, p| Ok(format!("{}", *p.size())))
-}
-
-fn get_blockdev_state(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-) -> Result<(), MethodErr> {
-    get_blockdev_property(i, p, |_, p| Ok(p.state() as u16))
 }
 
 fn get_blockdev_tier(

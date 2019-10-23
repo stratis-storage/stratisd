@@ -40,7 +40,7 @@ fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let fs_used_result = filesystem_operation(m.tree, object_path.get_name(), |(_, _, fs)| {
         fs.used()
-            .map(|u| u.to_string())
+            .map(|u| (*u).to_string())
             .map_err(|e| MethodErr::failed(&e))
     });
     let (fs_used_success, fs_used_prop) = match fs_used_result {
@@ -74,7 +74,7 @@ fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 let fs_used_result =
                     filesystem_operation(m.tree, object_path.get_name(), |(_, _, fs)| {
                         fs.used()
-                            .map(|u| u.to_string())
+                            .map(|u| (*u).to_string())
                             .map_err(|e| MethodErr::failed(&e))
                     });
                 let (fs_used_success, fs_used_prop) = match fs_used_result {

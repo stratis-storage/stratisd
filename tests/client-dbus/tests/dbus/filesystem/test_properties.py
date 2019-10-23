@@ -84,7 +84,7 @@ class SetNameTestCase(SimTestCase):
         )["Used"]
 
         self.assertEqual(used_success, True)
-        self.assertEqual(used, "12345678 bytes")
+        self.assertEqual(used, "12345678")
 
         devnode = Filesystem.Properties.Devnode.Get(filesystem)
 

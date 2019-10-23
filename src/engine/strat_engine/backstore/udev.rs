@@ -13,6 +13,14 @@ use libudev;
 
 use crate::stratis::StratisResult;
 
+/// Make an enumerator for enumerating block devices. Return an error if there
+/// was any udev-related error.
+fn block_enumerator(context: &libudev::Context) -> libudev::Result<libudev::Enumerator> {
+    let mut enumerator = libudev::Enumerator::new(context)?;
+    enumerator.match_subsystem("block")?;
+    Ok(enumerator)
+}
+
 /// Takes a libudev device entry and returns the properties as a HashMap.
 fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
     let rc: HashMap<_, _> = device
@@ -32,8 +40,7 @@ pub fn get_udev_block_device(
     dev_node_search: &Path,
 ) -> StratisResult<Option<HashMap<String, String>>> {
     let context = libudev::Context::new()?;
-    let mut enumerator = libudev::Enumerator::new(&context)?;
-    enumerator.match_subsystem("block")?;
+    let mut enumerator = block_enumerator(&context)?;
 
     // Get canonical form to ensure we do correct lookup in udev db
     let canonical = fs::canonicalize(dev_node_search)?;
@@ -56,8 +63,7 @@ pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<String>> {
 /// appear to be empty from a udev perspective.
 pub fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
     let context = libudev::Context::new()?;
-    let mut enumerator = libudev::Enumerator::new(&context)?;
-    enumerator.match_subsystem("block")?;
+    let mut enumerator = block_enumerator(&context)?;
 
     Ok(enumerator
         .scan_devices()?

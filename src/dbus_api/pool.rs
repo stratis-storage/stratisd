@@ -381,7 +381,7 @@ fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let return_message = message.method_return();
 
     let total_size_result = pool_operation(m.tree, object_path.get_name(), |(_, _, pool)| {
-        Ok(pool.total_physical_size().to_string())
+        Ok((*pool.total_physical_size()).to_string())
     });
     let (total_size_success, total_size_prop) = match total_size_result {
         Ok(size) => (true, Variant(Box::new(size) as Box<dyn RefArg>)),
@@ -414,7 +414,7 @@ fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             consts::POOL_TOTAL_SIZE_PROP => {
                 let total_size_result =
                     pool_operation(m.tree, object_path.get_name(), |(_, _, pool)| {
-                        Ok(pool.total_physical_size().to_string())
+                        Ok((*pool.total_physical_size()).to_string())
                     });
                 let (total_size_success, total_size_prop) = match total_size_result {
                     Ok(size) => (true, Variant(Box::new(size) as Box<dyn RefArg>)),

@@ -102,23 +102,8 @@ SPECS = {
 <property name="Name" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="true"/>
 </property>
-<property name="TotalPhysicalSize" type="s" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
-</property>
-<property name="TotalPhysicalUsed" type="s" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
-</property>
 <property name="Uuid" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
-</property>
-<property name="State" type="q" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="true"/>
-</property>
-<property name="ExtendState" type="q" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="true"/>
-</property>
-<property name="SpaceState" type="q" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="true"/>
 </property>
 </interface>
 """,
@@ -141,9 +126,6 @@ SPECS = {
 </property>
 <property name="Pool" type="o" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
-</property>
-<property name="Used" type="s" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
 </property>
 <property name="Uuid" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
@@ -170,13 +152,7 @@ SPECS = {
 <property name="Pool" type="o" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
 </property>
-<property name="State" type="q" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="true"/>
-</property>
 <property name="Tier" type="q" access="read">
-<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
-</property>
-<property name="TotalPhysicalSize" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
 </property>
 <property name="UserInfo" type="s" access="read">

@@ -3,11 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! udev-related methods
-use std::{
-    collections::HashMap,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, fs, path::Path};
 
 use libudev;
 
@@ -15,7 +11,7 @@ use crate::stratis::StratisResult;
 
 /// Make an enumerator for enumerating block devices. Return an error if there
 /// was any udev-related error.
-fn block_enumerator(context: &libudev::Context) -> libudev::Result<libudev::Enumerator> {
+pub fn block_enumerator(context: &libudev::Context) -> libudev::Result<libudev::Enumerator> {
     let mut enumerator = libudev::Enumerator::new(context)?;
     enumerator.match_subsystem("block")?;
     Ok(enumerator)
@@ -57,24 +53,4 @@ pub fn get_udev_block_device(
 pub fn hw_lookup(dev_node_search: &Path) -> StratisResult<Option<String>> {
     let dev = get_udev_block_device(dev_node_search)?;
     Ok(dev.and_then(|dev| dev.get("ID_WWN").cloned()))
-}
-
-/// Collect paths for all the block devices which are not individual multipath paths and which
-/// appear to be empty from a udev perspective.
-pub fn get_all_empty_devices() -> StratisResult<Vec<PathBuf>> {
-    let context = libudev::Context::new()?;
-    let mut enumerator = block_enumerator(&context)?;
-
-    Ok(enumerator
-        .scan_devices()?
-        .filter(|dev| dev.is_initialized())
-        .filter(|dev| {
-            dev.property_value("DM_MULTIPATH_DEVICE_PATH")
-                .map_or(true, |v| v != "1")
-                && !((dev.property_value("ID_PART_TABLE_TYPE").is_some()
-                    && dev.property_value("ID_PART_ENTRY_DISK").is_none())
-                    || dev.property_value("ID_FS_USAGE").is_some())
-        })
-        .filter_map(|i| i.devnode().map(|d| d.into()))
-        .collect())
 }

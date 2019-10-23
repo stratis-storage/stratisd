@@ -24,7 +24,7 @@ use crate::{
                 blockdev::StratBlockDev,
                 device::identify,
                 metadata::{device_identifiers, BDA},
-                udev::get_all_empty_devices,
+                udev::block_enumerator,
             },
             device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
@@ -36,20 +36,22 @@ use crate::{
 
 /// Retrieve all the block devices on the system that have a Stratis signature.
 fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
-    let context = libudev::Context::new()?;
-    let mut enumerator = libudev::Enumerator::new(&context)?;
-    enumerator.match_subsystem("block")?;
-    enumerator.match_property("ID_FS_TYPE", "stratis")?;
+    let devices = {
+        let context = libudev::Context::new()?;
+        let mut enumerator = libudev::Enumerator::new(&context)?;
+        enumerator.match_subsystem("block")?;
+        enumerator.match_property("ID_FS_TYPE", "stratis")?;
 
-    let devices: Vec<PathBuf> = enumerator
-        .scan_devices()?
-        .filter(|dev| dev.is_initialized())
-        .filter(|dev| {
-            dev.property_value("DM_MULTIPATH_DEVICE_PATH")
-                .map_or(true, |v| v != "1")
-        })
-        .filter_map(|i| i.devnode().map(|d| d.into()))
-        .collect();
+        enumerator
+            .scan_devices()?
+            .filter(|dev| dev.is_initialized())
+            .filter(|dev| {
+                dev.property_value("DM_MULTIPATH_DEVICE_PATH")
+                    .map_or(true, |v| v != "1")
+            })
+            .filter_map(|i| i.devnode().map(|d| d.into()))
+            .collect::<Vec<PathBuf>>()
+    };
 
     if devices.is_empty() {
         // We have found no Stratis devices, possible reasons are:
@@ -60,11 +62,21 @@ fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
         //
         // In this case we will get all the block devices which have complete udev db block device
         // entries and appear "empty" and go out to disk and check them!
-
-        Ok(get_all_empty_devices()?
-            .into_iter()
-            .filter(|x| {
-                identify(x)
+        let context = libudev::Context::new()?;
+        let mut enumerator = block_enumerator(&context)?;
+        Ok(enumerator
+            .scan_devices()?
+            .filter(|dev| dev.is_initialized())
+            .filter(|dev| {
+                dev.property_value("DM_MULTIPATH_DEVICE_PATH")
+                    .map_or(true, |v| v != "1")
+                    && !((dev.property_value("ID_PART_TABLE_TYPE").is_some()
+                        && dev.property_value("ID_PART_ENTRY_DISK").is_none())
+                        || dev.property_value("ID_FS_USAGE").is_some())
+            })
+            .filter_map(|dev| dev.devnode().map(|d| d.to_owned()))
+            .filter(|devnode| {
+                identify(devnode)
                     .map(|ownership| ownership.stratis_identifiers().is_some())
                     .unwrap_or(false)
             })

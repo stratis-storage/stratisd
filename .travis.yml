@@ -66,8 +66,8 @@ matrix:
           env: TASK=test
         # destructive tests that can be run on Travis
         - rust: stable
-          env: TASK=test-travis
           sudo: required
+          script: sudo PATH=${TRAVIS_HOME}/.cargo/bin:$PATH make -f Makefile test-travis
         # release
         - rust: stable
           env: TASK=release

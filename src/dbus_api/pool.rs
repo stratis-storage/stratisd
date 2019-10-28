@@ -327,9 +327,9 @@ fn pool_operation<F, R>(
     tree: &Tree<MTFn<TData>, TData>,
     object_path: &dbus::Path<'static>,
     closure: F,
-) -> Result<R, MethodErr>
+) -> Result<R, String>
 where
-    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, MethodErr>,
+    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, String>,
     R: dbus::arg::Append,
 {
     let dbus_context = tree.get_data();
@@ -341,13 +341,13 @@ where
     let pool_uuid = pool_path
         .get_data()
         .as_ref()
-        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?
+        .ok_or_else(|| format!("no data for object path {}", object_path))?
         .uuid;
 
     let engine = dbus_context.engine.borrow();
-    let (pool_name, pool) = engine.get_pool(pool_uuid).ok_or_else(|| {
-        MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))
-    })?;
+    let (pool_name, pool) = engine
+        .get_pool(pool_uuid)
+        .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
 
     closure((pool_name, pool_uuid, pool))
 }
@@ -361,12 +361,12 @@ fn get_pool_property<F, R>(
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, MethodErr>,
+    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, String>,
     R: dbus::arg::Append,
 {
     let object_path = p.path.get_name();
 
-    i.append(pool_operation(p.tree, object_path, getter)?);
+    i.append(pool_operation(p.tree, object_path, getter).map_err(|ref e| MethodErr::failed(e))?);
     Ok(())
 }
 
@@ -385,10 +385,7 @@ fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     });
     let (total_size_success, total_size_prop) = match total_size_result {
         Ok(size) => (true, Variant(Box::new(size) as Box<dyn RefArg>)),
-        Err(e) => (
-            false,
-            Variant(Box::new(format!("{}: {}", e.errorname(), e.description())) as Box<dyn RefArg>),
-        ),
+        Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
     };
 
     let mut return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = HashMap::new();
@@ -418,11 +415,7 @@ fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                     });
                 let (total_size_success, total_size_prop) = match total_size_result {
                     Ok(size) => (true, Variant(Box::new(size) as Box<dyn RefArg>)),
-                    Err(e) => (
-                        false,
-                        Variant(Box::new(format!("{}: {}", e.errorname(), e.description()))
-                            as Box<dyn RefArg>),
-                    ),
+                    Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
                 };
                 Some((prop, (total_size_success, total_size_prop)))
             }

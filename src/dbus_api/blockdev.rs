@@ -201,10 +201,7 @@ fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let bd_size_result = blockdev_operation(m.tree, object_path.get_name(), |_, bd| Ok(*bd.size()));
     let (bd_size_success, bd_size_prop) = match bd_size_result {
         Ok(bd_size) => (true, Variant(Box::new(bd_size) as Box<dyn RefArg>)),
-        Err(e) => (
-            false,
-            Variant(Box::new(format!("{}: {}", e.errorname(), e.description())) as Box<dyn RefArg>),
-        ),
+        Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
     };
 
     return_value.insert(
@@ -231,11 +228,7 @@ fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                     blockdev_operation(m.tree, object_path.get_name(), |_, bd| Ok(*bd.size()));
                 let (bd_size_success, bd_size_prop) = match bd_size_result {
                     Ok(bd_size) => (true, Variant(Box::new(bd_size) as Box<dyn RefArg>)),
-                    Err(e) => (
-                        false,
-                        Variant(Box::new(format!("{}: {}", e.errorname(), e.description()))
-                            as Box<dyn RefArg>),
-                    ),
+                    Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
                 };
 
                 Some((prop, (bd_size_success, bd_size_prop)))
@@ -253,9 +246,9 @@ fn blockdev_operation<F, R>(
     tree: &Tree<MTFn<TData>, TData>,
     object_path: &Path<'static>,
     closure: F,
-) -> Result<R, MethodErr>
+) -> Result<R, String>
 where
-    F: Fn(BlockDevTier, &dyn BlockDev) -> Result<R, MethodErr>,
+    F: Fn(BlockDevTier, &dyn BlockDev) -> Result<R, String>,
     R: dbus::arg::Append,
 {
     let dbus_context = tree.get_data();
@@ -267,28 +260,25 @@ where
     let blockdev_data = blockdev_path
         .get_data()
         .as_ref()
-        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
+        .ok_or_else(|| format!("no data for object path {}", object_path))?;
 
-    let pool_path = tree.get(&blockdev_data.parent).ok_or_else(|| {
-        MethodErr::failed(&format!(
-            "no path for parent object path {}",
-            &blockdev_data.parent
-        ))
-    })?;
+    let pool_path = tree
+        .get(&blockdev_data.parent)
+        .ok_or_else(|| format!("no path for parent object path {}", &blockdev_data.parent))?;
 
     let pool_uuid = pool_path
         .get_data()
         .as_ref()
-        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?
+        .ok_or_else(|| format!("no data for object path {}", object_path))?
         .uuid;
 
     let engine = dbus_context.engine.borrow();
-    let (_, pool) = engine.get_pool(pool_uuid).ok_or_else(|| {
-        MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))
-    })?;
-    let (tier, blockdev) = pool.get_blockdev(blockdev_data.uuid).ok_or_else(|| {
-        MethodErr::failed(&format!("no blockdev with uuid {}", blockdev_data.uuid))
-    })?;
+    let (_, pool) = engine
+        .get_pool(pool_uuid)
+        .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
+    let (tier, blockdev) = pool
+        .get_blockdev(blockdev_data.uuid)
+        .ok_or_else(|| format!("no blockdev with uuid {}", blockdev_data.uuid))?;
     closure(tier, blockdev)
 }
 
@@ -301,11 +291,13 @@ fn get_blockdev_property<F, R>(
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn(BlockDevTier, &dyn BlockDev) -> Result<R, MethodErr>,
+    F: Fn(BlockDevTier, &dyn BlockDev) -> Result<R, String>,
     R: dbus::arg::Append,
 {
     let object_path = p.path.get_name();
-    i.append(blockdev_operation(p.tree, object_path, getter)?);
+    i.append(
+        blockdev_operation(p.tree, object_path, getter).map_err(|ref e| MethodErr::failed(e))?,
+    );
     Ok(())
 }
 

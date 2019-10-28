@@ -4,17 +4,13 @@
 
 use std::{fmt::Debug, sync::Once};
 
-use crate::engine::types::{BlockDevState, MaybeDbusPath};
+use crate::engine::types::MaybeDbusPath;
 
 static INIT: Once = Once::new();
 static mut ENGINE_LISTENER_LIST: Option<EngineListenerList> = None;
 
 #[derive(Debug, Clone)]
 pub enum EngineEvent<'a> {
-    BlockdevStateChanged {
-        dbus_path: &'a MaybeDbusPath,
-        state: BlockDevState,
-    },
     FilesystemRenamed {
         dbus_path: &'a MaybeDbusPath,
         from: &'a str,

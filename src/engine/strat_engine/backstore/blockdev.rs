@@ -13,7 +13,6 @@ use devicemapper::{Device, Sectors};
 use crate::{
     engine::{
         engine::BlockDev,
-        event::{get_engine_listener_list, EngineEvent},
         strat_engine::{
             backstore::{
                 metadata::{disown_device, BDAExtendedSize, MDADataSize, BDA},
@@ -101,15 +100,7 @@ impl StratBlockDev {
     /// sectors are needed than are available, return partial results.
     /// If all sectors are desired, use available() method to get all.
     pub fn request_space(&mut self, size: Sectors) -> (Sectors, Vec<(Sectors, Sectors)>) {
-        let prev_state = self.state();
-        let result = self.used.request(size);
-        if result.0 > Sectors(0) && prev_state != BlockDevState::InUse {
-            get_engine_listener_list().notify(&EngineEvent::BlockdevStateChanged {
-                dbus_path: self.get_dbus_path(),
-                state: BlockDevState::InUse,
-            });
-        }
-        result
+        self.used.request(size)
     }
 
     // ALL SIZE METHODS (except size(), which is in BlockDev impl.)

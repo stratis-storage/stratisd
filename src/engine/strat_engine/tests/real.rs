@@ -181,7 +181,7 @@ fn make_linear_test_dev(devnode: &Path, start: Sectors, length: Sectors) -> Line
         get_dm(),
         DmName::new(&format!("stratis_test_{}", Uuid::new_v4())).expect("valid format"),
         None,
-        table.clone(),
+        table,
     )
     .unwrap()
 }

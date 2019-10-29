@@ -13,8 +13,9 @@ use dbus::{
     },
     Message,
 };
-use devicemapper::Sectors;
 use itertools::Itertools;
+
+use devicemapper::Sectors;
 
 use crate::{
     dbus_api::{

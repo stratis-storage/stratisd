@@ -30,37 +30,12 @@ use crate::{
     },
 };
 
-fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+fn get_properties_shared(
+    m: &MethodInfo<MTFn<TData>, TData>,
+    properties: &mut dyn Iterator<Item = String>,
+) -> MethodResult {
     let message: &Message = m.msg;
     let object_path = &m.path;
-
-    let return_message = message.method_return();
-
-    let mut return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = HashMap::new();
-
-    let fs_used_result = filesystem_operation(m.tree, object_path.get_name(), |(_, _, fs)| {
-        fs.used()
-            .map(|u| (*u).to_string())
-            .map_err(|e| e.to_string())
-    });
-    let (fs_used_success, fs_used_prop) = match fs_used_result {
-        Ok(fs_used) => (true, Variant(Box::new(fs_used) as Box<dyn RefArg>)),
-        Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
-    };
-
-    return_value.insert(
-        consts::FILESYSTEM_USED_PROP.to_string(),
-        (fs_used_success, fs_used_prop),
-    );
-
-    Ok(vec![return_message.append1(return_value)])
-}
-
-fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-    let object_path = &m.path;
-    let properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
 
     let return_message = message.method_return();
 
@@ -86,6 +61,22 @@ fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .collect();
 
     Ok(vec![return_message.append1(return_value)])
+}
+
+fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    get_properties_shared(
+        m,
+        &mut vec![consts::FILESYSTEM_USED_PROP]
+            .into_iter()
+            .map(|s| s.to_string()),
+    )
+}
+
+fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+    let mut properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
+    get_properties_shared(m, &mut properties)
 }
 
 pub fn create_dbus_filesystem<'a>(

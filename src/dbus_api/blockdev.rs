@@ -190,33 +190,12 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+fn get_properties_shared(
+    m: &MethodInfo<MTFn<TData>, TData>,
+    properties: &mut dyn Iterator<Item = String>,
+) -> MethodResult {
     let message: &Message = m.msg;
     let object_path = &m.path;
-
-    let return_message = message.method_return();
-
-    let mut return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = HashMap::new();
-
-    let bd_size_result = blockdev_operation(m.tree, object_path.get_name(), |_, bd| Ok(*bd.size()));
-    let (bd_size_success, bd_size_prop) = match bd_size_result {
-        Ok(bd_size) => (true, Variant(Box::new(bd_size) as Box<dyn RefArg>)),
-        Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
-    };
-
-    return_value.insert(
-        "TotalPhysicalSize".to_string(),
-        (bd_size_success, bd_size_prop),
-    );
-
-    Ok(vec![return_message.append1(return_value)])
-}
-
-fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-    let object_path = &m.path;
-    let properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
 
     let return_message = message.method_return();
 
@@ -238,6 +217,20 @@ fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .collect();
 
     Ok(vec![return_message.append1(return_value)])
+}
+
+fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    get_properties_shared(
+        m,
+        &mut vec!["TotalPhysicalSize"].into_iter().map(|s| s.to_string()),
+    )
+}
+
+fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+    let mut properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
+    get_properties_shared(m, &mut properties)
 }
 
 /// Perform an operation on a `BlockDev` object for a given

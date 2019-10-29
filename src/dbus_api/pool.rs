@@ -374,34 +374,12 @@ fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
     get_pool_property(i, p, |(name, _, _)| Ok(name.to_owned()))
 }
 
-fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+fn get_properties_shared(
+    m: &MethodInfo<MTFn<TData>, TData>,
+    properties: &mut dyn Iterator<Item = String>,
+) -> MethodResult {
     let message: &Message = m.msg;
     let object_path = &m.path;
-
-    let return_message = message.method_return();
-
-    let total_size_result = pool_operation(m.tree, object_path.get_name(), |(_, _, pool)| {
-        Ok((*pool.total_physical_size()).to_string())
-    });
-    let (total_size_success, total_size_prop) = match total_size_result {
-        Ok(size) => (true, Variant(Box::new(size) as Box<dyn RefArg>)),
-        Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
-    };
-
-    let mut return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = HashMap::new();
-    return_value.insert(
-        consts::POOL_TOTAL_SIZE_PROP.to_string(),
-        (total_size_success, total_size_prop),
-    );
-
-    Ok(vec![return_message.append1(return_value)])
-}
-
-fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-    let object_path = &m.path;
-    let properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
 
     let return_message = message.method_return();
 
@@ -423,11 +401,23 @@ fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         })
         .collect();
 
-    Ok(vec![return_message.append3(
-        return_value,
-        msg_code_ok(),
-        msg_string_ok(),
-    )])
+    Ok(vec![return_message.append1(return_value)])
+}
+
+fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    get_properties_shared(
+        m,
+        &mut vec![consts::POOL_TOTAL_SIZE_PROP]
+            .into_iter()
+            .map(|s| s.to_string()),
+    )
+}
+
+fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+    let mut properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
+    get_properties_shared(m, &mut properties)
 }
 
 pub fn create_dbus_pool<'a>(

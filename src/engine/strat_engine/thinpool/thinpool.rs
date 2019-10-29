@@ -615,9 +615,7 @@ impl ThinPool {
         } else if meta_extend_failed {
             new_state = PoolExtendState::MetaFailed;
         }
-        if self.pool_extend_state != new_state {
-            self.pool_extend_state = new_state;
-        }
+        self.pool_extend_state = new_state;
     }
 
     fn set_free_space_state(&mut self, new_state: FreeSpaceState) {

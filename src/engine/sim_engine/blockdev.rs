@@ -14,9 +14,7 @@ use uuid::Uuid;
 use devicemapper::{Bytes, Sectors, IEC};
 
 use crate::engine::{
-    engine::BlockDev,
-    sim_engine::randomization::Randomizer,
-    types::{BlockDevState, MaybeDbusPath},
+    engine::BlockDev, sim_engine::randomization::Randomizer, types::MaybeDbusPath,
 };
 
 #[derive(Debug)]
@@ -49,10 +47,6 @@ impl BlockDev for SimDev {
 
     fn size(&self) -> Sectors {
         Bytes(IEC::Gi).sectors()
-    }
-
-    fn state(&self) -> BlockDevState {
-        BlockDevState::InUse
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {

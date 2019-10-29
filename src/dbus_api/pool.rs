@@ -364,9 +364,9 @@ where
     F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, String>,
     R: dbus::arg::Append,
 {
-    let object_path = p.path.get_name();
-
-    i.append(pool_operation(p.tree, object_path, getter).map_err(|ref e| MethodErr::failed(e))?);
+    i.append(
+        pool_operation(p.tree, p.path.get_name(), getter).map_err(|ref e| MethodErr::failed(e))?,
+    );
     Ok(())
 }
 

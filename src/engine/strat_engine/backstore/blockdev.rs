@@ -20,7 +20,7 @@ use crate::{
             },
             serde_structs::{BaseBlockDevSave, Recordable},
         },
-        types::{BlockDevState, DevUuid, MaybeDbusPath},
+        types::{DevUuid, MaybeDbusPath},
     },
     stratis::StratisResult,
 };
@@ -152,15 +152,6 @@ impl BlockDev for StratBlockDev {
         let size = self.used.size();
         assert_eq!(self.bda.dev_size(), size);
         size.sectors()
-    }
-
-    fn state(&self) -> BlockDevState {
-        // TODO: Implement support for other BlockDevStates
-        if self.used.used() > self.metadata_size().sectors() {
-            BlockDevState::InUse
-        } else {
-            BlockDevState::NotInUse
-        }
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {

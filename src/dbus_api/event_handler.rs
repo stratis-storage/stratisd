@@ -25,23 +25,6 @@ impl EventHandler {
 impl EngineListener for EventHandler {
     fn notify(&self, event: &EngineEvent) {
         match *event {
-            EngineEvent::BlockdevStateChanged { dbus_path, state } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
-                        consts::BLOCKDEV_STATE_PROP,
-                        state as u16,
-                        dbus_path,
-                        consts::BLOCKDEV_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        warn!(
-                            "BlockdevStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path, state as u16,
-                        );
-                    });
-                }
-            }
             EngineEvent::FilesystemRenamed {
                 dbus_path,
                 from,
@@ -63,23 +46,6 @@ impl EngineListener for EventHandler {
                     });
                 }
             }
-            EngineEvent::PoolExtendStateChanged { dbus_path, state } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
-                        consts::POOL_EXTEND_STATE_PROP,
-                        state as u16,
-                        dbus_path,
-                        consts::POOL_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        warn!(
-                            "PoolExtendStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path, state as u16,
-                        );
-                    });
-                }
-            }
             EngineEvent::PoolRenamed {
                 dbus_path,
                 from,
@@ -97,40 +63,6 @@ impl EngineListener for EventHandler {
                         warn!(
                             "PoolRenamed: {} from: {} to: {} failed to send dbus update.",
                             dbus_path, from, to,
-                        );
-                    });
-                }
-            }
-            EngineEvent::PoolSpaceStateChanged { dbus_path, state } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
-                        consts::POOL_SPACE_STATE_PROP,
-                        state as u16,
-                        dbus_path,
-                        consts::POOL_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        warn!(
-                            "PoolSpaceStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path, state as u16,
-                        );
-                    });
-                }
-            }
-            EngineEvent::PoolStateChanged { dbus_path, state } => {
-                if let MaybeDbusPath(Some(ref dbus_path)) = *dbus_path {
-                    prop_changed_dispatch(
-                        &self.dbus_conn.borrow(),
-                        consts::POOL_STATE_PROP,
-                        state as u16,
-                        dbus_path,
-                        consts::POOL_INTERFACE_NAME,
-                    )
-                    .unwrap_or_else(|()| {
-                        warn!(
-                            "PoolStateChanged: {} state: {} failed to send dbus update.",
-                            dbus_path, state as u16,
                         );
                     });
                 }

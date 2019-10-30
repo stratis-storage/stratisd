@@ -15,6 +15,7 @@
 Test accessing properties of a filesystem.
 """
 
+from stratisd_client_dbus import FetchProperties
 from stratisd_client_dbus import Filesystem
 from stratisd_client_dbus import Manager
 from stratisd_client_dbus import Pool
@@ -78,8 +79,11 @@ class SetNameTestCase(SimTestCase):
         # I think this is also always true
         self.assertEqual(len(created), 20)
 
-        used = Filesystem.Properties.Used.Get(filesystem)
+        (used_success, used) = FetchProperties.Methods.GetProperties(
+            filesystem, {"properties": ["Used"]}
+        )["Used"]
 
+        self.assertEqual(used_success, True)
         self.assertEqual(used, "12345678")
 
         devnode = Filesystem.Properties.Devnode.Get(filesystem)

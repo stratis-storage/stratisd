@@ -15,9 +15,8 @@ use devicemapper::{Bytes, Device, Sectors};
 
 use crate::{
     engine::types::{
-        BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
-        FreeSpaceState, MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid, RenameAction,
-        SetCreateAction, SetDeleteAction,
+        BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid, MaybeDbusPath, Name,
+        PoolUuid, RenameAction, SetCreateAction, SetDeleteAction,
     },
     stratis::StratisResult,
 };
@@ -57,9 +56,6 @@ pub trait BlockDev: Debug {
 
     /// The total size of the device, including space not usable for data.
     fn size(&self) -> Sectors;
-
-    /// The current state of the blockdev.
-    fn state(&self) -> BlockDevState;
 
     /// Set dbus path associated with the BlockDev.
     fn set_dbus_path(&mut self, path: MaybeDbusPath) -> ();
@@ -138,11 +134,6 @@ pub trait Pool: Debug {
     /// associated with a pool.
     fn total_physical_size(&self) -> Sectors;
 
-    /// The number of Sectors in this pool that are currently in use by the
-    /// pool for some purpose, be it to store metadata, to store user data,
-    /// or to reserve for some other purpose.
-    fn total_physical_used(&self) -> StratisResult<Sectors>;
-
     /// Get all the filesystems belonging to this pool.
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)>;
 
@@ -176,15 +167,6 @@ pub trait Pool: Debug {
         uuid: DevUuid,
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>>;
-
-    /// The current state of the Pool.
-    fn state(&self) -> PoolState;
-
-    /// The current extend state of the Pool.
-    fn extend_state(&self) -> PoolExtendState;
-
-    /// The current space state of the Pool.
-    fn free_space_state(&self) -> FreeSpaceState;
 
     /// Set dbus path associated with the Pool.
     fn set_dbus_path(&mut self, path: MaybeDbusPath) -> ();

@@ -6,12 +6,14 @@ use std::{collections::HashMap, path::Path, vec::Vec};
 
 use dbus::{
     self,
-    arg::{Array, IterAppend},
+    arg::{Array, IterAppend, RefArg, Variant},
     tree::{
         Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
+        Tree,
     },
     Message,
 };
+use itertools::Itertools;
 
 use devicemapper::Sectors;
 
@@ -322,6 +324,35 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
+fn pool_operation<F, R>(
+    tree: &Tree<MTFn<TData>, TData>,
+    object_path: &dbus::Path<'static>,
+    closure: F,
+) -> Result<R, String>
+where
+    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, String>,
+    R: dbus::arg::Append,
+{
+    let dbus_context = tree.get_data();
+
+    let pool_path = tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+
+    let pool_uuid = pool_path
+        .get_data()
+        .as_ref()
+        .ok_or_else(|| format!("no data for object path {}", object_path))?
+        .uuid;
+
+    let engine = dbus_context.engine.borrow();
+    let (pool_name, pool) = engine
+        .get_pool(pool_uuid)
+        .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
+
+    closure((pool_name, pool_uuid, pool))
+}
+
 /// Get a pool property and place it on the D-Bus. The property is
 /// found by means of the getter method which takes a reference to a
 /// Pool and obtains the property from the pool.
@@ -331,28 +362,12 @@ fn get_pool_property<F, R>(
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, MethodErr>,
+    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, String>,
     R: dbus::arg::Append,
 {
-    let dbus_context = p.tree.get_data();
-    let object_path = p.path.get_name();
-    let pool_path = p
-        .tree
-        .get(object_path)
-        .expect("implicit argument must be in tree");
-
-    let pool_uuid = pool_path
-        .get_data()
-        .as_ref()
-        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?
-        .uuid;
-
-    let engine = dbus_context.engine.borrow();
-    let (pool_name, pool) = engine.get_pool(pool_uuid).ok_or_else(|| {
-        MethodErr::failed(&format!("no pool corresponding to uuid {}", &pool_uuid))
-    })?;
-
-    i.append(getter((pool_name, pool_uuid, pool))?);
+    i.append(
+        pool_operation(p.tree, p.path.get_name(), getter).map_err(|ref e| MethodErr::failed(e))?,
+    );
     Ok(())
 }
 
@@ -360,48 +375,50 @@ fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
     get_pool_property(i, p, |(name, _, _)| Ok(name.to_owned()))
 }
 
-fn get_pool_total_physical_used(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-) -> Result<(), MethodErr> {
-    fn get_used((_, uuid, pool): (Name, PoolUuid, &dyn Pool)) -> Result<String, MethodErr> {
-        let err_func = |_| {
-            MethodErr::failed(&format!(
-                "no total physical size computed for pool with uuid {}",
-                uuid
-            ))
-        };
+fn get_properties_shared(
+    m: &MethodInfo<MTFn<TData>, TData>,
+    properties: &mut dyn Iterator<Item = String>,
+) -> MethodResult {
+    let message: &Message = m.msg;
+    let object_path = &m.path;
 
-        pool.total_physical_used()
-            .map(|u| Ok(format!("{}", *u)))
-            .map_err(err_func)?
-    }
+    let return_message = message.method_return();
 
-    get_pool_property(i, p, get_used)
+    let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
+        .unique()
+        .filter_map(|prop| match prop.as_str() {
+            consts::POOL_TOTAL_SIZE_PROP => {
+                let total_size_result =
+                    pool_operation(m.tree, object_path.get_name(), |(_, _, pool)| {
+                        Ok((*pool.total_physical_size()).to_string())
+                    });
+                let (total_size_success, total_size_prop) = match total_size_result {
+                    Ok(size) => (true, Variant(Box::new(size) as Box<dyn RefArg>)),
+                    Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
+                };
+                Some((prop, (total_size_success, total_size_prop)))
+            }
+            _ => None,
+        })
+        .collect();
+
+    Ok(vec![return_message.append1(return_value)])
 }
 
-fn get_pool_total_physical_size(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(_, _, p)| {
-        Ok(format!("{}", *p.total_physical_size()))
-    })
+fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    get_properties_shared(
+        m,
+        &mut vec![consts::POOL_TOTAL_SIZE_PROP]
+            .into_iter()
+            .map(|s| s.to_string()),
+    )
 }
 
-fn get_pool_state(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(_, _, pool)| Ok(pool.state() as u16))
-}
-
-fn get_pool_extend_state(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(_, _, pool)| Ok(pool.extend_state() as u16))
-}
-
-fn get_space_state(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(_, _, pool)| Ok(pool.free_space_state() as u16))
+fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+    let mut properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
+    get_properties_shared(m, &mut properties)
 }
 
 pub fn create_dbus_pool<'a>(
@@ -485,41 +502,30 @@ pub fn create_dbus_pool<'a>(
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_name);
 
-    let total_physical_size_property = f
-        .property::<&str, _>("TotalPhysicalSize", ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
-        .on_get(get_pool_total_physical_size);
-
-    let total_physical_used_property = f
-        .property::<&str, _>("TotalPhysicalUsed", ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
-        .on_get(get_pool_total_physical_used);
-
     let uuid_property = f
         .property::<&str, _>("Uuid", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid);
 
-    let state_property = f
-        .property::<u16, _>(consts::POOL_STATE_PROP, ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::True)
-        .on_get(get_pool_state);
+    let get_all_properties_method = f
+        .method("GetAllProperties", (), get_all_properties)
+        // a{s(bv)}: Dictionary of property names to tuples
+        // In the tuple:
+        // b: Indicates whether the property value fetched was successful
+        // v: If b is true, represents the value for the given property
+        //    If b is false, represents the error returned when fetching the property
+        .out_arg(("results", "a{s(bv)}"));
 
-    let extend_state_property = f
-        .property::<u16, _>(consts::POOL_EXTEND_STATE_PROP, ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::True)
-        .on_get(get_pool_extend_state);
-
-    let space_state_property = f
-        .property::<u16, _>(consts::POOL_SPACE_STATE_PROP, ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::True)
-        .on_get(get_space_state);
+    let get_properties_method = f
+        .method("GetProperties", (), get_properties)
+        .in_arg(("properties", "as"))
+        // a{s(bv)}: Dictionary of property names to tuples
+        // In the tuple:
+        // b: Indicates whether the property value fetched was successful
+        // v: If b is true, represents the value for the given property
+        //    If b is false, represents the error returned when fetching the property
+        .out_arg(("results", "a{s(bv)}"));
 
     let object_name = make_object_path(dbus_context);
 
@@ -535,12 +541,12 @@ pub fn create_dbus_pool<'a>(
                 .add_m(add_cachedevs_method)
                 .add_m(rename_method)
                 .add_p(name_property)
-                .add_p(total_physical_size_property)
-                .add_p(total_physical_used_property)
-                .add_p(uuid_property)
-                .add_p(state_property)
-                .add_p(space_state_property)
-                .add_p(extend_state_property),
+                .add_p(uuid_property),
+        )
+        .add(
+            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
+                .add_m(get_all_properties_method)
+                .add_m(get_properties_method),
         );
 
     let path = object_path.get_name().to_owned();

@@ -53,7 +53,7 @@ impl BlockDev for SimDev {
     }
 
     fn size(&self) -> Sectors {
-        Bytes(IEC::Gi).sectors()
+        Bytes(u128::from(IEC::Gi)).sectors()
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {

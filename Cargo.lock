@@ -244,14 +244,14 @@ dependencies = [
 
 [[package]]
 name = "devicemapper"
-version = "0.28.1"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c41333e34258e919c0811c25c9340a157667fc53d63c2b6047e13a6bf27de37"
+checksum = "f6021f0cc22004ebe05b9042e3d944fc9b08d024057d9cd113273902625f3e4c"
 dependencies = [
  "bitflags",
  "error-chain",
  "libc",
- "nix 0.18.0",
+ "nix 0.19.1",
  "serde",
 ]
 
@@ -615,6 +615,18 @@ dependencies = [
  "bitflags",
  "cc",
  "cfg-if 0.1.10",
+ "libc",
+]
+
+[[package]]
+name = "nix"
+version = "0.19.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2ccba0cfe4fdf15982d1674c69b1fd80bad427d293849982668dfe454bd61f2"
+dependencies = [
+ "bitflags",
+ "cc",
+ "cfg-if 1.0.0",
  "libc",
 ]
 

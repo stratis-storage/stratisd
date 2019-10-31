@@ -502,12 +502,11 @@ pub mod tests {
     pub fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
         let pool_uuid = Uuid::new_v4();
         let dev_uuid = Uuid::new_v4();
-        let mda_size = MDADataSize::new(
-            MDADataSize::default().bytes() + Bytes(u64::from(mda_size_factor * 4)),
-        )
-        .region_size()
-        .mda_size();
-        let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
+        let mda_size =
+            MDADataSize::new(MDADataSize::default().bytes() + Bytes::from(mda_size_factor * 4))
+                .region_size()
+                .mda_size();
+        let blkdev_size = (Bytes::from(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
         StaticHeader::new(
             StratisIdentifiers::new(pool_uuid, dev_uuid),
             mda_size,

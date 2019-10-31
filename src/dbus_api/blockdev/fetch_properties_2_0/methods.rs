@@ -26,24 +26,20 @@ fn get_properties_shared(
 
     let return_message = message.method_return();
 
-    let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> =
-        properties
-            .unique()
-            .filter_map(|prop| match prop.as_str() {
-                consts::BLOCKDEV_TOTAL_SIZE_PROP => Some((
-                    prop,
-                    result_to_tuple(blockdev_operation(
-                        m.tree,
-                        object_path.get_name(),
-                        |_, bd| {
-                            Ok((u128::from(*bd.size()) * devicemapper::SECTOR_SIZE as u128)
-                                .to_string())
-                        },
-                    )),
+    let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
+        .unique()
+        .filter_map(|prop| match prop.as_str() {
+            consts::BLOCKDEV_TOTAL_SIZE_PROP => Some((
+                prop,
+                result_to_tuple(blockdev_operation(
+                    m.tree,
+                    object_path.get_name(),
+                    |_, bd| Ok((*bd.size().bytes()).to_string()),
                 )),
-                _ => None,
-            })
-            .collect();
+            )),
+            _ => None,
+        })
+        .collect();
 
     Ok(vec![return_message.append1(return_value)])
 }

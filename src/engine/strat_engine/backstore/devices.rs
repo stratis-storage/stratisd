@@ -36,7 +36,7 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
+const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u128);
 
 // Get information that can be obtained from udev for the block device
 // identified by devnode. Return an error if there was an error finding the

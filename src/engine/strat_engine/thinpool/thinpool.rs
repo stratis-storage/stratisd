@@ -1409,7 +1409,7 @@ mod tests {
     #[test]
     fn loop_test_full_pool() {
         loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(2, Some(Bytes(IEC::Gi).sectors())),
+            &loopbacked::DeviceLimits::Exactly(2, Some(Bytes(u128::from(IEC::Gi)).sectors())),
             test_full_pool,
         );
     }
@@ -1419,8 +1419,8 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(
                 2,
-                Some(Bytes(IEC::Gi).sectors()),
-                Some(Bytes(IEC::Gi * 4).sectors()),
+                Some(Bytes(u128::from(IEC::Gi)).sectors()),
+                Some(Bytes(u128::from(IEC::Gi) * 4).sectors()),
             ),
             test_full_pool,
         );
@@ -1726,7 +1726,7 @@ mod tests {
 
         // Create a filesystem as small as possible.  Allocate 1 MiB bigger than
         // the low water mark.
-        let fs_size = FILESYSTEM_LOWATER + Bytes(IEC::Mi).sectors();
+        let fs_size = FILESYSTEM_LOWATER + Bytes(u128::from(IEC::Mi)).sectors();
 
         let pool_name = "stratis_test_pool";
         devlinks::pool_added(pool_name);
@@ -1755,7 +1755,7 @@ mod tests {
         }
         // Write 2 MiB of data. The filesystem's free space is now 1 MiB
         // below FILESYSTEM_LOWATER.
-        let write_size = Bytes(IEC::Mi * 2).sectors();
+        let write_size = Bytes(u128::from(IEC::Mi) * 2).sectors();
         let buf = &[1u8; SECTOR_SIZE];
         for i in 0..*write_size {
             let file_path = tmp_dir.path().join(format!("stratis_test{}.txt", i));

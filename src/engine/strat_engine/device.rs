@@ -5,8 +5,10 @@
 // Functions for dealing with devices.
 
 use std::{
+    convert::TryInto,
     fs::{File, OpenOptions},
     io::{self, BufWriter, Cursor, Seek, SeekFrom, Write},
+    num::TryFromIntError,
     os::unix::prelude::AsRawFd,
     path::Path,
 };
@@ -33,7 +35,7 @@ pub fn blkdev_size(file: &File) -> StratisResult<Bytes> {
 
     match unsafe { blkgetsize64(file.as_raw_fd(), &mut val) } {
         Err(x) => Err(StratisError::Nix(x)),
-        Ok(_) => Ok(Bytes(val)),
+        Ok(_) => Ok(Bytes(u128::from(val))),
     }
 }
 
@@ -82,7 +84,9 @@ pub fn write_sectors<P: AsRef<Path>>(
     let mut f =
         BufWriter::with_capacity(IEC::Mi as usize, OpenOptions::new().write(true).open(path)?);
 
-    f.seek(SeekFrom::Start(*offset.bytes()))?;
+    f.seek(SeekFrom::Start((*offset.bytes()).try_into().map_err(
+        |e: TryFromIntError| StratisError::Error(e.to_string()),
+    )?))?;
     for _ in 0..*length {
         f.write_all(buf)?;
     }

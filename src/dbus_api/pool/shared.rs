@@ -75,10 +75,7 @@ pub fn get_pool_has_cache(m: &MethodInfo<MTFn<TData>, TData>) -> Result<bool, St
 
 pub fn get_pool_total_size(m: &MethodInfo<MTFn<TData>, TData>) -> Result<String, String> {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
-        Ok(
-            (u128::from(*pool.total_physical_size()) * devicemapper::SECTOR_SIZE as u128)
-                .to_string(),
-        )
+        Ok((*pool.total_physical_size().bytes()).to_string())
     })
 }
 
@@ -86,7 +83,7 @@ pub fn get_pool_total_used(m: &MethodInfo<MTFn<TData>, TData>) -> Result<String,
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         pool.total_physical_used()
             .map_err(|e| e.to_string())
-            .map(|size| (u128::from(*size) * devicemapper::SECTOR_SIZE as u128).to_string())
+            .map(|size| (*size.bytes()).to_string())
     })
 }
 

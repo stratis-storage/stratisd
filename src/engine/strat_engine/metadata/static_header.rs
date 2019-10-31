@@ -503,11 +503,11 @@ pub mod tests {
         let pool_uuid = Uuid::new_v4();
         let dev_uuid = Uuid::new_v4();
         let mda_size = MDADataSize::new(
-            MDADataSize::default().bytes() + Bytes(u64::from(mda_size_factor * 4)),
+            MDADataSize::default().bytes() + Bytes(u128::from(mda_size_factor * 4)),
         )
         .region_size()
         .mda_size();
-        let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
+        let blkdev_size = (Bytes(u128::from(IEC::Mi)) + Sectors(blkdev_size).bytes()).sectors();
         StaticHeader::new(
             StratisIdentifiers::new(pool_uuid, dev_uuid),
             mda_size,

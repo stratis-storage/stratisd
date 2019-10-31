@@ -789,7 +789,7 @@ mod tests {
             let buf = &[1u8; SECTOR_SIZE];
 
             let mut amount_written = Sectors(0);
-            let buffer_length = Bytes(buffer_length).sectors();
+            let buffer_length = Bytes(u128::from(buffer_length)).sectors();
             while match pool.thin_pool.state() {
                 Some(ThinPoolStatus::Working(working)) => {
                     working.summary == ThinPoolStatusSummary::Good
@@ -823,7 +823,11 @@ mod tests {
     #[test]
     fn loop_test_add_datadevs() {
         loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, Some((4u64 * Bytes(IEC::Gi)).sectors())),
+            &loopbacked::DeviceLimits::Range(
+                2,
+                3,
+                Some((4u64 * Bytes(u128::from(IEC::Gi))).sectors()),
+            ),
             test_add_datadevs,
         );
     }
@@ -833,8 +837,8 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(
                 2,
-                Some((2u64 * Bytes(IEC::Gi)).sectors()),
-                Some((4u64 * Bytes(IEC::Gi)).sectors()),
+                Some((2u64 * Bytes(u128::from(IEC::Gi))).sectors()),
+                Some((4u64 * Bytes(u128::from(IEC::Gi))).sectors()),
             ),
             test_add_datadevs,
         );

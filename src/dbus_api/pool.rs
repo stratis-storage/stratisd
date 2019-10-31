@@ -390,19 +390,15 @@ fn get_properties_shared(
             consts::POOL_TOTAL_SIZE_PROP => Some((
                 prop,
                 pool_operation(m.tree, object_path.get_name(), |(_, _, pool)| {
-                    Ok((u128::from(*pool.total_physical_size())
-                        * devicemapper::SECTOR_SIZE as u128)
-                        .to_string())
+                    Ok((*pool.total_physical_size().bytes()).to_string())
                 }),
             )),
             consts::POOL_TOTAL_USED_PROP => Some((
                 prop,
                 pool_operation(m.tree, object_path.get_name(), |(_, _, pool)| {
                     pool.total_physical_used()
+                        .map(|size| (*size.bytes()).to_string())
                         .map_err(|e| e.to_string())
-                        .map(|size| {
-                            (u128::from(*size) * devicemapper::SECTOR_SIZE as u128).to_string()
-                        })
                 }),
             )),
             _ => None,

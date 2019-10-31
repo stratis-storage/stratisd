@@ -203,7 +203,7 @@ fn get_properties_shared(
             consts::BLOCKDEV_TOTAL_SIZE_PROP => Some((
                 prop,
                 blockdev_operation(m.tree, object_path.get_name(), |_, bd| {
-                    Ok((u128::from(*bd.size()) * devicemapper::SECTOR_SIZE as u128).to_string())
+                    Ok((*bd.size().bytes()).to_string())
                 }),
             )),
             _ => None,

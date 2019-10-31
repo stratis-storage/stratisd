@@ -5,7 +5,9 @@
 use std::{
     self,
     cmp::Ordering,
+    convert::TryInto,
     io::{Read, Seek, SeekFrom},
+    num::TryFromIntError,
 };
 
 use byteorder::{ByteOrder, LittleEndian};
@@ -44,7 +46,7 @@ pub struct MDARegions {
 
 impl MDARegions {
     /// Calculate the offset from start of device for an MDARegion.
-    fn mda_offset(header_size: Bytes, index: usize, per_region_size: Bytes) -> u64 {
+    fn mda_offset(header_size: Bytes, index: usize, per_region_size: Bytes) -> u128 {
         *(header_size + per_region_size * index)
     }
 
@@ -72,11 +74,11 @@ impl MDARegions {
         let region_size = mda_size.region_size();
         let region_size_bytes = region_size.sectors().bytes();
         for region in 0..mda_size::NUM_MDA_REGIONS {
-            f.seek(SeekFrom::Start(MDARegions::mda_offset(
-                header_size,
-                region,
-                region_size_bytes,
-            )))?;
+            f.seek(SeekFrom::Start(
+                MDARegions::mda_offset(header_size, region, region_size_bytes)
+                    .try_into()
+                    .map_err(|e: TryFromIntError| StratisError::Error(e.to_string()))?,
+            ))?;
             f.write_all(&hdr_buf)?;
         }
 
@@ -112,11 +114,11 @@ impl MDARegions {
         // been corrupted, return an error.
         let mut load_a_region = |index: usize| -> StratisResult<Option<MDAHeader>> {
             let mut hdr_buf = [0u8; mda_size::_MDA_REGION_HDR_SIZE];
-            f.seek(SeekFrom::Start(MDARegions::mda_offset(
-                header_size,
-                index,
-                region_size_bytes,
-            )))?;
+            f.seek(SeekFrom::Start(
+                MDARegions::mda_offset(header_size, index, region_size_bytes)
+                    .try_into()
+                    .map_err(|e: TryFromIntError| StratisError::Error(e.to_string()))?,
+            ))?;
             f.read_exact(&mut hdr_buf)?;
             Ok(MDAHeader::from_buf(&hdr_buf)?)
         };
@@ -159,7 +161,7 @@ impl MDARegions {
             ));
         }
 
-        let used = Bytes(data.len() as u64);
+        let used = Bytes(data.len() as u128);
         let max_available = self.max_data_size().bytes();
         if used > max_available {
             let err_msg = format!(
@@ -179,11 +181,11 @@ impl MDARegions {
         // Write data to a region specified by index.
         let region_size = self.region_size.sectors().bytes();
         let mut save_region = |index: usize| -> StratisResult<()> {
-            f.seek(SeekFrom::Start(MDARegions::mda_offset(
-                header_size,
-                index,
-                region_size,
-            )))?;
+            f.seek(SeekFrom::Start(
+                MDARegions::mda_offset(header_size, index, region_size)
+                    .try_into()
+                    .map_err(|e: TryFromIntError| StratisError::Error(e.to_string()))?,
+            ))?;
             f.write_all(&hdr_buf)?;
             f.write_all(data)?;
             f.sync_all()?;
@@ -221,8 +223,10 @@ impl MDARegions {
         // It is an error if the metadata can not be found.
         let mut load_region = |index: usize| -> StratisResult<Vec<u8>> {
             let offset = MDARegions::mda_offset(header_size, index, region_size)
-                + mda_size::_MDA_REGION_HDR_SIZE as u64;
-            f.seek(SeekFrom::Start(offset))?;
+                + mda_size::_MDA_REGION_HDR_SIZE as u128;
+            f.seek(SeekFrom::Start(offset.try_into().map_err(
+                |e: TryFromIntError| StratisError::Error(e.to_string()),
+            )?))?;
             mda.load_region(f)
         };
 
@@ -335,7 +339,7 @@ impl MDAHeader {
                 assert!(secs <= std::i64::MAX as u64);
 
                 Some(MDAHeader {
-                    used: MetaDataSize::new(Bytes(used)),
+                    used: MetaDataSize::new(Bytes(u128::from(used))),
                     last_updated: Utc.timestamp(secs as i64, LittleEndian::read_u32(&buf[24..28])),
                     data_crc: LittleEndian::read_u32(&buf[4..8]),
                 })
@@ -485,7 +489,7 @@ mod tests {
 
             let header = MDAHeader {
                 last_updated: Utc.timestamp(sec, nsec),
-                used: MetaDataSize::new(Bytes(data.len() as u64)),
+                used: MetaDataSize::new(Bytes(data.len() as u128)),
                 data_crc: crc32::checksum_castagnoli(data),
             };
             let buf = header.to_buf();
@@ -507,7 +511,7 @@ mod tests {
 
         let header = MDAHeader {
             last_updated: Utc::now(),
-            used: MetaDataSize::new(Bytes(data.len() as u64)),
+            used: MetaDataSize::new(Bytes(data.len() as u128)),
             data_crc: crc32::checksum_castagnoli(&data),
         };
         let mut buf = header.to_buf();

@@ -37,7 +37,7 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
+const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u128);
 const MAX_NUM_TO_WRITE: usize = 10;
 
 /// struct to represent a continuous set of sectors on a disk
@@ -282,7 +282,7 @@ impl BlockDevMgr {
             current_time
         };
 
-        let data_size = Bytes(metadata.len() as u64);
+        let data_size = Bytes(metadata.len() as u128);
         let candidates = self
             .block_devs
             .iter_mut()

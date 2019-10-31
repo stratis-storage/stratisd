@@ -45,13 +45,12 @@ fn get_properties_shared(
             consts::FILESYSTEM_USED_PROP => {
                 let fs_used_result =
                     filesystem_operation(m.tree, object_path.get_name(), |(_, _, fs)| {
-                        fs.used().map(|u| *u).map_err(|e| e.to_string())
+                        fs.used()
+                            .map(|u| (*u).to_string())
+                            .map_err(|e| e.to_string())
                     });
                 let (fs_used_success, fs_used_prop) = match fs_used_result {
-                    Ok(fs_used) => (
-                        true,
-                        Variant(Box::new(fs_used.to_string()) as Box<dyn RefArg>),
-                    ),
+                    Ok(fs_used) => (true, Variant(Box::new(fs_used) as Box<dyn RefArg>)),
                     Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
                 };
 

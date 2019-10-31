@@ -390,11 +390,10 @@ fn get_properties_shared(
             consts::POOL_TOTAL_SIZE_PROP => {
                 let total_size_result =
                     pool_operation(m.tree, object_path.get_name(), |(_, _, pool)| {
-                        Ok(*pool.total_physical_size())
-                    })
-                    .map(|size| u128::from(size) * devicemapper::SECTOR_SIZE as u128);
+                        Ok((*pool.total_physical_size().bytes()).to_string())
+                    });
                 let (total_size_success, total_size_prop) = match total_size_result {
-                    Ok(size) => (true, Variant(Box::new(size.to_string()) as Box<dyn RefArg>)),
+                    Ok(size) => (true, Variant(Box::new(size) as Box<dyn RefArg>)),
                     Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
                 };
                 Some((prop, (total_size_success, total_size_prop)))

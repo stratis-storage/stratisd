@@ -345,7 +345,7 @@ pub fn fs_usage(mount_point: &Path) -> StratisResult<(Bytes, Bytes)> {
         stat.blocks_free() as u64,
     );
     Ok((
-        Bytes(block_size * blocks),
-        Bytes(block_size * (blocks - blocks_free)),
+        Bytes(u128::from(block_size * blocks)),
+        Bytes(u128::from(block_size * (blocks - blocks_free))),
     ))
 }

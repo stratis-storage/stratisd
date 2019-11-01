@@ -18,6 +18,7 @@ use crate::{
         devlinks,
         engine::Eventable,
         event::get_engine_listener_list,
+        shared::create_pool_idempotent_or_err,
         strat_engine::{
             backstore::{find_all, get_metadata, identify},
             cmd::verify_binaries,
@@ -181,6 +182,7 @@ impl Engine for StratEngine {
         validate_name(name)?;
 
         match self.pools.get_by_name(name) {
+            Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
             None => {
                 let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy)?;
 
@@ -189,7 +191,6 @@ impl Engine for StratEngine {
                 self.pools.insert(name, uuid, pool);
                 Ok(CreateAction::Created(uuid))
             }
-            Some(_) => Ok(CreateAction::Identity),
         }
     }
 

@@ -22,6 +22,7 @@ mod devlinks;
 #[allow(clippy::module_inception)]
 mod engine;
 mod event;
+mod shared;
 mod sim_engine;
 mod strat_engine;
 mod structures;

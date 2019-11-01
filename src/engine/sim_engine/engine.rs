@@ -15,6 +15,7 @@ use devicemapper::Device;
 use crate::{
     engine::{
         engine::{Engine, Eventable, Pool},
+        shared::create_pool_idempotent_or_err,
         sim_engine::{pool::SimPool, randomization::Randomizer},
         structures::Table,
         types::{CreateAction, DeleteAction, Name, PoolUuid, Redundancy, RenameAction},
@@ -40,7 +41,7 @@ impl Engine for SimEngine {
         let redundancy = calculate_redundancy!(redundancy);
 
         match self.pools.get_by_name(name) {
-            Some(_) => Ok(CreateAction::Identity),
+            Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
             None => {
                 let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
                 let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
@@ -243,7 +244,7 @@ mod tests {
     }
 
     #[test]
-    /// Creating a new pool with the same name should fail
+    /// Creating a new pool with the same name and arguments should return identity
     fn create_pool_name_collision() {
         let name = "name";
         let mut engine = SimEngine::default();
@@ -251,8 +252,22 @@ mod tests {
             .create_pool(name, &[Path::new("/s/d")], None)
             .unwrap();
         assert_matches!(
-            engine.create_pool(name, &[], None),
+            engine.create_pool(name, &[Path::new("/s/d")], None),
             Ok(CreateAction::Identity)
+        );
+    }
+
+    #[test]
+    /// Creating a new pool with the same name and different arguments should fail
+    fn create_pool_name_collision_different_args() {
+        let name = "name";
+        let mut engine = SimEngine::default();
+        engine
+            .create_pool(name, &[Path::new("/s/d")], None)
+            .unwrap();
+        assert_matches!(
+            engine.create_pool(name, &[], None),
+            Err(StratisError::Engine(ErrorEnum::Invalid, _))
         );
     }
 

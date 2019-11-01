@@ -82,3 +82,45 @@ macro_rules! set_blockdev_user_info {
         }
     };
 }
+
+macro_rules! create_pool_check_num {
+    ($vec:ident, ($is_one:tt, $is_many:tt)) => {{
+        let joined_string = $vec.join(", ");
+        if $vec.len() == 1 {
+            format!($is_one, joined_string)
+        } else if $vec.len() > 1 {
+            format!($is_many, joined_string)
+        } else {
+            String::new()
+        }
+    }};
+}
+
+macro_rules! create_pool_generate_error_string {
+    ($pool_name:ident, $input:ident, $exists:ident) => {
+        format!(
+            "There was a difference in the blockdevs associated with \
+             the existing pool named {} and the input requesting creation \
+             of a pool by the same name{}{}",
+            $pool_name,
+            create_pool_check_num!(
+                $input,
+                (
+                    " - the input requests blockdev {} \
+                     which does not exist in the current pool",
+                    " - the input requests blockdevs {} \
+                     which do not exist in the current pool"
+                )
+            ),
+            create_pool_check_num!(
+                $exists,
+                (
+                    " - the existing pool contains blockdev {} which was \
+                     not requested by the input",
+                    " - the existing pool contains blockdevs {} which were \
+                     not requested by the input"
+                )
+            ),
+        )
+    };
+}

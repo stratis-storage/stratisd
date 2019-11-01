@@ -23,8 +23,8 @@ SPECS = {
 </method>
 </interface>
 """,
-    "org.storage.stratis1.FetchProperties": """
-<interface name="org.storage.stratis1.FetchProperties">
+    "org.storage.stratis2.FetchProperties": """
+<interface name="org.storage.stratis2.FetchProperties">
 <method name="GetAllProperties">
 <arg name="property_hash" type="a{s(bv)}" direction="out"/>
 </method>
@@ -34,8 +34,8 @@ SPECS = {
 </method>
 </interface>
 """,
-    "org.storage.stratis1.Manager": """
-<interface name="org.storage.stratis1.Manager">
+    "org.storage.stratis2.Manager": """
+<interface name="org.storage.stratis2.Manager">
 <method name="ConfigureSimulator">
 <arg name="denominator" type="u" direction="in"/>
 <arg name="return_code" type="q" direction="out"/>
@@ -60,8 +60,8 @@ SPECS = {
 </property>
 </interface>
 """,
-    "org.storage.stratis1.pool": """
-<interface name="org.storage.stratis1.pool">
+    "org.storage.stratis2.pool": """
+<interface name="org.storage.stratis2.pool">
 <method name="AddCacheDevs">
 <arg name="devices" type="as" direction="in"/>
 <arg name="results" type="(bao)" direction="out"/>
@@ -107,8 +107,8 @@ SPECS = {
 </property>
 </interface>
 """,
-    "org.storage.stratis1.filesystem": """
-<interface name="org.storage.stratis1.filesystem">
+    "org.storage.stratis2.filesystem": """
+<interface name="org.storage.stratis2.filesystem">
 <method name="SetName">
 <arg name="name" type="s" direction="in"/>
 <arg name="action" type="(bs)" direction="out"/>
@@ -132,8 +132,8 @@ SPECS = {
 </property>
 </interface>
 """,
-    "org.storage.stratis1.blockdev": """
-<interface name="org.storage.stratis1.blockdev">
+    "org.storage.stratis2.blockdev": """
+<interface name="org.storage.stratis2.blockdev">
 <method name="SetUserInfo">
 <arg name="id" type="s" direction="in"/>
 <arg name="changed" type="(bs)" direction="out"/>

@@ -42,6 +42,7 @@ class Create2TestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
+        self._devs = _DEVICE_STRATEGY()
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testCreate(self):
@@ -50,7 +51,7 @@ class Create2TestCase(SimTestCase):
 
         If rc is OK, then pool must exist.
         """
-        devs = _DEVICE_STRATEGY()
+        devs = self._devs
         ((_, (poolpath, devnodes)), rc, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": devs},
@@ -86,7 +87,7 @@ class Create2TestCase(SimTestCase):
 
 class Create3TestCase(SimTestCase):
     """
-    Test 'create' on name collision.
+    Test 'create' on name collision and different arguments.
     """
 
     _POOLNAME = "deadpool"
@@ -107,9 +108,63 @@ class Create3TestCase(SimTestCase):
         )
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
-    def testCreate(self):
+    def testCreateDifferentBlockdevs(self):
         """
-        Create should fail trying to create new pool with same name as previous.
+        Create should fail trying to create new pool with same name
+        and different blockdevs from previous.
+        """
+        pools1 = pools().search(
+            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        )
+
+        (_, rc, _) = Manager.Methods.CreatePool(
+            self._proxy,
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 0),
+                "devices": _DEVICE_STRATEGY(),
+            },
+        )
+        self.assertEqual(rc, StratisdErrors.ERROR)
+
+        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
+        pools2 = list(pools().search(managed_objects))
+        pool = next(pools(props={"Name": self._POOLNAME}).search(managed_objects), None)
+
+        self.assertIsNotNone(pool)
+        self.assertEqual(
+            frozenset(x for (x, y) in pools1), frozenset(x for (x, y) in pools2)
+        )
+
+
+class Create4TestCase(SimTestCase):
+    """
+    Test 'create' when passing same arguments twice (idempotence).
+    """
+
+    _POOLNAME = "idempool"
+
+    def setUp(self):
+        """
+        Start the stratisd daemon with the simulator.
+        """
+        super().setUp()
+        self._proxy = get_object(TOP_OBJECT)
+        self._blockdevs = ["/dev/one", "/dev/two", "/dev/red", "/dev/blue"]
+        Manager.Methods.CreatePool(
+            self._proxy,
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 0),
+                "devices": self._blockdevs,
+            },
+        )
+        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
+
+    def testCreateSameBlockdevs(self):
+        """
+        Create should fail trying to create new pool with same name
+        and different blockdevs from previous.
         """
         pools1 = pools().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
@@ -120,7 +175,7 @@ class Create3TestCase(SimTestCase):
             {
                 "name": self._POOLNAME,
                 "redundancy": (True, 0),
-                "devices": _DEVICE_STRATEGY(),
+                "devices": self._blockdevs,
             },
         )
         self.assertEqual(rc, StratisdErrors.OK)

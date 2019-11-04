@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Test accessing properties of a filesystem.
+Test accessing properties of a pool using FetchProperties interface.
 """
 
-from stratisd_client_dbus import Filesystem
+from stratisd_client_dbus import FetchProperties
 from stratisd_client_dbus import Manager
-from stratisd_client_dbus import Pool
 from stratisd_client_dbus import get_object
 
 from stratisd_client_dbus._constants import TOP_OBJECT
@@ -28,19 +27,18 @@ from .._misc import device_name_list
 _DEVICE_STRATEGY = device_name_list()
 
 
-class SetNameTestCase(SimTestCase):
+class FetchPropertiesTestCase(SimTestCase):
     """
-    Set up a pool with a name and one filesystem.
+    Set up a pool with a name.
     """
 
-    _POOLNAME = "deadpool"
+    _POOLNAME = "fetchprops"
 
     def setUp(self):
         """
         Start the stratisd daemon with the simulator.
         """
         super().setUp()
-        self._fs_name = "fs"
         self._proxy = get_object(TOP_OBJECT)
         ((_, (self._pool_object_path, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
@@ -51,33 +49,15 @@ class SetNameTestCase(SimTestCase):
             },
         )
         self._pool_object = get_object(self._pool_object_path)
-        ((_, created), _, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {"specs": [self._fs_name]}
-        )
-        self._filesystem_object_path = created[0][0]
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
-    def testProps(self):
+    def testFetchSizeProperty(self):
         """
-        Test reading some filesystem properties.
+        Test FetchProperties for pool property, TotalPhysicalSize
         """
-        filesystem = get_object(self._filesystem_object_path)
-        name = Filesystem.Properties.Name.Get(filesystem)
+        (size_success, size) = FetchProperties.Methods.GetProperties(
+            self._pool_object, {"properties": ["TotalPhysicalSize"]}
+        )["TotalPhysicalSize"]
 
-        self.assertEqual(self._fs_name, name)
-
-        uuid = Filesystem.Properties.Uuid.Get(filesystem)
-
-        # must be a 32 character string
-        self.assertEqual(32, len(uuid))
-
-        created = Filesystem.Properties.Created.Get(filesystem)
-
-        # Should be a UTC rfc3339 string, which should end in Z
-        self.assertTrue(created.endswith("Z"))
-        # I think this is also always true
-        self.assertEqual(len(created), 20)
-
-        devnode = Filesystem.Properties.Devnode.Get(filesystem)
-
-        self.assertEqual(devnode, "/stratis/deadpool/fs")
+        self.assertEqual(size_success, True)
+        self.assertTrue(size.isnumeric())

@@ -807,6 +807,37 @@ impl ThinPool {
         result
     }
 
+    /// The number of physical sectors in use by this thinpool abstraction.
+    /// All sectors allocated to the mdv, all sectors allocated to the
+    /// metadata spare, and all sectors actually in use by the thinpool DM
+    /// device, either for the metadata device or for the data device.
+    pub fn total_physical_used(&self) -> StratisResult<Sectors> {
+        let (data_dev_used, meta_dev_used) = match self.thin_pool.status(get_dm())? {
+            ThinPoolStatus::Working(ref status) => (
+                datablocks_to_sectors(status.usage.used_data),
+                status.usage.used_meta.sectors(),
+            ),
+            ThinPoolStatus::Error => {
+                let err_msg = format!(
+                    "Devicemapper could not obtain status for devicemapper thin
+ pool device {}",
+                    self.thin_pool.device(),
+                );
+                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+            }
+            ThinPoolStatus::Fail => {
+                let err_msg = "thin pool failed, could not obtain usage";
+                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
+            }
+        };
+
+        let spare_total = self.segments.meta_spare_segments.iter().map(|s| s.1).sum();
+
+        let mdv_total = self.segments.mdv_segments.iter().map(|s| s.1).sum();
+
+        Ok(data_dev_used + spare_total + meta_dev_used + mdv_total)
+    }
+
     pub fn get_filesystem_by_uuid(&self, uuid: FilesystemUuid) -> Option<(Name, &StratFilesystem)> {
         self.filesystems.get_by_uuid(uuid)
     }

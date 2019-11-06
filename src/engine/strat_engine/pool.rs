@@ -395,6 +395,18 @@ impl Pool for StratPool {
         self.backstore.datatier_size()
     }
 
+    fn total_physical_used(&self) -> StratisResult<Sectors> {
+        // TODO: note that with the addition of another layer, the
+        // calculation of the amount of physical spaced used by means
+        // of adding the amount used by Stratis metadata to the amount used
+        // by the pool abstraction will be invalid. In the event of, e.g.,
+        // software RAID, the amount will be far too low to be useful, in the
+        // event of, e.g, VDO, the amount will be far too large to be useful.
+        self.thin_pool
+            .total_physical_used()
+            .map(|v| v + self.backstore.datatier_metadata_size())
+    }
+
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {
         self.thin_pool.filesystems()
     }

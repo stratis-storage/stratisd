@@ -134,6 +134,12 @@ pub trait Pool: Debug {
     /// associated with a pool.
     fn total_physical_size(&self) -> Sectors;
 
+    /// The number of Sectors in this pool that are currently in use by the
+    /// pool for some purpose, and therefore not available for future use,
+    /// by any subcomponent of Stratis, either for internal managment or to
+    /// store user data.
+    fn total_physical_used(&self) -> StratisResult<Sectors>;
+
     /// Get all the filesystems belonging to this pool.
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)>;
 

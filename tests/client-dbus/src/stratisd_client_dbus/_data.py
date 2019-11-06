@@ -135,7 +135,7 @@ SPECS = {
     "org.storage.stratis2.blockdev": """
 <interface name="org.storage.stratis2.blockdev">
 <method name="SetUserInfo">
-<arg name="id" type="s" direction="in"/>
+<arg name="id" type="(bs)" direction="in"/>
 <arg name="changed" type="(bs)" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
@@ -143,7 +143,7 @@ SPECS = {
 <property name="Devnode" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
 </property>
-<property name="HardwareInfo" type="s" access="read">
+<property name="HardwareInfo" type="(bs)" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
 </property>
 <property name="InitializationTime" type="t" access="read">
@@ -155,7 +155,7 @@ SPECS = {
 <property name="Tier" type="q" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
 </property>
-<property name="UserInfo" type="s" access="read">
+<property name="UserInfo" type="(bs)" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false"/>
 </property>
 <property name="Uuid" type="s" access="read">

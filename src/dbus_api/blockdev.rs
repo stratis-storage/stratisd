@@ -22,7 +22,7 @@ use crate::{
         types::{DbusContext, DbusErrorEnum, OPContext, TData},
         util::{
             engine_to_dbus_err_tuple, get_next_arg, get_parent, get_uuid, make_object_path,
-            msg_code_ok, msg_string_ok,
+            msg_code_ok, msg_string_ok, tuple_to_option,
         },
     },
     engine::{BlockDev, BlockDevTier, DevUuid, MaybeDbusPath, RenameAction},
@@ -38,7 +38,7 @@ pub fn create_dbus_blockdev<'a>(
 
     let set_userid_method = f
         .method("SetUserInfo", (), set_user_info)
-        .in_arg(("id", "s"))
+        .in_arg(("id", "(bs)"))
         // b: false if no change to the user info
         // s: UUID of the changed device
         //
@@ -54,13 +54,13 @@ pub fn create_dbus_blockdev<'a>(
         .on_get(get_blockdev_devnode);
 
     let hardware_info_property = f
-        .property::<&str, _>("HardwareInfo", ())
+        .property::<(bool, &str), _>("HardwareInfo", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_blockdev_hardware_info);
 
     let user_info_property = f
-        .property::<&str, _>("UserInfo", ())
+        .property::<(bool, &str), _>("UserInfo", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_user_info);
@@ -140,10 +140,7 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let new_id: Option<&str> = match get_next_arg(&mut iter, 0)? {
-        "" => None,
-        val => Some(val),
-    };
+    let new_id_spec: (bool, &str) = get_next_arg(&mut iter, 0)?;
 
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
@@ -162,7 +159,8 @@ fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let result = pool.set_blockdev_user_info(&pool_name, blockdev_data.uuid, new_id);
+    let result =
+        pool.set_blockdev_user_info(&pool_name, blockdev_data.uuid, tuple_to_option(new_id_spec));
 
     let msg = match result {
         Ok(RenameAction::NoSource) => {
@@ -310,14 +308,20 @@ fn get_blockdev_hardware_info(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_blockdev_property(i, p, |_, p| Ok(p.hardware_info().unwrap_or("").to_owned()))
+    get_blockdev_property(i, p, |_, p| {
+        Ok(p.hardware_info()
+            .map_or_else(|| (false, "".to_owned()), |val| (true, val.to_owned())))
+    })
 }
 
 fn get_blockdev_user_info(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_blockdev_property(i, p, |_, p| Ok(p.user_info().unwrap_or("").to_owned()))
+    get_blockdev_property(i, p, |_, p| {
+        Ok(p.user_info()
+            .map_or_else(|| (false, "".to_owned()), |val| (true, val.to_owned())))
+    })
 }
 
 fn get_blockdev_initialization_time(

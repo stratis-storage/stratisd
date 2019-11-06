@@ -1,14 +1,41 @@
-stratisd 2.0.0 (UNRELEASED)
-===========================
+stratisd 2.0.0
+==============
 Recommended Rust toolchain version: 1.38
 Lowest supported Rust toolchain version: 1.37
 Python auto-formatter: black (18.9b0)
 
+New minimum Rust crate requirements:
+  - itertools: 0.8.0
+  - proptest: 0.9.0
+
+- Update version of D-Bus service name and interface names:
+  https://github.com/stratis-storage/project/issues/103
+  https://github.com/stratis-storage/stratisd/pull/1682
+
+- Restrict D-Bus properties to a core set of fundamental properties;
+  fetch other properties using a D-Bus method:
+  https://github.com/stratis-storage/project/issues/52
+  https://github.com/stratis-storage/stratisd/pull/1679
+  https://github.com/stratis-storage/stratisd/issues/1688
+  https://github.com/stratis-storage/stratisd/pull/1692
+  https://github.com/stratis-storage/stratisd/pull/1697
+
 - Make D-Bus API and engine operations idempotent:
   https://github.com/stratis-storage/project/issues/51
   https://github.com/stratis-storage/stratisd/pull/1651
+  https://github.com/stratis-storage/stratisd/issues/1686
+  https://github.com/stratis-storage/stratisd/pull/1695
+
+- Return all size values in bytes:
+  https://github.com/stratis-storage/stratisd/issues/1243
+  https://github.com/stratis-storage/stratisd/pull/1680
+
+- Use tuple for D-Bus types that are optional:
+  https://github.com/stratis-storage/project/issues/37
+  https://github.com/stratis-storage/stratisd/pull/1696
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/1685
   https://github.com/stratis-storage/stratisd/pull/1673
   https://github.com/stratis-storage/stratisd/pull/1671
   https://github.com/stratis-storage/stratisd/pull/1669
@@ -21,6 +48,7 @@ Python auto-formatter: black (18.9b0)
   https://github.com/stratis-storage/stratisd/pull/1658
   https://github.com/stratis-storage/stratisd/pull/1657
   https://github.com/stratis-storage/stratisd/pull/1655
+  https://github.com/stratis-storage/stratisd/pull/1629
   https://github.com/stratis-storage/stratisd/pull/1626
   https://github.com/stratis-storage/stratisd/pull/1514
 

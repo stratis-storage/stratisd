@@ -17,6 +17,7 @@ Top-level classes and methods.
 
 from ._connection import get_object
 
+from ._implementation import Blockdev
 from ._implementation import FetchProperties
 from ._implementation import Filesystem
 from ._implementation import Manager

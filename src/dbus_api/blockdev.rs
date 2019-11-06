@@ -201,14 +201,11 @@ fn get_properties_shared(
         .unique()
         .filter_map(|prop| match prop.as_str() {
             "TotalPhysicalSize" => {
-                let bd_size_result =
-                    blockdev_operation(m.tree, object_path.get_name(), |_, bd| Ok(*bd.size()))
-                        .map(|size| u128::from(size) * devicemapper::SECTOR_SIZE as u128);
+                let bd_size_result = blockdev_operation(m.tree, object_path.get_name(), |_, bd| {
+                    Ok((u128::from(*bd.size()) * devicemapper::SECTOR_SIZE as u128).to_string())
+                });
                 let (bd_size_success, bd_size_prop) = match bd_size_result {
-                    Ok(bd_size) => (
-                        true,
-                        Variant(Box::new(bd_size.to_string()) as Box<dyn RefArg>),
-                    ),
+                    Ok(bd_size) => (true, Variant(Box::new(bd_size) as Box<dyn RefArg>)),
                     Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
                 };
 

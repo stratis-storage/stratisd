@@ -43,11 +43,11 @@ class StratisTestCase(SimTestCase):
         """
         Getting version should succeed.
 
-        Major version number should be 0.
+        Major version number should be 2.
         """
         version = Manager.Properties.Version.Get(get_object(TOP_OBJECT))
         (major, _, _) = version.split(".")
-        self.assertEqual(major, "1")
+        self.assertEqual(major, "2")
 
 
 class StratisTestCase2(SimTestCase):

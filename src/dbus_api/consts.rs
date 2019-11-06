@@ -19,3 +19,4 @@ pub const FILESYSTEM_NAME_PROP: &str = "Name";
 pub const FILESYSTEM_USED_PROP: &str = "Used";
 
 pub const BLOCKDEV_INTERFACE_NAME: &str = "org.storage.stratis2.blockdev";
+pub const BLOCKDEV_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";

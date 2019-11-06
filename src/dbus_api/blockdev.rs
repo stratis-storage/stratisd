@@ -200,7 +200,7 @@ fn get_properties_shared(
     let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
         .unique()
         .filter_map(|prop| match prop.as_str() {
-            "TotalPhysicalSize" => {
+            consts::BLOCKDEV_TOTAL_SIZE_PROP => {
                 let bd_size_result = blockdev_operation(m.tree, object_path.get_name(), |_, bd| {
                     Ok((u128::from(*bd.size()) * devicemapper::SECTOR_SIZE as u128).to_string())
                 });
@@ -221,7 +221,9 @@ fn get_properties_shared(
 fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     get_properties_shared(
         m,
-        &mut vec!["TotalPhysicalSize"].into_iter().map(|s| s.to_string()),
+        &mut vec![consts::BLOCKDEV_TOTAL_SIZE_PROP]
+            .into_iter()
+            .map(|s| s.to_string()),
     )
 }
 

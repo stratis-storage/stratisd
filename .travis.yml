@@ -108,6 +108,6 @@ matrix:
           env: TASK=fmt-travis
 
 branches:
-    only: master
+    only: develop
 
 script: make -f Makefile $TASK

@@ -22,8 +22,10 @@ from ._implementation import FetchProperties
 from ._implementation import FetchProperties_2_1
 from ._implementation import Filesystem
 from ._implementation import Manager
+from ._implementation import ManagerR1
 from ._implementation import ObjectManager
 from ._implementation import Pool
+from ._implementation import PoolR1
 from ._implementation import blockdevs
 from ._implementation import pools
 from ._implementation import filesystems

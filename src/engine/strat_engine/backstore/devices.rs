@@ -212,6 +212,7 @@ pub fn initialize_devices(
     devices: Vec<DeviceInfo>,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
+    keyfile_path: Option<&Path>,
 ) -> StratisResult<Vec<StratBlockDev>> {
     let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
     for dev_info in devices {
@@ -246,6 +247,7 @@ pub fn initialize_devices(
                 &[],
                 None,
                 hw_id,
+                keyfile_path,
             )
             .expect("bda.size() == dev_size; only allocating space for metadata");
             initialized_blockdevs.push(blockdev);
@@ -344,7 +346,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         assert_matches!(
-            initialize_devices(devices, pool_uuid, MDADataSize::default()),
+            initialize_devices(devices, pool_uuid, MDADataSize::default(), None),
             Ok(_)
         );
 
@@ -393,6 +395,7 @@ mod tests {
             process_devices(paths).unwrap(),
             pool_uuid,
             MDADataSize::default(),
+            None,
         )
         .unwrap();
 
@@ -459,7 +462,8 @@ mod tests {
 
             assert_eq!(device_infos.len(), paths1.len());
 
-            let devices = initialize_devices(device_infos, uuid1, MDADataSize::default()).unwrap();
+            let devices =
+                initialize_devices(device_infos, uuid1, MDADataSize::default(), None).unwrap();
             assert_eq!(devices.len(), paths1.len());
 
             for path in paths1 {
@@ -492,7 +496,8 @@ mod tests {
 
             assert_eq!(device_infos.len(), paths2.len());
 
-            let devices = initialize_devices(device_infos, uuid2, MDADataSize::default()).unwrap();
+            let devices =
+                initialize_devices(device_infos, uuid2, MDADataSize::default(), None).unwrap();
             assert_eq!(devices.len(), paths2.len());
 
             for path in paths2 {

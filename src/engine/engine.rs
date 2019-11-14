@@ -68,6 +68,28 @@ pub trait BlockDev: Debug {
 }
 
 pub trait Pool: Debug {
+    /// Initialize the cache with the provided cache block devices.
+    /// Returns a list of the the block devices that were actually added as cache
+    /// devices. In practice, this will have three types of return values:
+    /// * An error if the cache has already been initialized with a different set
+    /// of block devices.
+    /// * `SetCreateAction::Identity` if the cache has already been initialized with
+    /// the same set of block devices.
+    /// * `SetCreateAction::Created` containing all provided block devices if the
+    /// cache has not yet been initialized.
+    ///
+    /// This ensures the contract of providing a truly idempotent API as the cache
+    /// can only be initialized once and if an attempt is made to initialize it
+    /// twice with different sets of block devices, the user should be notified
+    /// of their error.
+    fn init_cache(
+        &mut self,
+        pool_uuid: PoolUuid,
+        pool_name: &str,
+        blockdevs: &[&Path],
+        keyfile_path: Option<PathBuf>,
+    ) -> StratisResult<SetCreateAction<DevUuid>>;
+
     /// Creates the filesystems specified by specs.
     /// Returns a list of the names of filesystems actually created.
     /// Returns an error if any of the specified names are already in use
@@ -185,6 +207,12 @@ pub trait Pool: Debug {
 
     /// true if the pool has a cache, otherwise false
     fn has_cache(&self) -> bool;
+
+    /// Determine if the pool's data is encrypted
+    fn is_encrypted(&self) -> bool;
+
+    /// Get pool's keyfile path if it is encrypted
+    fn keyfile_path(&self) -> Option<&Path>;
 }
 
 pub trait Engine: Debug {
@@ -197,6 +225,7 @@ pub trait Engine: Debug {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
+        keyfile_path: Option<PathBuf>,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Handle a libudev event.

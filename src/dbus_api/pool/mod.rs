@@ -16,6 +16,7 @@ use crate::{
 mod fetch_properties_2_0;
 mod fetch_properties_2_1;
 mod pool_2_0;
+mod pool_2_1;
 mod shared;
 
 pub fn create_dbus_pool<'a>(
@@ -41,6 +42,19 @@ pub fn create_dbus_pool<'a>(
                 .add_m(pool_2_0::rename_method(&f))
                 .add_p(pool_2_0::name_property(&f))
                 .add_p(pool_2_0::uuid_property(&f)),
+        )
+        .add(
+            f.interface(consts::POOL_INTERFACE_NAME_2_1, ())
+                .add_m(pool_2_0::create_filesystems_method(&f))
+                .add_m(pool_2_0::destroy_filesystems_method(&f))
+                .add_m(pool_2_0::snapshot_filesystem_method(&f))
+                .add_m(pool_2_0::add_blockdevs_method(&f))
+                .add_m(pool_2_1::init_cache_method(&f))
+                .add_m(pool_2_1::add_cachedevs_method(&f))
+                .add_m(pool_2_0::rename_method(&f))
+                .add_p(pool_2_0::name_property(&f))
+                .add_p(pool_2_0::uuid_property(&f))
+                .add_p(pool_2_1::encrypted_property(&f)),
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())

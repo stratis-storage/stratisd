@@ -71,6 +71,33 @@ SPECS = {
 </property>
 </interface>
 """,
+    "org.storage.stratis2.Manager.r1": """
+<interface name="org.storage.stratis2.Manager.r1">
+<method name="ConfigureSimulator">
+<arg name="denominator" type="u" direction="in"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="CreatePool">
+<arg name="name" type="s" direction="in"/>
+<arg name="redundancy" type="(bq)" direction="in"/>
+<arg name="devices" type="as" direction="in"/>
+<arg name="keyfile_path" type="(bs)" direction="in"/>
+<arg name="result" type="(b(oao))" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="DestroyPool">
+<arg name="pool" type="o" direction="in"/>
+<arg name="result" type="(bs)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<property name="Version" type="s" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
+</property>
+</interface>
+""",
     "org.storage.stratis2.pool": """
 <interface name="org.storage.stratis2.pool">
 <method name="AddCacheDevs">
@@ -120,6 +147,12 @@ SPECS = {
 """,
     "org.storage.stratis2.pool.r1": """
 <interface name="org.storage.stratis2.pool.r1">
+<method name="InitCache">
+<arg name="devices" type="as" direction="in"/>
+<arg name="results" type="(bao)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
 <method name="AddCacheDevs">
 <arg name="devices" type="as" direction="in"/>
 <arg name="results" type="(bao)" direction="out"/>

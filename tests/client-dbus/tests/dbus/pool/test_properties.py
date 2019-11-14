@@ -16,7 +16,7 @@ Test accessing properties of a pool.
 """
 
 # isort: LOCAL
-from stratisd_client_dbus import Manager, PoolR1, get_object
+from stratisd_client_dbus import ManagerR1, PoolR1, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import SimTestCase, device_name_list
@@ -37,12 +37,13 @@ class PropertyTestCase(SimTestCase):
         """
         super().setUp()
         proxy = get_object(TOP_OBJECT)
-        ((_, (self._pool_object_path, _)), _, _) = Manager.Methods.CreatePool(
+        ((_, (self._pool_object_path, _)), _, _) = ManagerR1.Methods.CreatePool(
             proxy,
             {
                 "name": self._POOLNAME,
                 "redundancy": (True, 0),
                 "devices": _DEVICE_STRATEGY(),
+                "keyfile_path": (False, ""),
             },
         )
 

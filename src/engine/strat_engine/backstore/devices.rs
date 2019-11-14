@@ -261,6 +261,7 @@ pub fn initialize_devices(
     devices: Vec<DeviceInfo>,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
+    keyfile_path: Option<&Path>,
 ) -> StratisResult<Vec<StratBlockDev>> {
     // Initialize a single device using information in dev_info.
     // If initialization fails at any stage clean up the device.
@@ -300,6 +301,7 @@ pub fn initialize_devices(
                 &[],
                 None,
                 hw_id,
+                keyfile_path,
             )
         });
 
@@ -385,6 +387,7 @@ mod tests {
                 .collect(),
             pool_uuid,
             MDADataSize::default(),
+            None,
         )
         .unwrap();
 
@@ -453,7 +456,8 @@ mod tests {
 
             assert_eq!(device_infos.len(), paths1.len());
 
-            let devices = initialize_devices(device_infos, uuid1, MDADataSize::default()).unwrap();
+            let devices =
+                initialize_devices(device_infos, uuid1, MDADataSize::default(), None).unwrap();
             assert_eq!(devices.len(), paths1.len());
 
             for path in paths1 {
@@ -493,7 +497,8 @@ mod tests {
 
             assert_eq!(device_infos.len(), paths2.len());
 
-            let devices = initialize_devices(device_infos, uuid2, MDADataSize::default()).unwrap();
+            let devices =
+                initialize_devices(device_infos, uuid2, MDADataSize::default(), None).unwrap();
             assert_eq!(devices.len(), paths2.len());
 
             for path in paths2 {

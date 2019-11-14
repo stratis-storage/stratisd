@@ -214,6 +214,7 @@ pub fn get_blockdevs(
                 segments.unwrap_or(&vec![]),
                 bd_save.user_info.clone(),
                 bd_save.hardware_info.clone(),
+                None,
             )?,
         ))
     }

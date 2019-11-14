@@ -220,7 +220,14 @@ impl Engine for StratEngine {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
+        key_desc: Option<String>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
+        if key_desc.is_some() {
+            return Err(StratisError::Error(
+                "Key description parameters not currently accepted".to_string(),
+            ));
+        }
+
         let redundancy = calculate_redundancy!(redundancy);
 
         validate_name(name)?;
@@ -234,7 +241,8 @@ impl Engine for StratEngine {
                         "At least one blockdev is required to create a pool.".to_string(),
                     ))
                 } else {
-                    let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy)?;
+                    let (uuid, pool) =
+                        StratPool::initialize(name, blockdev_paths, redundancy, key_desc)?;
 
                     let name = Name::new(name.to_owned());
                     devlinks::pool_added(&name);
@@ -375,7 +383,7 @@ mod test {
 
         let name1 = "name1";
         let uuid1 = engine
-            .create_pool(name1, paths, None)
+            .create_pool(name1, paths, None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -425,14 +433,14 @@ mod test {
 
         let name1 = "name1";
         let uuid1 = engine
-            .create_pool(name1, paths1, None)
+            .create_pool(name1, paths1, None, None)
             .unwrap()
             .changed()
             .unwrap();
 
         let name2 = "name2";
         let uuid2 = engine
-            .create_pool(name2, paths2, None)
+            .create_pool(name2, paths2, None, None)
             .unwrap()
             .changed()
             .unwrap();

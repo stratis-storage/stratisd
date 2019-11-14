@@ -6,6 +6,7 @@ pub const STRATIS_BASE_PATH: &str = "/org/storage/stratis2";
 pub const STRATIS_BASE_SERVICE: &str = "org.storage.stratis2";
 
 pub const MANAGER_INTERFACE_NAME: &str = "org.storage.stratis2.Manager";
+pub const MANAGER_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.Manager.r1";
 
 pub const PROPERTY_FETCH_INTERFACE_NAME: &str = "org.storage.stratis2.FetchProperties";
 pub const PROPERTY_FETCH_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.FetchProperties.r1";

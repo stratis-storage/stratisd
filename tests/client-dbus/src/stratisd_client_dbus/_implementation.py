@@ -45,6 +45,9 @@ ObjectManager = make_class(
 Manager = make_class(
     "Manager", ET.fromstring(SPECS["org.storage.stratis2.Manager"]), TIME_OUT
 )
+ManagerR1 = make_class(
+    "ManagerR1", ET.fromstring(SPECS["org.storage.stratis2.Manager.r1"]), TIME_OUT
+)
 FetchProperties = make_class(
     "FetchProperties",
     ET.fromstring(SPECS["org.storage.stratis2.FetchProperties"]),

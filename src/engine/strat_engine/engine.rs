@@ -197,7 +197,14 @@ impl Engine for StratEngine {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
+        keyfile_path: Option<PathBuf>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
+        if keyfile_path.is_some() {
+            return Err(StratisError::Error(
+                "Keyfile parameters not currently accepted".to_string(),
+            ));
+        }
+
         let redundancy = calculate_redundancy!(redundancy);
 
         validate_name(name)?;
@@ -205,7 +212,8 @@ impl Engine for StratEngine {
         match self.pools.get_by_name(name) {
             Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
             None => {
-                let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy)?;
+                let (uuid, pool) =
+                    StratPool::initialize(name, blockdev_paths, redundancy, keyfile_path)?;
 
                 let name = Name::new(name.to_owned());
                 devlinks::pool_added(&name);
@@ -345,7 +353,7 @@ mod test {
 
         let name1 = "name1";
         let uuid1 = engine
-            .create_pool(name1, paths, None)
+            .create_pool(name1, paths, None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -395,14 +403,14 @@ mod test {
 
         let name1 = "name1";
         let uuid1 = engine
-            .create_pool(name1, paths1, None)
+            .create_pool(name1, paths1, None, None)
             .unwrap()
             .changed()
             .unwrap();
 
         let name2 = "name2";
         let uuid2 = engine
-            .create_pool(name2, paths2, None)
+            .create_pool(name2, paths2, None, None)
             .unwrap()
             .changed()
             .unwrap();

@@ -13,6 +13,8 @@ use crate::dbus_api::{
 };
 
 pub mod manager_2_0;
+pub mod manager_2_1;
+pub mod shared;
 
 pub fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, dbus::Path<'a>) {
     let f = Factory::new_fn();
@@ -26,6 +28,13 @@ pub fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>
         .add(
             f.interface(consts::MANAGER_INTERFACE_NAME, ())
                 .add_m(manager_2_0::create_pool_method(&f))
+                .add_m(manager_2_0::destroy_pool_method(&f))
+                .add_m(manager_2_0::configure_simulator_method(&f))
+                .add_p(manager_2_0::version_property(&f)),
+        )
+        .add(
+            f.interface(consts::MANAGER_INTERFACE_NAME_2_1, ())
+                .add_m(manager_2_1::create_pool_method(&f))
                 .add_m(manager_2_0::destroy_pool_method(&f))
                 .add_m(manager_2_0::configure_simulator_method(&f))
                 .add_p(manager_2_0::version_property(&f)),

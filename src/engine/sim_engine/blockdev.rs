@@ -60,7 +60,11 @@ impl BlockDev for SimDev {
 
 impl SimDev {
     /// Generates a new device from any devnode.
-    pub fn new(rdm: Rc<RefCell<Randomizer>>, devnode: &Path) -> (Uuid, SimDev) {
+    pub fn new(
+        rdm: Rc<RefCell<Randomizer>>,
+        devnode: &Path,
+        _keyfile_path: Option<&Path>,
+    ) -> (Uuid, SimDev) {
         (
             Uuid::new_v4(),
             SimDev {

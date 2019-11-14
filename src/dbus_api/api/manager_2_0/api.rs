@@ -9,14 +9,14 @@ use dbus::{
 
 use crate::dbus_api::{
     api::manager_2_0::{
-        methods::{configure_simulator, create_pool, destroy_pool},
+        methods::{configure_simulator, create_pool_2_0, destroy_pool},
         props::get_version,
     },
     types::TData,
 };
 
-pub fn create_pool_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
-    f.method("CreatePool", (), create_pool)
+pub fn create_pool_2_0_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+    f.method("CreatePool", (), create_pool_2_0)
         .in_arg(("name", "s"))
         .in_arg(("redundancy", "(bq)"))
         .in_arg(("devices", "as"))

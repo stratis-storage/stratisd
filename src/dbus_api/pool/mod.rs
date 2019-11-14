@@ -14,6 +14,7 @@ use crate::{
                 destroy_filesystems_method, name_property, rename_method,
                 snapshot_filesystem_method, uuid_property,
             },
+            pool_2_1::api::{add_cachedevs_2_1_method, init_cache_2_1_method},
         },
         types::{DbusContext, OPContext},
         util::make_object_path,
@@ -21,9 +22,10 @@ use crate::{
     engine::{MaybeDbusPath, Pool, PoolUuid},
 };
 
-mod fetch_properties_2_0;
-mod pool_2_0;
-mod shared;
+pub mod fetch_properties_2_0;
+pub mod pool_2_0;
+pub mod pool_2_1;
+pub mod shared;
 
 pub fn create_dbus_pool<'a>(
     dbus_context: &DbusContext,
@@ -45,6 +47,18 @@ pub fn create_dbus_pool<'a>(
                 .add_m(snapshot_filesystem_method(&f))
                 .add_m(add_blockdevs_method(&f))
                 .add_m(add_cachedevs_method(&f))
+                .add_m(rename_method(&f))
+                .add_p(name_property(&f))
+                .add_p(uuid_property(&f)),
+        )
+        .add(
+            f.interface(consts::POOL_INTERFACE_NAME_2_1, ())
+                .add_m(create_filesystems_method(&f))
+                .add_m(destroy_filesystems_method(&f))
+                .add_m(snapshot_filesystem_method(&f))
+                .add_m(add_blockdevs_method(&f))
+                .add_m(init_cache_2_1_method(&f))
+                .add_m(add_cachedevs_2_1_method(&f))
                 .add_m(rename_method(&f))
                 .add_p(name_property(&f))
                 .add_p(uuid_property(&f)),

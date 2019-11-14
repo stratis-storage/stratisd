@@ -36,6 +36,19 @@ macro_rules! get_parent {
     };
 }
 
+/// Macro for early return with Ok dbus message on failure to get immutable pool.
+macro_rules! get_pool {
+    ($engine:ident; $uuid:ident; $default:expr; $message:expr) => {
+        if let Some(pool) = $engine.get_pool($uuid) {
+            pool
+        } else {
+            let message = format!("engine does not know about pool with uuid {}", $uuid);
+            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, message);
+            return Ok(vec![$message.append3($default, rc, rs)]);
+        }
+    };
+}
+
 /// Macro for early return with Ok dbus message on failure to get mutable pool.
 macro_rules! get_mut_pool {
     ($engine:ident; $uuid:ident; $default:expr; $message:expr) => {

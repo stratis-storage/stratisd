@@ -4,7 +4,10 @@
 
 // Code to handle a single block device.
 
-use std::{fs::OpenOptions, path::PathBuf};
+use std::{
+    fs::OpenOptions,
+    path::{Path, PathBuf},
+};
 
 use chrono::{DateTime, TimeZone, Utc};
 
@@ -22,7 +25,7 @@ use crate::{
         },
         types::{DevUuid, MaybeDbusPath},
     },
-    stratis::StratisResult,
+    stratis::{StratisError, StratisResult},
 };
 
 #[derive(Debug)]
@@ -60,20 +63,32 @@ impl StratBlockDev {
         upper_segments: &[(Sectors, Sectors)],
         user_info: Option<String>,
         hardware_info: Option<String>,
+        keyfile_path: Option<&Path>,
     ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(upper_segments);
         let allocator = RangeAllocator::new(bda.dev_size(), &segments)?;
 
+        let devnode_maybe_encrypted = match keyfile_path {
+            Some(path) => Self::encrypt_blockdev(devnode.as_path(), path)?,
+            None => devnode,
+        };
+
         Ok(StratBlockDev {
             dev,
-            devnode,
+            devnode: devnode_maybe_encrypted,
             bda,
             used: allocator,
             user_info,
             hardware_info,
             dbus_path: MaybeDbusPath(None),
         })
+    }
+
+    fn encrypt_blockdev(_devnode: &Path, _keyfile_path: &Path) -> StratisResult<PathBuf> {
+        Err(StratisError::Error(
+            "Encryption is not yet supported.".to_string(),
+        ))
     }
 
     /// Returns the blockdev's Device

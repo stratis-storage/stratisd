@@ -194,6 +194,7 @@ pub trait Engine: Debug {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
+        keyfile_path: Option<PathBuf>,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Evaluate a device node & devicemapper::Device to see if it's a valid

@@ -325,7 +325,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(pool_name, &[], None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -344,7 +344,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(pool_name, &[], None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -369,7 +369,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(pool_name, &[], None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -395,7 +395,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(pool_name, &[], None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -414,7 +414,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(pool_name, &[], None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -431,7 +431,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(pool_name, &[], None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -448,7 +448,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(pool_name, &[], None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -471,7 +471,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(pool_name, &[], None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -486,7 +486,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(pool_name, &[], None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -508,7 +508,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(pool_name, &[], None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -528,7 +528,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(pool_name, &[], None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -548,7 +548,7 @@ mod tests {
     fn add_device_empty() {
         let mut engine = SimEngine::default();
         let uuid = engine
-            .create_pool("pool_name", &[], None)
+            .create_pool("pool_name", &[], None, None)
             .unwrap()
             .changed()
             .unwrap();

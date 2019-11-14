@@ -2,14 +2,19 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{cell::RefCell, path::Path, rc::Rc, vec::Vec};
+use std::{
+    cell::RefCell,
+    path::{Path, PathBuf},
+    rc::Rc,
+    vec::Vec,
+};
 
 use dbus::{
     self,
     arg::{Array, IterAppend},
     tree::{
-        Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
-        Tree,
+        Access, EmitsChangedSignal, Factory, MTFn, Method, MethodErr, MethodInfo, MethodResult,
+        PropInfo, Property, Tree,
     },
     BusType, Connection, ConnectionItem, Message, NameFlag,
 };
@@ -30,20 +35,31 @@ use crate::{
     stratis::VERSION,
 };
 
-fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_keyfile: bool) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
     let name: &str = get_next_arg(&mut iter, 0)?;
-    let redundancy: (bool, u16) = get_next_arg(&mut iter, 1)?;
+    let redundancy_tuple: (bool, u16) = get_next_arg(&mut iter, 1)?;
     let devs: Array<&str, _> = get_next_arg(&mut iter, 2)?;
+    let keyfile_tuple: Option<(bool, &str)> = if has_keyfile {
+        Some(get_next_arg(&mut iter, 3)?)
+    } else {
+        None
+    };
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
+    let redundancy = tuple_to_option(redundancy_tuple);
+    let keyfile_path = keyfile_tuple.and_then(|kt| tuple_to_option(kt).map(PathBuf::from));
 
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
     let mut engine = dbus_context.engine.borrow_mut();
-    let result = engine.create_pool(name, &blockdevs, tuple_to_option(redundancy));
+    let result = if has_keyfile {
+        engine.create_pool(name, &blockdevs, redundancy, keyfile_path)
+    } else {
+        engine.create_pool(name, &blockdevs, redundancy, None)
+    };
 
     let return_message = message.method_return();
 
@@ -78,6 +94,14 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     };
     Ok(vec![msg])
+}
+
+fn create_pool_2_0(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    create_pool_shared(m, false)
+}
+
+fn create_pool_2_1(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    create_pool_shared(m, true)
 }
 
 fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -165,7 +189,7 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
     let base_tree = f.tree(dbus_context);
 
     let create_pool_method = f
-        .method("CreatePool", (), create_pool)
+        .method("CreatePool", (), create_pool_2_0)
         .in_arg(("name", "s"))
         .in_arg(("redundancy", "(bq)"))
         .in_arg(("devices", "as"))
@@ -179,29 +203,55 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let destroy_pool_method = f
-        .method("DestroyPool", (), destroy_pool)
-        .in_arg(("pool", "o"))
-        // In order from left to right:
-        // b: true if a valid UUID is returned - otherwise no action was performed
-        // s: String representation of pool UUID that was destroyed
+    let create_pool_method_2_1 = f
+        .method("CreatePool", (), create_pool_2_1)
+        .in_arg(("name", "s"))
+        .in_arg(("redundancy", "(bq)"))
+        .in_arg(("devices", "as"))
+        // Optional keyfile
+        // b: true if the pool should be encrypted
+        // s: Path to keyfile
         //
         // Rust representation: (bool, String)
-        .out_arg(("result", "(bs)"))
+        .in_arg(("keyfile", "(bs)"))
+        // In order from left to right:
+        // b: true if a pool was created and object paths were returned
+        // o: Object path for Pool
+        // a(o): Array of object paths for block devices
+        //
+        // Rust representation: (bool, (dbus::Path, Vec<dbus::Path>))
+        .out_arg(("result", "(b(oao))"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let configure_simulator_method = f
-        .method("ConfigureSimulator", (), configure_simulator)
-        .in_arg(("denominator", "u"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
+    fn destroy_pool_method_object(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+        f.method("DestroyPool", (), destroy_pool)
+            .in_arg(("pool", "o"))
+            // In order from left to right:
+            // b: true if a valid UUID is returned - otherwise no action was performed
+            // s: String representation of pool UUID that was destroyed
+            //
+            // Rust representation: (bool, String)
+            .out_arg(("result", "(bs)"))
+            .out_arg(("return_code", "q"))
+            .out_arg(("return_string", "s"))
+    }
 
-    let version_property = f
-        .property::<&str, _>("Version", ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::Const)
-        .on_get(get_version);
+    fn configure_simulator_method_object(
+        f: &Factory<MTFn<TData>, TData>,
+    ) -> Method<MTFn<TData>, TData> {
+        f.method("ConfigureSimulator", (), configure_simulator)
+            .in_arg(("denominator", "u"))
+            .out_arg(("return_code", "q"))
+            .out_arg(("return_string", "s"))
+    }
+
+    fn version_property_object(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
+        f.property::<&str, _>("Version", ())
+            .access(Access::Read)
+            .emits_changed(EmitsChangedSignal::Const)
+            .on_get(get_version)
+    }
 
     let obj_path = f
         .object_path(consts::STRATIS_BASE_PATH, None)
@@ -210,9 +260,16 @@ fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, db
         .add(
             f.interface(consts::MANAGER_INTERFACE_NAME, ())
                 .add_m(create_pool_method)
-                .add_m(destroy_pool_method)
-                .add_m(configure_simulator_method)
-                .add_p(version_property),
+                .add_m(destroy_pool_method_object(&f))
+                .add_m(configure_simulator_method_object(&f))
+                .add_p(version_property_object(&f)),
+        )
+        .add(
+            f.interface(consts::MANAGER_INTERFACE_NAME_2_1, ())
+                .add_m(create_pool_method_2_1)
+                .add_m(destroy_pool_method_object(&f))
+                .add_m(configure_simulator_method_object(&f))
+                .add_p(version_property_object(&f)),
         );
 
     let path = obj_path.get_name().to_owned();

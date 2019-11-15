@@ -48,18 +48,15 @@ fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_keyfile: bool) -> 
         None
     };
 
-    let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
-    let redundancy = tuple_to_option(redundancy_tuple);
-    let keyfile_path = keyfile_tuple.and_then(|kt| tuple_to_option(kt).map(PathBuf::from));
-
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
     let mut engine = dbus_context.engine.borrow_mut();
-    let result = if has_keyfile {
-        engine.create_pool(name, &blockdevs, redundancy, keyfile_path)
-    } else {
-        engine.create_pool(name, &blockdevs, redundancy, None)
-    };
+    let result = engine.create_pool(
+        name,
+        &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
+        tuple_to_option(redundancy_tuple),
+        keyfile_tuple.and_then(|kt| tuple_to_option(kt).map(PathBuf::from)),
+    );
 
     let return_message = message.method_return();
 

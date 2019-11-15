@@ -61,3 +61,14 @@ class FetchPropertiesTestCase(SimTestCase):
 
         self.assertEqual(size_success, True)
         self.assertTrue(size.isnumeric())
+
+    def testFetchUsedSizeProperty(self):
+        """
+        Test FetchProperties for pool property, TotalPhysicalUsed
+        """
+        (size_success, size) = FetchProperties.Methods.GetProperties(
+            self._pool_object, {"properties": ["TotalPhysicalUsed"]}
+        )["TotalPhysicalUsed"]
+
+        self.assertEqual(size_success, True)
+        self.assertTrue(size.isnumeric())

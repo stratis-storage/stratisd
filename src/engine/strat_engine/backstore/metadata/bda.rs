@@ -41,7 +41,7 @@ const STRAT_SIGBLOCK_VERSION: u8 = 1;
 /// Get a Stratis pool UUID and device UUID from any device.
 /// If there is an error while obtaining these values return the error.
 /// If the device does not appear to be a Stratis device, return None.
-pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<((PoolUuid, DevUuid))>>
+pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<(PoolUuid, DevUuid)>>
 where
     F: Read + Seek + SyncAll,
 {

@@ -22,7 +22,7 @@ use crate::{
         types::{DbusContext, DbusErrorEnum, OPContext, TData},
         util::{
             engine_to_dbus_err_tuple, get_next_arg, get_parent, get_uuid, make_object_path,
-            msg_code_ok, msg_string_ok,
+            msg_code_ok, msg_string_ok, result_to_tuple,
         },
     },
     engine::{
@@ -52,13 +52,7 @@ fn get_properties_shared(
             )),
             _ => None,
         })
-        .map(|(key, result)| {
-            let (success, value) = match result {
-                Ok(value) => (true, Variant(Box::new(value) as Box<dyn RefArg>)),
-                Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
-            };
-            (key, (success, value))
-        })
+        .map(|(key, result)| result_to_tuple(key, result))
         .collect();
 
     Ok(vec![return_message.append1(return_value)])

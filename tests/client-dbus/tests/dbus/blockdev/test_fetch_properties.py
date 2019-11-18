@@ -36,16 +36,16 @@ class FetchPropertiesTestCase(SimTestCase):
         Start the stratisd daemon with the simulator.
         """
         super().setUp()
-        self._proxy = get_object(TOP_OBJECT)
+        proxy = get_object(TOP_OBJECT)
         ((_, (_, self._bd_object_paths)), _, _) = Manager.Methods.CreatePool(
-            self._proxy,
+            proxy,
             {
                 "name": self._POOLNAME,
                 "redundancy": (True, 0),
                 "devices": ["/dev/one", "/dev/two", "/dev/red", "/dev/blue"],
             },
         )
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
+        Manager.Methods.ConfigureSimulator(proxy, {"denominator": 8})
 
     def testFetchSizeProperty(self):
         """

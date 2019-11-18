@@ -34,28 +34,28 @@ class FetchPropertiesTestCase(SimTestCase):
     """
 
     _POOLNAME = "fetchprops"
+    _FSNAME = "fs"
 
     def setUp(self):
         """
         Start the stratisd daemon with the simulator.
         """
         super().setUp()
-        self._fs_name = "fs"
-        self._proxy = get_object(TOP_OBJECT)
-        ((_, (self._pool_object_path, _)), _, _) = Manager.Methods.CreatePool(
-            self._proxy,
+        proxy = get_object(TOP_OBJECT)
+        ((_, (pool_object_path, _)), _, _) = Manager.Methods.CreatePool(
+            proxy,
             {
                 "name": self._POOLNAME,
                 "redundancy": (True, 0),
                 "devices": _DEVICE_STRATEGY(),
             },
         )
-        self._pool_object = get_object(self._pool_object_path)
+        pool_object = get_object(pool_object_path)
         ((_, created), _, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {"specs": [self._fs_name]}
+            pool_object, {"specs": [self._FSNAME]}
         )
         self._filesystem_object_path = created[0][0]
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
+        Manager.Methods.ConfigureSimulator(proxy, {"denominator": 8})
 
     def testFetchUsedProperty(self):
         """

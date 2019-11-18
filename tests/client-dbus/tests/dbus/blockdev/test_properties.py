@@ -41,9 +41,9 @@ class SimpleTestCase(SimTestCase):
         Start the stratisd daemon with the simulator.
         """
         super().setUp()
-        proxy = get_object(TOP_OBJECT)
+        self._proxy = get_object(TOP_OBJECT)
         ((_, (_, self._blockdev_object_paths)), _, _) = Manager.Methods.CreatePool(
-            proxy,
+            self._proxy,
             {
                 "name": self._POOLNAME,
                 "redundancy": (True, 0),

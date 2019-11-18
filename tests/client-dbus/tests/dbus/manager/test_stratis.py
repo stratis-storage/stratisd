@@ -36,8 +36,8 @@ class StratisTestCase(SimTestCase):
         Start the stratisd daemon with the simulator.
         """
         super().setUp()
-        self._proxy = get_object(TOP_OBJECT)
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
+        proxy = get_object(TOP_OBJECT)
+        Manager.Methods.ConfigureSimulator(proxy, {"denominator": 8})
 
     def testStratisVersion(self):
         """

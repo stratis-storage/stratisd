@@ -51,10 +51,9 @@ class Create2TestCase(SimTestCase):
 
         If rc is OK, then pool must exist.
         """
-        devs = self._devs
         ((_, (poolpath, devnodes)), rc, _) = Manager.Methods.CreatePool(
             self._proxy,
-            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": devs},
+            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
         )
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
@@ -68,7 +67,7 @@ class Create2TestCase(SimTestCase):
             (pool, _) = result
             self.assertEqual(pool, poolpath)
             self.assertEqual(len(all_pools), 1)
-            self.assertLessEqual(len(devnodes), len(devs))
+            self.assertLessEqual(len(devnodes), len(self._devs))
         else:
             self.assertIsNone(result)
             self.assertEqual(len(all_pools), 0)
@@ -77,10 +76,13 @@ class Create2TestCase(SimTestCase):
         """
         Creation should always fail if RAID value is wrong.
         """
-        devs = _DEVICE_STRATEGY()
         (_, rc, _) = Manager.Methods.CreatePool(
             self._proxy,
-            {"name": self._POOLNAME, "redundancy": (True, 1), "devices": devs},
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 1),
+                "devices": _DEVICE_STRATEGY(),
+            },
         )
         self.assertEqual(rc, StratisdErrors.ERROR)
 

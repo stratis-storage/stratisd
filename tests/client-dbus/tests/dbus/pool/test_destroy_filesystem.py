@@ -43,10 +43,13 @@ class DestroyFSTestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        self._devs = _DEVICE_STRATEGY()
         ((_, (poolpath, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
-            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 0),
+                "devices": _DEVICE_STRATEGY(),
+            },
         )
         self._pool_object = get_object(poolpath)
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
@@ -92,7 +95,7 @@ class DestroyFSTestCase1(SimTestCase):
     """
 
     _POOLNAME = "deadpool"
-    _VOLNAME = "thunk"
+    _FSNAME = "thunk"
 
     def setUp(self):
         """
@@ -100,14 +103,17 @@ class DestroyFSTestCase1(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        self._devs = _DEVICE_STRATEGY()
-        ((_, (self._poolpath, _)), _, _) = Manager.Methods.CreatePool(
+        ((_, (poolpath, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
-            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 0),
+                "devices": _DEVICE_STRATEGY(),
+            },
         )
-        self._pool_object = get_object(self._poolpath)
+        self._pool_object = get_object(poolpath)
         ((_, self._filesystems), _, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {"specs": [(self._VOLNAME, "", None)]}
+            self._pool_object, {"specs": [(self._FSNAME, "", None)]}
         )
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 

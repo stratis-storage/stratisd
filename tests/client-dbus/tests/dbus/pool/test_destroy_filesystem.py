@@ -44,11 +44,11 @@ class DestroyFSTestCase(SimTestCase):
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
         self._devs = _DEVICE_STRATEGY()
-        ((_, (poolpath, _)), _, _) = Manager.Methods.CreatePool(
+        ((_, (self._poolpath, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
         )
-        self._pool_object = get_object(poolpath)
+        self._pool_object = get_object(self._poolpath)
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testDestroyNone(self):

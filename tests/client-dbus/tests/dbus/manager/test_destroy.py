@@ -118,7 +118,7 @@ class Destroy3TestCase(SimTestCase):
     """
 
     _POOLNAME = "deadpool"
-    _VOLNAME = "vol"
+    _FSNAME = "vol"
 
     def setUp(self):
         """
@@ -135,7 +135,7 @@ class Destroy3TestCase(SimTestCase):
                 "devices": _DEVICE_STRATEGY(),
             },
         )
-        Pool.Methods.CreateFilesystems(get_object(poolpath), {"specs": [self._VOLNAME]})
+        Pool.Methods.CreateFilesystems(get_object(poolpath), {"specs": [self._FSNAME]})
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testExecution(self):

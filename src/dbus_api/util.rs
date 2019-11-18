@@ -31,6 +31,26 @@ pub fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {
     }
 }
 
+/// Map a result obtained for the FetchProperties interface to a pair of
+/// a key and a value. The key is the property key, and therefore the key
+/// of the item returned. The value is a tuple. An error in the result
+/// argument yields a false in the return value, indicating that the value
+/// returned is a string representation of the error encountered in
+/// obtaining the value, and not the value requested.
+pub fn result_to_tuple<T>(
+    key: String,
+    result: Result<T, String>,
+) -> (String, (bool, Variant<Box<dyn RefArg>>))
+where
+    T: RefArg + 'static,
+{
+    let (success, value) = match result {
+        Ok(value) => (true, Variant(Box::new(value) as Box<dyn RefArg>)),
+        Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
+    };
+    (key, (success, value))
+}
+
 /// Get the next argument off the bus
 pub fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr>
 where

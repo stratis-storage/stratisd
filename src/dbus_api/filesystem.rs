@@ -42,21 +42,22 @@ fn get_properties_shared(
     let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
         .unique()
         .filter_map(|prop| match prop.as_str() {
-            consts::FILESYSTEM_USED_PROP => {
-                let fs_used_result =
-                    filesystem_operation(m.tree, object_path.get_name(), |(_, _, fs)| {
-                        fs.used()
-                            .map(|u| (*u).to_string())
-                            .map_err(|e| e.to_string())
-                    });
-                let (fs_used_success, fs_used_prop) = match fs_used_result {
-                    Ok(fs_used) => (true, Variant(Box::new(fs_used) as Box<dyn RefArg>)),
-                    Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
-                };
-
-                Some((prop, (fs_used_success, fs_used_prop)))
-            }
+            consts::FILESYSTEM_USED_PROP => Some((
+                prop,
+                filesystem_operation(m.tree, object_path.get_name(), |(_, _, fs)| {
+                    fs.used()
+                        .map(|u| (*u).to_string())
+                        .map_err(|e| e.to_string())
+                }),
+            )),
             _ => None,
+        })
+        .map(|(key, result)| {
+            let (success, value) = match result {
+                Ok(value) => (true, Variant(Box::new(value) as Box<dyn RefArg>)),
+                Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
+            };
+            (key, (success, value))
         })
         .collect();
 

@@ -200,18 +200,20 @@ fn get_properties_shared(
     let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
         .unique()
         .filter_map(|prop| match prop.as_str() {
-            consts::BLOCKDEV_TOTAL_SIZE_PROP => {
-                let bd_size_result = blockdev_operation(m.tree, object_path.get_name(), |_, bd| {
+            consts::BLOCKDEV_TOTAL_SIZE_PROP => Some((
+                prop,
+                blockdev_operation(m.tree, object_path.get_name(), |_, bd| {
                     Ok((u128::from(*bd.size()) * devicemapper::SECTOR_SIZE as u128).to_string())
-                });
-                let (bd_size_success, bd_size_prop) = match bd_size_result {
-                    Ok(bd_size) => (true, Variant(Box::new(bd_size) as Box<dyn RefArg>)),
-                    Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
-                };
-
-                Some((prop, (bd_size_success, bd_size_prop)))
-            }
+                }),
+            )),
             _ => None,
+        })
+        .map(|(key, result)| {
+            let (success, value) = match result {
+                Ok(value) => (true, Variant(Box::new(value) as Box<dyn RefArg>)),
+                Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
+            };
+            (key, (success, value))
         })
         .collect();
 

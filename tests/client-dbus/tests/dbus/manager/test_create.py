@@ -78,7 +78,11 @@ class Create2TestCase(SimTestCase):
         """
         (_, rc, _) = Manager.Methods.CreatePool(
             self._proxy,
-            {"name": self._POOLNAME, "redundancy": (True, 1), "devices": _DEVICE_STRATEGY()},
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 1),
+                "devices": _DEVICE_STRATEGY(),
+            },
         )
         self.assertEqual(rc, StratisdErrors.ERROR)
 

@@ -47,7 +47,11 @@ class CreateSnapshotTestCase(SimTestCase):
         self._proxy = get_object(TOP_OBJECT)
         ((_, (poolpath, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
-            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": _DEVICE_STRATEGY()},
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 0),
+                "devices": _DEVICE_STRATEGY(),
+            },
         )
         self._pool_object = get_object(poolpath)
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})

@@ -88,8 +88,8 @@ class CreateFSTestCase(SimTestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(rc, StratisdErrors.OK)
 
-        (_, self._FSNAME) = result[0]
-        self.assertEqual(self._FSNAME, new_name)
+        (_, fs_name) = result[0]
+        self.assertEqual(fs_name, new_name)
 
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
@@ -155,8 +155,8 @@ class CreateFSTestCase1(SimTestCase):
         self.assertTrue(is_some)
         self.assertEqual(len(result), 1)
 
-        (_, self._FSNAME) = result[0]
-        self.assertEqual(self._FSNAME, new_name)
+        (_, fs_name) = result[0]
+        self.assertEqual(fs_name, new_name)
 
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})

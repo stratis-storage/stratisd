@@ -62,10 +62,8 @@ class CreateSnapshotTestCase(SimTestCase):
 
         self.assertEqual(rc, StratisdErrors.OK)
 
-        fs_object_path = fs_objects[0][0]
-        self.assertNotEqual(fs_object_path, "/")
-
-        self._fs_object_path = fs_object_path
+        self._fs_object_path = fs_objects[0][0]
+        self.assertNotEqual(self._fs_object_path, "/")
 
     def testCreate(self):
         """

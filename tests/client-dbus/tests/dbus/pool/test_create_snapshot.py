@@ -36,7 +36,7 @@ class CreateSnapshotTestCase(SimTestCase):
     """
 
     _POOLNAME = "deadpool"
-    _VOLNAME = "some_fs"
+    _FSNAME = "some_fs"
     _SNAPSHOTNAME = "ss_fs"
 
     def setUp(self):
@@ -45,16 +45,15 @@ class CreateSnapshotTestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        self._devs = _DEVICE_STRATEGY()
         ((_, (poolpath, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
-            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
+            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": _DEVICE_STRATEGY()},
         )
         self._pool_object = get_object(poolpath)
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
         ((_, fs_objects), rc, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {"specs": [self._VOLNAME]}
+            self._pool_object, {"specs": [self._FSNAME]}
         )
 
         self.assertEqual(rc, StratisdErrors.OK)

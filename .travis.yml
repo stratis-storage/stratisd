@@ -36,10 +36,10 @@ matrix:
 
         # MANDATORY TESTING USING LOWEST SUPPORTED COMPILER
         # tests
-        - rust: 1.37.0
+        - rust: 1.38.0
           env: TASK=test
         # release
-        - rust: 1.37.0
+        - rust: 1.38.0
           env: TASK=release
 
 

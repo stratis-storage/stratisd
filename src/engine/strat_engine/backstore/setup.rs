@@ -22,9 +22,11 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                device::identify,
+                device::DevOwnership,
                 metadata::{device_identifiers, BDA},
-                udev::{block_enumerator, is_multipath_member, is_unclaimed, stratis_enumerator},
+                udev::{
+                    block_enumerator, decide_ownership, is_multipath_member, stratis_enumerator,
+                },
             },
             device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
@@ -49,25 +51,30 @@ fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
     };
 
     if devices.is_empty() {
-        // We have found no Stratis devices, possible reasons are:
-        // 1. We really don't have any
-        // 2. We have some, but libblkid is too old to support Stratis, thus we appear empty
-        // 3. We ran this code at early boot before we have any udev db entries which are complete
-        //    or are complete but fall into reasons 1 & 2 above
+        // No Stratis devices have been found, possible reasons are:
+        // 1. There are none
+        // 2. There are some but libblkid version is less than 2.32, so
+        // Stratis devices are not recognized by udev.
+        // 3. There are many incomplete udev entries, because this code is
+        // being run before the udev database is populated.
         //
-        // In this case we will get all the block devices which have complete udev db block device
-        // entries and appear "empty" and go out to disk and check them!
+        // Try again to find Stratis block devices, but this time enumerate
+        // all block devices, not just all the ones that can be identified
+        // as Stratis blockdevs by udev, and then scrutinize each one
+        // using various methods.
         let context = libudev::Context::new()?;
         let mut enumerator = block_enumerator(&context)?;
         Ok(enumerator
             .scan_devices()?
             .filter(|dev| dev.is_initialized())
-            .filter(|dev| !is_multipath_member(dev).unwrap_or(true) && is_unclaimed(dev))
-            .filter_map(|dev| dev.devnode().map(|d| d.to_owned()))
-            .filter(|devnode| {
-                identify(devnode)
-                    .map(|ownership| ownership.stratis_identifiers().is_some())
-                    .unwrap_or(false)
+            .filter_map(|dev| {
+                dev.devnode().and_then(|devnode| {
+                    decide_ownership(&dev)
+                        .and_then(|decision| DevOwnership::from_udev_ownership(&decision, devnode))
+                        .ok()
+                        .and_then(|ownership| ownership.stratis_identifiers())
+                        .map(|_| devnode.into())
+                })
             })
             .collect())
     } else {

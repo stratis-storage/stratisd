@@ -70,6 +70,54 @@ pub fn is_unclaimed(device: &libudev::Device) -> bool {
         && get_udev_property(device, "ID_FS_USAGE").is_none()
 }
 
+/// Return true if the device is identified by udev as belonging to Stratis.
+/// Return an error if a udev property value could not be converted.
+pub fn is_stratis(device: &libudev::Device) -> StratisResult<bool> {
+    match get_udev_property(device, "ID_FS_TYPE") {
+        None => Ok(false),
+        Some(Ok(value)) => Ok(value == "stratis"),
+        Some(Err(err)) => Err(err),
+    }
+}
+
+/// An enum to encode udev classification of a device
+#[derive(Debug, Eq, PartialEq)]
+pub enum UdevOwnership {
+    MultipathMember,
+    Stratis,
+    Theirs,
+    Unowned,
+}
+
+/// Decide the ownership of a device based on udev information.
+///
+/// Always check multipath member status first. The theory is that a multipath
+/// member may also appear to belong to Stratis, but it should not be identified
+/// as a Stratis device.
+///
+/// Note that the designation Theirs, i.e., the device already belongs to some
+/// other entity is the default designation. This seems counterintuitive, but
+/// it is the unclaimed designation that has a boolean expression on udev
+/// properties associated with it.
+pub fn decide_ownership(device: &libudev::Device) -> StratisResult<UdevOwnership> {
+    // We believe that it is possible to be a multipath member and also to
+    // be identified as a Stratis device. The designations are not mutually
+    // exclusive, but the multipath member device must not be used by Stratis.
+    if is_multipath_member(device)? {
+        return Ok(UdevOwnership::MultipathMember);
+    }
+
+    // We believe that the following designations are mutually exclusive, i.e.
+    // it is not possible to be a Stratis device and also to appear unowned.
+    Ok(if is_stratis(device)? {
+        UdevOwnership::Stratis
+    } else if is_unclaimed(device) {
+        UdevOwnership::Unowned
+    } else {
+        UdevOwnership::Theirs
+    })
+}
+
 /// Takes a libudev device entry and returns the properties as a HashMap.
 fn device_as_map(device: &libudev::Device) -> HashMap<String, String> {
     let rc: HashMap<_, _> = device

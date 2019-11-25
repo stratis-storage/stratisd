@@ -1,3 +1,83 @@
+stratisd 2.0.1
+==============
+Recommended Rust toolchain version: 1.40
+Lowest supported Rust toolchain version: 1.39
+Python import sorter: isort (4.3.4)
+Python auto-formatter: black (19.3b0)
+
+- Avoid returning from function while pool is suspended:
+  https://github.com/stratis-storage/stratisd/issues/1730
+  https://github.com/stratis-storage/stratisd/pull/1734
+
+- Refine description of stratisd.service in systemd configuration:
+  https://github.com/stratis-storage/stratisd/issues/1647
+  https://github.com/stratis-storage/stratisd/pull/1738
+
+- Fix a few places where the index of an incorrect D-Bus argument would be
+  misidentified in a D-Bus error message:
+  https://github.com/stratis-storage/stratisd/pull/1756
+
+- Add changelog matter from two previous releases to CHANGES.txt:
+  https://github.com/stratis-storage/stratisd/pull/1793
+
+- Add some additional logging for significant events:
+  https://github.com/stratis-storage/stratisd/pull/1797
+
+- Restructure dbus_api module to better support multiple versioned
+  interfaces:
+  https://github.com/stratis-storage/stratisd/pull/1804
+  https://github.com/stratis-storage/stratisd/pull/1776
+  https://github.com/stratis-storage/stratisd/pull/1770
+
+- Refactor device discovery mechanism:
+  https://github.com/stratis-storage/stratisd/pull/1779
+  https://github.com/stratis-storage/stratisd/pull/1767
+  https://github.com/stratis-storage/stratisd/pull/1765
+  https://github.com/stratis-storage/stratisd/pull/1759
+  https://github.com/stratis-storage/stratisd/pull/1750
+  https://github.com/stratis-storage/stratisd/pull/1739
+  https://github.com/stratis-storage/stratisd/pull/1736
+  https://github.com/stratis-storage/stratisd/pull/1725
+  https://github.com/stratis-storage/stratisd/pull/1723
+
+- Refactor idempotency implementation so that it is handled as close to
+  entry points to the engine as possible:
+  https://github.com/stratis-storage/stratisd/pull/1743
+
+- Refactor metadata handling for better encapsulation:
+  https://github.com/stratis-storage/stratisd/pull/1792
+
+- Fully qualify all non-prelude data types in macros:
+  https://github.com/stratis-storage/stratisd/issues/1748
+  https://github.com/stratis-storage/stratisd/pull/1758
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/1803
+  https://github.com/stratis-storage/stratisd/pull/1796
+  https://github.com/stratis-storage/stratisd/pull/1791
+  https://github.com/stratis-storage/stratisd/pull/1786
+  https://github.com/stratis-storage/stratisd/pull/1785
+  https://github.com/stratis-storage/stratisd/pull/1777
+  https://github.com/stratis-storage/stratisd/pull/1774
+  https://github.com/stratis-storage/stratisd/pull/1772
+  https://github.com/stratis-storage/stratisd/pull/1763
+  https://github.com/stratis-storage/stratisd/pull/1762
+  https://github.com/stratis-storage/stratisd/pull/1758
+  https://github.com/stratis-storage/stratisd/pull/1745
+  https://github.com/stratis-storage/stratisd/pull/1728
+  https://github.com/stratis-storage/stratisd/pull/1726
+  https://github.com/stratis-storage/stratisd/pull/1724
+  https://github.com/stratis-storage/stratisd/pull/1721
+  https://github.com/stratis-storage/stratisd/pull/1715
+  https://github.com/stratis-storage/stratisd/pull/1714
+  https://github.com/stratis-storage/stratisd/pull/1713
+  https://github.com/stratis-storage/stratisd/pull/1712
+  https://github.com/stratis-storage/stratisd/pull/1709
+  https://github.com/stratis-storage/stratisd/pull/1707
+  https://github.com/stratis-storage/stratisd/pull/1704
+  https://github.com/stratis-storage/stratisd/pull/1701
+
+
 stratisd 2.0.0
 ==============
 Recommended Rust toolchain version: 1.38

@@ -399,11 +399,11 @@ fn initialize(
             };
             match ownership {
                 DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, f))),
-                DevOwnership::Theirs(signature) => {
+                DevOwnership::Theirs(info) => {
                     let err_str = format!(
-                        "Device {} has an existing signature {}",
+                        "Device {} appears to be already claimed by another, reason: {}",
                         devnode.display(),
-                        signature
+                        info
                     );
                     return Err(StratisError::Engine(ErrorEnum::Invalid, err_str));
                 }

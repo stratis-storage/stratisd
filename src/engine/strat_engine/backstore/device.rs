@@ -10,7 +10,10 @@ use devicemapper::{devnode_to_devno, Device};
 
 use crate::{
     engine::{
-        strat_engine::backstore::{metadata::device_identifiers, udev::get_udev_block_device},
+        strat_engine::backstore::{
+            metadata::device_identifiers,
+            udev::{block_enumerator, decide_ownership, UdevOwnership},
+        },
         types::{DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -40,7 +43,9 @@ pub fn resolve_devices<'a>(paths: &'a [&Path]) -> StratisResult<HashMap<Device, 
 pub enum DevOwnership {
     Ours(PoolUuid, DevUuid),
     Unowned,
-    Theirs(String), // String is something useful to give back to end user about what's on device
+    // FIXME: Using a string for identification of specific subclasses of
+    // ownership is a mistake, an enum would be better.
+    Theirs(String), // A string that is supposed to give more description
 }
 
 impl DevOwnership {
@@ -52,65 +57,66 @@ impl DevOwnership {
     }
 }
 
-/// Returns true if a device has no signature and is not one of the paths of a multipath device,
-/// yes this is a bit convoluted.  Logic gleaned from blivet library.
-fn empty(device: &HashMap<String, String>) -> bool {
-    device
-        .get("DM_MULTIPATH_DEVICE_PATH")
-        .map_or(true, |v| v != "1")
-        && !((device.contains_key("ID_PART_TABLE_TYPE")
-            && !device.contains_key("ID_PART_ENTRY_DISK"))
-            || device.contains_key("ID_FS_USAGE"))
-}
-
-/// Generate some kind of human readable text about what's on a device.
-fn signature(device: &HashMap<String, String>) -> String {
-    if empty(device) {
-        String::from("empty")
-    } else {
-        device
-            .iter()
-            .filter(|&(k, _)| k.contains("ID_FS_") || k.contains("ID_PART_TABLE_"))
-            .map(|(k, v)| format!("{}={}", k, v))
-            .collect::<Vec<String>>()
-            .join(" ")
-    }
-}
-
 /// Determine what a block device is used for.
 pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
-    if let Some(device) = get_udev_block_device(devnode)? {
-        if empty(&device) {
-            // The device is either really empty or we are running on a distribution that hasn't
-            // picked up the latest libblkid, lets read down to the device and find out for sure.
-            // TODO: At some point in the future we can remove this and just return Unowned.
-            if let Some((pool_uuid, device_uuid)) =
-                device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
-            {
-                Ok(DevOwnership::Ours(pool_uuid, device_uuid))
-            } else {
-                Ok(DevOwnership::Unowned)
+    let canonical = devnode.canonicalize()?;
+
+    let context = libudev::Context::new()?;
+    let mut enumerator = block_enumerator(&context)?;
+    if let Some(udev_decision) = enumerator
+        .scan_devices()?
+        .filter(|dev| dev.is_initialized())
+        .find(|x| x.devnode().map_or(false, |d| canonical == d))
+        .map(|d| decide_ownership(&d))
+    {
+        match udev_decision {
+            Ok(decision) => {
+                match decision {
+                    UdevOwnership::Unowned => {
+                        // FIXME: It is possible that Stratis is running in
+                        // an old environment without the necessary version of
+                        // libblkid that would cause udev database to be
+                        // populated with Stratis information. So, if the
+                        // device appears unowned, attempt to read information
+                        // from Stratis metadata. We believe that this block
+                        // can be removed once Stratis is certainly runnng
+                        // with libblkid 2.32 or above.
+                        // https://github.com/stratis-storage/stratisd/issues/1656
+                        if let Some((pool_uuid, device_uuid)) =
+                            device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+                        {
+                            Ok(DevOwnership::Ours(pool_uuid, device_uuid))
+                        } else {
+                            Ok(DevOwnership::Unowned)
+                        }
+                    }
+                    UdevOwnership::MultipathMember => {
+                        Ok(DevOwnership::Theirs("multipath member".into()))
+                    }
+                    UdevOwnership::Stratis => {
+                        // Udev information does not include pool UUID and
+                        // device UUID so read these from Stratis metadata.
+                        if let Some((pool_uuid, device_uuid)) =
+                            device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+                        {
+                            Ok(DevOwnership::Ours(pool_uuid, device_uuid))
+                        } else {
+                            // FIXME: if udev says stratis but no stratis
+                            // idenfiers on device, likely they were there
+                            // recently, and udev has not yet caught up. It's
+                            // just as likely that this device is unclaimed as
+                            // that it belongs to some other entity.
+                            Ok(DevOwnership::Theirs(
+                                "Udev db says stratis, disk meta says no".into(),
+                            ))
+                        }
+                    }
+                    UdevOwnership::Theirs => Ok(DevOwnership::Theirs(
+                             "udev properties for this device did not indicate that the devices was unowned".into()
+                    )),
+                }
             }
-        } else if device
-            .get("DM_MULTIPATH_DEVICE_PATH")
-            .map_or(false, |v| v == "1")
-        {
-            Ok(DevOwnership::Theirs(String::from("multipath path")))
-        } else if device.contains_key("ID_FS_TYPE") && device["ID_FS_TYPE"] == "stratis" {
-            // Device is ours, but we don't get everything we need from udev db, lets go to disk.
-            if let Some((pool_uuid, device_uuid)) =
-                device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
-            {
-                Ok(DevOwnership::Ours(pool_uuid, device_uuid))
-            } else {
-                // In this case the udev db says it's ours, but our check says otherwise.  We should
-                // trust ourselves.  Should we raise an error here?
-                Ok(DevOwnership::Theirs(String::from(
-                    "Udev db says stratis, disk meta says no",
-                )))
-            }
-        } else {
-            Ok(DevOwnership::Theirs(signature(&device)))
+            Err(err) => Err(err),
         }
     } else {
         Err(StratisError::Engine(
@@ -138,18 +144,8 @@ mod test {
     /// Verify that the device is not stratis by creating a device with XFS fs.
     fn test_other_ownership(paths: &[&Path]) {
         cmd::create_fs(paths[0], None).unwrap();
-
         cmd::udev_settle().unwrap();
-
-        match identify(paths[0]).unwrap() {
-            DevOwnership::Theirs(identity) => {
-                assert!(identity.contains("ID_FS_USAGE=filesystem"));
-                assert!(identity.contains("ID_FS_TYPE=xfs"));
-                assert!(identity.contains("ID_FS_UUID"));
-            }
-            // This must fail, and will give a helpful error message
-            id => assert_matches!(id, DevOwnership::Theirs(_)),
-        }
+        assert_matches!(identify(paths[0]).unwrap(), DevOwnership::Theirs(_))
     }
 
     /// Verify that identify() recognizes a blank device as unowned

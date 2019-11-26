@@ -30,7 +30,7 @@ use crate::{
             },
             device::blkdev_size,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
-            udev::{block_enumerator, decide_ownership, get_udev_property},
+            udev::{block_device_apply, decide_ownership, get_udev_property},
         },
         types::{DevUuid, PoolUuid},
     },
@@ -382,23 +382,13 @@ fn initialize(
         let f = OpenOptions::new().read(true).write(true).open(&devnode)?;
         let dev_size = blkdev_size(&f)?;
 
-        let canonical = devnode.canonicalize()?;
-
-        let context = libudev::Context::new()?;
-        let mut enumerator = block_enumerator(&context)?;
-        if let Some((ownership, hw_id)) = enumerator
-            .scan_devices()?
-            .filter(|dev| dev.is_initialized())
-            .find(|x| x.devnode().map_or(false, |d| canonical == d))
-            .map(|d| {
-                (
-                    decide_ownership(&d).and_then(|decision| {
-                        DevOwnership::from_udev_ownership(&decision, &canonical)
-                    }),
-                    get_udev_property(&d, "ID_WWN"),
-                )
-            })
-        {
+        if let Some((ownership, hw_id)) = block_device_apply(devnode, |d| {
+            (
+                decide_ownership(d)
+                    .and_then(|decision| DevOwnership::from_udev_ownership(&decision, devnode)),
+                get_udev_property(d, "ID_WWN"),
+            )
+        })? {
             Ok((devnode, dev_size, ownership?, hw_id, f))
         } else {
             Err(StratisError::Engine(
@@ -554,9 +544,10 @@ mod tests {
     use uuid::Uuid;
 
     use crate::engine::strat_engine::{
-        backstore::{device::identify, find_all, get_metadata},
+        backstore::{find_all, get_metadata},
         cmd,
         tests::{loopbacked, real},
+        udev::{block_device_apply, decide_ownership},
     };
 
     use crate::engine::strat_engine::backstore::metadata::device_identifiers;
@@ -620,9 +611,23 @@ mod tests {
         );
         for (i, path) in paths.iter().enumerate() {
             if i == index {
-                assert_matches!(identify(path).unwrap(), DevOwnership::Theirs(_));
+                assert_matches!(
+                    block_device_apply(path, |d| decide_ownership(d)
+                        .and_then(|decision| DevOwnership::from_udev_ownership(&decision, path)))
+                    .unwrap()
+                    .unwrap()
+                    .unwrap(),
+                    DevOwnership::Theirs(_)
+                );
             } else {
-                assert_matches!(identify(path).unwrap(), DevOwnership::Unowned);
+                assert_matches!(
+                    block_device_apply(path, |d| decide_ownership(d)
+                        .and_then(|decision| DevOwnership::from_udev_ownership(&decision, path)))
+                    .unwrap()
+                    .unwrap()
+                    .unwrap(),
+                    DevOwnership::Unowned
+                );
             }
         }
 

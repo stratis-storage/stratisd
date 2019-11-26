@@ -34,7 +34,15 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-/// Retrieve all the block devices on the system that have a Stratis signature.
+/// Retrieve all Stratis block devices that should be made use of by the
+/// Stratis engine. This excludes Stratis block devices that are multipath
+/// members.
+///
+/// Includes a fallback path, which is used if no Stratis block devices are
+/// found using the obvious udev property- and enumerator-based approach.
+/// This fallback path is more expensive, because it must search all block
+/// devices via udev, and may also attempt to directly read Stratis
+/// metadata from the device.
 fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
     let devices = {
         let context = libudev::Context::new()?;

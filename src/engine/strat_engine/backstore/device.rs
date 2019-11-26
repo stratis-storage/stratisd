@@ -16,9 +16,6 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-#[cfg(test)]
-use crate::engine::strat_engine::udev::{block_enumerator, decide_ownership};
-
 /// Resolve a list of Paths of some sort to a set of unique Devices.
 /// Return an IOError if there was a problem resolving any particular device.
 /// The set of devices maps each device to one of the paths passed.
@@ -105,82 +102,5 @@ impl DevOwnership {
                     .into(),
             )),
         }
-    }
-}
-
-/// Determine what a block device is used for.
-#[cfg(test)]
-pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
-    let canonical = devnode.canonicalize()?;
-
-    let context = libudev::Context::new()?;
-    let mut enumerator = block_enumerator(&context)?;
-    if let Some(udev_decision) = enumerator
-        .scan_devices()?
-        .filter(|dev| dev.is_initialized())
-        .find(|x| x.devnode().map_or(false, |d| canonical == d))
-        .map(|d| decide_ownership(&d))
-    {
-        udev_decision.and_then(|decision| DevOwnership::from_udev_ownership(&decision, &canonical))
-    } else {
-        Err(StratisError::Engine(
-            ErrorEnum::NotFound,
-            format!(
-                "We expected to find the block device {:?} \
-                 in the udev db",
-                devnode
-            ),
-        ))
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::path::Path;
-
-    use crate::engine::strat_engine::{
-        cmd,
-        tests::{loopbacked, real},
-    };
-
-    use super::*;
-
-    /// Verify that the device is not stratis by creating a device with XFS fs.
-    fn test_other_ownership(paths: &[&Path]) {
-        cmd::create_fs(paths[0], None).unwrap();
-        cmd::udev_settle().unwrap();
-        assert_matches!(identify(paths[0]).unwrap(), DevOwnership::Theirs(_))
-    }
-
-    /// Verify that identify() recognizes a blank device as unowned
-    fn test_empty(paths: &[&Path]) {
-        cmd::udev_settle().unwrap();
-        assert_matches!(identify(paths[0]).unwrap(), DevOwnership::Unowned);
-    }
-
-    #[test]
-    pub fn loop_test_device_other_ownership() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 3, None),
-            test_other_ownership,
-        );
-    }
-
-    #[test]
-    pub fn real_test_device_other_ownership() {
-        real::test_with_spec(
-            &real::DeviceLimits::AtLeast(1, None, None),
-            test_other_ownership,
-        );
-    }
-
-    #[test]
-    pub fn loop_test_device_empty() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_empty);
-    }
-
-    #[test]
-    pub fn real_test_device_empty() {
-        real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_empty);
     }
 }

@@ -8,8 +8,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use libudev;
-
 use devicemapper::{Device, DmNameBuf};
 
 #[cfg(test)]
@@ -27,7 +25,7 @@ use crate::{
             dm::{get_dm, get_dm_init},
             names::validate_name,
             pool::{check_metadata, StratPool},
-            udev::{block_enumerator, decide_ownership},
+            udev::{block_device_apply, decide_ownership},
         },
         structures::Table,
         types::{CreateAction, DeleteAction, RenameAction},
@@ -209,19 +207,11 @@ impl Engine for StratEngine {
         device: Device,
         dev_node: PathBuf,
     ) -> StratisResult<Option<PoolUuid>> {
-        let canonical = dev_node.canonicalize()?;
-
-        let context = libudev::Context::new()?;
-        let mut enumerator = block_enumerator(&context)?;
-        let stratis_identifiers = if let Some(ownership) = enumerator
-            .scan_devices()?
-            .filter(|dev| dev.is_initialized())
-            .find(|x| x.devnode().map_or(false, |d| canonical == d))
-            .map(|d| {
-                decide_ownership(&d)
-                    .and_then(|decision| DevOwnership::from_udev_ownership(&decision, &canonical))
-            }) {
-                ownership?.stratis_identifiers()
+        let stratis_identifiers = if let Some(ownership) = block_device_apply(&dev_node, |d| {
+            decide_ownership(d)
+                .and_then(|decision| DevOwnership::from_udev_ownership(&decision, &dev_node))
+        })? {
+            ownership?.stratis_identifiers()
         } else {
             return Err(StratisError::Engine(
                 ErrorEnum::NotFound,

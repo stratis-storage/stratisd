@@ -64,7 +64,7 @@ pub fn is_multipath_member(device: &libudev::Device) -> StratisResult<bool> {
 /// known to udev to claim this device.
 /// Note from mulhern: I have no idea myself why this particular expression
 /// should be correct. I was told that the original source was dlehman.
-pub fn is_unclaimed(device: &libudev::Device) -> bool {
+fn is_unclaimed(device: &libudev::Device) -> bool {
     (get_udev_property(device, "ID_PART_TABLE_TYPE").is_none()
         || get_udev_property(device, "ID_PART_ENTRY_DISK").is_some())
         && get_udev_property(device, "ID_FS_USAGE").is_none()
@@ -72,7 +72,7 @@ pub fn is_unclaimed(device: &libudev::Device) -> bool {
 
 /// Return true if the device is identified by udev as belonging to Stratis.
 /// Return an error if a udev property value could not be converted.
-pub fn is_stratis(device: &libudev::Device) -> StratisResult<bool> {
+fn is_stratis(device: &libudev::Device) -> StratisResult<bool> {
     match get_udev_property(device, "ID_FS_TYPE") {
         None => Ok(false),
         Some(Ok(value)) => Ok(value == "stratis"),

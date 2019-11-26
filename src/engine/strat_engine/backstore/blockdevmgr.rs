@@ -8,7 +8,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt,
     fs::{File, OpenOptions},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use chrono::{DateTime, Duration, Utc};
@@ -128,6 +128,7 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParam
 pub struct BlockDevMgr {
     block_devs: Vec<StratBlockDev>,
     last_update_time: Option<DateTime<Utc>>,
+    keyfile_path: Option<PathBuf>,
 }
 
 impl BlockDevMgr {
@@ -135,10 +136,12 @@ impl BlockDevMgr {
     pub fn new(
         block_devs: Vec<StratBlockDev>,
         last_update_time: Option<DateTime<Utc>>,
+        keyfile_path: Option<PathBuf>,
     ) -> BlockDevMgr {
         BlockDevMgr {
             block_devs,
             last_update_time,
+            keyfile_path,
         }
     }
 
@@ -147,11 +150,19 @@ impl BlockDevMgr {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
+        keyfile_path: Option<PathBuf>,
     ) -> StratisResult<BlockDevMgr> {
         let devices = resolve_devices(paths)?;
         Ok(BlockDevMgr::new(
-            initialize(pool_uuid, devices, mda_data_size, &HashSet::new())?,
+            initialize(
+                pool_uuid,
+                devices,
+                mda_data_size,
+                &HashSet::new(),
+                keyfile_path.as_ref().map(|kfp| kfp.as_path()),
+            )?,
             None,
+            keyfile_path,
         ))
     }
 
@@ -173,7 +184,13 @@ impl BlockDevMgr {
         // variable length metadata requires more than the minimum allocated,
         // then the necessary amount must be provided or the data can not be
         // saved.
-        let bds = initialize(pool_uuid, devices, MDADataSize::default(), &current_uuids)?;
+        let bds = initialize(
+            pool_uuid,
+            devices,
+            MDADataSize::default(),
+            &current_uuids,
+            self.keyfile_path.as_ref().map(|kfp| kfp.as_path()),
+        )?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
         Ok(bdev_uuids)
@@ -348,6 +365,14 @@ impl BlockDevMgr {
             .map(|bd| bd.metadata_size().sectors())
             .sum()
     }
+
+    pub fn keyfile_path(&self) -> Option<&Path> {
+        self.keyfile_path.as_ref().map(|p| p.as_path())
+    }
+
+    pub fn is_encrypted(&self) -> bool {
+        self.keyfile_path.is_some()
+    }
 }
 
 impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
@@ -363,6 +388,7 @@ fn initialize(
     devices: HashMap<Device, &Path>,
     mda_data_size: MDADataSize,
     owned_devs: &HashSet<DevUuid>,
+    keyfile_path: Option<&Path>,
 ) -> StratisResult<Vec<StratBlockDev>> {
     /// Get device information, returns an error if problem with obtaining
     /// that information.
@@ -499,8 +525,9 @@ fn initialize(
             // FIXME: The expect is only provisionally true.
             // The dev_size is at least MIN_DEV_SIZE, but the size of the
             // metadata is not really bounded from above.
-            let blockdev = StratBlockDev::new(dev, devnode.to_owned(), bda, &[], None, hw_id)
-                .expect("bda.size() == dev_size; only allocating space for metadata");
+            let blockdev =
+                StratBlockDev::new(dev, devnode.to_owned(), bda, &[], None, hw_id, keyfile_path)
+                    .expect("bda.size() == dev_size; only allocating space for metadata");
             bds.push(blockdev);
         } else {
             // TODO: check the return values and update state machine on failure
@@ -560,7 +587,7 @@ mod tests {
     /// in balance.
     fn test_blockdevmgr_used(paths: &[&Path]) {
         let mut mgr =
-            BlockDevMgr::initialize(Uuid::new_v4(), paths, MDADataSize::default()).unwrap();
+            BlockDevMgr::initialize(Uuid::new_v4(), paths, MDADataSize::default(), None).unwrap();
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
         let allocated = Sectors(2);
@@ -606,7 +633,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         assert_matches!(
-            BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default()),
+            BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default(), None),
             Err(_)
         );
         for (i, path) in paths.iter().enumerate() {
@@ -639,7 +666,7 @@ mod tests {
             .collect::<Vec<&Path>>();
 
         assert_matches!(
-            BlockDevMgr::initialize(pool_uuid, &clean_paths, MDADataSize::default()),
+            BlockDevMgr::initialize(pool_uuid, &clean_paths, MDADataSize::default(), None),
             Ok(_)
         );
         cmd::udev_settle().unwrap();
@@ -691,11 +718,12 @@ mod tests {
         let uuid = Uuid::new_v4();
         let uuid2 = Uuid::new_v4();
 
-        let mut bd_mgr = BlockDevMgr::initialize(uuid, paths1, MDADataSize::default()).unwrap();
+        let mut bd_mgr =
+            BlockDevMgr::initialize(uuid, paths1, MDADataSize::default(), None).unwrap();
         cmd::udev_settle().unwrap();
 
         assert_matches!(
-            BlockDevMgr::initialize(uuid2, paths1, MDADataSize::default()),
+            BlockDevMgr::initialize(uuid2, paths1, MDADataSize::default(), None),
             Err(_)
         );
 
@@ -703,7 +731,7 @@ mod tests {
         assert_matches!(bd_mgr.add(uuid, paths1), Ok(_));
         assert_eq!(bd_mgr.block_devs.len(), original_length);
 
-        BlockDevMgr::initialize(uuid, paths2, MDADataSize::default()).unwrap();
+        BlockDevMgr::initialize(uuid, paths2, MDADataSize::default(), None).unwrap();
         cmd::udev_settle().unwrap();
 
         assert_matches!(bd_mgr.add(uuid, paths2), Err(_));
@@ -749,7 +777,7 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let uuid1 = Uuid::new_v4();
-        BlockDevMgr::initialize(uuid1, paths1, MDADataSize::default()).unwrap();
+        BlockDevMgr::initialize(uuid1, paths1, MDADataSize::default(), None).unwrap();
 
         cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
@@ -759,7 +787,7 @@ mod tests {
         assert_eq!(devices.len(), paths1.len());
 
         let uuid2 = Uuid::new_v4();
-        BlockDevMgr::initialize(uuid2, paths2, MDADataSize::default()).unwrap();
+        BlockDevMgr::initialize(uuid2, paths2, MDADataSize::default(), None).unwrap();
 
         cmd::udev_settle().unwrap();
         let pools = find_all().unwrap();
@@ -804,7 +832,8 @@ mod tests {
     /// them releases all.
     fn test_ownership(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
-        let mut bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+        let mut bd_mgr =
+            BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
 
         cmd::udev_settle().unwrap();
 

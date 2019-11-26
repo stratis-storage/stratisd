@@ -8,8 +8,8 @@ use dbus::{
     self,
     arg::{Array, IterAppend, RefArg, Variant},
     tree::{
-        Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
-        Tree,
+        Access, EmitsChangedSignal, Factory, MTFn, Method, MethodErr, MethodInfo, MethodResult,
+        PropInfo, Property, Tree,
     },
     Message,
 };
@@ -281,6 +281,81 @@ fn add_cachedevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     add_blockdevs(m, BlockDevTier::Cache)
 }
 
+fn add_cachedevs_2_1(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let return_message = message.method_return();
+    let object_path = m.path.get_name();
+    let default_return: (bool, Vec<dbus::Path>) = (false, Vec::new());
+    let pool_path = m
+        .tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let dbus_context = m.tree.get_data();
+    let mut engine = dbus_context.engine.borrow_mut();
+    let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    if pool.cache_initialized() {
+        add_blockdevs(m, BlockDevTier::Cache)
+    } else {
+        init_cache_2_1(m)
+    }
+}
+
+fn init_cache_2_1(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+
+    let devs: Array<&str, _> = get_next_arg(&mut iter, 1)?;
+
+    let dbus_context = m.tree.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let default_return: (bool, Vec<dbus::Path>) = (false, Vec::new());
+
+    let pool_path = m
+        .tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+
+    let mut engine = dbus_context.engine.borrow_mut();
+    let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+
+    let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
+    let result = pool.init_cache(
+        pool_uuid,
+        &blockdevs,
+        pool.keyfile_path().map(|kfp| kfp.to_path_buf()),
+    );
+    let return_value = match result.map(|r| r.changed()) {
+        Ok(Some(uuids)) => {
+            let return_value = uuids
+                .iter()
+                .map(|uuid| {
+                    // FIXME: To avoid this expect, modify add_blockdevs
+                    // so that it returns a mutable reference to each
+                    // blockdev created.
+                    create_dbus_blockdev(
+                        dbus_context,
+                        object_path.clone(),
+                        *uuid,
+                        pool.get_mut_blockdev(*uuid)
+                            .expect("just inserted by add_blockdevs")
+                            .1,
+                    )
+                })
+                .collect::<Vec<_>>();
+            return_message.append3((true, return_value), msg_code_ok(), msg_string_ok())
+        }
+        Ok(None) => return_message.append3(default_return, msg_code_ok(), msg_string_ok()),
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![return_value])
+}
+
 fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
@@ -437,33 +512,11 @@ pub fn create_dbus_pool<'a>(
 ) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
-    let create_filesystems_method = f
-        .method("CreateFilesystems", (), create_filesystems)
-        .in_arg(("specs", "as"))
-        // b: true if filesystems were created
-        // a(os): Array of tuples with object paths and names
-        //
-        // Rust representation: (bool, Vec<(dbus::Path, String)>)
-        .out_arg(("results", "(ba(os))"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let destroy_filesystems_method = f
-        .method("DestroyFilesystems", (), destroy_filesystems)
-        .in_arg(("filesystems", "ao"))
-        // b: true if filesystems were destroyed
-        // as: Array of UUIDs of destroyed filesystems
-        //
-        // Rust representation: (bool, Vec<String>)
-        .out_arg(("results", "(bas)"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let add_blockdevs_method = f
-        .method("AddDataDevs", (), add_datadevs)
+    let init_cache_method_2_1 = f
+        .method("InitCache", (), init_cache_2_1)
         .in_arg(("devices", "as"))
-        // b: Indicates if any data devices were added
-        // ao: Array of object paths of created data devices
+        // b: Indicates if any cache devices were added
+        // ao: Array of object paths of created cache devices
         //
         // Rust representation: (bool, Vec<dbus::path>)
         .out_arg(("results", "(bao)"))
@@ -481,40 +534,95 @@ pub fn create_dbus_pool<'a>(
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let rename_method = f
-        .method("SetName", (), rename_pool)
-        .in_arg(("name", "s"))
-        // b: false if no pool was renamed
-        // s: UUID of renamed pool
+    let add_cachedevs_method_2_1 = f
+        .method("AddCacheDevs", (), add_cachedevs_2_1)
+        .in_arg(("devices", "as"))
+        // b: Indicates if any cache devices were added
+        // ao: Array of object paths of created cache devices
         //
-        // Rust representation: (bool, String)
-        .out_arg(("result", "(bs)"))
+        // Rust representation: (bool, Vec<dbus::path>)
+        .out_arg(("results", "(bao)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"));
 
-    let snapshot_method = f
-        .method("SnapshotFilesystem", (), snapshot_filesystem)
-        .in_arg(("origin", "o"))
-        .in_arg(("snapshot_name", "s"))
-        // b: false if no new snapshot was created
-        // s: Object path of new snapshot
-        //
-        // Rust representation: (bool, String)
-        .out_arg(("result", "(bo)"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
+    fn create_filesystems_method_object(
+        f: &Factory<MTFn<TData>, TData>,
+    ) -> Method<MTFn<TData>, TData> {
+        f.method("CreateFilesystems", (), create_filesystems)
+            .in_arg(("specs", "as"))
+            // b: true if filesystems were created
+            // a(os): Array of tuples with object paths and names
+            //
+            // Rust representation: (bool, Vec<(dbus::Path, String)>)
+            .out_arg(("results", "(ba(os))"))
+            .out_arg(("return_code", "q"))
+            .out_arg(("return_string", "s"))
+    }
 
-    let name_property = f
-        .property::<&str, _>(consts::POOL_NAME_PROP, ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::True)
-        .on_get(get_pool_name);
+    fn destroy_filesystems_method_object(
+        f: &Factory<MTFn<TData>, TData>,
+    ) -> Method<MTFn<TData>, TData> {
+        f.method("DestroyFilesystems", (), destroy_filesystems)
+            .in_arg(("filesystems", "ao"))
+            // b: true if filesystems were destroyed
+            // as: Array of UUIDs of destroyed filesystems
+            //
+            // Rust representation: (bool, Vec<String>)
+            .out_arg(("results", "(bas)"))
+            .out_arg(("return_code", "q"))
+            .out_arg(("return_string", "s"))
+    }
 
-    let uuid_property = f
-        .property::<&str, _>("Uuid", ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::Const)
-        .on_get(get_uuid);
+    fn add_blockdevs_method_object(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+        f.method("AddDataDevs", (), add_datadevs)
+            .in_arg(("devices", "as"))
+            // b: Indicates if any data devices were added
+            // ao: Array of object paths of created data devices
+            //
+            // Rust representation: (bool, Vec<dbus::path>)
+            .out_arg(("results", "(bao)"))
+            .out_arg(("return_code", "q"))
+            .out_arg(("return_string", "s"))
+    }
+
+    fn rename_method_object(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+        f.method("SetName", (), rename_pool)
+            .in_arg(("name", "s"))
+            // b: false if no pool was renamed
+            // s: UUID of renamed pool
+            //
+            // Rust representation: (bool, String)
+            .out_arg(("result", "(bs)"))
+            .out_arg(("return_code", "q"))
+            .out_arg(("return_string", "s"))
+    }
+
+    fn snapshot_method_object(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+        f.method("SnapshotFilesystem", (), snapshot_filesystem)
+            .in_arg(("origin", "o"))
+            .in_arg(("snapshot_name", "s"))
+            // b: false if no new snapshot was created
+            // s: Object path of new snapshot
+            //
+            // Rust representation: (bool, String)
+            .out_arg(("result", "(bo)"))
+            .out_arg(("return_code", "q"))
+            .out_arg(("return_string", "s"))
+    }
+
+    fn name_property_object(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
+        f.property::<&str, _>(consts::POOL_NAME_PROP, ())
+            .access(Access::Read)
+            .emits_changed(EmitsChangedSignal::True)
+            .on_get(get_pool_name)
+    }
+
+    fn uuid_property_object(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
+        f.property::<&str, _>("Uuid", ())
+            .access(Access::Read)
+            .emits_changed(EmitsChangedSignal::Const)
+            .on_get(get_uuid)
+    }
 
     let get_all_properties_method = f
         .method("GetAllProperties", (), get_all_properties)
@@ -542,14 +650,26 @@ pub fn create_dbus_pool<'a>(
         .introspectable()
         .add(
             f.interface(consts::POOL_INTERFACE_NAME, ())
-                .add_m(create_filesystems_method)
-                .add_m(destroy_filesystems_method)
-                .add_m(snapshot_method)
-                .add_m(add_blockdevs_method)
+                .add_m(create_filesystems_method_object(&f))
+                .add_m(destroy_filesystems_method_object(&f))
+                .add_m(snapshot_method_object(&f))
+                .add_m(add_blockdevs_method_object(&f))
                 .add_m(add_cachedevs_method)
-                .add_m(rename_method)
-                .add_p(name_property)
-                .add_p(uuid_property),
+                .add_m(rename_method_object(&f))
+                .add_p(name_property_object(&f))
+                .add_p(uuid_property_object(&f)),
+        )
+        .add(
+            f.interface(consts::POOL_INTERFACE_NAME_2_1, ())
+                .add_m(create_filesystems_method_object(&f))
+                .add_m(destroy_filesystems_method_object(&f))
+                .add_m(snapshot_method_object(&f))
+                .add_m(add_blockdevs_method_object(&f))
+                .add_m(init_cache_method_2_1)
+                .add_m(add_cachedevs_method_2_1)
+                .add_m(rename_method_object(&f))
+                .add_p(name_property_object(&f))
+                .add_p(uuid_property_object(&f)),
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())

@@ -192,7 +192,8 @@ impl Engine for StratEngine {
         match self.pools.get_by_name(name) {
             Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
             None => {
-                let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy)?;
+                let (uuid, pool) =
+                    StratPool::initialize(name, blockdev_paths, redundancy, keyfile_path)?;
 
                 let name = Name::new(name.to_owned());
                 devlinks::pool_added(&name);

@@ -53,7 +53,8 @@ impl Engine for SimEngine {
                 let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
                 let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
 
-                let (pool_uuid, pool) = SimPool::new(&Rc::clone(&self.rdm), &devices, redundancy);
+                let (pool_uuid, pool) =
+                    SimPool::new(&Rc::clone(&self.rdm), &devices, redundancy, keyfile_path);
 
                 if self.rdm.borrow_mut().throw_die() {
                     return Err(StratisError::Engine(ErrorEnum::Error, "X".into()));

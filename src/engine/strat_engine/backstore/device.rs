@@ -10,14 +10,14 @@ use devicemapper::{devnode_to_devno, Device};
 
 use crate::{
     engine::{
-        strat_engine::{
-            backstore::metadata::device_identifiers,
-            udev::{block_enumerator, decide_ownership, UdevOwnership},
-        },
+        strat_engine::{backstore::metadata::device_identifiers, udev::UdevOwnership},
         types::{DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
+
+#[cfg(test)]
+use crate::engine::strat_engine::udev::{block_enumerator, decide_ownership};
 
 /// Resolve a list of Paths of some sort to a set of unique Devices.
 /// Return an IOError if there was a problem resolving any particular device.
@@ -109,6 +109,7 @@ impl DevOwnership {
 }
 
 /// Determine what a block device is used for.
+#[cfg(test)]
 pub fn identify(devnode: &Path) -> StratisResult<DevOwnership> {
     let canonical = devnode.canonicalize()?;
 

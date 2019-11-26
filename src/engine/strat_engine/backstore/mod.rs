@@ -17,7 +17,7 @@ mod shared;
 pub use self::{
     backstore::Backstore,
     blockdev::StratBlockDev,
-    device::identify,
+    device::DevOwnership,
     metadata::MDADataSize,
     setup::{find_all, get_metadata},
 };

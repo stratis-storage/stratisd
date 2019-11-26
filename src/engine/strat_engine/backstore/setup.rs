@@ -24,12 +24,10 @@ use crate::{
                 blockdev::StratBlockDev,
                 device::DevOwnership,
                 metadata::{device_identifiers, BDA},
-                udev::{
-                    block_enumerator, decide_ownership, is_multipath_member, stratis_enumerator,
-                },
             },
             device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
+            udev::{block_enumerator, decide_ownership, is_multipath_member, stratis_enumerator},
         },
         types::{BlockDevTier, DevUuid, PoolUuid},
     },

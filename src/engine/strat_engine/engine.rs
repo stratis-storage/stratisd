@@ -216,7 +216,7 @@ impl Engine for StratEngine {
             return Err(StratisError::Engine(
                 ErrorEnum::NotFound,
                 format!(
-                    "Block device {} not found in the udev database",
+                    "Could not determine ownership of block device {} because it could not be found in the udev database",
                     dev_node.display()
                 ),
             ));

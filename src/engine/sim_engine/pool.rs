@@ -118,16 +118,18 @@ impl Pool for SimPool {
                     "Must initialize cache with at least one blockdev.".to_string(),
                 ))
             } else {
-                let mut blockdev_pairs = blockdevs.iter().map(|p| {
-                    SimDev::new(
-                        Rc::clone(&self.rdm),
-                        p,
-                        keyfile_path.as_ref().map(|p| p.as_path()),
-                    )
-                });
-                let blockdev_uuids = blockdev_pairs.by_ref().map(|(uuid, _)| uuid).collect();
-                let blockdev_pair_vec: Vec<_> = blockdev_pairs.collect();
-                self.cache_devs.extend(blockdev_pair_vec);
+                let blockdev_pairs: Vec<_> = blockdevs
+                    .iter()
+                    .map(|p| {
+                        SimDev::new(
+                            Rc::clone(&self.rdm),
+                            p,
+                            keyfile_path.as_ref().map(|p| p.as_path()),
+                        )
+                    })
+                    .collect();
+                let blockdev_uuids: Vec<_> = blockdev_pairs.iter().map(|(uuid, _)| *uuid).collect();
+                self.cache_devs.extend(blockdev_pairs);
                 Ok(SetCreateAction::new(blockdev_uuids))
             }
         } else {

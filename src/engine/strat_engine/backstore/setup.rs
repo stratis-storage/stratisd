@@ -68,6 +68,9 @@ fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
         // all block devices, not just all the ones that can be identified
         // as Stratis blockdevs by udev, and then scrutinize each one
         // using various methods.
+
+        info!("Could not identify any Stratis devices by a udev search for devices with ID_FS_TYPE=\"stratis\"; using fallback search mechanism");
+
         let context = libudev::Context::new()?;
         let mut enumerator = block_enumerator(&context)?;
         Ok(enumerator

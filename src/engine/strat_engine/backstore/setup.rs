@@ -97,6 +97,13 @@ fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
 pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     let mut pool_map = HashMap::new();
 
+    // FIXME: If get_stratis_block_devices() has to go to fallback mechanism,
+    // it has already read the device identifiers for every device it returns.
+    // It seems a waste to just read them all again in that case. Likely
+    // get_stratis_block_devices() and this method should be consolidated in
+    // some creative way, or get_stratis_block_devices() should be required
+    // to return the device identifiers from the device as well as the devnode,
+    // regardless of which mechanism was used.
     for devnode in get_stratis_block_devices()? {
         match devnode_to_devno(&devnode)? {
             None => continue,

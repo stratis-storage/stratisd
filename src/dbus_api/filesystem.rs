@@ -25,9 +25,7 @@ use crate::{
             msg_code_ok, msg_string_ok, result_to_tuple,
         },
     },
-    engine::{
-        filesystem_mount_path, Filesystem, FilesystemUuid, MaybeDbusPath, Name, RenameAction,
-    },
+    engine::{Filesystem, FilesystemUuid, MaybeDbusPath, Name, RenameAction},
 };
 
 fn get_properties_shared(
@@ -284,11 +282,11 @@ fn get_filesystem_devnode(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_filesystem_property(i, p, |(pool_name, fs_name, _)| {
-        Ok(format!(
-            "{}",
-            filesystem_mount_path(pool_name, fs_name).display()
-        ))
+    get_filesystem_property(i, p, |(pool_name, fs_name, fs)| {
+        Ok(fs
+            .path_to_mount_filesystem(&pool_name, &fs_name)
+            .display()
+            .to_string())
     })
 }
 

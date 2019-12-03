@@ -44,6 +44,7 @@ use crate::{
 /// devices via udev, and may also attempt to directly read Stratis
 /// metadata from the device.
 fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
+    info!("Beginning initial search for Stratis block devices");
     let devices = {
         let context = libudev::Context::new()?;
         let mut enumerator = stratis_enumerator(&context)?;

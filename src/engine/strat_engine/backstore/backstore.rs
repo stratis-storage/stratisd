@@ -682,10 +682,13 @@ mod tests {
 
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
-    use crate::engine::strat_engine::{
-        backstore::find_all,
-        cmd,
-        tests::{loopbacked, real},
+    use crate::engine::{
+        strat_engine::{
+            backstore::find_all,
+            cmd,
+            tests::{loopbacked, real},
+        },
+        EngineAction,
     };
 
     use super::*;
@@ -722,7 +725,7 @@ mod tests {
     /// Nonetheless, because nothing is written or read, cache usage ought
     /// to be 0. Adding some more cachedevs exercises different code path
     /// from adding initial cachedevs.
-    fn test_add_cache_devs(paths: &[&Path]) {
+    fn test_init_cache_devs(paths: &[&Path]) {
         assert!(paths.len() > 3);
 
         let meta_size = Sectors(IEC::Mi);
@@ -770,9 +773,14 @@ mod tests {
         invariant(&backstore);
         assert_eq!(data_uuids.len(), datadevpaths.len());
 
-        let cache_uuids = backstore.add_cachedevs(pool_uuid, cachedevpaths).unwrap();
+        let cache_uuids = backstore
+            .init_cache(pool_uuid, cachedevpaths, None)
+            .unwrap();
         invariant(&backstore);
-        assert_eq!(cache_uuids.len(), cachedevpaths.len());
+        assert_eq!(
+            cache_uuids.changed().map(|c| c.len()).unwrap_or(0),
+            cachedevpaths.len()
+        );
 
         let cache_status = backstore
             .cache
@@ -798,7 +806,7 @@ mod tests {
     pub fn loop_test_add_cache_devs() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(4, 5, None),
-            test_add_cache_devs,
+            test_init_cache_devs,
         );
     }
 
@@ -806,7 +814,7 @@ mod tests {
     pub fn real_test_add_cache_devs() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(4, None, None),
-            test_add_cache_devs,
+            test_init_cache_devs,
         );
     }
 
@@ -814,7 +822,7 @@ mod tests {
     pub fn travis_test_add_cache_devs() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(4, 5, None),
-            test_add_cache_devs,
+            test_init_cache_devs,
         );
     }
 

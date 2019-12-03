@@ -26,10 +26,10 @@ use tempfile;
 
 use crate::{
     engine::{
-        devlinks,
         engine::Filesystem,
         strat_engine::{
             cmd::{create_fs, set_uuid, udev_settle, xfs_growfs},
+            devlinks,
             dm::get_dm,
             names::{format_thin_ids, ThinRole},
             serde_structs::FilesystemSave,

@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 pub use self::{
-    devlinks::filesystem_mount_path,
     engine::{BlockDev, Engine, Filesystem, Pool},
     event::{get_engine_listener_list_mut, EngineEvent, EngineListener},
     sim_engine::SimEngine,
@@ -18,7 +17,6 @@ pub use self::{
 #[macro_use]
 mod macros;
 
-mod devlinks;
 #[allow(clippy::module_inception)]
 mod engine;
 mod event;

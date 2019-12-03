@@ -15,13 +15,13 @@ use crate::engine::strat_engine::cleanup::teardown_pools;
 
 use crate::{
     engine::{
-        devlinks,
         engine::Eventable,
         event::get_engine_listener_list,
         shared::create_pool_idempotent_or_err,
         strat_engine::{
             backstore::{find_all, get_metadata, DevOwnership},
             cmd::verify_binaries,
+            devlinks,
             dm::{get_dm, get_dm_init},
             names::validate_name,
             pool::{check_metadata, StratPool},

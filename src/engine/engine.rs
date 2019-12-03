@@ -30,6 +30,9 @@ pub trait Filesystem: Debug {
     /// When the filesystem was created.
     fn created(&self) -> DateTime<Utc>;
 
+    /// path to mount the filesystem by
+    fn path_to_mount_filesystem(&self, pool_name: &str, fs_name: &str) -> PathBuf;
+
     /// The amount of data stored on the filesystem, including overhead.
     fn used(&self) -> StratisResult<Bytes>;
 

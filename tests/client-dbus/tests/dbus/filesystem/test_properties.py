@@ -15,6 +15,9 @@
 Test accessing properties of a filesystem.
 """
 
+# isort: STDLIB
+from os.path import isabs
+
 # isort: LOCAL
 from stratisd_client_dbus import Filesystem, Manager, Pool, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
@@ -75,5 +78,4 @@ class SetNameTestCase(SimTestCase):
         self.assertEqual(len(created), 20)
 
         devnode = Filesystem.Properties.Devnode.Get(filesystem)
-
-        self.assertEqual(devnode, "/stratis/deadpool/fs")
+        self.assertTrue(isabs(devnode))

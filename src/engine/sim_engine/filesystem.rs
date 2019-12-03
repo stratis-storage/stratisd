@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use devicemapper::Bytes;
 
 use crate::{
-    engine::{types::MaybeDbusPath, Filesystem},
+    engine::{devlinks, types::MaybeDbusPath, Filesystem},
     stratis::StratisResult,
 };
 
@@ -41,6 +41,10 @@ impl Filesystem for SimFilesystem {
 
     fn created(&self) -> DateTime<Utc> {
         self.created
+    }
+
+    fn path_to_mount_filesystem(&self, pool_name: &str, fs_name: &str) -> PathBuf {
+        devlinks::filesystem_mount_path(pool_name, fs_name)
     }
 
     fn used(&self) -> StratisResult<Bytes> {

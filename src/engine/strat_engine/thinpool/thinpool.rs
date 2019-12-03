@@ -21,13 +21,13 @@ use devicemapper::{
 
 use crate::{
     engine::{
-        devlinks,
         engine::Filesystem,
         event::{get_engine_listener_list, EngineEvent},
         strat_engine::{
             backstore::Backstore,
             cmd::{thin_check, thin_repair, udev_settle},
             device::wipe_sectors,
+            devlinks,
             dm::get_dm,
             names::{
                 format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole,

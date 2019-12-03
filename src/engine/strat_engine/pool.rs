@@ -490,10 +490,9 @@ mod tests {
     use devicemapper::{Bytes, IEC, SECTOR_SIZE};
 
     use crate::engine::{
-        devlinks,
         strat_engine::{
             backstore::{find_all, get_metadata},
-            cmd,
+            cmd, devlinks,
             tests::{loopbacked, real},
         },
         types::{EngineAction, PoolExtendState, PoolState, Redundancy},

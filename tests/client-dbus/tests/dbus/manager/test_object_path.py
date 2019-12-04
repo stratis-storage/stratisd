@@ -14,13 +14,14 @@
 """
 Test object path methods.
 """
+# isort: THIRDPARTY
 import dbus
 
+# isort: FIRSTPARTY
 from dbus_python_client_gen import DPClientInvocationError
 
-from stratisd_client_dbus import Manager
-from stratisd_client_dbus import ObjectManager
-from stratisd_client_dbus import get_object
+# isort: LOCAL
+from stratisd_client_dbus import Manager, ObjectManager, get_object
 
 from .._misc import SimTestCase
 

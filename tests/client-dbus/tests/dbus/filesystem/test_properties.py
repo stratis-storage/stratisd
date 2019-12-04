@@ -15,15 +15,11 @@
 Test accessing properties of a filesystem.
 """
 
-from stratisd_client_dbus import Filesystem
-from stratisd_client_dbus import Manager
-from stratisd_client_dbus import Pool
-from stratisd_client_dbus import get_object
-
+# isort: LOCAL
+from stratisd_client_dbus import Filesystem, Manager, Pool, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._misc import SimTestCase
-from .._misc import device_name_list
+from .._misc import SimTestCase, device_name_list
 
 _DEVICE_STRATEGY = device_name_list()
 

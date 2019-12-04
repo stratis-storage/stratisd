@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+# isort: STDLIB
 import argparse
 import subprocess
 import sys

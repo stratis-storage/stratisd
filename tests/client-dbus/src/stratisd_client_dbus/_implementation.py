@@ -15,11 +15,11 @@
 Classes to implement dbus interface.
 """
 
+# isort: STDLIB
 import xml.etree.ElementTree as ET
 
-from dbus_client_gen import managed_object_class
-from dbus_client_gen import mo_query_builder
-
+# isort: FIRSTPARTY
+from dbus_client_gen import managed_object_class, mo_query_builder
 from dbus_python_client_gen import make_class
 
 from ._data import SPECS

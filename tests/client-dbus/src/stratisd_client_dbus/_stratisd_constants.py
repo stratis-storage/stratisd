@@ -15,6 +15,7 @@
 Representing stratisd contants.
 """
 
+# isort: STDLIB
 from enum import IntEnum
 
 

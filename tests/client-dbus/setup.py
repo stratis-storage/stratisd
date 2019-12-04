@@ -1,5 +1,8 @@
+# isort: STDLIB
 import os
 import sys
+
+# isort: THIRDPARTY
 import setuptools
 
 if sys.version_info[0] < 3:

@@ -15,16 +15,14 @@
 Test accessing properties of a blockdev.
 """
 
+# isort: STDLIB
 from random import choice
 
-from stratisd_client_dbus import Blockdev
-from stratisd_client_dbus import Manager
-from stratisd_client_dbus import get_object
-
+# isort: LOCAL
+from stratisd_client_dbus import Blockdev, Manager, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._misc import SimTestCase
-from .._misc import device_name_list
+from .._misc import SimTestCase, device_name_list
 
 _DEVICE_STRATEGY = device_name_list(1)
 

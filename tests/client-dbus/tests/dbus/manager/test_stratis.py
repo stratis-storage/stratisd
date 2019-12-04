@@ -15,12 +15,11 @@
 Test 'stratisd'.
 """
 
+# isort: FIRSTPARTY
 from dbus_python_client_gen import DPClientInvalidArgError
 
-from stratisd_client_dbus import Manager
-from stratisd_client_dbus import ObjectManager
-from stratisd_client_dbus import get_object
-
+# isort: LOCAL
+from stratisd_client_dbus import Manager, ObjectManager, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import SimTestCase

@@ -17,10 +17,10 @@ Test unique stratis instance.
 """
 
 
+# isort: STDLIB
 import os
 import subprocess
 import unittest
-
 
 _STRATISD = os.environ["STRATISD"]
 

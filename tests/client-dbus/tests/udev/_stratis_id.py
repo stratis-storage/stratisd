@@ -16,9 +16,11 @@
 """
 Identify a device as a Stratis block device.
 """
+# isort: STDLIB
 import struct
 import sys
 from collections import namedtuple
+
 from ._crc32 import crc
 
 BS = 512

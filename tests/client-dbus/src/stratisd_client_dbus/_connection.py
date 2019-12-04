@@ -15,6 +15,7 @@
 Miscellaneous helpful methods.
 """
 
+# isort: THIRDPARTY
 import dbus
 
 from ._constants import SERVICE

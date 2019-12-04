@@ -15,10 +15,8 @@
 Test accessing properties of a blockdev using FetchProperties interface.
 """
 
-from stratisd_client_dbus import FetchProperties
-from stratisd_client_dbus import Manager
-from stratisd_client_dbus import get_object
-
+# isort: LOCAL
+from stratisd_client_dbus import FetchProperties, Manager, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import SimTestCase

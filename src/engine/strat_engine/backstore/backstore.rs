@@ -585,6 +585,8 @@ impl Recordable<BackstoreSave> for Backstore {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use uuid::Uuid;
 
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
@@ -818,9 +820,15 @@ mod tests {
         let backstore_save = backstore.record();
 
         cmd::udev_settle().unwrap();
+
         let map = find_all().unwrap();
-        let map = &map[&pool_uuid];
-        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, map, Utc::now()).unwrap();
+        assert_eq!(
+            map.keys().collect::<HashSet<&PoolUuid>>(),
+            vec![pool_uuid].iter().collect::<HashSet<&PoolUuid>>()
+        );
+
+        let mut backstore =
+            Backstore::setup(pool_uuid, &backstore_save, &map[&pool_uuid], Utc::now()).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();
@@ -830,9 +838,15 @@ mod tests {
         backstore.teardown().unwrap();
 
         cmd::udev_settle().unwrap();
+
         let map = find_all().unwrap();
-        let map = &map[&pool_uuid];
-        let mut backstore = Backstore::setup(pool_uuid, &backstore_save, map, Utc::now()).unwrap();
+        assert_eq!(
+            map.keys().collect::<HashSet<&PoolUuid>>(),
+            vec![pool_uuid].iter().collect::<HashSet<&PoolUuid>>()
+        );
+
+        let mut backstore =
+            Backstore::setup(pool_uuid, &backstore_save, &map[&pool_uuid], Utc::now()).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();

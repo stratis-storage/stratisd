@@ -12,6 +12,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use libudev;
 use serde_json;
 
 use devicemapper::{devnode_to_devno, Device, Sectors};
@@ -21,16 +22,75 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
+                device::DevOwnership,
                 metadata::{device_identifiers, BDA},
-                util::get_stratis_block_devices,
             },
             device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
+            udev::{block_enumerator, decide_ownership, is_multipath_member, stratis_enumerator},
         },
         types::{BlockDevTier, DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
+
+/// Retrieve all Stratis block devices that should be made use of by the
+/// Stratis engine. This excludes Stratis block devices that are multipath
+/// members.
+///
+/// Includes a fallback path, which is used if no Stratis block devices are
+/// found using the obvious udev property- and enumerator-based approach.
+/// This fallback path is more expensive, because it must search all block
+/// devices via udev, and may also attempt to directly read Stratis
+/// metadata from the device.
+fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
+    info!("Beginning initial search for Stratis block devices");
+    let devices = {
+        let context = libudev::Context::new()?;
+        let mut enumerator = stratis_enumerator(&context)?;
+
+        enumerator
+            .scan_devices()?
+            .filter(|dev| dev.is_initialized())
+            .filter(|dev| !is_multipath_member(dev).unwrap_or(true))
+            .filter_map(|i| i.devnode().map(|d| d.into()))
+            .collect::<Vec<PathBuf>>()
+    };
+
+    if devices.is_empty() {
+        // No Stratis devices have been found, possible reasons are:
+        // 1. There are none
+        // 2. There are some but libblkid version is less than 2.32, so
+        // Stratis devices are not recognized by udev.
+        // 3. There are many incomplete udev entries, because this code is
+        // being run before the udev database is populated.
+        //
+        // Try again to find Stratis block devices, but this time enumerate
+        // all block devices, not just all the ones that can be identified
+        // as Stratis blockdevs by udev, and then scrutinize each one
+        // using various methods.
+
+        info!("Could not identify any Stratis devices by a udev search for devices with ID_FS_TYPE=\"stratis\"; using fallback search mechanism");
+
+        let context = libudev::Context::new()?;
+        let mut enumerator = block_enumerator(&context)?;
+        Ok(enumerator
+            .scan_devices()?
+            .filter(|dev| dev.is_initialized())
+            .filter_map(|dev| {
+                dev.devnode().and_then(|devnode| {
+                    decide_ownership(&dev)
+                        .and_then(|decision| DevOwnership::from_udev_ownership(&decision, devnode))
+                        .ok()
+                        .and_then(|ownership| ownership.stratis_identifiers())
+                        .map(|_| devnode.into())
+                })
+            })
+            .collect())
+    } else {
+        Ok(devices)
+    }
+}
 
 /// Find all Stratis devices.
 ///
@@ -38,6 +98,13 @@ use crate::{
 pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     let mut pool_map = HashMap::new();
 
+    // FIXME: If get_stratis_block_devices() has to go to fallback mechanism,
+    // it has already read the device identifiers for every device it returns.
+    // It seems a waste to just read them all again in that case. Likely
+    // get_stratis_block_devices() and this method should be consolidated in
+    // some creative way, or get_stratis_block_devices() should be required
+    // to return the device identifiers from the device as well as the devnode,
+    // regardless of which mechanism was used.
     for devnode in get_stratis_block_devices()? {
         match devnode_to_devno(&devnode)? {
             None => continue,

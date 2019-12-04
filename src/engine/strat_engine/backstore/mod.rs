@@ -13,12 +13,11 @@ mod metadata;
 mod range_alloc;
 mod setup;
 mod shared;
-mod util;
 
 pub use self::{
     backstore::Backstore,
     blockdev::StratBlockDev,
-    device::identify,
+    device::DevOwnership,
     metadata::MDADataSize,
     setup::{find_all, get_metadata},
 };

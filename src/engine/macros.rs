@@ -30,18 +30,18 @@ macro_rules! get_mut_pool {
     };
 }
 
-macro_rules! rename_filesystem_pre {
-    ($s:ident; $uuid:ident; $new_name:ident) => {{
-        let old_name = match $s.filesystems.get_by_uuid($uuid) {
+macro_rules! rename_pre {
+    ($s:expr; $uuid:ident; $new_name:ident; $not_found:expr; $same:expr) => {{
+        let old_name = match $s.get_by_uuid($uuid) {
             Some((name, _)) => name,
-            None => return Ok(RenameAction::NoSource),
+            None => return $not_found,
         };
 
         if &*old_name == $new_name {
-            return Ok(RenameAction::Identity);
+            return $same;
         }
 
-        if $s.filesystems.contains_name($new_name) {
+        if $s.contains_name($new_name) {
             return Err(StratisError::Engine(
                 ErrorEnum::AlreadyExists,
                 $new_name.into(),
@@ -51,25 +51,51 @@ macro_rules! rename_filesystem_pre {
     }};
 }
 
-macro_rules! rename_pool_pre {
+macro_rules! rename_filesystem_pre {
     ($s:ident; $uuid:ident; $new_name:ident) => {{
-        let old_name = match $s.pools.get_by_uuid($uuid) {
-            Some((name, _)) => name,
-            None => return Ok(RenameAction::NoSource),
-        };
-
-        if &*old_name == $new_name {
-            return Ok(RenameAction::Identity);
-        }
-
-        if $s.pools.contains_name($new_name) {
-            return Err(StratisError::Engine(
-                ErrorEnum::AlreadyExists,
-                $new_name.into(),
+        rename_pre!(
+            $s.filesystems;
+            $uuid;
+            $new_name;
+            Err(StratisError::Engine(
+                ErrorEnum::NotFound,
+                format!("Filesystem not found with UUID of {}", $uuid),
             ));
-        }
-        old_name
-    }};
+            Ok(None)
+        )
+    }}
+}
+
+macro_rules! rename_pre_idem {
+    ($s:expr; $uuid:ident; $new_name:ident) => {{
+        rename_pre!(
+            $s;
+            $uuid;
+            $new_name;
+            Ok(RenameAction::NoSource);
+            Ok(RenameAction::Identity)
+        )
+    }}
+}
+
+macro_rules! rename_filesystem_pre_idem {
+    ($s:ident; $uuid:ident; $new_name:ident) => {{
+        rename_pre_idem!(
+            $s.filesystems;
+            $uuid;
+            $new_name
+        )
+    }}
+}
+
+macro_rules! rename_pool_pre_idem {
+    ($s:ident; $uuid:ident; $new_name:ident) => {{
+        rename_pre_idem!(
+            $s.pools;
+            $uuid;
+            $new_name
+        )
+    }}
 }
 
 macro_rules! set_blockdev_user_info {

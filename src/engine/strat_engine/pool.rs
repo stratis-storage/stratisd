@@ -25,8 +25,8 @@ use crate::{
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, CreateAction, DevUuid, EngineAction, FilesystemUuid, MaybeDbusPath, Name,
-            PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
+            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolUuid,
+            Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -360,8 +360,7 @@ impl Pool for StratPool {
     ) -> StratisResult<SetDeleteAction<FilesystemUuid>> {
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
-            let changed = self.thin_pool.destroy_filesystem(pool_name, uuid)?;
-            if changed.is_changed() {
+            if let Some(uuid) = self.thin_pool.destroy_filesystem(pool_name, uuid)? {
                 removed.push(uuid);
             }
         }
@@ -376,7 +375,17 @@ impl Pool for StratPool {
         new_name: &str,
     ) -> StratisResult<RenameAction<FilesystemUuid>> {
         validate_name(new_name)?;
-        self.thin_pool.rename_filesystem(pool_name, uuid, new_name)
+        match self.thin_pool.rename_filesystem(pool_name, uuid, new_name) {
+            Ok(Some(uuid)) => Ok(RenameAction::Renamed(uuid)),
+            Ok(None) => Ok(RenameAction::Identity),
+            Err(e) => {
+                if let StratisError::Engine(ErrorEnum::NotFound, _) = e {
+                    Ok(RenameAction::NoSource)
+                } else {
+                    Err(e)
+                }
+            }
+        }
     }
 
     fn snapshot_filesystem(
@@ -471,10 +480,14 @@ impl Pool for StratPool {
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>> {
         let result = self.backstore.set_blockdev_user_info(uuid, user_info);
-        if let RenameAction::Renamed(_) = result {
-            self.write_metadata(pool_name)?;
+        match result {
+            Ok(Some(uuid)) => {
+                self.write_metadata(pool_name)?;
+                Ok(RenameAction::Renamed(uuid))
+            }
+            Ok(None) => Ok(RenameAction::Identity),
+            Err(_) => Ok(RenameAction::NoSource),
         }
-        Ok(result)
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {

@@ -1161,7 +1161,6 @@ fn setup_metadev(
     meta_segments: Vec<(Sectors, Sectors)>,
     spare_segments: Vec<(Sectors, Sectors)>,
 ) -> StratisResult<(LinearDev, Vec<(Sectors, Sectors)>, Vec<(Sectors, Sectors)>)> {
-    #![allow(clippy::collapsible_if)]
     let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinMeta);
     let mut meta_dev = LinearDev::setup(
         get_dm(),

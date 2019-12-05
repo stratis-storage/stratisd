@@ -301,10 +301,7 @@ impl Backstore {
 
                 Ok(uuids)
             }
-            None => Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                "Cache has not yet been initialized.".to_string(),
-            )),
+            None => unreachable!("self.cache.is_some()"),
         }
     }
 

@@ -347,23 +347,29 @@ impl Pool for StratPool {
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         let bdev_info = if tier == BlockDevTier::Cache {
-            // If adding cache devices, must suspend the pool, since the cache
-            // must be augmented with the new devices.
-            self.thin_pool.suspend()?;
-            let bdev_info_res = self
-                .backstore
-                .add_cachedevs(pool_uuid, paths)
-                .and_then(|bdi| {
-                    self.thin_pool
-                        .set_device(self.backstore.device().expect(
-                            "Since thin pool exists, space must have been allocated \
-                             from the backstore, so backstore must have a cap device",
-                        ))
-                        .and(Ok(bdi))
-                });
-            self.thin_pool.resume()?;
-            let bdev_info = bdev_info_res?;
-            Ok(SetCreateAction::new(bdev_info))
+            if self.backstore.cache_initialized() {
+                // If adding cache devices, must suspend the pool, since the cache
+                // must be augmented with the new devices.
+                self.thin_pool.suspend()?;
+                let bdev_info_res = self
+                    .backstore
+                    .add_cachedevs(pool_uuid, paths)
+                    .and_then(|bdi| {
+                        self.thin_pool
+                            .set_device(self.backstore.device().expect(
+                                "Since thin pool exists, space must have been allocated \
+                                 from the backstore, so backstore must have a cap device",
+                            ))
+                            .and(Ok(bdi))
+                    });
+                self.thin_pool.resume()?;
+                let bdev_info = bdev_info_res?;
+                Ok(SetCreateAction::new(bdev_info))
+            } else {
+                Err(StratisError::Error(
+                    "The cache has not yet been initialized".to_string(),
+                ))
+            }
         } else {
             // If just adding data devices, no need to suspend the pool.
             // No action will be taken on the DM devices.
@@ -711,8 +717,7 @@ mod tests {
                 .unwrap();
         }
 
-        pool.add_blockdevs(uuid, name, paths1, BlockDevTier::Cache)
-            .unwrap();
+        pool.init_cache(uuid, paths1, None).unwrap();
         invariant(&pool, name);
 
         let metadata2 = pool.record(name);

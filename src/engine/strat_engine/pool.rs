@@ -18,6 +18,7 @@ use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
+        shared::init_cache_idempotent_or_err,
         strat_engine::{
             backstore::{Backstore, MDADataSize, StratBlockDev},
             names::validate_name,
@@ -292,8 +293,24 @@ impl Pool for StratPool {
         blockdevs: &[&Path],
         keyfile_path: Option<PathBuf>,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
-        self.backstore
-            .init_cache(pool_uuid, blockdevs, keyfile_path)
+        if self.backstore.cache_initialized() {
+            init_cache_idempotent_or_err(
+                blockdevs,
+                self.backstore
+                    .cachedevs()
+                    .into_iter()
+                    .map(|(_, bd)| bd.devnode()),
+            )
+        } else {
+            // If adding cache devices, must suspend the pool, since the cache
+            // must be augmented with the new devices.
+            self.thin_pool.suspend()?;
+            let devices = self
+                .backstore
+                .init_cache(pool_uuid, blockdevs, keyfile_path)?;
+            self.thin_pool.resume()?;
+            Ok(SetCreateAction::new(devices))
+        }
     }
 
     fn create_filesystems<'a, 'b>(
@@ -331,7 +348,7 @@ impl Pool for StratPool {
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         let bdev_info = if tier == BlockDevTier::Cache {
             // If adding cache devices, must suspend the pool, since the cache
-            // must be augmeneted with the new devices.
+            // must be augmented with the new devices.
             self.thin_pool.suspend()?;
             let bdev_info_res = self
                 .backstore

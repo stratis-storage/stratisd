@@ -1,5 +1,6 @@
 use std::{
     collections::{hash_map::RandomState, HashSet},
+    iter::FromIterator,
     path::{Path, PathBuf},
 };
 
@@ -51,19 +52,24 @@ pub fn create_pool_idempotent_or_err(
 /// existing pool. Returns an error if the specifications of the requested
 /// pool differ from the specifications of the existing pool, otherwise
 /// returns Ok(CreateAction::Identity).
-pub fn init_cache_idempotent_or_err(
-    existing_devices: &HashSet<PathBuf>,
-    input_devices: &HashSet<PathBuf>,
-) -> StratisResult<SetCreateAction<DevUuid>> {
+pub fn init_cache_idempotent_or_err<I>(
+    blockdev_paths: &[&Path],
+    existing_iter: I,
+) -> StratisResult<SetCreateAction<DevUuid>>
+where
+    I: Iterator<Item = PathBuf>,
+{
+    let input_devices = HashSet::from_iter(blockdev_paths.iter().map(|p| p.to_path_buf()));
+    let existing_devices = HashSet::<_, RandomState>::from_iter(existing_iter);
     if input_devices == existing_devices {
         Ok(SetCreateAction::empty())
     } else {
         let in_input = input_devices
-            .difference(existing_devices)
+            .difference(&existing_devices)
             .map(|path| path.display().to_string())
             .collect::<Vec<_>>();
         let in_pool = existing_devices
-            .difference(input_devices)
+            .difference(&input_devices)
             .map(|path| path.display().to_string())
             .collect::<Vec<_>>();
         Err(StratisError::Engine(

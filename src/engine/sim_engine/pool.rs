@@ -133,14 +133,10 @@ impl Pool for SimPool {
                 Ok(SetCreateAction::new(blockdev_uuids))
             }
         } else {
-            let existing_cache_devs = self
-                .cache_devs
-                .values()
-                .map(|bd| bd.devnode())
-                .collect::<HashSet<_>>();
-            let requested_cache_devs =
-                HashSet::from_iter(blockdevs.iter().map(|p| p.to_path_buf()));
-            init_cache_idempotent_or_err(&requested_cache_devs, &existing_cache_devs)
+            init_cache_idempotent_or_err(
+                blockdevs,
+                self.cache_devs.iter().map(|(_, bd)| bd.devnode()),
+            )
         }
     }
 

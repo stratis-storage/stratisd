@@ -6,8 +6,7 @@
 
 use std::{
     cmp,
-    collections::{hash_map::RandomState, HashMap, HashSet},
-    iter::FromIterator,
+    collections::HashMap,
     path::{Path, PathBuf},
 };
 
@@ -18,7 +17,6 @@ use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
 use crate::{
     engine::{
         engine::BlockDev,
-        shared::init_cache_idempotent_or_err,
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
@@ -33,7 +31,6 @@ use crate::{
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, Recordable},
         },
-        types::SetCreateAction,
         BlockDevTier, DevUuid, PoolUuid,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -202,36 +199,22 @@ impl Backstore {
         })
     }
 
-    /// Add cachedevs to the backstore.
+    /// Initialize the cache tier and add cachedevs to the backstore.
     ///
-    /// If the cache tier does not already exist, create it.
-    ///
-    /// Returns all `DevUuid`s that exist in the cache after this function
-    /// completes. If the cache is already initialized, that will be all
-    /// cache devices that the cache contains. If the cache has not been initialized,
-    /// it will contain all of the devices that have been added to cache.
+    /// Returns all `DevUuid`s of devices that were added to the cache on initialization.
     ///
     /// Precondition: Must be invoked only after some space has been allocated
     /// from the backstore. This ensures that there is certainly a cap device.
-    // Precondition: self.linear.is_some() XOR self.cache.is_some()
+    // Precondition: self.cache.is_none() && self.linear.is_some()
     // Postcondition: self.cache.is_some() && self.linear.is_none()
     pub fn init_cache(
         &mut self,
         pool_uuid: PoolUuid,
         paths: &[&Path],
         keyfile_path: Option<PathBuf>,
-    ) -> StratisResult<SetCreateAction<DevUuid>> {
+    ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
-            Some(ref mut cache_tier) => {
-                let existing_cache_devs: HashSet<_> = cache_tier
-                    .blockdevs()
-                    .iter()
-                    .map(|(_, bd)| bd.devnode())
-                    .collect();
-                let requested_cache_devs: HashSet<_, RandomState> =
-                    HashSet::from_iter(paths.iter().map(|p| p.to_path_buf()));
-                init_cache_idempotent_or_err(&existing_cache_devs, &requested_cache_devs)
-            }
+            Some(_) => unreachable!("self.cache.is_none()"),
             None => {
                 if paths.is_empty() {
                     return Err(StratisError::Engine(
@@ -271,7 +254,7 @@ impl Backstore {
 
                 self.cache_tier = Some(cache_tier);
 
-                Ok(SetCreateAction::new(uuids))
+                Ok(uuids)
             }
         }
     }
@@ -466,19 +449,27 @@ impl Backstore {
         }
     }
 
+    /// Get only the datadevs in the pool.
+    pub fn datadevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
+        self.data_tier.blockdevs().to_vec()
+    }
+
+    /// Get only the cachdevs in the pool.
+    pub fn cachedevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
+        match self.cache_tier {
+            Some(ref cache) => cache.blockdevs().to_vec(),
+            None => Vec::new(),
+        }
+    }
+
     /// Return a reference to all the blockdevs that this pool has ownership
     /// of. The blockdevs may be returned in any order. It is unsafe to assume
     /// that they are grouped by tier or any other organization.
     pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
-        match self.cache_tier {
-            Some(ref cache) => cache
-                .blockdevs()
-                .iter()
-                .chain(self.data_tier.blockdevs().iter())
-                .cloned()
-                .collect(),
-            None => self.data_tier.blockdevs(),
-        }
+        self.datadevs()
+            .into_iter()
+            .chain(self.cachedevs().into_iter())
+            .collect()
     }
 
     pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
@@ -682,13 +673,10 @@ mod tests {
 
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
-    use crate::engine::{
-        strat_engine::{
-            backstore::find_all,
-            cmd,
-            tests::{loopbacked, real},
-        },
-        EngineAction,
+    use crate::engine::strat_engine::{
+        backstore::find_all,
+        cmd,
+        tests::{loopbacked, real},
     };
 
     use super::*;
@@ -725,7 +713,7 @@ mod tests {
     /// Nonetheless, because nothing is written or read, cache usage ought
     /// to be 0. Adding some more cachedevs exercises different code path
     /// from adding initial cachedevs.
-    fn test_init_cache_devs(paths: &[&Path]) {
+    fn test_add_cache_devs(paths: &[&Path]) {
         assert!(paths.len() > 3);
 
         let meta_size = Sectors(IEC::Mi);
@@ -745,7 +733,9 @@ mod tests {
             .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
             .unwrap();
 
-        let cache_uuids = backstore.add_cachedevs(pool_uuid, initcachepaths).unwrap();
+        let cache_uuids = backstore
+            .init_cache(pool_uuid, initcachepaths, None)
+            .unwrap();
 
         invariant(&backstore);
 
@@ -773,14 +763,9 @@ mod tests {
         invariant(&backstore);
         assert_eq!(data_uuids.len(), datadevpaths.len());
 
-        let cache_uuids = backstore
-            .init_cache(pool_uuid, cachedevpaths, None)
-            .unwrap();
+        let cache_uuids = backstore.add_cachedevs(pool_uuid, cachedevpaths).unwrap();
         invariant(&backstore);
-        assert_eq!(
-            cache_uuids.changed().map(|c| c.len()).unwrap_or(0),
-            cachedevpaths.len()
-        );
+        assert_eq!(cache_uuids.len(), cachedevpaths.len());
 
         let cache_status = backstore
             .cache
@@ -806,7 +791,7 @@ mod tests {
     pub fn loop_test_add_cache_devs() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(4, 5, None),
-            test_init_cache_devs,
+            test_add_cache_devs,
         );
     }
 
@@ -814,7 +799,7 @@ mod tests {
     pub fn real_test_add_cache_devs() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(4, None, None),
-            test_init_cache_devs,
+            test_add_cache_devs,
         );
     }
 
@@ -822,7 +807,7 @@ mod tests {
     pub fn travis_test_add_cache_devs() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(4, 5, None),
-            test_init_cache_devs,
+            test_add_cache_devs,
         );
     }
 
@@ -911,7 +896,7 @@ mod tests {
 
         let old_device = backstore.device();
 
-        backstore.add_cachedevs(pool_uuid, paths2).unwrap();
+        backstore.init_cache(pool_uuid, paths2, None).unwrap();
         invariant(&backstore);
 
         assert_ne!(backstore.device(), old_device);

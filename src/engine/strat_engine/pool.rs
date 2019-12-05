@@ -471,10 +471,14 @@ impl Pool for StratPool {
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>> {
         let result = self.backstore.set_blockdev_user_info(uuid, user_info);
-        if let RenameAction::Renamed(_) = result {
-            self.write_metadata(pool_name)?;
+        match result {
+            Ok(Some(uuid)) => {
+                self.write_metadata(pool_name)?;
+                Ok(RenameAction::Renamed(uuid))
+            }
+            Ok(None) => Ok(RenameAction::Identity),
+            Err(_) => Ok(RenameAction::NoSource),
         }
-        Ok(result)
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {

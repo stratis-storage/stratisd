@@ -30,7 +30,6 @@ use crate::{
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, Recordable},
         },
-        types::RenameAction,
         BlockDevTier, DevUuid, PoolUuid,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -553,18 +552,28 @@ impl Backstore {
 
     /// Set user info field on the specified blockdev.
     /// May return an error if there is no blockdev for the given UUID.
+    ///
+    /// * Ok(Some(uuid)) provides the uuid of the changed blockdev
+    /// * Ok(None) is returned if the blockdev was unchanged
+    /// * Err(StratisError::Engine(ErrorEnum::NotFound, _)) is returned if the UUID
+    /// does not correspond to a blockdev
     pub fn set_blockdev_user_info(
         &mut self,
         uuid: DevUuid,
         user_info: Option<&str>,
-    ) -> RenameAction<DevUuid> {
+    ) -> StratisResult<Option<DevUuid>> {
         self.get_mut_blockdev_by_uuid(uuid).map_or_else(
-            || RenameAction::NoSource,
+            || {
+                Err(StratisError::Engine(
+                    ErrorEnum::NotFound,
+                    format!("Blockdev with a UUID of {} was not found", uuid),
+                ))
+            },
             |(_, b)| {
                 if b.set_user_info(user_info) {
-                    RenameAction::Renamed(uuid)
+                    Ok(Some(uuid))
                 } else {
-                    RenameAction::Identity
+                    Ok(None)
                 }
             },
         )

@@ -94,7 +94,7 @@ impl Engine for SimEngine {
         uuid: PoolUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>> {
-        rename_pool_pre!(self; uuid; new_name);
+        rename_pool_pre_idem!(self; uuid; new_name);
 
         let (_, pool) = self
             .pools

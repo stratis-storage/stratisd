@@ -125,7 +125,6 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
 
 /// Get the most recent metadata from a set of Devices for a given pool UUID.
 /// Returns None if no metadata found for this pool.
-#[allow(clippy::implicit_hasher)]
 pub fn get_metadata(
     pool_uuid: PoolUuid,
     devnodes: &HashMap<Device, PathBuf>,
@@ -195,7 +194,6 @@ pub fn get_metadata(
 /// are the devs that support the cache tier.
 /// Precondition: Every device in devnodes has already been determined to
 /// belong to the pool with the specified pool uuid.
-#[allow(clippy::implicit_hasher)]
 pub fn get_blockdevs(
     pool_uuid: PoolUuid,
     backstore_save: &BackstoreSave,

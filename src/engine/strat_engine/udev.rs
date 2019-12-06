@@ -17,15 +17,6 @@ pub fn block_enumerator(context: &libudev::Context) -> libudev::Result<libudev::
     Ok(enumerator)
 }
 
-/// Make an enumerator for enumerating stratis block devices. Return an error
-/// if there was any udev-related error.
-pub fn stratis_enumerator(context: &libudev::Context) -> libudev::Result<libudev::Enumerator> {
-    let mut enumerator = libudev::Enumerator::new(context)?;
-    enumerator.match_subsystem("block")?;
-    enumerator.match_property("ID_FS_TYPE", "stratis")?;
-    Ok(enumerator)
-}
-
 /// Get a udev property with the given name for the given device.
 /// Returns None if no udev property found for the given property name.
 /// Returns an error if the value of the property can not be converted to

@@ -36,32 +36,52 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-/// Retrieve all block devices that possibly should be made use of by the
+/// Retrieve all block devices that should be made use of by the
 /// Stratis engine. This excludes Stratis block devices that appear to be
 /// multipath members.
-///
-/// The devices that are retrieved are inspected further in a subsequent
-/// step. The device discovery actions used here are only udev-related.
 ///
 /// Includes a fallback path, which is used if no Stratis block devices are
 /// found using the obvious udev property- and enumerator-based approach.
 /// This fallback path is more expensive, because it must search all block
 /// devices via udev rather than just all Stratis block devices.
-fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
+///
+/// Returns a map of pool uuids to a map of devices to devnodes for each pool.
+pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     info!("Beginning initial search for Stratis block devices");
-    let devices = {
+    let pool_map = {
+        let mut pool_map = HashMap::new();
+
         let context = libudev::Context::new()?;
         let mut enumerator = stratis_enumerator(&context)?;
-
-        enumerator
+        for devnode in enumerator
             .scan_devices()?
             .filter(|dev| dev.is_initialized())
             .filter(|dev| !is_multipath_member(dev).unwrap_or(true))
-            .filter_map(|i| i.devnode().map(|d| d.into()))
-            .collect::<Vec<PathBuf>>()
+            .filter_map(|i| i.devnode().map(|d| d.to_path_buf()))
+        {
+            match devnode_to_devno(&devnode)? {
+                None => warn!("udev identified device {} as a Stratis block device but its device number could not be found",
+                              devnode.display()),
+                Some(devno) => {
+                    if let Some((pool_uuid, _)) =
+                        device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+                    {
+                        pool_map
+                            .entry(pool_uuid)
+                            .or_insert_with(HashMap::new)
+                            .insert(Device::from(devno), devnode);
+                    } else {
+                        warn!("udev identified device {} as a Stratis block device but no Stratis metadata could be read from the device",
+                              devnode.display())
+                    }
+                }
+            }
+        }
+
+        pool_map
     };
 
-    if devices.is_empty() {
+    if pool_map.is_empty() {
         // No Stratis devices have been found, possible reasons are:
         // 1. There are none
         // 2. There are some but libblkid version is less than 2.32, so
@@ -77,9 +97,11 @@ fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
 
         info!("Could not identify any Stratis devices by a udev search for devices with ID_FS_TYPE=\"stratis\"; using fallback search mechanism");
 
+        let mut pool_map = HashMap::new();
+
         let context = libudev::Context::new()?;
         let mut enumerator = block_enumerator(&context)?;
-        Ok(enumerator
+        for devnode in enumerator
             .scan_devices()?
             .filter(|dev| dev.is_initialized())
             .filter_map(|dev| {
@@ -87,39 +109,32 @@ fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
                     decide_ownership(&dev)
                         .ok()
                         .and_then(|decision| match decision {
-                            UdevOwnership::Stratis | UdevOwnership::Unowned => Some(devnode.into()),
+                            UdevOwnership::Stratis | UdevOwnership::Unowned => Some(devnode.to_path_buf()),
                             _ => None,
                         })
                 })
             })
-            .collect())
-    } else {
-        Ok(devices)
-    }
-}
-
-/// Find all Stratis devices.
-///
-/// Returns a map of pool uuids to a map of devices to devnodes for each pool.
-pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
-    let mut pool_map = HashMap::new();
-
-    for devnode in get_stratis_block_devices()? {
-        match devnode_to_devno(&devnode)? {
-            None => continue,
-            Some(devno) => {
-                if let Some((pool_uuid, _)) =
-                    device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
-                {
-                    pool_map
-                        .entry(pool_uuid)
-                        .or_insert_with(HashMap::new)
-                        .insert(Device::from(devno), devnode);
+        {
+            match devnode_to_devno(&devnode)? {
+                None => warn!("udev identified device {} as a block device but its device number could not be found",
+                              devnode.display()),
+                Some(devno) => {
+                    if let Some((pool_uuid, _)) =
+                        device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+                    {
+                        pool_map
+                            .entry(pool_uuid)
+                            .or_insert_with(HashMap::new)
+                            .insert(Device::from(devno), devnode.to_path_buf());
+                    }
                 }
             }
         }
+
+        Ok(pool_map)
+    } else {
+        Ok(pool_map)
     }
-    Ok(pool_map)
 }
 
 /// Get the most recent metadata from a set of Devices for a given pool UUID.

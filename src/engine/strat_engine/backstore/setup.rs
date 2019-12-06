@@ -59,22 +59,21 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
             .filter(|dev| !is_multipath_member(dev).unwrap_or(true))
             .filter_map(|i| i.devnode().map(|d| d.to_path_buf()))
         {
-            match devnode_to_devno(&devnode)? {
-                None => warn!("udev identified device {} as a Stratis block device but its device number could not be found",
-                              devnode.display()),
-                Some(devno) => {
-                    if let Some((pool_uuid, _)) =
-                        device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
-                    {
-                        pool_map
-                            .entry(pool_uuid)
-                            .or_insert_with(HashMap::new)
-                            .insert(Device::from(devno), devnode);
-                    } else {
-                        warn!("udev identified device {} as a Stratis block device but no Stratis metadata could be read from the device",
-                              devnode.display())
-                    }
+            if let Some(devno) = devnode_to_devno(&devnode)? {
+                if let Some((pool_uuid, _)) =
+                    device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+                {
+                    pool_map
+                        .entry(pool_uuid)
+                        .or_insert_with(HashMap::new)
+                        .insert(Device::from(devno), devnode);
+                } else {
+                    warn!("udev identified device {} as a Stratis block device but there appeared to be no Stratis metadata on the device",
+                          devnode.display())
                 }
+            } else {
+                warn!("udev identified device {} as a Stratis block device but its device number could not be found",
+                      devnode.display())
             }
         }
 
@@ -109,28 +108,28 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
                     decide_ownership(&dev)
                         .ok()
                         .and_then(|decision| match decision {
-                            UdevOwnership::Stratis | UdevOwnership::Unowned => Some(devnode.to_path_buf()),
+                            UdevOwnership::Stratis | UdevOwnership::Unowned => {
+                                Some(devnode.to_path_buf())
+                            }
                             _ => None,
                         })
                 })
             })
         {
-            match devnode_to_devno(&devnode)? {
-                None => warn!("udev identified device {} as a block device but its device number could not be found",
-                              devnode.display()),
-                Some(devno) => {
-                    if let Some((pool_uuid, _)) =
-                        device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
-                    {
-                        pool_map
-                            .entry(pool_uuid)
-                            .or_insert_with(HashMap::new)
-                            .insert(Device::from(devno), devnode.to_path_buf());
-                    }
+            if let Some(devno) = devnode_to_devno(&devnode)? {
+                if let Some((pool_uuid, _)) =
+                    device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
+                {
+                    pool_map
+                        .entry(pool_uuid)
+                        .or_insert_with(HashMap::new)
+                        .insert(Device::from(devno), devnode.to_path_buf());
                 }
+            } else {
+                warn!("udev identified device {} as a block device but its device number could not be found",
+                      devnode.display())
             }
         }
-
         Ok(pool_map)
     } else {
         Ok(pool_map)

@@ -117,9 +117,21 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
             })
         {
             if let Some(devno) = devnode_to_devno(&devnode)? {
-                if let Some((pool_uuid, _)) =
-                    device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
-                {
+                if let Some((pool_uuid, _)) = match device_identifiers(
+                    &mut OpenOptions::new().read(true).open(&devnode)?,
+                ) {
+                    Ok(ids) => ids,
+                    // FIXME: Refine error return in StaticHeader::setup(),
+                    // so it can be used to distinguish between signficant
+                    // and insignficant errors and then use that ability to
+                    // distinguish here between different levels of severity.
+                    Err(err) => {
+                        debug!("Encountered an error while trying to get Stratis device identifiers from block device {}: {}",
+                               devnode.display(),
+                               err);
+                        None
+                    }
+                } {
                     pool_map
                         .entry(pool_uuid)
                         .or_insert_with(HashMap::new)

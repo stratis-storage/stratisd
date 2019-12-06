@@ -827,8 +827,28 @@ mod tests {
             vec![pool_uuid].iter().collect::<HashSet<&PoolUuid>>()
         );
 
+        let found_devs = &map[&pool_uuid];
+        let found_devs_set = found_devs
+            .iter()
+            .map(|(_, path)| path.as_path())
+            .collect::<HashSet<&Path>>();
+        assert!(paths1
+            .iter()
+            .cloned()
+            .collect::<HashSet<&Path>>()
+            .is_subset(&found_devs_set));
+        assert!(paths2
+            .iter()
+            .cloned()
+            .collect::<HashSet<&Path>>()
+            .is_subset(&found_devs_set));
+        assert_eq!(
+            found_devs_set,
+            paths.iter().cloned().collect::<HashSet<&Path>>()
+        );
+
         let mut backstore =
-            Backstore::setup(pool_uuid, &backstore_save, &map[&pool_uuid], Utc::now()).unwrap();
+            Backstore::setup(pool_uuid, &backstore_save, found_devs, Utc::now()).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();
@@ -845,8 +865,28 @@ mod tests {
             vec![pool_uuid].iter().collect::<HashSet<&PoolUuid>>()
         );
 
+        let found_devs = &map[&pool_uuid];
+        let found_devs_set = found_devs
+            .iter()
+            .map(|(_, path)| path.as_path())
+            .collect::<HashSet<&Path>>();
+        assert!(paths1
+            .iter()
+            .cloned()
+            .collect::<HashSet<&Path>>()
+            .is_subset(&found_devs_set));
+        assert!(paths2
+            .iter()
+            .cloned()
+            .collect::<HashSet<&Path>>()
+            .is_subset(&found_devs_set));
+        assert_eq!(
+            found_devs_set,
+            paths.iter().cloned().collect::<HashSet<&Path>>()
+        );
+
         let mut backstore =
-            Backstore::setup(pool_uuid, &backstore_save, &map[&pool_uuid], Utc::now()).unwrap();
+            Backstore::setup(pool_uuid, &backstore_save, found_devs, Utc::now()).unwrap();
         invariant(&backstore);
 
         let backstore_save2 = backstore.record();

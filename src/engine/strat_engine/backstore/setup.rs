@@ -58,9 +58,17 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
             .filter_map(|i| i.devnode().map(|d| d.to_path_buf()))
         {
             if let Some(devno) = devnode_to_devno(&devnode)? {
-                if let Some((pool_uuid, _)) =
-                    device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
-                {
+                if let Some((pool_uuid, _)) = match device_identifiers(
+                    &mut OpenOptions::new().read(true).open(&devnode)?,
+                ) {
+                    Ok(ids) => ids,
+                    Err(err) => {
+                        warn!("udev identified device {} as a Stratis block device, but there was an error when reading the Stratis header: {}",
+                                  devnode.display(),
+                                  err);
+                        None
+                    }
+                } {
                     pool_map
                         .entry(pool_uuid)
                         .or_insert_with(HashMap::new)

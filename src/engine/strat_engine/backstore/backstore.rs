@@ -552,6 +552,11 @@ impl Backstore {
 
     /// Set user info field on the specified blockdev.
     /// May return an error if there is no blockdev for the given UUID.
+    ///
+    /// * Ok(Some(uuid)) provides the uuid of the changed blockdev
+    /// * Ok(None) is returned if the blockdev was unchanged
+    /// * Err(StratisError::Engine(ErrorEnum::NotFound, _)) is returned if the UUID
+    /// does not correspond to a blockdev
     pub fn set_blockdev_user_info(
         &mut self,
         uuid: DevUuid,
@@ -561,7 +566,7 @@ impl Backstore {
             || {
                 Err(StratisError::Engine(
                     ErrorEnum::NotFound,
-                    "Blockdev not found".to_string(),
+                    format!("Blockdev with a UUID of {} was not found", uuid),
                 ))
             },
             |(_, b)| {

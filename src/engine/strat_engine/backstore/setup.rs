@@ -26,10 +26,7 @@ use crate::{
             },
             device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
-            udev::{
-                block_enumerator, decide_ownership, is_multipath_member, stratis_enumerator,
-                UdevOwnership,
-            },
+            udev::{block_enumerator, decide_ownership, is_multipath_member, UdevOwnership},
         },
         types::{BlockDevTier, DevUuid, PoolUuid},
     },
@@ -52,7 +49,8 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
         let mut pool_map = HashMap::new();
 
         let context = libudev::Context::new()?;
-        let mut enumerator = stratis_enumerator(&context)?;
+        let mut enumerator = block_enumerator(&context)?;
+        enumerator.match_property("ID_FS_TYPE", "stratis")?;
         for devnode in enumerator
             .scan_devices()?
             .filter(|dev| dev.is_initialized())

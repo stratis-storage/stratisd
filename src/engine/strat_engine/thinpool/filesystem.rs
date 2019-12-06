@@ -29,6 +29,7 @@ use crate::{
         engine::Filesystem,
         strat_engine::{
             cmd::{create_fs, set_uuid, udev_settle, xfs_growfs},
+            devlinks,
             dm::get_dm,
             names::{format_thin_ids, ThinRole},
             serde_structs::FilesystemSave,
@@ -312,6 +313,10 @@ impl Filesystem for StratFilesystem {
 
     fn created(&self) -> DateTime<Utc> {
         self.created
+    }
+
+    fn path_to_mount_filesystem(&self, pool_name: &str, fs_name: &str) -> PathBuf {
+        devlinks::filesystem_mount_path(pool_name, fs_name)
     }
 
     fn used(&self) -> StratisResult<Bytes> {

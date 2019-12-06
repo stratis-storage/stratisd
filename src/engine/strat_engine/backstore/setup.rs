@@ -22,27 +22,31 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                device::DevOwnership,
                 metadata::{device_identifiers, BDA},
             },
             device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
-            udev::{block_enumerator, decide_ownership, is_multipath_member, stratis_enumerator},
+            udev::{
+                block_enumerator, decide_ownership, is_multipath_member, stratis_enumerator,
+                UdevOwnership,
+            },
         },
         types::{BlockDevTier, DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-/// Retrieve all Stratis block devices that should be made use of by the
-/// Stratis engine. This excludes Stratis block devices that are multipath
-/// members.
+/// Retrieve all block devices that possibly should be made use of by the
+/// Stratis engine. This excludes Stratis block devices that appear to be
+/// multipath members.
+///
+/// The devices that are retrieved are inspected further in a subsequent
+/// step. The device discovery actions used here are only udev-related.
 ///
 /// Includes a fallback path, which is used if no Stratis block devices are
 /// found using the obvious udev property- and enumerator-based approach.
 /// This fallback path is more expensive, because it must search all block
-/// devices via udev, and may also attempt to directly read Stratis
-/// metadata from the device.
+/// devices via udev rather than just all Stratis block devices.
 fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
     info!("Beginning initial search for Stratis block devices");
     let devices = {
@@ -67,8 +71,9 @@ fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
         //
         // Try again to find Stratis block devices, but this time enumerate
         // all block devices, not just all the ones that can be identified
-        // as Stratis blockdevs by udev, and then scrutinize each one
-        // using various methods.
+        // as Stratis blockdevs by udev, and return only those that appear
+        // unclaimed or appear to be claimed by Stratis (and not
+        // multipath members).
 
         info!("Could not identify any Stratis devices by a udev search for devices with ID_FS_TYPE=\"stratis\"; using fallback search mechanism");
 
@@ -80,10 +85,11 @@ fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
             .filter_map(|dev| {
                 dev.devnode().and_then(|devnode| {
                     decide_ownership(&dev)
-                        .and_then(|decision| DevOwnership::from_udev_ownership(&decision, devnode))
                         .ok()
-                        .and_then(|ownership| ownership.stratis_identifiers())
-                        .map(|_| devnode.into())
+                        .and_then(|decision| match decision {
+                            UdevOwnership::Stratis | UdevOwnership::Unowned => Some(devnode.into()),
+                            _ => None,
+                        })
                 })
             })
             .collect())
@@ -98,13 +104,6 @@ fn get_stratis_block_devices() -> StratisResult<Vec<PathBuf>> {
 pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     let mut pool_map = HashMap::new();
 
-    // FIXME: If get_stratis_block_devices() has to go to fallback mechanism,
-    // it has already read the device identifiers for every device it returns.
-    // It seems a waste to just read them all again in that case. Likely
-    // get_stratis_block_devices() and this method should be consolidated in
-    // some creative way, or get_stratis_block_devices() should be required
-    // to return the device identifiers from the device as well as the devnode,
-    // regardless of which mechanism was used.
     for devnode in get_stratis_block_devices()? {
         match devnode_to_devno(&devnode)? {
             None => continue,

@@ -36,7 +36,7 @@ macro_rules! get_parent {
     };
 }
 
-/// Macro for early return with Ok dbus message on failure to get mutable pool.
+/// Macro for early return with Ok dbus message on failure to get immutable pool.
 macro_rules! get_pool {
     ($engine:ident; $uuid:ident; $default:expr; $message:expr) => {
         if let Some(pool) = $engine.get_pool($uuid) {

@@ -34,6 +34,12 @@ use crate::{
     },
 };
 
+enum BlockDevOp {
+    InitCache,
+    AddCache,
+    AddData,
+}
+
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
@@ -220,6 +226,10 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 }
 
 fn init_cache_2_1(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    add_blockdevs(m, BlockDevOp::InitCache)
+}
+
+fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, op: BlockDevOp) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -237,66 +247,23 @@ fn init_cache_2_1(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
-
-    let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
-    let result = pool.init_cache(
-        pool_uuid,
-        &blockdevs,
-        pool.keyfile_path().map(|kfp| kfp.to_path_buf()),
-    );
-    let return_value = match result.map(|r| r.changed()) {
-        Ok(Some(uuids)) => {
-            let return_value = uuids
-                .iter()
-                .map(|uuid| {
-                    // FIXME: To avoid this expect, modify init_cache
-                    // so that it returns a mutable reference to each
-                    // blockdev created.
-                    create_dbus_blockdev(
-                        dbus_context,
-                        object_path.clone(),
-                        *uuid,
-                        pool.get_mut_blockdev(*uuid)
-                            .expect("just inserted by init_cache")
-                            .1,
-                    )
-                })
-                .collect::<Vec<_>>();
-            return_message.append3((true, return_value), msg_code_ok(), msg_string_ok())
-        }
-        Ok(None) => return_message.append3(default_return, msg_code_ok(), msg_string_ok()),
-        Err(err) => {
-            let (rc, rs) = engine_to_dbus_err_tuple(&err);
-            return_message.append3(default_return, rc, rs)
-        }
-    };
-    Ok(vec![return_value])
-}
-
-fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-
-    let devs: Array<&str, _> = get_next_arg(&mut iter, 1)?;
-
-    let dbus_context = m.tree.get_data();
-    let object_path = m.path.get_name();
-    let return_message = message.method_return();
-    let default_return: (bool, Vec<dbus::Path>) = (false, Vec::new());
-
-    let pool_path = m
-        .tree
-        .get(object_path)
-        .expect("implicit argument must be in tree");
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
-
-    let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
-    let result = pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, tier);
+    let result = match op {
+        BlockDevOp::InitCache => pool.init_cache(
+            pool_uuid,
+            &blockdevs,
+            pool.keyfile_path().map(|kfp| kfp.to_path_buf()),
+        ),
+        BlockDevOp::AddCache => {
+            pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Cache)
+        }
+        BlockDevOp::AddData => {
+            pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data)
+        }
+    };
     let msg = match result.map(|bds| bds.changed()) {
         Ok(Some(uuids)) => {
             let return_value = uuids
@@ -329,7 +296,7 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> Meth
 }
 
 fn add_datadevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    add_blockdevs(m, BlockDevTier::Data)
+    add_blockdevs(m, BlockDevOp::AddData)
 }
 
 fn add_cachedevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -349,14 +316,14 @@ fn add_cachedevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         pool.cache_initialized()
     };
     if cache_initialized {
-        add_blockdevs(m, BlockDevTier::Cache)
+        add_blockdevs(m, BlockDevOp::AddCache)
     } else {
         init_cache_2_1(m)
     }
 }
 
 fn add_cachedevs_2_1(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    add_blockdevs(m, BlockDevTier::Cache)
+    add_blockdevs(m, BlockDevOp::AddCache)
 }
 
 fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {

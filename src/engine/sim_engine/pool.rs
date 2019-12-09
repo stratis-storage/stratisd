@@ -112,26 +112,19 @@ impl Pool for SimPool {
         keyfile_path: Option<PathBuf>,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         if self.cache_devs.is_empty() {
-            if blockdevs.is_empty() {
-                Err(StratisError::Engine(
-                    ErrorEnum::Invalid,
-                    "Must initialize cache with at least one blockdev.".to_string(),
-                ))
-            } else {
-                let blockdev_pairs: Vec<_> = blockdevs
-                    .iter()
-                    .map(|p| {
-                        SimDev::new(
-                            Rc::clone(&self.rdm),
-                            p,
-                            keyfile_path.as_ref().map(|p| p.as_path()),
-                        )
-                    })
-                    .collect();
-                let blockdev_uuids: Vec<_> = blockdev_pairs.iter().map(|(uuid, _)| *uuid).collect();
-                self.cache_devs.extend(blockdev_pairs);
-                Ok(SetCreateAction::new(blockdev_uuids))
-            }
+            let blockdev_pairs: Vec<_> = blockdevs
+                .iter()
+                .map(|p| {
+                    SimDev::new(
+                        Rc::clone(&self.rdm),
+                        p,
+                        keyfile_path.as_ref().map(|p| p.as_path()),
+                    )
+                })
+                .collect();
+            let blockdev_uuids: Vec<_> = blockdev_pairs.iter().map(|(uuid, _)| *uuid).collect();
+            self.cache_devs.extend(blockdev_pairs);
+            Ok(SetCreateAction::new(blockdev_uuids))
         } else {
             init_cache_idempotent_or_err(
                 blockdevs,

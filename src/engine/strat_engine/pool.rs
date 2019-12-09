@@ -305,10 +305,11 @@ impl Pool for StratPool {
             // If adding cache devices, must suspend the pool, since the cache
             // must be augmented with the new devices.
             self.thin_pool.suspend()?;
-            let devices = self
+            let devices_result = self
                 .backstore
-                .init_cache(pool_uuid, blockdevs, keyfile_path)?;
+                .init_cache(pool_uuid, blockdevs, keyfile_path);
             self.thin_pool.resume()?;
+            let devices = devices_result?;
             Ok(SetCreateAction::new(devices))
         }
     }
@@ -351,17 +352,17 @@ impl Pool for StratPool {
                 // If adding cache devices, must suspend the pool, since the cache
                 // must be augmented with the new devices.
                 self.thin_pool.suspend()?;
-                let bdev_info_res = self
-                    .backstore
-                    .add_cachedevs(pool_uuid, paths)
-                    .and_then(|bdi| {
-                        self.thin_pool
-                            .set_device(self.backstore.device().expect(
-                                "Since thin pool exists, space must have been allocated \
-                                 from the backstore, so backstore must have a cap device",
-                            ))
-                            .and(Ok(bdi))
-                    });
+                let bdev_info_res =
+                    self.backstore
+                        .add_cachedevs(pool_uuid, paths)
+                        .and_then(|bdi| {
+                            self.thin_pool
+                                .set_device(self.backstore.device().expect(
+                                    "Since thin pool exists, space must have been allocated \
+                                     from the backstore, so backstore must have a cap device",
+                                ))
+                                .and(Ok(bdi))
+                        });
                 self.thin_pool.resume()?;
                 let bdev_info = bdev_info_res?;
                 Ok(SetCreateAction::new(bdev_info))

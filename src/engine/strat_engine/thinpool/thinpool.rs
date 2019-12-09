@@ -1039,8 +1039,19 @@ impl ThinPool {
     pub fn suspend(&mut self) -> StratisResult<()> {
         // thindevs automatically suspended when thinpool is suspended
         self.thin_pool.suspend(get_dm(), true)?;
-        self.mdv.suspend()?;
-        Ok(())
+        // If MDV suspend fails, resume the thin pool and return the error
+        if let Err(err) = self.mdv.suspend() {
+            self.thin_pool.resume(get_dm()).map_err(|e| {
+                StratisError::Error(format!(
+                    "Suspending the MDV failed: {}. MDV suspend clean up action \
+                     of resuming the thin pool also failed: {}.",
+                    err, e
+                ))
+            })?;
+            Err(err)
+        } else {
+            Ok(())
+        }
     }
 
     /// Resume the thinpool

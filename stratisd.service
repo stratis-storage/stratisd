@@ -1,5 +1,5 @@
 [Unit]
-Description=A daemon that manages a pool of block devices to create flexible file systems
+Description=Stratis daemon
 Documentation=man:stratisd(8)
 Before=local-fs-pre.target
 DefaultDependencies=no

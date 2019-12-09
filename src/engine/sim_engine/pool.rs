@@ -108,6 +108,7 @@ impl Pool for SimPool {
     fn init_cache(
         &mut self,
         _pool_uuid: PoolUuid,
+        _pool_name: &str,
         blockdevs: &[&Path],
         keyfile_path: Option<PathBuf>,
     ) -> StratisResult<SetCreateAction<DevUuid>> {

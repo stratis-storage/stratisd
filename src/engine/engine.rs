@@ -85,6 +85,7 @@ pub trait Pool: Debug {
     fn init_cache(
         &mut self,
         pool_uuid: PoolUuid,
+        pool_name: &str,
         blockdevs: &[&Path],
         keyfile_path: Option<PathBuf>,
     ) -> StratisResult<SetCreateAction<DevUuid>>;

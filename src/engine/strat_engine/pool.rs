@@ -290,6 +290,7 @@ impl Pool for StratPool {
     fn init_cache(
         &mut self,
         pool_uuid: PoolUuid,
+        pool_name: &str,
         blockdevs: &[&Path],
         keyfile_path: Option<PathBuf>,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
@@ -310,6 +311,7 @@ impl Pool for StratPool {
                 .init_cache(pool_uuid, blockdevs, keyfile_path);
             self.thin_pool.resume()?;
             let devices = devices_result?;
+            self.write_metadata(pool_name)?;
             Ok(SetCreateAction::new(devices))
         }
     }
@@ -718,7 +720,7 @@ mod tests {
                 .unwrap();
         }
 
-        pool.init_cache(uuid, paths1, None).unwrap();
+        pool.init_cache(uuid, name, paths1, None).unwrap();
         invariant(&pool, name);
 
         let metadata2 = pool.record(name);

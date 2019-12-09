@@ -254,6 +254,7 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, op: BlockDevOp) -> MethodRe
     let result = match op {
         BlockDevOp::InitCache => pool.init_cache(
             pool_uuid,
+            &*pool_name,
             &blockdevs,
             pool.keyfile_path().map(|kfp| kfp.to_path_buf()),
         ),

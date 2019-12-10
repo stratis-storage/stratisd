@@ -25,7 +25,7 @@ use crate::{
             dm::{get_dm, get_dm_init},
             names::validate_name,
             pool::{check_metadata, StratPool},
-            udev::{block_device_apply, decide_ownership},
+            udev::block_device_ownership,
         },
         structures::Table,
         types::{CreateAction, DeleteAction, RenameAction},
@@ -207,20 +207,9 @@ impl Engine for StratEngine {
         device: Device,
         dev_node: PathBuf,
     ) -> StratisResult<Option<PoolUuid>> {
-        let stratis_identifiers = if let Some(ownership) = block_device_apply(&dev_node, |d| {
-            decide_ownership(d)
-                .and_then(|decision| DevOwnership::from_udev_ownership(&decision, &dev_node))
-        })? {
-            ownership?.stratis_identifiers()
-        } else {
-            return Err(StratisError::Engine(
-                ErrorEnum::NotFound,
-                format!(
-                    "Could not determine ownership of block device {} because it could not be found in the udev database",
-                    dev_node.display()
-                ),
-            ));
-        };
+        let stratis_identifiers =
+            DevOwnership::from_udev_ownership(&block_device_ownership(&dev_node)???, &dev_node)?
+                .stratis_identifiers();
         let pool_uuid = if let Some((pool_uuid, device_uuid)) = stratis_identifiers {
             if self.pools.contains_uuid(pool_uuid) {
                 // We can get udev events for devices that are already in the pool.  Lets check

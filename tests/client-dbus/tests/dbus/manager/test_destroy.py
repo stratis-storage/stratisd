@@ -30,7 +30,7 @@ from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import SimTestCase, device_name_list
 
-_DEVICE_STRATEGY = device_name_list()
+_DEVICE_STRATEGY = device_name_list(1)
 
 
 class Destroy1TestCase(SimTestCase):
@@ -150,40 +150,3 @@ class Destroy3TestCase(SimTestCase):
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (pool1, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
         self.assertEqual(pool, pool1)
-
-
-class Destroy4TestCase(SimTestCase):
-    """
-    Test 'destroy' on database which contains the given pool with no devices.
-    """
-
-    _POOLNAME = "deadpool"
-
-    def setUp(self):
-        """
-        Start the stratisd daemon with the simulator.
-        """
-        super().setUp()
-        self._proxy = get_object(TOP_OBJECT)
-        Manager.Methods.CreatePool(
-            self._proxy,
-            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": []},
-        )
-
-    def testExecution(self):
-        """
-        The pool was just created and has no devices. It should always be
-        possible to destroy it.
-        """
-        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        (pool, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
-
-        ((is_some, _), rc, _) = Manager.Methods.DestroyPool(self._proxy, {"pool": pool})
-
-        self.assertEqual(rc, StratisdErrors.OK)
-        self.assertTrue(is_some)
-
-        managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        self.assertIsNone(
-            next(pools(props={"Name": self._POOLNAME}).search(managed_objects), None)
-        )

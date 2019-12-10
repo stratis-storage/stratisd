@@ -182,3 +182,10 @@ macro_rules! init_cache_generate_error_string {
         )
     };
 }
+
+#[cfg(test)]
+macro_rules! strs_to_paths {
+    ($slice:expr) => {
+        &$slice.iter().map(Path::new).collect::<Vec<_>>()
+    };
+}

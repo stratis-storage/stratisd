@@ -48,20 +48,27 @@ impl Engine for SimEngine {
         match self.pools.get_by_name(name) {
             Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
             None => {
-                let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
-                let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
+                if blockdev_paths.is_empty() {
+                    Err(StratisError::Engine(
+                        ErrorEnum::Invalid,
+                        "At least one blockdev is required to create a pool.".to_string(),
+                    ))
+                } else {
+                    let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
+                    let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
 
-                let (pool_uuid, pool) =
-                    SimPool::new(&Rc::clone(&self.rdm), &devices, redundancy, keyfile_path);
+                    let (pool_uuid, pool) =
+                        SimPool::new(&Rc::clone(&self.rdm), &devices, redundancy, keyfile_path);
 
-                if self.rdm.borrow_mut().throw_die() {
-                    return Err(StratisError::Engine(ErrorEnum::Error, "X".into()));
+                    if self.rdm.borrow_mut().throw_die() {
+                        return Err(StratisError::Engine(ErrorEnum::Error, "X".into()));
+                    }
+
+                    self.pools
+                        .insert(Name::new(name.to_owned()), pool_uuid, pool);
+
+                    Ok(CreateAction::Created(pool_uuid))
                 }
-
-                self.pools
-                    .insert(Name::new(name.to_owned()), pool_uuid, pool);
-
-                Ok(CreateAction::Created(pool_uuid))
             }
         }
     }
@@ -189,7 +196,12 @@ mod tests {
     fn destroy_empty_pool() {
         let mut engine = SimEngine::default();
         let uuid = engine
-            .create_pool("name", &[], None, None)
+            .create_pool(
+                "name",
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -266,7 +278,12 @@ mod tests {
             .create_pool(name, &[Path::new("/s/d")], None, None)
             .unwrap();
         assert_matches!(
-            engine.create_pool(name, &[], None, None),
+            engine.create_pool(
+                name,
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            ),
             Err(StratisError::Engine(ErrorEnum::Invalid, _))
         );
     }
@@ -313,7 +330,12 @@ mod tests {
         let name = "name";
         let mut engine = SimEngine::default();
         let uuid = engine
-            .create_pool(name, &[], None, None)
+            .create_pool(
+                name,
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -328,7 +350,12 @@ mod tests {
     fn rename_happens() {
         let mut engine = SimEngine::default();
         let uuid = engine
-            .create_pool("old_name", &[], None, None)
+            .create_pool(
+                "old_name",
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -344,11 +371,23 @@ mod tests {
         let new_name = "new_name";
         let mut engine = SimEngine::default();
         let uuid = engine
-            .create_pool("old_name", &[], None, None)
+            .create_pool(
+                "old_name",
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();
-        engine.create_pool(new_name, &[], None, None).unwrap();
+        engine
+            .create_pool(
+                new_name,
+                strs_to_paths!(["/dev/four", "/dev/five", "/dev/six"]),
+                None,
+                None,
+            )
+            .unwrap();
         assert_matches!(
             engine.rename_pool(uuid, new_name),
             Err(StratisError::Engine(ErrorEnum::AlreadyExists, _))
@@ -360,7 +399,14 @@ mod tests {
     fn rename_no_op() {
         let new_name = "new_name";
         let mut engine = SimEngine::default();
-        engine.create_pool(new_name, &[], None, None).unwrap();
+        engine
+            .create_pool(
+                new_name,
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
+            .unwrap();
         assert_matches!(
             engine.rename_pool(Uuid::new_v4(), new_name),
             Ok(RenameAction::NoSource)

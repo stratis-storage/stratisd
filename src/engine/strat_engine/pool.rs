@@ -300,6 +300,11 @@ impl Pool for StratPool {
                     .into_iter()
                     .map(|(_, bd)| bd.devnode()),
             )
+        } else if blockdevs.is_empty() {
+            Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                "At least one blockdev is required to initialize cache.".to_string(),
+            ))
         } else {
             // If adding cache devices, must suspend the pool, since the cache
             // must be augmented with the new devices.
@@ -347,6 +352,12 @@ impl Pool for StratPool {
         paths: &[&Path],
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
+        if paths.is_empty() {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                "At least one blockdev path is required when adding blockdevs.".to_string(),
+            ));
+        }
         let bdev_info = if tier == BlockDevTier::Cache {
             if self.backstore.cache_initialized() {
                 // If adding cache devices, must suspend the pool, since the cache

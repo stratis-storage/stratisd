@@ -957,6 +957,10 @@ impl ThinPool {
     /// Destroy a filesystem within the thin pool. Destroy metadata and
     /// devlinks information associated with the thinpool. If there is a
     /// failure to destroy the filesystem, retain it, and return an error.
+    ///
+    /// * Ok(Some(uuid)) provides the uuid of the destroyed filesystem
+    /// * Ok(None) is returned if the filesystem did not exist
+    /// * Err(_) is returned if the filesystem could not be destroyed
     pub fn destroy_filesystem(
         &mut self,
         pool_name: &str,

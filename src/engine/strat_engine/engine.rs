@@ -205,12 +205,19 @@ impl Engine for StratEngine {
         match self.pools.get_by_name(name) {
             Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
             None => {
-                let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy)?;
+                if blockdev_paths.is_empty() {
+                    Err(StratisError::Engine(
+                        ErrorEnum::Invalid,
+                        "At least one blockdev is required to create a pool.".to_string(),
+                    ))
+                } else {
+                    let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy)?;
 
-                let name = Name::new(name.to_owned());
-                devlinks::pool_added(&name);
-                self.pools.insert(name, uuid, pool);
-                Ok(CreateAction::Created(uuid))
+                    let name = Name::new(name.to_owned());
+                    devlinks::pool_added(&name);
+                    self.pools.insert(name, uuid, pool);
+                    Ok(CreateAction::Created(uuid))
+                }
             }
         }
     }

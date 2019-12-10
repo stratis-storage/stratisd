@@ -309,6 +309,16 @@ impl Pool for StratPool {
         paths: &[&Path],
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
+        if paths.is_empty() {
+            return if !self.has_cache() && tier == BlockDevTier::Cache {
+                Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    "At least one blockdev path is required to initialize a cache.".to_string(),
+                ))
+            } else {
+                Ok(SetCreateAction::new(vec![]))
+            };
+        }
         let bdev_info = if tier == BlockDevTier::Cache {
             // If adding cache devices, must suspend the pool, since the cache
             // must be augmeneted with the new devices.

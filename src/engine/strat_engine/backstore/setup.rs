@@ -109,18 +109,15 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
         for devnode in enumerator
             .scan_devices()?
             .filter(|dev| dev.is_initialized())
-            .filter_map(|dev| {
-                dev.devnode().and_then(|devnode| {
-                    decide_ownership(&dev)
-                        .ok()
-                        .and_then(|decision| match decision {
-                            UdevOwnership::Stratis | UdevOwnership::Unowned => {
-                                Some(devnode.to_path_buf())
-                            }
-                            _ => None,
-                        })
-                })
+            .filter(|dev| {
+                decide_ownership(dev)
+                    .map(|decision| match decision {
+                        UdevOwnership::Stratis | UdevOwnership::Unowned => true,
+                        _ => false,
+                    })
+                    .unwrap_or(false)
             })
+            .filter_map(|i| i.devnode().map(|d| d.to_path_buf()))
         {
             if let Some(devno) = devnode_to_devno(&devnode)? {
                 if let Some((pool_uuid, _)) = match device_identifiers(

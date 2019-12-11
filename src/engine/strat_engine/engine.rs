@@ -305,7 +305,7 @@ impl Engine for StratEngine {
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>> {
         validate_name(new_name)?;
-        let old_name = rename_pool_pre!(self; uuid; new_name);
+        let old_name = rename_pool_pre_idem!(self; uuid; new_name);
 
         let (_, mut pool) = self
             .pools

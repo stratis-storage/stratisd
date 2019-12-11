@@ -134,6 +134,59 @@ SPECS = {
 </property>
 </interface>
 """,
+    "org.storage.stratis2.pool.r1": """
+<interface name="org.storage.stratis2.pool.r1">
+<method name="InitCache">
+<arg name="devices" type="as" direction="in"/>
+<arg name="results" type="(bao)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="AddCacheDevs">
+<arg name="devices" type="as" direction="in"/>
+<arg name="results" type="(bao)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="AddDataDevs">
+<arg name="devices" type="as" direction="in"/>
+<arg name="results" type="(bao)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="CreateFilesystems">
+<arg name="specs" type="as" direction="in"/>
+<arg name="results" type="(ba(os))" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="DestroyFilesystems">
+<arg name="filesystems" type="ao" direction="in"/>
+<arg name="results" type="(bas)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="SetName">
+<arg name="name" type="s" direction="in"/>
+<arg name="result" type="(bs)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="SnapshotFilesystem">
+<arg name="origin" type="o" direction="in"/>
+<arg name="snapshot_name" type="s" direction="in"/>
+<arg name="result" type="(bo)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<property name="Name" type="s" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="true"/>
+</property>
+<property name="Uuid" type="s" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
+</property>
+</interface>
+""",
     "org.storage.stratis2.filesystem": """
 <interface name="org.storage.stratis2.filesystem">
 <method name="SetName">

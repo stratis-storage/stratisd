@@ -54,7 +54,12 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
         for devnode in enumerator
             .scan_devices()?
             .filter(|dev| dev.is_initialized())
-            .filter(|dev| !is_multipath_member(dev).unwrap_or(true))
+            .filter(|dev| !is_multipath_member(dev)
+                    .map_err(|err| {
+                        warn!("Could not certainly determine whether a device was a multipath member because of an error processing udev information, discarded the device from the set of devices to process, for safety: {}",
+                              err);
+                    })
+                    .unwrap_or(true))
             .filter_map(|i| i.devnode().map(|d| d.to_path_buf()))
         {
             if let Some(devno) = devnode_to_devno(&devnode)? {
@@ -109,18 +114,19 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
         for devnode in enumerator
             .scan_devices()?
             .filter(|dev| dev.is_initialized())
-            .filter_map(|dev| {
-                dev.devnode().and_then(|devnode| {
-                    decide_ownership(&dev)
-                        .ok()
-                        .and_then(|decision| match decision {
-                            UdevOwnership::Stratis | UdevOwnership::Unowned => {
-                                Some(devnode.to_path_buf())
-                            }
-                            _ => None,
-                        })
-                })
+            .filter(|dev| {
+                decide_ownership(dev)
+                    .map_err(|err| {
+                        warn!("Could not determine ownership of a udev block device because of an error processing udev information, discarded the device from the set of devices to process, for safety: {}",
+                              err);
+                    })
+                    .map(|decision| match decision {
+                        UdevOwnership::Stratis | UdevOwnership::Unowned => true,
+                        _ => false,
+                    })
+                    .unwrap_or(false)
             })
+            .filter_map(|i| i.devnode().map(|d| d.to_path_buf()))
         {
             if let Some(devno) = devnode_to_devno(&devnode)? {
                 if let Some((pool_uuid, _)) = match device_identifiers(

@@ -547,7 +547,7 @@ mod tests {
         backstore::{find_all, get_metadata},
         cmd,
         tests::{loopbacked, real},
-        udev::{block_device_apply, decide_ownership},
+        udev::block_device_ownership,
     };
 
     use crate::engine::strat_engine::backstore::metadata::device_identifiers;
@@ -612,19 +612,19 @@ mod tests {
         for (i, path) in paths.iter().enumerate() {
             if i == index {
                 assert_matches!(
-                    block_device_apply(path, |d| decide_ownership(d)
-                        .and_then(|decision| DevOwnership::from_udev_ownership(&decision, path)))
-                    .unwrap()
-                    .unwrap()
+                    DevOwnership::from_udev_ownership(
+                        &block_device_ownership(path).unwrap().unwrap().unwrap(),
+                        path
+                    )
                     .unwrap(),
                     DevOwnership::Theirs(_)
                 );
             } else {
                 assert_matches!(
-                    block_device_apply(path, |d| decide_ownership(d)
-                        .and_then(|decision| DevOwnership::from_udev_ownership(&decision, path)))
-                    .unwrap()
-                    .unwrap()
+                    DevOwnership::from_udev_ownership(
+                        &block_device_ownership(path).unwrap().unwrap().unwrap(),
+                        path
+                    )
                     .unwrap(),
                     DevOwnership::Unowned
                 );

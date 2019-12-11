@@ -53,7 +53,6 @@ class SetNameTestCase(SimTestCase):
             },
         )
         self._pool_object = get_object(self._pool_object_path)
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testNullMapping(self):
         """

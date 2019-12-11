@@ -27,7 +27,7 @@ from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import SimTestCase, device_name_list
 
-_DEVICE_STRATEGY = device_name_list()
+_DEVICE_STRATEGY = device_name_list(1)
 
 
 class Create2TestCase(SimTestCase):
@@ -109,7 +109,6 @@ class Create3TestCase(SimTestCase):
                 "devices": _DEVICE_STRATEGY(),
             },
         )
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testCreateDifferentBlockdevs(self):
         """
@@ -162,12 +161,11 @@ class Create4TestCase(SimTestCase):
                 "devices": self._blockdevs,
             },
         )
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testCreateSameBlockdevs(self):
         """
-        Create should fail trying to create new pool with same name
-        and different blockdevs from previous.
+        Create should succeed trying to create new pool with same name
+        and same blockdevs as previous.
         """
         pools1 = pools().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})

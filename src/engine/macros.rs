@@ -66,10 +66,10 @@ macro_rules! rename_filesystem_pre {
     }}
 }
 
-macro_rules! rename_filesystem_pre_idem {
-    ($s:ident; $uuid:ident; $new_name:ident) => {{
+macro_rules! rename_pre_idem {
+    ($s:expr; $uuid:ident; $new_name:ident) => {{
         rename_pre!(
-            $s.filesystems;
+            $s;
             $uuid;
             $new_name;
             Ok(RenameAction::NoSource);
@@ -78,14 +78,22 @@ macro_rules! rename_filesystem_pre_idem {
     }}
 }
 
+macro_rules! rename_filesystem_pre_idem {
+    ($s:ident; $uuid:ident; $new_name:ident) => {{
+        rename_pre_idem!(
+            $s.filesystems;
+            $uuid;
+            $new_name
+        )
+    }}
+}
+
 macro_rules! rename_pool_pre_idem {
     ($s:ident; $uuid:ident; $new_name:ident) => {{
-        rename_pre!(
+        rename_pre_idem!(
             $s.pools;
             $uuid;
-            $new_name;
-            Ok(RenameAction::NoSource);
-            Ok(RenameAction::Identity)
+            $new_name
         )
     }}
 }

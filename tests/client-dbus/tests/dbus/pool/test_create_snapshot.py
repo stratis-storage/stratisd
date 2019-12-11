@@ -55,7 +55,6 @@ class CreateSnapshotTestCase(SimTestCase):
             },
         )
         self._pool_object = get_object(poolpath)
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
         ((_, fs_objects), rc, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": [self._FSNAME]}

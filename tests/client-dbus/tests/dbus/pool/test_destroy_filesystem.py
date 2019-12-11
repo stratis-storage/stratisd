@@ -53,7 +53,6 @@ class DestroyFSTestCase(SimTestCase):
             },
         )
         self._pool_object = get_object(poolpath)
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testDestroyNone(self):
         """
@@ -116,7 +115,6 @@ class DestroyFSTestCase1(SimTestCase):
         ((_, self._filesystems), _, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": [(self._FSNAME, "", None)]}
         )
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testDestroyOne(self):
         """

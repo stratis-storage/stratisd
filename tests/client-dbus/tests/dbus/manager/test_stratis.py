@@ -36,7 +36,6 @@ class StratisTestCase(SimTestCase):
         """
         super().setUp()
         proxy = get_object(TOP_OBJECT)
-        Manager.Methods.ConfigureSimulator(proxy, {"denominator": 8})
 
     def testStratisVersion(self):
         """
@@ -60,7 +59,6 @@ class StratisTestCase2(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testArguments(self):
         """

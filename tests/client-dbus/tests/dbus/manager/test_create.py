@@ -164,8 +164,8 @@ class Create4TestCase(SimTestCase):
 
     def testCreateSameBlockdevs(self):
         """
-        Create should fail trying to create new pool with same name
-        and different blockdevs from previous.
+        Create should succeed trying to create new pool with same name
+        and same blockdevs as previous.
         """
         pools1 = pools().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})

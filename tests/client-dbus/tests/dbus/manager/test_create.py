@@ -109,7 +109,6 @@ class Create3TestCase(SimTestCase):
                 "devices": _DEVICE_STRATEGY(),
             },
         )
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testCreateDifferentBlockdevs(self):
         """
@@ -162,7 +161,6 @@ class Create4TestCase(SimTestCase):
                 "devices": self._blockdevs,
             },
         )
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testCreateSameBlockdevs(self):
         """

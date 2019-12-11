@@ -59,7 +59,6 @@ class SetNameTestCase(SimTestCase):
             pool_object, {"specs": [self._FSNAME]}
         )
         self._filesystem_object_path = created[0][0]
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testNullMapping(self):
         """

@@ -57,7 +57,6 @@ class CreateFSTestCase(SimTestCase):
             },
         )
         self._pool_object = get_object(poolpath)
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testCreate(self):
         """
@@ -126,7 +125,6 @@ class CreateFSTestCase1(SimTestCase):
         )
         self._pool_object = get_object(poolpath)
         Pool.Methods.CreateFilesystems(self._pool_object, {"specs": [self._FSNAME]})
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testCreate(self):
         """

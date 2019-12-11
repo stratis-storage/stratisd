@@ -43,7 +43,6 @@ class FetchPropertiesTestCase(SimTestCase):
                 "devices": ["/dev/one", "/dev/two", "/dev/red", "/dev/blue"],
             },
         )
-        Manager.Methods.ConfigureSimulator(proxy, {"denominator": 8})
 
     def testFetchSizeProperty(self):
         """

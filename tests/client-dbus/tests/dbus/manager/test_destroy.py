@@ -48,7 +48,6 @@ class Destroy1TestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testExecution(self):
         """
@@ -85,7 +84,6 @@ class Destroy2TestCase(SimTestCase):
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devices},
         )
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testExecution(self):
         """
@@ -137,7 +135,6 @@ class Destroy3TestCase(SimTestCase):
             },
         )
         Pool.Methods.CreateFilesystems(get_object(poolpath), {"specs": [self._FSNAME]})
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testExecution(self):
         """
@@ -172,7 +169,6 @@ class Destroy4TestCase(SimTestCase):
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": []},
         )
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testExecution(self):
         """

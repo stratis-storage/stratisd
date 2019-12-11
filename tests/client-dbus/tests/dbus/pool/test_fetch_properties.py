@@ -46,7 +46,6 @@ class FetchPropertiesTestCase(SimTestCase):
             },
         )
         self._pool_object = get_object(pool_object_path)
-        Manager.Methods.ConfigureSimulator(proxy, {"denominator": 8})
 
     def testFetchSizeProperty(self):
         """

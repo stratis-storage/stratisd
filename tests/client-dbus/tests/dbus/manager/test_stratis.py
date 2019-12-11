@@ -30,13 +30,6 @@ class StratisTestCase(SimTestCase):
     Test meta information about stratisd.
     """
 
-    def setUp(self):
-        """
-        Start the stratisd daemon with the simulator.
-        """
-        super().setUp()
-        proxy = get_object(TOP_OBJECT)
-
     def testStratisVersion(self):
         """
         Getting version should succeed.

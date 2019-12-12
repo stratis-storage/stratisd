@@ -145,7 +145,7 @@ dependencies = [
 [[package]]
 name = "devicemapper"
 version = "0.28.0"
-source = "git+https://github.com/jbaublitz/devicemapper-rs?branch=u128-bytes#3afe31837abb3910d722a67557b85a7a3cfeba33"
+source = "git+https://github.com/jbaublitz/devicemapper-rs?branch=u128-bytes#cf63914afec041220d59227a2677384c33cd6f5c"
 dependencies = [
  "bitflags 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "error-chain 0.12.1 (registry+https://github.com/rust-lang/crates.io-index)",

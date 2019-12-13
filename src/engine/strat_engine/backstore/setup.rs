@@ -56,7 +56,7 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
             .filter(|dev| dev.is_initialized())
             .filter(|dev| !is_multipath_member(dev)
                     .map_err(|err| {
-                        warn!("Could not certainly determine whether a device was a multipath member because of an error processing udev information, discarded the device from the set of devices to process, for safety: {}",
+                        warn!("Could not certainly determine whether a device was a multipath member because of an error processing udev information, omitting the device from the set of devices to process, for safety: {}",
                               err);
                     })
                     .unwrap_or(true))
@@ -117,7 +117,7 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
             .filter(|dev| {
                 decide_ownership(dev)
                     .map_err(|err| {
-                        warn!("Could not determine ownership of a udev block device because of an error processing udev information, discarded the device from the set of devices to process, for safety: {}",
+                        warn!("Could not determine ownership of a udev block device because of an error processing udev information, omitting the device from the set of devices to process, for safety: {}",
                               err);
                     })
                     .map(|decision| match decision {

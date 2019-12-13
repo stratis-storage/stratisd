@@ -5,10 +5,13 @@
 macro_rules! calculate_redundancy {
     ($redundancy:ident) => {
         match $redundancy {
-            None | Some(0) => Redundancy::NONE,
+            None | Some(0) => $crate::engine::Redundancy::NONE,
             Some(n) => {
                 let message = format!("code {} does not correspond to any redundancy", n);
-                return Err(StratisError::Engine(ErrorEnum::Error, message));
+                return Err($crate::stratis::StratisError::Engine(
+                    $crate::stratis::ErrorEnum::Error,
+                    message,
+                ));
             }
         }
     };
@@ -18,7 +21,7 @@ macro_rules! get_pool {
     ($s:ident; $uuid:ident) => {
         $s.pools
             .get_by_uuid($uuid)
-            .map(|(name, p)| (name.clone(), p as &dyn Pool))
+            .map(|(name, p)| (name.clone(), p as &dyn $crate::engine::Pool))
     };
 }
 
@@ -26,7 +29,7 @@ macro_rules! get_mut_pool {
     ($s:ident; $uuid:ident) => {
         $s.pools
             .get_mut_by_uuid($uuid)
-            .map(|(name, p)| (name.clone(), p as &mut dyn Pool))
+            .map(|(name, p)| (name.clone(), p as &mut dyn $crate::engine::Pool))
     };
 }
 
@@ -42,8 +45,8 @@ macro_rules! rename_pre {
         }
 
         if $s.contains_name($new_name) {
-            return Err(StratisError::Engine(
-                ErrorEnum::AlreadyExists,
+            return Err($crate::stratis::StratisError::Engine(
+                $crate::stratis::ErrorEnum::AlreadyExists,
                 $new_name.into(),
             ));
         }
@@ -57,8 +60,8 @@ macro_rules! rename_filesystem_pre {
             $s.filesystems;
             $uuid;
             $new_name;
-            Err(StratisError::Engine(
-                ErrorEnum::NotFound,
+            Err($crate::stratis::StratisError::Engine(
+                $crate::stratis::ErrorEnum::NotFound,
                 format!("Filesystem not found with UUID of {}", $uuid),
             ));
             Ok(None)
@@ -72,8 +75,8 @@ macro_rules! rename_pre_idem {
             $s;
             $uuid;
             $new_name;
-            Ok(RenameAction::NoSource);
-            Ok(RenameAction::Identity)
+            Ok($crate::engine::RenameAction::NoSource);
+            Ok($crate::engine::RenameAction::Identity)
         )
     }}
 }

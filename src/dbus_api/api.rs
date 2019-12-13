@@ -21,7 +21,7 @@ use crate::{
         consts,
         filesystem::create_dbus_filesystem,
         pool::create_dbus_pool,
-        types::{DbusContext, DbusErrorEnum, DeferredAction, TData},
+        types::{DbusContext, DeferredAction, TData},
         util::{
             engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, tuple_to_option,
         },

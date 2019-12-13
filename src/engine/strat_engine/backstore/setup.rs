@@ -53,14 +53,25 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
         enumerator.match_property("ID_FS_TYPE", "stratis")?;
         for devnode in enumerator
             .scan_devices()?
-            .filter(|dev| dev.is_initialized())
+            .filter(|dev| {
+                let initialized = dev.is_initialized();
+                if !initialized {
+                    warn!("Found a udev entry for a device identified as a Stratis device, but udev also identified it as uninitialized, omitting the device from the set of devices to process, for safety");
+                };
+                initialized
+            })
             .filter(|dev| !is_multipath_member(dev)
                     .map_err(|err| {
-                        warn!("Could not certainly determine whether a device was a multipath member because of an error processing udev information, discarded the device from the set of devices to process, for safety: {}",
+                        warn!("Could not certainly determine whether a device was a multipath member because of an error processing udev information, omitting the device from the set of devices to process, for safety: {}",
                               err);
                     })
                     .unwrap_or(true))
-            .filter_map(|i| i.devnode().map(|d| d.to_path_buf()))
+            .filter_map(|i| i.devnode()
+                        .map(|d| d.to_path_buf())
+                        .or_else(||{
+                            warn!("udev identified a device as a Stratis device, but the udev entry for the device had no device node, omitting the the device from the set of devices to process");
+                            None
+                        }))
         {
             if let Some(devno) = devnode_to_devno(&devnode)? {
                 if let Some((pool_uuid, _)) = match device_identifiers(
@@ -113,11 +124,17 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
         let mut enumerator = block_enumerator(&context)?;
         for devnode in enumerator
             .scan_devices()?
-            .filter(|dev| dev.is_initialized())
+            .filter(|dev| {
+                let initialized = dev.is_initialized();
+                if !initialized {
+                    debug!("Found a udev entry for a device identified as a block device, but udev also identified it as uninitialized, omitting the device from the set of devices to process, for safety");
+                };
+                initialized
+            })
             .filter(|dev| {
                 decide_ownership(dev)
                     .map_err(|err| {
-                        warn!("Could not determine ownership of a udev block device because of an error processing udev information, discarded the device from the set of devices to process, for safety: {}",
+                        warn!("Could not determine ownership of a udev block device because of an error processing udev information, omitting the device from the set of devices to process, for safety: {}",
                               err);
                     })
                     .map(|decision| match decision {
@@ -126,7 +143,12 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
                     })
                     .unwrap_or(false)
             })
-            .filter_map(|i| i.devnode().map(|d| d.to_path_buf()))
+            .filter_map(|i| i.devnode()
+                        .map(|d| d.to_path_buf())
+                        .or_else(||{
+                            warn!("udev identified a device as a block device, but the udev entry for the device had no device node, omitting the the device from the set of devices to process");
+                            None
+                        }))
         {
             if let Some(devno) = devnode_to_devno(&devnode)? {
                 if let Some((pool_uuid, _)) = match device_identifiers(

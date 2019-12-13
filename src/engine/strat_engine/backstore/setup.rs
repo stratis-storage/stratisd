@@ -66,7 +66,12 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
                               err);
                     })
                     .unwrap_or(true))
-            .filter_map(|i| i.devnode().map(|d| d.to_path_buf()))
+            .filter_map(|i| i.devnode()
+                        .map(|d| d.to_path_buf())
+                        .or_else(||{
+                            warn!("udev identified a device as a Stratis device, but the udev entry for the device had no device node, omitting the the device from the set of devices to process");
+                            None
+                        }))
         {
             if let Some(devno) = devnode_to_devno(&devnode)? {
                 if let Some((pool_uuid, _)) = match device_identifiers(
@@ -138,7 +143,12 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
                     })
                     .unwrap_or(false)
             })
-            .filter_map(|i| i.devnode().map(|d| d.to_path_buf()))
+            .filter_map(|i| i.devnode()
+                        .map(|d| d.to_path_buf())
+                        .or_else(||{
+                            warn!("udev identified a device as a block device, but the udev entry for the device had no device node, omitting the the device from the set of devices to process");
+                            None
+                        }))
         {
             if let Some(devno) = devnode_to_devno(&devnode)? {
                 if let Some((pool_uuid, _)) = match device_identifiers(

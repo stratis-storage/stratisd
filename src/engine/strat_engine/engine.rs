@@ -29,7 +29,7 @@ use crate::{
         },
         structures::Table,
         types::{CreateAction, DeleteAction, RenameAction},
-        Engine, EngineEvent, Name, Pool, PoolUuid, Redundancy,
+        Engine, EngineEvent, Name, Pool, PoolUuid,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

@@ -59,7 +59,7 @@ where
 // Transform a constant in sectors to a constant in bytes
 macro_rules! bytes {
     ($number:expr) => {
-        $number * SECTOR_SIZE
+        $number * devicemapper::SECTOR_SIZE
     };
 }
 

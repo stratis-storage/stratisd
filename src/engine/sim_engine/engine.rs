@@ -18,7 +18,7 @@ use crate::{
         shared::create_pool_idempotent_or_err,
         sim_engine::{pool::SimPool, randomization::Randomizer},
         structures::Table,
-        types::{CreateAction, DeleteAction, Name, PoolUuid, Redundancy, RenameAction},
+        types::{CreateAction, DeleteAction, Name, PoolUuid, RenameAction},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

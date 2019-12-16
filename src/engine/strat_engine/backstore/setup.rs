@@ -63,7 +63,12 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
                         err))
             })? {
             if let Some((pool_uuid, _)) = match device_identifiers(
-                &mut OpenOptions::new().read(true).open(devnode)?,
+                &mut OpenOptions::new().read(true).open(devnode)
+                .map_err(|err| { StratisError::Error(format!(
+                                "udev identified device {} as a Stratis block device, but the device could not be opened for reading: {}",
+                                devnode.display(),
+                                err))
+                })?
             ) {
                 Ok(ids) => ids,
                 Err(err) => {
@@ -100,7 +105,12 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
                         err))
             })? {
             if let Some((pool_uuid, _)) = match device_identifiers(
-                &mut OpenOptions::new().read(true).open(devnode)?,
+                &mut OpenOptions::new().read(true).open(devnode)
+                .map_err(|err| { StratisError::Error(format!(
+                                "udev identified device {} as a block device, but the device could not be opened for reading: {}",
+                                devnode.display(),
+                                err))
+                })?
             ) {
                 Ok(ids) => ids,
                 // FIXME: Refine error return in StaticHeader::setup(),

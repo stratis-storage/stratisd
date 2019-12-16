@@ -176,7 +176,7 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut iter = message.iter_init();
 
     let filesystem: dbus::Path<'static> = get_next_arg(&mut iter, 0)?;
-    let snapshot_name: &str = get_next_arg(&mut iter, 0)?;
+    let snapshot_name: &str = get_next_arg(&mut iter, 1)?;
 
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
@@ -223,7 +223,7 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> Meth
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let devs: Array<&str, _> = get_next_arg(&mut iter, 1)?;
+    let devs: Array<&str, _> = get_next_arg(&mut iter, 0)?;
 
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();

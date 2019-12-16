@@ -36,7 +36,7 @@ fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let name: &str = get_next_arg(&mut iter, 0)?;
     let redundancy: (bool, u16) = get_next_arg(&mut iter, 1)?;
-    let devs: Array<&str, _> = get_next_arg(&mut iter, 3)?;
+    let devs: Array<&str, _> = get_next_arg(&mut iter, 2)?;
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 

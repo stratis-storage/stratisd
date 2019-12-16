@@ -136,12 +136,11 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
     }
 
     let pool_map = {
-        let mut pool_map = HashMap::new();
-
         let context = libudev::Context::new()?;
         let mut enumerator = block_enumerator(&context)?;
         enumerator.match_property("ID_FS_TYPE", "stratis")?;
-        for devnode in enumerator
+
+        enumerator
             .scan_devices()?
             .filter(|dev| {
                 let initialized = dev.is_initialized();
@@ -157,25 +156,25 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
                     })
                     .unwrap_or(true))
             .filter_map(|i| i.devnode()
-                        .map(|d| d.to_path_buf())
+                        .and_then(|devnode| identify_on_main_path(devnode)
+                                  .map_err(|err| { warn!(
+                                              "{}, omitting the device from the set of devices to process",
+                                              err);
+                                      err
+                                  })
+                                  .ok().map(|(pool_uuid, device)| (pool_uuid, device, devnode.to_path_buf())))
                         .or_else(||{
                             warn!("udev identified a device as a Stratis device, but the udev entry for the device had no device node, omitting the the device from the set of devices to process");
                             None
                         }))
-        {
-            match identify_on_main_path(&devnode) {
-                Err(err) => {
-                    warn!("{}", err);
-                }
-                Ok((pool_uuid, device)) => {
-                    pool_map
+            .fold(HashMap::new(), |mut acc, (pool_uuid, device, devnode)| {
+                    acc
                         .entry(pool_uuid)
                         .or_insert_with(HashMap::new)
                         .insert(device, devnode);
+                    acc
                 }
-            }
-        }
-        pool_map
+            )
     };
 
     if pool_map.is_empty() {
@@ -194,11 +193,10 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
 
         info!("Could not identify any Stratis devices by a udev search for devices with ID_FS_TYPE=\"stratis\"; using fallback search mechanism");
 
-        let mut pool_map = HashMap::new();
-
         let context = libudev::Context::new()?;
         let mut enumerator = block_enumerator(&context)?;
-        for devnode in enumerator
+
+        let pool_map = enumerator
             .scan_devices()?
             .filter(|dev| {
                 let initialized = dev.is_initialized();
@@ -220,25 +218,27 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
                     .unwrap_or(false)
             })
             .filter_map(|i| i.devnode()
-                        .map(|d| d.to_path_buf())
+                        .and_then(|devnode| identify_on_fallback_path(devnode)
+                                  .map_err(|err| { warn!(
+                                              "{}, omitting the device from the set of devices to process",
+                                              err);
+                                        err
+                                  })
+                                  .ok()
+                                  .unwrap_or(None)
+                                  .map(|(pool_uuid, device)| (pool_uuid, device, devnode.to_path_buf())))
                         .or_else(||{
                             warn!("udev identified a device as a block device, but the udev entry for the device had no device node, omitting the the device from the set of devices to process");
                             None
                         }))
-        {
-            match identify_on_fallback_path(&devnode) {
-                Err(err) => {
-                    warn!("{}", err);
-                }
-                Ok(Some((pool_uuid, device))) => {
-                    pool_map
+            .fold(HashMap::new(), |mut acc, (pool_uuid, device, devnode)| {
+                    acc
                         .entry(pool_uuid)
                         .or_insert_with(HashMap::new)
                         .insert(device, devnode);
+                    acc
                 }
-                Ok(None) => { }
-            }
-        }
+            );
         Ok(pool_map)
     } else {
         Ok(pool_map)

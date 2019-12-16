@@ -51,7 +51,8 @@ where
     (key, (success, value))
 }
 
-/// Get the next argument off the bus
+/// Get the next argument off the bus. loc is the index of the location of
+/// the argument in the iterator, and is used solely for error-reporting.
 pub fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr>
 where
     T: dbus::arg::Get<'a> + dbus::arg::Arg,

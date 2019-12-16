@@ -56,7 +56,12 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
     // Note that this method is not useful outside find_all(), it is only
     // appropriate in the particular context of the udev main path.
     fn identify_on_main_path(devnode: &Path) -> StratisResult<(PoolUuid, Device)> {
-        if let Some(devno) = devnode_to_devno(devnode)? {
+        if let Some(devno) = devnode_to_devno(devnode)
+            .map_err(|err| { StratisError::Error(format!(
+                        "udev identified device {} as a Stratis block device but there was an error reading the device number: {}",
+                        devnode.display(),
+                        err))
+            })? {
             if let Some((pool_uuid, _)) = match device_identifiers(
                 &mut OpenOptions::new().read(true).open(devnode)?,
             ) {
@@ -88,7 +93,12 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
     // when reading Stratis identifiers; this is not necessarily an error
     // when all that is known is that the device seems to be a block device.
     fn identify_on_fallback_path(devnode: &Path) -> StratisResult<Option<(PoolUuid, Device)>> {
-        if let Some(devno) = devnode_to_devno(devnode)? {
+        if let Some(devno) = devnode_to_devno(devnode)
+            .map_err(|err| { StratisError::Error(format!(
+                        "udev identified device {} as a block device but there was an error reading the device number: {}",
+                        devnode.display(),
+                        err))
+            })? {
             if let Some((pool_uuid, _)) = match device_identifiers(
                 &mut OpenOptions::new().read(true).open(devnode)?,
             ) {

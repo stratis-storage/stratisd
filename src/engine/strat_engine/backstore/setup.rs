@@ -43,8 +43,78 @@ use crate::{
 /// devices via udev rather than just all Stratis block devices.
 ///
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
-pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
+///
+/// Omits any device that appears problematic in some way.
+///
+/// Returns an error only on initial failure to construct a udev enumerator.
+pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     info!("Beginning initial search for Stratis block devices");
+
+    // Do non udev-based identification on the main udev path. Since udev
+    // has already identified the device as a Stratis device on this path,
+    // treat failure to find any Stratis identifiers as an error.
+    // Note that this method is not useful outside find_all(), it is only
+    // appropriate in the particular context of the udev main path.
+    fn identify_on_main_path(devnode: &Path) -> StratisResult<(PoolUuid, Device)> {
+        if let Some(devno) = devnode_to_devno(devnode)? {
+            if let Some((pool_uuid, _)) = match device_identifiers(
+                &mut OpenOptions::new().read(true).open(devnode)?,
+            ) {
+                Ok(ids) => ids,
+                Err(err) => {
+                    return Err(StratisError::Error(format!(
+                                "udev identified device {} as a Stratis block device, but there was an error when reading the Stratis header: {}",
+                                devnode.display(),
+                                err)));
+                }
+            } {
+                Ok((pool_uuid, Device::from(devno)))
+            } else {
+                Err(StratisError::Error(format!(
+                            "udev identified device {} as a Stratis block device but there appeared to be no Stratis metadata on the device",
+                            devnode.display())))
+            }
+        } else {
+            Err(StratisError::Error(format!(
+                        "udev identified device {} as a Stratis block device but its device number could not be found",
+                        devnode.display())))
+        }
+    }
+
+    // Identify a device when called in the context of the udev fallback
+    // path. Do not treat missing Stratis headers as an error, udev has only
+    // identified the device as some kind of block device that does not
+    // appear to be otherwise owned. Log at the debug level for an error
+    // when reading Stratis identifiers; this is not necessarily an error
+    // when all that is known is that the device seems to be a block device.
+    fn identify_on_fallback_path(devnode: &Path) -> StratisResult<Option<(PoolUuid, Device)>> {
+        if let Some(devno) = devnode_to_devno(devnode)? {
+            if let Some((pool_uuid, _)) = match device_identifiers(
+                &mut OpenOptions::new().read(true).open(devnode)?,
+            ) {
+                Ok(ids) => ids,
+                // FIXME: Refine error return in StaticHeader::setup(),
+                // so it can be used to distinguish between signficant
+                // and insignficant errors and then use that ability to
+                // distinguish here between different levels of severity.
+                Err(err) => {
+                    debug!("Encountered an error while trying to get Stratis device identifiers from block device {}: {}",
+                               devnode.display(),
+                               err);
+                    None
+                }
+            } {
+                Ok(Some((pool_uuid, Device::from(devno))))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Err(StratisError::Error(format!(
+                        "udev identified device {} as a block device but its device number could not be found",
+                        devnode.display())))
+        }
+    }
+
     let pool_map = {
         let mut pool_map = HashMap::new();
 
@@ -73,32 +143,18 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
                             None
                         }))
         {
-            if let Some(devno) = devnode_to_devno(&devnode)? {
-                if let Some((pool_uuid, _)) = match device_identifiers(
-                    &mut OpenOptions::new().read(true).open(&devnode)?,
-                ) {
-                    Ok(ids) => ids,
-                    Err(err) => {
-                        warn!("udev identified device {} as a Stratis block device, but there was an error when reading the Stratis header: {}",
-                                  devnode.display(),
-                                  err);
-                        None
-                    }
-                } {
+            match identify_on_main_path(&devnode) {
+                Err(err) => {
+                    warn!("{}", err);
+                }
+                Ok((pool_uuid, device)) => {
                     pool_map
                         .entry(pool_uuid)
                         .or_insert_with(HashMap::new)
-                        .insert(Device::from(devno), devnode);
-                } else {
-                    warn!("udev identified device {} as a Stratis block device but there appeared to be no Stratis metadata on the device",
-                          devnode.display())
+                        .insert(device, devnode);
                 }
-            } else {
-                warn!("udev identified device {} as a Stratis block device but its device number could not be found",
-                      devnode.display())
             }
         }
-
         pool_map
     };
 
@@ -150,30 +206,17 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
                             None
                         }))
         {
-            if let Some(devno) = devnode_to_devno(&devnode)? {
-                if let Some((pool_uuid, _)) = match device_identifiers(
-                    &mut OpenOptions::new().read(true).open(&devnode)?,
-                ) {
-                    Ok(ids) => ids,
-                    // FIXME: Refine error return in StaticHeader::setup(),
-                    // so it can be used to distinguish between signficant
-                    // and insignficant errors and then use that ability to
-                    // distinguish here between different levels of severity.
-                    Err(err) => {
-                        debug!("Encountered an error while trying to get Stratis device identifiers from block device {}: {}",
-                               devnode.display(),
-                               err);
-                        None
-                    }
-                } {
+            match identify_on_fallback_path(&devnode) {
+                Err(err) => {
+                    warn!("{}", err);
+                }
+                Ok(Some((pool_uuid, device))) => {
                     pool_map
                         .entry(pool_uuid)
                         .or_insert_with(HashMap::new)
-                        .insert(Device::from(devno), devnode.to_path_buf());
+                        .insert(device, devnode);
                 }
-            } else {
-                warn!("udev identified device {} as a block device but its device number could not be found",
-                      devnode.display())
+                Ok(None) => { }
             }
         }
         Ok(pool_map)

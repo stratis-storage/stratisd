@@ -10,7 +10,10 @@ macro_rules! get_data {
             data
         } else {
             let message = format!("no data for object path {}", $path.get_name());
-            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, message);
+            let (rc, rs) = (
+                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                message,
+            );
             return Ok(vec![$message.append3($default, rc, rs)]);
         }
     };
@@ -24,7 +27,10 @@ macro_rules! get_parent {
             parent
         } else {
             let message = format!("no path for object path {}", $data.parent);
-            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, message);
+            let (rc, rs) = (
+                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                message,
+            );
             return Ok(vec![$message.append3($default, rc, rs)]);
         }
     };
@@ -37,7 +43,10 @@ macro_rules! get_mut_pool {
             pool
         } else {
             let message = format!("engine does not know about pool with uuid {}", $uuid);
-            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, message);
+            let (rc, rs) = (
+                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                message,
+            );
             return Ok(vec![$message.append3($default, rc, rs)]);
         }
     };

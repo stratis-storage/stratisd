@@ -42,8 +42,68 @@ use crate::{
 /// This fallback path is more expensive, because it must search all block
 /// devices via udev rather than just all Stratis block devices.
 ///
+/// Omits any device that appears problematic in some way.
+///
+/// Return an error only on a failure to construct or scan with a udev
+/// enumerator.
+///
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
-pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
+pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
+    // A wrapper for obtaining the device number as a devicemapper Device
+    // which interprets both an error in obtaining the value and no value
+    // as an error, which it is in this context.
+    fn devnode_to_devno_wrapper(devnode: &Path) -> Result<Device, String> {
+        devnode_to_devno(devnode)
+            .map_err(|err| {
+                format!(
+                    "encountered an error while trying to obtain device number for {}: {}",
+                    devnode.display(),
+                    err
+                )
+            })
+            .and_then(|maybe_devno| {
+                maybe_devno
+                    .ok_or_else(|| {
+                        format!("no device number found for device {}", devnode.display())
+                    })
+                    .map(Device::from)
+            })
+    }
+
+    // A wrapper around the metadata module's device_identifers method
+    // which also handles failure to open a device for reading.
+    // Returns an error if the device could not be opened for reading.
+    // Returns Ok(Err(...)) if there was an error while reading the
+    // Stratis identifiers from the device.
+    // Returns Ok(Ok(None)) if the identifers did not appear to be on
+    // the device.
+    fn device_identifiers_wrapper(
+        devnode: &Path,
+    ) -> Result<Result<Option<(PoolUuid)>, String>, String> {
+        OpenOptions::new()
+            .read(true)
+            .open(devnode)
+            .as_mut()
+            .map_err(|err| {
+                format!(
+                    "device {} could not be opened for reading: {}",
+                    devnode.display(),
+                    err
+                )
+            })
+            .map(|f| {
+                device_identifiers(f)
+                    .map_err(|err| {
+                        format!(
+                            "encountered an error while reading Stratis header for device {}: {}",
+                            devnode.display(),
+                            err
+                        )
+                    })
+                    .map(|maybe_ids| maybe_ids.map(|(pool_uuid, _)| pool_uuid))
+            })
+    }
+
     info!("Beginning initial search for Stratis block devices");
     let pool_map = {
         let mut pool_map = HashMap::new();
@@ -73,30 +133,22 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
                             None
                         }))
         {
-            if let Some(devno) = devnode_to_devno(&devnode)? {
-                if let Some((pool_uuid, _)) = match device_identifiers(
-                    &mut OpenOptions::new().read(true).open(&devnode)?,
-                ) {
-                    Ok(ids) => ids,
-                    Err(err) => {
-                        warn!("udev identified device {} as a Stratis block device, but there was an error when reading the Stratis header: {}",
-                                  devnode.display(),
-                                  err);
+            if let Some((pool_uuid, devno)) = match (devnode_to_devno_wrapper(&devnode), device_identifiers_wrapper(&devnode)) {
+                (Err(err), _) | (_, Err(err)) | (_, Ok(Err(err)))=> {
+                        warn!("udev identified device {} as a Stratis device but {}, omitting the device from the set of devices to process",
+                              devnode.display(),
+                              err);
                         None
-                    }
-                } {
-                    pool_map
-                        .entry(pool_uuid)
-                        .or_insert_with(HashMap::new)
-                        .insert(Device::from(devno), devnode);
-                } else {
-                    warn!("udev identified device {} as a Stratis block device but there appeared to be no Stratis metadata on the device",
-                          devnode.display())
                 }
-            } else {
-                warn!("udev identified device {} as a Stratis block device but its device number could not be found",
-                      devnode.display())
-            }
+                (_, Ok(Ok(None))) => {
+                        warn!("udev identified device {} as a Stratis device but there appeared to be no Stratis metadata on the device, omitting the device from the set of devices to process",
+                              devnode.display());
+                        None
+                }
+                (Ok(devno), Ok(Ok(Some(pool_uuid)))) => Some((pool_uuid, devno)),
+            } {
+                pool_map.entry(pool_uuid).or_insert_with(HashMap::new).insert(devno, devnode);
+            } else {};
         }
 
         pool_map
@@ -146,35 +198,32 @@ pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> 
             .filter_map(|i| i.devnode()
                         .map(|d| d.to_path_buf())
                         .or_else(||{
-                            warn!("udev identified a device as a block device, but the udev entry for the device had no device node, omitting the the device from the set of devices to process");
+                            warn!("udev identified a device as a block device, but the udev entry for the device had no device node, omitting the device from the set of devices to process");
                             None
                         }))
         {
-            if let Some(devno) = devnode_to_devno(&devnode)? {
-                if let Some((pool_uuid, _)) = match device_identifiers(
-                    &mut OpenOptions::new().read(true).open(&devnode)?,
-                ) {
-                    Ok(ids) => ids,
-                    // FIXME: Refine error return in StaticHeader::setup(),
-                    // so it can be used to distinguish between signficant
-                    // and insignficant errors and then use that ability to
-                    // distinguish here between different levels of severity.
-                    Err(err) => {
-                        debug!("Encountered an error while trying to get Stratis device identifiers from block device {}: {}",
-                               devnode.display(),
-                               err);
-                        None
-                    }
-                } {
-                    pool_map
-                        .entry(pool_uuid)
-                        .or_insert_with(HashMap::new)
-                        .insert(Device::from(devno), devnode.to_path_buf());
+            if let Some((pool_uuid, devno)) = match (devnode_to_devno_wrapper(&devnode), device_identifiers_wrapper(&devnode)) {
+                (Err(err), _) | (_, Err(err)) => {
+                    warn!("udev identified device {} as a block device but {}, omitting the device from the set of devices to process",
+                          devnode.display(),
+                          err);
+                    None
                 }
-            } else {
-                warn!("udev identified device {} as a block device but its device number could not be found",
-                      devnode.display())
-            }
+                // FIXME: Refine error return in StaticHeader::setup(),
+                // so it can be used to distinguish between signficant
+                // and insignficant errors and then use that ability to
+                // distinguish here between different levels of severity.
+                (_, Ok(Err(err))) => {
+                    debug!("udev identified device {} as a block device but {}, omitting the device from the set of devices to process",
+                           devnode.display(),
+                           err);
+                    None
+                }
+                (_, Ok(Ok(None))) => None,
+                (Ok(devno), Ok(Ok(Some(pool_uuid)))) => Some((pool_uuid, devno)),
+            } {
+                pool_map.entry(pool_uuid).or_insert_with(HashMap::new).insert(devno, devnode);
+            } else {};
         }
         Ok(pool_map)
     } else {

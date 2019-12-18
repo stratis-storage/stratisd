@@ -125,25 +125,28 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
                               err);
                     })
                     .unwrap_or(true))
-            .filter_map(|i| i.devnode()
-                        .and_then(|devnode| match (devnode_to_devno_wrapper(devnode), device_identifiers_wrapper(devnode)) {
-                            (Err(err), _) | (_, Err(err)) | (_, Ok(Err(err)))=> {
-                                warn!("udev identified device {} as a Stratis device but {}, omitting the device from the set of devices to process",
-                                      devnode.display(),
-                                      err);
-                                None
-                            }
-                            (_, Ok(Ok(None))) => {
-                                    warn!("udev identified device {} as a Stratis device but there appeared to be no Stratis metadata on the device, omitting the device from the set of devices to process",
-                                          devnode.display());
-                                    None
-                            }
-                            (Ok(devno), Ok(Ok(Some(pool_uuid)))) => Some((pool_uuid, devno, devnode.to_path_buf())),
-                        })
-                        .or_else(||{
-                            warn!("udev identified a device as a Stratis device, but the udev entry for the device had no device node, omitting the the device from the set of devices to process");
+            .filter_map(|i| match i.devnode() {
+                Some(devnode) => {
+                    match (devnode_to_devno_wrapper(devnode), device_identifiers_wrapper(devnode)) {
+                        (Err(err), _) | (_, Err(err)) | (_, Ok(Err(err)))=> {
+                            warn!("udev identified device {} as a Stratis device but {}, omitting the device from the set of devices to process",
+                                  devnode.display(),
+                                  err);
                             None
-                        }))
+                        }
+                        (_, Ok(Ok(None))) => {
+                                warn!("udev identified device {} as a Stratis device but there appeared to be no Stratis metadata on the device, omitting the device from the set of devices to process",
+                                      devnode.display());
+                                None
+                        }
+                        (Ok(devno), Ok(Ok(Some(pool_uuid)))) => Some((pool_uuid, devno, devnode.to_path_buf())),
+                    }
+                }
+                None => {
+                    warn!("udev identified a device as a Stratis device, but the udev entry for the device had no device node, omitting the the device from the set of devices to process");
+                    None
+                }
+            })
             .fold(HashMap::new(), |mut acc, (pool_uuid, device, devnode)| {
                 acc.entry(pool_uuid).or_insert_with(HashMap::new).insert(device, devnode);
                 acc
@@ -190,32 +193,35 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
                     })
                     .unwrap_or(false)
             })
-            .filter_map(|i| i.devnode()
-                        .and_then(|devnode| match (devnode_to_devno_wrapper(devnode), device_identifiers_wrapper(devnode)) {
-                            (Err(err), _) | (_, Err(err)) => {
-                                warn!("udev identified device {} as a block device but {}, omitting the device from the set of devices to process",
-                                      devnode.display(),
-                                      err);
-                                None
-                            }
-                            // FIXME: Refine error return in
-                            // StaticHeader::setup(), so it can be used to
-                            // distinguish between signficant and insignficant
-                            // errors and then use that ability to distinguish
-                            // here between different levels of severity.
-                            (_, Ok(Err(err))) => {
-                                debug!("udev identified device {} as a block device but {}, omitting the device from the set of devices to process",
-                                       devnode.display(),
-                                       err);
-                                None
-                            }
-                            (_, Ok(Ok(None))) => None,
-                            (Ok(devno), Ok(Ok(Some(pool_uuid)))) => Some((pool_uuid, devno, devnode.to_path_buf())),
-                        })
-                        .or_else(||{
-                            warn!("udev identified a device as a block device, but the udev entry for the device had no device node, omitting the device from the set of devices to process");
+            .filter_map(|i| match i.devnode() {
+                Some(devnode) => {
+                    match (devnode_to_devno_wrapper(devnode), device_identifiers_wrapper(devnode)) {
+                        (Err(err), _) | (_, Err(err)) => {
+                            warn!("udev identified device {} as a block device but {}, omitting the device from the set of devices to process",
+                                  devnode.display(),
+                                  err);
                             None
-                        }))
+                        }
+                        // FIXME: Refine error return in StaticHeader::setup(),
+                        // so it can be used to distinguish between signficant
+                        // and insignficant errors and then use that ability to
+                        // distinguish here between different levels of
+                        // severity.
+                        (_, Ok(Err(err))) => {
+                            debug!("udev identified device {} as a block device but {}, omitting the device from the set of devices to process",
+                                   devnode.display(),
+                                   err);
+                            None
+                        }
+                        (_, Ok(Ok(None))) => None,
+                        (Ok(devno), Ok(Ok(Some(pool_uuid)))) => Some((pool_uuid, devno, devnode.to_path_buf())),
+                    }
+                }
+                None => {
+                    warn!("udev identified a device as a block device, but the udev entry for the device had no device node, omitting the device from the set of devices to process");
+                    None
+                }
+            })
             .fold(HashMap::new(), |mut acc, (pool_uuid, device, devnode)| {
                 acc.entry(pool_uuid).or_insert_with(HashMap::new).insert(device, devnode);
                 acc

@@ -19,9 +19,12 @@ macro_rules! calculate_redundancy {
 
 macro_rules! get_pool {
     ($s:ident; $uuid:ident) => {
-        $s.pools
-            .get_by_uuid($uuid)
-            .map(|(name, p)| (name.clone(), $crate::engine::structures::Threaded::<dyn $crate::engine::Pool>::from(p)))
+        $s.pools.get_by_uuid($uuid).map(|(name, p)| {
+            (
+                name.clone(),
+                $crate::engine::structures::Threaded::<dyn $crate::engine::Pool>::from(p),
+            )
+        })
     };
 }
 

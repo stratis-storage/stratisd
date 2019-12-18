@@ -106,12 +106,11 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
 
     info!("Beginning initial search for Stratis block devices");
     let pool_map = {
-        let mut pool_map = HashMap::new();
-
         let context = libudev::Context::new()?;
         let mut enumerator = block_enumerator(&context)?;
         enumerator.match_property("ID_FS_TYPE", "stratis")?;
-        for devnode in enumerator
+
+        enumerator
             .scan_devices()?
             .filter(|dev| {
                 let initialized = dev.is_initialized();
@@ -127,31 +126,28 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
                     })
                     .unwrap_or(true))
             .filter_map(|i| i.devnode()
-                        .map(|d| d.to_path_buf())
+                        .and_then(|devnode| match (devnode_to_devno_wrapper(devnode), device_identifiers_wrapper(devnode)) {
+                            (Err(err), _) | (_, Err(err)) | (_, Ok(Err(err)))=> {
+                                warn!("udev identified device {} as a Stratis device but {}, omitting the device from the set of devices to process",
+                                      devnode.display(),
+                                      err);
+                                None
+                            }
+                            (_, Ok(Ok(None))) => {
+                                    warn!("udev identified device {} as a Stratis device but there appeared to be no Stratis metadata on the device, omitting the device from the set of devices to process",
+                                          devnode.display());
+                                    None
+                            }
+                            (Ok(devno), Ok(Ok(Some(pool_uuid)))) => Some((pool_uuid, devno, devnode.to_path_buf())),
+                        })
                         .or_else(||{
                             warn!("udev identified a device as a Stratis device, but the udev entry for the device had no device node, omitting the the device from the set of devices to process");
                             None
                         }))
-        {
-            if let Some((pool_uuid, devno)) = match (devnode_to_devno_wrapper(&devnode), device_identifiers_wrapper(&devnode)) {
-                (Err(err), _) | (_, Err(err)) | (_, Ok(Err(err)))=> {
-                        warn!("udev identified device {} as a Stratis device but {}, omitting the device from the set of devices to process",
-                              devnode.display(),
-                              err);
-                        None
-                }
-                (_, Ok(Ok(None))) => {
-                        warn!("udev identified device {} as a Stratis device but there appeared to be no Stratis metadata on the device, omitting the device from the set of devices to process",
-                              devnode.display());
-                        None
-                }
-                (Ok(devno), Ok(Ok(Some(pool_uuid)))) => Some((pool_uuid, devno)),
-            } {
-                pool_map.entry(pool_uuid).or_insert_with(HashMap::new).insert(devno, devnode);
-            } else {};
-        }
-
-        pool_map
+            .fold(HashMap::new(), |mut acc, (pool_uuid, device, devnode)| {
+                acc.entry(pool_uuid).or_insert_with(HashMap::new).insert(device, devnode);
+                acc
+            })
     };
 
     if pool_map.is_empty() {
@@ -170,11 +166,10 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
 
         info!("Could not identify any Stratis devices by a udev search for devices with ID_FS_TYPE=\"stratis\"; using fallback search mechanism");
 
-        let mut pool_map = HashMap::new();
-
         let context = libudev::Context::new()?;
         let mut enumerator = block_enumerator(&context)?;
-        for devnode in enumerator
+
+        let pool_map = enumerator
             .scan_devices()?
             .filter(|dev| {
                 let initialized = dev.is_initialized();
@@ -196,35 +191,35 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
                     .unwrap_or(false)
             })
             .filter_map(|i| i.devnode()
-                        .map(|d| d.to_path_buf())
+                        .and_then(|devnode| match (devnode_to_devno_wrapper(devnode), device_identifiers_wrapper(devnode)) {
+                            (Err(err), _) | (_, Err(err)) => {
+                                warn!("udev identified device {} as a block device but {}, omitting the device from the set of devices to process",
+                                      devnode.display(),
+                                      err);
+                                None
+                            }
+                            // FIXME: Refine error return in
+                            // StaticHeader::setup(), so it can be used to
+                            // distinguish between signficant and insignficant
+                            // errors and then use that ability to distinguish
+                            // here between different levels of severity.
+                            (_, Ok(Err(err))) => {
+                                debug!("udev identified device {} as a block device but {}, omitting the device from the set of devices to process",
+                                       devnode.display(),
+                                       err);
+                                None
+                            }
+                            (_, Ok(Ok(None))) => None,
+                            (Ok(devno), Ok(Ok(Some(pool_uuid)))) => Some((pool_uuid, devno, devnode.to_path_buf())),
+                        })
                         .or_else(||{
                             warn!("udev identified a device as a block device, but the udev entry for the device had no device node, omitting the device from the set of devices to process");
                             None
                         }))
-        {
-            if let Some((pool_uuid, devno)) = match (devnode_to_devno_wrapper(&devnode), device_identifiers_wrapper(&devnode)) {
-                (Err(err), _) | (_, Err(err)) => {
-                    warn!("udev identified device {} as a block device but {}, omitting the device from the set of devices to process",
-                          devnode.display(),
-                          err);
-                    None
-                }
-                // FIXME: Refine error return in StaticHeader::setup(),
-                // so it can be used to distinguish between signficant
-                // and insignficant errors and then use that ability to
-                // distinguish here between different levels of severity.
-                (_, Ok(Err(err))) => {
-                    debug!("udev identified device {} as a block device but {}, omitting the device from the set of devices to process",
-                           devnode.display(),
-                           err);
-                    None
-                }
-                (_, Ok(Ok(None))) => None,
-                (Ok(devno), Ok(Ok(Some(pool_uuid)))) => Some((pool_uuid, devno)),
-            } {
-                pool_map.entry(pool_uuid).or_insert_with(HashMap::new).insert(devno, devnode);
-            } else {};
-        }
+            .fold(HashMap::new(), |mut acc, (pool_uuid, device, devnode)| {
+                acc.entry(pool_uuid).or_insert_with(HashMap::new).insert(device, devnode);
+                acc
+            });
         Ok(pool_map)
     } else {
         Ok(pool_map)

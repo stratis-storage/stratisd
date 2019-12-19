@@ -234,24 +234,35 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
 
 /// Get the most recent metadata from a set of Devices for a given pool UUID.
 /// Returns None if no metadata found for this pool.
+///
+/// Precondition: all devices in devnodes have been previously identified as
+/// Stratis devices that belong to a single pool. Thus, an error reading the
+/// BDA or a missing BDA must be considered to be an error.
 pub fn get_metadata(
-    pool_uuid: PoolUuid,
     devnodes: &HashMap<Device, PathBuf>,
 ) -> StratisResult<Option<(DateTime<Utc>, PoolSave)>> {
-    // Get pairs of device nodes and matching BDAs
-    // If no BDA, or BDA UUID does not match pool UUID, skip.
-    // If there is an error reading the BDA, error. There could have been
-    // vital information on that BDA, for example, it may have contained
-    // the newest metadata.
-    let mut bdas = Vec::new();
-    for devnode in devnodes.values() {
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
-        if let Some(bda) = bda {
-            if bda.pool_uuid() == pool_uuid {
-                bdas.push((devnode, bda));
-            }
-        }
+    // Read a BDA from the designated device. Return an error if the BDA
+    // is not found.
+    fn get_bda(devnode: &Path) -> StratisResult<BDA> {
+        BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?.ok_or_else(|| {
+            StratisError::Error(format!("No BDA found on device {}", devnode.display()))
+        })
     }
+
+    // Get pairs of device nodes and matching BDAs. If there is any device
+    // from which a BDA can not be obtained, return an error. There could have
+    // been vital information on that BDA, for example, it might have contained
+    // the newest metadata.
+    let bdas = devnodes.values()
+        .map(|devnode| {
+            get_bda(devnode)
+                .map_err(|err| StratisError::Error(format!(
+                            "Could not obtain BDA for device {} that was previously identified as a Stratis device: {}",
+                            devnode.display(),
+                            err)))
+                .map(|bda| (devnode, bda))
+        })
+        .collect::<StratisResult<Vec<(_, _)>>>()?;
 
     // Most recent time should never be None if this was a properly
     // created pool; this allows for the method to be called in other

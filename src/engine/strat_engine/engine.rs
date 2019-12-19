@@ -61,7 +61,7 @@ fn setup_pool(
         format!("(pool UUID: {}, devnodes: {})", pool_uuid, dev_paths)
     };
 
-    let (timestamp, metadata) = get_metadata(pool_uuid, devices)?.ok_or_else(|| {
+    let (timestamp, metadata) = get_metadata(devices)?.ok_or_else(|| {
         let err_msg = format!("no metadata found for {}", info_string());
         StratisError::Engine(ErrorEnum::NotFound, err_msg)
     })?;

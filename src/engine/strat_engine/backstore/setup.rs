@@ -79,7 +79,7 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
     // the device.
     fn device_identifiers_wrapper(
         devnode: &Path,
-    ) -> Result<Result<Option<(PoolUuid)>, String>, String> {
+    ) -> Result<Result<Option<PoolUuid>, String>, String> {
         OpenOptions::new()
             .read(true)
             .open(devnode)

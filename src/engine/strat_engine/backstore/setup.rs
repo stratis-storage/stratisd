@@ -250,6 +250,41 @@ pub fn get_metadata(
         })
     }
 
+    // Get the pool's variable length metadata.
+    //
+    // Precondition: The last update time for the pool metadata is not None,
+    // so it should be possible to read the pool metadata from the device.
+    fn get_pool_metadata(devnode: &Path, bda: &BDA) -> Result<PoolSave, String> {
+        let mut f = OpenOptions::new().read(true).open(devnode).map_err(|err| {
+            format!(
+                "Could not open device {} while attempting to read pool metadata: {}",
+                devnode.display(),
+                err
+            )
+        })?;
+        let data =
+            bda.load_state(&mut f)
+                .map_err(|err| {
+                    format!(
+                        "Encountered an error while attempting to read pool metadata from device {}: {}",
+                        devnode.display(),
+                        err)
+                })?
+                .ok_or_else(|| {
+                    format!(
+                        "No pool metadata found on device {}",
+                        devnode.display()
+                    )
+                })?;
+        serde_json::from_slice(&data).map_err(|err| {
+            format!(
+                "Pool metadata was read from device {} but the pool metadata could not be parsed: {}",
+                devnode.display(),
+                err
+            )
+        })
+    }
+
     // Get pairs of device nodes and matching BDAs. If there is any device
     // from which a BDA can not be obtained, return an error. There could have
     // been vital information on that BDA, for example, it might have contained
@@ -295,16 +330,18 @@ pub fn get_metadata(
 
     // Try to read from all available devnodes that could contain most
     // recent metadata. In the event of errors, continue to try until all are
-    // exhausted.
+    // exhausted. Return the first metadata found that has the correct
+    // timestamp and can be read.
     bdas.iter()
         .filter_map(|&(devnode, ref bda)| {
             if bda.last_update_time() == Some(most_recent_time) {
-                OpenOptions::new()
-                    .read(true)
-                    .open(devnode)
-                    .ok()
-                    .and_then(|mut f| bda.load_state(&mut f).unwrap_or(None))
-                    .and_then(|data| serde_json::from_slice(&data).ok())
+                get_pool_metadata(devnode, bda)
+                    .map_err(|err| {
+                        warn!("Could not obtain pool metadata from device {}, but Stratis header indicates that pool metadata was written: {}",
+                              devnode.display(),
+                              err);
+                    })
+                .ok()
             } else {
                 None
             }
@@ -313,8 +350,9 @@ pub fn get_metadata(
         .ok_or_else(|| {
             StratisError::Engine(
                 ErrorEnum::NotFound,
-                "timestamp indicates data was written, but no data successfully read".into(),
-            )
+                format!(
+                    "Timestamp on some device indicates pool metadata was written, but no pool metadata could be read from devices {}",
+                    devnodes.values().map(|path| path.display().to_string()).collect::<Vec<_>>().join(", ")))
         })
         .map(|psave| Some((*most_recent_time, psave)))
 }

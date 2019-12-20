@@ -237,7 +237,8 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
 ///
 /// Precondition: all devices in devnodes have been previously identified as
 /// Stratis devices that belong to a single pool. Thus, an error reading the
-/// BDA or a missing BDA must be considered to be an error.
+/// BDA or a missing BDA must be considered to be an error. So should a
+/// situation where the BDAs do not agree on their pool UUID.
 pub fn get_metadata(
     devnodes: &HashMap<Device, PathBuf>,
 ) -> StratisResult<Option<(DateTime<Utc>, PoolSave)>> {
@@ -263,6 +264,18 @@ pub fn get_metadata(
                 .map(|bda| (devnode, bda))
         })
         .collect::<StratisResult<Vec<(_, _)>>>()?;
+
+    let pool_uuids = bdas
+        .iter()
+        .map(|(_, bda)| bda.pool_uuid())
+        .collect::<HashSet<_>>();
+    if pool_uuids.len() > 1 {
+        return Err(StratisError::Error(format!(
+                    "The set of devices ({}) to be processed must belong to a single pool, but Stratis metadata indicates that the devices belong to {} distinct pools with uuids ({})",
+                    devnodes.values().map(|path| path.display().to_string()).collect::<Vec<_>>().join(", "),
+                    pool_uuids.len(),
+                    pool_uuids.iter().map(|u| u.to_simple_ref().to_string()).collect::<Vec<_>>().join(", "))));
+    }
 
     // Most recent time should never be None if this was a properly
     // created pool; this allows for the method to be called in other

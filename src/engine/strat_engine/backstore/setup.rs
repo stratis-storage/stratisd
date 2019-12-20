@@ -279,7 +279,9 @@ pub fn get_metadata(
 
     // Most recent time should never be None if this was a properly
     // created pool; this allows for the method to be called in other
-    // circumstances.
+    // circumstances. The other circumstances might consist of a sudden
+    // failure between the time the block devices are initialized and the
+    // time that the metadata is first written.
     let most_recent_time = {
         match bdas
             .iter()

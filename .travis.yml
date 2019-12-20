@@ -100,11 +100,6 @@ matrix:
         # * It should be an advisory, and should not gate our development.
         - rust: stable
           env: TASK=audit
-        # Run fmt on rust beta, to observe any upcoming formatting changes
-        - rust: beta
-          before_script:
-              - rustup component add rustfmt
-          env: TASK=fmt-travis
 
 branches:
     only: master

@@ -87,12 +87,18 @@ matrix:
               - cd tests/client-dbus
           env: TASK=fmt-travis
 
-        # ALLOWED FAILURES
-        # Run clippy on rust beta, in order to be good Rustaceans
+
+        # INTERMITTENTLY ALLOWED FAILURES
+        # Allowed if a failure occurs after a new Rust release until the
+        # failure is addressed.
+        # Run clippy on rust beta, in order to be good Rustaceans.
         - rust: beta
           before_script:
               - rustup component add clippy
           env: TASK=clippy
+
+
+        # ALLOWED FAILURES
         # Run audit on Rust stable.  Make it an allowed failure, because:
         # * It takes 9 minutes, the longest of any task.
         # * It should be an advisory, and should not gate our development.

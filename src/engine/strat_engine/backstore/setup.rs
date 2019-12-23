@@ -15,7 +15,7 @@ use chrono::{DateTime, Utc};
 use libudev;
 use serde_json;
 
-use devicemapper::{devnode_to_devno, Device, Sectors};
+use devicemapper::{Device, Sectors};
 
 use crate::{
     engine::{
@@ -50,24 +50,13 @@ use crate::{
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
 pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     // A wrapper for obtaining the device number as a devicemapper Device
-    // which interprets both an error in obtaining the value and no value
-    // as an error, which it is in this context.
-    fn devnode_to_devno_wrapper(devnode: &Path) -> Result<Device, String> {
-        devnode_to_devno(devnode)
-            .map_err(|err| {
-                format!(
-                    "encountered an error while trying to obtain device number for {}: {}",
-                    devnode.display(),
-                    err
-                )
-            })
-            .and_then(|maybe_devno| {
-                maybe_devno
-                    .ok_or_else(|| {
-                        format!("no device number found for device {}", devnode.display())
-                    })
-                    .map(Device::from)
-            })
+    // which interprets absence of the value as an error, which it is in this
+    // context.
+    fn device_to_devno_wrapper(device: &libudev::Device) -> Result<Device, String> {
+        device
+            .devnum()
+            .ok_or_else(|| "udev entry did not contain a device number".into())
+            .map(Device::from)
     }
 
     // A wrapper around the metadata module's device_identifers method
@@ -125,9 +114,9 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
                               err);
                     })
                     .unwrap_or(true))
-            .filter_map(|i| match i.devnode() {
+            .filter_map(|dev| match dev.devnode() {
                 Some(devnode) => {
-                    match (devnode_to_devno_wrapper(devnode), device_identifiers_wrapper(devnode)) {
+                    match (device_to_devno_wrapper(&dev), device_identifiers_wrapper(devnode)) {
                         (Err(err), _) | (_, Err(err)) | (_, Ok(Err(err)))=> {
                             warn!("udev identified device {} as a Stratis device but {}, omitting the device from the set of devices to process",
                                   devnode.display(),
@@ -193,9 +182,9 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
                     })
                     .unwrap_or(false)
             })
-            .filter_map(|i| match i.devnode() {
+            .filter_map(|dev| match dev.devnode() {
                 Some(devnode) => {
-                    match (devnode_to_devno_wrapper(devnode), device_identifiers_wrapper(devnode)) {
+                    match (device_to_devno_wrapper(&dev), device_identifiers_wrapper(devnode)) {
                         (Err(err), _) | (_, Err(err)) => {
                             warn!("udev identified device {} as a block device but {}, omitting the device from the set of devices to process",
                                   devnode.display(),

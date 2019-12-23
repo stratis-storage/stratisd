@@ -28,16 +28,18 @@ pub fn get_udev_property<T: AsRef<OsStr>>(
 where
     T: std::fmt::Display,
 {
-    device
-        .property_value(&property_name)
-        .map(|value| match value.to_str() {
-            Some(value) => Ok(value.into()),
-            None => Err(StratisError::Error(format!(
-                "Unable to convert udev property value with key {} belonging to device {} to a string",
-                property_name,
-                device.devnode().map_or("<unknown>".into(), |x| x.to_string_lossy().into_owned())
-            ))),
-        })
+    device.property_value(&property_name).map(|value| {
+        value
+            .to_str()
+            .ok_or_else(|| {
+                StratisError::Error(format!(
+                    "Unable to convert udev property value with key {} to a string, lossy value is {}",
+                    property_name,
+                    value.to_string_lossy()
+                ))
+            })
+            .map(|value| value.into())
+    })
 }
 
 /// Returns true if udev indicates that the device is a multipath member

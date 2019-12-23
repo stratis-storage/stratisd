@@ -11,7 +11,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Device, Sectors};
+use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::types::{
@@ -196,14 +196,12 @@ pub trait Engine: Debug {
         redundancy: Option<u16>,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
-    /// Evaluate a device node & devicemapper::Device to see if it's a valid
-    /// stratis device.  If all the devices are present in the pool and the pool isn't already
-    /// up and running, it will get setup and the pool uuid will be returned.
-    fn block_evaluate(
-        &mut self,
-        device: Device,
-        dev_node: PathBuf,
-    ) -> StratisResult<Option<PoolUuid>>;
+    /// Handle a libudev event.
+    /// If the handling action resulted in pool creation, return the pool
+    /// and its UUID.
+    ///
+    /// Precondition: the subsystem of the device evented on is "block".
+    fn handle_event(&mut self, event: &libudev::Event) -> Option<(PoolUuid, &mut dyn Pool)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.

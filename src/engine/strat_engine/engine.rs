@@ -8,6 +8,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use libudev;
+
 use devicemapper::{Device, DmNameBuf};
 
 #[cfg(test)]
@@ -169,31 +171,6 @@ impl StratEngine {
     pub fn teardown(self) -> StratisResult<()> {
         teardown_pools(self.pools)
     }
-}
-
-impl Engine for StratEngine {
-    fn create_pool(
-        &mut self,
-        name: &str,
-        blockdev_paths: &[&Path],
-        redundancy: Option<u16>,
-    ) -> StratisResult<CreateAction<PoolUuid>> {
-        let redundancy = calculate_redundancy!(redundancy);
-
-        validate_name(name)?;
-
-        match self.pools.get_by_name(name) {
-            Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
-            None => {
-                let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy)?;
-
-                let name = Name::new(name.to_owned());
-                devlinks::pool_added(&name);
-                self.pools.insert(name, uuid, pool);
-                Ok(CreateAction::Created(uuid))
-            }
-        }
-    }
 
     /// Evaluate a device node & devicemapper::Device to see if it's a valid
     /// stratis device.  If all the devices are present in the pool and the pool isn't already
@@ -271,6 +248,56 @@ impl Engine for StratEngine {
             None
         };
         Ok(pool_uuid)
+    }
+}
+
+impl Engine for StratEngine {
+    fn handle_event(&mut self, event: &libudev::Event) -> Option<(PoolUuid, &mut dyn Pool)> {
+        let event_type = event.event_type();
+        if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change {
+            let device = event.device();
+            device
+                .devnode()
+                .and_then(|devnode| {
+                    device.devnum().and_then(|devnum| {
+                        self.block_evaluate(Device::from(devnum), PathBuf::from(devnode))
+                            .unwrap_or(None)
+                    })
+                })
+                .map(move |pool_uuid| {
+                    (
+                        pool_uuid,
+                        self.get_mut_pool(pool_uuid)
+                            .expect("block_evaluate() returned a pool UUID, pool must be available")
+                            .1,
+                    )
+                })
+        } else {
+            None
+        }
+    }
+
+    fn create_pool(
+        &mut self,
+        name: &str,
+        blockdev_paths: &[&Path],
+        redundancy: Option<u16>,
+    ) -> StratisResult<CreateAction<PoolUuid>> {
+        let redundancy = calculate_redundancy!(redundancy);
+
+        validate_name(name)?;
+
+        match self.pools.get_by_name(name) {
+            Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
+            None => {
+                let (uuid, pool) = StratPool::initialize(name, blockdev_paths, redundancy)?;
+
+                let name = Name::new(name.to_owned());
+                devlinks::pool_added(&name);
+                self.pools.insert(name, uuid, pool);
+                Ok(CreateAction::Created(uuid))
+            }
+        }
     }
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {

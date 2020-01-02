@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use dbus::{
     arg::{Array, RefArg, Variant},
-    tree::{MethodInfo, MethodResult, MTFn},
+    tree::{MTFn, MethodInfo, MethodResult},
     Message,
 };
 use itertools::Itertools;

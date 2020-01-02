@@ -2,39 +2,26 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, path::Path, vec::Vec};
+use std::{collections::HashMap, path::Path};
 
 use dbus::{
-    self,
-    arg::{Array, IterAppend, RefArg, Variant},
-    tree::{
-        Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
-        Tree,
-    },
+    arg::Array,
+    tree::{MTFn, MethodInfo, MethodResult},
     Message,
 };
-use itertools::Itertools;
-
 use devicemapper::Sectors;
 
 use crate::{
     dbus_api::{
         blockdev::create_dbus_blockdev,
-        consts,
         filesystem::create_dbus_filesystem,
-        types::{DbusContext, DbusErrorEnum, OPContext, TData},
-        util::{
-            engine_to_dbus_err_tuple, get_next_arg, get_uuid, make_object_path, msg_code_ok,
-            msg_string_ok, result_to_tuple,
-        },
+        types::{DbusErrorEnum, TData},
+        util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
-    engine::{
-        BlockDevTier, CreateAction, EngineAction, FilesystemUuid, MaybeDbusPath, Name, Pool,
-        PoolUuid, RenameAction,
-    },
+    engine::{BlockDevTier, CreateAction, EngineAction, FilesystemUuid, PoolUuid, RenameAction},
 };
 
-fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -109,7 +96,7 @@ fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     )])
 }
 
-fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -171,7 +158,7 @@ fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -219,7 +206,7 @@ fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> MethodResult {
+pub fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -273,15 +260,15 @@ fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, tier: BlockDevTier) -> Meth
     Ok(vec![msg])
 }
 
-fn add_datadevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn add_datadevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     add_blockdevs(m, BlockDevTier::Data)
 }
 
-fn add_cachedevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn add_cachedevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     add_blockdevs(m, BlockDevTier::Cache)
 }
 
-fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -322,243 +309,4 @@ fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     };
     Ok(vec![msg])
-}
-
-fn pool_operation<F, R>(
-    tree: &Tree<MTFn<TData>, TData>,
-    object_path: &dbus::Path<'static>,
-    closure: F,
-) -> Result<R, String>
-where
-    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, String>,
-    R: dbus::arg::Append,
-{
-    let dbus_context = tree.get_data();
-
-    let pool_path = tree
-        .get(object_path)
-        .expect("implicit argument must be in tree");
-
-    let pool_uuid = pool_path
-        .get_data()
-        .as_ref()
-        .ok_or_else(|| format!("no data for object path {}", object_path))?
-        .uuid;
-
-    let engine = dbus_context.engine.borrow();
-    let (pool_name, pool) = engine
-        .get_pool(pool_uuid)
-        .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
-
-    closure((pool_name, pool_uuid, pool))
-}
-
-/// Get a pool property and place it on the D-Bus. The property is
-/// found by means of the getter method which takes a reference to a
-/// Pool and obtains the property from the pool.
-fn get_pool_property<F, R>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
-    getter: F,
-) -> Result<(), MethodErr>
-where
-    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, String>,
-    R: dbus::arg::Append,
-{
-    i.append(
-        pool_operation(p.tree, p.path.get_name(), getter).map_err(|ref e| MethodErr::failed(e))?,
-    );
-    Ok(())
-}
-
-fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(name, _, _)| Ok(name.to_owned()))
-}
-
-fn get_properties_shared(
-    m: &MethodInfo<MTFn<TData>, TData>,
-    properties: &mut dyn Iterator<Item = String>,
-) -> MethodResult {
-    let message: &Message = m.msg;
-    let object_path = &m.path;
-
-    let return_message = message.method_return();
-
-    let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
-        .unique()
-        .filter_map(|prop| match prop.as_str() {
-            consts::POOL_TOTAL_SIZE_PROP => Some((
-                prop,
-                pool_operation(m.tree, object_path.get_name(), |(_, _, pool)| {
-                    Ok((u128::from(*pool.total_physical_size())
-                        * devicemapper::SECTOR_SIZE as u128)
-                        .to_string())
-                }),
-            )),
-            consts::POOL_TOTAL_USED_PROP => Some((
-                prop,
-                pool_operation(m.tree, object_path.get_name(), |(_, _, pool)| {
-                    pool.total_physical_used()
-                        .map_err(|e| e.to_string())
-                        .map(|size| {
-                            (u128::from(*size) * devicemapper::SECTOR_SIZE as u128).to_string()
-                        })
-                }),
-            )),
-            _ => None,
-        })
-        .map(|(key, result)| result_to_tuple(key, result))
-        .collect();
-
-    Ok(vec![return_message.append1(return_value)])
-}
-
-fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    get_properties_shared(
-        m,
-        &mut vec![consts::POOL_TOTAL_SIZE_PROP, consts::POOL_TOTAL_USED_PROP]
-            .into_iter()
-            .map(|s| s.to_string()),
-    )
-}
-
-fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-    let mut properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
-    get_properties_shared(m, &mut properties)
-}
-
-pub fn create_dbus_pool<'a>(
-    dbus_context: &DbusContext,
-    parent: dbus::Path<'static>,
-    uuid: PoolUuid,
-    pool: &mut dyn Pool,
-) -> dbus::Path<'a> {
-    let f = Factory::new_fn();
-
-    let create_filesystems_method = f
-        .method("CreateFilesystems", (), create_filesystems)
-        .in_arg(("specs", "as"))
-        // b: true if filesystems were created
-        // a(os): Array of tuples with object paths and names
-        //
-        // Rust representation: (bool, Vec<(dbus::Path, String)>)
-        .out_arg(("results", "(ba(os))"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let destroy_filesystems_method = f
-        .method("DestroyFilesystems", (), destroy_filesystems)
-        .in_arg(("filesystems", "ao"))
-        // b: true if filesystems were destroyed
-        // as: Array of UUIDs of destroyed filesystems
-        //
-        // Rust representation: (bool, Vec<String>)
-        .out_arg(("results", "(bas)"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let add_blockdevs_method = f
-        .method("AddDataDevs", (), add_datadevs)
-        .in_arg(("devices", "as"))
-        // b: Indicates if any data devices were added
-        // ao: Array of object paths of created data devices
-        //
-        // Rust representation: (bool, Vec<dbus::path>)
-        .out_arg(("results", "(bao)"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let add_cachedevs_method = f
-        .method("AddCacheDevs", (), add_cachedevs)
-        .in_arg(("devices", "as"))
-        // b: Indicates if any cache devices were added
-        // ao: Array of object paths of created cache devices
-        //
-        // Rust representation: (bool, Vec<dbus::path>)
-        .out_arg(("results", "(bao)"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let rename_method = f
-        .method("SetName", (), rename_pool)
-        .in_arg(("name", "s"))
-        // b: false if no pool was renamed
-        // s: UUID of renamed pool
-        //
-        // Rust representation: (bool, String)
-        .out_arg(("result", "(bs)"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let snapshot_method = f
-        .method("SnapshotFilesystem", (), snapshot_filesystem)
-        .in_arg(("origin", "o"))
-        .in_arg(("snapshot_name", "s"))
-        // b: false if no new snapshot was created
-        // s: Object path of new snapshot
-        //
-        // Rust representation: (bool, String)
-        .out_arg(("result", "(bo)"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"));
-
-    let name_property = f
-        .property::<&str, _>(consts::POOL_NAME_PROP, ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::True)
-        .on_get(get_pool_name);
-
-    let uuid_property = f
-        .property::<&str, _>("Uuid", ())
-        .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::Const)
-        .on_get(get_uuid);
-
-    let get_all_properties_method = f
-        .method("GetAllProperties", (), get_all_properties)
-        // a{s(bv)}: Dictionary of property names to tuples
-        // In the tuple:
-        // b: Indicates whether the property value fetched was successful
-        // v: If b is true, represents the value for the given property
-        //    If b is false, represents the error returned when fetching the property
-        .out_arg(("results", "a{s(bv)}"));
-
-    let get_properties_method = f
-        .method("GetProperties", (), get_properties)
-        .in_arg(("properties", "as"))
-        // a{s(bv)}: Dictionary of property names to tuples
-        // In the tuple:
-        // b: Indicates whether the property value fetched was successful
-        // v: If b is true, represents the value for the given property
-        //    If b is false, represents the error returned when fetching the property
-        .out_arg(("results", "a{s(bv)}"));
-
-    let object_name = make_object_path(dbus_context);
-
-    let object_path = f
-        .object_path(object_name, Some(OPContext::new(parent, uuid)))
-        .introspectable()
-        .add(
-            f.interface(consts::POOL_INTERFACE_NAME, ())
-                .add_m(create_filesystems_method)
-                .add_m(destroy_filesystems_method)
-                .add_m(snapshot_method)
-                .add_m(add_blockdevs_method)
-                .add_m(add_cachedevs_method)
-                .add_m(rename_method)
-                .add_p(name_property)
-                .add_p(uuid_property),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
-                .add_m(get_all_properties_method)
-                .add_m(get_properties_method),
-        );
-
-    let path = object_path.get_name().to_owned();
-    dbus_context.actions.borrow_mut().push_add(object_path);
-    pool.set_dbus_path(MaybeDbusPath(Some(path.clone())));
-    path
 }

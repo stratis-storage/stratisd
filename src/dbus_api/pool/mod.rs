@@ -6,14 +6,13 @@ use std::{collections::HashMap, path::Path, vec::Vec};
 
 use dbus::{
     self,
-    arg::{Array, IterAppend, RefArg, Variant},
+    arg::{Array, IterAppend},
     tree::{
         Access, EmitsChangedSignal, Factory, MTFn, MethodErr, MethodInfo, MethodResult, PropInfo,
         Tree,
     },
     Message,
 };
-use itertools::Itertools;
 
 use devicemapper::Sectors;
 
@@ -22,10 +21,11 @@ use crate::{
         blockdev::create_dbus_blockdev,
         consts,
         filesystem::create_dbus_filesystem,
+        pool::fetch_properties_2_0::api::{get_all_properties_method, get_properties_method},
         types::{DbusContext, DbusErrorEnum, OPContext, TData},
         util::{
             engine_to_dbus_err_tuple, get_next_arg, get_uuid, make_object_path, msg_code_ok,
-            msg_string_ok, result_to_tuple,
+            msg_string_ok,
         },
     },
     engine::{
@@ -33,6 +33,8 @@ use crate::{
         PoolUuid, RenameAction,
     },
 };
+
+mod fetch_properties_2_0;
 
 fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
@@ -375,60 +377,6 @@ fn get_pool_name(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result
     get_pool_property(i, p, |(name, _, _)| Ok(name.to_owned()))
 }
 
-fn get_properties_shared(
-    m: &MethodInfo<MTFn<TData>, TData>,
-    properties: &mut dyn Iterator<Item = String>,
-) -> MethodResult {
-    let message: &Message = m.msg;
-    let object_path = &m.path;
-
-    let return_message = message.method_return();
-
-    let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
-        .unique()
-        .filter_map(|prop| match prop.as_str() {
-            consts::POOL_TOTAL_SIZE_PROP => Some((
-                prop,
-                pool_operation(m.tree, object_path.get_name(), |(_, _, pool)| {
-                    Ok((u128::from(*pool.total_physical_size())
-                        * devicemapper::SECTOR_SIZE as u128)
-                        .to_string())
-                }),
-            )),
-            consts::POOL_TOTAL_USED_PROP => Some((
-                prop,
-                pool_operation(m.tree, object_path.get_name(), |(_, _, pool)| {
-                    pool.total_physical_used()
-                        .map_err(|e| e.to_string())
-                        .map(|size| {
-                            (u128::from(*size) * devicemapper::SECTOR_SIZE as u128).to_string()
-                        })
-                }),
-            )),
-            _ => None,
-        })
-        .map(|(key, result)| result_to_tuple(key, result))
-        .collect();
-
-    Ok(vec![return_message.append1(return_value)])
-}
-
-fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    get_properties_shared(
-        m,
-        &mut vec![consts::POOL_TOTAL_SIZE_PROP, consts::POOL_TOTAL_USED_PROP]
-            .into_iter()
-            .map(|s| s.to_string()),
-    )
-}
-
-fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-    let mut properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
-    get_properties_shared(m, &mut properties)
-}
-
 pub fn create_dbus_pool<'a>(
     dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
@@ -516,25 +464,6 @@ pub fn create_dbus_pool<'a>(
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid);
 
-    let get_all_properties_method = f
-        .method("GetAllProperties", (), get_all_properties)
-        // a{s(bv)}: Dictionary of property names to tuples
-        // In the tuple:
-        // b: Indicates whether the property value fetched was successful
-        // v: If b is true, represents the value for the given property
-        //    If b is false, represents the error returned when fetching the property
-        .out_arg(("results", "a{s(bv)}"));
-
-    let get_properties_method = f
-        .method("GetProperties", (), get_properties)
-        .in_arg(("properties", "as"))
-        // a{s(bv)}: Dictionary of property names to tuples
-        // In the tuple:
-        // b: Indicates whether the property value fetched was successful
-        // v: If b is true, represents the value for the given property
-        //    If b is false, represents the error returned when fetching the property
-        .out_arg(("results", "a{s(bv)}"));
-
     let object_name = make_object_path(dbus_context);
 
     let object_path = f
@@ -553,8 +482,8 @@ pub fn create_dbus_pool<'a>(
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
-                .add_m(get_all_properties_method)
-                .add_m(get_properties_method),
+                .add_m(get_all_properties_method(&f))
+                .add_m(get_properties_method(&f)),
         );
 
     let path = object_path.get_name().to_owned();

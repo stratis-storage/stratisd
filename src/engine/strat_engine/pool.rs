@@ -19,7 +19,7 @@ use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
         strat_engine::{
-            backstore::{Backstore, MDADataSize, StratBlockDev},
+            backstore::{Backstore, MDADataSize},
             names::validate_name,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
@@ -272,8 +272,28 @@ impl StratPool {
         }
     }
 
-    pub fn get_strat_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
-        self.backstore.get_blockdev_by_uuid(uuid)
+    /// Verify that a block device specified by its UUID and Device already
+    /// belongs to this pool. If it does not, return an appropriate error.
+    pub fn verify_inclusion(&self, uuid: DevUuid, device: Device) -> StratisResult<()> {
+        self.backstore
+            .get_blockdev_by_uuid(uuid)
+            .ok_or_else(|| StratisError::Error(format!(
+                        "Block device with Stratis UUID {} and device number {} was identified as belonging to this pool, but this pool has no record of it",
+                        uuid.to_simple_ref(),
+                        device)
+            ))
+            .and_then(|(_, blockdev)| {
+                if device != *blockdev.device() {
+                    Err(StratisError::Error(format!(
+                                "Block device with Stratis UUID {} and device number {} was identified as belonging to this pool. This pool has a record of a device with that UUID, but it identifies the device number as {}",
+                                uuid.to_simple_ref(),
+                                device,
+                                *blockdev.device())
+                    ))
+                } else {
+                    Ok(())
+                }
+            })
     }
 }
 
@@ -463,7 +483,8 @@ impl Pool for StratPool {
     }
 
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)> {
-        self.get_strat_blockdev(uuid)
+        self.backstore
+            .get_blockdev_by_uuid(uuid)
             .map(|(t, b)| (t, b as &dyn BlockDev))
     }
 

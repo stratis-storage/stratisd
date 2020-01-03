@@ -219,34 +219,20 @@ impl Engine for StratEngine {
                 // TODO: Handle the case where we have found a device for an already active pool
                 // ref. https://github.com/stratis-storage/stratisd/issues/748
 
-                let (name, pool) = self
+                let (pool_name, pool) = self
                     .pools
                     .get_by_uuid(pool_uuid)
                     .expect("pools.contains_uuid(pool_uuid)");
 
-                match pool.get_strat_blockdev(device_uuid) {
-                    None => {
-                        error!(
-                            "we have a block device {:?} with pool {}, uuid = {} device uuid = {} \
-                             which believes it belongs in this pool, but existing active pool has \
-                             no knowledge of it",
-                            dev_node, name, pool_uuid, device_uuid
-                        );
-                    }
-                    Some((_tier, block_dev)) => {
-                        // Make sure that this block device and existing block device refer to the
-                        // same physical device that's already in the pool
-                        if device != *block_dev.device() {
-                            error!(
-                                "we have a block device with the same uuid as one already in the \
-                                 pool, but the one in the pool has device number {:}, \
-                                 while the one just found has device number {:}",
-                                block_dev.device(),
-                                device,
-                            );
-                        }
-                    }
+                if let Err(err) = pool.verify_inclusion(device_uuid, device) {
+                    error!(
+                        "Existing block devices and the information for pool with UUID {} and name {} were found to be incompatible: {}",
+                        pool_uuid.to_simple_ref(),
+                        pool_name,
+                        err
+                    )
                 }
+
                 None
             } else {
                 let mut devices = self

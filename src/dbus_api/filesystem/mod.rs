@@ -8,7 +8,7 @@ use crate::{
     dbus_api::{
         consts,
         filesystem::{
-            fetch_properties_2_0::methods::{get_all_properties, get_properties},
+            fetch_properties_2_0::api::{get_all_properties_method, get_properties_method},
             filesystem_2_0::api::{
                 created_property, devnode_property, name_property, pool_property, rename_method,
                 uuid_property,
@@ -32,25 +32,6 @@ pub fn create_dbus_filesystem<'a>(
 ) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
-    let get_all_properties_method = f
-        .method("GetAllProperties", (), get_all_properties)
-        // a{s(bv)}: Dictionary of property names to tuples
-        // In the tuple:
-        // b: Indicates whether the property value fetched was successful
-        // v: If b is true, represents the value for the given property
-        //    If b is false, represents the error returned when fetching the property
-        .out_arg(("results", "a{s(bv)}"));
-
-    let get_properties_method = f
-        .method("GetProperties", (), get_properties)
-        .in_arg(("properties", "as"))
-        // a{s(bv)}: Dictionary of property names to tuples
-        // In the tuple:
-        // b: Indicates whether the property value fetched was successful
-        // v: If b is true, represents the value for the given property
-        //    If b is false, represents the error returned when fetching the property
-        .out_arg(("results", "a{s(bv)}"));
-
     let object_name = make_object_path(dbus_context);
 
     let object_path = f
@@ -67,8 +48,8 @@ pub fn create_dbus_filesystem<'a>(
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
-                .add_m(get_all_properties_method)
-                .add_m(get_properties_method),
+                .add_m(get_all_properties_method(&f))
+                .add_m(get_properties_method(&f)),
         );
 
     let path = object_path.get_name().to_owned();

@@ -2,9 +2,12 @@ use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, Method, Property};
 
 use crate::dbus_api::{
     consts,
-    pool::{
-        add_cachedevs, add_datadevs, create_filesystems, destroy_filesystems, get_pool_name,
-        rename_pool, snapshot_filesystem,
+    pool::pool_2_0::{
+        methods::{
+            add_cachedevs, add_datadevs, create_filesystems, destroy_filesystems, rename_pool,
+            snapshot_filesystem,
+        },
+        props::get_pool_name,
     },
     types::TData,
     util::get_uuid,

@@ -9,7 +9,7 @@ use itertools::Itertools;
 
 use crate::dbus_api::{
     consts,
-    pool::pool_operation,
+    pool::shared::pool_operation,
     types::TData,
     util::{get_next_arg, result_to_tuple},
 };

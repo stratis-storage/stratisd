@@ -17,7 +17,7 @@ use devicemapper::Device;
 use crate::engine::{
     strat_engine::{
         backstore::metadata::device_identifiers,
-        udev::{block_enumerator, decide_ownership, is_multipath_member, UdevOwnership},
+        udev::{block_enumerator, decide_ownership, UdevOwnership},
     },
     types::{DevUuid, PoolUuid},
 };
@@ -183,13 +183,22 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Devic
             };
             initialized
         })
-        .filter(|dev| !is_multipath_member(dev)
+        .filter_map(|dev| {
+            decide_ownership(&dev)
                 .map_err(|err| {
-                    warn!("Could not certainly determine whether a device was a multipath member because of an error processing udev information, omitting the device from the set of devices to process, for safety: {}",
+                    warn!("Could not determine ownership of a block device identified as a Stratis device by udev because of an error processing udev information, omitting the device from the set of devices to process, for safety: {}",
                           err);
                 })
-                .unwrap_or(true))
-        .filter_map(|dev| process_stratis_device(&dev))
+            .map(|decision| match decision {
+                UdevOwnership::Stratis => process_stratis_device(&dev),
+                UdevOwnership::MultipathMember => None,
+                _ => {
+                    warn!("udev enumeration identified this device as a Stratis block device but on further examination it appears not to belong to Stratis");
+                    None
+                }
+            })
+            .unwrap_or(None)
+        })
         .fold(HashMap::new(), |mut acc, (pool_uuid, _, device, devnode)| {
             acc.entry(pool_uuid).or_insert_with(HashMap::new).insert(device, devnode);
             acc

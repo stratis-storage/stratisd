@@ -109,44 +109,6 @@ pub fn decide_ownership(device: &libudev::Device) -> StratisResult<UdevOwnership
     })
 }
 
-/// Locate a udev block device with the specified devnode and return
-/// the UdevOwnership decision.
-/// If there is a udev error in setting up the search returns a Stratis error.
-/// If the device being searched can not be found, returns Ok(Stratis error).
-/// If the device could be found, but there was an error in determining
-/// ownership, return Ok(Ok(Stratis error)).
-/// Otherwise, returns the UdevOwnership designation.
-/// Precondition: The block device is known in the udev database.
-pub fn block_device_ownership(
-    devnode: &Path,
-) -> StratisResult<StratisResult<StratisResult<UdevOwnership>>> {
-    block_device_apply(devnode, |d| decide_ownership(d))
-        .map_err(|err| {
-            StratisError::Error(format!(
-                "Could not determine ownership of block device {} because of a udev failure: {}",
-                devnode.display(),
-                err
-            ))
-        })
-    .map(|option_ownership| {
-        option_ownership.ok_or_else(|| {
-            StratisError::Error(format!(
-                "Could not determine ownership of block device {} because it could not be found in the udev database",
-                devnode.display(),
-            ))
-        })
-        .map(|error_ownership| {
-            error_ownership.map_err(|err| {
-                StratisError::Error(format!(
-                        "Could not determine ownership of block device {} because of an error processing udev information: {}",
-                        devnode.display(),
-                        err
-                ))
-            })
-        })
-    })
-}
-
 /// Locate a udev block device with the specified devnode and apply a function
 /// to that device, returning the result.
 /// This approach is necessitated by the libudev lifetimes, which do not allow

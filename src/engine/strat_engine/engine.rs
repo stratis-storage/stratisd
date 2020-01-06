@@ -21,13 +21,12 @@ use crate::{
         event::get_engine_listener_list,
         shared::create_pool_idempotent_or_err,
         strat_engine::{
-            backstore::{find_all, get_metadata, DevOwnership},
+            backstore::{find_all, get_metadata, identify_block_device},
             cmd::verify_binaries,
             devlinks,
             dm::{get_dm, get_dm_init},
             names::validate_name,
             pool::{check_metadata, StratPool},
-            udev::block_device_ownership,
         },
         structures::Table,
         types::{CreateAction, DeleteAction, RenameAction},
@@ -172,22 +171,15 @@ impl StratEngine {
         teardown_pools(self.pools)
     }
 
-    /// Evaluate a device node & devicemapper::Device to see if it's a valid
-    /// stratis device.  If all the devices are present in the pool and the pool isn't already
+    /// Given a udev database entry, process the entry.
+    ///
+    /// If all the devices are present in the pool and the pool isn't already
     /// up and running, it will get setup and the pool uuid will be returned.
     ///
-    /// Returns an error if the status of the block device can not be evaluated.
     /// Logs a warning if the block devices appears to be a Stratis block
     /// device and no pool is set up.
-    fn block_evaluate(
-        &mut self,
-        device: Device,
-        dev_node: PathBuf,
-    ) -> StratisResult<Option<PoolUuid>> {
-        let stratis_identifiers =
-            DevOwnership::from_udev_ownership(&block_device_ownership(&dev_node)???, &dev_node)?
-                .stratis_identifiers();
-        let pool_uuid = if let Some((pool_uuid, device_uuid)) = stratis_identifiers {
+    fn block_evaluate(&mut self, device: &libudev::Device) -> Option<PoolUuid> {
+        if let Some((pool_uuid, device_uuid, device, dev_node)) = identify_block_device(device) {
             if self.pools.contains_uuid(pool_uuid) {
                 // We can get udev events for devices that are already in the pool.  Lets check
                 // to see if this block device is already in this existing pool.  If it is, then all
@@ -246,8 +238,7 @@ impl StratEngine {
             }
         } else {
             None
-        };
-        Ok(pool_uuid)
+        }
     }
 }
 
@@ -255,23 +246,14 @@ impl Engine for StratEngine {
     fn handle_event(&mut self, event: &libudev::Event) -> Option<(PoolUuid, &mut dyn Pool)> {
         let event_type = event.event_type();
         if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change {
-            let device = event.device();
-            device
-                .devnode()
-                .and_then(|devnode| {
-                    device.devnum().and_then(|devnum| {
-                        self.block_evaluate(Device::from(devnum), PathBuf::from(devnode))
-                            .unwrap_or(None)
-                    })
-                })
-                .map(move |pool_uuid| {
-                    (
-                        pool_uuid,
-                        self.get_mut_pool(pool_uuid)
-                            .expect("block_evaluate() returned a pool UUID, pool must be available")
-                            .1,
-                    )
-                })
+            self.block_evaluate(event.device()).map(move |pool_uuid| {
+                (
+                    pool_uuid,
+                    self.get_mut_pool(pool_uuid)
+                        .expect("block_evaluate() returned a pool UUID, pool must be available")
+                        .1,
+                )
+            })
         } else {
             None
         }

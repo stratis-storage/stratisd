@@ -64,6 +64,75 @@ fn device_identifiers_wrapper(
         })
 }
 
+/// Process a device which udev information indicates is a Stratis device.
+fn process_stratis_device(dev: &libudev::Device) -> Option<(PoolUuid, DevUuid, Device, PathBuf)> {
+    match dev.devnode() {
+        Some(devnode) => {
+            match (
+                device_to_devno_wrapper(dev),
+                device_identifiers_wrapper(devnode),
+            ) {
+                (Err(err), _) | (_, Err(err)) | (_, Ok(Err(err))) => {
+                    warn!("udev identified device {} as a Stratis device but {}, disregarding the device",
+                          devnode.display(),
+                          err);
+                    None
+                }
+                (_, Ok(Ok(None))) => {
+                    warn!("udev identified device {} as a Stratis device but there appeared to be no Stratis metadata on the device, disregarding the device",
+                          devnode.display());
+                    None
+                }
+                (Ok(devno), Ok(Ok(Some((pool_uuid, device_uuid))))) => {
+                    Some((pool_uuid, device_uuid, devno, devnode.to_path_buf()))
+                }
+            }
+        }
+        None => {
+            warn!("udev identified a device as a Stratis device, but the udev entry for the device had no device node, disregarding device");
+            None
+        }
+    }
+}
+
+/// Process a device which udev information indicates is unowned.
+fn process_unowned_device(dev: &libudev::Device) -> Option<(PoolUuid, DevUuid, Device, PathBuf)> {
+    match dev.devnode() {
+        Some(devnode) => {
+            match (
+                device_to_devno_wrapper(dev),
+                device_identifiers_wrapper(devnode),
+            ) {
+                (Err(err), _) | (_, Err(err)) => {
+                    warn!("udev identified device {} as a block device but {}, disregarding the device",
+                          devnode.display(),
+                          err);
+                    None
+                }
+                // FIXME: Refine error return in StaticHeader::setup(),
+                // so it can be used to distinguish between signficant
+                // and insignficant errors and then use that ability to
+                // distinguish here between different levels of
+                // severity.
+                (_, Ok(Err(err))) => {
+                    debug!("udev identified device {} as a block device but {}, disregarding the device",
+                           devnode.display(),
+                           err);
+                    None
+                }
+                (_, Ok(Ok(None))) => None,
+                (Ok(devno), Ok(Ok(Some((pool_uuid, device_uuid))))) => {
+                    Some((pool_uuid, device_uuid, devno, devnode.to_path_buf()))
+                }
+            }
+        }
+        None => {
+            warn!("udev identified a device as a block device, but the udev entry for the device had no device node, disregarding the device");
+            None
+        }
+    }
+}
+
 // Use udev to identify all block devices and return the subset of those
 // that have Stratis signatures.
 fn find_all_block_devices_with_stratis_signatures(
@@ -79,48 +148,20 @@ fn find_all_block_devices_with_stratis_signatures(
             };
             initialized
         })
-        .filter(|dev| {
-            decide_ownership(dev)
+        .filter_map(|dev| {
+            decide_ownership(&dev)
                 .map_err(|err| {
                     warn!("Could not determine ownership of a udev block device because of an error processing udev information, omitting the device from the set of devices to process, for safety: {}",
                           err);
                 })
-                .map(|decision| match decision {
-                    UdevOwnership::Stratis | UdevOwnership::Unowned => true,
-                    _ => false,
-                })
-                .unwrap_or(false)
+            .map(|decision| match decision {
+                UdevOwnership::Stratis => process_stratis_device(&dev),
+                UdevOwnership::Unowned => process_unowned_device(&dev),
+                _ => None,
+            })
+            .unwrap_or(None)
         })
-        .filter_map(|dev| match dev.devnode() {
-            Some(devnode) => {
-                match (device_to_devno_wrapper(&dev), device_identifiers_wrapper(devnode)) {
-                    (Err(err), _) | (_, Err(err)) => {
-                        warn!("udev identified device {} as a block device but {}, omitting the device from the set of devices to process",
-                              devnode.display(),
-                              err);
-                        None
-                    }
-                    // FIXME: Refine error return in StaticHeader::setup(),
-                    // so it can be used to distinguish between signficant
-                    // and insignficant errors and then use that ability to
-                    // distinguish here between different levels of
-                    // severity.
-                    (_, Ok(Err(err))) => {
-                        debug!("udev identified device {} as a block device but {}, omitting the device from the set of devices to process",
-                               devnode.display(),
-                               err);
-                        None
-                    }
-                    (_, Ok(Ok(None))) => None,
-                    (Ok(devno), Ok(Ok(Some((pool_uuid, _))))) => Some((pool_uuid, devno, devnode.to_path_buf())),
-                }
-            }
-            None => {
-                warn!("udev identified a device as a block device, but the udev entry for the device had no device node, omitting the device from the set of devices to process");
-                None
-            }
-        })
-        .fold(HashMap::new(), |mut acc, (pool_uuid, device, devnode)| {
+        .fold(HashMap::new(), |mut acc, (pool_uuid, _, device, devnode)| {
             acc.entry(pool_uuid).or_insert_with(HashMap::new).insert(device, devnode);
             acc
         });
@@ -148,29 +189,8 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Devic
                           err);
                 })
                 .unwrap_or(true))
-        .filter_map(|dev| match dev.devnode() {
-            Some(devnode) => {
-                match (device_to_devno_wrapper(&dev), device_identifiers_wrapper(devnode)) {
-                    (Err(err), _) | (_, Err(err)) | (_, Ok(Err(err)))=> {
-                        warn!("udev identified device {} as a Stratis device but {}, omitting the device from the set of devices to process",
-                              devnode.display(),
-                              err);
-                        None
-                    }
-                    (_, Ok(Ok(None))) => {
-                            warn!("udev identified device {} as a Stratis device but there appeared to be no Stratis metadata on the device, omitting the device from the set of devices to process",
-                                  devnode.display());
-                            None
-                    }
-                    (Ok(devno), Ok(Ok(Some((pool_uuid, _))))) => Some((pool_uuid, devno, devnode.to_path_buf())),
-                }
-            }
-            None => {
-                warn!("udev identified a device as a Stratis device, but the udev entry for the device had no device node, omitting the the device from the set of devices to process");
-                None
-            }
-        })
-        .fold(HashMap::new(), |mut acc, (pool_uuid, device, devnode)| {
+        .filter_map(|dev| process_stratis_device(&dev))
+        .fold(HashMap::new(), |mut acc, (pool_uuid, _, device, devnode)| {
             acc.entry(pool_uuid).or_insert_with(HashMap::new).insert(device, devnode);
             acc
         });
@@ -196,67 +216,8 @@ pub fn identify_block_device(
             None
         }
         Ok(ownership) => match ownership {
-            UdevOwnership::Stratis => match dev.devnode() {
-                Some(devnode) => {
-                    match (
-                        device_to_devno_wrapper(dev),
-                        device_identifiers_wrapper(devnode),
-                    ) {
-                        (Err(err), _) | (_, Err(err)) | (_, Ok(Err(err))) => {
-                            warn!("udev identified device {} as a Stratis device but {}, disregarding the device",
-                              devnode.display(),
-                              err);
-                            None
-                        }
-                        (_, Ok(Ok(None))) => {
-                            warn!("udev identified device {} as a Stratis device but there appeared to be no Stratis metadata on the device, disregarding the device",
-                                  devnode.display());
-                            None
-                        }
-                        (Ok(devno), Ok(Ok(Some((pool_uuid, device_uuid))))) => {
-                            Some((pool_uuid, device_uuid, devno, devnode.to_path_buf()))
-                        }
-                    }
-                }
-                None => {
-                    warn!("udev identified a device as a Stratis device, but the udev entry for the device had no device node, disregarding device");
-                    None
-                }
-            },
-            UdevOwnership::Unowned => match dev.devnode() {
-                Some(devnode) => {
-                    match (
-                        device_to_devno_wrapper(dev),
-                        device_identifiers_wrapper(devnode),
-                    ) {
-                        (Err(err), _) | (_, Err(err)) => {
-                            warn!("udev identified device {} as a block device but {}, disregarding device",
-                              devnode.display(),
-                              err);
-                            None
-                        }
-                        // FIXME: Refine error return in StaticHeader::setup(),
-                        // so it can be used to distinguish between signficant
-                        // and insignficant errors and then use that ability to
-                        // distinguish here between different levels of
-                        // severity.
-                        (_, Ok(Err(err))) => {
-                            debug!("udev identified device {} as a block device but {}, disregarding device",
-                               devnode.display(),
-                               err);
-                            None
-                        }
-                        (_, Ok(Ok(None))) => None,
-                        (Ok(devno), Ok(Ok(Some((pool_uuid, device_uuid))))) => {
-                            Some((pool_uuid, device_uuid, devno, devnode.to_path_buf()))
-                        }
-                    }
-                }
-                None => {
-                    warn!("udev identified a device as a block device, but the udev entry for the device had no device node, omitting the device from the set of devices to process");
-                    None
-                }
-            },
+            UdevOwnership::Stratis => process_stratis_device(dev),
+            UdevOwnership::Unowned => process_unowned_device(dev),
             _ => None,
         },
     }

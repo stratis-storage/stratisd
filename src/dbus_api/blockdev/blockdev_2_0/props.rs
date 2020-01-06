@@ -16,7 +16,7 @@ use crate::{
 /// Get a blockdev property and place it on the D-Bus. The property is
 /// found by means of the getter method which takes a reference to a
 /// blockdev and obtains the property from the blockdev.
-pub fn get_blockdev_property<F, R>(
+fn get_blockdev_property<F, R>(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
     getter: F,

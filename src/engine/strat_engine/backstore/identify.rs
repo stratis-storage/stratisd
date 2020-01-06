@@ -19,7 +19,7 @@ use crate::engine::{
         backstore::metadata::device_identifiers,
         udev::{block_enumerator, decide_ownership, is_multipath_member, UdevOwnership},
     },
-    types::PoolUuid,
+    types::{DevUuid, PoolUuid},
 };
 
 // A wrapper for obtaining the device number as a devicemapper Device
@@ -39,7 +39,9 @@ fn device_to_devno_wrapper(device: &libudev::Device) -> Result<Device, String> {
 // Stratis identifiers from the device.
 // Returns Ok(Ok(None)) if the identifers did not appear to be on
 // the device.
-fn device_identifiers_wrapper(devnode: &Path) -> Result<Result<Option<PoolUuid>, String>, String> {
+fn device_identifiers_wrapper(
+    devnode: &Path,
+) -> Result<Result<Option<(PoolUuid, DevUuid)>, String>, String> {
     OpenOptions::new()
         .read(true)
         .open(devnode)
@@ -52,15 +54,13 @@ fn device_identifiers_wrapper(devnode: &Path) -> Result<Result<Option<PoolUuid>,
             )
         })
         .map(|f| {
-            device_identifiers(f)
-                .map_err(|err| {
-                    format!(
-                        "encountered an error while reading Stratis header for device {}: {}",
-                        devnode.display(),
-                        err
-                    )
-                })
-                .map(|maybe_ids| maybe_ids.map(|(pool_uuid, _)| pool_uuid))
+            device_identifiers(f).map_err(|err| {
+                format!(
+                    "encountered an error while reading Stratis header for device {}: {}",
+                    devnode.display(),
+                    err
+                )
+            })
         })
 }
 
@@ -112,7 +112,7 @@ fn find_all_block_devices_with_stratis_signatures(
                         None
                     }
                     (_, Ok(Ok(None))) => None,
-                    (Ok(devno), Ok(Ok(Some(pool_uuid)))) => Some((pool_uuid, devno, devnode.to_path_buf())),
+                    (Ok(devno), Ok(Ok(Some((pool_uuid, _))))) => Some((pool_uuid, devno, devnode.to_path_buf())),
                 }
             }
             None => {
@@ -162,7 +162,7 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Devic
                                   devnode.display());
                             None
                     }
-                    (Ok(devno), Ok(Ok(Some(pool_uuid)))) => Some((pool_uuid, devno, devnode.to_path_buf())),
+                    (Ok(devno), Ok(Ok(Some((pool_uuid, _))))) => Some((pool_uuid, devno, devnode.to_path_buf())),
                 }
             }
             None => {

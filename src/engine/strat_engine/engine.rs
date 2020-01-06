@@ -174,11 +174,12 @@ impl StratEngine {
     /// Given a udev database entry, process the entry.
     ///
     /// If all the devices are present in the pool and the pool isn't already
-    /// up and running, it will get setup and the pool uuid will be returned.
+    /// up and running, it will get setup and the newly created pool and UUID
+    /// will be returned.
     ///
     /// Logs a warning if the block devices appears to be a Stratis block
     /// device and no pool is set up.
-    fn block_evaluate(&mut self, device: &libudev::Device) -> Option<PoolUuid> {
+    fn block_evaluate(&mut self, device: &libudev::Device) -> Option<(PoolUuid, &mut dyn Pool)> {
         if let Some((pool_uuid, device_uuid, device, dev_node)) = identify_block_device(device) {
             if self.pools.contains_uuid(pool_uuid) {
                 // We can get udev events for devices that are already in the pool.  Lets check
@@ -227,7 +228,12 @@ impl StratEngine {
                 match setup_pool(pool_uuid, &devices, &self.pools) {
                     Ok((pool_name, pool)) => {
                         self.pools.insert(pool_name, pool_uuid, pool);
-                        Some(pool_uuid)
+                        Some((
+                            pool_uuid,
+                            self.get_mut_pool(pool_uuid)
+                                .expect("pool was just inserted")
+                                .1,
+                        ))
                     }
                     Err(err) => {
                         warn!("no pool set up, reason: {:?}", err);
@@ -246,14 +252,7 @@ impl Engine for StratEngine {
     fn handle_event(&mut self, event: &libudev::Event) -> Option<(PoolUuid, &mut dyn Pool)> {
         let event_type = event.event_type();
         if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change {
-            self.block_evaluate(event.device()).map(move |pool_uuid| {
-                (
-                    pool_uuid,
-                    self.get_mut_pool(pool_uuid)
-                        .expect("block_evaluate() returned a pool UUID, pool must be available")
-                        .1,
-                )
-            })
+            self.block_evaluate(event.device())
         } else {
             None
         }

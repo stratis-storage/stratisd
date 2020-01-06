@@ -43,7 +43,7 @@ where
 /// Returns true if udev indicates that the device is a multipath member
 /// device, else false. Returns an error on a failure to interpret the
 /// value.
-pub fn is_multipath_member(device: &libudev::Device) -> StratisResult<bool> {
+fn is_multipath_member(device: &libudev::Device) -> StratisResult<bool> {
     match get_udev_property(device, "DM_MULTIPATH_DEVICE_PATH") {
         None => Ok(false),
         Some(Ok(value)) => Ok(value == "1"),

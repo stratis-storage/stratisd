@@ -140,31 +140,18 @@ fn find_all_block_devices_with_stratis_signatures(
     let context = libudev::Context::new()?;
     let mut enumerator = block_enumerator(&context)?;
 
-    let pool_map = enumerator.scan_devices()?
-        .filter(|dev| {
-            let initialized = dev.is_initialized();
-            if !initialized {
-                debug!("Found a udev entry for a device identified as a block device, but udev also identified it as uninitialized, omitting the device from the set of devices to process, for safety");
-            };
-            initialized
-        })
-        .filter_map(|dev| {
-            decide_ownership(&dev)
-                .map_err(|err| {
-                    warn!("Could not determine ownership of a udev block device because of an error processing udev information, omitting the device from the set of devices to process, for safety: {}",
-                          err);
-                })
-            .map(|decision| match decision {
-                UdevOwnership::Stratis => process_stratis_device(&dev),
-                UdevOwnership::Unowned => process_unowned_device(&dev),
-                _ => None,
-            })
-            .unwrap_or(None)
-        })
-        .fold(HashMap::new(), |mut acc, (pool_uuid, _, device, devnode)| {
-            acc.entry(pool_uuid).or_insert_with(HashMap::new).insert(device, devnode);
-            acc
-        });
+    let pool_map = enumerator
+        .scan_devices()?
+        .filter_map(|dev| identify_block_device(&dev))
+        .fold(
+            HashMap::new(),
+            |mut acc, (pool_uuid, _, device, devnode)| {
+                acc.entry(pool_uuid)
+                    .or_insert_with(HashMap::new)
+                    .insert(device, devnode);
+                acc
+            },
+        );
 
     Ok(pool_map)
 }

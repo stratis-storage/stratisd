@@ -22,12 +22,12 @@ matrix:
 
         # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
         # rustfmt
-        - rust: 1.39.0
+        - rust: 1.40.0
           before_script:
               - rustup component add rustfmt
           env: TASK=fmt-travis
         # clippy
-        - rust: 1.39.0
+        - rust: 1.40.0
           before_script:
               - rustup component add clippy
           env: TASK=clippy

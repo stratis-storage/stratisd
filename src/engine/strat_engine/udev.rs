@@ -43,7 +43,7 @@ where
 /// Returns true if udev indicates that the device is a multipath member
 /// device, else false. Returns an error on a failure to interpret the
 /// value.
-pub fn is_multipath_member(device: &libudev::Device) -> StratisResult<bool> {
+fn is_multipath_member(device: &libudev::Device) -> StratisResult<bool> {
     match get_udev_property(device, "DM_MULTIPATH_DEVICE_PATH") {
         None => Ok(false),
         Some(Ok(value)) => Ok(value == "1"),
@@ -106,44 +106,6 @@ pub fn decide_ownership(device: &libudev::Device) -> StratisResult<UdevOwnership
         UdevOwnership::Unowned
     } else {
         UdevOwnership::Theirs
-    })
-}
-
-/// Locate a udev block device with the specified devnode and return
-/// the UdevOwnership decision.
-/// If there is a udev error in setting up the search returns a Stratis error.
-/// If the device being searched can not be found, returns Ok(Stratis error).
-/// If the device could be found, but there was an error in determining
-/// ownership, return Ok(Ok(Stratis error)).
-/// Otherwise, returns the UdevOwnership designation.
-/// Precondition: The block device is known in the udev database.
-pub fn block_device_ownership(
-    devnode: &Path,
-) -> StratisResult<StratisResult<StratisResult<UdevOwnership>>> {
-    block_device_apply(devnode, |d| decide_ownership(d))
-        .map_err(|err| {
-            StratisError::Error(format!(
-                "Could not determine ownership of block device {} because of a udev failure: {}",
-                devnode.display(),
-                err
-            ))
-        })
-    .map(|option_ownership| {
-        option_ownership.ok_or_else(|| {
-            StratisError::Error(format!(
-                "Could not determine ownership of block device {} because it could not be found in the udev database",
-                devnode.display(),
-            ))
-        })
-        .map(|error_ownership| {
-            error_ownership.map_err(|err| {
-                StratisError::Error(format!(
-                        "Could not determine ownership of block device {} because of an error processing udev information: {}",
-                        devnode.display(),
-                        err
-                ))
-            })
-        })
     })
 }
 

@@ -46,13 +46,6 @@ pub enum DevOwnership {
 }
 
 impl DevOwnership {
-    pub fn stratis_identifiers(&self) -> Option<(PoolUuid, DevUuid)> {
-        match self {
-            DevOwnership::Ours(pool_uuid, dev_uuid) => Some((*pool_uuid, *dev_uuid)),
-            _ => None,
-        }
-    }
-
     /// Given a udev assignment of ownership and the devnode for the device
     /// in question, do some additional work to determine DevOwnership.
     pub fn from_udev_ownership(

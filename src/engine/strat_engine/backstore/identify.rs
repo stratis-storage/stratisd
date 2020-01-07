@@ -162,35 +162,46 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Devic
     let mut enumerator = block_enumerator(&context)?;
     enumerator.match_property("ID_FS_TYPE", "stratis")?;
 
-    let pool_map = enumerator.scan_devices()?
-        .filter(|dev| {
-            let initialized = dev.is_initialized();
-            if !initialized {
-                warn!("Found a udev entry for a device identified as a Stratis device, but udev also identified it as uninitialized, omitting the device from the set of devices to process, for safety");
-            };
-            initialized
-        })
-        .filter_map(|dev| {
-            decide_ownership(&dev)
-                .map_err(|err| {
-                    warn!("Could not determine ownership of a block device identified as a Stratis device by udev because of an error processing udev information, omitting the device from the set of devices to process, for safety: {}",
-                          err);
-                })
-            .map(|decision| match decision {
-                UdevOwnership::Stratis => process_stratis_device(&dev),
-                UdevOwnership::MultipathMember => None,
-                _ => {
-                    warn!("udev enumeration identified this device as a Stratis block device but on further examination it appears not to belong to Stratis");
-                    None
-                }
-            })
-            .unwrap_or(None)
-        })
-        .fold(HashMap::new(), |mut acc, (pool_uuid, _, device, devnode)| {
-            acc.entry(pool_uuid).or_insert_with(HashMap::new).insert(device, devnode);
-            acc
-        });
+    let pool_map = enumerator
+        .scan_devices()?
+        .filter_map(|dev| identify_stratis_device(&dev))
+        .fold(
+            HashMap::new(),
+            |mut acc, (pool_uuid, _, device, devnode)| {
+                acc.entry(pool_uuid)
+                    .or_insert_with(HashMap::new)
+                    .insert(device, devnode);
+                acc
+            },
+        );
     Ok(pool_map)
+}
+
+// Identify a device that udev enumeration has already picked up as a Stratis
+// device. Return None if the device does not, after all, appear to be a Stratis
+// device. Log anything unusual at an appropriate level.
+fn identify_stratis_device(dev: &libudev::Device) -> Option<(PoolUuid, DevUuid, Device, PathBuf)> {
+    let initialized = dev.is_initialized();
+    if !initialized {
+        warn!("Found a udev entry for a device identified as a Stratis device, but udev also identified it as uninitialized, disregarding the device");
+        return None;
+    };
+
+    match decide_ownership(dev) {
+        Err(err) => {
+            warn!("Could not determine ownership of a block device identified as a Stratis device by udev because of an error processing udev information, disregarding the device: {}",
+                  err);
+            None
+        }
+        Ok(ownership) => match ownership {
+            UdevOwnership::Stratis => process_stratis_device(dev),
+            UdevOwnership::MultipathMember => None,
+            _ => {
+                warn!("udev enumeration identified this device as a Stratis block device but on further examination it appears not to belong to Stratis");
+                None
+            }
+        },
+    }
 }
 
 /// Identify a block device in the context where a udev event has been

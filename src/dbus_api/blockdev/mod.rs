@@ -7,13 +7,6 @@ use uuid::Uuid;
 
 use crate::{
     dbus_api::{
-        blockdev::{
-            blockdev_2_0::api::{
-                devnode_property, hardware_info_property, initialization_time_property,
-                pool_property, set_userid_method, tier_property, user_info_property, uuid_property,
-            },
-            fetch_properties_2_0::api::{get_all_properties_method, get_properties_method},
-        },
         consts,
         types::{DbusContext, OPContext},
         util::make_object_path,
@@ -40,19 +33,19 @@ pub fn create_dbus_blockdev<'a>(
         .introspectable()
         .add(
             f.interface(consts::BLOCKDEV_INTERFACE_NAME, ())
-                .add_m(set_userid_method(&f))
-                .add_p(devnode_property(&f))
-                .add_p(hardware_info_property(&f))
-                .add_p(initialization_time_property(&f))
-                .add_p(pool_property(&f))
-                .add_p(tier_property(&f))
-                .add_p(user_info_property(&f))
-                .add_p(uuid_property(&f)),
+                .add_m(blockdev_2_0::set_userid_method(&f))
+                .add_p(blockdev_2_0::devnode_property(&f))
+                .add_p(blockdev_2_0::hardware_info_property(&f))
+                .add_p(blockdev_2_0::initialization_time_property(&f))
+                .add_p(blockdev_2_0::pool_property(&f))
+                .add_p(blockdev_2_0::tier_property(&f))
+                .add_p(blockdev_2_0::user_info_property(&f))
+                .add_p(blockdev_2_0::uuid_property(&f)),
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
-                .add_m(get_all_properties_method(&f))
-                .add_m(get_properties_method(&f)),
+                .add_m(fetch_properties_2_0::get_all_properties_method(&f))
+                .add_m(fetch_properties_2_0::get_properties_method(&f)),
         );
 
     let path = object_path.get_name().to_owned();

@@ -9,10 +9,10 @@ use crate::dbus_api::{
     types::TData,
 };
 
-pub fn init_cache_2_1(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn init_cache(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     add_blockdevs(m, BlockDevOp::InitCache)
 }
 
-pub fn add_cachedevs_2_1(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn add_cachedevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     add_blockdevs(m, BlockDevOp::AddCache)
 }

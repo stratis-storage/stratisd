@@ -17,7 +17,7 @@ use crate::{
     engine::{DeleteAction, PoolUuid},
 };
 
-pub fn create_pool_2_0(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     create_pool_shared(m, false)
 }
 

@@ -6,6 +6,6 @@ use dbus::tree::{MTFn, MethodInfo, MethodResult};
 
 use crate::dbus_api::{api::shared::create_pool_shared, types::TData};
 
-pub fn create_pool_2_1(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     create_pool_shared(m, true)
 }

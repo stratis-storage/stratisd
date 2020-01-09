@@ -5,12 +5,12 @@
 use dbus::tree::{Factory, MTFn, Method};
 
 use crate::dbus_api::{
-    pool::pool_2_1::methods::{add_cachedevs_2_1, init_cache_2_1},
+    pool::pool_2_1::methods::{add_cachedevs, init_cache},
     types::TData,
 };
 
-pub fn init_cache_2_1_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
-    f.method("InitCache", (), init_cache_2_1)
+pub fn init_cache_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+    f.method("InitCache", (), init_cache)
         .in_arg(("devices", "as"))
         // b: Indicates if any cache devices were added
         // ao: Array of object paths of created cache devices
@@ -21,8 +21,8 @@ pub fn init_cache_2_1_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TDa
         .out_arg(("return_string", "s"))
 }
 
-pub fn add_cachedevs_2_1_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
-    f.method("AddCacheDevs", (), add_cachedevs_2_1)
+pub fn add_cachedevs_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+    f.method("AddCacheDevs", (), add_cachedevs)
         .in_arg(("devices", "as"))
         // b: Indicates if any cache devices were added
         // ao: Array of object paths of created cache devices

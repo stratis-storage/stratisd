@@ -1,2 +1,4 @@
-pub mod api;
-pub mod methods;
+mod api;
+mod methods;
+
+pub use api::create_pool_method;

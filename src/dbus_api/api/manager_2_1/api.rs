@@ -4,10 +4,10 @@
 
 use dbus::tree::{Factory, MTFn, Method};
 
-use crate::dbus_api::{api::manager_2_1::methods::create_pool_2_1, types::TData};
+use crate::dbus_api::{api::manager_2_1::methods::create_pool, types::TData};
 
-pub fn create_pool_2_1_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
-    f.method("CreatePool", (), create_pool_2_1)
+pub fn create_pool_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+    f.method("CreatePool", (), create_pool)
         .in_arg(("name", "s"))
         .in_arg(("redundancy", "(bq)"))
         .in_arg(("devices", "as"))

@@ -7,14 +7,6 @@ use dbus::{self, tree::Factory};
 use crate::{
     dbus_api::{
         consts,
-        pool::{
-            fetch_properties_2_0::api::{get_all_properties_method, get_properties_method},
-            pool_2_0::api::{
-                add_blockdevs_method, add_cachedevs_method, create_filesystems_method,
-                destroy_filesystems_method, name_property, rename_method,
-                snapshot_filesystem_method, uuid_property,
-            },
-        },
         types::{DbusContext, OPContext},
         util::make_object_path,
     },
@@ -40,19 +32,19 @@ pub fn create_dbus_pool<'a>(
         .introspectable()
         .add(
             f.interface(consts::POOL_INTERFACE_NAME, ())
-                .add_m(create_filesystems_method(&f))
-                .add_m(destroy_filesystems_method(&f))
-                .add_m(snapshot_filesystem_method(&f))
-                .add_m(add_blockdevs_method(&f))
-                .add_m(add_cachedevs_method(&f))
-                .add_m(rename_method(&f))
-                .add_p(name_property(&f))
-                .add_p(uuid_property(&f)),
+                .add_m(pool_2_0::create_filesystems_method(&f))
+                .add_m(pool_2_0::destroy_filesystems_method(&f))
+                .add_m(pool_2_0::snapshot_filesystem_method(&f))
+                .add_m(pool_2_0::add_blockdevs_method(&f))
+                .add_m(pool_2_0::add_cachedevs_method(&f))
+                .add_m(pool_2_0::rename_method(&f))
+                .add_p(pool_2_0::name_property(&f))
+                .add_p(pool_2_0::uuid_property(&f)),
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
-                .add_m(get_all_properties_method(&f))
-                .add_m(get_properties_method(&f)),
+                .add_m(fetch_properties_2_0::get_all_properties_method(&f))
+                .add_m(fetch_properties_2_0::get_properties_method(&f)),
         );
 
     let path = object_path.get_name().to_owned();

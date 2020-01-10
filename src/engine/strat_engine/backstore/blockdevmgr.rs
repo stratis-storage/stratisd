@@ -520,7 +520,7 @@ pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
     let mut unerased_devnodes = Vec::new();
 
     for bd in blockdevs {
-        let bd_devnode = bd.devnode.to_owned();
+        let bd_devnode = bd.devnode();
         bd.disown()
             .unwrap_or_else(|_| unerased_devnodes.push(bd_devnode));
     }

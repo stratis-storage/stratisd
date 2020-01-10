@@ -7,13 +7,6 @@ use dbus::{self, tree::Factory};
 use crate::{
     dbus_api::{
         consts,
-        filesystem::{
-            fetch_properties_2_0::api::{get_all_properties_method, get_properties_method},
-            filesystem_2_0::api::{
-                created_property, devnode_property, name_property, pool_property, rename_method,
-                uuid_property,
-            },
-        },
         types::{DbusContext, OPContext},
         util::make_object_path,
     },
@@ -39,17 +32,17 @@ pub fn create_dbus_filesystem<'a>(
         .introspectable()
         .add(
             f.interface(consts::FILESYSTEM_INTERFACE_NAME, ())
-                .add_m(rename_method(&f))
-                .add_p(devnode_property(&f))
-                .add_p(name_property(&f))
-                .add_p(pool_property(&f))
-                .add_p(uuid_property(&f))
-                .add_p(created_property(&f)),
+                .add_m(filesystem_2_0::rename_method(&f))
+                .add_p(filesystem_2_0::devnode_property(&f))
+                .add_p(filesystem_2_0::name_property(&f))
+                .add_p(filesystem_2_0::pool_property(&f))
+                .add_p(filesystem_2_0::uuid_property(&f))
+                .add_p(filesystem_2_0::created_property(&f)),
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
-                .add_m(get_all_properties_method(&f))
-                .add_m(get_properties_method(&f)),
+                .add_m(fetch_properties_2_0::get_all_properties_method(&f))
+                .add_m(fetch_properties_2_0::get_properties_method(&f)),
         );
 
     let path = object_path.get_name().to_owned();

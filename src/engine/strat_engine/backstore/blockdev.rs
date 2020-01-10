@@ -28,7 +28,7 @@ use crate::{
 #[derive(Debug)]
 pub struct StratBlockDev {
     dev: Device,
-    pub(super) devnode: PathBuf,
+    devnode: PathBuf,
     bda: BDA,
     used: RangeAllocator,
     user_info: Option<String>,

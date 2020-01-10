@@ -517,13 +517,13 @@ fn initialize(
 /// Return an error if any of the blockdevs could not be wiped.
 /// If an error occurs while wiping a blockdev, attempt to wipe all remaining.
 pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
-    let mut unerased_devnodes = Vec::new();
-
-    for bd in blockdevs {
-        let bd_devnode = bd.devnode.to_owned();
-        bd.disown()
-            .unwrap_or_else(|_| unerased_devnodes.push(bd_devnode));
-    }
+    let unerased_devnodes: Vec<_> = blockdevs
+        .iter()
+        .filter_map(|bd| match bd.disown() {
+            Err(_) => Some(bd.devnode()),
+            _ => None,
+        })
+        .collect();
 
     if unerased_devnodes.is_empty() {
         Ok(())

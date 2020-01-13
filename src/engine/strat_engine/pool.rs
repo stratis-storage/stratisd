@@ -19,7 +19,7 @@ use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
         strat_engine::{
-            backstore::{Backstore, MDADataSize, StratBlockDev},
+            backstore::{Backstore, MDADataSize},
             names::validate_name,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
@@ -271,10 +271,6 @@ impl StratPool {
             thinpool_dev: self.thin_pool.record(),
         }
     }
-
-    pub fn get_strat_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
-        self.backstore.get_blockdev_by_uuid(uuid)
-    }
 }
 
 impl Pool for StratPool {
@@ -463,7 +459,8 @@ impl Pool for StratPool {
     }
 
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)> {
-        self.get_strat_blockdev(uuid)
+        self.backstore
+            .get_blockdev_by_uuid(uuid)
             .map(|(t, b)| (t, b as &dyn BlockDev))
     }
 

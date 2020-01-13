@@ -192,19 +192,14 @@ impl StratEngine {
                 match setup_pool(pool_uuid, &devices, &self.pools) {
                     Ok((pool_name, pool)) => {
                         self.pools.insert(pool_name, pool_uuid, pool);
-                        Some((
-                            pool_uuid,
-                            self.get_mut_pool(pool_uuid)
-                                .expect("pool was just inserted")
-                                .1,
-                        ))
                     }
                     Err(err) => {
                         warn!("no pool set up, reason: {:?}", err);
                         self.incomplete_pools.insert(pool_uuid, devices);
-                        None
                     }
-                }
+                };
+                self.get_mut_pool(pool_uuid)
+                    .map(|(_, pool)| (pool_uuid, pool))
             }
         })
     }

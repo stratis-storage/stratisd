@@ -198,8 +198,9 @@ impl StratEngine {
                         self.incomplete_pools.insert(pool_uuid, devices);
                     }
                 };
-                self.get_mut_pool(pool_uuid)
-                    .map(|(_, pool)| (pool_uuid, pool))
+                self.pools
+                    .get_mut_by_uuid(pool_uuid)
+                    .map(|(_, pool)| (pool_uuid, pool as &mut dyn Pool))
             }
         })
     }

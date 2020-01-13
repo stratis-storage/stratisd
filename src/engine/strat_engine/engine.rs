@@ -138,31 +138,33 @@ impl StratEngine {
 
         devlinks::setup_dev_path()?;
 
-        let pools = find_all()?;
-
-        let mut table = Table::default();
-        let mut incomplete_pools = HashMap::new();
-        for (pool_uuid, devices) in pools {
-            match setup_pool(pool_uuid, &devices, &table) {
-                Ok((pool_name, pool)) => {
-                    table.insert(pool_name, pool_uuid, pool);
-                }
-                Err(err) => {
-                    warn!("no pool set up, reason: {:?}", err);
-                    incomplete_pools.insert(pool_uuid, devices);
-                }
-            }
-        }
-
-        let engine = StratEngine {
-            pools: table,
-            incomplete_pools,
+        let mut engine = StratEngine {
+            pools: Table::default(),
+            incomplete_pools: HashMap::new(),
             watched_dev_last_event_nrs: HashMap::new(),
         };
+
+        for (pool_uuid, devices) in find_all()? {
+            engine.try_setup_pool(pool_uuid, devices);
+        }
 
         devlinks::cleanup_devlinks(engine.pools().iter());
 
         Ok(engine)
+    }
+
+    // Given a set of devices, try to set up a pool. If the setup fails,
+    // insert the devices into incomplete_pools.
+    fn try_setup_pool(&mut self, pool_uuid: PoolUuid, devices: HashMap<Device, PathBuf>) {
+        match setup_pool(pool_uuid, &devices, &self.pools) {
+            Ok((pool_name, pool)) => {
+                self.pools.insert(pool_name, pool_uuid, pool);
+            }
+            Err(err) => {
+                warn!("no pool set up, reason: {:?}", err);
+                self.incomplete_pools.insert(pool_uuid, devices);
+            }
+        }
     }
 
     /// Teardown Stratis, preparatory to a shutdown.
@@ -189,15 +191,7 @@ impl StratEngine {
                     .remove(&pool_uuid)
                     .unwrap_or_else(HashMap::new);
                 devices.insert(device, dev_node);
-                match setup_pool(pool_uuid, &devices, &self.pools) {
-                    Ok((pool_name, pool)) => {
-                        self.pools.insert(pool_name, pool_uuid, pool);
-                    }
-                    Err(err) => {
-                        warn!("no pool set up, reason: {:?}", err);
-                        self.incomplete_pools.insert(pool_uuid, devices);
-                    }
-                };
+                self.try_setup_pool(pool_uuid, devices);
                 self.pools
                     .get_mut_by_uuid(pool_uuid)
                     .map(|(_, pool)| (pool_uuid, pool as &mut dyn Pool))

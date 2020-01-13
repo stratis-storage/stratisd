@@ -187,8 +187,7 @@ impl StratEngine {
                 let mut devices = self
                     .incomplete_pools
                     .remove(&pool_uuid)
-                    .or_else(|| Some(HashMap::new()))
-                    .expect("We just retrieved or created a HashMap");
+                    .unwrap_or_else(HashMap::new);
                 devices.insert(device, dev_node);
                 match setup_pool(pool_uuid, &devices, &self.pools) {
                     Ok((pool_name, pool)) => {

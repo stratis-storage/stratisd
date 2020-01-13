@@ -180,7 +180,7 @@ impl StratEngine {
     /// Logs a warning if the block devices appears to be a Stratis block
     /// device and no pool is set up.
     fn block_evaluate(&mut self, device: &libudev::Device) -> Option<(PoolUuid, &mut dyn Pool)> {
-        if let Some((pool_uuid, _, device, dev_node)) = identify_block_device(device) {
+        identify_block_device(device).and_then(move |(pool_uuid, _, device, dev_node)| {
             if self.pools.contains_uuid(pool_uuid) {
                 None
             } else {
@@ -207,9 +207,7 @@ impl StratEngine {
                     }
                 }
             }
-        } else {
-            None
-        }
+        })
     }
 }
 

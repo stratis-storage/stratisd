@@ -180,43 +180,8 @@ impl StratEngine {
     /// Logs a warning if the block devices appears to be a Stratis block
     /// device and no pool is set up.
     fn block_evaluate(&mut self, device: &libudev::Device) -> Option<(PoolUuid, &mut dyn Pool)> {
-        if let Some((pool_uuid, device_uuid, device, dev_node)) = identify_block_device(device) {
+        if let Some((pool_uuid, _, device, dev_node)) = identify_block_device(device) {
             if self.pools.contains_uuid(pool_uuid) {
-                // We can get udev events for devices that are already in the pool.  Lets check
-                // to see if this block device is already in this existing pool.  If it is, then all
-                // is well.  If it's not then we have what is documented below.
-                //
-                // TODO: Handle the case where we have found a device for an already active pool
-                // ref. https://github.com/stratis-storage/stratisd/issues/748
-
-                let (name, pool) = self
-                    .pools
-                    .get_by_uuid(pool_uuid)
-                    .expect("pools.contains_uuid(pool_uuid)");
-
-                match pool.get_strat_blockdev(device_uuid) {
-                    None => {
-                        error!(
-                            "we have a block device {:?} with pool {}, uuid = {} device uuid = {} \
-                             which believes it belongs in this pool, but existing active pool has \
-                             no knowledge of it",
-                            dev_node, name, pool_uuid, device_uuid
-                        );
-                    }
-                    Some((_tier, block_dev)) => {
-                        // Make sure that this block device and existing block device refer to the
-                        // same physical device that's already in the pool
-                        if device != *block_dev.device() {
-                            error!(
-                                "we have a block device with the same uuid as one already in the \
-                                 pool, but the one in the pool has device number {:}, \
-                                 while the one just found has device number {:}",
-                                block_dev.device(),
-                                device,
-                            );
-                        }
-                    }
-                }
                 None
             } else {
                 let mut devices = self

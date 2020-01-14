@@ -161,12 +161,8 @@ impl StratEngine {
 
     /// Given a udev database entry, process the entry.
     ///
-    /// If all the devices are present in the pool and the pool isn't already
-    /// up and running, it will get setup and the newly created pool and UUID
-    /// will be returned.
-    ///
-    /// Logs a warning if the block devices appears to be a Stratis block
-    /// device and no pool is set up.
+    /// If a new pool is created as a result of the processing, return
+    /// the newly created pool and its UUID, otherwise return None.
     fn block_evaluate(&mut self, device: &libudev::Device) -> Option<(PoolUuid, &mut dyn Pool)> {
         identify_block_device(device).and_then(move |(pool_uuid, _, device, dev_node)| {
             if self.pools.contains_uuid(pool_uuid) {

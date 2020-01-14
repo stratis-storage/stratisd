@@ -69,7 +69,7 @@ fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
 /// Check the metadata of an individual pool for consistency.
 /// Precondition: This method is called only when setting up a pool, which
 /// ensures that the flex devs metadata lists are all non-empty.
-pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
+fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
     let flex_devs = &metadata.flex_devs;
     let next = next_index(flex_devs);
     let allocated_from_cap = metadata.backstore.cap.allocs[0].1;
@@ -195,6 +195,8 @@ impl StratPool {
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
     ) -> StratisResult<(Name, StratPool)> {
+        check_metadata(metadata)?;
+
         let mut backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, timestamp)?;
         let mut thinpool = ThinPool::setup(
             uuid,

@@ -26,7 +26,7 @@ use crate::{
             devlinks,
             dm::{get_dm, get_dm_init},
             names::validate_name,
-            pool::{check_metadata, StratPool},
+            pool::StratPool,
         },
         structures::Table,
         types::{CreateAction, DeleteAction, RenameAction},
@@ -76,24 +76,14 @@ fn setup_pool(
         return Err(StratisError::Engine(ErrorEnum::AlreadyExists, err_msg));
     }
 
-    check_metadata(&metadata)
+    StratPool::setup(pool_uuid, devices, timestamp, &metadata)
         .or_else(|e| {
             let err_msg = format!(
-                "inconsistent metadata for {}: reason: {:?}",
+                "failed to set up pool for {}: reason: {:?}",
                 info_string(),
                 e
             );
             Err(StratisError::Engine(ErrorEnum::Error, err_msg))
-        })
-        .and_then(|_| {
-            StratPool::setup(pool_uuid, devices, timestamp, &metadata).or_else(|e| {
-                let err_msg = format!(
-                    "failed to set up pool for {}: reason: {:?}",
-                    info_string(),
-                    e
-                );
-                Err(StratisError::Engine(ErrorEnum::Error, err_msg))
-            })
         })
         .and_then(|(pool_name, pool)| {
             devlinks::setup_pool_devlinks(&pool_name, &pool);

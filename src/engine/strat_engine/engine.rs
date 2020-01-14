@@ -92,62 +92,62 @@ impl StratEngine {
     // Given a set of devices, try to set up a pool. If the setup fails,
     // insert the devices into incomplete_pools.
     fn try_setup_pool(&mut self, pool_uuid: PoolUuid, devices: HashMap<Device, PathBuf>) {
-        /// Setup a pool from constituent devices in the context of some already
-        /// setup pools. Return an error on anything that prevents the pool
-        /// being set up.
-        /// Precondition: every device in devices has already been determined to belong
-        /// to the pool with pool_uuid.
+        // Setup a pool from constituent devices in the context of some already
+        // setup pools.
+        // Return None if the pool's metadata was not found. This is a
+        // legitimate non-error condition, which may result if only a subset
+        // of the pool's devices are in the set of devices being used.
+        // Return an error on all other errors. Note that any one of these
+        // errors could represent a temporary condition, that could be changed
+        // by finding another device. So it is reasonable to treat them all
+        // as loggable at the warning level, but not at the error level.
+        // Precondition: every device in devices has already been determined to belong
+        // to the pool with pool_uuid.
         fn setup_pool(
             pool_uuid: PoolUuid,
             devices: &HashMap<Device, PathBuf>,
             pools: &Table<StratPool>,
-        ) -> StratisResult<(Name, StratPool)> {
-            // FIXME: In this method, various errors are assembled from various
-            // sources and combined into strings, so that they
-            // can be printed as log messages if necessary. Instead, some kind of
-            // error-chaining should be used here and if it is necessary
-            // to log the error, the log code should be able to reduce the error
-            // chain to something that can be sensibly logged.
-            let info_string = || {
-                let dev_paths = devices
-                    .values()
-                    .map(|p| p.to_str().expect("Unix is utf-8"))
-                    .collect::<Vec<&str>>()
-                    .join(" ,");
-                format!("(pool UUID: {}, devnodes: {})", pool_uuid, dev_paths)
+        ) -> Result<Option<(Name, StratPool)>, String> {
+            let (timestamp, metadata) = match get_metadata(pool_uuid, devices) {
+                Err(err) => return Err(format!(
+                        "There was an error encountered when reading the metadata for the devices found for pool with UUID {}: {}",
+                        pool_uuid.to_simple_ref(),
+                        err)),
+                Ok(None) => return Ok(None),
+                Ok(Some((timestamp, metadata))) => (timestamp, metadata),
             };
 
-            let (timestamp, metadata) = get_metadata(pool_uuid, devices)?.ok_or_else(|| {
-                let err_msg = format!("no metadata found for {}", info_string());
-                StratisError::Engine(ErrorEnum::NotFound, err_msg)
-            })?;
-
-            if pools.contains_name(&metadata.name) {
-                let err_msg = format!(
-                    "pool with name \"{}\" set up; metadata specifies same name for {}",
-                    &metadata.name,
-                    info_string()
-                );
-                return Err(StratisError::Engine(ErrorEnum::AlreadyExists, err_msg));
+            if let Some((uuid, _)) = pools.get_by_name(&metadata.name) {
+                return Err(format!(
+                        "There is a pool name conflict. The devices currently being processed have been identified as belonging to the pool with UUID {} and name {}, but a pool with the same name and UUID {} is already active",
+                        pool_uuid.to_simple_ref(),
+                        &metadata.name,
+                        uuid.to_simple_ref()));
             }
 
-            StratPool::setup(pool_uuid, devices, timestamp, &metadata).or_else(|e| {
-                let err_msg = format!(
-                    "failed to set up pool for {}: reason: {:?}",
-                    info_string(),
-                    e
-                );
-                Err(StratisError::Engine(ErrorEnum::Error, err_msg))
-            })
+            StratPool::setup(pool_uuid, devices, timestamp, &metadata)
+                .map_err(|err| {
+                    format!(
+                        "An attempt to set up pool with UUID {} from the assembled devices failed: {}",
+                        pool_uuid.to_simple_ref(),
+                        err
+                    )
+                })
+                .map(Some)
         }
 
-        match setup_pool(pool_uuid, &devices, &self.pools) {
-            Ok((pool_name, pool)) => {
+        let result = setup_pool(pool_uuid, &devices, &self.pools);
+
+        if let Err(err) = &result {
+            warn!("{}", err);
+        }
+
+        match result {
+            Ok(Some((pool_name, pool))) => {
                 devlinks::setup_pool_devlinks(&pool_name, &pool);
                 self.pools.insert(pool_name, pool_uuid, pool);
             }
-            Err(err) => {
-                warn!("no pool set up, reason: {:?}", err);
+            _ => {
                 self.incomplete_pools.insert(pool_uuid, devices);
             }
         }

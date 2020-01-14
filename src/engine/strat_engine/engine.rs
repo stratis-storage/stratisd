@@ -131,23 +131,19 @@ impl StratEngine {
                 return Err(StratisError::Engine(ErrorEnum::AlreadyExists, err_msg));
             }
 
-            StratPool::setup(pool_uuid, devices, timestamp, &metadata)
-                .or_else(|e| {
-                    let err_msg = format!(
-                        "failed to set up pool for {}: reason: {:?}",
-                        info_string(),
-                        e
-                    );
-                    Err(StratisError::Engine(ErrorEnum::Error, err_msg))
-                })
-                .and_then(|(pool_name, pool)| {
-                    devlinks::setup_pool_devlinks(&pool_name, &pool);
-                    Ok((pool_name, pool))
-                })
+            StratPool::setup(pool_uuid, devices, timestamp, &metadata).or_else(|e| {
+                let err_msg = format!(
+                    "failed to set up pool for {}: reason: {:?}",
+                    info_string(),
+                    e
+                );
+                Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+            })
         }
 
         match setup_pool(pool_uuid, &devices, &self.pools) {
             Ok((pool_name, pool)) => {
+                devlinks::setup_pool_devlinks(&pool_name, &pool);
                 self.pools.insert(pool_name, pool_uuid, pool);
             }
             Err(err) => {

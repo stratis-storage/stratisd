@@ -19,7 +19,7 @@ use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
         strat_engine::{
-            backstore::{Backstore, MDADataSize, StratBlockDev},
+            backstore::{Backstore, MDADataSize},
             names::validate_name,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
@@ -69,7 +69,7 @@ fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
 /// Check the metadata of an individual pool for consistency.
 /// Precondition: This method is called only when setting up a pool, which
 /// ensures that the flex devs metadata lists are all non-empty.
-pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
+fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
     let flex_devs = &metadata.flex_devs;
     let next = next_index(flex_devs);
     let allocated_from_cap = metadata.backstore.cap.allocs[0].1;
@@ -195,6 +195,8 @@ impl StratPool {
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
     ) -> StratisResult<(Name, StratPool)> {
+        check_metadata(metadata)?;
+
         let mut backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, timestamp)?;
         let mut thinpool = ThinPool::setup(
             uuid,
@@ -270,10 +272,6 @@ impl StratPool {
             flex_devs: self.thin_pool.record(),
             thinpool_dev: self.thin_pool.record(),
         }
-    }
-
-    pub fn get_strat_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
-        self.backstore.get_blockdev_by_uuid(uuid)
     }
 }
 
@@ -463,7 +461,8 @@ impl Pool for StratPool {
     }
 
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)> {
-        self.get_strat_blockdev(uuid)
+        self.backstore
+            .get_blockdev_by_uuid(uuid)
             .map(|(t, b)| (t, b as &dyn BlockDev))
     }
 

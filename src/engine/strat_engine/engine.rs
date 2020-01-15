@@ -26,7 +26,7 @@ use crate::{
             devlinks,
             dm::{get_dm, get_dm_init},
             names::validate_name,
-            pool::{check_metadata, StratPool},
+            pool::StratPool,
         },
         structures::Table,
         types::{CreateAction, DeleteAction, RenameAction},
@@ -36,70 +36,6 @@ use crate::{
 };
 
 const REQUIRED_DM_MINOR_VERSION: u32 = 37;
-
-/// Setup a pool from constituent devices in the context of some already
-/// setup pools. Return an error on anything that prevents the pool
-/// being set up.
-/// Precondition: every device in devices has already been determined to belong
-/// to the pool with pool_uuid.
-fn setup_pool(
-    pool_uuid: PoolUuid,
-    devices: &HashMap<Device, PathBuf>,
-    pools: &Table<StratPool>,
-) -> StratisResult<(Name, StratPool)> {
-    // FIXME: In this method, various errors are assembled from various
-    // sources and combined into strings, so that they
-    // can be printed as log messages if necessary. Instead, some kind of
-    // error-chaining should be used here and if it is necessary
-    // to log the error, the log code should be able to reduce the error
-    // chain to something that can be sensibly logged.
-    let info_string = || {
-        let dev_paths = devices
-            .values()
-            .map(|p| p.to_str().expect("Unix is utf-8"))
-            .collect::<Vec<&str>>()
-            .join(" ,");
-        format!("(pool UUID: {}, devnodes: {})", pool_uuid, dev_paths)
-    };
-
-    let (timestamp, metadata) = get_metadata(pool_uuid, devices)?.ok_or_else(|| {
-        let err_msg = format!("no metadata found for {}", info_string());
-        StratisError::Engine(ErrorEnum::NotFound, err_msg)
-    })?;
-
-    if pools.contains_name(&metadata.name) {
-        let err_msg = format!(
-            "pool with name \"{}\" set up; metadata specifies same name for {}",
-            &metadata.name,
-            info_string()
-        );
-        return Err(StratisError::Engine(ErrorEnum::AlreadyExists, err_msg));
-    }
-
-    check_metadata(&metadata)
-        .or_else(|e| {
-            let err_msg = format!(
-                "inconsistent metadata for {}: reason: {:?}",
-                info_string(),
-                e
-            );
-            Err(StratisError::Engine(ErrorEnum::Error, err_msg))
-        })
-        .and_then(|_| {
-            StratPool::setup(pool_uuid, devices, timestamp, &metadata).or_else(|e| {
-                let err_msg = format!(
-                    "failed to set up pool for {}: reason: {:?}",
-                    info_string(),
-                    e
-                );
-                Err(StratisError::Engine(ErrorEnum::Error, err_msg))
-            })
-        })
-        .and_then(|(pool_name, pool)| {
-            devlinks::setup_pool_devlinks(&pool_name, &pool);
-            Ok((pool_name, pool))
-        })
-}
 
 #[derive(Debug)]
 pub struct StratEngine {
@@ -138,31 +74,83 @@ impl StratEngine {
 
         devlinks::setup_dev_path()?;
 
-        let pools = find_all()?;
-
-        let mut table = Table::default();
-        let mut incomplete_pools = HashMap::new();
-        for (pool_uuid, devices) in pools {
-            match setup_pool(pool_uuid, &devices, &table) {
-                Ok((pool_name, pool)) => {
-                    table.insert(pool_name, pool_uuid, pool);
-                }
-                Err(err) => {
-                    warn!("no pool set up, reason: {:?}", err);
-                    incomplete_pools.insert(pool_uuid, devices);
-                }
-            }
-        }
-
-        let engine = StratEngine {
-            pools: table,
-            incomplete_pools,
+        let mut engine = StratEngine {
+            pools: Table::default(),
+            incomplete_pools: HashMap::new(),
             watched_dev_last_event_nrs: HashMap::new(),
         };
+
+        for (pool_uuid, devices) in find_all()? {
+            engine.try_setup_pool(pool_uuid, devices);
+        }
 
         devlinks::cleanup_devlinks(engine.pools().iter());
 
         Ok(engine)
+    }
+
+    // Given a set of devices, try to set up a pool. If the setup fails,
+    // insert the devices into incomplete_pools.
+    fn try_setup_pool(&mut self, pool_uuid: PoolUuid, devices: HashMap<Device, PathBuf>) {
+        // Setup a pool from constituent devices in the context of some already
+        // setup pools.
+        // Return None if the pool's metadata was not found. This is a
+        // legitimate non-error condition, which may result if only a subset
+        // of the pool's devices are in the set of devices being used.
+        // Return an error on all other errors. Note that any one of these
+        // errors could represent a temporary condition, that could be changed
+        // by finding another device. So it is reasonable to treat them all
+        // as loggable at the warning level, but not at the error level.
+        // Precondition: every device in devices has already been determined to belong
+        // to the pool with pool_uuid.
+        fn setup_pool(
+            pool_uuid: PoolUuid,
+            devices: &HashMap<Device, PathBuf>,
+            pools: &Table<StratPool>,
+        ) -> Result<Option<(Name, StratPool)>, String> {
+            let (timestamp, metadata) = match get_metadata(pool_uuid, devices) {
+                Err(err) => return Err(format!(
+                        "There was an error encountered when reading the metadata for the devices found for pool with UUID {}: {}",
+                        pool_uuid.to_simple_ref(),
+                        err)),
+                Ok(None) => return Ok(None),
+                Ok(Some((timestamp, metadata))) => (timestamp, metadata),
+            };
+
+            if let Some((uuid, _)) = pools.get_by_name(&metadata.name) {
+                return Err(format!(
+                        "There is a pool name conflict. The devices currently being processed have been identified as belonging to the pool with UUID {} and name {}, but a pool with the same name and UUID {} is already active",
+                        pool_uuid.to_simple_ref(),
+                        &metadata.name,
+                        uuid.to_simple_ref()));
+            }
+
+            StratPool::setup(pool_uuid, devices, timestamp, &metadata)
+                .map_err(|err| {
+                    format!(
+                        "An attempt to set up pool with UUID {} from the assembled devices failed: {}",
+                        pool_uuid.to_simple_ref(),
+                        err
+                    )
+                })
+                .map(Some)
+        }
+
+        let result = setup_pool(pool_uuid, &devices, &self.pools);
+
+        if let Err(err) = &result {
+            warn!("{}", err);
+        }
+
+        match result {
+            Ok(Some((pool_name, pool))) => {
+                devlinks::setup_pool_devlinks(&pool_name, &pool);
+                self.pools.insert(pool_name, pool_uuid, pool);
+            }
+            _ => {
+                self.incomplete_pools.insert(pool_uuid, devices);
+            }
+        }
     }
 
     /// Teardown Stratis, preparatory to a shutdown.
@@ -173,78 +161,24 @@ impl StratEngine {
 
     /// Given a udev database entry, process the entry.
     ///
-    /// If all the devices are present in the pool and the pool isn't already
-    /// up and running, it will get setup and the newly created pool and UUID
-    /// will be returned.
-    ///
-    /// Logs a warning if the block devices appears to be a Stratis block
-    /// device and no pool is set up.
+    /// If a new pool is created as a result of the processing, return
+    /// the newly created pool and its UUID, otherwise return None.
     fn block_evaluate(&mut self, device: &libudev::Device) -> Option<(PoolUuid, &mut dyn Pool)> {
-        if let Some((pool_uuid, device_uuid, device, dev_node)) = identify_block_device(device) {
+        identify_block_device(device).and_then(move |(pool_uuid, _, device, dev_node)| {
             if self.pools.contains_uuid(pool_uuid) {
-                // We can get udev events for devices that are already in the pool.  Lets check
-                // to see if this block device is already in this existing pool.  If it is, then all
-                // is well.  If it's not then we have what is documented below.
-                //
-                // TODO: Handle the case where we have found a device for an already active pool
-                // ref. https://github.com/stratis-storage/stratisd/issues/748
-
-                let (name, pool) = self
-                    .pools
-                    .get_by_uuid(pool_uuid)
-                    .expect("pools.contains_uuid(pool_uuid)");
-
-                match pool.get_strat_blockdev(device_uuid) {
-                    None => {
-                        error!(
-                            "we have a block device {:?} with pool {}, uuid = {} device uuid = {} \
-                             which believes it belongs in this pool, but existing active pool has \
-                             no knowledge of it",
-                            dev_node, name, pool_uuid, device_uuid
-                        );
-                    }
-                    Some((_tier, block_dev)) => {
-                        // Make sure that this block device and existing block device refer to the
-                        // same physical device that's already in the pool
-                        if device != *block_dev.device() {
-                            error!(
-                                "we have a block device with the same uuid as one already in the \
-                                 pool, but the one in the pool has device number {:}, \
-                                 while the one just found has device number {:}",
-                                block_dev.device(),
-                                device,
-                            );
-                        }
-                    }
-                }
                 None
             } else {
                 let mut devices = self
                     .incomplete_pools
                     .remove(&pool_uuid)
-                    .or_else(|| Some(HashMap::new()))
-                    .expect("We just retrieved or created a HashMap");
+                    .unwrap_or_else(HashMap::new);
                 devices.insert(device, dev_node);
-                match setup_pool(pool_uuid, &devices, &self.pools) {
-                    Ok((pool_name, pool)) => {
-                        self.pools.insert(pool_name, pool_uuid, pool);
-                        Some((
-                            pool_uuid,
-                            self.get_mut_pool(pool_uuid)
-                                .expect("pool was just inserted")
-                                .1,
-                        ))
-                    }
-                    Err(err) => {
-                        warn!("no pool set up, reason: {:?}", err);
-                        self.incomplete_pools.insert(pool_uuid, devices);
-                        None
-                    }
-                }
+                self.try_setup_pool(pool_uuid, devices);
+                self.pools
+                    .get_mut_by_uuid(pool_uuid)
+                    .map(|(_, pool)| (pool_uuid, pool as &mut dyn Pool))
             }
-        } else {
-            None
-        }
+        })
     }
 }
 

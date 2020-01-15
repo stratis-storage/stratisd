@@ -25,6 +25,8 @@ use crate::{
     engine::CreateAction,
 };
 
+/// Shared code for the creation of pools using the D-Bus API without the option
+/// for a keyfile path or with an optional keyfile in later versions of the interface.
 pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_keyfile: bool) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();

@@ -69,7 +69,7 @@ impl StratBlockDev {
         let allocator = RangeAllocator::new(bda.dev_size(), &segments)?;
 
         let devnode_maybe_encrypted = match keyfile_path {
-            Some(path) => Self::encrypt_blockdev(devnode.as_path(), path)?,
+            Some(path) => StratBlockDev::encrypt_blockdev(devnode.as_path(), path)?,
             None => devnode,
         };
 

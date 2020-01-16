@@ -5,8 +5,8 @@
 use std::path::Path;
 
 use dbus::{
-    arg::Array,
-    tree::{MTFn, MethodInfo, MethodResult, Tree},
+    arg::{Array, IterAppend},
+    tree::{MTFn, MethodErr, MethodInfo, MethodResult, PropInfo, Tree},
     Message,
 };
 
@@ -119,4 +119,22 @@ pub fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, op: BlockDevOp) -> Meth
     };
 
     Ok(vec![msg])
+}
+
+/// Get a pool property and place it on the D-Bus. The property is
+/// found by means of the getter method which takes a reference to a
+/// Pool and obtains the property from the pool.
+pub fn get_pool_property<F, R>(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+    getter: F,
+) -> Result<(), MethodErr>
+where
+    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, String>,
+    R: dbus::arg::Append,
+{
+    i.append(
+        pool_operation(p.tree, p.path.get_name(), getter).map_err(|ref e| MethodErr::failed(e))?,
+    );
+    Ok(())
 }

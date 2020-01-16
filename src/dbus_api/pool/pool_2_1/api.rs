@@ -2,10 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::tree::{Factory, MTFn, Method};
+use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, Method, Property};
 
 use crate::dbus_api::{
-    pool::pool_2_1::methods::{add_cachedevs, init_cache},
+    consts,
+    pool::pool_2_1::{
+        methods::{add_cachedevs, init_cache},
+        props::get_pool_encrypted,
+    },
     types::TData,
 };
 
@@ -31,4 +35,11 @@ pub fn add_cachedevs_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TDat
         .out_arg(("results", "(bao)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"))
+}
+
+pub fn encrypted_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
+    f.property::<bool, _>(consts::POOL_ENCRYPTED_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_pool_encrypted)
 }

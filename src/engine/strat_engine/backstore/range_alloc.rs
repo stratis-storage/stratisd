@@ -20,7 +20,6 @@ pub struct RangeAllocator {
 impl RangeAllocator {
     /// Create a new RangeAllocator with the specified (offset, length)
     /// ranges marked as used.
-    #[allow(clippy::new_ret_no_self)]
     pub fn new(
         limit: BlockdevSize,
         initial_used: &[(Sectors, Sectors)],

@@ -226,11 +226,14 @@ pub fn add_cachedevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         let (_, pool) = get_pool!(engine; pool_uuid; default_return; return_message);
         pool.cache_initialized()
     };
-    if cache_initialized {
-        add_blockdevs(m, BlockDevOp::AddCache)
-    } else {
-        add_blockdevs(m, BlockDevOp::InitCache)
-    }
+    add_blockdevs(
+        m,
+        if cache_initialized {
+            BlockDevOp::AddCache
+        } else {
+            BlockDevOp::InitCache
+        },
+    )
 }
 
 pub fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {

@@ -143,7 +143,6 @@ impl CacheTier {
     /// sub-device too big.
     ///
     /// WARNING: metadata changing event
-    #[allow(clippy::new_ret_no_self)]
     pub fn new(mut block_mgr: BlockDevMgr) -> StratisResult<CacheTier> {
         let avail_space = block_mgr.avail_space();
 

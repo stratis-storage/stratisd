@@ -52,7 +52,6 @@ impl StratBlockDev {
     /// on the device is simply invisible to the blockdev. Consequently, it
     /// is invisible to the engine, and is not part of the total size value
     /// reported on the D-Bus.
-    #[allow(clippy::new_ret_no_self)]
     pub fn new(
         dev: Device,
         devnode: PathBuf,

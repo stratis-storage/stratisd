@@ -235,7 +235,6 @@ pub struct ThinPool {
 
 impl ThinPool {
     /// Make a new thin pool.
-    #[allow(clippy::new_ret_no_self)]
     pub fn new(
         pool_uuid: PoolUuid,
         thin_pool_size: &ThinPoolSizeParams,

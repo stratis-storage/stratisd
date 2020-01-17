@@ -185,6 +185,9 @@ SPECS = {
 <property name="Uuid" type="s" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
 </property>
+<property name="Encrypted" type="b" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
+</property>
 </interface>
 """,
     "org.storage.stratis2.filesystem": """

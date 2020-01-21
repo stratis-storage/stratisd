@@ -73,14 +73,14 @@ matrix:
         - name: "lint Python test code on Python 3.7"
           language: python
           python: "3.7"
-          install: pip3 install -r tests/client-dbus/requirements.txt
+          install: pip3 install tox==3.2.1
           before_script:
               - cd tests/client-dbus
           env: TASK=lint
         - name: "format Python test code on Python 3.7"
           language: python
           python: "3.7"
-          install: pip3 install -r tests/client-dbus/requirements.txt
+          install: pip3 install black==19.3b0 isort==4.3.4
           before_script:
               - cd tests/client-dbus
           env: TASK=fmt-travis

@@ -42,10 +42,10 @@ matrix:
         # MANDATORY TESTING ON STABLE
         - name: "build using stable toolchain"
           rust: stable
-          env: TASK=build TARGET=x86_64-unknown-linux-gnu
+          env: TASK=build
         - name: "build without defaults using stable toolchain"
           rust: stable
-          env: TASK=build-no-default TARGET=x86_64-unknown-linux-gnu
+          env: TASK=build-no-default
         - name: "build Rust source on a 32-bit system using stable toolchain"
           rust: stable
           env: TASK=build TARGET=i686-unknown-linux-gnu PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/

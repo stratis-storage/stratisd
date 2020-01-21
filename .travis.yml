@@ -7,8 +7,6 @@ addons:
           - libdbus-1-dev
           - libudev-dev
           - libdbus-glib-1-dev
-          # needed for i686-unknown-linux-gnu target
-          - gcc-multilib
           - python3-pyudev
 
 language: rust

@@ -19,66 +19,66 @@ matrix:
     include:
 
         # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
-        # rustfmt
-        - rust: 1.40.0
+        - name: "format Rust source using current development toolchain"
+          rust: 1.40.0
           before_script:
               - rustup component add rustfmt
           env: TASK=fmt-travis
-        # clippy
-        - rust: 1.40.0
+        - name: "lint Rust source using current development toolchain"
+          rust: 1.40.0
           before_script:
               - rustup component add clippy
           env: TASK=clippy
 
         # MANDATORY TESTING USING LOWEST SUPPORTED COMPILER
-        # tests
-        - rust: 1.39.0
+        - name: "run Rust unit tests on lowest supported toolchain"
+          rust: 1.39.0
           env: TASK=test
-        # release
-        - rust: 1.39.0
+        - name: "build release on lowest supported toolchain"
+          rust: 1.39.0
           env: TASK=release
 
 
         # MANDATORY TESTING ON STABLE
-        # compile
-        - rust: stable
+        - name: "build using stable toolchain"
+          rust: stable
           env: TASK=build TARGET=x86_64-unknown-linux-gnu
-        # compile with no defaults enabled
-        - rust: stable
+        - name: "build without defaults using stable toolchain"
+          rust: stable
           env: TASK=build-no-default TARGET=x86_64-unknown-linux-gnu
-        # compile on a 32-bit system
-        - rust: stable
+        - name: "build Rust source on a 32-bit system using stable toolchain"
+          rust: stable
           env: TASK=build TARGET=i686-unknown-linux-gnu PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
           install:
             - rustup target add $TARGET
             - sudo dpkg --add-architecture i386
             - sudo apt-get update
             - sudo apt-get install -y gcc-multilib libdbus-1-dev:i386 libdbus-glib-1-dev:i386 libglib2.0-dev:i386 libudev-dev:i386
-        # Build docs
-        - rust: stable
+        - name: "build Rust docs using stable toolchain"
+          rust: stable
           env: TASK=docs-travis
-        # test
-        - rust: stable
+        - name: "run Rust unit tests using stable toolchain"
+          rust: stable
           env: TASK=test
-        # destructive tests that can be run on Travis
-        - rust: stable
+        - name: "run Rust destructive unit tests using stable toolchain"
+          rust: stable
           sudo: required
           script: sudo PATH=${TRAVIS_HOME}/.cargo/bin:$PATH make -f Makefile test-travis
-        # release
-        - rust: stable
+        - name: "build release using stable toolchain"
+          rust: stable
           env: TASK=release
 
 
         # MANDATORY PYTHON CHECKS
-        # Run pylint, Python linter, on any Python test code
-        - language: python
+        - name: "lint Python test code on Python 3.7"
+          language: python
           python: "3.7"
           install: pip3 install -r tests/client-dbus/requirements.txt
           before_script:
               - cd tests/client-dbus
           env: TASK=lint
-        # Format any Python test code using yapf
-        - language: python
+        - name: "format Python test code on Python 3.7"
+          language: python
           python: "3.7"
           install: pip3 install -r tests/client-dbus/requirements.txt
           before_script:
@@ -89,8 +89,8 @@ matrix:
         # INTERMITTENTLY ALLOWED FAILURES
         # Allowed if a failure occurs after a new Rust release until the
         # failure is addressed.
-        # Run clippy on rust beta, in order to be good Rustaceans.
-        - rust: beta
+        - name: "lint Rust source using beta toolchain"
+          rust: beta
           before_script:
               - rustup component add clippy
           env: TASK=clippy
@@ -100,7 +100,8 @@ matrix:
         # Run audit on Rust stable.  Make it an allowed failure, because:
         # * It takes 9 minutes, the longest of any task.
         # * It should be an advisory, and should not gate our development.
-        - rust: stable
+        - name: "run Rust audit task using stable toolchain"
+          rust: stable
           env: TASK=audit
 
 branches:

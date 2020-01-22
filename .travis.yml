@@ -45,9 +45,9 @@ matrix:
         - name: "build without defaults using stable toolchain"
           rust: stable
           env: TASK=build-no-default
-        - name: "build Rust source on a 32-bit system using stable toolchain"
+        - name: "build Rust source and tests on a 32-bit system using stable toolchain"
           rust: stable
-          env: TASK=build TARGET=i686-unknown-linux-gnu PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
+          env: TASK=build-tests TARGET=i686-unknown-linux-gnu PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
           install:
             - rustup target add $TARGET
             - sudo dpkg --add-architecture i386

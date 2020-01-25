@@ -5,7 +5,7 @@
 // Discover or identify devices that may belong to Stratis.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::OpenOptions,
     path::{Path, PathBuf},
 };
@@ -156,6 +156,7 @@ pub fn find_all_block_devices_with_stratis_signatures(
 // Find all devices identified by udev as Stratis devices.
 fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     let context = libudev::Context::new()?;
+
     let mut enumerator = block_enumerator(&context)?;
     enumerator.match_property("ID_FS_TYPE", "stratis")?;
 
@@ -169,6 +170,43 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Devic
             acc
         });
     Ok(pool_map)
+}
+
+/// Returns the physical path of the device
+fn identify_encrypted_stratis_device(_dev: &libudev::Device) -> Option<PathBuf> {
+    None
+}
+
+/// Get the physical device path from the logical activated decrypted device
+fn logical_path_to_physical_path(_path: &Path) -> Option<PathBuf> {
+    None
+}
+
+fn find_all_closed_encrypted_stratis_devices(
+    available_stratis_devices: &HashSet<PathBuf>,
+) -> libudev::Result<HashSet<PathBuf>> {
+    let context = libudev::Context::new()?;
+
+    let opened_encrypted_devices = available_stratis_devices
+        .iter()
+        .filter_map(|path| logical_path_to_physical_path(path.as_path()))
+        .collect::<HashSet<_>>();
+
+    let mut enumerator = block_enumerator(&context)?;
+    enumerator.match_property("ID_FS_TYPE", "crypto_LUKS")?;
+
+    let encrypted_devices: Vec<_> = enumerator.scan_devices()?.collect();
+
+    let closed_encrypted_device_map = encrypted_devices
+        .iter()
+        .filter_map(|dev| identify_encrypted_stratis_device(dev))
+        .fold(HashSet::new(), |mut acc, phy_path| {
+            if !opened_encrypted_devices.contains(&phy_path) {
+                acc.insert(phy_path);
+            }
+            acc
+        });
+    Ok(closed_encrypted_device_map)
 }
 
 // Identify a device that udev enumeration has already picked up as a Stratis
@@ -226,6 +264,11 @@ pub fn identify_block_device(
     }
 }
 
+/// Error should eventually be libcryptsetup_rs::LibcryptErr
+fn unlock_stratis_devices(_paths: &HashSet<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
+    Ok(())
+}
+
 /// Retrieve all block devices that should be made use of by the
 /// Stratis engine. This excludes Stratis block devices that appear to be
 /// multipath members.
@@ -243,6 +286,17 @@ pub fn identify_block_device(
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
 pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     info!("Beginning initial search for Stratis block devices");
+    let pool_map = find_all_stratis_devices()?;
+    let visible_stratis_devices: HashSet<_> = pool_map
+        .values()
+        .map(|map| map.values().cloned())
+        .flatten()
+        .collect();
+    let closed_encrypted_paths =
+        find_all_closed_encrypted_stratis_devices(&visible_stratis_devices)?;
+    // Currently ignoring errors due to type conflicts that need to be resolved.
+    let _ = unlock_stratis_devices(&closed_encrypted_paths);
+    // Original pool no longer matters as we've determined which encrypted volumes to open
     let pool_map = find_all_stratis_devices()?;
 
     if pool_map.is_empty() {

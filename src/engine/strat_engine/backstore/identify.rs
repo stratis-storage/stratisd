@@ -172,11 +172,6 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Devic
     Ok(pool_map)
 }
 
-/// Returns the physical path of the device
-fn identify_encrypted_stratis_device(_dev: &libudev::Device) -> Option<PathBuf> {
-    None
-}
-
 /// Get the physical device path from the logical activated decrypted device
 fn logical_path_to_physical_path(_path: &Path) -> Option<PathBuf> {
     None
@@ -199,7 +194,7 @@ fn find_all_closed_encrypted_stratis_devices(
 
     let closed_encrypted_device_map = encrypted_devices
         .iter()
-        .filter_map(|dev| identify_encrypted_stratis_device(dev))
+        .filter_map(|dev| dev.devnode().map(|path| path.to_path_buf()))
         .fold(HashSet::new(), |mut acc, phy_path| {
             if !opened_encrypted_devices.contains(&phy_path) {
                 acc.insert(phy_path);

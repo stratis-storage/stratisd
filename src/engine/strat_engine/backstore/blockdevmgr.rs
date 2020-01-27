@@ -375,7 +375,7 @@ fn initialize(
     ) -> StratisResult<(
         &Path,
         Bytes,
-        DevOwnership,
+        StratisResult<DevOwnership>,
         Option<StratisResult<String>>,
         File,
     )> {
@@ -389,7 +389,7 @@ fn initialize(
                 get_udev_property(d, "ID_WWN"),
             )
         })? {
-            Ok((devnode, dev_size, ownership?, hw_id, f))
+            Ok((devnode, dev_size, ownership, hw_id, f))
         } else {
             Err(StratisError::Engine(
                 ErrorEnum::NotFound,
@@ -422,7 +422,7 @@ fn initialize(
                 StratisResult<(
                     &'a Path,
                     Bytes,
-                    DevOwnership,
+                    StratisResult<DevOwnership>,
                     Option<StratisResult<String>>,
                     File,
                 )>,
@@ -438,8 +438,8 @@ fn initialize(
                 return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
             };
             match ownership {
-                DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, hw_id, f))),
-                DevOwnership::Theirs(info) => {
+                Ok(DevOwnership::Unowned) => add_devs.push((dev, (devnode, dev_size, hw_id, f))),
+                Ok(DevOwnership::Theirs(info)) => {
                     let err_str = format!(
                         "Device {} appears to be already claimed by another, reason: {}",
                         devnode.display(),
@@ -447,7 +447,7 @@ fn initialize(
                     );
                     return Err(StratisError::Engine(ErrorEnum::Invalid, err_str));
                 }
-                DevOwnership::Ours(uuid, dev_uuid) => {
+                Ok(DevOwnership::Ours(uuid, dev_uuid)) => {
                     if pool_uuid == uuid {
                         if !owned_devs.contains(&dev_uuid) {
                             let error_str = format!(
@@ -464,6 +464,14 @@ fn initialize(
                         );
                         return Err(StratisError::Engine(ErrorEnum::Invalid, error_str));
                     }
+                }
+                Err(err) => {
+                    let error_str = format!(
+                        "Unable to obtain ownership information for device {}: {}",
+                        devnode.display(),
+                        err
+                    );
+                    return Err(StratisError::Error(error_str));
                 }
             }
         }

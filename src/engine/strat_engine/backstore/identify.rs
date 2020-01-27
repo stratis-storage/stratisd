@@ -189,7 +189,7 @@ fn identify_stratis_device(dev: &libudev::Device) -> Option<(PoolUuid, DevUuid, 
 
     match decide_ownership(dev) {
         Err(err) => {
-            warn!("Could not determine ownership of a block device identified as a Stratis device by udev because of an error processing udev information, disregarding the device: {}",
+            warn!("Could not determine ownership of a block device identified as a Stratis device by udev, disregarding the device: {}",
                   err);
             None
         }
@@ -218,8 +218,10 @@ pub fn identify_block_device(
 
     match decide_ownership(dev) {
         Err(err) => {
-            warn!("Could not determine ownership of a udev block device because of an error processing udev information, disregarding the device: {}",
-                  err);
+            warn!(
+                "Could not determine ownership of a udev block device, disregarding the device: {}",
+                err
+            );
             None
         }
         Ok(ownership) => match ownership {

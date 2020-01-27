@@ -15,8 +15,8 @@ use libudev;
 use devicemapper::Device;
 
 use crate::engine::{
-    strat_engine::{
-        backstore::metadata::device_identifiers,
+    strat_engine::backstore::{
+        metadata::device_identifiers,
         udev::{block_enumerator, decide_ownership, UdevOwnership},
     },
     types::{DevUuid, PoolUuid},

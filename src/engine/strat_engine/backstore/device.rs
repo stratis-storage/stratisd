@@ -10,7 +10,7 @@ use devicemapper::{devnode_to_devno, Device};
 
 use crate::{
     engine::{
-        strat_engine::{backstore::metadata::device_identifiers, udev::UdevOwnership},
+        strat_engine::backstore::{metadata::device_identifiers, udev::UdevOwnership},
         types::{DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},

@@ -93,21 +93,29 @@ pub enum UdevOwnership {
 /// it is the unclaimed designation that has a boolean expression on udev
 /// properties associated with it.
 pub fn decide_ownership(device: &libudev::Device) -> StratisResult<UdevOwnership> {
-    // We believe that it is possible to be a multipath member and also to
-    // be identified as a Stratis device. The designations are not mutually
-    // exclusive, but the multipath member device must not be used by Stratis.
-    if is_multipath_member(device)? {
-        return Ok(UdevOwnership::MultipathMember);
-    }
+    || -> StratisResult<UdevOwnership> {
+        // We believe that it is possible to be a multipath member and also to
+        // be identified as a Stratis device. The designations are not mutually
+        // exclusive, but the multipath member device must not be used by Stratis.
+        if is_multipath_member(device)? {
+            return Ok(UdevOwnership::MultipathMember);
+        }
 
-    // We believe that the following designations are mutually exclusive, i.e.
-    // it is not possible to be a Stratis device and also to appear unowned.
-    Ok(if is_stratis(device)? {
-        UdevOwnership::Stratis
-    } else if is_unclaimed(device) {
-        UdevOwnership::Unowned
-    } else {
-        UdevOwnership::Theirs
+        // We believe that the following designations are mutually exclusive, i.e.
+        // it is not possible to be a Stratis device and also to appear unowned.
+        Ok(if is_stratis(device)? {
+            UdevOwnership::Stratis
+        } else if is_unclaimed(device) {
+            UdevOwnership::Unowned
+        } else {
+            UdevOwnership::Theirs
+        })
+    }()
+    .map_err(|err| {
+        StratisError::Error(format!(
+            "Could not determine ownership of a device from a udev database entry: {}",
+            err
+        ))
     })
 }
 

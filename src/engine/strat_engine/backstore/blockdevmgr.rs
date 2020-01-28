@@ -351,21 +351,12 @@ impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::OpenOptions;
-
-    use rand;
     use uuid::Uuid;
 
     use crate::engine::strat_engine::{
         backstore::{find_all, get_metadata},
         cmd,
         tests::{loopbacked, real},
-    };
-
-    use crate::engine::strat_engine::backstore::{
-        device::DevOwnership,
-        metadata::device_identifiers,
-        udev::{block_device_apply, decide_ownership},
     };
 
     use super::*;
@@ -408,96 +399,6 @@ mod tests {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(1, 3, None),
             test_blockdevmgr_used,
-        );
-    }
-
-    /// Verify that it is impossible to initialize a set of disks of which
-    /// even one of them has a signature.  Choose the dirty disk randomly.
-    fn test_fail_single_signature(paths: &[&Path]) {
-        assert!(paths.len() > 1);
-        let index = rand::random::<u8>() as usize % paths.len();
-
-        cmd::create_fs(paths[index], None).unwrap();
-        cmd::udev_settle().unwrap();
-
-        let pool_uuid = Uuid::new_v4();
-        assert_matches!(
-            BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default()),
-            Err(_)
-        );
-        for (i, path) in paths.iter().enumerate() {
-            if i == index {
-                assert_matches!(
-                    DevOwnership::from_udev_ownership(
-                        &block_device_apply(path, |d| decide_ownership(d))
-                            .unwrap()
-                            .unwrap()
-                            .unwrap(),
-                        path
-                    )
-                    .unwrap(),
-                    DevOwnership::Theirs(_)
-                );
-            } else {
-                assert_matches!(
-                    DevOwnership::from_udev_ownership(
-                        &block_device_apply(path, |d| decide_ownership(d))
-                            .unwrap()
-                            .unwrap()
-                            .unwrap(),
-                        path
-                    )
-                    .unwrap(),
-                    DevOwnership::Unowned
-                );
-            }
-        }
-
-        let clean_paths = paths
-            .iter()
-            .enumerate()
-            .filter(|(n, _)| *n != index)
-            .map(|(_, v)| *v)
-            .collect::<Vec<&Path>>();
-
-        assert_matches!(
-            BlockDevMgr::initialize(pool_uuid, &clean_paths, MDADataSize::default()),
-            Ok(_)
-        );
-        cmd::udev_settle().unwrap();
-
-        for path in clean_paths {
-            assert_eq!(
-                pool_uuid,
-                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
-                    .unwrap()
-                    .unwrap()
-                    .0
-            );
-        }
-    }
-
-    #[test]
-    pub fn loop_test_fail_single_signature() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_fail_single_signature,
-        );
-    }
-
-    #[test]
-    pub fn real_test_fail_single_signature() {
-        real::test_with_spec(
-            &real::DeviceLimits::AtLeast(2, None, None),
-            test_fail_single_signature,
-        );
-    }
-
-    #[test]
-    pub fn travis_test_fail_single_signature() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_fail_single_signature,
         );
     }
 
@@ -620,49 +521,5 @@ mod tests {
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_initialize,
         );
-    }
-
-    /// Test that initialing devices claims all and that destroying
-    /// them releases all.
-    fn test_ownership(paths: &[&Path]) {
-        let pool_uuid = Uuid::new_v4();
-        let mut bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
-
-        cmd::udev_settle().unwrap();
-
-        for path in paths {
-            assert_eq!(
-                pool_uuid,
-                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
-                    .unwrap()
-                    .unwrap()
-                    .0
-            );
-        }
-
-        bd_mgr.destroy_all().unwrap();
-
-        for path in paths {
-            assert_eq!(
-                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
-                    .unwrap(),
-                None
-            );
-        }
-    }
-
-    #[test]
-    pub fn loop_test_ownership() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
-    }
-
-    #[test]
-    pub fn real_test_ownership() {
-        real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_ownership);
-    }
-
-    #[test]
-    pub fn travis_test_ownership() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
     }
 }

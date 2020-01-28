@@ -4,37 +4,15 @@
 
 // Functions for dealing with devices.
 
-use std::{collections::HashMap, fs::OpenOptions, path::Path};
-
-use devicemapper::{devnode_to_devno, Device};
+use std::{fs::OpenOptions, path::Path};
 
 use crate::{
     engine::{
         strat_engine::backstore::{metadata::device_identifiers, udev::UdevOwnership},
         types::{DevUuid, PoolUuid},
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::StratisResult,
 };
-
-/// Resolve a list of Paths of some sort to a set of unique Devices.
-/// Return an IOError if there was a problem resolving any particular device.
-/// The set of devices maps each device to one of the paths passed.
-/// Returns an error if any path does not correspond to a block device.
-pub fn resolve_devices<'a>(paths: &'a [&Path]) -> StratisResult<HashMap<Device, &'a Path>> {
-    let mut map = HashMap::new();
-    for path in paths {
-        match devnode_to_devno(path)? {
-            Some(devno) => {
-                let _ = map.insert(Device::from(devno), *path);
-            }
-            None => {
-                let err_msg = format!("path {} does not refer to a block device", path.display());
-                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
-            }
-        }
-    }
-    Ok(map)
-}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum DevOwnership {

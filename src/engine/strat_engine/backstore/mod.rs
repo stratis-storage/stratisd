@@ -19,7 +19,6 @@ mod udev;
 pub use self::{
     backstore::Backstore,
     blockdev::StratBlockDev,
-    device::DevOwnership,
     identify::{find_all, identify_block_device},
     metadata::MDADataSize,
     setup::get_metadata,

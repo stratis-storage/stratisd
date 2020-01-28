@@ -9,6 +9,7 @@ mod blockdevmgr;
 mod cache_tier;
 mod data_tier;
 mod device;
+mod devices;
 mod identify;
 mod metadata;
 mod range_alloc;

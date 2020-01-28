@@ -25,7 +25,8 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                device::{resolve_devices, DevOwnership},
+                device::DevOwnership,
+                devices::resolve_devices,
                 metadata::{disown_device, BlockdevSize, MDADataSize, BDA},
                 udev::{block_device_apply, decide_ownership, get_udev_property},
             },

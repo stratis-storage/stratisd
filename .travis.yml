@@ -13,6 +13,8 @@ language: rust
 matrix:
     fast_finish: true
     allow_failures:
+        # Temporarily allow beta lint task to fail
+        - rust: beta
         # Allow audit task to fail
         - env: TASK=audit
     include:

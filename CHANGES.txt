@@ -125,3 +125,135 @@ New minimum Rust crate requirements:
   https://github.com/stratis-storage/stratisd/pull/1566
   https://github.com/stratis-storage/stratisd/pull/1565
   https://github.com/stratis-storage/stratisd/pull/1563
+
+
+stratisd 1.0.5
+==============
+Recommended Rust toolchain version: 1.33
+Lowest supported Rust toolchain version: 1.31
+Python auto-formatter: yapf (0.21.0)
+
+New minimum Rust crate requirements:
+  - devicemapper: 0.28
+  - libmount: 0.1.13
+  - nix: 0.14
+
+- Fix an error in the calculation of the maximum size of variable length
+  metadata that a single block device can store:
+  https://github.com/stratis-storage/stratisd/pull/1524
+
+- Make a note of some code defects that would cause a bug if variable
+  length metadata were very large, as might occur if a pool contained very
+  many devices:
+  https://github.com/stratis-storage/stratisd/pull/1521
+
+- Clarify the error message that stratisd displays if an external application
+  that it depends on is missing:
+  https://github.com/stratis-storage/stratisd/pull/1547
+
+- Use nested imports in all Rust source:
+  https://github.com/stratis-storage/stratisd/pull/1517
+
+- Metadata refactoring to improve encapsulation and clarity and to use
+  types to distinguish among the sizes of different metadata regions:
+  https://github.com/stratis-storage/stratisd/pull/1554
+  https://github.com/stratis-storage/stratisd/pull/1549
+  https://github.com/stratis-storage/stratisd/pull/1546
+  https://github.com/stratis-storage/stratisd/pull/1545
+  https://github.com/stratis-storage/stratisd/pull/1541
+  https://github.com/stratis-storage/stratisd/pull/1534
+  https://github.com/stratis-storage/stratisd/pull/1522
+  https://github.com/stratis-storage/stratisd/pull/1516
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/1560
+  https://github.com/stratis-storage/stratisd/pull/1555
+  https://github.com/stratis-storage/stratisd/pull/1553
+  https://github.com/stratis-storage/stratisd/pull/1552
+  https://github.com/stratis-storage/stratisd/pull/1550
+  https://github.com/stratis-storage/stratisd/pull/1537
+  https://github.com/stratis-storage/stratisd/pull/1536
+  https://github.com/stratis-storage/stratisd/pull/1535
+  https://github.com/stratis-storage/stratisd/pull/1532
+  https://github.com/stratis-storage/stratisd/pull/1530
+  https://github.com/stratis-storage/stratisd/pull/1528
+  https://github.com/stratis-storage/stratisd/pull/1525
+  https://github.com/stratis-storage/stratisd/pull/1515
+  https://github.com/stratis-storage/stratisd/pull/1508
+  https://github.com/stratis-storage/stratisd/pull/1507
+
+
+stratisd 1.0.4
+==============
+Recommended Rust toolchain version: 1.33
+Lowest supported Rust toolchain version: 1.31
+Python auto-formatter: yapf (0.21.0)
+
+New minimum Rust crate requirements:
+  - devicemapper: 0.27.0
+  - libc: 0.2.47
+  - nix: 0.13
+
+- Fix a bug where stratisd was not writing to Stratis filesystem metadata
+  properly:
+  https://github.com/stratis-storage/stratisd/pull/1480
+
+- Require new version of devicemapper that contains fixes to devicemapper
+  status parsing code, and handle the newly available values appropriately:
+  https://github.com/stratis-storage/stratisd/pull/1461
+
+- Set RUST_BACKTRACE to 1 in the systemd service file in order to ensure that
+  a stack trace is generated if stratisd panics:
+  https://github.com/stratis-storage/stratisd/pull/1479
+
+- Use edition 2018:
+  https://github.com/stratis-storage/stratisd/pull/1501
+
+- Do not combine the errors that might result from reading one or the other
+  of the Stratis static headers from a device:
+  https://github.com/stratis-storage/stratisd/pull/1439
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/1510
+  https://github.com/stratis-storage/stratisd/pull/1505
+  https://github.com/stratis-storage/stratisd/pull/1504
+  https://github.com/stratis-storage/stratisd/pull/1503
+  https://github.com/stratis-storage/stratisd/pull/1500
+  https://github.com/stratis-storage/stratisd/pull/1498
+  https://github.com/stratis-storage/stratisd/pull/1497
+  https://github.com/stratis-storage/stratisd/pull/1493
+  https://github.com/stratis-storage/stratisd/pull/1492
+  https://github.com/stratis-storage/stratisd/pull/1488
+  https://github.com/stratis-storage/stratisd/pull/1484
+  https://github.com/stratis-storage/stratisd/pull/1477
+  https://github.com/stratis-storage/stratisd/pull/1469
+  https://github.com/stratis-storage/stratisd/pull/1459
+  https://github.com/stratis-storage/stratisd/pull/1452
+  https://github.com/stratis-storage/stratisd/pull/1451
+  https://github.com/stratis-storage/stratisd/pull/1450
+  https://github.com/stratis-storage/stratisd/pull/1442
+  https://github.com/stratis-storage/stratisd/pull/1441
+  https://github.com/stratis-storage/stratisd/pull/1436
+  https://github.com/stratis-storage/stratisd/pull/1435
+  https://github.com/stratis-storage/stratisd/pull/1434
+  https://github.com/stratis-storage/stratisd/pull/1432
+  https://github.com/stratis-storage/stratisd/pull/1431
+  https://github.com/stratis-storage/stratisd/pull/1427
+  https://github.com/stratis-storage/stratisd/pull/1425
+  https://github.com/stratis-storage/stratisd/pull/1423
+  https://github.com/stratis-storage/stratisd/pull/1420
+  https://github.com/stratis-storage/stratisd/pull/1418
+  https://github.com/stratis-storage/stratisd/pull/1416
+  https://github.com/stratis-storage/stratisd/pull/1415
+  https://github.com/stratis-storage/stratisd/pull/1414
+  https://github.com/stratis-storage/stratisd/pull/1413
+  https://github.com/stratis-storage/stratisd/pull/1412
+  https://github.com/stratis-storage/stratisd/pull/1411
+  https://github.com/stratis-storage/stratisd/pull/1409
+  https://github.com/stratis-storage/stratisd/pull/1407
+  https://github.com/stratis-storage/stratisd/pull/1406
+  https://github.com/stratis-storage/stratisd/pull/1405
+  https://github.com/stratis-storage/stratisd/pull/1404
+  https://github.com/stratis-storage/stratisd/pull/1403
+  https://github.com/stratis-storage/stratisd/pull/1391
+  https://github.com/stratis-storage/stratisd/pull/1345

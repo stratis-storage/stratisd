@@ -291,7 +291,7 @@ mod tests {
     use uuid::Uuid;
 
     use crate::engine::strat_engine::{
-        backstore::metadata::device_identifiers,
+        backstore::{identify::find_all, metadata::device_identifiers, setup::get_metadata},
         cmd,
         tests::{loopbacked, real},
     };
@@ -430,5 +430,88 @@ mod tests {
     #[test]
     pub fn travis_test_ownership() {
         loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
+    }
+
+    /// Verify that find_all function locates and assigns pools appropriately.
+    /// 1. Split available paths into 2 discrete sets.
+    /// 2. Initialize the block devices in the first set with a pool uuid.
+    /// 3. Run find_all() and verify that it has found the initialized devices
+    /// and no others.
+    /// 4. Initialize the block devices in the second set with a different pool
+    /// uuid.
+    /// 5. Run find_all() again and verify that both sets of devices are found.
+    /// 6. Verify that get_metadata() return an error. initialize() only
+    /// initializes block devices, it does not write metadata.
+    fn test_initialize(paths: &[&Path]) {
+        assert!(paths.len() > 1);
+
+        let (paths1, paths2) = paths.split_at(paths.len() / 2);
+
+        let uuid1 = Uuid::new_v4();
+        initialize_devices(
+            process_devices(paths1).unwrap(),
+            uuid1,
+            MDADataSize::default(),
+        )
+        .unwrap();
+
+        cmd::udev_settle().unwrap();
+
+        let pools = find_all().unwrap();
+
+        assert_eq!(pools.len(), 1);
+        assert!(pools.contains_key(&uuid1));
+
+        let devices = pools.get(&uuid1).expect("pools.contains_key() was true");
+
+        assert_eq!(devices.len(), paths1.len());
+
+        let uuid2 = Uuid::new_v4();
+        initialize_devices(
+            process_devices(paths2).unwrap(),
+            uuid2,
+            MDADataSize::default(),
+        )
+        .unwrap();
+
+        cmd::udev_settle().unwrap();
+
+        let pools = find_all().unwrap();
+
+        assert_eq!(pools.len(), 2);
+        assert!(pools.contains_key(&uuid1));
+
+        let devices1 = pools.get(&uuid1).expect("pools.contains_key() was true");
+        assert_eq!(devices1.len(), paths1.len());
+        assert!(pools.contains_key(&uuid2));
+
+        let devices2 = pools.get(&uuid2).expect("pools.contains_key() was true");
+        assert_eq!(devices2.len(), paths2.len());
+
+        assert!(pools
+            .iter()
+            .map(|(uuid, devs)| get_metadata(*uuid, devs))
+            .all(|x| x.unwrap().is_none()));
+    }
+
+    #[test]
+    pub fn loop_test_initialize() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_initialize,
+        );
+    }
+
+    #[test]
+    pub fn real_test_initialize() {
+        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_initialize);
+    }
+
+    #[test]
+    pub fn travis_test_initialize() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_initialize,
+        );
     }
 }

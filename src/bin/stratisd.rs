@@ -340,6 +340,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     let mut udev_monitor = UdevMonitor::create(&context)?;
 
     let engine: Rc<RefCell<dyn Engine>> = {
+        info!("stratis daemon version {} started", VERSION);
         if matches.is_present("sim") {
             info!("Using SimEngine");
             Rc::new(RefCell::new(SimEngine::default()))

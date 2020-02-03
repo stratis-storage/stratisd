@@ -336,13 +336,12 @@ mod tests {
             .map(|(_, v)| *v)
             .collect::<Vec<&Path>>();
 
+        let devices = process_devices(&clean_paths).unwrap();
+        assert_eq!(devices.len(), clean_paths.len());
+
         let pool_uuid = Uuid::new_v4();
         assert_matches!(
-            initialize_devices(
-                process_devices(&clean_paths).unwrap(),
-                pool_uuid,
-                MDADataSize::default()
-            ),
+            initialize_devices(devices, pool_uuid, MDADataSize::default()),
             Ok(_)
         );
 
@@ -448,50 +447,77 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let uuid1 = Uuid::new_v4();
-        initialize_devices(
-            process_devices(paths1).unwrap(),
-            uuid1,
-            MDADataSize::default(),
-        )
-        .unwrap();
+        {
+            let device_infos = process_devices(paths1).unwrap();
+
+            assert_eq!(device_infos.len(), paths1.len());
+
+            let devices = initialize_devices(device_infos, uuid1, MDADataSize::default()).unwrap();
+            assert_eq!(devices.len(), paths1.len());
+
+            for path in paths1 {
+                let mut f = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(path)
+                    .unwrap();
+                assert_eq!(device_identifiers(&mut f).unwrap().unwrap().0, uuid1);
+            }
+        }
 
         cmd::udev_settle().unwrap();
 
-        let pools = find_all().unwrap();
+        {
+            let pools = find_all().unwrap();
 
-        assert_eq!(pools.len(), 1);
-        assert!(pools.contains_key(&uuid1));
+            assert_eq!(pools.len(), 1);
+            assert!(pools.contains_key(&uuid1));
 
-        let devices = pools.get(&uuid1).expect("pools.contains_key() was true");
+            let devices = pools.get(&uuid1).expect("pools.contains_key() was true");
 
-        assert_eq!(devices.len(), paths1.len());
+            assert_eq!(devices.len(), paths1.len());
+        }
 
         let uuid2 = Uuid::new_v4();
-        initialize_devices(
-            process_devices(paths2).unwrap(),
-            uuid2,
-            MDADataSize::default(),
-        )
-        .unwrap();
+
+        {
+            let device_infos = process_devices(paths2).unwrap();
+
+            assert_eq!(device_infos.len(), paths2.len());
+
+            let devices = initialize_devices(device_infos, uuid2, MDADataSize::default()).unwrap();
+            assert_eq!(devices.len(), paths2.len());
+
+            for path in paths2 {
+                let mut f = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(path)
+                    .unwrap();
+                assert_eq!(device_identifiers(&mut f).unwrap().unwrap().0, uuid2);
+            }
+        }
 
         cmd::udev_settle().unwrap();
 
-        let pools = find_all().unwrap();
+        {
+            let pools = find_all().unwrap();
 
-        assert_eq!(pools.len(), 2);
-        assert!(pools.contains_key(&uuid1));
+            assert_eq!(pools.len(), 2);
+            assert!(pools.contains_key(&uuid1));
 
-        let devices1 = pools.get(&uuid1).expect("pools.contains_key() was true");
-        assert_eq!(devices1.len(), paths1.len());
-        assert!(pools.contains_key(&uuid2));
+            let devices1 = pools.get(&uuid1).expect("pools.contains_key() was true");
+            assert_eq!(devices1.len(), paths1.len());
+            assert!(pools.contains_key(&uuid2));
 
-        let devices2 = pools.get(&uuid2).expect("pools.contains_key() was true");
-        assert_eq!(devices2.len(), paths2.len());
+            let devices2 = pools.get(&uuid2).expect("pools.contains_key() was true");
+            assert_eq!(devices2.len(), paths2.len());
 
-        assert!(pools
-            .iter()
-            .map(|(uuid, devs)| get_metadata(*uuid, devs))
-            .all(|x| x.unwrap().is_none()));
+            assert!(pools
+                .iter()
+                .map(|(uuid, devs)| get_metadata(*uuid, devs))
+                .all(|x| x.unwrap().is_none()));
+        }
     }
 
     #[test]

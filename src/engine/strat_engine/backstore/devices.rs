@@ -5,15 +5,15 @@
 // Functions for dealing with devices.
 
 use std::{
-    collections::HashMap,
     fs::OpenOptions,
     path::{Path, PathBuf},
 };
 
 use chrono::Utc;
+use itertools::Itertools;
 use uuid::Uuid;
 
-use devicemapper::{devnode_to_devno, Bytes, Device, IEC};
+use devicemapper::{Bytes, Device, IEC};
 
 use crate::{
     engine::{
@@ -33,33 +33,19 @@ use crate::{
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 
-/// Resolve a list of Paths of some sort to a set of unique Devices.
-/// Return an IOError if there was a problem resolving any particular device.
-/// The set of devices maps each device to one of the paths passed.
-/// Returns an error if any path does not correspond to a block device.
-fn resolve_devices<'a>(paths: &'a [&Path]) -> StratisResult<HashMap<Device, &'a Path>> {
-    let mut map = HashMap::new();
-    for path in paths {
-        match devnode_to_devno(path)? {
-            Some(devno) => {
-                let _ = map.insert(Device::from(devno), *path);
-            }
-            None => {
-                let err_msg = format!("path {} does not refer to a block device", path.display());
-                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
-            }
-        }
-    }
-    Ok(map)
-}
-
 // Get information that can be obtained from udev for the block device
 // identified by devnode. Return an error if there was an error finding the
 // information or no udev entry corresponding to the devnode could be found.
 // Return an error if udev ownership could not be obtained.
-fn udev_info(devnode: &Path) -> StratisResult<(UdevOwnership, Option<StratisResult<String>>)> {
+fn udev_info(
+    devnode: &Path,
+) -> StratisResult<(UdevOwnership, Device, Option<StratisResult<String>>)> {
     block_device_apply(devnode, |d| {
-        (decide_ownership(d), get_udev_property(d, "ID_WWN"))
+        (
+            decide_ownership(d),
+            d.devnum(),
+            get_udev_property(d, "ID_WWN"),
+        )
     })
     .and_then(|res| {
         res.ok_or_else(|| {
@@ -82,13 +68,26 @@ fn udev_info(devnode: &Path) -> StratisResult<(UdevOwnership, Option<StratisResu
             ),
         )
     })
-    .and_then(|(ownership, id_wwn)| ownership.and_then(|ownership| Ok((ownership, id_wwn))))
-    .map_err(|err| {
-        StratisError::Error(format!(
-            "Could not obtain ownership information for device {} using udev: {}",
-            devnode.display(),
-            err
-        ))
+    .and_then(|(ownership, devnum, id_wwn)| {
+        devnum
+            .ok_or_else(|| {
+                StratisError::Error(format!(
+                    "Insufficient information: no device number found for device {} using udev",
+                    devnode.display()
+                ))
+            })
+            .map(|dev| (ownership, Device::from(dev), id_wwn))
+    })
+    .and_then(|(ownership, devnum, id_wwn)| {
+        ownership
+            .and_then(|ownership| Ok((ownership, devnum, id_wwn)))
+            .map_err(|err| {
+                StratisError::Error(format!(
+                    "Could not obtain ownership information for device {} using udev: {}",
+                    devnode.display(),
+                    err
+                ))
+            })
     })
 }
 
@@ -104,8 +103,9 @@ fn dev_info(
     Option<StratisResult<String>>,
     Bytes,
     Option<(PoolUuid, DevUuid)>,
+    Device,
 )> {
-    let (ownership, hw_id) = udev_info(devnode)?;
+    let (ownership, devnum, hw_id) = udev_info(devnode)?;
     match ownership {
         UdevOwnership::MultipathMember => {
             let err_str = format!(
@@ -160,7 +160,7 @@ fn dev_info(
                 return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
             }
 
-            Ok((hw_id, dev_size, stratis_identifiers))
+            Ok((hw_id, dev_size, stratis_identifiers, devnum))
         }
     }
 }
@@ -186,10 +186,10 @@ pub struct DeviceInfo {
 /// Process a list of devices specified as device nodes. Return a vector
 /// of accumulated information about the device nodes.
 pub fn process_devices(paths: &[&Path]) -> StratisResult<Vec<DeviceInfo>> {
-    resolve_devices(paths)?
-        .into_iter()
-        .map(|(devno, devnode)| {
-            dev_info(devnode).map(|(id_wwn, size, stratis_identifiers)| DeviceInfo {
+    paths
+        .iter()
+        .map(|devnode| {
+            dev_info(devnode).map(|(id_wwn, size, stratis_identifiers, devno)| DeviceInfo {
                 devno,
                 devnode: devnode.to_path_buf(),
                 id_wwn,
@@ -205,6 +205,7 @@ pub fn process_devices(paths: &[&Path]) -> StratisResult<Vec<DeviceInfo>> {
             );
             StratisError::Engine(ErrorEnum::Invalid, error_message)
         })
+        .map(|infos| infos.into_iter().unique_by(|info| info.devno).collect())
 }
 
 pub fn initialize_devices(

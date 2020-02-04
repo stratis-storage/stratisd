@@ -540,4 +540,38 @@ mod tests {
             test_initialize,
         );
     }
+
+    // Verify that a non-existent path results in a reasonably elegant
+    // error, i.e., not an assertion failure.
+    fn test_nonexistent_path(paths: &[&Path]) {
+        assert!(!paths.is_empty());
+
+        let test_paths = [paths, &[Path::new("/srk/cheese")]].concat();
+
+        assert_matches!(process_devices(&test_paths), Err(_));
+    }
+
+    #[test]
+    pub fn loop_test_nonexistent_path() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 3, None),
+            test_nonexistent_path,
+        );
+    }
+
+    #[test]
+    pub fn real_test_nonexistent_path() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(1, None, None),
+            test_nonexistent_path,
+        );
+    }
+
+    #[test]
+    pub fn travis_test_nonexistent_path() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 3, None),
+            test_nonexistent_path,
+        );
+    }
 }

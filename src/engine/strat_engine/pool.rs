@@ -579,6 +579,7 @@ mod tests {
 
     fn invariant(pool: &StratPool, pool_name: &str) {
         check_metadata(&pool.record(&Name::new(pool_name.into()))).unwrap();
+        assert!(!(pool.is_encrypted() && pool.backstore.cache_initialized()));
     }
 
     /// Verify that metadata can be read from pools.

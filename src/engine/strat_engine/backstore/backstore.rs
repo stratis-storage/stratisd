@@ -578,6 +578,10 @@ impl Backstore {
             },
         )
     }
+
+    pub fn has_cache(&self) -> bool {
+        self.cache_tier.is_some()
+    }
 }
 
 impl Recordable<BackstoreSave> for Backstore {

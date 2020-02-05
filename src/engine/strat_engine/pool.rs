@@ -309,7 +309,7 @@ impl Pool for StratPool {
             // If adding cache devices, must suspend the pool, since the cache
             // must be augmented with the new devices.
             self.thin_pool.suspend()?;
-            let devices_result = self.backstore.init_cache(pool_uuid, blockdevs, None);
+            let devices_result = self.backstore.init_cache(pool_uuid, blockdevs);
             self.thin_pool.resume()?;
             let devices = devices_result?;
             self.write_metadata(pool_name)?;

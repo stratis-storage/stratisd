@@ -211,7 +211,6 @@ impl Backstore {
         &mut self,
         pool_uuid: PoolUuid,
         paths: &[&Path],
-        keyfile_path: Option<PathBuf>,
     ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(_) => unreachable!("self.cache.is_none()"),
@@ -228,12 +227,7 @@ impl Backstore {
                 // If it is desired to change a cache dev to a data dev, it
                 // should be removed and then re-added in order to ensure
                 // that the MDA region is set to the correct size.
-                let bdm = BlockDevMgr::initialize(
-                    pool_uuid,
-                    paths,
-                    MDADataSize::default(),
-                    keyfile_path,
-                )?;
+                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default(), None)?;
 
                 let cache_tier = CacheTier::new(bdm)?;
 
@@ -726,9 +720,7 @@ mod tests {
             .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
             .unwrap();
 
-        let cache_uuids = backstore
-            .init_cache(pool_uuid, initcachepaths, None)
-            .unwrap();
+        let cache_uuids = backstore.init_cache(pool_uuid, initcachepaths).unwrap();
 
         invariant(&backstore);
 
@@ -889,7 +881,7 @@ mod tests {
 
         let old_device = backstore.device();
 
-        backstore.init_cache(pool_uuid, paths2, None).unwrap();
+        backstore.init_cache(pool_uuid, paths2).unwrap();
         invariant(&backstore);
 
         assert_ne!(backstore.device(), old_device);

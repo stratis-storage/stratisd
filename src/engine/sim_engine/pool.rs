@@ -111,6 +111,12 @@ impl Pool for SimPool {
         _pool_name: &str,
         blockdevs: &[&Path],
     ) -> StratisResult<SetCreateAction<DevUuid>> {
+        if self.is_encrypted() {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                "Use of a cache is not supported with an encrypted pool".to_string(),
+            ));
+        }
         if self.cache_devs.is_empty() {
             let blockdev_pairs: Vec<_> = blockdevs
                 .iter()

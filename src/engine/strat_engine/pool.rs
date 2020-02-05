@@ -291,6 +291,12 @@ impl Pool for StratPool {
         pool_name: &str,
         blockdevs: &[&Path],
     ) -> StratisResult<SetCreateAction<DevUuid>> {
+        if self.is_encrypted() {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                "Use of a cache is not supported with an encrypted pool".to_string(),
+            ));
+        }
         if self.backstore.cache_initialized() {
             init_cache_idempotent_or_err(
                 blockdevs,

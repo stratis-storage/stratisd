@@ -156,11 +156,6 @@ impl DataTier {
     pub fn is_encrypted(&self) -> bool {
         self.block_mgr.is_encrypted()
     }
-
-    /// Data tier keyfile_path
-    pub fn keyfile_path(&self) -> Option<&Path> {
-        self.block_mgr.keyfile_path()
-    }
 }
 
 impl Recordable<DataTierSave> for DataTier {

@@ -543,10 +543,6 @@ impl Pool for StratPool {
         self.datadevs_encrypted()
     }
 
-    fn keyfile_path(&self) -> Option<&Path> {
-        self.backstore.data_keyfile_path()
-    }
-
     fn cache_initialized(&self) -> bool {
         self.backstore.cache_initialized()
     }

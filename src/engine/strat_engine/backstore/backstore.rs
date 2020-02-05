@@ -637,10 +637,6 @@ impl Backstore {
         )
     }
 
-    pub fn data_keyfile_path(&self) -> Option<&Path> {
-        self.data_tier.keyfile_path()
-    }
-
     pub fn data_tier_is_encrypted(&self) -> bool {
         self.data_tier.is_encrypted()
     }

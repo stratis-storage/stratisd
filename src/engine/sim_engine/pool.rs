@@ -364,10 +364,6 @@ impl Pool for SimPool {
         self.datadevs_encrypted()
     }
 
-    fn keyfile_path(&self) -> Option<&Path> {
-        self.block_devs_keyfile_path.as_ref().map(|p| p.as_path())
-    }
-
     fn cache_initialized(&self) -> bool {
         !self.cache_devs.is_empty()
     }

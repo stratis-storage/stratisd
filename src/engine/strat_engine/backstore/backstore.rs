@@ -16,7 +16,6 @@ use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
 
 use crate::{
     engine::{
-        engine::BlockDev,
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
@@ -103,13 +102,6 @@ pub struct Backstore {
     next: Sectors,
 }
 
-/// Load the keyfile path associated with the blockdevs in this `BlockDevMgr`.
-/// This function will verify that all blockdev paths passed as input
-/// were encrypted with the same keyfile.
-fn load_keyfile_path(_devnode: Vec<PathBuf>) -> StratisResult<Option<PathBuf>> {
-    Ok(None)
-}
-
 impl Backstore {
     /// Make a Backstore object from blockdevs that already belong to Stratis.
     /// Precondition: every device in devnodes has already been determined to
@@ -130,9 +122,7 @@ impl Backstore {
         last_update_time: DateTime<Utc>,
     ) -> StratisResult<Backstore> {
         let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
-        let datadev_keyfile =
-            load_keyfile_path(datadevs.iter().map(|dd| dd.devnode()).collect::<Vec<_>>())?;
-        let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time), datadev_keyfile);
+        let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time), None);
         let data_tier = DataTier::setup(block_mgr, &backstore_save.data_tier)?;
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
         let origin = LinearDev::setup(
@@ -143,9 +133,7 @@ impl Backstore {
         )?;
 
         let (cache_tier, cache, origin) = if !cachedevs.is_empty() {
-            let cachedev_keyfile =
-                load_keyfile_path(cachedevs.iter().map(|cd| cd.devnode()).collect::<Vec<_>>())?;
-            let block_mgr = BlockDevMgr::new(cachedevs, Some(last_update_time), cachedev_keyfile);
+            let block_mgr = BlockDevMgr::new(cachedevs, Some(last_update_time), None);
             match backstore_save.cache_tier {
                 Some(ref cache_tier_save) => {
                     let cache_tier = CacheTier::setup(block_mgr, cache_tier_save)?;

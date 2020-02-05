@@ -192,8 +192,6 @@ impl StratPool {
     /// Precondition: every device in devnodes has already been determined
     /// to belong to the pool with the specified uuid.
     /// Precondition: A metadata verification step has already been run.
-    /// Precondition: All blockdevs have been encrypted using the same keyfile
-    /// in the same pool.
     pub fn setup(
         uuid: PoolUuid,
         devnodes: &HashMap<Device, PathBuf>,

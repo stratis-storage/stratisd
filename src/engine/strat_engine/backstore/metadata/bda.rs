@@ -150,6 +150,7 @@ mod tests {
         sizes::static_header_size,
         static_header::{tests::random_static_header, tests::static_header_strategy},
     };
+
     use super::*;
 
     proptest! {

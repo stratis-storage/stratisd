@@ -497,6 +497,10 @@ impl Pool for StratPool {
     fn get_dbus_path(&self) -> &MaybeDbusPath {
         &self.dbus_path
     }
+
+    fn has_cache(&self) -> bool {
+        self.backstore.has_cache()
+    }
 }
 
 #[cfg(test)]

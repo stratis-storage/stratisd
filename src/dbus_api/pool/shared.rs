@@ -77,12 +77,7 @@ pub fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, op: BlockDevOp) -> Meth
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
     let result = match op {
-        BlockDevOp::InitCache => pool.init_cache(
-            pool_uuid,
-            &*pool_name,
-            &blockdevs,
-            pool.keyfile_path().map(|kfp| kfp.to_path_buf()),
-        ),
+        BlockDevOp::InitCache => pool.init_cache(pool_uuid, &*pool_name, &blockdevs),
         BlockDevOp::AddCache => {
             pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Cache)
         }

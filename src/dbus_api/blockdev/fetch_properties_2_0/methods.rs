@@ -30,7 +30,7 @@ fn get_properties_shared(
     let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
         .unique()
         .filter_map(|prop| match prop.as_str() {
-            consts::BLOCKDEV_TOTAL_SIZE_PROP => Some((
+            consts::BLOCKDEV_TOTAL_SIZE_PROP => Some(result_to_tuple(
                 prop,
                 blockdev_operation(m.tree, object_path.get_name(), |_, bd| {
                     Ok((u128::from(*bd.size()) * devicemapper::SECTOR_SIZE as u128).to_string())
@@ -38,7 +38,6 @@ fn get_properties_shared(
             )),
             _ => None,
         })
-        .map(|(key, result)| result_to_tuple(key, result))
         .collect();
 
     Ok(vec![return_message.append1(return_value)])

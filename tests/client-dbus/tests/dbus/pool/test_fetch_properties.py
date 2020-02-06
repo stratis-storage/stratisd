@@ -16,7 +16,12 @@ Test accessing properties of a pool using FetchProperties interface.
 """
 
 # isort: LOCAL
-from stratisd_client_dbus import FetchProperties, Manager, get_object
+from stratisd_client_dbus import (
+    FetchProperties,
+    FetchProperties_2_1,
+    Manager,
+    get_object,
+)
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import SimTestCase, device_name_list
@@ -58,6 +63,13 @@ class FetchPropertiesTestCase(SimTestCase):
         self.assertEqual(size_success, True)
         self.assertTrue(size.isnumeric())
 
+        (size_success, size) = FetchProperties_2_1.Methods.GetProperties(
+            self._pool_object, {"properties": ["TotalPhysicalSize"]}
+        )["TotalPhysicalSize"]
+
+        self.assertEqual(size_success, True)
+        self.assertTrue(size.isnumeric())
+
     def testFetchUsedSizeProperty(self):
         """
         Test FetchProperties for pool property, TotalPhysicalUsed
@@ -68,3 +80,23 @@ class FetchPropertiesTestCase(SimTestCase):
 
         self.assertEqual(size_success, True)
         self.assertTrue(size.isnumeric())
+
+        (size_success, size) = FetchProperties_2_1.Methods.GetProperties(
+            self._pool_object, {"properties": ["TotalPhysicalUsed"]}
+        )["TotalPhysicalUsed"]
+
+        self.assertEqual(size_success, True)
+        self.assertTrue(size.isnumeric())
+
+    def testFetchHasCacheProperty(self):
+        """
+        Test FetchProperties_2_1 for pool HasCache property
+        """
+        (has_cache_success, has_cache) = FetchProperties_2_1.Methods.GetProperties(
+            self._pool_object, {"properties": ["HasCache"]}
+        )["HasCache"]
+
+        self.assertEqual(has_cache_success, True)
+        # dbus-python Booleans are actually ints, but they define equality
+        # that works for bools
+        self.assertIn(has_cache, (True, False))

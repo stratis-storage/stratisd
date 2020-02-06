@@ -50,6 +50,11 @@ FetchProperties = make_class(
     ET.fromstring(SPECS["org.storage.stratis2.FetchProperties"]),
     TIME_OUT,
 )
+FetchProperties_2_1 = make_class(
+    "FetchProperties_2_1",
+    ET.fromstring(SPECS["org.storage.stratis2.FetchProperties.r1"]),
+    TIME_OUT,
+)
 Filesystem = make_class("Filesystem", _FILESYSTEM_SPEC, TIME_OUT)
 Pool = make_class("Pool", _POOL_SPEC, TIME_OUT)
 Blockdev = make_class("Blockdev", _BLOCKDEV_SPEC, TIME_OUT)

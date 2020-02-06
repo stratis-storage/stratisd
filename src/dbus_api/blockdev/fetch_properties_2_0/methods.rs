@@ -6,34 +6,17 @@ use std::collections::HashMap;
 
 use dbus::{
     self,
-    arg::{Array, RefArg, Variant},
+    arg::{RefArg, Variant},
     tree::{MTFn, MethodInfo, MethodResult},
     Message,
 };
 use itertools::Itertools;
 
 use crate::dbus_api::{
-    blockdev::shared::blockdev_operation,
-    consts,
-    types::TData,
-    util::{get_next_arg, result_to_tuple},
+    blockdev::shared::blockdev_operation, consts, types::TData, util::result_to_tuple,
 };
 
-pub fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    get_properties_shared(
-        m,
-        &mut vec![consts::BLOCKDEV_TOTAL_SIZE_PROP]
-            .into_iter()
-            .map(|s| s.to_string()),
-    )
-}
-
-pub fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-    let mut properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
-    get_properties_shared(m, &mut properties)
-}
+const ALL_PROPERTIES: [&str; 1] = [consts::BLOCKDEV_TOTAL_SIZE_PROP];
 
 fn get_properties_shared(
     m: &MethodInfo<MTFn<TData>, TData>,
@@ -60,3 +43,5 @@ fn get_properties_shared(
 
     Ok(vec![return_message.append1(return_value)])
 }
+
+properties_footer!();

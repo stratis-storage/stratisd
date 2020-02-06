@@ -38,6 +38,12 @@ where
     closure((pool_name, pool_uuid, pool))
 }
 
+pub fn get_pool_has_cache(m: &MethodInfo<MTFn<TData>, TData>) -> Result<bool, String> {
+    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
+        Ok(pool.has_cache())
+    })
+}
+
 pub fn get_pool_total_size(m: &MethodInfo<MTFn<TData>, TData>) -> Result<String, String> {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok(

@@ -27,7 +27,7 @@ fn get_properties_shared(
     let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
         .unique()
         .filter_map(|prop| match prop.as_str() {
-            consts::POOL_TOTAL_SIZE_PROP => Some((
+            consts::POOL_TOTAL_SIZE_PROP => Some(result_to_tuple(
                 prop,
                 pool_operation(m.tree, object_path.get_name(), |(_, _, pool)| {
                     Ok((u128::from(*pool.total_physical_size())
@@ -35,7 +35,7 @@ fn get_properties_shared(
                         .to_string())
                 }),
             )),
-            consts::POOL_TOTAL_USED_PROP => Some((
+            consts::POOL_TOTAL_USED_PROP => Some(result_to_tuple(
                 prop,
                 pool_operation(m.tree, object_path.get_name(), |(_, _, pool)| {
                     pool.total_physical_used()
@@ -47,7 +47,6 @@ fn get_properties_shared(
             )),
             _ => None,
         })
-        .map(|(key, result)| result_to_tuple(key, result))
         .collect();
 
     Ok(vec![return_message.append1(return_value)])

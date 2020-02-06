@@ -30,7 +30,7 @@ fn get_properties_shared(
     let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
         .unique()
         .filter_map(|prop| match prop.as_str() {
-            consts::FILESYSTEM_USED_PROP => Some((
+            consts::FILESYSTEM_USED_PROP => Some(result_to_tuple(
                 prop,
                 filesystem_operation(m.tree, object_path.get_name(), |(_, _, fs)| {
                     fs.used()
@@ -40,7 +40,6 @@ fn get_properties_shared(
             )),
             _ => None,
         })
-        .map(|(key, result)| result_to_tuple(key, result))
         .collect();
 
     Ok(vec![return_message.append1(return_value)])

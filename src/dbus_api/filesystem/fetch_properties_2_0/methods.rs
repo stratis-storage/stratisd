@@ -6,18 +6,17 @@ use std::collections::HashMap;
 
 use dbus::{
     self,
-    arg::{Array, RefArg, Variant},
+    arg::{RefArg, Variant},
     tree::{MTFn, MethodInfo, MethodResult},
     Message,
 };
 use itertools::Itertools;
 
 use crate::dbus_api::{
-    consts,
-    filesystem::shared::filesystem_operation,
-    types::TData,
-    util::{get_next_arg, result_to_tuple},
+    consts, filesystem::shared::filesystem_operation, types::TData, util::result_to_tuple,
 };
+
+const ALL_PROPERTIES: [&str; 1] = [consts::FILESYSTEM_USED_PROP];
 
 fn get_properties_shared(
     m: &MethodInfo<MTFn<TData>, TData>,
@@ -47,18 +46,4 @@ fn get_properties_shared(
     Ok(vec![return_message.append1(return_value)])
 }
 
-pub fn get_all_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    get_properties_shared(
-        m,
-        &mut vec![consts::FILESYSTEM_USED_PROP]
-            .into_iter()
-            .map(|s| s.to_string()),
-    )
-}
-
-pub fn get_properties(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-    let mut properties: Array<String, _> = get_next_arg(&mut iter, 0)?;
-    get_properties_shared(m, &mut properties)
-}
+properties_footer!();

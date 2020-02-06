@@ -2,8 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::error::Error;
-
 use dbus::{
     self,
     arg::{ArgType, Iter, IterAppend, RefArg, Variant},
@@ -97,7 +95,7 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
     };
     let description = match *err {
         StratisError::DM(DmError::Core(ref err)) => err.to_string(),
-        ref err => err.description().to_owned(),
+        ref err => err.to_string(),
     };
     (error as u16, description)
 }

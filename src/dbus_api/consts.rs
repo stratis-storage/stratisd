@@ -12,6 +12,7 @@ pub const PROPERTY_FETCH_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.FetchP
 
 pub const POOL_INTERFACE_NAME: &str = "org.storage.stratis2.pool";
 pub const POOL_NAME_PROP: &str = "Name";
+pub const POOL_HAS_CACHE_PROP: &str = "HasCache";
 pub const POOL_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";
 pub const POOL_TOTAL_USED_PROP: &str = "TotalPhysicalUsed";
 

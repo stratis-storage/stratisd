@@ -209,6 +209,7 @@ impl Engine for StratEngine {
 
                 let name = Name::new(name.to_owned());
                 devlinks::pool_added(&name);
+                info!("created a pool: uuid {}, name {}", uuid, name);
                 self.pools.insert(name, uuid, pool);
                 Ok(CreateAction::Created(uuid))
             }
@@ -237,6 +238,7 @@ impl Engine for StratEngine {
             Err(err)
         } else {
             devlinks::pool_removed(&pool_name);
+            info!("destroyed a pool: uuid {}, name {}", uuid, pool_name);
             Ok(DeleteAction::Deleted(uuid))
         }
     }
@@ -267,6 +269,10 @@ impl Engine for StratEngine {
 
             self.pools.insert(new_name.clone(), uuid, pool);
             devlinks::pool_renamed(&old_name, &new_name);
+            info!(
+                "renamed a pool: uuid {}, old_name {}, new_name {}",
+                uuid, old_name, new_name
+            );
             Ok(RenameAction::Renamed(uuid))
         }
     }

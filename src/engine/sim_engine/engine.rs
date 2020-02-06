@@ -53,6 +53,7 @@ impl Engine for SimEngine {
                 self.pools
                     .insert(Name::new(name.to_owned()), pool_uuid, pool);
 
+                info!("created a pool: uuid {}", pool_uuid);
                 Ok(CreateAction::Created(pool_uuid))
             }
         }
@@ -78,6 +79,7 @@ impl Engine for SimEngine {
             .expect("Must succeed since self.pool.get_by_uuid() returned a value")
             .1
             .destroy()?;
+        info!("destroyed a pool: uuid {}", uuid);
         Ok(DeleteAction::Deleted(uuid))
     }
 
@@ -95,6 +97,7 @@ impl Engine for SimEngine {
 
         self.pools
             .insert(Name::new(new_name.to_owned()), uuid, pool);
+        info!("renamed a pool: uuid {}", uuid);
         Ok(RenameAction::Renamed(uuid))
     }
 

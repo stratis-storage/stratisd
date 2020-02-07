@@ -368,8 +368,10 @@ impl Pool for StratPool {
                 let bdev_info = bdev_info_res?;
                 Ok(SetCreateAction::new(bdev_info))
             } else {
-                Err(StratisError::Error(
-                    "The cache has not yet been initialized".to_string(),
+                Err(StratisError::Error(format!(
+                            "No cache has been initialized for pool with UUID {} and name {}; it is therefore impossible to add additional devices to the cache",
+                            pool_uuid.to_simple_ref(),
+                            pool_name)
                 ))
             }
         } else {

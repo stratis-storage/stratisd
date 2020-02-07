@@ -106,6 +106,8 @@ pub trait Pool: Debug {
     /// Returns a list of uuids corresponding to devices actually added.
     /// Returns an error if a blockdev can not be added because it is owned
     /// or there was an error while reading or writing a blockdev.
+    /// Also return an error if the tier specified is Cache, and the cache
+    /// is not yet initialized.
     fn add_blockdevs(
         &mut self,
         pool_uuid: PoolUuid,

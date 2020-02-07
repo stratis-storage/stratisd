@@ -54,6 +54,12 @@ where
     closure((pool_name, pool_uuid, pool))
 }
 
+/// A method shared by all pool interfaces and by all blockdev-adding
+/// operations, including cache initialization, which is considered a
+/// blockdev-adding operation because when a cache is initialized, the
+/// data tier must already contain some block devices. The op parameter
+/// determines which method belonging to the engine's Pool interface must
+/// be invoked.
 pub fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, op: BlockDevOp) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();

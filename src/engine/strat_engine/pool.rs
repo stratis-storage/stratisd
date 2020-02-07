@@ -347,8 +347,12 @@ impl Pool for StratPool {
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         let bdev_info = if tier == BlockDevTier::Cache {
             if self.backstore.has_cache() {
-                // If adding cache devices, must suspend the pool, since the cache
-                // must be augmented with the new devices.
+                // If adding cache devices, must suspend the pool; the cache
+                // must be augmented with the new devices. Note that this
+                // justifies checking whether the cache is initialized
+                // before beginning the operation; it is unreasonable to
+                // do an interesting operation like suspending the pool if
+                // the blockdevs are not going to be added anyway.
                 self.thin_pool.suspend()?;
                 let bdev_info_res =
                     self.backstore

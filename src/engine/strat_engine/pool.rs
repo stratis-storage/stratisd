@@ -191,8 +191,6 @@ impl StratPool {
     /// Precondition: every device in devnodes has already been determined
     /// to belong to the pool with the specified uuid.
     /// Precondition: A metadata verification step has already been run.
-    /// Precondition: All blockdevs have been encrypted using the same keyfile
-    /// in the same pool.
     pub fn setup(
         uuid: PoolUuid,
         devnodes: &HashMap<Device, PathBuf>,
@@ -291,6 +289,12 @@ impl Pool for StratPool {
         blockdevs: &[&Path],
         keyfile_path: Option<PathBuf>,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
+        if self.is_encrypted() {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                "Use of a cache is not supported with an encrypted pool".to_string(),
+            ));
+        }
         if self.backstore.has_cache() {
             init_cache_idempotent_or_err(
                 blockdevs,
@@ -358,8 +362,12 @@ impl Pool for StratPool {
         }
         let bdev_info = if tier == BlockDevTier::Cache {
             if self.backstore.has_cache() {
-                // If adding cache devices, must suspend the pool, since the cache
-                // must be augmented with the new devices.
+                // If adding cache devices, must suspend the pool; the cache
+                // must be augmented with the new devices. Note that this
+                // justifies checking whether the cache is initialized
+                // before beginning the operation; it is unreasonable to
+                // do an interesting operation like suspending the pool if
+                // the blockdevs are not going to be added anyway.
                 self.thin_pool.suspend()?;
                 let bdev_info_res =
                     self.backstore
@@ -376,8 +384,10 @@ impl Pool for StratPool {
                 let bdev_info = bdev_info_res?;
                 Ok(SetCreateAction::new(bdev_info))
             } else {
-                Err(StratisError::Error(
-                    "The cache has not yet been initialized".to_string(),
+                Err(StratisError::Error(format!(
+                            "No cache has been initialized for pool with UUID {} and name {}; it is therefore impossible to add additional devices to the cache",
+                            pool_uuid.to_simple_ref(),
+                            pool_name)
                 ))
             }
         } else {
@@ -588,6 +598,7 @@ mod tests {
 
     fn invariant(pool: &StratPool, pool_name: &str) {
         check_metadata(&pool.record(&Name::new(pool_name.into()))).unwrap();
+        assert!(!(pool.is_encrypted() && pool.backstore.has_cache()));
     }
 
     /// Verify that metadata can be read from pools.

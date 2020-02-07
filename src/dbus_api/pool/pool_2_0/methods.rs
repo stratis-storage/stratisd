@@ -210,6 +210,14 @@ pub fn add_datadevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     add_blockdevs(m, BlockDevOp::AddData)
 }
 
+/// This method supports a method for adding cachedevs to a pool where,
+/// if there was no previously existing cache, the addition of the cache
+/// devices caused a cache to be automatically constructed. The newer
+/// version of the interface requires initializing the cache in a distinct
+/// step and the engine's Pool trait is designed to accomodate that
+/// interface. For this reason, this method contains an extra step:
+/// it must determine whether or not the cache is already initialized in
+/// order to specify which Pool trait method must be invoked.
 pub fn add_cachedevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let return_message = message.method_return();
@@ -226,11 +234,14 @@ pub fn add_cachedevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         let (_, pool) = get_pool!(engine; pool_uuid; default_return; return_message);
         pool.has_cache()
     };
-    if cache_initialized {
-        add_blockdevs(m, BlockDevOp::AddCache)
-    } else {
-        add_blockdevs(m, BlockDevOp::InitCache)
-    }
+    add_blockdevs(
+        m,
+        if cache_initialized {
+            BlockDevOp::AddCache
+        } else {
+            BlockDevOp::InitCache
+        },
+    )
 }
 
 pub fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {

@@ -29,16 +29,12 @@ pub fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {
     }
 }
 
-/// Map a result obtained for the FetchProperties interface to a pair of
-/// a key and a value. The key is the property key, and therefore the key
-/// of the item returned. The value is a tuple. An error in the result
+/// Map a result obtained for the FetchProperties interface to a value used
+/// to represent an option.  An error in the result
 /// argument yields a false in the return value, indicating that the value
 /// returned is a string representation of the error encountered in
 /// obtaining the value, and not the value requested.
-pub fn result_to_tuple<T>(
-    key: String,
-    result: Result<T, String>,
-) -> (String, (bool, Variant<Box<dyn RefArg>>))
+pub fn result_to_tuple<T>(result: Result<T, String>) -> (bool, Variant<Box<dyn RefArg>>)
 where
     T: RefArg + 'static,
 {
@@ -46,7 +42,7 @@ where
         Ok(value) => (true, Variant(Box::new(value) as Box<dyn RefArg>)),
         Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
     };
-    (key, (success, value))
+    (success, value)
 }
 
 /// Get the next argument off the bus. loc is the index of the location of

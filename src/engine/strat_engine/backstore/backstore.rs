@@ -598,14 +598,14 @@ impl Recordable<BackstoreSave> for Backstore {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::{collections::HashSet, fs::OpenOptions};
 
     use uuid::Uuid;
 
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
     use crate::engine::strat_engine::{
-        backstore::find_all,
+        backstore::{identify::find_all, metadata::device_identifiers},
         cmd,
         tests::{loopbacked, real},
     };
@@ -816,6 +816,17 @@ mod tests {
 
         let mut backstore =
             Backstore::initialize(pool_uuid, paths1, MDADataSize::default()).unwrap();
+
+        for path in paths1 {
+            assert_eq!(
+                pool_uuid,
+                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap()
+                    .unwrap()
+                    .0
+            );
+        }
+
         invariant(&backstore);
 
         // Allocate space from the backstore so that the cap device is made.
@@ -826,6 +837,17 @@ mod tests {
         let old_device = backstore.device();
 
         backstore.add_cachedevs(pool_uuid, paths2).unwrap();
+
+        for path in paths2 {
+            assert_eq!(
+                pool_uuid,
+                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap()
+                    .unwrap()
+                    .0
+            );
+        }
+
         invariant(&backstore);
 
         assert_ne!(backstore.device(), old_device);

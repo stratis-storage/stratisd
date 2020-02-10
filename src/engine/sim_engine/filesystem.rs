@@ -43,6 +43,10 @@ impl Filesystem for SimFilesystem {
         self.created
     }
 
+    fn path_to_mount_filesystem(&self, pool_name: &str, fs_name: &str) -> PathBuf {
+        vec!["/somepath", pool_name, fs_name].iter().collect()
+    }
+
     fn used(&self) -> StratisResult<Bytes> {
         Ok(Bytes(12_345_678))
     }

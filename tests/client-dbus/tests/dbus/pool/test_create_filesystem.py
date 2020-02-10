@@ -15,19 +15,21 @@
 Test creating a filesystem in a pool.
 """
 
+# isort: STDLIB
 import unittest
 
-from stratisd_client_dbus import Manager
-from stratisd_client_dbus import ObjectManager
-from stratisd_client_dbus import Pool
-from stratisd_client_dbus import StratisdErrors
-from stratisd_client_dbus import filesystems
-from stratisd_client_dbus import get_object
-
+# isort: LOCAL
+from stratisd_client_dbus import (
+    Manager,
+    ObjectManager,
+    Pool,
+    StratisdErrors,
+    filesystems,
+    get_object,
+)
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._misc import SimTestCase
-from .._misc import device_name_list
+from .._misc import SimTestCase, device_name_list
 
 _DEVICE_STRATEGY = device_name_list()
 
@@ -38,6 +40,7 @@ class CreateFSTestCase(SimTestCase):
     """
 
     _POOLNAME = "deadpool"
+    _FSNAME = "fs"
 
     def setUp(self):
         """
@@ -45,13 +48,15 @@ class CreateFSTestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        self._devs = _DEVICE_STRATEGY()
         ((_, (poolpath, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
-            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 0),
+                "devices": _DEVICE_STRATEGY(),
+            },
         )
         self._pool_object = get_object(poolpath)
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testCreate(self):
         """
@@ -102,7 +107,7 @@ class CreateFSTestCase1(SimTestCase):
     """
 
     _POOLNAME = "deadpool"
-    _VOLNAME = "thunk"
+    _FSNAME = "thunk"
 
     def setUp(self):
         """
@@ -110,14 +115,16 @@ class CreateFSTestCase1(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        self._devs = _DEVICE_STRATEGY()
         ((_, (poolpath, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
-            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 0),
+                "devices": _DEVICE_STRATEGY(),
+            },
         )
         self._pool_object = get_object(poolpath)
-        Pool.Methods.CreateFilesystems(self._pool_object, {"specs": [self._VOLNAME]})
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
+        Pool.Methods.CreateFilesystems(self._pool_object, {"specs": [self._FSNAME]})
 
     def testCreate(self):
         """
@@ -127,7 +134,7 @@ class CreateFSTestCase1(SimTestCase):
         should be created.
         """
         ((is_some, result), rc, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {"specs": [self._VOLNAME]}
+            self._pool_object, {"specs": [self._FSNAME]}
         )
 
         self.assertEqual(rc, StratisdErrors.OK)
@@ -170,7 +177,7 @@ class CreateFSTestCase1(SimTestCase):
         and the command should succeed.
         """
         ((is_some, result), rc, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {"specs": [self._VOLNAME, "newname"]}
+            self._pool_object, {"specs": [self._FSNAME, "newname"]}
         )
 
         self.assertEqual(rc, StratisdErrors.OK)

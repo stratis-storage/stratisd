@@ -10,7 +10,10 @@ macro_rules! get_data {
             data
         } else {
             let message = format!("no data for object path {}", $path.get_name());
-            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, message);
+            let (rc, rs) = (
+                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                message,
+            );
             return Ok(vec![$message.append3($default, rc, rs)]);
         }
     };
@@ -24,7 +27,10 @@ macro_rules! get_parent {
             parent
         } else {
             let message = format!("no path for object path {}", $data.parent);
-            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, message);
+            let (rc, rs) = (
+                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                message,
+            );
             return Ok(vec![$message.append3($default, rc, rs)]);
         }
     };
@@ -37,7 +43,10 @@ macro_rules! get_mut_pool {
             pool
         } else {
             let message = format!("engine does not know about pool with uuid {}", $uuid);
-            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, message);
+            let (rc, rs) = (
+                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                message,
+            );
             return Ok(vec![$message.append3($default, rc, rs)]);
         }
     };
@@ -47,5 +56,31 @@ macro_rules! get_mut_pool {
 macro_rules! uuid_to_string {
     ($uuid:expr) => {
         $uuid.to_simple_ref().to_string()
+    };
+}
+
+macro_rules! properties_footer {
+    () => {
+        pub fn get_all_properties(
+            m: &dbus::tree::MethodInfo<
+                dbus::tree::MTFn<$crate::dbus_api::types::TData>,
+                $crate::dbus_api::types::TData,
+            >,
+        ) -> dbus::tree::MethodResult {
+            get_properties_shared(m, &mut ALL_PROPERTIES.iter().map(|&s| s.to_string()))
+        }
+
+        pub fn get_properties(
+            m: &dbus::tree::MethodInfo<
+                dbus::tree::MTFn<$crate::dbus_api::types::TData>,
+                $crate::dbus_api::types::TData,
+            >,
+        ) -> dbus::tree::MethodResult {
+            let message: &dbus::Message = m.msg;
+            let mut iter = message.iter_init();
+            let mut properties: dbus::arg::Array<String, _> =
+                $crate::dbus_api::util::get_next_arg(&mut iter, 0)?;
+            get_properties_shared(m, &mut properties)
+        }
     };
 }

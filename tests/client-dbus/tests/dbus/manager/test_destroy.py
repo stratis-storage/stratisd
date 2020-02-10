@@ -15,19 +15,20 @@
 Test DestroyPool.
 """
 
-from stratisd_client_dbus import Manager
-from stratisd_client_dbus import ObjectManager
-from stratisd_client_dbus import Pool
-from stratisd_client_dbus import MOBlockDev
-from stratisd_client_dbus import StratisdErrors
-from stratisd_client_dbus import blockdevs
-from stratisd_client_dbus import get_object
-from stratisd_client_dbus import pools
-
+# isort: LOCAL
+from stratisd_client_dbus import (
+    Manager,
+    MOBlockDev,
+    ObjectManager,
+    Pool,
+    StratisdErrors,
+    blockdevs,
+    get_object,
+    pools,
+)
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._misc import SimTestCase
-from .._misc import device_name_list
+from .._misc import SimTestCase, device_name_list
 
 _DEVICE_STRATEGY = device_name_list()
 
@@ -47,7 +48,6 @@ class Destroy1TestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testExecution(self):
         """
@@ -84,7 +84,6 @@ class Destroy2TestCase(SimTestCase):
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devices},
         )
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testExecution(self):
         """
@@ -118,7 +117,7 @@ class Destroy3TestCase(SimTestCase):
     """
 
     _POOLNAME = "deadpool"
-    _VOLNAME = "vol"
+    _FSNAME = "vol"
 
     def setUp(self):
         """
@@ -135,8 +134,7 @@ class Destroy3TestCase(SimTestCase):
                 "devices": _DEVICE_STRATEGY(),
             },
         )
-        Pool.Methods.CreateFilesystems(get_object(poolpath), {"specs": [self._VOLNAME]})
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
+        Pool.Methods.CreateFilesystems(get_object(poolpath), {"specs": [self._FSNAME]})
 
     def testExecution(self):
         """
@@ -171,7 +169,6 @@ class Destroy4TestCase(SimTestCase):
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": []},
         )
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testExecution(self):
         """

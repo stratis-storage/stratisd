@@ -9,16 +9,17 @@ mod blockdevmgr;
 mod cache_tier;
 mod data_tier;
 mod device;
+mod identify;
 mod metadata;
 mod range_alloc;
 mod setup;
 mod shared;
-mod util;
 
 pub use self::{
     backstore::Backstore,
     blockdev::StratBlockDev,
-    device::identify,
+    device::DevOwnership,
+    identify::{find_all, identify_block_device},
     metadata::MDADataSize,
-    setup::{find_all, get_metadata},
+    setup::get_metadata,
 };

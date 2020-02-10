@@ -15,26 +15,24 @@
 Used to test behavior of the udev device discovery mechanism.
 """
 
-import unittest
-
-import subprocess
-import time
+# isort: STDLIB
+import os
 import random
 import string
-import os
+import subprocess
+import time
+import unittest
+
+# isort: THIRDPARTY
 import pyudev
 
-from stratisd_client_dbus import Manager
-from stratisd_client_dbus import ObjectManager
-from stratisd_client_dbus import get_object
-from stratisd_client_dbus import pools
-from stratisd_client_dbus import Pool
-
+# isort: LOCAL
+from stratisd_client_dbus import Manager, ObjectManager, Pool, get_object, pools
 from stratisd_client_dbus._constants import TOP_OBJECT
 
+from ._dm import _get_stratis_devices, remove_stratis_setup
 from ._loopback import LoopBackDevices
-from ._dm import remove_stratis_setup, _get_stratis_devices
-from ._stratis_id import stratis_signature, dump_stratis_signature_area
+from ._stratis_id import dump_stratis_signature_area, stratis_signature
 
 _STRATISD = os.environ["STRATISD"]
 

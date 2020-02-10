@@ -43,7 +43,6 @@ pub struct SimPool {
 }
 
 impl SimPool {
-    #[allow(clippy::new_ret_no_self)]
     pub fn new(
         rdm: &Rc<RefCell<Randomizer>>,
         paths: &[&Path],
@@ -164,7 +163,7 @@ impl Pool for SimPool {
         uuid: FilesystemUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction<FilesystemUuid>> {
-        rename_filesystem_pre!(self; uuid; new_name);
+        rename_filesystem_pre_idem!(self; uuid; new_name);
 
         let (_, filesystem) = self
             .filesystems

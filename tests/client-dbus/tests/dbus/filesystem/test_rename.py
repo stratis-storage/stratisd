@@ -15,18 +15,19 @@
 Test renaming a filesystem.
 """
 
-from stratisd_client_dbus import Filesystem
-from stratisd_client_dbus import Manager
-from stratisd_client_dbus import ObjectManager
-from stratisd_client_dbus import Pool
-from stratisd_client_dbus import StratisdErrors
-from stratisd_client_dbus import filesystems
-from stratisd_client_dbus import get_object
-
+# isort: LOCAL
+from stratisd_client_dbus import (
+    Filesystem,
+    Manager,
+    ObjectManager,
+    Pool,
+    StratisdErrors,
+    filesystems,
+    get_object,
+)
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._misc import SimTestCase
-from .._misc import device_name_list
+from .._misc import SimTestCase, device_name_list
 
 _DEVICE_STRATEGY = device_name_list()
 
@@ -37,15 +38,15 @@ class SetNameTestCase(SimTestCase):
     """
 
     _POOLNAME = "deadpool"
+    _FSNAME = "fs"
 
     def setUp(self):
         """
         Start the stratisd daemon with the simulator.
         """
         super().setUp()
-        self._fs_name = "fs"
         self._proxy = get_object(TOP_OBJECT)
-        ((_, (self._pool_object_path, _)), _, _) = Manager.Methods.CreatePool(
+        ((_, (pool_object_path, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
             {
                 "name": self._POOLNAME,
@@ -53,12 +54,11 @@ class SetNameTestCase(SimTestCase):
                 "devices": _DEVICE_STRATEGY(),
             },
         )
-        self._pool_object = get_object(self._pool_object_path)
+        pool_object = get_object(pool_object_path)
         ((_, created), _, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {"specs": [self._fs_name]}
+            pool_object, {"specs": [self._FSNAME]}
         )
         self._filesystem_object_path = created[0][0]
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testNullMapping(self):
         """
@@ -66,7 +66,7 @@ class SetNameTestCase(SimTestCase):
         """
         filesystem = get_object(self._filesystem_object_path)
         ((is_some, result), rc, _) = Filesystem.Methods.SetName(
-            filesystem, {"name": self._fs_name}
+            filesystem, {"name": self._FSNAME}
         )
 
         self.assertEqual(rc, StratisdErrors.OK)
@@ -90,6 +90,6 @@ class SetNameTestCase(SimTestCase):
         self.assertEqual(self._filesystem_object_path, fs_object_path)
 
         fs_object_path = next(
-            filesystems(props={"Name": self._fs_name}).search(managed_objects), None
+            filesystems(props={"Name": self._FSNAME}).search(managed_objects), None
         )
         self.assertIsNone(fs_object_path)

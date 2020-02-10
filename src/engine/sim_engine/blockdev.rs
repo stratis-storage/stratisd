@@ -60,7 +60,6 @@ impl BlockDev for SimDev {
 
 impl SimDev {
     /// Generates a new device from any devnode.
-    #[allow(clippy::new_ret_no_self)]
     pub fn new(rdm: Rc<RefCell<Randomizer>>, devnode: &Path) -> (Uuid, SimDev) {
         (
             Uuid::new_v4(),

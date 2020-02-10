@@ -21,13 +21,13 @@ use devicemapper::{
 
 use crate::{
     engine::{
-        devlinks,
         engine::Filesystem,
         event::{get_engine_listener_list, EngineEvent},
         strat_engine::{
             backstore::Backstore,
             cmd::{thin_check, thin_repair, udev_settle},
             device::wipe_sectors,
+            devlinks,
             dm::get_dm,
             names::{
                 format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole,
@@ -42,8 +42,8 @@ use crate::{
         },
         structures::Table,
         types::{
-            DeleteAction, FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState,
-            PoolState, PoolUuid, RenameAction,
+            FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState, PoolState,
+            PoolUuid,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -235,7 +235,6 @@ pub struct ThinPool {
 
 impl ThinPool {
     /// Make a new thin pool.
-    #[allow(clippy::new_ret_no_self)]
     pub fn new(
         pool_uuid: PoolUuid,
         thin_pool_size: &ThinPoolSizeParams,
@@ -957,11 +956,15 @@ impl ThinPool {
     /// Destroy a filesystem within the thin pool. Destroy metadata and
     /// devlinks information associated with the thinpool. If there is a
     /// failure to destroy the filesystem, retain it, and return an error.
+    ///
+    /// * Ok(Some(uuid)) provides the uuid of the destroyed filesystem
+    /// * Ok(None) is returned if the filesystem did not exist
+    /// * Err(_) is returned if the filesystem could not be destroyed
     pub fn destroy_filesystem(
         &mut self,
         pool_name: &str,
         uuid: FilesystemUuid,
-    ) -> StratisResult<DeleteAction<FilesystemUuid>> {
+    ) -> StratisResult<Option<FilesystemUuid>> {
         match self.filesystems.remove_by_uuid(uuid) {
             Some((fs_name, mut fs)) => match fs.destroy(&self.thin_pool) {
                 Ok(_) => {
@@ -973,14 +976,14 @@ impl ThinPool {
                                err);
                     }
                     devlinks::filesystem_removed(pool_name, &fs_name);
-                    Ok(DeleteAction::Deleted(uuid))
+                    Ok(Some(uuid))
                 }
                 Err(err) => {
                     self.filesystems.insert(fs_name, uuid, fs);
                     Err(err)
                 }
             },
-            None => Ok(DeleteAction::Identity),
+            None => Ok(None),
         }
     }
 
@@ -995,12 +998,19 @@ impl ThinPool {
     }
 
     /// Rename a filesystem within the thin pool.
+    ///
+    /// * Ok(Some(uuid)) provides the uuid of the renamed filesystem
+    /// * Ok(None) is returned if the source and target filesystem names are the same
+    /// * Err(StratisError::Engine(ErrorEnum::NotFound, _)) is returned if the source
+    /// filesystem name does not exist
+    /// * Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) is returned if the target
+    /// filesystem name already exists
     pub fn rename_filesystem(
         &mut self,
         pool_name: &str,
         uuid: FilesystemUuid,
         new_name: &str,
-    ) -> StratisResult<RenameAction<Uuid>> {
+    ) -> StratisResult<Option<Uuid>> {
         let old_name = rename_filesystem_pre!(self; uuid; new_name);
         let new_name = Name::new(new_name.to_owned());
 
@@ -1021,7 +1031,7 @@ impl ThinPool {
             });
             self.filesystems.insert(new_name.clone(), uuid, filesystem);
             devlinks::filesystem_renamed(pool_name, &old_name, &new_name);
-            Ok(RenameAction::Renamed(uuid))
+            Ok(Some(uuid))
         }
     }
 
@@ -1039,8 +1049,19 @@ impl ThinPool {
     pub fn suspend(&mut self) -> StratisResult<()> {
         // thindevs automatically suspended when thinpool is suspended
         self.thin_pool.suspend(get_dm(), true)?;
-        self.mdv.suspend()?;
-        Ok(())
+        // If MDV suspend fails, resume the thin pool and return the error
+        if let Err(err) = self.mdv.suspend() {
+            self.thin_pool.resume(get_dm()).map_err(|e| {
+                StratisError::Error(format!(
+                    "Suspending the MDV failed: {}. MDV suspend clean up action \
+                     of resuming the thin pool also failed: {}.",
+                    err, e
+                ))
+            })?;
+            Err(err)
+        } else {
+            Ok(())
+        }
     }
 
     /// Resume the thinpool
@@ -1161,7 +1182,6 @@ fn setup_metadev(
     meta_segments: Vec<(Sectors, Sectors)>,
     spare_segments: Vec<(Sectors, Sectors)>,
 ) -> StratisResult<(LinearDev, Vec<(Sectors, Sectors)>, Vec<(Sectors, Sectors)>)> {
-    #![allow(clippy::collapsible_if)]
     let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinMeta);
     let mut meta_dev = LinearDev::setup(
         get_dm(),
@@ -1526,7 +1546,7 @@ mod tests {
             .unwrap();
 
         let action = pool.rename_filesystem(pool_name, fs_uuid, name2).unwrap();
-        assert_matches!(action, RenameAction::Renamed(_));
+        assert_matches!(action, Some(_));
         let flexdevs: FlexDevsSave = pool.record();
         let thinpoolsave: ThinPoolDevSave = pool.record();
         pool.teardown().unwrap();

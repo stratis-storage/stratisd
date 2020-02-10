@@ -6,11 +6,9 @@ use std::{
     cell::RefCell,
     collections::{hash_map::RandomState, HashSet},
     iter::FromIterator,
-    path::{Path, PathBuf},
+    path::Path,
     rc::Rc,
 };
-
-use devicemapper::Device;
 
 use crate::{
     engine::{
@@ -18,7 +16,7 @@ use crate::{
         shared::create_pool_idempotent_or_err,
         sim_engine::{pool::SimPool, randomization::Randomizer},
         structures::Table,
-        types::{CreateAction, DeleteAction, Name, PoolUuid, Redundancy, RenameAction},
+        types::{CreateAction, DeleteAction, Name, PoolUuid, RenameAction},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -60,14 +58,8 @@ impl Engine for SimEngine {
         }
     }
 
-    fn block_evaluate(
-        &mut self,
-        device: Device,
-        dev_node: PathBuf,
-    ) -> StratisResult<Option<PoolUuid>> {
-        assert_ne!(dev_node, PathBuf::from("/"));
-        assert_ne!(libc::dev_t::from(device), 0);
-        Ok(None)
+    fn handle_event(&mut self, _event: &libudev::Event) -> Option<(PoolUuid, &mut dyn Pool)> {
+        None
     }
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
@@ -94,7 +86,7 @@ impl Engine for SimEngine {
         uuid: PoolUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>> {
-        rename_pool_pre!(self; uuid; new_name);
+        rename_pool_pre_idem!(self; uuid; new_name);
 
         let (_, pool) = self
             .pools

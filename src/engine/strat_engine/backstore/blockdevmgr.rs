@@ -25,12 +25,12 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                device::{identify, resolve_devices, DevOwnership},
+                device::{resolve_devices, DevOwnership},
                 metadata::{disown_device, BlockdevSize, MDADataSize, BDA},
-                util::hw_lookup,
             },
             device::blkdev_size,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
+            udev::{block_device_apply, decide_ownership, get_udev_property},
         },
         types::{DevUuid, PoolUuid},
     },
@@ -367,14 +367,38 @@ fn initialize(
     /// Get device information, returns an error if problem with obtaining
     /// that information.
     /// Returns a tuple with the device's path, its size in bytes,
-    /// its signature as determined by calling device::identify(),
-    /// and an open File handle, all of which are needed later.
-    fn dev_info(devnode: &Path) -> StratisResult<(&Path, Bytes, DevOwnership, File)> {
+    /// its DevOwnership classification, its optional hw_id,
+    /// and an open File handle.
+    #[allow(clippy::type_complexity)]
+    fn dev_info(
+        devnode: &Path,
+    ) -> StratisResult<(
+        &Path,
+        Bytes,
+        DevOwnership,
+        Option<StratisResult<String>>,
+        File,
+    )> {
         let f = OpenOptions::new().read(true).write(true).open(&devnode)?;
         let dev_size = blkdev_size(&f)?;
-        let ownership = identify(devnode)?;
 
-        Ok((devnode, dev_size, ownership, f))
+        if let Some((ownership, hw_id)) = block_device_apply(devnode, |d| {
+            (
+                decide_ownership(d)
+                    .and_then(|decision| DevOwnership::from_udev_ownership(&decision, devnode)),
+                get_udev_property(d, "ID_WWN"),
+            )
+        })? {
+            Ok((devnode, dev_size, ownership?, hw_id, f))
+        } else {
+            Err(StratisError::Engine(
+                ErrorEnum::NotFound,
+                format!(
+                    "Could not determine ownership of block device {} because it could not be found in the udev database",
+                    devnode.display()
+                ),
+            ))
+        }
     }
 
     /// Filter devices for admission to pool based on dev_infos.
@@ -385,25 +409,41 @@ fn initialize(
         dev_infos: I,
         pool_uuid: PoolUuid,
         owned_devs: &HashSet<DevUuid>,
-    ) -> StratisResult<Vec<(Device, (&'a Path, Bytes, File))>>
+    ) -> StratisResult<
+        Vec<(
+            Device,
+            (&'a Path, Bytes, Option<StratisResult<String>>, File),
+        )>,
+    >
     where
-        I: Iterator<Item = (Device, StratisResult<(&'a Path, Bytes, DevOwnership, File)>)>,
+        I: Iterator<
+            Item = (
+                Device,
+                StratisResult<(
+                    &'a Path,
+                    Bytes,
+                    DevOwnership,
+                    Option<StratisResult<String>>,
+                    File,
+                )>,
+            ),
+        >,
     {
         let mut add_devs = Vec::new();
         for (dev, dev_result) in dev_infos {
-            let (devnode, dev_size, ownership, f) = dev_result?;
+            let (devnode, dev_size, ownership, hw_id, f) = dev_result?;
             if dev_size < MIN_DEV_SIZE {
                 let error_message =
                     format!("{} too small, minimum {}", devnode.display(), MIN_DEV_SIZE);
                 return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
             };
             match ownership {
-                DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, f))),
-                DevOwnership::Theirs(signature) => {
+                DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, hw_id, f))),
+                DevOwnership::Theirs(info) => {
                     let err_str = format!(
-                        "Device {} has an existing signature {}",
+                        "Device {} appears to be already claimed by another, reason: {}",
                         devnode.display(),
-                        signature
+                        info
                     );
                     return Err(StratisError::Engine(ErrorEnum::Invalid, err_str));
                 }
@@ -435,7 +475,7 @@ fn initialize(
     let add_devs = filter_devs(dev_infos, pool_uuid, owned_devs)?;
 
     let mut bds: Vec<StratBlockDev> = Vec::new();
-    for (dev, (devnode, dev_size, mut f)) in add_devs {
+    for (dev, (devnode, dev_size, hw_id, mut f)) in add_devs {
         let bda = BDA::initialize(
             &mut f,
             pool_uuid,
@@ -445,14 +485,15 @@ fn initialize(
             Utc::now().timestamp() as u64,
         );
         if let Ok(bda) = bda {
-            let hw_id = match hw_lookup(devnode) {
-                Ok(id) => id,
-                // TODO: Consider logging if no hardware ID obtained. If
-                // logging distinguish between non-existant ID, which is a
-                // normal situation, and failure to obtain the ID due to an
-                // error in decoding the ID or failure to locate the udev
-                // entry for this devnode, which is not normal.
-                Err(_) => None,
+            let hw_id = match hw_id {
+                Some(Ok(hw_id)) => Some(hw_id),
+                Some(Err(_)) => {
+                    warn!("Value for ID_WWN for device {} obtained from the udev database could not be decoded; inserting device into pool with UUID {} anyway",
+                          devnode.display(),
+                          pool_uuid.to_simple_ref());
+                    None
+                }
+                None => None,
             };
 
             // FIXME: The expect is only provisionally true.
@@ -476,13 +517,13 @@ fn initialize(
 /// Return an error if any of the blockdevs could not be wiped.
 /// If an error occurs while wiping a blockdev, attempt to wipe all remaining.
 pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
-    let mut unerased_devnodes = Vec::new();
-
-    for bd in blockdevs {
-        let bd_devnode = bd.devnode.to_owned();
-        bd.disown()
-            .unwrap_or_else(|_| unerased_devnodes.push(bd_devnode));
-    }
+    let unerased_devnodes: Vec<_> = blockdevs
+        .iter()
+        .filter_map(|bd| match bd.disown() {
+            Err(_) => Some(bd.devnode()),
+            _ => None,
+        })
+        .collect();
 
     if unerased_devnodes.is_empty() {
         Ok(())
@@ -569,9 +610,29 @@ mod tests {
         );
         for (i, path) in paths.iter().enumerate() {
             if i == index {
-                assert_matches!(identify(path).unwrap(), DevOwnership::Theirs(_));
+                assert_matches!(
+                    DevOwnership::from_udev_ownership(
+                        &block_device_apply(path, |d| decide_ownership(d))
+                            .unwrap()
+                            .unwrap()
+                            .unwrap(),
+                        path
+                    )
+                    .unwrap(),
+                    DevOwnership::Theirs(_)
+                );
             } else {
-                assert_matches!(identify(path).unwrap(), DevOwnership::Unowned);
+                assert_matches!(
+                    DevOwnership::from_udev_ownership(
+                        &block_device_apply(path, |d| decide_ownership(d))
+                            .unwrap()
+                            .unwrap()
+                            .unwrap(),
+                        path
+                    )
+                    .unwrap(),
+                    DevOwnership::Unowned
+                );
             }
         }
 

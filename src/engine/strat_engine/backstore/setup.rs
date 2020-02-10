@@ -14,16 +14,12 @@ use std::{
 use chrono::{DateTime, Utc};
 use serde_json;
 
-use devicemapper::{devnode_to_devno, Device, Sectors};
+use devicemapper::{Device, Sectors};
 
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{
-                blockdev::StratBlockDev,
-                metadata::{device_identifiers, BDA},
-                util::get_stratis_block_devices,
-            },
+            backstore::{blockdev::StratBlockDev, metadata::BDA},
             device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
@@ -32,33 +28,8 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-/// Find all Stratis devices.
-///
-/// Returns a map of pool uuids to a map of devices to devnodes for each pool.
-pub fn find_all() -> StratisResult<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
-    let mut pool_map = HashMap::new();
-
-    for devnode in get_stratis_block_devices()? {
-        match devnode_to_devno(&devnode)? {
-            None => continue,
-            Some(devno) => {
-                if let Some((pool_uuid, _)) =
-                    device_identifiers(&mut OpenOptions::new().read(true).open(&devnode)?)?
-                {
-                    pool_map
-                        .entry(pool_uuid)
-                        .or_insert_with(HashMap::new)
-                        .insert(Device::from(devno), devnode);
-                }
-            }
-        }
-    }
-    Ok(pool_map)
-}
-
 /// Get the most recent metadata from a set of Devices for a given pool UUID.
 /// Returns None if no metadata found for this pool.
-#[allow(clippy::implicit_hasher)]
 pub fn get_metadata(
     pool_uuid: PoolUuid,
     devnodes: &HashMap<Device, PathBuf>,
@@ -128,7 +99,6 @@ pub fn get_metadata(
 /// are the devs that support the cache tier.
 /// Precondition: Every device in devnodes has already been determined to
 /// belong to the pool with the specified pool uuid.
-#[allow(clippy::implicit_hasher)]
 pub fn get_blockdevs(
     pool_uuid: PoolUuid,
     backstore_save: &BackstoreSave,

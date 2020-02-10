@@ -19,14 +19,14 @@ use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
         strat_engine::{
-            backstore::{Backstore, MDADataSize, StratBlockDev},
+            backstore::{Backstore, MDADataSize},
             names::validate_name,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, CreateAction, DevUuid, EngineAction, FilesystemUuid, MaybeDbusPath, Name,
-            PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
+            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolUuid,
+            Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -69,7 +69,7 @@ fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
 /// Check the metadata of an individual pool for consistency.
 /// Precondition: This method is called only when setting up a pool, which
 /// ensures that the flex devs metadata lists are all non-empty.
-pub fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
+fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
     let flex_devs = &metadata.flex_devs;
     let next = next_index(flex_devs);
     let allocated_from_cap = metadata.backstore.cap.allocs[0].1;
@@ -195,6 +195,8 @@ impl StratPool {
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
     ) -> StratisResult<(Name, StratPool)> {
+        check_metadata(metadata)?;
+
         let mut backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, timestamp)?;
         let mut thinpool = ThinPool::setup(
             uuid,
@@ -271,10 +273,6 @@ impl StratPool {
             thinpool_dev: self.thin_pool.record(),
         }
     }
-
-    pub fn get_strat_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
-        self.backstore.get_blockdev_by_uuid(uuid)
-    }
 }
 
 impl Pool for StratPool {
@@ -315,9 +313,19 @@ impl Pool for StratPool {
             // If adding cache devices, must suspend the pool, since the cache
             // must be augmeneted with the new devices.
             self.thin_pool.suspend()?;
-            let bdev_info = self.backstore.add_cachedevs(pool_uuid, paths)?;
-            self.thin_pool.set_device(self.backstore.device().expect("Since thin pool exists, space must have been allocated from the backstore, so backstore must have a cap device"))?;
+            let bdev_info_res = self
+                .backstore
+                .add_cachedevs(pool_uuid, paths)
+                .and_then(|bdi| {
+                    self.thin_pool
+                        .set_device(self.backstore.device().expect(
+                            "Since thin pool exists, space must have been allocated \
+                             from the backstore, so backstore must have a cap device",
+                        ))
+                        .and(Ok(bdi))
+                });
             self.thin_pool.resume()?;
+            let bdev_info = bdev_info_res?;
             Ok(SetCreateAction::new(bdev_info))
         } else {
             // If just adding data devices, no need to suspend the pool.
@@ -350,8 +358,7 @@ impl Pool for StratPool {
     ) -> StratisResult<SetDeleteAction<FilesystemUuid>> {
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
-            let changed = self.thin_pool.destroy_filesystem(pool_name, uuid)?;
-            if changed.is_changed() {
+            if let Some(uuid) = self.thin_pool.destroy_filesystem(pool_name, uuid)? {
                 removed.push(uuid);
             }
         }
@@ -366,7 +373,17 @@ impl Pool for StratPool {
         new_name: &str,
     ) -> StratisResult<RenameAction<FilesystemUuid>> {
         validate_name(new_name)?;
-        self.thin_pool.rename_filesystem(pool_name, uuid, new_name)
+        match self.thin_pool.rename_filesystem(pool_name, uuid, new_name) {
+            Ok(Some(uuid)) => Ok(RenameAction::Renamed(uuid)),
+            Ok(None) => Ok(RenameAction::Identity),
+            Err(e) => {
+                if let StratisError::Engine(ErrorEnum::NotFound, _) = e {
+                    Ok(RenameAction::NoSource)
+                } else {
+                    Err(e)
+                }
+            }
+        }
     }
 
     fn snapshot_filesystem(
@@ -444,7 +461,8 @@ impl Pool for StratPool {
     }
 
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)> {
-        self.get_strat_blockdev(uuid)
+        self.backstore
+            .get_blockdev_by_uuid(uuid)
             .map(|(t, b)| (t, b as &dyn BlockDev))
     }
 
@@ -461,10 +479,14 @@ impl Pool for StratPool {
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>> {
         let result = self.backstore.set_blockdev_user_info(uuid, user_info);
-        if let RenameAction::Renamed(_) = result {
-            self.write_metadata(pool_name)?;
+        match result {
+            Ok(Some(uuid)) => {
+                self.write_metadata(pool_name)?;
+                Ok(RenameAction::Renamed(uuid))
+            }
+            Ok(None) => Ok(RenameAction::Identity),
+            Err(_) => Ok(RenameAction::NoSource),
         }
-        Ok(result)
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {
@@ -490,10 +512,9 @@ mod tests {
     use devicemapper::{Bytes, IEC, SECTOR_SIZE};
 
     use crate::engine::{
-        devlinks,
         strat_engine::{
             backstore::{find_all, get_metadata},
-            cmd,
+            cmd, devlinks,
             tests::{loopbacked, real},
         },
         types::{EngineAction, PoolExtendState, PoolState, Redundancy},

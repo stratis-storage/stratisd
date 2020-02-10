@@ -50,12 +50,12 @@ mailing list, if preferred.
 ### Setting up for development
 
 #### Development Compiler
-The version of the compiler recommended for development is 1.38. Other
+The version of the compiler recommended for development is 1.40. Other
 versions of the compiler may disagree with the CI tasks on some points,
 so should be avoided.
 
 #### Building
-Stratisd requires Rust 1.37+ and Cargo to build. These may be available via
+Stratisd requires Rust 1.39+ and Cargo to build. These may be available via
 your distribution's package manager. If not, [Rustup](https://www.rustup.rs/)
 is available to install and update the Rust toolchain.
 Once toolchain and other dependencies are in place, run `make build` to build, and then run the

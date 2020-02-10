@@ -13,7 +13,6 @@ use std::{
     fs::{File, OpenOptions},
     io::{Read, Write},
     os::unix::io::{AsRawFd, RawFd},
-    path::PathBuf,
     process::exit,
     rc::Rc,
 };
@@ -33,8 +32,6 @@ use nix::{
 };
 use timerfd::{SetTimeFlags, TimerFd, TimerState};
 use uuid::Uuid;
-
-use devicemapper::Device;
 
 #[cfg(feature = "dbus_enabled")]
 use libstratis::{
@@ -265,23 +262,8 @@ impl<'a> UdevMonitor<'a> {
     /// data structures if so.
     fn handle_events(&mut self, engine: &mut dyn Engine, dbus_support: &mut MaybeDbusSupport) {
         while let Some(event) = self.socket.receive_event() {
-            if event.event_type() == libudev::EventType::Add
-                || event.event_type() == libudev::EventType::Change
-            {
-                let device = event.device();
-                let new_pool_uuid = device.devnode().and_then(|devnode| {
-                    device.devnum().and_then(|devnum| {
-                        engine
-                            .block_evaluate(Device::from(devnum), PathBuf::from(devnode))
-                            .unwrap_or(None)
-                    })
-                });
-                if let Some(pool_uuid) = new_pool_uuid {
-                    let (_, pool) = engine
-                        .get_mut_pool(pool_uuid)
-                        .expect("block_evaluate() returned a pool UUID, pool must be available");
-                    dbus_support.register_pool(pool_uuid, pool);
-                }
+            if let Some((pool_uuid, pool)) = engine.handle_event(&event) {
+                dbus_support.register_pool(pool_uuid, pool);
             }
         }
     }
@@ -358,6 +340,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     let mut udev_monitor = UdevMonitor::create(&context)?;
 
     let engine: Rc<RefCell<dyn Engine>> = {
+        info!("stratis daemon version {} started", VERSION);
         if matches.is_present("sim") {
             info!("Using SimEngine");
             Rc::new(RefCell::new(SimEngine::default()))

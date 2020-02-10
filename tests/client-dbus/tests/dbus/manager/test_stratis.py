@@ -15,12 +15,11 @@
 Test 'stratisd'.
 """
 
+# isort: FIRSTPARTY
 from dbus_python_client_gen import DPClientInvalidArgError
 
-from stratisd_client_dbus import Manager
-from stratisd_client_dbus import ObjectManager
-from stratisd_client_dbus import get_object
-
+# isort: LOCAL
+from stratisd_client_dbus import Manager, ObjectManager, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import SimTestCase
@@ -30,14 +29,6 @@ class StratisTestCase(SimTestCase):
     """
     Test meta information about stratisd.
     """
-
-    def setUp(self):
-        """
-        Start the stratisd daemon with the simulator.
-        """
-        super().setUp()
-        self._proxy = get_object(TOP_OBJECT)
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testStratisVersion(self):
         """
@@ -61,7 +52,6 @@ class StratisTestCase2(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testArguments(self):
         """

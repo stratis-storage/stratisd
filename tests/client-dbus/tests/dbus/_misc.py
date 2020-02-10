@@ -15,6 +15,7 @@
 Miscellaneous methods to support testing.
 """
 
+# isort: STDLIB
 import os
 import random
 import string
@@ -22,6 +23,7 @@ import subprocess
 import time
 import unittest
 
+# isort: THIRDPARTY
 import psutil
 
 _STRATISD = os.environ["STRATISD"]

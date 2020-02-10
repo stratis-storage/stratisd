@@ -7,12 +7,14 @@ mod backstore;
 mod cleanup;
 mod cmd;
 mod device;
+mod devlinks;
 mod dm;
 mod engine;
 mod names;
 mod pool;
 mod serde_structs;
 mod thinpool;
+mod udev;
 
 pub use self::engine::StratEngine;
 

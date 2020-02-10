@@ -15,17 +15,18 @@
 Test renaming a pool.
 """
 
-from stratisd_client_dbus import Manager
-from stratisd_client_dbus import ObjectManager
-from stratisd_client_dbus import Pool
-from stratisd_client_dbus import StratisdErrors
-from stratisd_client_dbus import get_object
-from stratisd_client_dbus import pools
-
+# isort: LOCAL
+from stratisd_client_dbus import (
+    Manager,
+    ObjectManager,
+    Pool,
+    StratisdErrors,
+    get_object,
+    pools,
+)
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._misc import SimTestCase
-from .._misc import device_name_list
+from .._misc import SimTestCase, device_name_list
 
 _DEVICE_STRATEGY = device_name_list()
 
@@ -52,7 +53,6 @@ class SetNameTestCase(SimTestCase):
             },
         )
         self._pool_object = get_object(self._pool_object_path)
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
     def testNullMapping(self):
         """

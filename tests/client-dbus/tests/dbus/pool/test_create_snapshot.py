@@ -15,17 +15,18 @@
 Test creating a snapshot
 """
 
-from stratisd_client_dbus import Manager
-from stratisd_client_dbus import ObjectManager
-from stratisd_client_dbus import Pool
-from stratisd_client_dbus import StratisdErrors
-from stratisd_client_dbus import filesystems
-from stratisd_client_dbus import get_object
-
+# isort: LOCAL
+from stratisd_client_dbus import (
+    Manager,
+    ObjectManager,
+    Pool,
+    StratisdErrors,
+    filesystems,
+    get_object,
+)
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from .._misc import SimTestCase
-from .._misc import device_name_list
+from .._misc import SimTestCase, device_name_list
 
 _DEVICE_STRATEGY = device_name_list()
 
@@ -36,7 +37,7 @@ class CreateSnapshotTestCase(SimTestCase):
     """
 
     _POOLNAME = "deadpool"
-    _VOLNAME = "some_fs"
+    _FSNAME = "some_fs"
     _SNAPSHOTNAME = "ss_fs"
 
     def setUp(self):
@@ -45,24 +46,24 @@ class CreateSnapshotTestCase(SimTestCase):
         """
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
-        self._devs = _DEVICE_STRATEGY()
         ((_, (poolpath, _)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
-            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 0),
+                "devices": _DEVICE_STRATEGY(),
+            },
         )
         self._pool_object = get_object(poolpath)
-        Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
         ((_, fs_objects), rc, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {"specs": [self._VOLNAME]}
+            self._pool_object, {"specs": [self._FSNAME]}
         )
 
         self.assertEqual(rc, StratisdErrors.OK)
 
-        fs_object_path = fs_objects[0][0]
-        self.assertNotEqual(fs_object_path, "/")
-
-        self._fs_object_path = fs_object_path
+        self._fs_object_path = fs_objects[0][0]
+        self.assertNotEqual(self._fs_object_path, "/")
 
     def testCreate(self):
         """

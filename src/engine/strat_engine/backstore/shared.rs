@@ -27,7 +27,6 @@ use crate::{
 // the value from a function, and there is no other way for the function to
 // be returned from a closure.
 // In future, it may be possible to address this better with FnBox.
-#[allow(clippy::borrowed_box)]
 pub fn metadata_to_segment(
     uuid_to_devno: &HashMap<DevUuid, Device>,
     base_dev_save: &BaseDevSave,

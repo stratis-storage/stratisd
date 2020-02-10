@@ -2,8 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::error::Error;
-
 use dbus::{
     self,
     arg::{ArgType, Iter, IterAppend, RefArg, Variant},
@@ -31,7 +29,24 @@ pub fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {
     }
 }
 
-/// Get the next argument off the bus
+/// Map a result obtained for the FetchProperties interface to a value used
+/// to represent an option.  An error in the result
+/// argument yields a false in the return value, indicating that the value
+/// returned is a string representation of the error encountered in
+/// obtaining the value, and not the value requested.
+pub fn result_to_tuple<T>(result: Result<T, String>) -> (bool, Variant<Box<dyn RefArg>>)
+where
+    T: RefArg + 'static,
+{
+    let (success, value) = match result {
+        Ok(value) => (true, Variant(Box::new(value) as Box<dyn RefArg>)),
+        Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
+    };
+    (success, value)
+}
+
+/// Get the next argument off the bus. loc is the index of the location of
+/// the argument in the iterator, and is used solely for error-reporting.
 pub fn get_next_arg<'a, T>(iter: &mut Iter<'a>, loc: u16) -> Result<T, MethodErr>
 where
     T: dbus::arg::Get<'a> + dbus::arg::Arg,
@@ -76,7 +91,7 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
     };
     let description = match *err {
         StratisError::DM(DmError::Core(ref err)) => err.to_string(),
-        ref err => err.description().to_owned(),
+        ref err => err.to_string(),
     };
     (error as u16, description)
 }

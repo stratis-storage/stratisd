@@ -892,10 +892,9 @@ mod tests {
         loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
     }
 
-    #[test]
-    pub fn real_test_setup() {
-        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_setup);
-    }
+    // There is no real_test_setup() function because we have chosen not to
+    // run this test on Jenkins, because it is chronically flaky, due to some
+    // udev-related flakiness in the Jenkins CI.
 
     #[test]
     pub fn travis_test_setup() {

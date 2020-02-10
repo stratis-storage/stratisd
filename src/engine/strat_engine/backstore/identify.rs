@@ -135,7 +135,7 @@ fn process_unowned_device(dev: &libudev::Device) -> Option<(PoolUuid, DevUuid, D
 
 // Use udev to identify all block devices and return the subset of those
 // that have Stratis signatures.
-fn find_all_block_devices_with_stratis_signatures(
+pub fn find_all_block_devices_with_stratis_signatures(
 ) -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     let context = libudev::Context::new()?;
     let mut enumerator = block_enumerator(&context)?;

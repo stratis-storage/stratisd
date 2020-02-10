@@ -291,7 +291,10 @@ mod tests {
     use uuid::Uuid;
 
     use crate::engine::strat_engine::{
-        backstore::{identify::find_all, metadata::device_identifiers, setup::get_metadata},
+        backstore::{
+            identify::find_all_block_devices_with_stratis_signatures, metadata::device_identifiers,
+            setup::get_metadata,
+        },
         cmd,
         tests::{loopbacked, real},
     };
@@ -441,6 +444,10 @@ mod tests {
     /// 5. Run find_all() again and verify that both sets of devices are found.
     /// 6. Verify that get_metadata() return an error. initialize() only
     /// initializes block devices, it does not write metadata.
+    // This method uses the fallback method for finding all Stratis devices,
+    // since udev sometimes can not catch up to the changes made in this test
+    // in the time the test allows. The fallback method has the long name
+    // "find_all_block_devices_with_stratis_signatures".
     fn test_initialize(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
@@ -468,7 +475,7 @@ mod tests {
         cmd::udev_settle().unwrap();
 
         {
-            let pools = find_all().unwrap();
+            let pools = find_all_block_devices_with_stratis_signatures().unwrap();
 
             assert_eq!(pools.len(), 1);
             assert!(pools.contains_key(&uuid1));
@@ -501,7 +508,7 @@ mod tests {
         cmd::udev_settle().unwrap();
 
         {
-            let pools = find_all().unwrap();
+            let pools = find_all_block_devices_with_stratis_signatures().unwrap();
 
             assert_eq!(pools.len(), 2);
             assert!(pools.contains_key(&uuid1));

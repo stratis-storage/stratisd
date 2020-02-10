@@ -605,7 +605,9 @@ mod tests {
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
     use crate::engine::strat_engine::{
-        backstore::{identify::find_all, metadata::device_identifiers},
+        backstore::{
+            identify::find_all_block_devices_with_stratis_signatures, metadata::device_identifiers,
+        },
         cmd,
         tests::{loopbacked, real},
     };
@@ -807,6 +809,10 @@ mod tests {
     /// Setup the same backstore again.
     /// Verify blockdev metadata again.
     /// Destroy all.
+    // This method uses the fallback method for finding all Stratis devices,
+    // since udev sometimes can not catch up to the changes made in this test
+    // in the time the test allows. The fallback method has the long name
+    // "find_all_block_devices_with_stratis_signatures".
     fn test_setup(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
@@ -856,7 +862,7 @@ mod tests {
 
         cmd::udev_settle().unwrap();
 
-        let map = find_all().unwrap();
+        let map = find_all_block_devices_with_stratis_signatures().unwrap();
         assert_eq!(
             map.keys().collect::<HashSet<&PoolUuid>>(),
             vec![pool_uuid].iter().collect::<HashSet<&PoolUuid>>()
@@ -874,7 +880,7 @@ mod tests {
 
         cmd::udev_settle().unwrap();
 
-        let map = find_all().unwrap();
+        let map = find_all_block_devices_with_stratis_signatures().unwrap();
         assert_eq!(
             map.keys().collect::<HashSet<&PoolUuid>>(),
             vec![pool_uuid].iter().collect::<HashSet<&PoolUuid>>()

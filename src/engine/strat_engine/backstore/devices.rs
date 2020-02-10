@@ -535,9 +535,10 @@ mod tests {
         );
     }
 
-    // There is no real_test_initialize() function because we have chosen not to
-    // run this test on Jenkins, because it is chronically flaky, due to some
-    // udev-related flakiness in the Jenkins CI.
+    #[test]
+    pub fn real_test_initialize() {
+        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_initialize);
+    }
 
     #[test]
     pub fn travis_test_initialize() {

@@ -63,23 +63,6 @@ impl fmt::Display for StratisError {
 }
 
 impl Error for StratisError {
-    fn description(&self) -> &str {
-        match *self {
-            StratisError::Error(ref s) => s,
-            StratisError::Engine(_, ref msg) => msg,
-            StratisError::Io(ref err) => err.description(),
-            StratisError::Nix(ref err) => err.description(),
-            StratisError::Uuid(_) => "Uuid::ParseError",
-            StratisError::Utf8(ref err) => err.description(),
-            StratisError::Serde(ref err) => err.description(),
-            StratisError::DM(ref err) => err.description(),
-
-            #[cfg(feature = "dbus_enabled")]
-            StratisError::Dbus(ref err) => err.message().unwrap_or("D-Bus Error"),
-            StratisError::Udev(ref err) => Error::description(err),
-        }
-    }
-
     fn cause(&self) -> Option<&dyn Error> {
         match *self {
             StratisError::Error(_) | StratisError::Engine(_, _) => None,

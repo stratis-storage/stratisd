@@ -48,7 +48,11 @@ class AddDataDevsTestCase(SimTestCase):
         self._data_devices = _DEVICE_STRATEGY()
         ((_, (poolpath, self._blockdev_paths)), _, _) = Manager.Methods.CreatePool(
             self._proxy,
-            {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._data_devices},
+            {
+                "name": self._POOLNAME,
+                "redundancy": (True, 0),
+                "devices": self._data_devices,
+            },
         )
         self._pool_object = get_object(poolpath)
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
@@ -118,7 +122,9 @@ class AddDataDevsTestCase(SimTestCase):
 
         # There are no blockdevs but for those in this pool
         blockdevs3 = blockdevs(props={}).search(managed_objects)
-        self.assertEqual(len(list(blockdevs3)), num_devices_added + len(self._data_devices))
+        self.assertEqual(
+            len(list(blockdevs3)), num_devices_added + len(self._data_devices)
+        )
 
         # There are no cachedevs belonging to this pool
         blockdevs4 = blockdevs(props={"Pool": pool, "Tier": 1}).search(managed_objects)

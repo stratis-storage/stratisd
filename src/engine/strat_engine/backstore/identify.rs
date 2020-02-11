@@ -2,7 +2,45 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// Discover or identify devices that may belong to Stratis.
+//! Discover or identify devices that may belong to Stratis.
+//!
+//! This module contains methods for finding all block devices that may belong
+//! to Stratis, generally run when Stratis starts up, and other methods that
+//! may be used to classify a single unknown block device.
+//!
+//! The methods rely to a greater or lesser extent on libudev.
+//!
+//! They have the following invocation heirarchy:
+//! find_all*
+//!  |
+//! find_all_*_devices
+//!  |
+//! identify_*_device
+//!  |
+//! process_*_device
+//!
+//! The primary purpose of the find* methods is to construct a udev
+//! enumeration and to properly process each of the udev database entries
+//! found.
+//!
+//! The primary purpose of the identify_* methods is to use udev to identify
+//! a single device and take the appropriate action based on that
+//! identification.
+//!
+//! The primary purpose of the process_* methods is to gather up Stratis
+//! device identifiers.
+//!
+//! Each method is expected to be invoked in a particular situation which
+//! is guaranteed by the method that invokes it. The methods are not,
+//! in general, general purpose methods that can be used in any situation.
+//!
+//! find_all is public because it is the method that is invoked by the
+//! engine on startup. find_all_block_devices_with_stratis_signatures is
+//! public for use in testing. identify_block_device is public because it
+//! is suitable for identifying a block device associated with a uevent,
+//! as the situation in which the uevent is handled is equivalent to that
+//! provided by the execution of the
+//! find_all_block_devices_with_stratis_signatures method.
 
 use std::{
     collections::HashMap,

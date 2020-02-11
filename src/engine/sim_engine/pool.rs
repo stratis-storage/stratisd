@@ -61,7 +61,7 @@ impl SimPool {
             SimDev::new(
                 Rc::clone(rdm),
                 p,
-                keyfile_path.as_ref().map(|kfp| kfp.as_path()),
+                keyfile_path.as_deref(),
             )
         });
         (
@@ -118,7 +118,7 @@ impl Pool for SimPool {
                     SimDev::new(
                         Rc::clone(&self.rdm),
                         p,
-                        keyfile_path.as_ref().map(|p| p.as_path()),
+                        keyfile_path.as_deref(),
                     )
                 })
                 .collect();
@@ -172,12 +172,10 @@ impl Pool for SimPool {
                     match tier {
                         BlockDevTier::Data => self
                             .block_devs_keyfile_path
-                            .as_ref()
-                            .map(|kfp| kfp.as_path()),
+                            .as_deref(),
                         BlockDevTier::Cache => self
                             .cache_devs_keyfile_path
-                            .as_ref()
-                            .map(|kfp| kfp.as_path()),
+                            .as_deref(),
                     },
                 )
             })
@@ -371,7 +369,7 @@ impl Pool for SimPool {
     }
 
     fn keyfile_path(&self) -> Option<&Path> {
-        self.block_devs_keyfile_path.as_ref().map(|p| p.as_path())
+        self.block_devs_keyfile_path.as_deref()
     }
 
     fn cache_initialized(&self) -> bool {

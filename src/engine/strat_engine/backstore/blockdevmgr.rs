@@ -159,7 +159,7 @@ impl BlockDevMgr {
                 devices,
                 mda_data_size,
                 &HashSet::new(),
-                keyfile_path.as_ref().map(|kfp| kfp.as_path()),
+                keyfile_path.as_deref(),
             )?,
             None,
             keyfile_path,
@@ -189,7 +189,7 @@ impl BlockDevMgr {
             devices,
             MDADataSize::default(),
             &current_uuids,
-            self.keyfile_path.as_ref().map(|kfp| kfp.as_path()),
+            self.keyfile_path.as_deref(),
         )?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
@@ -367,7 +367,7 @@ impl BlockDevMgr {
     }
 
     pub fn keyfile_path(&self) -> Option<&Path> {
-        self.keyfile_path.as_ref().map(|p| p.as_path())
+        self.keyfile_path.as_deref()
     }
 
     pub fn is_encrypted(&self) -> bool {

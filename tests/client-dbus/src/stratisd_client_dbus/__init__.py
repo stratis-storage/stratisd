@@ -19,6 +19,7 @@ from ._connection import get_object
 
 from ._implementation import Blockdev
 from ._implementation import FetchProperties
+from ._implementation import FetchProperties_2_1
 from ._implementation import Filesystem
 from ._implementation import Manager
 from ._implementation import ObjectManager

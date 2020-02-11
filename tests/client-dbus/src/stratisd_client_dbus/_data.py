@@ -34,6 +34,17 @@ SPECS = {
 </method>
 </interface>
 """,
+    "org.storage.stratis2.FetchProperties.r1": """
+<interface name="org.storage.stratis2.FetchProperties.r1">
+<method name="GetAllProperties">
+<arg name="property_hash" type="a{s(bv)}" direction="out"/>
+</method>
+<method name="GetProperties">
+<arg name="properties" type="as" direction="in"/>
+<arg name="property_hash" type="a{s(bv)}" direction="out"/>
+</method>
+</interface>
+""",
     "org.storage.stratis2.Manager": """
 <interface name="org.storage.stratis2.Manager">
 <method name="ConfigureSimulator">

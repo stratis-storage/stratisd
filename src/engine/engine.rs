@@ -182,6 +182,9 @@ pub trait Pool: Debug {
 
     /// Get dbus path associated with the Pool.
     fn get_dbus_path(&self) -> &MaybeDbusPath;
+
+    /// true if the pool has a cache, otherwise false
+    fn has_cache(&self) -> bool;
 }
 
 pub trait Engine: Debug {

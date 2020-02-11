@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::tree::{MTFn, Tree};
+use dbus::tree::{MTFn, MethodInfo, Tree};
 
 use crate::{
     dbus_api::types::TData,
@@ -36,4 +36,27 @@ where
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
 
     closure((pool_name, pool_uuid, pool))
+}
+
+pub fn get_pool_has_cache(m: &MethodInfo<MTFn<TData>, TData>) -> Result<bool, String> {
+    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
+        Ok(pool.has_cache())
+    })
+}
+
+pub fn get_pool_total_size(m: &MethodInfo<MTFn<TData>, TData>) -> Result<String, String> {
+    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
+        Ok(
+            (u128::from(*pool.total_physical_size()) * devicemapper::SECTOR_SIZE as u128)
+                .to_string(),
+        )
+    })
+}
+
+pub fn get_pool_total_used(m: &MethodInfo<MTFn<TData>, TData>) -> Result<String, String> {
+    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
+        pool.total_physical_used()
+            .map_err(|e| e.to_string())
+            .map(|size| (u128::from(*size) * devicemapper::SECTOR_SIZE as u128).to_string())
+    })
 }

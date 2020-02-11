@@ -598,14 +598,16 @@ impl Recordable<BackstoreSave> for Backstore {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::{collections::HashSet, fs::OpenOptions};
 
     use uuid::Uuid;
 
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
     use crate::engine::strat_engine::{
-        backstore::find_all,
+        backstore::{
+            identify::find_all_block_devices_with_stratis_signatures, metadata::device_identifiers,
+        },
         cmd,
         tests::{loopbacked, real},
     };
@@ -807,6 +809,10 @@ mod tests {
     /// Setup the same backstore again.
     /// Verify blockdev metadata again.
     /// Destroy all.
+    // This method uses the fallback method for finding all Stratis devices,
+    // since udev sometimes can not catch up to the changes made in this test
+    // in the time the test allows. The fallback method has the long name
+    // "find_all_block_devices_with_stratis_signatures".
     fn test_setup(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
@@ -816,6 +822,17 @@ mod tests {
 
         let mut backstore =
             Backstore::initialize(pool_uuid, paths1, MDADataSize::default()).unwrap();
+
+        for path in paths1 {
+            assert_eq!(
+                pool_uuid,
+                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap()
+                    .unwrap()
+                    .0
+            );
+        }
+
         invariant(&backstore);
 
         // Allocate space from the backstore so that the cap device is made.
@@ -826,6 +843,17 @@ mod tests {
         let old_device = backstore.device();
 
         backstore.add_cachedevs(pool_uuid, paths2).unwrap();
+
+        for path in paths2 {
+            assert_eq!(
+                pool_uuid,
+                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap()
+                    .unwrap()
+                    .0
+            );
+        }
+
         invariant(&backstore);
 
         assert_ne!(backstore.device(), old_device);
@@ -834,7 +862,7 @@ mod tests {
 
         cmd::udev_settle().unwrap();
 
-        let map = find_all().unwrap();
+        let map = find_all_block_devices_with_stratis_signatures().unwrap();
         assert_eq!(
             map.keys().collect::<HashSet<&PoolUuid>>(),
             vec![pool_uuid].iter().collect::<HashSet<&PoolUuid>>()
@@ -852,7 +880,7 @@ mod tests {
 
         cmd::udev_settle().unwrap();
 
-        let map = find_all().unwrap();
+        let map = find_all_block_devices_with_stratis_signatures().unwrap();
         assert_eq!(
             map.keys().collect::<HashSet<&PoolUuid>>(),
             vec![pool_uuid].iter().collect::<HashSet<&PoolUuid>>()

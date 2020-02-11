@@ -7,17 +7,13 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt,
-    fs::{File, OpenOptions},
     path::Path,
 };
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{seq, thread_rng};
-use uuid::Uuid;
 
-use devicemapper::{
-    Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine, IEC,
-};
+use devicemapper::{Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine};
 
 use crate::{
     engine::{
@@ -25,19 +21,16 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                device::{resolve_devices, DevOwnership},
-                metadata::{disown_device, BlockdevSize, MDADataSize, BDA},
+                devices::{initialize_devices, process_devices, wipe_blockdevs, DeviceInfo},
+                metadata::MDADataSize,
             },
-            device::blkdev_size,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
-            udev::{block_device_apply, decide_ownership, get_udev_property},
         },
         types::{DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi);
 const MAX_NUM_TO_WRITE: usize = 10;
 
 /// struct to represent a continuous set of sectors on a disk
@@ -130,6 +123,95 @@ pub struct BlockDevMgr {
     last_update_time: Option<DateTime<Utc>>,
 }
 
+// Check coherence of pool and device UUIDs with existing state of current
+// blockdevmgr. If the selection of devices is incompatible with the current
+// state of the blockdevmgr, or simply invalid, return an error.
+//
+// Postcondition: All infos in the returned vector have their
+// stratis_identifiers value equal to None. Either their Stratis identifiers
+// indicated an error, or else the devices specified are already owned by
+// this blockdevmgr and should not be added again.
+//
+// FIXME:
+// Note that this method _should_ be somewhat temporary. We hope that in
+// another step the functionality contained will be hoisted up closer to
+// the D-Bus/engine interface, as it computes some idempotency information.
+fn check_device_ids(
+    pool_uuid: PoolUuid,
+    current_uuids: &HashSet<DevUuid>,
+    devices: Vec<DeviceInfo>,
+) -> StratisResult<Vec<DeviceInfo>> {
+    let stratis_identifiers: HashMap<PoolUuid, HashSet<DevUuid>> = devices
+        .iter()
+        .filter_map(|info| info.stratis_identifiers)
+        .fold(HashMap::new(), |mut acc, (pool_uuid, dev_uuid)| {
+            acc.entry(pool_uuid)
+                .or_insert_with(HashSet::new)
+                .insert(dev_uuid);
+            acc
+        });
+
+    let (this_pool, other_pools): (Vec<_>, Vec<_>) = stratis_identifiers
+        .iter()
+        .partition(|(k, _)| **k == pool_uuid);
+
+    if !other_pools.is_empty() {
+        let error_string = other_pools
+            .iter()
+            .map(|(p, devs)| {
+                let dev_string = devices
+                    .iter()
+                    .filter(|info| match info.stratis_identifiers {
+                        None => false,
+                        Some((pool_uuid, _)) => devs.contains(&pool_uuid),
+                    })
+                    .map(|info| info.devnode.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!(
+                    "Devices ({}) appear to belong to Stratis pool with UUID {}",
+                    dev_string,
+                    p.to_simple_ref()
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("; ");
+        let error_message = format!(
+            "Some devices specified appear to be already in use by other Stratis pools: {}",
+            error_string
+        );
+        return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
+    }
+
+    if !this_pool.is_empty() {
+        let (_, dev_uuids) = this_pool[0];
+
+        let invalid_uuids = dev_uuids.difference(current_uuids).collect::<Vec<_>>();
+
+        if !invalid_uuids.is_empty() {
+            let error_string = devices
+                .iter()
+                .filter(|info| match info.stratis_identifiers {
+                    None => false,
+                    Some((pool_uuid, _)) => invalid_uuids.contains(&&pool_uuid),
+                })
+                .map(|info| info.devnode.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let error_message = format!(
+                "Devices ({}) appear to be already in use by this pool; they may be in use by the other tier",
+                error_string
+            );
+            return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
+        }
+    }
+
+    Ok(devices
+        .into_iter()
+        .filter(|info| info.stratis_identifiers.is_none())
+        .collect())
+}
+
 impl BlockDevMgr {
     /// Make a struct that represents an existing BlockDevMgr.
     pub fn new(
@@ -148,9 +230,10 @@ impl BlockDevMgr {
         paths: &[&Path],
         mda_data_size: MDADataSize,
     ) -> StratisResult<BlockDevMgr> {
-        let devices = resolve_devices(paths)?;
+        let devices = check_device_ids(pool_uuid, &HashSet::new(), process_devices(paths)?)?;
+
         Ok(BlockDevMgr::new(
-            initialize(pool_uuid, devices, mda_data_size, &HashSet::new())?,
+            initialize_devices(devices, pool_uuid, mda_data_size)?,
             None,
         ))
     }
@@ -167,13 +250,18 @@ impl BlockDevMgr {
     /// Return the uuids of all blockdevs corresponding to paths that were
     /// added.
     pub fn add(&mut self, pool_uuid: PoolUuid, paths: &[&Path]) -> StratisResult<Vec<DevUuid>> {
-        let devices = resolve_devices(paths)?;
-        let current_uuids = self.block_devs.iter().map(|bd| bd.uuid()).collect();
+        let current_uuids = self
+            .block_devs
+            .iter()
+            .map(|bd| bd.uuid())
+            .collect::<HashSet<_>>();
+        let devices = check_device_ids(pool_uuid, &current_uuids, process_devices(paths)?)?;
+
         // FIXME: This is a bug. If new devices are added to a pool, and the
         // variable length metadata requires more than the minimum allocated,
         // then the necessary amount must be provided or the data can not be
         // saved.
-        let bds = initialize(pool_uuid, devices, MDADataSize::default(), &current_uuids)?;
+        let bds = initialize_devices(devices, pool_uuid, MDADataSize::default())?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
         Ok(bdev_uuids)
@@ -356,200 +444,14 @@ impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
     }
 }
 
-/// Initialize multiple blockdevs at once. This allows all of them
-/// to be checked for usability before writing to any of them.
-fn initialize(
-    pool_uuid: PoolUuid,
-    devices: HashMap<Device, &Path>,
-    mda_data_size: MDADataSize,
-    owned_devs: &HashSet<DevUuid>,
-) -> StratisResult<Vec<StratBlockDev>> {
-    /// Get device information, returns an error if problem with obtaining
-    /// that information.
-    /// Returns a tuple with the device's path, its size in bytes,
-    /// its DevOwnership classification, its optional hw_id,
-    /// and an open File handle.
-    #[allow(clippy::type_complexity)]
-    fn dev_info(
-        devnode: &Path,
-    ) -> StratisResult<(
-        &Path,
-        Bytes,
-        DevOwnership,
-        Option<StratisResult<String>>,
-        File,
-    )> {
-        let f = OpenOptions::new().read(true).write(true).open(&devnode)?;
-        let dev_size = blkdev_size(&f)?;
-
-        if let Some((ownership, hw_id)) = block_device_apply(devnode, |d| {
-            (
-                decide_ownership(d)
-                    .and_then(|decision| DevOwnership::from_udev_ownership(&decision, devnode)),
-                get_udev_property(d, "ID_WWN"),
-            )
-        })? {
-            Ok((devnode, dev_size, ownership?, hw_id, f))
-        } else {
-            Err(StratisError::Engine(
-                ErrorEnum::NotFound,
-                format!(
-                    "Could not determine ownership of block device {} because it could not be found in the udev database",
-                    devnode.display()
-                ),
-            ))
-        }
-    }
-
-    /// Filter devices for admission to pool based on dev_infos.
-    /// If there is an error finding out the info, return that error.
-    /// Also, return an error if a device is not appropriate for this pool.
-    #[allow(clippy::type_complexity)]
-    fn filter_devs<'a, I>(
-        dev_infos: I,
-        pool_uuid: PoolUuid,
-        owned_devs: &HashSet<DevUuid>,
-    ) -> StratisResult<
-        Vec<(
-            Device,
-            (&'a Path, Bytes, Option<StratisResult<String>>, File),
-        )>,
-    >
-    where
-        I: Iterator<
-            Item = (
-                Device,
-                StratisResult<(
-                    &'a Path,
-                    Bytes,
-                    DevOwnership,
-                    Option<StratisResult<String>>,
-                    File,
-                )>,
-            ),
-        >,
-    {
-        let mut add_devs = Vec::new();
-        for (dev, dev_result) in dev_infos {
-            let (devnode, dev_size, ownership, hw_id, f) = dev_result?;
-            if dev_size < MIN_DEV_SIZE {
-                let error_message =
-                    format!("{} too small, minimum {}", devnode.display(), MIN_DEV_SIZE);
-                return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
-            };
-            match ownership {
-                DevOwnership::Unowned => add_devs.push((dev, (devnode, dev_size, hw_id, f))),
-                DevOwnership::Theirs(info) => {
-                    let err_str = format!(
-                        "Device {} appears to be already claimed by another, reason: {}",
-                        devnode.display(),
-                        info
-                    );
-                    return Err(StratisError::Engine(ErrorEnum::Invalid, err_str));
-                }
-                DevOwnership::Ours(uuid, dev_uuid) => {
-                    if pool_uuid == uuid {
-                        if !owned_devs.contains(&dev_uuid) {
-                            let error_str = format!(
-                                "Device {} with pool UUID is unknown to pool",
-                                devnode.display()
-                            );
-                            return Err(StratisError::Engine(ErrorEnum::Invalid, error_str));
-                        }
-                    } else {
-                        let error_str = format!(
-                            "Device {} already belongs to Stratis pool {}",
-                            devnode.display(),
-                            uuid
-                        );
-                        return Err(StratisError::Engine(ErrorEnum::Invalid, error_str));
-                    }
-                }
-            }
-        }
-        Ok(add_devs)
-    }
-
-    let dev_infos = devices.into_iter().map(|(d, p)| (d, dev_info(p)));
-
-    let add_devs = filter_devs(dev_infos, pool_uuid, owned_devs)?;
-
-    let mut bds: Vec<StratBlockDev> = Vec::new();
-    for (dev, (devnode, dev_size, hw_id, mut f)) in add_devs {
-        let bda = BDA::initialize(
-            &mut f,
-            pool_uuid,
-            Uuid::new_v4(),
-            mda_data_size,
-            BlockdevSize::new(dev_size.sectors()),
-            Utc::now().timestamp() as u64,
-        );
-        if let Ok(bda) = bda {
-            let hw_id = match hw_id {
-                Some(Ok(hw_id)) => Some(hw_id),
-                Some(Err(_)) => {
-                    warn!("Value for ID_WWN for device {} obtained from the udev database could not be decoded; inserting device into pool with UUID {} anyway",
-                          devnode.display(),
-                          pool_uuid.to_simple_ref());
-                    None
-                }
-                None => None,
-            };
-
-            // FIXME: The expect is only provisionally true.
-            // The dev_size is at least MIN_DEV_SIZE, but the size of the
-            // metadata is not really bounded from above.
-            let blockdev = StratBlockDev::new(dev, devnode.to_owned(), bda, &[], None, hw_id)
-                .expect("bda.size() == dev_size; only allocating space for metadata");
-            bds.push(blockdev);
-        } else {
-            // TODO: check the return values and update state machine on failure
-            let _ = disown_device(&mut f);
-            let _ = wipe_blockdevs(&bds);
-
-            return Err(bda.unwrap_err());
-        }
-    }
-    Ok(bds)
-}
-
-/// Wipe some blockdevs of their identifying headers.
-/// Return an error if any of the blockdevs could not be wiped.
-/// If an error occurs while wiping a blockdev, attempt to wipe all remaining.
-pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
-    let unerased_devnodes: Vec<_> = blockdevs
-        .iter()
-        .filter_map(|bd| match bd.disown() {
-            Err(_) => Some(bd.devnode()),
-            _ => None,
-        })
-        .collect();
-
-    if unerased_devnodes.is_empty() {
-        Ok(())
-    } else {
-        let err_msg = format!(
-            "Failed to wipe already initialized devnodes: {:?}",
-            unerased_devnodes
-        );
-        Err(StratisError::Engine(ErrorEnum::Error, err_msg))
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::fs::OpenOptions;
-
-    use rand;
     use uuid::Uuid;
 
     use crate::engine::strat_engine::{
-        backstore::{find_all, get_metadata},
         cmd,
         tests::{loopbacked, real},
     };
-
-    use crate::engine::strat_engine::backstore::metadata::device_identifiers;
 
     use super::*;
 
@@ -591,96 +493,6 @@ mod tests {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(1, 3, None),
             test_blockdevmgr_used,
-        );
-    }
-
-    /// Verify that it is impossible to initialize a set of disks of which
-    /// even one of them has a signature.  Choose the dirty disk randomly.
-    fn test_fail_single_signature(paths: &[&Path]) {
-        assert!(paths.len() > 1);
-        let index = rand::random::<u8>() as usize % paths.len();
-
-        cmd::create_fs(paths[index], None).unwrap();
-        cmd::udev_settle().unwrap();
-
-        let pool_uuid = Uuid::new_v4();
-        assert_matches!(
-            BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default()),
-            Err(_)
-        );
-        for (i, path) in paths.iter().enumerate() {
-            if i == index {
-                assert_matches!(
-                    DevOwnership::from_udev_ownership(
-                        &block_device_apply(path, |d| decide_ownership(d))
-                            .unwrap()
-                            .unwrap()
-                            .unwrap(),
-                        path
-                    )
-                    .unwrap(),
-                    DevOwnership::Theirs(_)
-                );
-            } else {
-                assert_matches!(
-                    DevOwnership::from_udev_ownership(
-                        &block_device_apply(path, |d| decide_ownership(d))
-                            .unwrap()
-                            .unwrap()
-                            .unwrap(),
-                        path
-                    )
-                    .unwrap(),
-                    DevOwnership::Unowned
-                );
-            }
-        }
-
-        let clean_paths = paths
-            .iter()
-            .enumerate()
-            .filter(|(n, _)| *n != index)
-            .map(|(_, v)| *v)
-            .collect::<Vec<&Path>>();
-
-        assert_matches!(
-            BlockDevMgr::initialize(pool_uuid, &clean_paths, MDADataSize::default()),
-            Ok(_)
-        );
-        cmd::udev_settle().unwrap();
-
-        for path in clean_paths {
-            assert_eq!(
-                pool_uuid,
-                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
-                    .unwrap()
-                    .unwrap()
-                    .0
-            );
-        }
-    }
-
-    #[test]
-    pub fn loop_test_fail_single_signature() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_fail_single_signature,
-        );
-    }
-
-    #[test]
-    pub fn real_test_fail_single_signature() {
-        real::test_with_spec(
-            &real::DeviceLimits::AtLeast(2, None, None),
-            test_fail_single_signature,
-        );
-    }
-
-    #[test]
-    pub fn travis_test_fail_single_signature() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_fail_single_signature,
         );
     }
 
@@ -736,116 +548,5 @@ mod tests {
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_initialization_add_stratis,
         );
-    }
-
-    /// Verify that find_all function locates and assigns pools appropriately.
-    /// 1. Split available paths into 2 discrete sets.
-    /// 2. Initialize the block devices in the first set with a pool uuid.
-    /// 3. Run find_all() and verify that it has found the initialized devices
-    /// and no others.
-    /// 4. Initialize the block devices in the second set with a different pool
-    /// uuid.
-    /// 5. Run find_all() again and verify that both sets of devices are found.
-    /// 6. Verify that get_metadata() return an error. initialize() only
-    /// initializes block devices, it does not write metadata.
-    fn test_initialize(paths: &[&Path]) {
-        assert!(paths.len() > 1);
-
-        let (paths1, paths2) = paths.split_at(paths.len() / 2);
-
-        let uuid1 = Uuid::new_v4();
-        BlockDevMgr::initialize(uuid1, paths1, MDADataSize::default()).unwrap();
-
-        cmd::udev_settle().unwrap();
-        let pools = find_all().unwrap();
-        assert_eq!(pools.len(), 1);
-        assert!(pools.contains_key(&uuid1));
-        let devices = pools.get(&uuid1).expect("pools.contains_key() was true");
-        assert_eq!(devices.len(), paths1.len());
-
-        let uuid2 = Uuid::new_v4();
-        BlockDevMgr::initialize(uuid2, paths2, MDADataSize::default()).unwrap();
-
-        cmd::udev_settle().unwrap();
-        let pools = find_all().unwrap();
-        assert_eq!(pools.len(), 2);
-
-        assert!(pools.contains_key(&uuid1));
-        let devices1 = pools.get(&uuid1).expect("pools.contains_key() was true");
-        assert_eq!(devices1.len(), paths1.len());
-
-        assert!(pools.contains_key(&uuid2));
-        let devices2 = pools.get(&uuid2).expect("pools.contains_key() was true");
-        assert_eq!(devices2.len(), paths2.len());
-
-        assert!(pools
-            .iter()
-            .map(|(uuid, devs)| get_metadata(*uuid, devs))
-            .all(|x| x.unwrap().is_none()));
-    }
-
-    #[test]
-    pub fn loop_test_initialize() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_initialize,
-        );
-    }
-
-    #[test]
-    pub fn real_test_initialize() {
-        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_initialize);
-    }
-
-    #[test]
-    pub fn travis_test_initialize() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_initialize,
-        );
-    }
-
-    /// Test that initialing devices claims all and that destroying
-    /// them releases all.
-    fn test_ownership(paths: &[&Path]) {
-        let pool_uuid = Uuid::new_v4();
-        let mut bd_mgr = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
-
-        cmd::udev_settle().unwrap();
-
-        for path in paths {
-            assert_eq!(
-                pool_uuid,
-                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
-                    .unwrap()
-                    .unwrap()
-                    .0
-            );
-        }
-
-        bd_mgr.destroy_all().unwrap();
-
-        for path in paths {
-            assert_eq!(
-                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
-                    .unwrap(),
-                None
-            );
-        }
-    }
-
-    #[test]
-    pub fn loop_test_ownership() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
-    }
-
-    #[test]
-    pub fn real_test_ownership() {
-        real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_ownership);
-    }
-
-    #[test]
-    pub fn travis_test_ownership() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
     }
 }

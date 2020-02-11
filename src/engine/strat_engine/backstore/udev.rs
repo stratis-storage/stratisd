@@ -28,16 +28,18 @@ pub fn get_udev_property<T: AsRef<OsStr>>(
 where
     T: std::fmt::Display,
 {
-    device
-        .property_value(&property_name)
-        .map(|value| match value.to_str() {
-            Some(value) => Ok(value.into()),
-            None => Err(StratisError::Error(format!(
-                "Unable to convert udev property value with key {} belonging to device {} to a string",
-                property_name,
-                device.devnode().map_or("<unknown>".into(), |x| x.to_string_lossy().into_owned())
-            ))),
-        })
+    device.property_value(&property_name).map(|value| {
+        value
+            .to_str()
+            .ok_or_else(|| {
+                StratisError::Error(format!(
+                    "Unable to convert udev property value with key {} to a string, lossy value is {}",
+                    property_name,
+                    value.to_string_lossy()
+                ))
+            })
+            .map(|value| value.into())
+    })
 }
 
 /// Returns true if udev indicates that the device is a multipath member
@@ -91,21 +93,29 @@ pub enum UdevOwnership {
 /// it is the unclaimed designation that has a boolean expression on udev
 /// properties associated with it.
 pub fn decide_ownership(device: &libudev::Device) -> StratisResult<UdevOwnership> {
-    // We believe that it is possible to be a multipath member and also to
-    // be identified as a Stratis device. The designations are not mutually
-    // exclusive, but the multipath member device must not be used by Stratis.
-    if is_multipath_member(device)? {
-        return Ok(UdevOwnership::MultipathMember);
-    }
+    || -> StratisResult<UdevOwnership> {
+        // We believe that it is possible to be a multipath member and also to
+        // be identified as a Stratis device. The designations are not mutually
+        // exclusive, but the multipath member device must not be used by Stratis.
+        if is_multipath_member(device)? {
+            return Ok(UdevOwnership::MultipathMember);
+        }
 
-    // We believe that the following designations are mutually exclusive, i.e.
-    // it is not possible to be a Stratis device and also to appear unowned.
-    Ok(if is_stratis(device)? {
-        UdevOwnership::Stratis
-    } else if is_unclaimed(device) {
-        UdevOwnership::Unowned
-    } else {
-        UdevOwnership::Theirs
+        // We believe that the following designations are mutually exclusive, i.e.
+        // it is not possible to be a Stratis device and also to appear unowned.
+        Ok(if is_stratis(device)? {
+            UdevOwnership::Stratis
+        } else if is_unclaimed(device) {
+            UdevOwnership::Unowned
+        } else {
+            UdevOwnership::Theirs
+        })
+    }()
+    .map_err(|err| {
+        StratisError::Error(format!(
+            "Could not determine ownership of a device from a udev database entry: {}",
+            err
+        ))
     })
 }
 

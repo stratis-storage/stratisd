@@ -1,5 +1,4 @@
 os: linux
-group: edge
 
 addons:
     apt:

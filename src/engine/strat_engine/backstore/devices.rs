@@ -287,7 +287,6 @@ pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
 mod tests {
     use std::fs::OpenOptions;
 
-    use rand;
     use uuid::Uuid;
 
     use crate::engine::strat_engine::{
@@ -300,90 +299,6 @@ mod tests {
     };
 
     use super::*;
-
-    /// Verify that it is impossible to initialize a set of disks of which
-    /// even one of them has a signature.  Choose the dirty disk randomly.
-    fn test_fail_single_signature(paths: &[&Path]) {
-        assert!(paths.len() > 1);
-        let index = rand::random::<u8>() as usize % paths.len();
-
-        cmd::create_fs(paths[index], None).unwrap();
-        cmd::udev_settle().unwrap();
-
-        for (i, path) in paths.iter().enumerate() {
-            if i == index {
-                assert_matches!(
-                    block_device_apply(path, |d| decide_ownership(d))
-                        .unwrap()
-                        .unwrap()
-                        .unwrap(),
-                    UdevOwnership::Theirs
-                );
-            } else {
-                assert_matches!(
-                    block_device_apply(path, |d| decide_ownership(d))
-                        .unwrap()
-                        .unwrap()
-                        .unwrap(),
-                    UdevOwnership::Unowned
-                );
-            }
-        }
-
-        assert_matches!(process_devices(paths), Err(_));
-
-        let clean_paths = paths
-            .iter()
-            .enumerate()
-            .filter(|(n, _)| *n != index)
-            .map(|(_, v)| *v)
-            .collect::<Vec<&Path>>();
-
-        let devices = process_devices(&clean_paths).unwrap();
-        assert_eq!(devices.len(), clean_paths.len());
-
-        let pool_uuid = Uuid::new_v4();
-        assert_matches!(
-            initialize_devices(devices, pool_uuid, MDADataSize::default()),
-            Ok(_)
-        );
-
-        cmd::udev_settle().unwrap();
-
-        for path in clean_paths {
-            assert_eq!(
-                pool_uuid,
-                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
-                    .unwrap()
-                    .unwrap()
-                    .0
-            );
-        }
-    }
-
-    #[test]
-    pub fn loop_test_fail_single_signature() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_fail_single_signature,
-        );
-    }
-
-    #[test]
-    pub fn real_test_fail_single_signature() {
-        real::test_with_spec(
-            &real::DeviceLimits::AtLeast(2, None, None),
-            test_fail_single_signature,
-        );
-    }
-
-    #[test]
-    pub fn travis_test_fail_single_signature() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_fail_single_signature,
-        );
-    }
 
     /// Test that initialing devices claims all and that destroying
     /// them releases all.

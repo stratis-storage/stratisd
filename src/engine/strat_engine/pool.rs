@@ -517,7 +517,7 @@ mod tests {
 
     use crate::engine::{
         strat_engine::{
-            backstore::{find_all, get_metadata},
+            backstore::{find_all_block_devices_with_stratis_signatures, get_metadata},
             cmd, devlinks,
             tests::{loopbacked, real},
         },
@@ -537,6 +537,10 @@ mod tests {
     /// 4. Use get_metadata to find metadata for each pool and verify
     /// correctness.
     /// 5. Teardown the engine and repeat.
+    // This method uses the fallback method for finding all Stratis devices,
+    // since udev sometimes can not catch up to the changes made in this test
+    // in the time the test allows. The fallback method has the long name
+    // "find_all_block_devices_with_stratis_signatures".
     fn test_basic_metadata(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
@@ -555,7 +559,7 @@ mod tests {
         let metadata2 = pool2.record(name2);
 
         cmd::udev_settle().unwrap();
-        let pools = find_all().unwrap();
+        let pools = find_all_block_devices_with_stratis_signatures().unwrap();
         assert_eq!(pools.len(), 2);
         let devnodes1 = &pools[&uuid1];
         let devnodes2 = &pools[&uuid2];
@@ -568,7 +572,7 @@ mod tests {
         pool2.teardown().unwrap();
 
         cmd::udev_settle().unwrap();
-        let pools = find_all().unwrap();
+        let pools = find_all_block_devices_with_stratis_signatures().unwrap();
         assert_eq!(pools.len(), 2);
         let devnodes1 = &pools[&uuid1];
         let devnodes2 = &pools[&uuid2];
@@ -618,6 +622,10 @@ mod tests {
     /// Verify that teardown and setup of pool allows reading from filesystem
     /// written before cache was added. Check some basic facts about the
     /// metadata.
+    // This method uses the fallback method for finding all Stratis devices,
+    // since udev sometimes can not catch up to the changes made in this test
+    // in the time the test allows. The fallback method has the long name
+    // "find_all_block_devices_with_stratis_signatures".
     fn test_add_cachedevs(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
@@ -688,7 +696,8 @@ mod tests {
         pool.teardown().unwrap();
 
         cmd::udev_settle().unwrap();
-        let pools = find_all().unwrap();
+
+        let pools = find_all_block_devices_with_stratis_signatures().unwrap();
         assert_eq!(pools.len(), 1);
         let devices = &pools[&uuid];
 

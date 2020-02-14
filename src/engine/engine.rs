@@ -185,6 +185,9 @@ pub trait Pool: Debug {
 
     /// true if the pool has a cache, otherwise false
     fn has_cache(&self) -> bool;
+
+    /// Determine if the pool's data is encrypted
+    fn is_encrypted(&self) -> bool;
 }
 
 pub trait Engine: Debug {

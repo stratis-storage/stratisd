@@ -10,9 +10,9 @@ use dbus::{
 
 use crate::dbus_api::{pool::shared::get_pool_property, types::TData};
 
-pub fn get_pool_name(
+pub fn get_pool_encrypted(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(name, _, _)| Ok(name.to_owned()))
+    get_pool_property(i, p, |(_, _, pool)| Ok(pool.is_encrypted()))
 }

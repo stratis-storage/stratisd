@@ -2,7 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::tree::{MTFn, MethodInfo, Tree};
+use dbus::{
+    arg::IterAppend,
+    tree::{MTFn, MethodErr, MethodInfo, PropInfo, Tree},
+};
 
 use crate::{
     dbus_api::types::TData,
@@ -59,4 +62,22 @@ pub fn get_pool_total_used(m: &MethodInfo<MTFn<TData>, TData>) -> Result<String,
             .map_err(|e| e.to_string())
             .map(|size| (u128::from(*size) * devicemapper::SECTOR_SIZE as u128).to_string())
     })
+}
+
+/// Get a pool property and place it on the D-Bus. The property is
+/// found by means of the getter method which takes a reference to a
+/// Pool and obtains the property from the pool.
+pub fn get_pool_property<F, R>(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+    getter: F,
+) -> Result<(), MethodErr>
+where
+    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, String>,
+    R: dbus::arg::Append,
+{
+    i.append(
+        pool_operation(p.tree, p.path.get_name(), getter).map_err(|ref e| MethodErr::failed(e))?,
+    );
+    Ok(())
 }

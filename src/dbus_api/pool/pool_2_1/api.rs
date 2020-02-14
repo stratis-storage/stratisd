@@ -9,6 +9,6 @@ use crate::dbus_api::{consts, pool::pool_2_1::props::get_pool_encrypted, types::
 pub fn encrypted_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
     f.property::<bool, _>(consts::POOL_ENCRYPTED_PROP, ())
         .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::True)
+        .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_pool_encrypted)
 }

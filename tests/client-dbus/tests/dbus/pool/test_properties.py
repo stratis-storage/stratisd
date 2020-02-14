@@ -48,7 +48,7 @@ class SetNameTestCase(SimTestCase):
 
     def testProps(self):
         """
-        Test reading some filesystem properties.
+        Test reading some pool properties.
         """
         pool = get_object(self._pool_object_path)
         is_encrypted = PoolR1.Properties.Encrypted.Get(pool)

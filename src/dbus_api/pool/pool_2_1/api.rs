@@ -4,13 +4,7 @@
 
 use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, Property};
 
-use crate::dbus_api::{
-    consts,
-    pool::pool_2_1::{
-        props::get_pool_encrypted,
-    },
-    types::TData,
-};
+use crate::dbus_api::{consts, pool::pool_2_1::props::get_pool_encrypted, types::TData};
 
 pub fn encrypted_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
     f.property::<bool, _>(consts::POOL_ENCRYPTED_PROP, ())

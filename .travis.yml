@@ -1,4 +1,7 @@
 os: linux
+# use most recent available distro to support installation of crypsetup 2.2.0
+# or above with as little fuss as possible.
+dist: bionic
 
 addons:
     apt:
@@ -8,6 +11,14 @@ addons:
           - libdbus-glib-1-dev
 
 language: rust
+
+# Use a repository which supplies at least cryptesetup 2.2.0 which is required
+# by libcryptesetup-rs v0.1.0.
+before_install:
+  - sudo add-apt-repository -y "deb http://us.archive.ubuntu.com/ubuntu/ eoan main"
+  - sudo apt-get -q update
+  - sudo apt-get -y install libcryptsetup-dev
+
 
 matrix:
     fast_finish: true

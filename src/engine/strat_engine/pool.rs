@@ -501,6 +501,10 @@ impl Pool for StratPool {
     fn has_cache(&self) -> bool {
         self.backstore.has_cache()
     }
+
+    fn is_encrypted(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]

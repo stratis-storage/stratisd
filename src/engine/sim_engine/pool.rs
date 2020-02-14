@@ -305,6 +305,10 @@ impl Pool for SimPool {
     fn has_cache(&self) -> bool {
         !self.cache_devs.is_empty()
     }
+
+    fn is_encrypted(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]

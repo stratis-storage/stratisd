@@ -5,7 +5,6 @@
 use std::io::{Read, Seek};
 
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
 
 use crate::{
     engine::{
@@ -13,7 +12,7 @@ use crate::{
             backstore::metadata::{
                 mda,
                 sizes::{BDAExtendedSize, BlockdevSize, MDADataSize, STATIC_HEADER_SIZE},
-                static_header::{MetadataLocation, StaticHeader},
+                static_header::{MetadataLocation, StaticHeader, StratisIdentifiers},
             },
             device::SyncAll,
         },
@@ -32,8 +31,7 @@ impl BDA {
     /// Initialize a blockdev with a Stratis BDA.
     pub fn initialize<F>(
         f: &mut F,
-        pool_uuid: Uuid,
-        dev_uuid: Uuid,
+        identifiers: StratisIdentifiers,
         mda_data_size: MDADataSize,
         blkdev_size: BlockdevSize,
         initialization_time: u64,
@@ -42,8 +40,7 @@ impl BDA {
         F: Seek + SyncAll,
     {
         let header = StaticHeader::new(
-            pool_uuid,
-            dev_uuid,
+            identifiers,
             mda_data_size.region_size().mda_size(),
             blkdev_size,
             initialization_time,
@@ -111,12 +108,12 @@ impl BDA {
 
     /// The UUID of the device.
     pub fn dev_uuid(&self) -> DevUuid {
-        self.header.dev_uuid
+        self.header.identifiers.device_uuid
     }
 
     /// The UUID of the device's pool.
     pub fn pool_uuid(&self) -> PoolUuid {
-        self.header.pool_uuid
+        self.header.identifiers.pool_uuid
     }
 
     /// The size of the device.
@@ -163,8 +160,7 @@ mod tests {
             let mut buf = Cursor::new(vec![0; buf_size]);
             let bda = BDA::initialize(
                 &mut buf,
-                sh.pool_uuid,
-                sh.dev_uuid,
+                sh.identifiers,
                 sh.mda_size.region_size().data_size(),
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,
@@ -184,8 +180,7 @@ mod tests {
         let mut buf = Cursor::new(vec![0; *sh.blkdev_size.sectors().bytes() as usize]);
         let mut bda = BDA::initialize(
             &mut buf,
-            sh.pool_uuid,
-            sh.dev_uuid,
+            sh.identifiers,
             sh.mda_size.region_size().data_size(),
             sh.blkdev_size,
             Utc::now().timestamp() as u64,
@@ -229,8 +224,7 @@ mod tests {
             let mut buf = Cursor::new(vec![0; buf_size]);
             let mut bda = BDA::initialize(
                 &mut buf,
-                sh.pool_uuid,
-                sh.dev_uuid,
+                sh.identifiers,
                 sh.mda_size.region_size().data_size(),
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,

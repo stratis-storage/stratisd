@@ -829,7 +829,7 @@ mod tests {
                 device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
                     .unwrap()
                     .unwrap()
-                    .0
+                    .pool_uuid
             );
         }
 
@@ -850,7 +850,7 @@ mod tests {
                 device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
                     .unwrap()
                     .unwrap()
-                    .0
+                    .pool_uuid
             );
         }
 

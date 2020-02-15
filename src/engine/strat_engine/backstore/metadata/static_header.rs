@@ -40,14 +40,38 @@ pub enum MetadataLocation {
     Second,
 }
 
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub struct StratisIdentifiers {
+    pub pool_uuid: PoolUuid,
+    pub device_uuid: DevUuid,
+}
+
+impl StratisIdentifiers {
+    pub fn new(pool_uuid: PoolUuid, device_uuid: DevUuid) -> StratisIdentifiers {
+        StratisIdentifiers {
+            pool_uuid,
+            device_uuid,
+        }
+    }
+}
+
+impl fmt::Debug for StratisIdentifiers {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("StratisIdentifiers")
+            .field("pool_uuid", &self.pool_uuid.to_simple_ref())
+            .field("device_uuid", &self.device_uuid.to_simple_ref())
+            .finish()
+    }
+}
+
 /// Get a Stratis pool UUID and device UUID from any device.
 /// If there is an error while obtaining these values return the error.
 /// If the device does not appear to be a Stratis device, return None.
-pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<(PoolUuid, DevUuid)>>
+pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<StratisIdentifiers>>
 where
     F: Read + Seek + SyncAll,
 {
-    StaticHeader::setup(f).map(|sh| sh.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
+    StaticHeader::setup(f).map(|sh| sh.map(|sh| sh.identifiers))
 }
 
 /// Remove Stratis identifying information from device.
@@ -61,8 +85,7 @@ where
 #[derive(Eq, PartialEq)]
 pub struct StaticHeader {
     pub blkdev_size: BlockdevSize,
-    pub pool_uuid: PoolUuid,
-    pub dev_uuid: DevUuid,
+    pub identifiers: StratisIdentifiers,
     pub mda_size: MDASize,
     pub reserved_size: ReservedSize,
     pub flags: u64,
@@ -72,16 +95,14 @@ pub struct StaticHeader {
 
 impl StaticHeader {
     pub fn new(
-        pool_uuid: PoolUuid,
-        dev_uuid: DevUuid,
+        identifiers: StratisIdentifiers,
         mda_size: MDASize,
         blkdev_size: BlockdevSize,
         initialization_time: u64,
     ) -> StaticHeader {
         StaticHeader {
             blkdev_size,
-            pool_uuid,
-            dev_uuid,
+            identifiers,
             mda_size,
             reserved_size: ReservedSize::new(RESERVED_SECTORS),
             flags: 0,
@@ -312,8 +333,20 @@ impl StaticHeader {
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size.sectors());
         buf[28] = STRAT_SIGBLOCK_VERSION;
-        buf[32..64].clone_from_slice(self.pool_uuid.to_simple_ref().to_string().as_bytes());
-        buf[64..96].clone_from_slice(self.dev_uuid.to_simple_ref().to_string().as_bytes());
+        buf[32..64].clone_from_slice(
+            self.identifiers
+                .pool_uuid
+                .to_simple_ref()
+                .to_string()
+                .as_bytes(),
+        );
+        buf[64..96].clone_from_slice(
+            self.identifiers
+                .device_uuid
+                .to_simple_ref()
+                .to_string()
+                .as_bytes(),
+        );
         LittleEndian::write_u64(&mut buf[96..104], *self.mda_size.sectors());
         LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size.sectors());
         LittleEndian::write_u64(&mut buf[120..128], self.initialization_time);
@@ -360,8 +393,7 @@ impl StaticHeader {
         let mda_size = MDASize(Sectors(LittleEndian::read_u64(&buf[96..104])));
 
         Ok(Some(StaticHeader {
-            pool_uuid,
-            dev_uuid,
+            identifiers: StratisIdentifiers::new(pool_uuid, dev_uuid),
             blkdev_size,
             mda_size,
             reserved_size: ReservedSize::new(Sectors(LittleEndian::read_u64(&buf[104..112]))),
@@ -387,8 +419,7 @@ impl fmt::Debug for StaticHeader {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("StaticHeader")
             .field("blkdev_size", &self.blkdev_size)
-            .field("pool_uuid", &self.pool_uuid.to_simple_ref())
-            .field("dev_uuid", &self.dev_uuid.to_simple_ref())
+            .field("identifiers", &self.identifiers)
             .field("mda_size", &self.mda_size)
             .field("reserved_size", &self.reserved_size)
             .field("flags", &self.flags)
@@ -431,7 +462,7 @@ pub mod tests {
 
             prop_assert!(StaticHeader::setup(&mut buf)
                          .unwrap()
-                         .map(|new_sh| new_sh.pool_uuid == sh.pool_uuid && new_sh.dev_uuid == sh.dev_uuid)
+                         .map(|new_sh| new_sh.identifiers == sh.identifiers)
                          .unwrap_or(false));
 
             StaticHeader::wipe(&mut buf).unwrap();
@@ -451,8 +482,7 @@ pub mod tests {
         .mda_size();
         let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
         StaticHeader::new(
-            pool_uuid,
-            dev_uuid,
+            StratisIdentifiers::new(pool_uuid, dev_uuid),
             mda_size,
             BlockdevSize::new(blkdev_size),
             Utc::now().timestamp() as u64,
@@ -554,8 +584,7 @@ pub mod tests {
         fn static_header(ref sh1 in static_header_strategy()) {
             let buf = sh1.sigblock_to_buf();
             let sh2 = StaticHeader::sigblock_from_buf(&buf).unwrap().unwrap();
-            prop_assert_eq!(sh1.pool_uuid, sh2.pool_uuid);
-            prop_assert_eq!(sh1.dev_uuid, sh2.dev_uuid);
+            prop_assert_eq!(sh1.identifiers, sh2.identifiers);
             prop_assert_eq!(sh1.blkdev_size, sh2.blkdev_size);
             prop_assert_eq!(sh1.mda_size, sh2.mda_size);
             prop_assert_eq!(sh1.reserved_size, sh2.reserved_size);
@@ -572,15 +601,8 @@ pub mod tests {
         let sh = random_static_header(10000, 4);
 
         let ts = Utc::now().timestamp() as u64;
-        let sh_older =
-            StaticHeader::new(sh.pool_uuid, sh.dev_uuid, sh.mda_size, sh.blkdev_size, ts);
-        let sh_newer = StaticHeader::new(
-            sh.pool_uuid,
-            sh.dev_uuid,
-            sh.mda_size,
-            sh.blkdev_size,
-            ts + 1,
-        );
+        let sh_older = StaticHeader::new(sh.identifiers, sh.mda_size, sh.blkdev_size, ts);
+        let sh_newer = StaticHeader::new(sh.identifiers, sh.mda_size, sh.blkdev_size, ts + 1);
         assert_ne!(sh_older, sh_newer);
 
         let buf_size = bytes!(static_header_size::STATIC_HEADER_SECTORS);

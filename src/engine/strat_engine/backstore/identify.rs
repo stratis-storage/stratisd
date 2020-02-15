@@ -16,10 +16,10 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::backstore::{
-        metadata::device_identifiers,
+        metadata::{device_identifiers, StratisIdentifiers},
         udev::{block_enumerator, decide_ownership, UdevOwnership},
     },
-    types::{DevUuid, PoolUuid},
+    types::PoolUuid,
 };
 
 // A wrapper for obtaining the device number as a devicemapper Device
@@ -41,7 +41,7 @@ fn device_to_devno_wrapper(device: &libudev::Device) -> Result<Device, String> {
 // the device.
 fn device_identifiers_wrapper(
     devnode: &Path,
-) -> Result<Result<Option<(PoolUuid, DevUuid)>, String>, String> {
+) -> Result<Result<Option<StratisIdentifiers>, String>, String> {
     OpenOptions::new()
         .read(true)
         .open(devnode)
@@ -65,7 +65,7 @@ fn device_identifiers_wrapper(
 }
 
 /// Process a device which udev information indicates is a Stratis device.
-fn process_stratis_device(dev: &libudev::Device) -> Option<(PoolUuid, DevUuid, Device, PathBuf)> {
+fn process_stratis_device(dev: &libudev::Device) -> Option<(StratisIdentifiers, Device, PathBuf)> {
     match dev.devnode() {
         Some(devnode) => {
             match (
@@ -83,8 +83,8 @@ fn process_stratis_device(dev: &libudev::Device) -> Option<(PoolUuid, DevUuid, D
                           devnode.display());
                     None
                 }
-                (Ok(devno), Ok(Ok(Some((pool_uuid, device_uuid))))) => {
-                    Some((pool_uuid, device_uuid, devno, devnode.to_path_buf()))
+                (Ok(devno), Ok(Ok(Some(identifiers)))) => {
+                    Some((identifiers, devno, devnode.to_path_buf()))
                 }
             }
         }
@@ -96,7 +96,7 @@ fn process_stratis_device(dev: &libudev::Device) -> Option<(PoolUuid, DevUuid, D
 }
 
 /// Process a device which udev information indicates is unowned.
-fn process_unowned_device(dev: &libudev::Device) -> Option<(PoolUuid, DevUuid, Device, PathBuf)> {
+fn process_unowned_device(dev: &libudev::Device) -> Option<(StratisIdentifiers, Device, PathBuf)> {
     match dev.devnode() {
         Some(devnode) => {
             match (
@@ -121,8 +121,8 @@ fn process_unowned_device(dev: &libudev::Device) -> Option<(PoolUuid, DevUuid, D
                     None
                 }
                 (_, Ok(Ok(None))) => None,
-                (Ok(devno), Ok(Ok(Some((pool_uuid, device_uuid))))) => {
-                    Some((pool_uuid, device_uuid, devno, devnode.to_path_buf()))
+                (Ok(devno), Ok(Ok(Some(identifiers)))) => {
+                    Some((identifiers, devno, devnode.to_path_buf()))
                 }
             }
         }
@@ -143,15 +143,12 @@ pub fn find_all_block_devices_with_stratis_signatures(
     let pool_map = enumerator
         .scan_devices()?
         .filter_map(|dev| identify_block_device(&dev))
-        .fold(
-            HashMap::new(),
-            |mut acc, (pool_uuid, _, device, devnode)| {
-                acc.entry(pool_uuid)
-                    .or_insert_with(HashMap::new)
-                    .insert(device, devnode);
-                acc
-            },
-        );
+        .fold(HashMap::new(), |mut acc, (identifiers, device, devnode)| {
+            acc.entry(identifiers.pool_uuid)
+                .or_insert_with(HashMap::new)
+                .insert(device, devnode);
+            acc
+        });
 
     Ok(pool_map)
 }
@@ -165,22 +162,19 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Devic
     let pool_map = enumerator
         .scan_devices()?
         .filter_map(|dev| identify_stratis_device(&dev))
-        .fold(
-            HashMap::new(),
-            |mut acc, (pool_uuid, _, device, devnode)| {
-                acc.entry(pool_uuid)
-                    .or_insert_with(HashMap::new)
-                    .insert(device, devnode);
-                acc
-            },
-        );
+        .fold(HashMap::new(), |mut acc, (identifiers, device, devnode)| {
+            acc.entry(identifiers.pool_uuid)
+                .or_insert_with(HashMap::new)
+                .insert(device, devnode);
+            acc
+        });
     Ok(pool_map)
 }
 
 // Identify a device that udev enumeration has already picked up as a Stratis
 // device. Return None if the device does not, after all, appear to be a Stratis
 // device. Log anything unusual at an appropriate level.
-fn identify_stratis_device(dev: &libudev::Device) -> Option<(PoolUuid, DevUuid, Device, PathBuf)> {
+fn identify_stratis_device(dev: &libudev::Device) -> Option<(StratisIdentifiers, Device, PathBuf)> {
     let initialized = dev.is_initialized();
     if !initialized {
         warn!("Found a udev entry for a device identified as a Stratis device, but udev also identified it as uninitialized, disregarding the device");
@@ -209,7 +203,7 @@ fn identify_stratis_device(dev: &libudev::Device) -> Option<(PoolUuid, DevUuid, 
 /// appear to be a Stratis device. Log at an appropriate level on all errors.
 pub fn identify_block_device(
     dev: &libudev::Device,
-) -> Option<(PoolUuid, DevUuid, Device, PathBuf)> {
+) -> Option<(StratisIdentifiers, Device, PathBuf)> {
     let initialized = dev.is_initialized();
     if !initialized {
         debug!("Found a udev entry for a device identified as a block device, but udev also identified it as uninitialized, disregarding the device");

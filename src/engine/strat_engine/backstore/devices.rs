@@ -21,12 +21,15 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                metadata::{device_identifiers, disown_device, BlockdevSize, MDADataSize, BDA},
+                metadata::{
+                    device_identifiers, disown_device, BlockdevSize, MDADataSize,
+                    StratisIdentifiers, BDA,
+                },
                 udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
             },
             device::blkdev_size,
         },
-        types::{DevUuid, PoolUuid},
+        types::PoolUuid,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -102,7 +105,7 @@ fn dev_info(
 ) -> StratisResult<(
     Option<StratisResult<String>>,
     Bytes,
-    Option<(PoolUuid, DevUuid)>,
+    Option<StratisIdentifiers>,
     Device,
 )> {
     let (ownership, devnum, hw_id) = udev_info(devnode)?;
@@ -180,7 +183,7 @@ pub struct DeviceInfo {
     pub size: Bytes,
     /// The device identifiers obtained from the Stratis metadata. If None,
     /// the device has been determined to be unowned.
-    pub stratis_identifiers: Option<(PoolUuid, DevUuid)>,
+    pub stratis_identifiers: Option<StratisIdentifiers>,
 }
 
 /// Process a list of devices specified as device nodes. Return a vector
@@ -218,8 +221,7 @@ pub fn initialize_devices(
         let mut f = OpenOptions::new().write(true).open(&dev_info.devnode)?;
         let bda = BDA::initialize(
             &mut f,
-            pool_uuid,
-            Uuid::new_v4(),
+            StratisIdentifiers::new(pool_uuid, Uuid::new_v4()),
             mda_data_size,
             BlockdevSize::new(dev_info.size.sectors()),
             Utc::now().timestamp() as u64,
@@ -319,7 +321,7 @@ mod tests {
                 device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
                     .unwrap()
                     .unwrap()
-                    .0
+                    .pool_uuid
             );
         }
 
@@ -383,7 +385,10 @@ mod tests {
                     .write(true)
                     .open(path)
                     .unwrap();
-                assert_eq!(device_identifiers(&mut f).unwrap().unwrap().0, uuid1);
+                assert_eq!(
+                    device_identifiers(&mut f).unwrap().unwrap().pool_uuid,
+                    uuid1
+                );
             }
         }
 
@@ -416,7 +421,10 @@ mod tests {
                     .write(true)
                     .open(path)
                     .unwrap();
-                assert_eq!(device_identifiers(&mut f).unwrap().unwrap().0, uuid2);
+                assert_eq!(
+                    device_identifiers(&mut f).unwrap().unwrap().pool_uuid,
+                    uuid2
+                );
             }
         }
 

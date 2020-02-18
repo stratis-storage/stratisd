@@ -72,7 +72,7 @@ class AddDataDevsTestCase(SimTestCase):
         )
 
         self.assertFalse(is_some)
-        self.assertEqual(rc, StratisdErrors.ERROR)
+        self.assertEqual(rc, StratisdErrors.OK)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         blockdevs2 = blockdevs(props={"Pool": pool}).search(managed_objects)

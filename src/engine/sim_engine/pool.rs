@@ -113,10 +113,14 @@ impl Pool for SimPool {
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         if paths.is_empty() {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                "At least one blockdev path is required to add blockdevs".to_string(),
-            ));
+            return if self.has_cache() && tier == BlockDevTier::Cache {
+                Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    "At least one blockdev path is required to add blockdevs".to_string(),
+                ))
+            } else {
+                Ok(SetCreateAction::new(vec![]))
+            };
         }
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
 

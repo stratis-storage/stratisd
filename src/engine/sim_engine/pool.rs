@@ -116,7 +116,7 @@ impl Pool for SimPool {
             return if !self.has_cache() && tier == BlockDevTier::Cache {
                 Err(StratisError::Engine(
                     ErrorEnum::Invalid,
-                    "At least one blockdev path is required to add blockdevs".to_string(),
+                    "At least one blockdev path is required to initialize a cache.".to_string(),
                 ))
             } else {
                 Ok(SetCreateAction::new(vec![]))

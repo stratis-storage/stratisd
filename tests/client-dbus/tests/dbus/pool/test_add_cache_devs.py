@@ -111,5 +111,5 @@ class AddCacheDevsTestCase1(SimTestCase):
         self.assertEqual(len(list(blockdevs3)), num_devices_added)
 
         # There must be datadevs belonging to this pool as it was created
-        blockdevs4 = blockdevs(props={"Pool": pool, "Tier": 0}).search(managed_objects)
+        blockdevs4 = blockdevs(props={"Pool": pool, "Tier": BlockDevTiers.Data}).search(managed_objects)
         self.assertEqual(len(list(blockdevs4)), len(self._data_devices))

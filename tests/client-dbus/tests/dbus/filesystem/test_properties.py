@@ -24,7 +24,7 @@ from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import SimTestCase, device_name_list
 
-_DEVICE_STRATEGY = device_name_list()
+_DEVICE_STRATEGY = device_name_list(1)
 
 
 class SetNameTestCase(SimTestCase):

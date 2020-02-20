@@ -164,19 +164,19 @@ impl StratEngine {
     /// If a new pool is created as a result of the processing, return
     /// the newly created pool and its UUID, otherwise return None.
     fn block_evaluate(&mut self, device: &libudev::Device) -> Option<(PoolUuid, &mut dyn Pool)> {
-        identify_block_device(device).and_then(move |(pool_uuid, _, device, dev_node)| {
-            if self.pools.contains_uuid(pool_uuid) {
+        identify_block_device(device).and_then(move |(identifiers, device, dev_node)| {
+            if self.pools.contains_uuid(identifiers.pool_uuid) {
                 None
             } else {
                 let mut devices = self
                     .incomplete_pools
-                    .remove(&pool_uuid)
+                    .remove(&identifiers.pool_uuid)
                     .unwrap_or_else(HashMap::new);
                 devices.insert(device, dev_node);
-                self.try_setup_pool(pool_uuid, devices);
+                self.try_setup_pool(identifiers.pool_uuid, devices);
                 self.pools
-                    .get_mut_by_uuid(pool_uuid)
-                    .map(|(_, pool)| (pool_uuid, pool as &mut dyn Pool))
+                    .get_mut_by_uuid(identifiers.pool_uuid)
+                    .map(|(_, pool)| (identifiers.pool_uuid, pool as &mut dyn Pool))
             }
         })
     }

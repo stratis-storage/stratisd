@@ -22,7 +22,7 @@ use crate::{
             backstore::{
                 blockdev::StratBlockDev,
                 devices::{initialize_devices, process_devices, wipe_blockdevs, DeviceInfo},
-                metadata::MDADataSize,
+                metadata::{MDADataSize, StratisIdentifiers},
             },
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
@@ -144,10 +144,10 @@ fn check_device_ids(
     let stratis_identifiers: HashMap<PoolUuid, HashSet<DevUuid>> = devices
         .iter()
         .filter_map(|info| info.stratis_identifiers)
-        .fold(HashMap::new(), |mut acc, (pool_uuid, dev_uuid)| {
-            acc.entry(pool_uuid)
+        .fold(HashMap::new(), |mut acc, identifiers| {
+            acc.entry(identifiers.pool_uuid)
                 .or_insert_with(HashSet::new)
-                .insert(dev_uuid);
+                .insert(identifiers.device_uuid);
             acc
         });
 
@@ -163,7 +163,7 @@ fn check_device_ids(
                     .iter()
                     .filter(|info| match info.stratis_identifiers {
                         None => false,
-                        Some((pool_uuid, _)) => devs.contains(&pool_uuid),
+                        Some(StratisIdentifiers { pool_uuid, .. }) => devs.contains(&pool_uuid),
                     })
                     .map(|info| info.devnode.display().to_string())
                     .collect::<Vec<_>>()
@@ -193,7 +193,9 @@ fn check_device_ids(
                 .iter()
                 .filter(|info| match info.stratis_identifiers {
                     None => false,
-                    Some((pool_uuid, _)) => invalid_uuids.contains(&&pool_uuid),
+                    Some(StratisIdentifiers { pool_uuid, .. }) => {
+                        invalid_uuids.contains(&&pool_uuid)
+                    }
                 })
                 .map(|info| info.devnode.display().to_string())
                 .collect::<Vec<_>>()

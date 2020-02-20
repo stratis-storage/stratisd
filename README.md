@@ -70,7 +70,8 @@ tests without running any of them, as a convenience to developers.
 The rust library dbus-rs has an external dependency on the C dbus library
 [dbus development library](https://www.freedesktop.org/wiki/Software/dbus/).
 Please check with your distributions package manager to locate the needed
-package.
+package (e.g. `libdbus-1-dev` for Debian-based, `dbus-devel` for Fedora RPM-based
+Linux distributions).
 
 The files needed to build dbus-rs include, but are not limited to:
 
@@ -82,7 +83,7 @@ The files needed to build dbus-rs include, but are not limited to:
 
 Also, the rust library libudev-sys has a dependency on the C libudev library.
 Please check with your distributions package manager to locate the needed
-package (e.g libudev-dev for Debian-based, systemd-devel for Fedora RPM-based
+package (e.g. `libudev-dev` for Debian-based, `systemd-devel` for Fedora RPM-based
 Linux distributions).
 
 At least, you need to include:

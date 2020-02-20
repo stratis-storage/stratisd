@@ -124,16 +124,6 @@ fn dev_info(
             );
             Err(StratisError::Engine(ErrorEnum::Invalid, err_str))
         }
-        // FIXME: Note that the additional information that is gathered is
-        // the same for Stratis and Unowned designations.
-        // It may be the case the libblkid is running with an older version
-        // than 2.32. In that case, Stratis information will not be in the
-        // udev database and it will come up as unowned.
-        // Also, note that we would like to verify twice that the device is
-        // really unowned by checking the device further with libblkid,
-        // but we are not in that position yet. If either of these things
-        // changes, behavior suitable for a Stratis designation and behavior
-        // suitable for an Unowned designation will diverge.
         UdevOwnership::Stratis | UdevOwnership::Unowned => {
             let mut f = OpenOptions::new().read(true).write(true).open(&devnode)?;
             let dev_size = blkdev_size(&f)?;
@@ -146,6 +136,14 @@ fn dev_info(
                 return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
             };
 
+            // FIXME: Read device identifiers from either an Unowned or a
+            // Stratis device. For a Stratis device, this is the correct thing
+            // to do. For an unowned device, this is the best available check
+            // that we currently have to prevent overwriting a device which
+            // is owned, but which udev has not identified as such. In future,
+            // we hope to use libblkid in order to double check that the
+            // device is truly unowned, not just for Stratis but also for
+            // other potential owners.
             let stratis_identifiers = device_identifiers(&mut f).map_err(|err| {
                 let error_message = format!(
                     "There was an error reading Stratis metadata from device {}; the device is unsuitable for initialization: {}",

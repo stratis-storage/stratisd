@@ -117,7 +117,13 @@ impl Pool for SimPool {
                 "Use of a cache is not supported with an encrypted pool".to_string(),
             ));
         }
-        if self.cache_devs.is_empty() {
+        if !self.has_cache() {
+            if blockdevs.is_empty() {
+                return Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    "At least one blockdev path is required to initialize a cache.".to_string(),
+                ));
+            }
             let blockdev_pairs: Vec<_> = blockdevs
                 .iter()
                 .map(|p| {
@@ -168,12 +174,16 @@ impl Pool for SimPool {
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         if paths.is_empty() {
+            // Pool must be initialized with data devices so only check
+            // if the cache has been initialized.
             return if !self.has_cache() && tier == BlockDevTier::Cache {
                 Err(StratisError::Engine(
                     ErrorEnum::Invalid,
-                    "At least one blockdev path is required to initialize a cache.".to_string(),
+                    "The cache has not been initialized; you must use init_cache first to initialize the cache.".to_string(),
                 ))
             } else {
+                // If the cache has been initialized or we are adding zero blockdevs,
+                // treat adding no new blockdevs as the empty set.
                 Ok(SetCreateAction::new(vec![]))
             };
         }

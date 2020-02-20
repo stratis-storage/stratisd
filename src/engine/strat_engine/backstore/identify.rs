@@ -248,9 +248,7 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
     if pool_map.is_empty() {
         // No Stratis devices have been found, possible reasons are:
         // 1. There are none
-        // 2. There are some but libblkid version is less than 2.32, so
-        // Stratis devices are not recognized by udev.
-        // 3. There are many incomplete udev entries, because this code is
+        // 2. There are many incomplete udev entries, because this code is
         // being run before the udev database is populated.
         //
         // Try again to find Stratis block devices, but this time enumerate

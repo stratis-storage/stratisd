@@ -43,10 +43,10 @@ matrix:
 
         # MANDATORY TESTING USING LOWEST SUPPORTED COMPILER
         - name: "run Rust unit tests on lowest supported toolchain"
-          rust: 1.40.0
+          rust: 1.41.0
           env: TASK=test
         - name: "build release on lowest supported toolchain"
-          rust: 1.40.0
+          rust: 1.41.0
           env: TASK=release
 
 

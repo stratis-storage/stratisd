@@ -5,9 +5,9 @@
 use dbus::{
     self,
     arg::{ArgType, Iter, IterAppend, RefArg, Variant},
-    stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged,
+    ffidisp::{stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged, Connection},
+    message::SignalArgs,
     tree::{MTFn, MethodErr, PropInfo},
-    Connection, SignalArgs,
 };
 
 use devicemapper::DmError;

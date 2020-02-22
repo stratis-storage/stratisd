@@ -6,8 +6,8 @@ use std::{cell::RefCell, rc::Rc, vec::Vec};
 
 use dbus::{
     self,
+    ffidisp::{BusType, Connection, ConnectionItem, NameFlag, WatchEvent},
     tree::{MTFn, Tree},
-    BusType, Connection, ConnectionItem, NameFlag,
 };
 use libc;
 
@@ -89,7 +89,7 @@ impl DbusConnectionData {
             let items: Vec<ConnectionItem> = self
                 .connection
                 .borrow()
-                .watch_handle(pfd.fd, dbus::WatchEvent::from_revents(pfd.revents))
+                .watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents))
                 .collect();
 
             for item in items {

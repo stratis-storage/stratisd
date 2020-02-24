@@ -38,6 +38,9 @@ pub fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     info!("preparing to create pool {}", name);
     let result = engine.create_pool(name, &blockdevs, tuple_to_option(redundancy));
+    if let Ok(ref test_uuid) = result {
+        info!("pool created: uuid {}", test_uuid);
+    }
 
     let return_message = message.method_return();
 

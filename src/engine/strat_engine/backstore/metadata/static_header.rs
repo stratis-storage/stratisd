@@ -121,6 +121,7 @@ impl StaticHeader {
     /// will not fail.
     fn read<F>(
         f: &mut F,
+        index: usize,
     ) -> (
         io::Result<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>,
         io::Result<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>,
@@ -130,7 +131,6 @@ impl StaticHeader {
     {
         let mut buf_loc_1 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
         let mut buf_loc_2 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
-
         fn read_sector_at_offset<F>(
             f: &mut F,
             index: usize,
@@ -140,21 +140,22 @@ impl StaticHeader {
         where
             F: Read + Seek,
         {
-            f.seek(SeekFrom::Start((index + offset) as u64))
+            let start_index: usize = index + offset;
+            f.seek(SeekFrom::Start(start_index as u64))
                 .and_then(|_| f.read_exact(&mut buf))
         }
 
         (
             read_sector_at_offset(
                 f,
-                bytes!(0usize),
+                bytes!(index),
                 bytes!(static_header_size::FIRST_SIGBLOCK_START_SECTORS),
                 &mut buf_loc_1,
             )
             .map(|_| buf_loc_1),
             read_sector_at_offset(
                 f,
-                bytes!(0usize),
+                bytes!(index),
                 bytes!(static_header_size::SECOND_SIGBLOCK_START_SECTORS),
                 &mut buf_loc_2,
             )
@@ -281,7 +282,7 @@ impl StaticHeader {
             Ok(Some(sh))
         }
 
-        let (maybe_buf_1, maybe_buf_2) = StaticHeader::read(f);
+        let (maybe_buf_1, maybe_buf_2) = StaticHeader::read(f, 0usize);
         match (
             maybe_buf_1.map(|buf| StaticHeader::sigblock_from_buf(&buf)),
             maybe_buf_2.map(|buf| StaticHeader::sigblock_from_buf(&buf)),

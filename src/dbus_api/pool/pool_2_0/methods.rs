@@ -285,11 +285,11 @@ pub fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let msg = match dbus_context
-        .engine
-        .borrow_mut()
-        .rename_pool(pool_uuid, new_name)
-    {
+    let mut engine = dbus_context.engine.borrow_mut();
+
+    let result = pool_op_logging!("preparing to rename pool with name {}, UUID {}", new_name, pool_uuid.to_simple_ref(); engine.rename_pool(pool_uuid, new_name); "pool with name {}", new_name);
+
+    let msg = match result {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", pool_uuid);
             let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);

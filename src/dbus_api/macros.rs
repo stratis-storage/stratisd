@@ -84,3 +84,17 @@ macro_rules! properties_footer {
         }
     };
 }
+
+macro_rules! pool_op_logging {
+    ($pre_oper:tt $(, $pre_args:expr)*; $engine_op:expr $(; $post_oper:tt $(, $post_args:expr)*)?) => {{
+        info!($pre_oper, $($pre_args),*);
+        let result = $engine_op;
+        match result {
+            Ok(ref action) => info!(concat!($($post_oper, ", ",)? "{}"), $($($post_args,)*)? action),
+            Err(ref err) => {
+                warn!("pool operation failed with error: {}", err);
+            }
+        }
+        result
+    }};
+}

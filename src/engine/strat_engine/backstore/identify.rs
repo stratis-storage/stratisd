@@ -43,7 +43,7 @@
 //! find_all_block_devices_with_stratis_signatures method.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::OpenOptions,
     path::{Path, PathBuf},
 };
@@ -212,6 +212,54 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Devic
     Ok(pool_map)
 }
 
+/// Get the physical device path from the logical activated decrypted device.
+// Note: We expect that this will involve libcryptsetup examining the block
+// device in order to identify whether it is a device with a relationship
+// to an underlying device crypt device.
+// Note: This should probably go in the not-yet-created crypt module, since
+// it is a generic sort of discovery about a device.
+fn logical_path_to_physical_path(_path: &Path) -> Option<PathBuf> {
+    None
+}
+
+/// Find all encrypted devices belonging to Stratis which are not open.
+/// Determine whether or not a device is open by determining if it belongs
+/// to the set of open devices which have already been identified as Stratis
+/// devices and are in available_stratis_devices.
+///
+/// Return an error only on an error to properly initialize a libudev scan.
+///
+/// Log all other errors at the appropriate level.
+///
+/// Note: Due to the unreliability of libudev this set may contain paths
+/// to some opened luks2 devices.
+fn find_all_closed_encrypted_stratis_devices(
+    available_stratis_devices: &HashSet<PathBuf>,
+) -> libudev::Result<HashSet<PathBuf>> {
+    let context = libudev::Context::new()?;
+
+    let opened_encrypted_stratis_devices = available_stratis_devices
+        .iter()
+        .filter_map(|path| logical_path_to_physical_path(path.as_path()))
+        .collect::<HashSet<_>>();
+
+    let mut enumerator = block_enumerator(&context)?;
+    enumerator.match_property("ID_FS_TYPE", "crypto_LUKS")?;
+
+    let encrypted_devices: Vec<_> = enumerator.scan_devices()?.collect();
+
+    let closed_encrypted_device_map = encrypted_devices
+        .iter()
+        .filter_map(|dev| identify_encrypted_device(dev))
+        .fold(HashSet::new(), |mut acc, phy_path| {
+            if !opened_encrypted_stratis_devices.contains(&phy_path) {
+                acc.insert(phy_path);
+            }
+            acc
+        });
+    Ok(closed_encrypted_device_map)
+}
+
 // Identify a device that udev enumeration has already picked up as a Stratis
 // device. Return None if the device does not, after all, appear to be a Stratis
 // device. Log anything unusual at an appropriate level.
@@ -284,9 +332,16 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
     })
 }
 
-/// Retrieve all block devices that should be made use of by the
-/// Stratis engine. This excludes Stratis block devices that appear to be
-/// multipath members.
+/// Identify an encrypted Stratis device in the context where libudev has
+/// identified the device as a luks2 device. Return None if the device appears
+/// to be an encrypted device that does not actually belong to Stratis.
+/// Log all errors at the appropriate level.
+fn identify_encrypted_device(_dev: &libudev::Device) -> Option<PathBuf> {
+    None
+}
+
+/// Retrieve all block devices identified as Stratis block devices.
+/// This excludes Stratis block devices that appear to be multipath members.
 ///
 /// Includes a fallback path, which is used if no Stratis block devices are
 /// found using the obvious udev property- and enumerator-based approach.
@@ -299,9 +354,33 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
 /// enumerator.
 ///
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
-pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
+fn find_all_stratis_devices_with_fallback(
+) -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     info!("Beginning initial search for Stratis block devices");
     find_all_stratis_devices()
+}
+
+/// Retrieve all block devices that should be made use of by the
+/// Stratis engine. This excludes Stratis block devices that appear to be
+/// multipath members.
+///
+/// Returns a map of pool uuids to a map of devices to devnodes for each pool.
+pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
+    let pool_map = find_all_stratis_devices_with_fallback()?;
+
+    let visible_stratis_devices: HashSet<_> = pool_map
+        .values()
+        .map(|map| map.values().cloned())
+        .flatten()
+        .collect();
+
+    let _closed_encrypted_paths =
+        find_all_closed_encrypted_stratis_devices(&visible_stratis_devices)?;
+
+    // Here we unlock those that are closed, keeping in mind that some of those
+    // "closed devices" could be open.
+
+    find_all_stratis_devices_with_fallback()
 }
 
 #[cfg(test)]

@@ -36,6 +36,7 @@ pub fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
     let mut engine = dbus_context.engine.borrow_mut();
+    info!("preparing to create pool {}", name);
     let result = engine.create_pool(name, &blockdevs, tuple_to_option(redundancy));
 
     let return_message = message.method_return();
@@ -99,6 +100,8 @@ pub fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             )]);
         }
     };
+
+    info!("preparing to destroy pool {}", pool_uuid);
 
     let msg = match dbus_context.engine.borrow_mut().destroy_pool(pool_uuid) {
         Ok(DeleteAction::Deleted(uuid)) => {

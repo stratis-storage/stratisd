@@ -84,3 +84,14 @@ macro_rules! properties_footer {
         }
     };
 }
+
+macro_rules! pre_pool_op {
+    ($oper:tt, $arg:ident; $postoper:tt $(, $args:ident)*; $engine_op:expr) => {{
+        info!($oper, $arg);
+        let result = $engine_op;
+        if let Ok(ref test_uuid) = result {
+            info!($postoper, $($args,)* test_uuid);
+        }
+        result
+    }};
+}

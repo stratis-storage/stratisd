@@ -175,11 +175,11 @@ dependencies = [
 
 [[package]]
 name = "dbus"
-version = "0.6.4"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "libc 0.2.66 (registry+https://github.com/rust-lang/crates.io-index)",
- "libdbus-sys 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libdbus-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -344,7 +344,7 @@ dependencies = [
 
 [[package]]
 name = "libdbus-sys"
-version = "0.1.5"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -377,7 +377,7 @@ dependencies = [
  "chrono 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.29.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "crc 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "dbus 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "dbus 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "devicemapper 0.28.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "either 1.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.5.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -995,7 +995,7 @@ dependencies = [
 "checksum cloudabi 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 "checksum crc 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bc1914fae6f18ae347320f0ba5e4fc270e17c037ea621fe41ec7e8adf67d11b0"
 "checksum dbghelp-sys 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "97590ba53bcb8ac28279161ca943a924d1fd4a8fb3fa63302591647c4fc5b850"
-"checksum dbus 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)" = "b9e1b39f3f6aa3d4a1522c4f0f9f1e9e9167bd93740a8690874caa7cf8ce47d7"
+"checksum dbus 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2fd043051adb767dd40f869e6034c8ea4d3a0a719e78d4058f705a8038649059"
 "checksum devicemapper 0.28.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b4a417275b3c8275cf39af619cd5d52d719f511a87b0262b7b40c4480ba5bccc"
 "checksum dtoa 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "80c8b71fd71146990a9742fc06dcbbde19161a267e0ad4e572c35162f4578c90"
 "checksum either 1.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
@@ -1017,7 +1017,7 @@ dependencies = [
 "checksum libc 0.2.66 (registry+https://github.com/rust-lang/crates.io-index)" = "d515b1f41455adea1313a4a2ac8a8a477634fbae63cc6100e3aebb207ce61558"
 "checksum libcryptsetup-rs 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d7240305fe3dba8dc266d799a38bcf6ec96fb59fbc89bacb2f10e58865db0a14"
 "checksum libcryptsetup-rs-sys 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "aa648c2d1359d2e22cb3482e517383cbdfa2141f9f994dc9f0a08396903ad936"
-"checksum libdbus-sys 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "18cb88963258d00f4962205dbb5933d82780d9962c8c8a064b651d2ad7189210"
+"checksum libdbus-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "dc12a3bc971424edbbf7edaf6e5740483444db63aa8e23d3751ff12a30f306f0"
 "checksum libloading 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f2b111a074963af1d37a139918ac6d49ad1d0d5e47f72fd55388619691a7d753"
 "checksum libmount 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)" = "fb5543ddc79983a086a52c23a857bd7d9965be2c25a779e0dbc0739b0871e0c2"
 "checksum libudev 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ea626d3bdf40a1c5aee3bcd4f40826970cae8d80a8fec934c82a63840094dcfe"

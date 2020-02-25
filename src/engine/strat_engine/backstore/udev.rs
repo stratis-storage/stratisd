@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! udev-related methods
-use std::{ffi::OsStr, path::Path};
+use std::{ffi::OsStr, fmt, path::Path};
 
 use libudev;
 
@@ -26,7 +26,7 @@ pub fn get_udev_property<T: AsRef<OsStr>>(
     property_name: T,
 ) -> Option<StratisResult<String>>
 where
-    T: std::fmt::Display,
+    T: fmt::Display,
 {
     device.property_value(&property_name).map(|value| {
         value
@@ -73,13 +73,36 @@ fn is_stratis(device: &libudev::Device) -> StratisResult<bool> {
     }
 }
 
+/// Return true if the device is identified by udev as being an encrypted
+/// LUKS device. Return an error if a udev property could not be converted.
+fn is_luks(device: &libudev::Device) -> StratisResult<bool> {
+    match get_udev_property(device, "ID_FS_TYPE") {
+        None => Ok(false),
+        Some(Ok(value)) => Ok(value == "crypto_LUKS"),
+        Some(Err(err)) => Err(err),
+    }
+}
+
 /// An enum to encode udev classification of a device
 #[derive(Debug, Eq, PartialEq)]
 pub enum UdevOwnership {
+    Luks,
     MultipathMember,
     Stratis,
     Theirs,
     Unowned,
+}
+
+impl fmt::Display for UdevOwnership {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            UdevOwnership::Luks => write!(f, "LUKS encrypted block device"),
+            UdevOwnership::MultipathMember => write!(f, "member of a multipath block device"),
+            UdevOwnership::Stratis => write!(f, "Stratis block device"),
+            UdevOwnership::Theirs => write!(f, "block device which appears to be owned"),
+            UdevOwnership::Unowned => write!(f, "block device which appears to be unowned"),
+        }
+    }
 }
 
 /// Decide the ownership of a device based on udev information.
@@ -105,6 +128,8 @@ pub fn decide_ownership(device: &libudev::Device) -> StratisResult<UdevOwnership
         // it is not possible to be a Stratis device and also to appear unowned.
         Ok(if is_stratis(device)? {
             UdevOwnership::Stratis
+        } else if is_luks(device)? {
+            UdevOwnership::Luks
         } else if is_unclaimed(device) {
             UdevOwnership::Unowned
         } else {

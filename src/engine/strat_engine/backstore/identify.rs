@@ -22,6 +22,10 @@ use crate::engine::{
     types::PoolUuid,
 };
 
+// A miscellaneous group of identifiers found when identifiying a Stratis
+// device.
+pub type StratisInfo = (StratisIdentifiers, Device, PathBuf);
+
 // A wrapper for obtaining the device number as a devicemapper Device
 // which interprets absence of the value as an error, which it is in this
 // context.
@@ -65,7 +69,7 @@ fn device_identifiers_wrapper(
 }
 
 /// Process a device which udev information indicates is a Stratis device.
-fn process_stratis_device(dev: &libudev::Device) -> Option<(StratisIdentifiers, Device, PathBuf)> {
+fn process_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
     match dev.devnode() {
         Some(devnode) => {
             match (
@@ -96,7 +100,7 @@ fn process_stratis_device(dev: &libudev::Device) -> Option<(StratisIdentifiers, 
 }
 
 /// Process a device which udev information indicates is unowned.
-fn process_unowned_device(dev: &libudev::Device) -> Option<(StratisIdentifiers, Device, PathBuf)> {
+fn process_unowned_device(dev: &libudev::Device) -> Option<StratisInfo> {
     match dev.devnode() {
         Some(devnode) => {
             match (
@@ -174,7 +178,7 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Devic
 // Identify a device that udev enumeration has already picked up as a Stratis
 // device. Return None if the device does not, after all, appear to be a Stratis
 // device. Log anything unusual at an appropriate level.
-fn identify_stratis_device(dev: &libudev::Device) -> Option<(StratisIdentifiers, Device, PathBuf)> {
+fn identify_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
     let initialized = dev.is_initialized();
     if !initialized {
         warn!("Found a udev entry for a device identified as a Stratis device, but udev also identified it as uninitialized, disregarding the device");
@@ -202,9 +206,7 @@ fn identify_stratis_device(dev: &libudev::Device) -> Option<(StratisIdentifiers,
 /// Identify a block device in the context where a udev event has been
 /// captured for some block device. Return None if the device does not
 /// appear to be a Stratis device. Log at an appropriate level on all errors.
-pub fn identify_block_device(
-    dev: &libudev::Device,
-) -> Option<(StratisIdentifiers, Device, PathBuf)> {
+pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
     let initialized = dev.is_initialized();
     if !initialized {
         debug!("Found a udev entry for a device identified as a block device, but udev also identified it as uninitialized, disregarding the device");

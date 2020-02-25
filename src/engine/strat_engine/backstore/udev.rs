@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! udev-related methods
-use std::{ffi::OsStr, path::Path};
+use std::{ffi::OsStr, fmt, path::Path};
 
 use libudev;
 
@@ -26,7 +26,7 @@ pub fn get_udev_property<T: AsRef<OsStr>>(
     property_name: T,
 ) -> Option<StratisResult<String>>
 where
-    T: std::fmt::Display,
+    T: fmt::Display,
 {
     device.property_value(&property_name).map(|value| {
         value
@@ -91,6 +91,18 @@ pub enum UdevOwnership {
     Stratis,
     Theirs,
     Unowned,
+}
+
+impl fmt::Display for UdevOwnership {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            UdevOwnership::Luks => write!(f, "LUKS encrypted block device"),
+            UdevOwnership::MultipathMember => write!(f, "member of a multipath block device"),
+            UdevOwnership::Stratis => write!(f, "Stratis block device"),
+            UdevOwnership::Theirs => write!(f, "block device which appears to be owned"),
+            UdevOwnership::Unowned => write!(f, "block device which appears to be unowned"),
+        }
+    }
 }
 
 /// Decide the ownership of a device based on udev information.

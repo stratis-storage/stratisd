@@ -110,24 +110,11 @@ fn dev_info(
 )> {
     let (ownership, devnum, hw_id) = udev_info(devnode)?;
     match ownership {
-        UdevOwnership::MultipathMember => {
+        UdevOwnership::Luks | UdevOwnership::MultipathMember | UdevOwnership::Theirs => {
             let err_str = format!(
-                "udev information indicates that device {} is a multipath member device",
+                "udev information indicates that device {} is a {}",
                 devnode.display(),
-            );
-            Err(StratisError::Engine(ErrorEnum::Invalid, err_str))
-        }
-        UdevOwnership::Luks => {
-            let err_str = format!(
-                "udev information indicates that device {} is a LUKS encrypted device",
-                devnode.display(),
-            );
-            Err(StratisError::Engine(ErrorEnum::Invalid, err_str))
-        }
-        UdevOwnership::Theirs => {
-            let err_str = format!(
-                "udev information indicates that device {} is not unowned",
-                devnode.display(),
+                ownership
             );
             Err(StratisError::Engine(ErrorEnum::Invalid, err_str))
         }

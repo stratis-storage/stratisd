@@ -300,6 +300,8 @@ fn identify_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
 /// Identify a block device in the context where a udev event has been
 /// captured for some block device. Return None if the device does not
 /// appear to be a Stratis device. Log at an appropriate level on all errors.
+/// This method does not attempt any action on LUKS devices, instead ignoring
+/// them.
 pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
     let initialized = dev.is_initialized();
     if !initialized {

@@ -19,7 +19,9 @@ use crate::{
         event::get_engine_listener_list,
         shared::create_pool_idempotent_or_err,
         strat_engine::{
-            backstore::{find_all, get_metadata, identify_block_device},
+            backstore::{
+                find_all, get_metadata, identify_possibly_encrypted_block_device, Identification,
+            },
             cmd::verify_binaries,
             devlinks,
             dm::{get_dm, get_dm_init},
@@ -167,40 +169,49 @@ impl StratEngine {
     /// If a new pool is created as a result of the processing, return
     /// the newly created pool and its UUID, otherwise return None.
     fn block_evaluate(&mut self, device: &libudev::Device) -> Option<(PoolUuid, &mut dyn Pool)> {
-        identify_block_device(device).and_then(move |(identifiers, device, dev_node)| {
-            let pool_uuid = identifiers.pool_uuid;
-            if self.pools.contains_uuid(pool_uuid) {
-                None
-            } else {
-                let mut devices = self
-                    .incomplete_pools
-                    .remove(&pool_uuid)
-                    .unwrap_or_else(HashMap::new);
-
-                if devices.insert(device, dev_node).is_none() {
-                    info!(
-                        "Stratis block device with device number \"{}\", pool UUID \"{}\", and device UUID \"{}\" discovered, i.e., identified for the first time during this execution of stratisd",
-                        device,
-                        identifiers.pool_uuid.to_simple_ref(),
-                        identifiers.device_uuid.to_simple_ref(),
-                    );
-                }
-
-                // FIXME: An attempt to set up the pool is made, even if no
-                // new device has been added to the set of devices that appear
-                // to belong to the pool. The reason for this is that there
-                // may be many causes of failure to set up a pool, and that
-                // it may be worth another try. If an attempt to setup the
-                // pool is only made on discovery of a new device that may
-                // leave a pool that could be set up in limbo forever. An
-                // alternative, where the user can explicitly ask to try to
-                // set up an incomplete pool would be a better choice.
-                self.try_setup_pool(pool_uuid, devices);
-
-                self.pools
-                    .get_mut_by_uuid(pool_uuid)
-                    .map(|(_, pool)| (pool_uuid, pool as &mut dyn Pool))
+        identify_possibly_encrypted_block_device(device).and_then(|identification| {
+            match identification {
+                // Verify that the device should be opened and open it if so.
+                // It should not be opened if it can be proved that it already
+                // has been opened. In that case it should return None.
+                Identification::Luks2WithStratis(_dev_node) => unimplemented!(),
+                Identification::Stratis(stratis_info) => Some(stratis_info),
             }
+            .and_then(move |(identifiers, device, dev_node)| {
+                let pool_uuid = identifiers.pool_uuid;
+                if self.pools.contains_uuid(pool_uuid) {
+                    None
+                } else {
+                    let mut devices = self
+                        .incomplete_pools
+                        .remove(&pool_uuid)
+                        .unwrap_or_else(HashMap::new);
+
+                    if devices.insert(device, dev_node).is_none() {
+                        info!(
+                            "Stratis block device with device number \"{}\", pool UUID \"{}\", and device UUID \"{}\" discovered, i.e., identified for the first time during this execution of stratisd",
+                            device,
+                            identifiers.pool_uuid.to_simple_ref(),
+                            identifiers.device_uuid.to_simple_ref(),
+                        );
+                    }
+
+                    // FIXME: An attempt to set up the pool is made, even if no
+                    // new device has been added to the set of devices that appear
+                    // to belong to the pool. The reason for this is that there
+                    // may be many causes of failure to set up a pool, and that
+                    // it may be worth another try. If an attempt to setup the
+                    // pool is only made on discovery of a new device that may
+                    // leave a pool that could be set up in limbo forever. An
+                    // alternative, where the user can explicitly ask to try to
+                    // set up an incomplete pool would be a better choice.
+                    self.try_setup_pool(pool_uuid, devices);
+
+                    self.pools
+                        .get_mut_by_uuid(pool_uuid)
+                        .map(|(_, pool)| (pool_uuid, pool as &mut dyn Pool))
+                }
+            })
         })
     }
 }

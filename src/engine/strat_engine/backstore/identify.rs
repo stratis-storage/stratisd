@@ -304,6 +304,40 @@ fn identify_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
     })
 }
 
+/// Possible identifications when processing a single device.
+pub enum Identification {
+    /// A Stratis device
+    Stratis(StratisInfo),
+    /// A LUKS2 device containing an encrypted Stratis device
+    Luks2WithStratis(PathBuf),
+}
+
+/// Identify a block device in the context where a udev event has been
+/// captured for some block device.
+pub fn identify_possibly_encrypted_block_device(dev: &libudev::Device) -> Option<Identification> {
+    let initialized = dev.is_initialized();
+    if !initialized {
+        warn!("Found a udev entry for a block device, but udev also identified it as uninitialized, disregarding the device");
+        return None;
+    };
+
+    match decide_ownership(dev) {
+        Err(err) => {
+            warn!(
+                "Could not determine ownership of a udev block device, disregarding the device: {}",
+                err
+            );
+            None
+        }
+        Ok(ownership) => match ownership {
+            UdevOwnership::Luks => process_luks_device(dev).map(Identification::Luks2WithStratis),
+            UdevOwnership::Stratis => process_stratis_device(dev).map(Identification::Stratis),
+            UdevOwnership::Unowned => process_unowned_device(dev).map(Identification::Stratis),
+            _ => None,
+        },
+    }
+}
+
 /// Identify a block device in the context where a udev event has been
 /// captured for some block device. Return None if the device does not
 /// appear to be a Stratis device. Log at an appropriate level on all errors.

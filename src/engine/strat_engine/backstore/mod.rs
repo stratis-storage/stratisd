@@ -20,7 +20,7 @@ mod udev;
 pub use self::{
     backstore::Backstore,
     blockdev::StratBlockDev,
-    identify::{find_all, identify_block_device},
+    identify::{find_all, identify_possibly_encrypted_block_device, Identification, StratisInfo},
     metadata::MDADataSize,
     setup::get_metadata,
 };

@@ -73,9 +73,20 @@ fn is_stratis(device: &libudev::Device) -> StratisResult<bool> {
     }
 }
 
+/// Return true if the device is identified by udev as being an encrypted
+/// LUKS device. Return an error if a udev property could not be converted.
+fn is_luks(device: &libudev::Device) -> StratisResult<bool> {
+    match get_udev_property(device, "ID_FS_TYPE") {
+        None => Ok(false),
+        Some(Ok(value)) => Ok(value == "crypto_LUKS"),
+        Some(Err(err)) => Err(err),
+    }
+}
+
 /// An enum to encode udev classification of a device
 #[derive(Debug, Eq, PartialEq)]
 pub enum UdevOwnership {
+    Luks,
     MultipathMember,
     Stratis,
     Theirs,
@@ -105,6 +116,8 @@ pub fn decide_ownership(device: &libudev::Device) -> StratisResult<UdevOwnership
         // it is not possible to be a Stratis device and also to appear unowned.
         Ok(if is_stratis(device)? {
             UdevOwnership::Stratis
+        } else if is_luks(device)? {
+            UdevOwnership::Luks
         } else if is_unclaimed(device) {
             UdevOwnership::Unowned
         } else {

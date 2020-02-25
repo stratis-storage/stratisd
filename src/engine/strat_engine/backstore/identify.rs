@@ -191,7 +191,8 @@ fn identify_stratis_device(dev: &libudev::Device) -> Option<(StratisIdentifiers,
             UdevOwnership::Stratis => process_stratis_device(dev),
             UdevOwnership::MultipathMember => None,
             _ => {
-                warn!("udev enumeration identified this device as a Stratis block device but on further examination it appears not to belong to Stratis");
+                warn!("udev enumeration identified this device as a Stratis block device but on further examination udev identifies it as a {}",
+                      ownership);
                 None
             }
         },

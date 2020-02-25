@@ -117,6 +117,13 @@ fn dev_info(
             );
             Err(StratisError::Engine(ErrorEnum::Invalid, err_str))
         }
+        UdevOwnership::Luks => {
+            let err_str = format!(
+                "udev information indicates that device {} is a LUKS encrypted device",
+                devnode.display(),
+            );
+            Err(StratisError::Engine(ErrorEnum::Invalid, err_str))
+        }
         UdevOwnership::Theirs => {
             let err_str = format!(
                 "udev information indicates that device {} is not unowned",

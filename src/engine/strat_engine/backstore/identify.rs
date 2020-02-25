@@ -173,6 +173,13 @@ fn process_unowned_device(dev: &libudev::Device) -> Option<StratisInfo> {
     }
 }
 
+// Process a device which udev information indicates is a LUKS device.
+// FIXME: Use libcryptsetup here to determine whether the device is Stratis
+// on LUKS2. Do not attempt any action on the device.
+fn process_luks_device(_dev: &libudev::Device) -> Option<PathBuf> {
+    None
+}
+
 // Use udev to identify all block devices and return the subset of those
 // that have Stratis signatures.
 #[cfg(test)]
@@ -338,8 +345,30 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
 /// identified the device as a luks2 device. Return None if the device appears
 /// to be an encrypted device that does not actually belong to Stratis.
 /// Log all errors at the appropriate level.
-fn identify_encrypted_device(_dev: &libudev::Device) -> Option<PathBuf> {
-    None
+fn identify_encrypted_device(dev: &libudev::Device) -> Option<PathBuf> {
+    let initialized = dev.is_initialized();
+    if !initialized {
+        debug!("Found a udev entry for a device identified as a LUKS encrypted block device, but udev also identified it as uninitialized, disregarding the device");
+        return None;
+    };
+
+    match decide_ownership(dev) {
+        Err(err) => {
+            warn!(
+                "Could not determine ownership of a udev block device, disregarding the device: {}",
+                err
+            );
+            None
+        }
+        Ok(ownership) => match ownership {
+            UdevOwnership::Luks => process_luks_device(dev),
+            _ => {
+                warn!("udev enumeration identified this device as a LUKS encrypted block device but on further examination udev identifies it as a {}",
+                      ownership);
+                None
+            }
+        },
+    }
 }
 
 /// Retrieve all block devices identified as Stratis block devices.

@@ -175,6 +175,7 @@ fn process_unowned_device(dev: &libudev::Device) -> Option<StratisInfo> {
 
 // Use udev to identify all block devices and return the subset of those
 // that have Stratis signatures.
+#[cfg(test)]
 pub fn find_all_block_devices_with_stratis_signatures(
 ) -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     let context = libudev::Context::new()?;
@@ -282,26 +283,7 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
 pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     info!("Beginning initial search for Stratis block devices");
-    let pool_map = find_all_stratis_devices()?;
-
-    if pool_map.is_empty() {
-        // No Stratis devices have been found, possible reasons are:
-        // 1. There are none
-        // 2. There are many incomplete udev entries, because this code is
-        // being run before the udev database is populated.
-        //
-        // Try again to find Stratis block devices, but this time enumerate
-        // all block devices, not just all the ones that can be identified
-        // as Stratis blockdevs by udev, and process only those that appear
-        // unclaimed or appear to be claimed by Stratis (and not
-        // multipath members).
-
-        info!("Could not identify any Stratis devices by a udev search for devices with ID_FS_TYPE=\"stratis\"; using fallback search mechanism");
-
-        find_all_block_devices_with_stratis_signatures()
-    } else {
-        Ok(pool_map)
-    }
+    find_all_stratis_devices()
 }
 
 #[cfg(test)]

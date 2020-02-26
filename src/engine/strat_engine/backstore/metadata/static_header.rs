@@ -71,7 +71,7 @@ pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<StratisIdentifie
 where
     F: Read + Seek + SyncAll,
 {
-    StaticHeader::setup(f).map(|sh| sh.map(|sh| sh.identifiers))
+    StaticHeader::setup(f, 0usize).map(|sh| sh.map(|sh| sh.identifiers))
 }
 
 /// Remove Stratis identifying information from device.
@@ -216,7 +216,7 @@ impl StaticHeader {
     /// Return an error if the sigblocks differ in some unaccountable way.
     /// Returns an error if a write intended to repair an ill-formed,
     /// unreadable, or stale signature block failed.
-    pub fn setup<F>(f: &mut F) -> StratisResult<Option<StaticHeader>>
+    pub fn setup<F>(f: &mut F, index: usize) -> StratisResult<Option<StaticHeader>>
     where
         F: Read + Seek + SyncAll,
     {
@@ -282,7 +282,7 @@ impl StaticHeader {
             Ok(Some(sh))
         }
 
-        let (maybe_buf_1, maybe_buf_2) = StaticHeader::read(f, 0usize);
+        let (maybe_buf_1, maybe_buf_2) = StaticHeader::read(f, index);
         match (
             maybe_buf_1.map(|buf| StaticHeader::sigblock_from_buf(&buf)),
             maybe_buf_2.map(|buf| StaticHeader::sigblock_from_buf(&buf)),
@@ -464,17 +464,17 @@ pub mod tests {
         fn test_ownership(ref sh in static_header_strategy()) {
             let buf_size = bytes!(static_header_size::STATIC_HEADER_SECTORS);
             let mut buf = Cursor::new(vec![0; buf_size]);
-            prop_assert!(StaticHeader::setup(&mut buf).unwrap().is_none());
+            prop_assert!(StaticHeader::setup(&mut buf, 0usize).unwrap().is_none());
 
             sh.write(&mut buf, MetadataLocation::Both).unwrap();
 
-            prop_assert!(StaticHeader::setup(&mut buf)
+            prop_assert!(StaticHeader::setup(&mut buf, 0usize)
                          .unwrap()
                          .map(|new_sh| new_sh.identifiers == sh.identifiers)
                          .unwrap_or(false));
 
             StaticHeader::wipe(&mut buf).unwrap();
-            prop_assert!(StaticHeader::setup(&mut buf).unwrap().is_none());
+            prop_assert!(StaticHeader::setup(&mut buf, 0usize).unwrap().is_none());
         }
     }
 
@@ -554,7 +554,7 @@ pub mod tests {
                 .unwrap();
             }
 
-            let setup_result = StaticHeader::setup(&mut buf);
+            let setup_result = StaticHeader::setup(&mut buf, 0usize);
 
             match (primary, secondary) {
                 (Some(p_index), Some(s_index)) => {
@@ -636,7 +636,7 @@ pub mod tests {
             sh_newer.write(&mut buf, newer_location).unwrap();
             assert_ne!(buf.get_ref(), reference_buf.get_ref());
             assert_eq!(
-                StaticHeader::setup(&mut buf).unwrap().as_ref(),
+                StaticHeader::setup(&mut buf, 0usize).unwrap().as_ref(),
                 Some(sh_newer)
             );
             assert_eq!(buf.get_ref(), reference_buf.get_ref());

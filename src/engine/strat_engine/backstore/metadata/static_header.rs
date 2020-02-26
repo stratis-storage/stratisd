@@ -131,11 +131,7 @@ impl StaticHeader {
     {
         let mut buf_loc_1 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
         let mut buf_loc_2 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
-        fn read_sector_at_offset<F>(
-            f: &mut F,
-            offset: usize,
-            mut buf: &mut [u8],
-        ) -> io::Result<()>
+        fn read_sector_at_offset<F>(f: &mut F, offset: usize, mut buf: &mut [u8]) -> io::Result<()>
         where
             F: Read + Seek,
         {
@@ -163,13 +159,13 @@ impl StaticHeader {
     // If first location is specified, write zeroes to empty regions in the
     // first 8 sectors. If the second location is specified, writes zeroes to empty
     // regions in the second 8 sectors.
-    pub fn write<F>(&self, f: &mut F, which: MetadataLocation) -> io::Result<()>
+    pub fn write<F>(&self, f: &mut F, index: usize, which: MetadataLocation) -> io::Result<()>
     where
         F: Seek + SyncAll,
     {
         let signature_block = self.sigblock_to_buf();
         let zeroed = [0u8; bytes!(static_header_size::POST_SIGBLOCK_PADDING_SECTORS)];
-        f.seek(SeekFrom::Start(0))?;
+        f.seek(SeekFrom::Start(index as u64))?;
 
         // Write to a static header region in the static header.
         fn write_region<F>(f: &mut F, signature_block: &[u8], zeroed: &[u8]) -> io::Result<()>
@@ -187,7 +183,7 @@ impl StaticHeader {
             write_region(f, &signature_block, &zeroed)?;
         } else {
             f.seek(SeekFrom::Start(
-                bytes!(static_header_size::SIGBLOCK_REGION_SECTORS) as u64,
+                (index + bytes!(static_header_size::SIGBLOCK_REGION_SECTORS)) as u64,
             ))?;
         }
 
@@ -225,6 +221,7 @@ impl StaticHeader {
         // In all other cases, return the error associated with the invalid sigblock.
         fn ok_err_static_header_handling<F>(
             f: &mut F,
+            index: usize,
             maybe_sh: Option<StaticHeader>,
             sh_error: StratisError,
             repair_location: MetadataLocation,
@@ -233,7 +230,7 @@ impl StaticHeader {
             F: Read + Seek + SyncAll,
         {
             if let Some(sh) = maybe_sh {
-                write_header(f, sh, repair_location)
+                write_header(f, index, sh, repair_location)
             } else {
                 Err(sh_error)
             }
@@ -249,6 +246,7 @@ impl StaticHeader {
         //   reading the sigblock.
         fn copy_ok_err_handling<F>(
             f: &mut F,
+            index: usize,
             maybe_sh: StratisResult<Option<StaticHeader>>,
             repair_location: MetadataLocation,
         ) -> StratisResult<Option<StaticHeader>>
@@ -258,7 +256,7 @@ impl StaticHeader {
             match maybe_sh {
                 Ok(loc) => {
                     if let Some(ref sh) = loc {
-                        sh.write(f, repair_location)?;
+                        sh.write(f, index, repair_location)?;
                     }
                     Ok(loc)
                 }
@@ -268,13 +266,14 @@ impl StaticHeader {
 
         fn write_header<F>(
             f: &mut F,
+            index: usize,
             sh: StaticHeader,
             repair_location: MetadataLocation,
         ) -> StratisResult<Option<StaticHeader>>
         where
             F: Read + Seek + SyncAll,
         {
-            sh.write(f, repair_location)?;
+            sh.write(f, index, repair_location)?;
             Ok(Some(sh))
         }
 
@@ -297,22 +296,22 @@ impl StaticHeader {
                         } else if loc_1.initialization_time > loc_2.initialization_time {
                             // If the first header block is newer, overwrite second with
                             // contents of first.
-                            write_header(f, loc_1, MetadataLocation::Second)
+                            write_header(f, index, loc_1, MetadataLocation::Second)
                         } else {
                             // The second header block must be newer, so overwrite first
                             // with contents of second.
-                            write_header(f, loc_2, MetadataLocation::First)
+                            write_header(f, index, loc_2, MetadataLocation::First)
                         }
                     }
                     (None, None) => Ok(None),
-                    (Some(loc_1), None) => write_header(f, loc_1, MetadataLocation::Second),
-                    (None, Some(loc_2)) => write_header(f, loc_2, MetadataLocation::First),
+                    (Some(loc_1), None) => write_header(f, index, loc_1, MetadataLocation::Second),
+                    (None, Some(loc_2)) => write_header(f, index, loc_2, MetadataLocation::First),
                 },
                 (Ok(loc_1), Err(loc_2)) => {
-                    ok_err_static_header_handling(f, loc_1, loc_2, MetadataLocation::Second)
+                    ok_err_static_header_handling(f, index, loc_1, loc_2, MetadataLocation::Second)
                 }
                 (Err(loc_1), Ok(loc_2)) => {
-                    ok_err_static_header_handling(f, loc_2, loc_1, MetadataLocation::First)
+                    ok_err_static_header_handling(f, index, loc_2, loc_1, MetadataLocation::First)
                 }
                 (Err(_), Err(_)) => {
                     let err_str = "Appeared to be a Stratis device, but no valid sigblock found";
@@ -320,9 +319,13 @@ impl StaticHeader {
                 }
             },
             // Copy 1 read OK, 2 resulted in an IO error
-            (Ok(buf_loc_1), Err(_)) => copy_ok_err_handling(f, buf_loc_1, MetadataLocation::Second),
+            (Ok(buf_loc_1), Err(_)) => {
+                copy_ok_err_handling(f, index, buf_loc_1, MetadataLocation::Second)
+            }
             // Copy 2 read OK, 1 resulted in IO Error
-            (Err(_), Ok(buf_loc_2)) => copy_ok_err_handling(f, buf_loc_2, MetadataLocation::First),
+            (Err(_), Ok(buf_loc_2)) => {
+                copy_ok_err_handling(f, index, buf_loc_2, MetadataLocation::First)
+            }
             (Err(_), Err(_)) => {
                 // Unable to read the device at all.
                 let err_str = "Unable to read data at sigblock locations.";

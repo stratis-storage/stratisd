@@ -267,3 +267,145 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
         Ok(pool_map)
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use uuid::Uuid;
+
+    use crate::engine::strat_engine::{
+        backstore::{
+            devices::{initialize_devices, process_devices},
+            metadata::MDADataSize,
+            udev::block_device_apply,
+        },
+        cmd::create_fs,
+        tests::{loopbacked, real},
+    };
+
+    use super::*;
+
+    /// Test that the process_*_device methods return the expected
+    /// pool UUID and device node for initialized paths.
+    fn test_process_device_initialized(paths: &[&Path]) {
+        assert!(!paths.is_empty());
+
+        let pool_uuid = Uuid::new_v4();
+
+        initialize_devices(
+            process_devices(paths).unwrap(),
+            pool_uuid,
+            MDADataSize::default(),
+        )
+        .unwrap();
+
+        for path in paths {
+            let (identifiers, _, dev_node) =
+                block_device_apply(path, |dev| process_stratis_device(dev))
+                    .unwrap()
+                    .unwrap()
+                    .unwrap();
+            assert_eq!(identifiers.pool_uuid, pool_uuid);
+            assert_eq!(&&dev_node, path);
+
+            let (identifiers, _, dev_node) =
+                block_device_apply(path, |dev| process_unowned_device(dev))
+                    .unwrap()
+                    .unwrap()
+                    .unwrap();
+            assert_eq!(identifiers.pool_uuid, pool_uuid);
+            assert_eq!(&&dev_node, path);
+        }
+    }
+
+    #[test]
+    pub fn loop_test_process_device_initialized() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_process_device_initialized,
+        );
+    }
+
+    #[test]
+    pub fn real_test_process_device_initialized() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(1, None, None),
+            test_process_device_initialized,
+        );
+    }
+
+    #[test]
+    pub fn travis_test_process_device_initialized() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_process_device_initialized,
+        );
+    }
+
+    /// Test that the process_*_device methods return None if the device is
+    /// not a Stratis device. Strictly speaking, the methods are only supposed
+    /// to be called in particular contexts, the situation where the device
+    /// is claimed by a filesystem should be excluded by udev, which should
+    /// identify the device as Theirs. But the methods should return the
+    /// correct result in this situation, regardless, although their log
+    /// messages will not precisely match their actual situation, but rather
+    /// their expected context.
+    fn test_process_device_uninitialized(paths: &[&Path]) {
+        assert!(!paths.is_empty());
+
+        for path in paths {
+            assert_eq!(
+                block_device_apply(path, |dev| process_stratis_device(dev))
+                    .unwrap()
+                    .unwrap(),
+                None
+            );
+            assert_eq!(
+                block_device_apply(path, |dev| process_unowned_device(dev))
+                    .unwrap()
+                    .unwrap(),
+                None
+            );
+        }
+
+        for path in paths {
+            create_fs(path, None).unwrap();
+            assert_eq!(
+                block_device_apply(path, |dev| process_stratis_device(dev))
+                    .unwrap()
+                    .unwrap(),
+                None
+            );
+            assert_eq!(
+                block_device_apply(path, |dev| process_unowned_device(dev))
+                    .unwrap()
+                    .unwrap(),
+                None
+            );
+        }
+    }
+
+    #[test]
+    pub fn loop_test_process_device_uninitialized() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_process_device_uninitialized,
+        );
+    }
+
+    #[test]
+    pub fn real_test_process_device_uninitialized() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(1, None, None),
+            test_process_device_uninitialized,
+        );
+    }
+
+    #[test]
+    pub fn travis_test_process_device_uninitialized() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_process_device_uninitialized,
+        );
+    }
+}

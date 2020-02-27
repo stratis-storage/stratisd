@@ -44,7 +44,8 @@ pub trait Filesystem: Debug {
 }
 
 pub trait BlockDev: Debug {
-    /// Get the path of the device node for this device.
+    /// Get the path of the device node for writing Stratis metadata to this
+    /// device.
     fn devnode(&self) -> PathBuf;
 
     /// Get the user-settable string associated with this blockdev.
@@ -65,6 +66,9 @@ pub trait BlockDev: Debug {
 
     /// Get dbus path associated with the BlockDev.
     fn get_dbus_path(&self) -> &MaybeDbusPath;
+
+    /// Get the status of whether a block device is encrypted or not.
+    fn is_encrypted(&self) -> bool;
 }
 
 pub trait Pool: Debug {

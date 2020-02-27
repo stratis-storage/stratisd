@@ -18,7 +18,7 @@ use devicemapper::{Device, Sectors};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{blockdev::StratBlockDev, metadata::BDA},
+            backstore::{blockdev::StratBlockDev, metadata::BDA, shared::BlockDevPath},
             device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
@@ -208,11 +208,12 @@ pub fn get_blockdevs(
             tier,
             StratBlockDev::new(
                 device,
-                devnode.to_owned(),
+                BlockDevPath::Unencrypted(devnode.to_owned()),
                 bda,
                 segments.unwrap_or(&vec![]),
                 bd_save.user_info.clone(),
                 bd_save.hardware_info.clone(),
+                None,
             )?,
         ))
     }

@@ -4,7 +4,10 @@
 
 // Code to handle a single block device.
 
-use std::{fs::OpenOptions, path::PathBuf};
+use std::{
+    fs::OpenOptions,
+    path::{Path, PathBuf},
+};
 
 use chrono::{DateTime, TimeZone, Utc};
 
@@ -15,36 +18,42 @@ use crate::{
         engine::BlockDev,
         strat_engine::{
             backstore::{
+                crypt::CryptHandle,
                 metadata::{disown_device, BDAExtendedSize, MDADataSize, BDA},
                 range_alloc::RangeAllocator,
+                shared::BlockDevPath,
             },
             serde_structs::{BaseBlockDevSave, Recordable},
         },
         types::{DevUuid, MaybeDbusPath},
     },
-    stratis::StratisResult,
+    stratis::{StratisError, StratisResult},
 };
 
 #[derive(Debug)]
 pub struct StratBlockDev {
     dev: Device,
-    devnode: PathBuf,
+    devnode: BlockDevPath,
     bda: BDA,
     used: RangeAllocator,
     user_info: Option<String>,
     hardware_info: Option<String>,
     dbus_path: MaybeDbusPath,
+    key_description: Option<String>,
 }
 
 impl StratBlockDev {
     /// Make a new BlockDev from the parameters.
     /// Allocate space for the Stratis metadata on the device.
     /// - dev: the device, identified by number
-    /// - devnode: the device node
+    /// - devnode: for encrypted devices, the logical and physical
+    ///            paths; for unencrypted devices, the physical path
     /// - bda: the device's BDA
     /// - other_segments: segments claimed for non-Stratis metadata use
     /// - user_info: user settable identifying information
     /// - hardware_info: identifying information in the hardware
+    /// - key_description: optional argument enabling encryption using
+    ///                    the specified key in the kernel keyring
     /// Returns an error if it is impossible to allocate all segments on the
     /// device.
     /// NOTE: It is possible that the actual device size is greater than
@@ -54,11 +63,12 @@ impl StratBlockDev {
     /// reported on the D-Bus.
     pub fn new(
         dev: Device,
-        devnode: PathBuf,
+        devnode: BlockDevPath,
         bda: BDA,
         upper_segments: &[(Sectors, Sectors)],
         user_info: Option<String>,
         hardware_info: Option<String>,
+        key_description: Option<String>,
     ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(upper_segments);
@@ -72,6 +82,7 @@ impl StratBlockDev {
             user_info,
             hardware_info,
             dbus_path: MaybeDbusPath(None),
+            key_description,
         })
     }
 
@@ -80,13 +91,52 @@ impl StratBlockDev {
         &self.dev
     }
 
+    /// Return the path to the physical device on which data is stored either
+    /// encrypted or unencrypted.
+    pub fn physical_path(&self) -> &Path {
+        self.devnode.physical_path()
+    }
+
     /// Remove information that identifies this device as belonging to Stratis
+    ///
+    /// If self.is_encrypted() is true, destroy all keyslots and wipe the LUKS2 header.
+    /// This will render all Stratis and LUKS2 metadata unreadable and unrecoverable
+    /// from the given device.
+    ///
+    /// If self.is_encrypted() is false, wipe the Stratis metadata on the device.
+    /// This will make the Stratis data and metadata invisible to all standard blkid
+    /// and stratisd operations.
+    ///
+    /// Precondition: if self.is_encrypted() == true, the data on
+    ///               self.devnode.physical_path() has been encrypted with
+    ///               aes-xts-plain64 encryption.
     pub fn disown(&self) -> StratisResult<()> {
-        disown_device(&mut OpenOptions::new().write(true).open(&self.devnode)?)
+        if !self.is_encrypted() {
+            disown_device(
+                &mut OpenOptions::new()
+                    .write(true)
+                    .open(self.devnode.metadata_path())?,
+            )?;
+            Ok(())
+        } else if let Some(ref mut handle) = CryptHandle::setup(self.devnode.physical_path())? {
+            handle.wipe()?;
+            Ok(())
+        } else {
+            warn!(
+                "Device {} was determined to not be a Stratis device; cannot \
+                disown a device that does not belong to Stratis.",
+                self.devnode.physical_path().display()
+            );
+            Err(StratisError::Error(
+                "Device requested to be disowned did not belong to Stratis".to_string(),
+            ))
+        }
     }
 
     pub fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> StratisResult<()> {
-        let mut f = OpenOptions::new().write(true).open(&self.devnode)?;
+        let mut f = OpenOptions::new()
+            .write(true)
+            .open(self.devnode.metadata_path())?;
         self.bda.save_state(time, metadata, &mut f)
     }
 
@@ -130,7 +180,7 @@ impl StratBlockDev {
 
 impl BlockDev for StratBlockDev {
     fn devnode(&self) -> PathBuf {
-        self.devnode.clone()
+        self.devnode.metadata_path().to_owned()
     }
 
     fn user_info(&self) -> Option<&str> {
@@ -159,6 +209,10 @@ impl BlockDev for StratBlockDev {
 
     fn get_dbus_path(&self) -> &MaybeDbusPath {
         &self.dbus_path
+    }
+
+    fn is_encrypted(&self) -> bool {
+        self.key_description.is_some()
     }
 }
 

@@ -465,7 +465,7 @@ pub mod tests {
             let mut buf = Cursor::new(vec![0; buf_size]);
             prop_assert!(StaticHeader::setup(&mut buf, 0usize).unwrap().is_none());
 
-            sh.write(&mut buf, MetadataLocation::Both).unwrap();
+            sh.write(&mut buf, 0usize, MetadataLocation::Both).unwrap();
 
             prop_assert!(StaticHeader::setup(&mut buf, 0usize)
                          .unwrap()
@@ -532,10 +532,10 @@ pub mod tests {
             let buf_size = bytes!(static_header_size::STATIC_HEADER_SECTORS);
 
             let mut reference_buf = Cursor::new(vec![0; buf_size]);
-            sh.write(&mut reference_buf, MetadataLocation::Both).unwrap();
+            sh.write(&mut reference_buf, 0usize, MetadataLocation::Both).unwrap();
 
             let mut buf = Cursor::new(vec![0; buf_size]);
-            sh.write(&mut buf, MetadataLocation::Both).unwrap();
+            sh.write(&mut buf, 0usize, MetadataLocation::Both).unwrap();
 
             if let Some(index) = primary {
                 corrupt_byte(
@@ -616,7 +616,7 @@ pub mod tests {
 
         let mut reference_buf = Cursor::new(vec![0; buf_size]);
         sh_newer
-            .write(&mut reference_buf, MetadataLocation::Both)
+            .write(&mut reference_buf, 0usize, MetadataLocation::Both)
             .unwrap();
 
         // Test that StaticHeader::setup succeeds by writing the older
@@ -631,8 +631,8 @@ pub mod tests {
                             older_location: MetadataLocation,
                             newer_location: MetadataLocation| {
             let mut buf = Cursor::new(vec![0; buf_size]);
-            sh_older.write(&mut buf, older_location).unwrap();
-            sh_newer.write(&mut buf, newer_location).unwrap();
+            sh_older.write(&mut buf, 0usize, older_location).unwrap();
+            sh_newer.write(&mut buf, 0usize, newer_location).unwrap();
             assert_ne!(buf.get_ref(), reference_buf.get_ref());
             assert_eq!(
                 StaticHeader::setup(&mut buf, 0usize).unwrap().as_ref(),

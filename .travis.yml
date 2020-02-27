@@ -55,14 +55,6 @@ matrix:
         - name: "build without defaults using stable toolchain"
           rust: stable
           env: TASK=build-no-default
-        - name: "build Rust source and tests on a 32-bit system using stable toolchain"
-          rust: stable
-          env: TASK=build-tests TARGET=i686-unknown-linux-gnu PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig/
-          install:
-            - rustup target add $TARGET
-            - sudo dpkg --add-architecture i386
-            - sudo apt-get update
-            - sudo apt-get install -y gcc-multilib libdbus-1-dev:i386 libdbus-glib-1-dev:i386 libglib2.0-dev:i386 libudev-dev:i386
         - name: "build Rust docs using stable toolchain"
           rust: stable
           env: TASK=docs-travis

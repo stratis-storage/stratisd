@@ -7,6 +7,7 @@ mod backstore;
 mod blockdev;
 mod blockdevmgr;
 mod cache_tier;
+mod crypt;
 mod data_tier;
 mod devices;
 mod identify;

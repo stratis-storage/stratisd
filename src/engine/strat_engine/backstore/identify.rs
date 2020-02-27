@@ -317,11 +317,73 @@ mod tests {
             metadata::MDADataSize,
             udev::block_device_apply,
         },
-        cmd::create_fs,
+        cmd::{create_fs, udev_settle},
         tests::{loopbacked, real},
     };
 
     use super::*;
+
+    // Test that identify_block_device can really identify an initialized
+    // block device. Since identify_block_device() uses udev use a scheme
+    // that allows several tries once udev events are received. If all
+    // udev events on block devices are dropped, this test will hang.
+    fn test_identify_block_device(paths: &[&Path]) {
+        assert_eq!(paths.len(), 1);
+
+        let context = libudev::Context::new().unwrap();
+        let mut monitor = libudev::Monitor::new(&context).unwrap();
+        monitor.match_subsystem("block").unwrap();
+
+        let mut socket = monitor.listen().unwrap();
+
+        let pool_uuid = Uuid::new_v4();
+        initialize_devices(
+            process_devices(paths).unwrap(),
+            pool_uuid,
+            MDADataSize::default(),
+        )
+        .unwrap();
+
+        let mut event_tries = None;
+        while event_tries != Some(0) {
+            if let Some(event) = socket.receive_event() {
+                event_tries = Some(5);
+                let event_type = event.event_type();
+                if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change
+                {
+                    if let Some((identifiers, _device, devnode)) =
+                        identify_block_device(event.device())
+                    {
+                        assert_eq!(identifiers.pool_uuid, pool_uuid);
+                        assert_eq!(devnode, paths[0]);
+                    }
+                }
+            } else {
+                udev_settle().unwrap();
+                event_tries = event_tries.map(|n| n - 1);
+            }
+        }
+        panic!("identify_block_device() did not detect a Stratis device in the allotted number of tries");
+    }
+
+    #[test]
+    pub fn loop_test_identify_block_device() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_identify_block_device,
+        );
+    }
+
+    // Do not have a real test, as this test may hang and real tests are
+    // run on the more sensitive Jenkins infrastructure.
+
+    #[test]
+    pub fn travis_test_identify_block_device() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_identify_block_device,
+        );
+    }
 
     /// Test that the process_*_device methods return the expected
     /// pool UUID and device node for initialized paths.

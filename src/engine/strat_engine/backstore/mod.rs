@@ -7,6 +7,7 @@ mod backstore;
 mod blockdev;
 mod blockdevmgr;
 mod cache_tier;
+mod crypt;
 mod data_tier;
 mod devices;
 mod identify;
@@ -24,5 +25,7 @@ pub use self::{
     setup::get_metadata,
 };
 
+#[cfg(test)]
+pub use self::crypt::STRATIS_KEY_SIZE;
 #[cfg(test)]
 pub use self::identify::find_all_block_devices_with_stratis_signatures;

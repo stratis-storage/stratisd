@@ -65,6 +65,9 @@ pub trait BlockDev: Debug {
 
     /// Get dbus path associated with the BlockDev.
     fn get_dbus_path(&self) -> &MaybeDbusPath;
+
+    /// Get the status of whether a block device is encrypted or not.
+    fn is_encrypted(&self) -> bool;
 }
 
 pub trait Pool: Debug {

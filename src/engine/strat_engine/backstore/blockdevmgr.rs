@@ -236,7 +236,7 @@ impl BlockDevMgr {
         let devices = check_device_ids(pool_uuid, &HashSet::new(), process_devices(paths)?)?;
 
         Ok(BlockDevMgr::new(
-            initialize_devices(devices, pool_uuid, mda_data_size)?,
+            initialize_devices(devices, pool_uuid, mda_data_size, None)?,
             None,
         ))
     }
@@ -264,7 +264,7 @@ impl BlockDevMgr {
         // variable length metadata requires more than the minimum allocated,
         // then the necessary amount must be provided or the data can not be
         // saved.
-        let bds = initialize_devices(devices, pool_uuid, MDADataSize::default())?;
+        let bds = initialize_devices(devices, pool_uuid, MDADataSize::default(), None)?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
         Ok(bdev_uuids)

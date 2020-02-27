@@ -14,7 +14,7 @@ use chrono::Utc;
 use itertools::Itertools;
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Device, IEC};
+use devicemapper::{Bytes, DevId, Device, DmName, IEC};
 
 use crate::{
     engine::{
@@ -22,6 +22,10 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
+                crypt::{
+                    destroy_encrypted_stratis_device, initialize_encrypted_stratis_device,
+                    name_from_uuids,
+                },
                 metadata::{
                     device_identifiers, disown_device, BlockdevSize, MDADataSize,
                     StratisIdentifiers, BDA,
@@ -29,8 +33,9 @@ use crate::{
                 udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
             },
             device::blkdev_size,
+            dm::get_dm_init,
         },
-        types::PoolUuid,
+        types::{DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -261,63 +266,174 @@ pub fn initialize_devices(
     devices: Vec<DeviceInfo>,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
+    key_description: Option<&str>,
 ) -> StratisResult<Vec<StratBlockDev>> {
-    // Initialize a single device using information in dev_info.
-    // If initialization fails at any stage clean up the device.
-    // Return an error if initialization failed. Log a warning if cleanup
-    // fails.
-    fn initialize_one(
+    /// Map a major/minor device number of a physical device
+    /// to the corresponding major/minor number of the encrypted
+    /// device using the physical device as storage.
+    fn map_device_nums(device_name: &str) -> StratisResult<Device> {
+        let dm = get_dm_init()?;
+        let info = dm.device_info(&DevId::Name(DmName::new(device_name)?))?;
+        Ok(info.device())
+    }
+
+    /// Initialize an encrypted device on the given physical device
+    /// using the pool and device UUIDs of the new Stratis block device
+    /// and the key description for the key to use for encrypting the
+    /// data.
+    ///
+    /// On failure, this method will roll back the initialization
+    /// process and clean up the device that it has just initialized.
+    fn initialize_encrypted(
+        physical_device: &Path,
+        pool_uuid: PoolUuid,
+        dev_uuid: DevUuid,
+        key_description: &str,
+    ) -> StratisResult<(PathBuf, Device)> {
+        let device_name = name_from_uuids(&pool_uuid, &dev_uuid);
+
+        let logical_path = initialize_encrypted_stratis_device(
+            physical_device,
+            pool_uuid,
+            dev_uuid,
+            key_description,
+        );
+
+        let initialization_result = logical_path
+            .map_err(StratisError::from)
+            .and_then(|lp| map_device_nums(&device_name).map(|dn| (lp, dn)));
+        if initialization_result.is_err() {
+            // Clean up if any stage of initialization fails;
+            // destroy_encrypted_stratis_device should be able to handle
+            // any rollback state that a failed initialization is left in.
+            destroy_encrypted_stratis_device(physical_device)?;
+        }
+        initialization_result
+    }
+
+    fn initialize_stratis_metadata(
+        path: &Path,
+        devno: Device,
         dev_info: &DeviceInfo,
         pool_uuid: PoolUuid,
+        dev_uuid: DevUuid,
         mda_data_size: MDADataSize,
+        key_description: Option<&str>,
     ) -> StratisResult<StratBlockDev> {
-        let mut f = OpenOptions::new().write(true).open(&dev_info.devnode)?;
+        let mut f = OpenOptions::new().write(true).open(path)?;
 
-        let hw_id = match &dev_info.id_wwn {
-            Some(Ok(hw_id)) => Some(hw_id.to_owned()),
-            Some(Err(_)) => {
+        // NOTE: Encrypted devices will discard the hardware ID as encrypted devices
+        // are always represented as logical, software-based devicemapper devices
+        // which will never have a hardware ID.
+        let hw_id = match (key_description.is_some(), &dev_info.id_wwn) {
+            (true, _) => None,
+            (_, Some(Ok(hw_id))) => Some(hw_id.to_owned()),
+            (_, Some(Err(_))) => {
                 warn!("Value for ID_WWN for device {} obtained from the udev database could not be decoded; inserting device into pool with UUID {} anyway",
-                      dev_info.devnode.display(),
+                      path.display(),
                       pool_uuid.to_simple_ref());
                 None
             }
-            None => None,
+            (_, None) => None,
         };
 
         let bda = BDA::initialize(
             &mut f,
-            StratisIdentifiers::new(pool_uuid, Uuid::new_v4()),
+            StratisIdentifiers::new(pool_uuid, dev_uuid),
             mda_data_size,
             BlockdevSize::new(dev_info.size.sectors()),
             Utc::now().timestamp() as u64,
         );
 
-        let blockdev = bda.and_then(|bda| {
+        bda.and_then(|bda| {
             StratBlockDev::new(
-                dev_info.devno,
-                dev_info.devnode.to_owned(),
+                devno,
+                path.to_owned(),
                 bda,
                 &[],
                 None,
                 hw_id,
+                key_description.map(|s| s.to_owned()),
             )
-        });
+        })
+    }
 
+    /// Clean up the Stratis metadata for unencrypted devices
+    /// and log a warning if the device could not be cleaned up.
+    fn clean_up_unencrypted_device(physical_path: &Path, pool_uuid: PoolUuid) -> StratisResult<()> {
+        if let Err(err) = OpenOptions::new()
+            .write(true)
+            .open(physical_path)
+            .map_err(StratisError::from)
+            .and_then(|mut f| disown_device(&mut f))
+        {
+            warn!(
+                "Failed to clean up device {}; cleanup was attempted because initialization \
+                of the device for pool with UUID {} failed: {}",
+                physical_path.display(),
+                pool_uuid.to_simple_ref(),
+                err
+            );
+        }
+        Ok(())
+    }
+
+    /// Clean up an encrypted device using the crypt module.
+    fn clean_up_encrypted_device(physical_path: &Path) -> StratisResult<()> {
+        destroy_encrypted_stratis_device(physical_path)?;
+        Ok(())
+    }
+
+    // Initialize a single device using information in dev_info.
+    // If initialization fails at any stage clean up the device.
+    // Return an error if initialization failed. Log a warning if cleanup
+    // fails.
+    //
+    // This method will clean up after LUKS2 and unencrypted Stratis devices
+    // in phases. In the case of encryption, if a device has been initialized
+    // as an encrypted volume, it will either rely on StratBlockDev::disown()
+    // if the in-memory StratBlockDev object has been created or
+    // will call out directly to destroy_encrypted_stratis_device() if it
+    // fails before that.
+    fn initialize_one(
+        dev_info: &DeviceInfo,
+        pool_uuid: PoolUuid,
+        mda_data_size: MDADataSize,
+        key_description: Option<&str>,
+    ) -> StratisResult<StratBlockDev> {
+        let dev_uuid = Uuid::new_v4();
+        let (devpath, devno) = match key_description {
+            Some(desc) => initialize_encrypted(&dev_info.devnode, pool_uuid, dev_uuid, desc)?,
+            None => (dev_info.devnode.clone(), dev_info.devno),
+        };
+
+        let blockdev = initialize_stratis_metadata(
+            &devpath,
+            devno,
+            dev_info,
+            pool_uuid,
+            dev_uuid,
+            mda_data_size,
+            key_description,
+        );
         if blockdev.is_err() {
-            if let Err(err) = disown_device(&mut f) {
-                warn!("Failed to clean up device {}; cleanup was attempted because initialization of the device for pool with UUID {} failed: {}",
-                      dev_info.devnode.display(),
-                      pool_uuid.to_simple_ref(),
-                      err);
+            if key_description.is_some() {
+                clean_up_encrypted_device(&dev_info.devnode)?;
+            } else {
+                clean_up_unencrypted_device(&dev_info.devnode, pool_uuid)?;
             }
         }
-
         blockdev
     }
 
     let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
     for dev_info in devices {
-        match initialize_one(&dev_info, pool_uuid, mda_data_size) {
+        match initialize_one(
+            &dev_info,
+            pool_uuid,
+            mda_data_size,
+            key_description.as_deref(),
+        ) {
             Ok(blockdev) => initialized_blockdevs.push(blockdev),
             Err(err) => {
                 if let Err(err) = wipe_blockdevs(&initialized_blockdevs) {
@@ -340,6 +456,8 @@ pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
     let unerased_devnodes: Vec<_> = blockdevs
         .iter()
         .filter_map(|bd| match bd.disown() {
+            // NOTE: We may want to rethink error messaging here because
+            // it will report the logical path, not the physical path.
             Err(_) => Some(bd.devnode()),
             _ => None,
         })
@@ -358,70 +476,147 @@ pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::OpenOptions;
+    use std::{error::Error, fs::OpenOptions};
 
     use uuid::Uuid;
 
-    use crate::engine::strat_engine::{
-        backstore::{
-            identify::find_all_block_devices_with_stratis_signatures, metadata::device_identifiers,
-            setup::get_metadata,
+    use crate::engine::{
+        engine::BlockDev,
+        strat_engine::{
+            backstore::{
+                crypt::is_encrypted_stratis_device,
+                identify::find_all_block_devices_with_stratis_signatures,
+                metadata::device_identifiers, setup::get_metadata,
+            },
+            cmd,
+            tests::{crypt, loopbacked, real},
         },
-        cmd,
-        tests::{loopbacked, real},
     };
 
     use super::*;
 
     /// Test that initialing devices claims all and that destroying
     /// them releases all.
-    fn test_ownership(paths: &[&Path]) {
+    fn test_ownership(
+        paths: &[&Path],
+        key_description: Option<&str>,
+    ) -> Result<(), Box<dyn Error>> {
         let pool_uuid = Uuid::new_v4();
+        let dev_infos: Vec<_> = process_devices(paths)?
+            .into_iter()
+            .map(|(info, _)| info)
+            .collect();
+        let dev_infos_len = dev_infos.len();
+
         let blockdevs = initialize_devices(
-            process_devices(paths)
-                .unwrap()
-                .into_iter()
-                .map(|(info, _)| info)
-                .collect(),
+            dev_infos,
             pool_uuid,
             MDADataSize::default(),
-        )
-        .unwrap();
+            key_description,
+        )?;
 
-        for path in paths {
-            assert_eq!(
-                pool_uuid,
-                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
-                    .unwrap()
-                    .unwrap()
-                    .pool_uuid
-            );
+        if dev_infos_len != blockdevs.len() {
+            return Err(Box::new(StratisError::Error(
+                "Fewer blockdevices were created than were requested".to_string(),
+            )));
         }
 
-        wipe_blockdevs(&blockdevs).unwrap();
+        for blockdev in blockdevs.iter() {
+            let pool_uuid_from_disk =
+                device_identifiers(&mut OpenOptions::new().read(true).open(&blockdev.devnode())?)?
+                    .ok_or_else(|| {
+                        StratisError::Error(
+                            "No device identifiers were present on the device when they \
+                    should have been"
+                                .to_string(),
+                        )
+                    })?
+                    .pool_uuid;
+            if pool_uuid != pool_uuid_from_disk {
+                return Err(Box::new(StratisError::Error(
+                    "Pool UUID in the metadata does not match the input pool UUID".to_string(),
+                )));
+            }
+        }
+
+        wipe_blockdevs(&blockdevs)?;
 
         for path in paths {
-            assert_eq!(
-                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap(),)
-                    .unwrap(),
-                None
-            );
+            if key_description.is_some() {
+                if is_encrypted_stratis_device(path) {
+                    return Err(Box::new(StratisError::Error(
+                        "LUKS2 metadata on Stratis devices was not successfully wiped".to_string(),
+                    )));
+                }
+            } else if device_identifiers(&mut OpenOptions::new().read(true).open(path)?)? != None {
+                return Err(Box::new(StratisError::Error(
+                    "Metadata on Stratis devices was not successfully wiped".to_string(),
+                )));
+            }
         }
+        Ok(())
+    }
+
+    /// Test ownership with encryption
+    fn test_ownership_crypt(paths: &[&Path]) {
+        fn call_crypt_test(paths: &[&Path], key_description: &str) -> Result<(), Box<dyn Error>> {
+            test_ownership(paths, Some(key_description))
+        }
+
+        crypt::insert_and_cleanup_key(paths, call_crypt_test)
+    }
+
+    /// Test ownership with no encryption
+    fn test_ownership_no_crypt(paths: &[&Path]) {
+        test_ownership(paths, None).unwrap()
     }
 
     #[test]
     fn loop_test_ownership() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 3, None),
+            test_ownership_no_crypt,
+        );
     }
 
     #[test]
     fn real_test_ownership() {
-        real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_ownership);
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(1, None, None),
+            test_ownership_no_crypt,
+        );
     }
 
     #[test]
     fn travis_test_ownership() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 3, None),
+            test_ownership_no_crypt,
+        );
+    }
+
+    #[test]
+    fn loop_test_crypt_ownership() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 3, None),
+            test_ownership_crypt,
+        );
+    }
+
+    #[test]
+    fn real_test_crypt_ownership() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(1, None, None),
+            test_ownership_crypt,
+        );
+    }
+
+    #[test]
+    fn travis_test_crypt_ownership() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 3, None),
+            test_ownership_crypt,
+        );
     }
 
     /// Verify that find_all function locates and assigns pools appropriately.
@@ -453,7 +648,8 @@ mod tests {
 
             assert_eq!(device_infos.len(), paths1.len());
 
-            let devices = initialize_devices(device_infos, uuid1, MDADataSize::default()).unwrap();
+            let devices =
+                initialize_devices(device_infos, uuid1, MDADataSize::default(), None).unwrap();
             assert_eq!(devices.len(), paths1.len());
 
             for path in paths1 {
@@ -493,7 +689,8 @@ mod tests {
 
             assert_eq!(device_infos.len(), paths2.len());
 
-            let devices = initialize_devices(device_infos, uuid2, MDADataSize::default()).unwrap();
+            let devices =
+                initialize_devices(device_infos, uuid2, MDADataSize::default(), None).unwrap();
             assert_eq!(devices.len(), paths2.len());
 
             for path in paths2 {
@@ -610,7 +807,7 @@ mod tests {
         devices.push(new_info);
 
         assert_matches!(
-            initialize_devices(devices, Uuid::new_v4(), MDADataSize::default()),
+            initialize_devices(devices, Uuid::new_v4(), MDADataSize::default(), None),
             Err(_)
         );
 

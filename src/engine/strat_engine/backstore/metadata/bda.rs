@@ -31,6 +31,7 @@ impl BDA {
     /// Initialize a blockdev with a Stratis BDA.
     pub fn initialize<F>(
         f: &mut F,
+        index: usize,
         identifiers: StratisIdentifiers,
         mda_data_size: MDADataSize,
         blkdev_size: BlockdevSize,
@@ -46,7 +47,7 @@ impl BDA {
             initialization_time,
         );
 
-        header.write(f, 0usize, MetadataLocation::Both)?;
+        header.write(f, index, MetadataLocation::Both)?;
 
         let regions =
             mda::MDARegions::initialize(STATIC_HEADER_SIZE.sectors().bytes(), header.mda_size, f)?;
@@ -56,11 +57,11 @@ impl BDA {
 
     /// Load a BDA on initial setup of a device.
     /// Returns None if no BDA appears to exist.
-    pub fn load<F>(f: &mut F) -> StratisResult<Option<BDA>>
+    pub fn load<F>(f: &mut F, index: usize) -> StratisResult<Option<BDA>>
     where
         F: Read + Seek + SyncAll,
     {
-        let header = match StaticHeader::setup(f, 0usize)? {
+        let header = match StaticHeader::setup(f, index)? {
             Some(header) => header,
             None => return Ok(None),
         };
@@ -159,6 +160,7 @@ mod tests {
             let mut buf = Cursor::new(vec![0; buf_size]);
             let bda = BDA::initialize(
                 &mut buf,
+                0usize,
                 sh.identifiers,
                 sh.mda_size.region_size().data_size(),
                 sh.blkdev_size,
@@ -179,6 +181,7 @@ mod tests {
         let mut buf = Cursor::new(vec![0; *sh.blkdev_size.sectors().bytes() as usize]);
         let mut bda = BDA::initialize(
             &mut buf,
+            0usize,
             sh.identifiers,
             sh.mda_size.region_size().data_size(),
             sh.blkdev_size,
@@ -223,6 +226,7 @@ mod tests {
             let mut buf = Cursor::new(vec![0; buf_size]);
             let mut bda = BDA::initialize(
                 &mut buf,
+                0usize,
                 sh.identifiers,
                 sh.mda_size.region_size().data_size(),
                 sh.blkdev_size,
@@ -234,7 +238,7 @@ mod tests {
             prop_assert!(bda.last_update_time().map(|t| t == &current_time).unwrap_or(false));
             prop_assert!(loaded_state.map(|s| &s == state).unwrap_or(false));
 
-            let mut bda = BDA::load(&mut buf).unwrap().unwrap();
+            let mut bda = BDA::load(&mut buf, 0usize).unwrap().unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();
             prop_assert!(loaded_state.map(|s| &s == state).unwrap_or(false));
             prop_assert!(bda.last_update_time().map(|t| t == &current_time).unwrap_or(false));

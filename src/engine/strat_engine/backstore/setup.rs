@@ -41,7 +41,7 @@ pub fn get_metadata(
     // the newest metadata.
     let mut bdas = Vec::new();
     for devnode in devnodes.values() {
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
+        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?, 0usize)?;
         if let Some(bda) = bda {
             if bda.pool_uuid() == pool_uuid {
                 bdas.push((devnode, bda));
@@ -220,7 +220,7 @@ pub fn get_blockdevs(
 
     let (mut datadevs, mut cachedevs): (Vec<StratBlockDev>, Vec<StratBlockDev>) = (vec![], vec![]);
     for (device, devnode) in devnodes {
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?.ok_or_else(|| {
+        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?, 0usize)?.ok_or_else(|| {
             StratisError::Engine(ErrorEnum::NotFound,
                                                  format!("Device {} with devnode {} was previously determined to belong to pool with uuid {} but no BDA was found",
                                                  device,

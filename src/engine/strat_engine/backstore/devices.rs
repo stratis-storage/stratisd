@@ -213,6 +213,7 @@ pub fn initialize_devices(
         let mut f = OpenOptions::new().write(true).open(&dev_info.devnode)?;
         let bda = BDA::initialize(
             &mut f,
+            0usize,
             StratisIdentifiers::new(pool_uuid, Uuid::new_v4()),
             mda_data_size,
             BlockdevSize::new(dev_info.size.sectors()),

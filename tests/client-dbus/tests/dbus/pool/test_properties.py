@@ -24,7 +24,7 @@ from .._misc import SimTestCase, device_name_list
 _DEVICE_STRATEGY = device_name_list()
 
 
-class SetNameTestCase(SimTestCase):
+class PropertyTestCase(SimTestCase):
     """
     Set up a pool with a name and one filesystem.
     """

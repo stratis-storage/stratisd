@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 
-use std::path::{Path, PathBuf};
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 
 use libcryptsetup_rs::{
     c_uint, CryptActivateFlags, CryptDevice, CryptInit, EncryptionFormat, LibcryptErr,
@@ -159,5 +162,11 @@ pub fn activate_encrypted_stratis_device(physical_path: &Path) -> Result<PathBuf
     let mut activated_path = PathBuf::from("/dev/mapper");
     activated_path.push(stratis_device_name);
 
-    Ok(activated_path)
+    if activated_path.exists() {
+        Ok(activated_path)
+    } else {
+        Err(LibcryptErr::IOError(io::Error::from(
+            io::ErrorKind::NotFound,
+        )))
+    }
 }

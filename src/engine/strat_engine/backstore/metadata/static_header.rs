@@ -469,7 +469,7 @@ pub mod tests {
 
             prop_assert!(StaticHeader::setup(&mut buf, 0usize)
                          .unwrap()
-                         .map(|new_sh| new_sh == sh)
+                         .map(|new_sh| new_sh == *sh)
                          .unwrap_or(false));
 
             StaticHeader::wipe(&mut buf).unwrap();

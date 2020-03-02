@@ -347,7 +347,7 @@ mod tests {
         let mut event_tries = None;
         while event_tries != Some(0) {
             if let Some(event) = socket.receive_event() {
-                event_tries = Some(5);
+                event_tries = Some(100);
                 let event_type = event.event_type();
                 if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change
                 {

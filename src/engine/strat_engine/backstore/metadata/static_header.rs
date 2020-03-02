@@ -454,7 +454,7 @@ pub mod tests {
         /// Wipe the static header.
         /// Verify that the buffer is again unowned.
         fn test_ownership(ref sh in static_header_strategy()) {
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + bytes!(static_header_size::STATIC_HEADER_SECTORS);
+            let buf_size = bytes!(static_header_size::STATIC_HEADER_SECTORS);
             let mut buf = Cursor::new(vec![0; buf_size]);
             prop_assert!(StaticHeader::setup(&mut buf).unwrap().is_none());
 

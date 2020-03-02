@@ -131,7 +131,11 @@ impl StaticHeader {
     {
         let mut buf_loc_1 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
         let mut buf_loc_2 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
-        fn read_sector_at_offset<F>(f: &mut F, offset: usize, mut buf: &mut [u8]) -> io::Result<()>
+        fn read_sector_at_offset<F>(
+            f: &mut F,
+            offset: usize,
+            mut buf: &mut [u8],
+        ) -> io::Result<()>
         where
             F: Read + Seek,
         {
@@ -319,13 +323,9 @@ impl StaticHeader {
                 }
             },
             // Copy 1 read OK, 2 resulted in an IO error
-            (Ok(buf_loc_1), Err(_)) => {
-                copy_ok_err_handling(f, index, buf_loc_1, MetadataLocation::Second)
-            }
+            (Ok(buf_loc_1), Err(_)) => copy_ok_err_handling(f, index, buf_loc_1, MetadataLocation::Second),
             // Copy 2 read OK, 1 resulted in IO Error
-            (Err(_), Ok(buf_loc_2)) => {
-                copy_ok_err_handling(f, index, buf_loc_2, MetadataLocation::First)
-            }
+            (Err(_), Ok(buf_loc_2)) => copy_ok_err_handling(f, index, buf_loc_2, MetadataLocation::First),
             (Err(_), Err(_)) => {
                 // Unable to read the device at all.
                 let err_str = "Unable to read data at sigblock locations.";

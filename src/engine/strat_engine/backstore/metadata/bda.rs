@@ -143,9 +143,8 @@ mod tests {
 
     use proptest::{collection::vec, num};
 
-    use crate::engine::strat_engine::backstore::metadata::{
-        sizes::static_header_size,
-        static_header::{tests::random_static_header, tests::static_header_strategy},
+    use crate::engine::strat_engine::backstore::metadata::static_header::{
+        tests::random_static_header, tests::static_header_strategy,
     };
 
     use super::*;
@@ -156,7 +155,7 @@ mod tests {
         /// Initialize a BDA.
         /// Verify that the last update time is None.
         fn empty_bda(ref sh in static_header_strategy()) {
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + bytes!(static_header_size::STATIC_HEADER_SECTORS);
+            let buf_size = *sh.mda_size.bda_size().sectors().bytes() as usize;
             let mut buf = Cursor::new(vec![0; buf_size]);
             let bda = BDA::initialize(
                 &mut buf,
@@ -220,7 +219,7 @@ mod tests {
             ref state in vec(num::u8::ANY, 1..100),
             ref next_state in vec(num::u8::ANY, 1..100)
         ) {
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + bytes!(static_header_size::STATIC_HEADER_SECTORS);
+            let buf_size = *sh.mda_size.bda_size().sectors().bytes() as usize;
             let mut buf = Cursor::new(vec![0; buf_size]);
             let mut bda = BDA::initialize(
                 &mut buf,

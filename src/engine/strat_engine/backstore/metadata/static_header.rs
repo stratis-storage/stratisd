@@ -186,8 +186,8 @@ impl StaticHeader {
         if which == MetadataLocation::Both || which == MetadataLocation::First {
             write_region(f, &signature_block, &zeroed)?;
         } else {
-            f.seek(SeekFrom::Start(
-                (index + bytes!(static_header_size::SIGBLOCK_REGION_SECTORS)) as u64,
+            f.seek(SeekFrom::Current(
+                (bytes!(static_header_size::SIGBLOCK_REGION_SECTORS)) as u64,
             ))?;
         }
 

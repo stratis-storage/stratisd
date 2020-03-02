@@ -31,7 +31,7 @@ impl BDA {
     /// Initialize a blockdev with a Stratis BDA.
     pub fn initialize<F>(
         f: &mut F,
-        index: usize,
+        offset: usize,
         identifiers: StratisIdentifiers,
         mda_data_size: MDADataSize,
         blkdev_size: BlockdevSize,
@@ -47,7 +47,7 @@ impl BDA {
             initialization_time,
         );
 
-        header.write(f, index, MetadataLocation::Both)?;
+        header.write(f, offset, MetadataLocation::Both)?;
 
         let regions =
             mda::MDARegions::initialize(STATIC_HEADER_SIZE.sectors().bytes(), header.mda_size, f)?;
@@ -57,11 +57,11 @@ impl BDA {
 
     /// Load a BDA on initial setup of a device.
     /// Returns None if no BDA appears to exist.
-    pub fn load<F>(f: &mut F, index: usize) -> StratisResult<Option<BDA>>
+    pub fn load<F>(f: &mut F, offset: usize) -> StratisResult<Option<BDA>>
     where
         F: Read + Seek + SyncAll,
     {
-        let header = match StaticHeader::setup(f, index)? {
+        let header = match StaticHeader::setup(f, offset)? {
             Some(header) => header,
             None => return Ok(None),
         };

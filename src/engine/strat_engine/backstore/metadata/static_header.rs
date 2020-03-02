@@ -187,7 +187,7 @@ impl StaticHeader {
             write_region(f, &signature_block, &zeroed)?;
         } else {
             f.seek(SeekFrom::Current(
-                (bytes!(static_header_size::SIGBLOCK_REGION_SECTORS)) as u64,
+                (bytes!(static_header_size::SIGBLOCK_REGION_SECTORS)) as i64,
             ))?;
         }
 

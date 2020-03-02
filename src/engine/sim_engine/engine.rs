@@ -231,32 +231,15 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
-    /// Creating a new pool identical to the previous should succeed
-    fn create_new_pool_twice() {
-        let name = "name";
-        let mut engine = SimEngine::default();
-        engine.create_pool(name, &[], None).unwrap();
-        assert!(match engine
-            .create_pool(name, &[], None)
-            .ok()
-            .and_then(|uuid| uuid.changed())
-        {
-            Some(uuid) => engine.get_pool(uuid).unwrap().1.blockdevs().is_empty(),
-            _ => false,
-        });
-    }
-
-    #[test]
-    /// Creating a new pool with the same name and arguments should return identity
+    /// Creating a new pool with the same name and arguments should return
+    /// identity.
     fn create_pool_name_collision() {
         let name = "name";
         let mut engine = SimEngine::default();
-        engine
-            .create_pool(name, &[Path::new("/s/d")], None)
-            .unwrap();
+        let devices = [Path::new("/s/d")];
+        engine.create_pool(name, &devices, None).unwrap();
         assert_matches!(
-            engine.create_pool(name, &[Path::new("/s/d")], None),
+            engine.create_pool(name, &devices, None),
             Ok(CreateAction::Identity)
         );
     }

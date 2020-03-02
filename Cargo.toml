@@ -25,7 +25,11 @@ libudev = "0.2.0"
 lazy_static = "1.4.0"
 timerfd = "1.0.0"
 itertools = "0.8.0"
-libcryptsetup-rs = "0.2.0"
+
+[dependencies.libcryptsetup-rs]
+version = "0.2.0"
+git = "https://github.com/jbaublitz/libcryptsetup-rs"
+branch = "issue-libcryptsetup-rs-29"
 
 [dependencies.uuid]
 version = "0.7"

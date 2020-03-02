@@ -1,12 +1,16 @@
 #![allow(dead_code)]
 
 use std::{
+    ffi::CString,
     io,
     path::{Path, PathBuf},
 };
 
+use libc::{c_void, syscall, SYS_keyctl, SYS_request_key};
+
 use libcryptsetup_rs::{
-    c_uint, CryptActivateFlags, CryptDevice, CryptInit, EncryptionFormat, LibcryptErr,
+    c_uint, CryptActivateFlags, CryptDevice, CryptInit, CryptStatusInfo, CryptVolumeKeyFlags, EncryptionFormat,
+    LibcryptErr, SafeMemHandle,
 };
 
 type Result<T> = std::result::Result<T, LibcryptErr>;
@@ -14,16 +18,24 @@ type Result<T> = std::result::Result<T, LibcryptErr>;
 pub static LUKS2_TOKEN_ID: c_uint = 0;
 pub static STRATIS_TOKEN_ID: c_uint = 1;
 pub static STRATIS_TOKEN_TYPE: &str = "stratis";
+pub static STRATIS_KEY_SIZE: usize = 512 / 8;
+
+mod consts {
+    use libc::c_int;
+
+    pub const KEYCTL_GET_PERSISTENT: c_int = 22;
+    pub const KEYCTL_READ: c_int = 11;
+    pub const KEY_SPEC_PROCESS_KEYRING: c_int = -2;
+}
+
+use self::consts::{KEYCTL_GET_PERSISTENT, KEYCTL_READ, KEY_SPEC_PROCESS_KEYRING};
 
 /// Check that the token can open the device.
 ///
 /// No activation will actually occur, only validation.
 fn check_luks2_token(crypt_device: &mut CryptDevice) -> Result<()> {
     crypt_device.token_handle().activate_by_token::<()>(
-        // FIXME: This will be fixed upon the release of libcryptsetup-rs-0.3.0
-        // 
-        // "name" should be an optional type
-        unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(std::ptr::null(), 0)) },
+        None,
         Some(LUKS2_TOKEN_ID),
         None,
         CryptActivateFlags::empty(),
@@ -141,27 +153,117 @@ pub fn device_is_luks2(physical_path: &Path) -> Result<bool> {
     Ok(crypt_device.format_handle().get_type()? == EncryptionFormat::Luks2)
 }
 
+fn read_key(key_description: &str) -> Result<SafeMemHandle> {
+    // Attach persistent keyring to process keyring
+    match unsafe {
+        syscall(
+            SYS_keyctl,
+            KEYCTL_GET_PERSISTENT,
+            0,
+            KEY_SPEC_PROCESS_KEYRING,
+        )
+    } {
+        i if i < 0 => return Err(LibcryptErr::IOError(io::Error::last_os_error())),
+        _ => (),
+    };
+
+    let key_type_cstring = CString::new("user").expect("String is valid");
+    let key_description_cstring = CString::new(key_description).map_err(LibcryptErr::NullError)?;
+
+    // Request key ID from persistent keyring
+    let key_id = match unsafe {
+        syscall(
+            SYS_request_key,
+            key_type_cstring.as_ptr(),
+            key_description_cstring.as_ptr(),
+            std::ptr::null::<c_void>(),
+            0,
+        )
+    } {
+        i if i < 0 => return Err(LibcryptErr::IOError(io::Error::last_os_error())),
+        i => i,
+    };
+
+    let mut key_buffer = SafeMemHandle::alloc(STRATIS_KEY_SIZE)?;
+    let mut_ref = key_buffer.as_mut();
+
+    // Read key from keyring
+    match unsafe { syscall(
+        SYS_keyctl,
+        KEYCTL_READ,
+        key_id,
+        mut_ref.as_mut_ptr(),
+        mut_ref.len(),
+    ) } {
+        i if i < 0 => return Err(LibcryptErr::IOError(io::Error::last_os_error())),
+        _ => (),
+    };
+
+    Ok(key_buffer)
+}
+
 /// Lay down properly configured LUKS2 metadata on a new physical device
-pub fn initialize_encrypted_stratis_device(_physical_path: &Path) -> Result<()> {
+pub fn initialize_encrypted_stratis_device(
+    physical_path: &Path,
+    key_description: &str,
+) -> Result<()> {
+    let mut crypt_device = CryptInit::init(physical_path)?;
+
+    crypt_device.context_handle().format::<()>(
+        EncryptionFormat::Luks2,
+        ("aes", "xts-plain64"),
+        None,
+        libcryptsetup_rs::Either::Right(STRATIS_KEY_SIZE),
+        None,
+    )?;
+
+    let key = read_key(key_description)?;
+
+    crypt_device.keyslot_handle(None).add_by_key(
+        None,
+        key.as_ref(),
+        CryptVolumeKeyFlags::empty(),
+    )?;
+
     Ok(())
 }
 
+/// Activate encrypted Stratis device using the name stored in the
+/// Stratis token
 pub fn activate_encrypted_stratis_device(physical_path: &Path) -> Result<PathBuf> {
     let mut crypt_device = CryptInit::init(physical_path)?;
+    crypt_device
+        .context_handle()
+        .load::<()>(EncryptionFormat::Luks2, None)?;
+
     let stratis_device_name = get_stratis_device_name(&mut crypt_device)?;
     crypt_device.token_handle().activate_by_token::<()>(
-        stratis_device_name.as_str(),
+        Some(stratis_device_name.as_str()),
         Some(LUKS2_TOKEN_ID),
         None,
         CryptActivateFlags::empty(),
     )?;
 
-    // Potentially should just check device activation status but checking
-    // that the symlink was created may also be valuable in case a race
-    // condition occurs with udev
+    // Assert that physical device path is equal to the path of the provided
+    // physical device.
+    assert_eq!(
+        crypt_device.status_handle().get_device_path()?,
+        physical_path
+    );
+
+    // Check activation status.
+    let status = crypt_device.status_handle().status(&stratis_device_name)?;
+    if CryptStatusInfo::Active != status {
+        return Err(LibcryptErr::Other("Failed to activate device".to_string()));
+    }
+
+    // Checking that the symlink was created may also be valuable in case a race
+    // condition occurs with udev.
     let mut activated_path = PathBuf::from("/dev/mapper");
     activated_path.push(stratis_device_name);
 
+    // Can potentially use inotify with a timeout to wait for the symlink
+    // if race conditions become a problem.
     if activated_path.exists() {
         Ok(activated_path)
     } else {

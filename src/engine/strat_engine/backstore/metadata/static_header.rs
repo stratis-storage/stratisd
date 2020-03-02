@@ -460,20 +460,20 @@ pub mod tests {
         /// Verify that Stratis buffer validates.
         /// Wipe the static header.
         /// Verify that the buffer is again unowned.
-        fn test_ownership(ref sh in static_header_strategy()) {
+        fn test_ownership(ref sh in static_header_strategy(), offset in 0..bytes!(static_header_size::STATIC_HEADER_SECTORS)){
             let buf_size = bytes!(static_header_size::STATIC_HEADER_SECTORS);
             let mut buf = Cursor::new(vec![0; buf_size]);
-            prop_assert!(StaticHeader::setup(&mut buf, 0usize).unwrap().is_none());
+            prop_assert!(StaticHeader::setup(&mut buf, offset).unwrap().is_none());
 
-            sh.write(&mut buf, 0usize, MetadataLocation::Both).unwrap();
+            sh.write(&mut buf, offset, MetadataLocation::Both).unwrap();
 
-            prop_assert!(StaticHeader::setup(&mut buf, 0usize)
+            prop_assert!(StaticHeader::setup(&mut buf, offset)
                          .unwrap()
                          .map(|new_sh| new_sh == *sh)
                          .unwrap_or(false));
 
             StaticHeader::wipe(&mut buf).unwrap();
-            prop_assert!(StaticHeader::setup(&mut buf, 0usize).unwrap().is_none());
+            prop_assert!(StaticHeader::setup(&mut buf, offset).unwrap().is_none());
         }
     }
 

@@ -281,7 +281,14 @@ mod tests {
     /// Creating a pool with an impossible raid level should fail
     fn create_pool_max_u16_raid() {
         let mut engine = SimEngine::default();
-        assert_matches!(engine.create_pool("name", &[], Some(std::u16::MAX)), Err(_));
+        assert_matches!(
+            engine.create_pool(
+                "name",
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                Some(std::u16::MAX)
+            ),
+            Err(_)
+        );
     }
 
     #[test]

@@ -205,7 +205,7 @@ mod tests {
     fn destroy_pool_w_devices() {
         let mut engine = SimEngine::default();
         let uuid = engine
-            .create_pool("name", &[Path::new("/s/d")], None)
+            .create_pool("name", strs_to_paths!(["/s/d"]), None)
             .unwrap()
             .changed()
             .unwrap();
@@ -218,7 +218,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[Path::new("/s/d")], None)
+            .create_pool(pool_name, strs_to_paths!(["/s/d"]), None)
             .unwrap()
             .changed()
             .unwrap();
@@ -236,10 +236,10 @@ mod tests {
     fn create_pool_name_collision() {
         let name = "name";
         let mut engine = SimEngine::default();
-        let devices = [Path::new("/s/d")];
-        engine.create_pool(name, &devices, None).unwrap();
+        let devices = strs_to_paths!(["/s/d"]);
+        engine.create_pool(name, devices, None).unwrap();
         assert_matches!(
-            engine.create_pool(name, &devices, None),
+            engine.create_pool(name, devices, None),
             Ok(CreateAction::Identity)
         );
     }
@@ -250,7 +250,7 @@ mod tests {
         let name = "name";
         let mut engine = SimEngine::default();
         engine
-            .create_pool(name, &[Path::new("/s/d")], None)
+            .create_pool(name, strs_to_paths!(["/s/d"]), None)
             .unwrap();
         assert_matches!(
             engine.create_pool(
@@ -267,10 +267,9 @@ mod tests {
     fn create_pool_duplicate_devices() {
         let path = "/s/d";
         let mut engine = SimEngine::default();
-        let devices = vec![Path::new(path), Path::new(path)];
         assert_matches!(
             engine
-                .create_pool("name", &devices, None)
+                .create_pool("name", strs_to_paths!([path, path]), None)
                 .unwrap()
                 .changed()
                 .map(|uuid| engine.get_pool(uuid).unwrap().1.blockdevs().len()),

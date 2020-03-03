@@ -205,7 +205,7 @@ mod tests {
     fn destroy_pool_w_devices() {
         let mut engine = SimEngine::default();
         let uuid = engine
-            .create_pool("name", &[Path::new("/s/d")], None)
+            .create_pool("name", strs_to_paths!(["/s/d"]), None)
             .unwrap()
             .changed()
             .unwrap();
@@ -218,7 +218,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[Path::new("/s/d")], None)
+            .create_pool(pool_name, strs_to_paths!(["/s/d"]), None)
             .unwrap()
             .changed()
             .unwrap();
@@ -231,32 +231,15 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
-    /// Creating a new pool identical to the previous should succeed
-    fn create_new_pool_twice() {
-        let name = "name";
-        let mut engine = SimEngine::default();
-        engine.create_pool(name, &[], None).unwrap();
-        assert!(match engine
-            .create_pool(name, &[], None)
-            .ok()
-            .and_then(|uuid| uuid.changed())
-        {
-            Some(uuid) => engine.get_pool(uuid).unwrap().1.blockdevs().is_empty(),
-            _ => false,
-        });
-    }
-
-    #[test]
-    /// Creating a new pool with the same name and arguments should return identity
+    /// Creating a new pool with the same name and arguments should return
+    /// identity.
     fn create_pool_name_collision() {
         let name = "name";
         let mut engine = SimEngine::default();
-        engine
-            .create_pool(name, &[Path::new("/s/d")], None)
-            .unwrap();
+        let devices = strs_to_paths!(["/s/d"]);
+        engine.create_pool(name, devices, None).unwrap();
         assert_matches!(
-            engine.create_pool(name, &[Path::new("/s/d")], None),
+            engine.create_pool(name, devices, None),
             Ok(CreateAction::Identity)
         );
     }
@@ -267,7 +250,7 @@ mod tests {
         let name = "name";
         let mut engine = SimEngine::default();
         engine
-            .create_pool(name, &[Path::new("/s/d")], None)
+            .create_pool(name, strs_to_paths!(["/s/d"]), None)
             .unwrap();
         assert_matches!(
             engine.create_pool(
@@ -284,10 +267,9 @@ mod tests {
     fn create_pool_duplicate_devices() {
         let path = "/s/d";
         let mut engine = SimEngine::default();
-        let devices = vec![Path::new(path), Path::new(path)];
         assert_matches!(
             engine
-                .create_pool("name", &devices, None)
+                .create_pool("name", strs_to_paths!([path, path]), None)
                 .unwrap()
                 .changed()
                 .map(|uuid| engine.get_pool(uuid).unwrap().1.blockdevs().len()),
@@ -299,7 +281,14 @@ mod tests {
     /// Creating a pool with an impossible raid level should fail
     fn create_pool_max_u16_raid() {
         let mut engine = SimEngine::default();
-        assert_matches!(engine.create_pool("name", &[], Some(std::u16::MAX)), Err(_));
+        assert_matches!(
+            engine.create_pool(
+                "name",
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                Some(std::u16::MAX)
+            ),
+            Err(_)
+        );
     }
 
     #[test]

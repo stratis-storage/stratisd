@@ -161,7 +161,8 @@ fn dev_info(
 }
 
 /// A miscellaneous grab bag of useful information required to decide whether
-/// a device should be allowed to be initialized by Stratis.
+/// a device should be allowed to be initialized by Stratis or to be used
+/// when initializing a device.
 #[derive(Debug)]
 pub struct DeviceInfo {
     /// The device number
@@ -173,26 +174,31 @@ pub struct DeviceInfo {
     pub id_wwn: Option<StratisResult<String>>,
     /// The total size of the device
     pub size: Bytes,
-    /// The device identifiers obtained from the Stratis metadata. If None,
-    /// the device has been determined to be unowned.
-    pub stratis_identifiers: Option<StratisIdentifiers>,
 }
 
 /// Process a list of devices specified as device nodes. Return a vector
-/// of accumulated information about the device nodes.
-pub fn process_devices(paths: &[&Path]) -> StratisResult<Vec<DeviceInfo>> {
+/// of accumulated information about the device nodes. If the
+/// StratisIdentifiers value is not None, then the device has been
+/// identified as a Stratis device.
+pub fn process_devices(
+    paths: &[&Path],
+) -> StratisResult<Vec<(DeviceInfo, Option<StratisIdentifiers>)>> {
     paths
         .iter()
         .map(|devnode| {
-            dev_info(devnode).map(|(id_wwn, size, stratis_identifiers, devno)| DeviceInfo {
-                devno,
-                devnode: devnode.to_path_buf(),
-                id_wwn,
-                size,
-                stratis_identifiers,
+            dev_info(devnode).map(|(id_wwn, size, stratis_identifiers, devno)| {
+                (
+                    DeviceInfo {
+                        devno,
+                        devnode: devnode.to_path_buf(),
+                        id_wwn,
+                        size,
+                    },
+                    stratis_identifiers,
+                )
             })
         })
-        .collect::<StratisResult<Vec<DeviceInfo>>>()
+        .collect::<StratisResult<Vec<(DeviceInfo, Option<StratisIdentifiers>)>>>()
         .map_err(|err| {
             let error_message = format!(
                 "At least one of the devices specified was unsuitable for initialization: {}",
@@ -200,9 +206,21 @@ pub fn process_devices(paths: &[&Path]) -> StratisResult<Vec<DeviceInfo>> {
             );
             StratisError::Engine(ErrorEnum::Invalid, error_message)
         })
-        .map(|infos| infos.into_iter().unique_by(|info| info.devno).collect())
+        .map(|infos| {
+            infos
+                .into_iter()
+                .unique_by(|(info, _)| info.devno)
+                .collect()
+        })
 }
 
+/// Initialze devices in devices.
+///
+/// Precondition: All devices have been identified as ready to be initialized
+/// in a previous step.
+///
+/// Precondition: Each device's DeviceInfo struct contains all necessary
+/// information about the device.
 pub fn initialize_devices(
     devices: Vec<DeviceInfo>,
     pool_uuid: PoolUuid,
@@ -299,7 +317,11 @@ mod tests {
     fn test_ownership(paths: &[&Path]) {
         let pool_uuid = Uuid::new_v4();
         let blockdevs = initialize_devices(
-            process_devices(paths).unwrap(),
+            process_devices(paths)
+                .unwrap()
+                .into_iter()
+                .map(|(info, _)| info)
+                .collect(),
             pool_uuid,
             MDADataSize::default(),
         )
@@ -364,7 +386,11 @@ mod tests {
 
         let uuid1 = Uuid::new_v4();
         {
-            let device_infos = process_devices(paths1).unwrap();
+            let device_infos: Vec<DeviceInfo> = process_devices(paths1)
+                .unwrap()
+                .into_iter()
+                .map(|(info, _)| info)
+                .collect();
 
             assert_eq!(device_infos.len(), paths1.len());
 
@@ -400,7 +426,11 @@ mod tests {
         let uuid2 = Uuid::new_v4();
 
         {
-            let device_infos = process_devices(paths2).unwrap();
+            let device_infos: Vec<DeviceInfo> = process_devices(paths2)
+                .unwrap()
+                .into_iter()
+                .map(|(info, _)| info)
+                .collect();
 
             assert_eq!(device_infos.len(), paths2.len());
 

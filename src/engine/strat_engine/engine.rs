@@ -41,9 +41,9 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 pub struct StratEngine {
     pools: Table<StratPool>,
 
-    // Map of stratis devices that have been found but one or more stratis block devices are missing
-    // which prevents the associated pools from being setup.
-    incomplete_pools: HashMap<PoolUuid, HashMap<Device, PathBuf>>,
+    // Map of pool UUIDs to identifying matter on Stratis devices that have
+    // been found, but which have not been formed into a pool.
+    liminal_device_sets: HashMap<PoolUuid, HashMap<Device, PathBuf>>,
 
     // Maps name of DM devices we are watching to the most recent event number
     // we've handled for each
@@ -76,7 +76,7 @@ impl StratEngine {
 
         let mut engine = StratEngine {
             pools: Table::default(),
-            incomplete_pools: HashMap::new(),
+            liminal_device_sets: HashMap::new(),
             watched_dev_last_event_nrs: HashMap::new(),
         };
 
@@ -90,7 +90,7 @@ impl StratEngine {
     }
 
     // Given a set of devices, try to set up a pool. If the setup fails,
-    // insert the devices into incomplete_pools.
+    // insert the devices into liminal_device_sets.
     fn try_setup_pool(&mut self, pool_uuid: PoolUuid, devices: HashMap<Device, PathBuf>) {
         // Setup a pool from constituent devices in the context of some already
         // setup pools.
@@ -153,7 +153,7 @@ impl StratEngine {
                 self.pools.insert(pool_name, pool_uuid, pool);
             }
             _ => {
-                self.incomplete_pools.insert(pool_uuid, devices);
+                self.liminal_device_sets.insert(pool_uuid, devices);
             }
         }
     }
@@ -175,7 +175,7 @@ impl StratEngine {
                 None
             } else {
                 let mut devices = self
-                    .incomplete_pools
+                    .liminal_device_sets
                     .remove(&pool_uuid)
                     .unwrap_or_else(HashMap::new);
 
@@ -453,7 +453,7 @@ mod test {
         remove_dir_all(DEV_PATH).unwrap();
 
         let engine = StratEngine::initialize().unwrap();
-        assert_eq!(engine.incomplete_pools, HashMap::new());
+        assert_eq!(engine.liminal_device_sets, HashMap::new());
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());

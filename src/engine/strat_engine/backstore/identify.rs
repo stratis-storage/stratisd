@@ -331,7 +331,11 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
 
         initialize_devices(
-            process_devices(paths).unwrap(),
+            process_devices(paths)
+                .unwrap()
+                .into_iter()
+                .map(|(info, _)| info)
+                .collect(),
             pool_uuid,
             MDADataSize::default(),
         )

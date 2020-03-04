@@ -15,6 +15,9 @@ language: rust
 # Use a package which supplies cryptsetup 2.3.0 which is required
 # by features added in libcryptsetup-rs that are used in stratisd.
 before_install:
+  # Need newer packages for our .deb dependencies
+  - sudo add-apt-repository -y "deb http://us.archive.ubuntu.com/ubuntu/ eoan main"                                   │
+  - sudo apt-get -q update
   - wget "https://github.com/jbaublitz/stratisd/raw/deb/cryptsetup_2.3.0-1_amd64.deb"
   - sudo apt-get install -y "./cryptsetup_2.3.0-1_amd64.deb"
 

@@ -330,7 +330,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "libcryptsetup-rs"
 version = "0.2.0"
-source = "git+https://github.com/jbaublitz/libcryptsetup-rs?branch=issue-libcryptsetup-rs-29#d7b312409bebbf6d1eaadaa2134c37f18623fa22"
+source = "git+https://github.com/jbaublitz/libcryptsetup-rs?branch=issue-libcryptsetup-rs-29#2ddbfbd3b9fa7fd2fa762e992c21c302795362b7"
 dependencies = [
  "either 1.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.66 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -344,7 +344,7 @@ dependencies = [
 [[package]]
 name = "libcryptsetup-rs-sys"
 version = "0.1.1"
-source = "git+https://github.com/jbaublitz/libcryptsetup-rs?branch=issue-libcryptsetup-rs-29#d7b312409bebbf6d1eaadaa2134c37f18623fa22"
+source = "git+https://github.com/jbaublitz/libcryptsetup-rs?branch=issue-libcryptsetup-rs-29#2ddbfbd3b9fa7fd2fa762e992c21c302795362b7"
 dependencies = [
  "bindgen 0.53.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.50 (registry+https://github.com/rust-lang/crates.io-index)",

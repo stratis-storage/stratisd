@@ -161,7 +161,8 @@ fn dev_info(
 }
 
 /// A miscellaneous grab bag of useful information required to decide whether
-/// a device should be allowed to be initialized by Stratis.
+/// a device should be allowed to be initialized by Stratis or to be used
+/// when initializing a device.
 #[derive(Debug)]
 pub struct DeviceInfo {
     /// The device number
@@ -176,7 +177,9 @@ pub struct DeviceInfo {
 }
 
 /// Process a list of devices specified as device nodes. Return a vector
-/// of accumulated information about the device nodes.
+/// of accumulated information about the device nodes. If the
+/// StratisIdentifiers value is not None, then the device has been
+/// identified as a Stratis device.
 pub fn process_devices(
     paths: &[&Path],
 ) -> StratisResult<Vec<(DeviceInfo, Option<StratisIdentifiers>)>> {
@@ -211,6 +214,13 @@ pub fn process_devices(
         })
 }
 
+/// Initialze devices in devices.
+///
+/// Precondition: All devices have been identified as ready to be initialized
+/// in a previous step.
+///
+/// Precondition: Each device's DeviceInfo struct contains all necessary
+/// information about the device.
 pub fn initialize_devices(
     devices: Vec<DeviceInfo>,
     pool_uuid: PoolUuid,

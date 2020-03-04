@@ -127,7 +127,7 @@ pub struct BlockDevMgr {
 // blockdevmgr. If the selection of devices is incompatible with the current
 // state of the blockdevmgr, or simply invalid, return an error.
 //
-// Postcondition: All infos in the returned vector have their
+// Postcondition: All infos in the returned vector have their corresponding
 // stratis_identifiers value equal to None. Either their Stratis identifiers
 // indicated an error, or else the devices specified are already owned by
 // this blockdevmgr and should not be added again.
@@ -139,11 +139,11 @@ pub struct BlockDevMgr {
 fn check_device_ids(
     pool_uuid: PoolUuid,
     current_uuids: &HashSet<DevUuid>,
-    devices: Vec<DeviceInfo>,
+    devices: Vec<(DeviceInfo, Option<StratisIdentifiers>)>,
 ) -> StratisResult<Vec<DeviceInfo>> {
     let stratis_identifiers: HashMap<PoolUuid, HashSet<DevUuid>> = devices
         .iter()
-        .filter_map(|info| info.stratis_identifiers)
+        .filter_map(|(_, stratis_identifiers)| stratis_identifiers.as_ref())
         .fold(HashMap::new(), |mut acc, identifiers| {
             acc.entry(identifiers.pool_uuid)
                 .or_insert_with(HashSet::new)
@@ -161,11 +161,11 @@ fn check_device_ids(
             .map(|(p, devs)| {
                 let dev_string = devices
                     .iter()
-                    .filter(|info| match info.stratis_identifiers {
+                    .filter(|(_, stratis_identifiers)| match stratis_identifiers {
                         None => false,
-                        Some(StratisIdentifiers { pool_uuid, .. }) => devs.contains(&pool_uuid),
+                        Some(StratisIdentifiers { pool_uuid, .. }) => devs.contains(pool_uuid),
                     })
-                    .map(|info| info.devnode.display().to_string())
+                    .map(|(info, _)| info.devnode.display().to_string())
                     .collect::<Vec<_>>()
                     .join(", ");
                 format!(
@@ -191,13 +191,13 @@ fn check_device_ids(
         if !invalid_uuids.is_empty() {
             let error_string = devices
                 .iter()
-                .filter(|info| match info.stratis_identifiers {
+                .filter(|(_, stratis_identifiers)| match stratis_identifiers {
                     None => false,
                     Some(StratisIdentifiers { pool_uuid, .. }) => {
-                        invalid_uuids.contains(&&pool_uuid)
+                        invalid_uuids.contains(&pool_uuid)
                     }
                 })
-                .map(|info| info.devnode.display().to_string())
+                .map(|(info, _)| info.devnode.display().to_string())
                 .collect::<Vec<_>>()
                 .join(", ");
             let error_message = format!(
@@ -210,7 +210,8 @@ fn check_device_ids(
 
     Ok(devices
         .into_iter()
-        .filter(|info| info.stratis_identifiers.is_none())
+        .filter(|(_, stratis_identifiers)| stratis_identifiers.is_none())
+        .map(|(info, _)| info)
         .collect())
 }
 

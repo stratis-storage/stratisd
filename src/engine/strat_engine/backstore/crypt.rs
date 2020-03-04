@@ -9,9 +9,11 @@ use std::{
 use libc::{c_void, syscall, SYS_keyctl, SYS_request_key};
 
 use libcryptsetup_rs::{
-    c_uint, CryptActivateFlags, CryptDevice, CryptInit, CryptStatusInfo, CryptVolumeKeyFlags, EncryptionFormat,
-    LibcryptErr, SafeMemHandle,
+    c_uint, CryptActivateFlags, CryptDevice, CryptInit, CryptStatusInfo, CryptVolumeKeyFlags,
+    EncryptionFormat, LibcryptErr, SafeMemHandle,
 };
+
+use crate::engine::{DevUuid, PoolUuid};
 
 type Result<T> = std::result::Result<T, LibcryptErr>;
 
@@ -65,11 +67,11 @@ fn get_key_description(crypt_device: &mut CryptDevice) -> Result<String> {
 /// Get the Stratis activation name from a Stratis token
 fn get_stratis_device_name(crypt_device: &mut CryptDevice) -> Result<String> {
     let json = crypt_device.token_handle().json_get(STRATIS_TOKEN_ID)?;
-    json.get("device_name")
+    json.get("activation_name")
         .and_then(|type_val| type_val.as_str())
         .map(|type_str| type_str.to_string())
         .ok_or_else(|| {
-            LibcryptErr::Other("Could not get device_name from Stratis token".to_string())
+            LibcryptErr::Other("Could not get activation_name from Stratis token".to_string())
         })
 }
 
@@ -99,7 +101,7 @@ fn stratis_token_is_valid(json: &serde_json::Value, key_description: String) -> 
             .and_then(|uuid| uuid.as_str())
             .and_then(|uuid_str| uuid::Uuid::from_slice(uuid_str.as_bytes()).ok())
             .is_some()
-        && json.get("device_name").is_some()
+        && json.get("activation_name").is_some()
 }
 
 /// Check whether the physical device path corresponds to an encrypted
@@ -153,6 +155,11 @@ pub fn device_is_luks2(physical_path: &Path) -> Result<bool> {
     Ok(crypt_device.format_handle().get_type()? == EncryptionFormat::Luks2)
 }
 
+// Read key from keyring with the given key description
+//
+// Returns a safe owned memory segment that will clear itself when dropped.
+//
+// Requires cryptsetup 2.3
 fn read_key(key_description: &str) -> Result<SafeMemHandle> {
     // Attach persistent keyring to process keyring
     match unsafe {
@@ -188,13 +195,15 @@ fn read_key(key_description: &str) -> Result<SafeMemHandle> {
     let mut_ref = key_buffer.as_mut();
 
     // Read key from keyring
-    match unsafe { syscall(
-        SYS_keyctl,
-        KEYCTL_READ,
-        key_id,
-        mut_ref.as_mut_ptr(),
-        mut_ref.len(),
-    ) } {
+    match unsafe {
+        syscall(
+            SYS_keyctl,
+            KEYCTL_READ,
+            key_id,
+            mut_ref.as_mut_ptr(),
+            mut_ref.len(),
+        )
+    } {
         i if i < 0 => return Err(LibcryptErr::IOError(io::Error::last_os_error())),
         _ => (),
     };
@@ -205,8 +214,10 @@ fn read_key(key_description: &str) -> Result<SafeMemHandle> {
 /// Lay down properly configured LUKS2 metadata on a new physical device
 pub fn initialize_encrypted_stratis_device(
     physical_path: &Path,
+    pool_uuid: PoolUuid,
+    dev_uuid: DevUuid,
     key_description: &str,
-) -> Result<()> {
+) -> Result<PathBuf> {
     let mut crypt_device = CryptInit::init(physical_path)?;
 
     crypt_device.context_handle().format::<()>(
@@ -216,16 +227,68 @@ pub fn initialize_encrypted_stratis_device(
         libcryptsetup_rs::Either::Right(STRATIS_KEY_SIZE),
         None,
     )?;
-
     let key = read_key(key_description)?;
 
-    crypt_device.keyslot_handle(None).add_by_key(
+    let keyslot = crypt_device.keyslot_handle(None).add_by_key(
         None,
         key.as_ref(),
         CryptVolumeKeyFlags::empty(),
     )?;
 
-    Ok(())
+    // Initialize keyring token
+    crypt_device
+        .token_handle()
+        .luks2_keyring_set(Some(LUKS2_TOKEN_ID), key_description)?;
+    crypt_device
+        .token_handle()
+        .assign_keyslot(LUKS2_TOKEN_ID, Some(keyslot))?;
+
+    let activation_name = format!("{}-{}", pool_uuid.to_simple_ref(), dev_uuid.to_simple_ref());
+
+    // Initialize stratis token
+    crypt_device.token_handle().json_set(
+        Some(STRATIS_TOKEN_ID),
+        &json!({
+            "type": STRATIS_TOKEN_TYPE,
+            "keyslots": [],
+            "pool_uuid": pool_uuid.to_simple_ref().to_string(),
+            "device_uuid": dev_uuid.to_simple_ref().to_string(),
+            "key_description": key_description,
+            "activation_name": activation_name,
+        }),
+    )?;
+
+    crypt_device.token_handle().activate_by_token::<()>(
+        Some(&activation_name),
+        Some(LUKS2_TOKEN_ID),
+        None,
+        CryptActivateFlags::empty(),
+    )?;
+
+    check_activated_device_path(&mut crypt_device, &activation_name)
+}
+
+fn check_activated_device_path(crypt_device: &mut CryptDevice, name: &str) -> Result<PathBuf> {
+    // Check activation status.
+    let status = crypt_device.status_handle().status(name)?;
+    if CryptStatusInfo::Active != status {
+        return Err(LibcryptErr::Other("Failed to activate device".to_string()));
+    }
+
+    // Checking that the symlink was created may also be valuable in case a race
+    // condition occurs with udev.
+    let mut activated_path = PathBuf::from("/dev/mapper");
+    activated_path.push(name);
+
+    // Can potentially use inotify with a timeout to wait for the symlink
+    // if race conditions become a problem.
+    if activated_path.exists() {
+        Ok(activated_path)
+    } else {
+        Err(LibcryptErr::IOError(io::Error::from(
+            io::ErrorKind::NotFound,
+        )))
+    }
 }
 
 /// Activate encrypted Stratis device using the name stored in the
@@ -244,31 +307,5 @@ pub fn activate_encrypted_stratis_device(physical_path: &Path) -> Result<PathBuf
         CryptActivateFlags::empty(),
     )?;
 
-    // Assert that physical device path is equal to the path of the provided
-    // physical device.
-    assert_eq!(
-        crypt_device.status_handle().get_device_path()?,
-        physical_path
-    );
-
-    // Check activation status.
-    let status = crypt_device.status_handle().status(&stratis_device_name)?;
-    if CryptStatusInfo::Active != status {
-        return Err(LibcryptErr::Other("Failed to activate device".to_string()));
-    }
-
-    // Checking that the symlink was created may also be valuable in case a race
-    // condition occurs with udev.
-    let mut activated_path = PathBuf::from("/dev/mapper");
-    activated_path.push(stratis_device_name);
-
-    // Can potentially use inotify with a timeout to wait for the symlink
-    // if race conditions become a problem.
-    if activated_path.exists() {
-        Ok(activated_path)
-    } else {
-        Err(LibcryptErr::IOError(io::Error::from(
-            io::ErrorKind::NotFound,
-        )))
-    }
+    check_activated_device_path(&mut crypt_device, &stratis_device_name)
 }

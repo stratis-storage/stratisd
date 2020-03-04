@@ -16,10 +16,11 @@ language: rust
 # by features added in libcryptsetup-rs that are used in stratisd.
 before_install:
   # Need newer packages for our .deb dependencies
-  - sudo add-apt-repository -y "deb http://us.archive.ubuntu.com/ubuntu/ eoan main"                                   │
+  - sudo add-apt-repository -y "deb http://us.archive.ubuntu.com/ubuntu/ eoan main"
   - sudo apt-get -q update
+  - sudo apt-get install -y libargon2-1 libjson-c4
   - wget "https://github.com/jbaublitz/stratisd/raw/deb/cryptsetup_2.3.0-1_amd64.deb"
-  - sudo apt-get install -y "./cryptsetup_2.3.0-1_amd64.deb"
+  - sudo dpkg -i ./cryptsetup_2.3.0-1_amd64.deb
 
 matrix:
     fast_finish: true

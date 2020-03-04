@@ -16,6 +16,7 @@ language: rust
 # by features added in libcryptsetup-rs that are used in stratisd.
 before_install:
   - sudo apt-get -q update
+  - sudo apt-get autoremove cryptsetup-bin
   - sudo apt-get install -y libargon2-0 libjson-c3
   - wget "https://github.com/jbaublitz/stratisd/raw/deb/cryptsetup_2.3.0-1_amd64.deb"
   - sudo dpkg -i ./cryptsetup_2.3.0-1_amd64.deb

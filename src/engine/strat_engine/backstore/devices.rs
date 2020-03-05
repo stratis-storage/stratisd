@@ -552,4 +552,70 @@ mod tests {
             test_nonexistent_path,
         );
     }
+
+    // Verify that if the last device in a list of devices to intialize
+    // can not be intialized, all the devices previously initialized are
+    // properly cleaned up.
+    fn test_failure_cleanup(paths: &[&Path]) {
+        assert!(paths.len() > 1);
+
+        let mut devices: Vec<DeviceInfo> = process_devices(paths)
+            .unwrap()
+            .into_iter()
+            .map(|(info, _)| info)
+            .collect::<Vec<DeviceInfo>>();
+
+        let old_info = devices.pop().unwrap();
+
+        let new_info = DeviceInfo {
+            devnode: PathBuf::from("/srk/cheese"),
+            devno: old_info.devno,
+            id_wwn: None,
+            size: old_info.size,
+        };
+
+        devices.push(new_info);
+
+        assert_matches!(
+            initialize_devices(devices, Uuid::new_v4(), MDADataSize::default()),
+            Err(_)
+        );
+
+        // Just check all paths for absence of device identifiers.
+        // Initialization of the last path was never attempted, so it should
+        // be as bare of Stratis identifiers as all the other paths that
+        // were initialized.
+        for path in paths {
+            let mut f = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(path)
+                .unwrap();
+            assert_matches!(device_identifiers(&mut f), Ok(None));
+        }
+    }
+
+    #[test]
+    pub fn loop_test_failure_cleanup() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_failure_cleanup,
+        );
+    }
+
+    #[test]
+    pub fn real_test_failure_cleanup() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_failure_cleanup,
+        );
+    }
+
+    #[test]
+    pub fn travis_test_failure_cleanup() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_failure_cleanup,
+        );
+    }
 }

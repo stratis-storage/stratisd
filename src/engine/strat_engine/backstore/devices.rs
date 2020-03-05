@@ -215,6 +215,9 @@ pub fn process_devices(
 }
 
 /// Initialze devices in devices.
+/// Clean up previously initialized devices if initialization of any single
+/// device fails during initialization. Log at the warning level if cleanup
+/// fails.
 ///
 /// Precondition: All devices have been identified as ready to be initialized
 /// in a previous step.
@@ -226,9 +229,17 @@ pub fn initialize_devices(
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
 ) -> StratisResult<Vec<StratBlockDev>> {
-    let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
-    for dev_info in devices {
+    // Initialize a single device using information in dev_info.
+    // If initialization fails at any stage clean up the device.
+    // Return an error if initialization failed. Log a warning if cleanup
+    // fails.
+    fn initialize_one(
+        dev_info: &DeviceInfo,
+        pool_uuid: PoolUuid,
+        mda_data_size: MDADataSize,
+    ) -> StratisResult<StratBlockDev> {
         let mut f = OpenOptions::new().write(true).open(&dev_info.devnode)?;
+
         let bda = BDA::initialize(
             &mut f,
             StratisIdentifiers::new(pool_uuid, Uuid::new_v4()),
@@ -236,37 +247,58 @@ pub fn initialize_devices(
             BlockdevSize::new(dev_info.size.sectors()),
             Utc::now().timestamp() as u64,
         );
-        if let Ok(bda) = bda {
-            let hw_id = match dev_info.id_wwn {
-                Some(Ok(hw_id)) => Some(hw_id),
-                Some(Err(_)) => {
-                    warn!("Value for ID_WWN for device {} obtained from the udev database could not be decoded; inserting device into pool with UUID {} anyway",
+        match bda {
+            Ok(bda) => {
+                let hw_id = match &dev_info.id_wwn {
+                    Some(Ok(hw_id)) => Some(hw_id.to_owned()),
+                    Some(Err(_)) => {
+                        warn!("Value for ID_WWN for device {} obtained from the udev database could not be decoded; inserting device into pool with UUID {} anyway",
                           dev_info.devnode.display(),
                           pool_uuid.to_simple_ref());
-                    None
+                        None
+                    }
+                    None => None,
+                };
+
+                // FIXME: The expect is only provisionally true.
+                // The dev_size is at least MIN_DEV_SIZE, but the size of the
+                // metadata is not really bounded from above.
+                let blockdev = StratBlockDev::new(
+                    dev_info.devno,
+                    dev_info.devnode.to_owned(),
+                    bda,
+                    &[],
+                    None,
+                    hw_id,
+                )
+                .expect("bda.size() == dev_size; only allocating space for metadata");
+                Ok(blockdev)
+            }
+            Err(err) => {
+                if let Err(err) = disown_device(&mut f) {
+                    warn!("Failed to clean up device {}; cleanup was attempted because initialization of the device for pool with UUID {} failed: {}",
+                          dev_info.devnode.display(),
+                          pool_uuid.to_simple_ref(),
+                          err);
                 }
-                None => None,
-            };
+                Err(err)
+            }
+        }
+    }
 
-            // FIXME: The expect is only provisionally true.
-            // The dev_size is at least MIN_DEV_SIZE, but the size of the
-            // metadata is not really bounded from above.
-            let blockdev = StratBlockDev::new(
-                dev_info.devno,
-                dev_info.devnode.to_owned(),
-                bda,
-                &[],
-                None,
-                hw_id,
-            )
-            .expect("bda.size() == dev_size; only allocating space for metadata");
-            initialized_blockdevs.push(blockdev);
-        } else {
-            // TODO: check the return values and update state machine on failure
-            let _ = disown_device(&mut f);
-            let _ = wipe_blockdevs(&initialized_blockdevs);
-
-            return Err(bda.unwrap_err());
+    let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
+    for dev_info in devices {
+        match initialize_one(&dev_info, pool_uuid, mda_data_size) {
+            Ok(blockdev) => initialized_blockdevs.push(blockdev),
+            Err(err) => {
+                if let Err(err) = wipe_blockdevs(&initialized_blockdevs) {
+                    warn!("Failed to clean up some devices after initialization of device {} for pool with UUID {} failed: {}",
+                          dev_info.devnode.display(),
+                          pool_uuid.to_simple_ref(),
+                          err);
+                }
+                return Err(err);
+            }
         }
     }
     Ok(initialized_blockdevs)

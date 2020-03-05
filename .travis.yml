@@ -18,6 +18,9 @@ before_install:
   - sudo apt-get -q update
   # cryptsetup-bin conflicts with custom built cryptsetup
   - sudo apt-get remove cryptsetup-bin
+  # Linking fails if libcryptsetup 2.2 is present - must force
+  # remove due to system dependencies
+  - sudo dpkg --purge --force-all libcryptsetup12
   - sudo apt-get install -y libargon2-0 libjson-c3
   - wget "https://github.com/jbaublitz/stratisd/raw/deb/cryptsetup_2.3.0-1_amd64.deb"
   - sudo dpkg -i ./cryptsetup_2.3.0-1_amd64.deb

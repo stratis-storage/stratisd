@@ -17,8 +17,18 @@ use crate::engine::{DevUuid, PoolUuid};
 
 type Result<T> = std::result::Result<T, LibcryptErr>;
 
+// Stratis token JSON keys
+pub static TOKEN_TYPE_KEY: &str = "type";
+pub static TOKEN_KEYSLOTS_KEY: &str = "keyslots";
+pub static STRATIS_TOKEN_DEVNAME_KEY: &str = "activation_name";
+pub static STRATIS_TOKEN_KEYDESC_KEY: &str = "key_description";
+pub static STRATIS_TOKEN_POOL_UUID_KEY: &str = "pool_uuid";
+pub static STRATIS_TOKEN_DEV_UUID_KEY: &str = "device_uuid";
+
 pub static LUKS2_TOKEN_ID: c_uint = 0;
 pub static STRATIS_TOKEN_ID: c_uint = 1;
+
+pub static LUKS2_TOKEN_TYPE: &str = "luks2-keyring";
 pub static STRATIS_TOKEN_TYPE: &str = "stratis";
 pub static STRATIS_KEY_SIZE: usize = 512 / 8;
 
@@ -49,16 +59,16 @@ fn check_luks2_token(crypt_device: &mut CryptDevice) -> Result<()> {
 ///
 /// May not be necessary. See the comment above the invocation.
 fn luks2_token_type_is_valid(json: &serde_json::Value) -> bool {
-    json.get("type")
+    json.get(TOKEN_TYPE_KEY)
         .and_then(|type_val| type_val.as_str())
-        .map(|type_str| type_str == "luks2-keyring")
+        .map(|type_str| type_str == LUKS2_TOKEN_TYPE)
         .unwrap_or(false)
 }
 
 /// Get the key description from a LUKS2 keyring token
 fn get_key_description(crypt_device: &mut CryptDevice) -> Result<String> {
     let json = crypt_device.token_handle().json_get(LUKS2_TOKEN_ID)?;
-    json.get("key_description")
+    json.get(STRATIS_TOKEN_KEYDESC_KEY)
         .and_then(|type_val| type_val.as_str())
         .map(|type_str| type_str.to_string())
         .ok_or_else(|| LibcryptErr::Other("Malformed key_description in LUKS2 token".to_string()))
@@ -67,7 +77,7 @@ fn get_key_description(crypt_device: &mut CryptDevice) -> Result<String> {
 /// Get the Stratis activation name from a Stratis token
 fn get_stratis_device_name(crypt_device: &mut CryptDevice) -> Result<String> {
     let json = crypt_device.token_handle().json_get(STRATIS_TOKEN_ID)?;
-    json.get("activation_name")
+    json.get(STRATIS_TOKEN_DEVNAME_KEY)
         .and_then(|type_val| type_val.as_str())
         .map(|type_str| type_str.to_string())
         .ok_or_else(|| {
@@ -77,31 +87,31 @@ fn get_stratis_device_name(crypt_device: &mut CryptDevice) -> Result<String> {
 
 /// Validate that the Stratis token is present and valid
 fn stratis_token_is_valid(json: &serde_json::Value, key_description: String) -> bool {
-    json.get("type")
+    json.get(TOKEN_TYPE_KEY)
         .and_then(|type_val| type_val.as_str())
         .map(|type_str| type_str == STRATIS_TOKEN_TYPE)
         .unwrap_or(false)
         && json
-            .get("keyslots")
+            .get(TOKEN_KEYSLOTS_KEY)
             .and_then(|arr| arr.as_array())
             .map(|arr| arr.is_empty())
             .unwrap_or(false)
         && json
-            .get("key_description")
+            .get(STRATIS_TOKEN_KEYDESC_KEY)
             .and_then(|key| key.as_str())
             .map(|key_str| key_str == key_description.as_str())
             .unwrap_or(false)
         && json
-            .get("pool_uuid")
+            .get(STRATIS_TOKEN_POOL_UUID_KEY)
             .and_then(|uuid| uuid.as_str())
             .and_then(|uuid_str| uuid::Uuid::from_slice(uuid_str.as_bytes()).ok())
             .is_some()
         && json
-            .get("device_uuid")
+            .get(STRATIS_TOKEN_POOL_UUID_KEY)
             .and_then(|uuid| uuid.as_str())
             .and_then(|uuid_str| uuid::Uuid::from_slice(uuid_str.as_bytes()).ok())
             .is_some()
-        && json.get("activation_name").is_some()
+        && json.get(STRATIS_TOKEN_DEVNAME_KEY).is_some()
 }
 
 /// Check whether the physical device path corresponds to an encrypted
@@ -276,18 +286,20 @@ pub fn initialize_encrypted_stratis_device(
         .token_handle()
         .assign_keyslot(LUKS2_TOKEN_ID, Some(keyslot))?;
 
+    // The default activation name is [POOLUUID]-[DEVUUID] which should be unique
+    // across all Stratis pools.
     let activation_name = format!("{}-{}", pool_uuid.to_simple_ref(), dev_uuid.to_simple_ref());
 
     // Initialize stratis token
     crypt_device.token_handle().json_set(
         Some(STRATIS_TOKEN_ID),
         &json!({
-            "type": STRATIS_TOKEN_TYPE,
-            "keyslots": [],
-            "pool_uuid": pool_uuid.to_simple_ref().to_string(),
-            "device_uuid": dev_uuid.to_simple_ref().to_string(),
-            "key_description": key_description,
-            "activation_name": activation_name,
+            TOKEN_TYPE_KEY: STRATIS_TOKEN_TYPE,
+            TOKEN_KEYSLOTS_KEY: [],
+            STRATIS_TOKEN_POOL_UUID_KEY: pool_uuid.to_simple_ref().to_string(),
+            STRATIS_TOKEN_DEV_UUID_KEY: dev_uuid.to_simple_ref().to_string(),
+            STRATIS_TOKEN_KEYDESC_KEY: key_description,
+            STRATIS_TOKEN_DEVNAME_KEY: activation_name,
         }),
     )?;
 

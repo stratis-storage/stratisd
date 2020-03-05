@@ -10,6 +10,8 @@ use std::{
     rc::Rc,
 };
 
+use serde_json::{Map, Value};
+
 use crate::{
     engine::{
         engine::{Engine, Eventable, Pool},
@@ -140,6 +142,10 @@ impl Engine for SimEngine {
 
     fn evented(&mut self) -> StratisResult<()> {
         Ok(())
+    }
+
+    fn get_liminal_devices(&self) -> Value {
+        Map::new().into()
     }
 }
 

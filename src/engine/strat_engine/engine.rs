@@ -9,6 +9,7 @@ use std::{
 };
 
 use libudev;
+use serde_json::{Map, Value};
 
 use devicemapper::{Device, DmNameBuf};
 
@@ -356,6 +357,10 @@ impl Engine for StratEngine {
         self.watched_dev_last_event_nrs = device_list;
 
         Ok(())
+    }
+
+    fn get_liminal_devices(&self) -> Value {
+        Map::new().into()
     }
 }
 

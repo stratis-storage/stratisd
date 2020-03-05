@@ -246,6 +246,9 @@ pub trait Engine: Debug {
 
     /// Notify the engine that an event has occurred on the Eventable.
     fn evented(&mut self) -> StratisResult<()>;
+
+    /// Get a report of the liminal devices
+    fn get_liminal_devices(&self) -> serde_json::Value;
 }
 
 /// Allows an Engine to include a fd in the event loop. See

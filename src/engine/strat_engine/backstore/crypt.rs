@@ -211,6 +211,39 @@ fn read_key(key_description: &str) -> Result<SafeMemHandle> {
     Ok(key_buffer)
 }
 
+// Activate device by token then check that the logical path exists corresponding
+// to the activation name passed into this method.
+fn activate_and_check_device_path(crypt_device: &mut CryptDevice, name: &str) -> Result<PathBuf> {
+    // Activate by token
+    crypt_device.token_handle().activate_by_token::<()>(
+        Some(name),
+        Some(LUKS2_TOKEN_ID),
+        None,
+        CryptActivateFlags::empty(),
+    )?;
+
+    // Check activation status.
+    let status = crypt_device.status_handle().status(name)?;
+    if CryptStatusInfo::Active != status {
+        return Err(LibcryptErr::Other("Failed to activate device".to_string()));
+    }
+
+    // Checking that the symlink was created may also be valuable in case a race
+    // condition occurs with udev.
+    let mut activated_path = PathBuf::from("/dev/mapper");
+    activated_path.push(name);
+
+    // Can potentially use inotify with a timeout to wait for the symlink
+    // if race conditions become a problem.
+    if activated_path.exists() {
+        Ok(activated_path)
+    } else {
+        Err(LibcryptErr::IOError(io::Error::from(
+            io::ErrorKind::NotFound,
+        )))
+    }
+}
+
 /// Lay down properly configured LUKS2 metadata on a new physical device
 pub fn initialize_encrypted_stratis_device(
     physical_path: &Path,
@@ -258,37 +291,7 @@ pub fn initialize_encrypted_stratis_device(
         }),
     )?;
 
-    crypt_device.token_handle().activate_by_token::<()>(
-        Some(&activation_name),
-        Some(LUKS2_TOKEN_ID),
-        None,
-        CryptActivateFlags::empty(),
-    )?;
-
-    check_activated_device_path(&mut crypt_device, &activation_name)
-}
-
-fn check_activated_device_path(crypt_device: &mut CryptDevice, name: &str) -> Result<PathBuf> {
-    // Check activation status.
-    let status = crypt_device.status_handle().status(name)?;
-    if CryptStatusInfo::Active != status {
-        return Err(LibcryptErr::Other("Failed to activate device".to_string()));
-    }
-
-    // Checking that the symlink was created may also be valuable in case a race
-    // condition occurs with udev.
-    let mut activated_path = PathBuf::from("/dev/mapper");
-    activated_path.push(name);
-
-    // Can potentially use inotify with a timeout to wait for the symlink
-    // if race conditions become a problem.
-    if activated_path.exists() {
-        Ok(activated_path)
-    } else {
-        Err(LibcryptErr::IOError(io::Error::from(
-            io::ErrorKind::NotFound,
-        )))
-    }
+    activate_and_check_device_path(&mut crypt_device, &activation_name)
 }
 
 /// Activate encrypted Stratis device using the name stored in the
@@ -300,12 +303,6 @@ pub fn activate_encrypted_stratis_device(physical_path: &Path) -> Result<PathBuf
         .load::<()>(EncryptionFormat::Luks2, None)?;
 
     let stratis_device_name = get_stratis_device_name(&mut crypt_device)?;
-    crypt_device.token_handle().activate_by_token::<()>(
-        Some(stratis_device_name.as_str()),
-        Some(LUKS2_TOKEN_ID),
-        None,
-        CryptActivateFlags::empty(),
-    )?;
 
-    check_activated_device_path(&mut crypt_device, &stratis_device_name)
+    activate_and_check_device_path(&mut crypt_device, &stratis_device_name)
 }

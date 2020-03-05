@@ -336,6 +336,7 @@ mod tests {
                 .collect(),
             pool_uuid,
             MDADataSize::default(),
+            None,
         )
         .unwrap();
 

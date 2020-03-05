@@ -26,6 +26,7 @@ pub enum StratisError {
     Utf8(str::Utf8Error),
     Serde(serde_json::error::Error),
     DM(devicemapper::DmError),
+    Crypt(libcryptsetup_rs::LibcryptErr),
 
     #[cfg(feature = "dbus_enabled")]
     Dbus(dbus::Error),
@@ -43,6 +44,7 @@ impl fmt::Display for StratisError {
             StratisError::Utf8(ref err) => write!(f, "Utf8 error: {}", err),
             StratisError::Serde(ref err) => write!(f, "Serde error: {}", err),
             StratisError::DM(ref err) => write!(f, "DM error: {}", err),
+            StratisError::Crypt(ref err) => write!(f, "Cryptsetup error: {}", err),
 
             #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => {
@@ -63,6 +65,7 @@ impl Error for StratisError {
             StratisError::Utf8(ref err) => Some(err),
             StratisError::Serde(ref err) => Some(err),
             StratisError::DM(ref err) => Some(err),
+            StratisError::Crypt(ref err) => Some(err),
 
             #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => Some(err),
@@ -104,6 +107,12 @@ impl From<serde_json::error::Error> for StratisError {
 impl From<devicemapper::DmError> for StratisError {
     fn from(err: devicemapper::DmError) -> StratisError {
         StratisError::DM(err)
+    }
+}
+
+impl From<libcryptsetup_rs::LibcryptErr> for StratisError {
+    fn from(err: libcryptsetup_rs::LibcryptErr) -> StratisError {
+        StratisError::Crypt(err)
     }
 }
 

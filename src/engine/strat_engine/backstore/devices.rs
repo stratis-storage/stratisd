@@ -22,6 +22,7 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
+                crypt::initialize_encrypted_stratis_device,
                 metadata::{
                     device_identifiers, disown_device, BlockdevSize, MDADataSize,
                     StratisIdentifiers, BDA,
@@ -261,6 +262,7 @@ pub fn initialize_devices(
     devices: Vec<DeviceInfo>,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
+    key_description: Option<&str>,
 ) -> StratisResult<Vec<StratBlockDev>> {
     // Initialize a single device using information in dev_info.
     // If initialization fails at any stage clean up the device.
@@ -270,8 +272,19 @@ pub fn initialize_devices(
         dev_info: &DeviceInfo,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
+        key_description: Option<&str>,
     ) -> StratisResult<StratBlockDev> {
-        let mut f = OpenOptions::new().write(true).open(&dev_info.devnode)?;
+        let dev_uuid = Uuid::new_v4();
+        let physical_or_logical_path = match key_description {
+            Some(desc) => {
+                initialize_encrypted_stratis_device(&dev_info.devnode, pool_uuid, dev_uuid, desc)?
+            }
+            None => dev_info.devnode.clone(),
+        };
+
+        let mut f = OpenOptions::new()
+            .write(true)
+            .open(physical_or_logical_path)?;
 
         let hw_id = match &dev_info.id_wwn {
             Some(Ok(hw_id)) => Some(hw_id.to_owned()),
@@ -286,7 +299,7 @@ pub fn initialize_devices(
 
         let bda = BDA::initialize(
             &mut f,
-            StratisIdentifiers::new(pool_uuid, Uuid::new_v4()),
+            StratisIdentifiers::new(pool_uuid, dev_uuid),
             mda_data_size,
             BlockdevSize::new(dev_info.size.sectors()),
             Utc::now().timestamp() as u64,
@@ -317,7 +330,7 @@ pub fn initialize_devices(
 
     let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
     for dev_info in devices {
-        match initialize_one(&dev_info, pool_uuid, mda_data_size) {
+        match initialize_one(&dev_info, pool_uuid, mda_data_size, key_description) {
             Ok(blockdev) => initialized_blockdevs.push(blockdev),
             Err(err) => {
                 if let Err(err) = wipe_blockdevs(&initialized_blockdevs) {
@@ -385,6 +398,7 @@ mod tests {
                 .collect(),
             pool_uuid,
             MDADataSize::default(),
+            None,
         )
         .unwrap();
 
@@ -453,7 +467,8 @@ mod tests {
 
             assert_eq!(device_infos.len(), paths1.len());
 
-            let devices = initialize_devices(device_infos, uuid1, MDADataSize::default()).unwrap();
+            let devices =
+                initialize_devices(device_infos, uuid1, MDADataSize::default(), None).unwrap();
             assert_eq!(devices.len(), paths1.len());
 
             for path in paths1 {
@@ -493,7 +508,8 @@ mod tests {
 
             assert_eq!(device_infos.len(), paths2.len());
 
-            let devices = initialize_devices(device_infos, uuid2, MDADataSize::default()).unwrap();
+            let devices =
+                initialize_devices(device_infos, uuid2, MDADataSize::default(), None).unwrap();
             assert_eq!(devices.len(), paths2.len());
 
             for path in paths2 {
@@ -610,7 +626,7 @@ mod tests {
         devices.push(new_info);
 
         assert_matches!(
-            initialize_devices(devices, Uuid::new_v4(), MDADataSize::default()),
+            initialize_devices(devices, Uuid::new_v4(), MDADataSize::default(), None),
             Err(_)
         );
 

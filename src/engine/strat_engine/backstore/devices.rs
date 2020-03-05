@@ -327,8 +327,6 @@ mod tests {
         )
         .unwrap();
 
-        cmd::udev_settle().unwrap();
-
         for path in paths {
             assert_eq!(
                 pool_uuid,

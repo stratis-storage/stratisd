@@ -262,6 +262,34 @@ impl StaticHeader {
             }
         }
 
+        // Action taken when both signature blocks are interpreted as valid.
+        //
+        // If the contents of the signature blocks are equivalent,
+        // return valid static header result.
+        //
+        // If the contents of the signature blocks are not equivalent,
+        // overwrite the older block with the contents of the newer one,
+        // or return an error if the blocks have the same initialization time.
+        fn compare_static_headers<F>(
+            f: &mut F,
+            sh_1: StaticHeader,
+            sh_2: StaticHeader,
+        ) -> StratisResult<Option<StaticHeader>>
+        where
+            F: Read + Seek + SyncAll,
+        {
+            if sh_1 == sh_2 {
+                Ok(Some(sh_1))
+            } else if sh_1.initialization_time == sh_2.initialization_time {
+                let err_str = "Appeared to be a Stratis device, but signature blocks disagree.";
+                Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
+            } else if sh_1.initialization_time > sh_2.initialization_time {
+                write_header(f, sh_1, MetadataLocation::Second)
+            } else {
+                write_header(f, sh_2, MetadataLocation::First)
+            }
+        }
+
         fn write_header<F>(
             f: &mut F,
             sh: StaticHeader,
@@ -282,24 +310,7 @@ impl StaticHeader {
             // We read both copies without an IO error.
             (Ok(buf_loc_1), Ok(buf_loc_2)) => match (buf_loc_1, buf_loc_2) {
                 (Ok(loc_1), Ok(loc_2)) => match (loc_1, loc_2) {
-                    (Some(loc_1), Some(loc_2)) => {
-                        if loc_1 == loc_2 {
-                            Ok(Some(loc_1))
-                        } else if loc_1.initialization_time == loc_2.initialization_time {
-                            // Inexplicable disagreement among static headers
-                            let err_str =
-                                "Appeared to be a Stratis device, but signature blocks disagree.";
-                            Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
-                        } else if loc_1.initialization_time > loc_2.initialization_time {
-                            // If the first header block is newer, overwrite second with
-                            // contents of first.
-                            write_header(f, loc_1, MetadataLocation::Second)
-                        } else {
-                            // The second header block must be newer, so overwrite first
-                            // with contents of second.
-                            write_header(f, loc_2, MetadataLocation::First)
-                        }
-                    }
+                    (Some(loc_1), Some(loc_2)) => compare_static_headers(f, loc_1, loc_2),
                     (None, None) => Ok(None),
                     (Some(loc_1), None) => write_header(f, loc_1, MetadataLocation::Second),
                     (None, Some(loc_2)) => write_header(f, loc_2, MetadataLocation::First),

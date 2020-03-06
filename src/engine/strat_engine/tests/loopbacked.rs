@@ -25,7 +25,7 @@ pub enum DeviceLimits {
     /// Require exactly the number of devices specified.
     /// Specify their size in Sectors.
     Exactly(usize, Option<Sectors>),
-    /// Required exactly the number of devices specified in the first and
+    /// Specify a minimum and maximum number of devices in the first and
     /// second argument to the constructors. Specify their size in Sectors.
     Range(usize, usize, Option<Sectors>),
 }

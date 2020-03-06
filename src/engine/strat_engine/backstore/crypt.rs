@@ -18,29 +18,30 @@ use crate::engine::{DevUuid, PoolUuid};
 type Result<T> = std::result::Result<T, LibcryptErr>;
 
 // Stratis token JSON keys
-pub static TOKEN_TYPE_KEY: &str = "type";
-pub static TOKEN_KEYSLOTS_KEY: &str = "keyslots";
-pub static STRATIS_TOKEN_DEVNAME_KEY: &str = "activation_name";
-pub static STRATIS_TOKEN_KEYDESC_KEY: &str = "key_description";
-pub static STRATIS_TOKEN_POOL_UUID_KEY: &str = "pool_uuid";
-pub static STRATIS_TOKEN_DEV_UUID_KEY: &str = "device_uuid";
+pub const TOKEN_TYPE_KEY: &str = "type";
+pub const TOKEN_KEYSLOTS_KEY: &str = "keyslots";
+pub const STRATIS_TOKEN_DEVNAME_KEY: &str = "activation_name";
+pub const STRATIS_TOKEN_KEYDESC_KEY: &str = "key_description";
+pub const STRATIS_TOKEN_POOL_UUID_KEY: &str = "pool_uuid";
+pub const STRATIS_TOKEN_DEV_UUID_KEY: &str = "device_uuid";
 
-pub static LUKS2_TOKEN_ID: c_uint = 0;
-pub static STRATIS_TOKEN_ID: c_uint = 1;
+pub const LUKS2_TOKEN_ID: c_uint = 0;
+pub const STRATIS_TOKEN_ID: c_uint = 1;
 
-pub static LUKS2_TOKEN_TYPE: &str = "luks2-keyring";
-pub static STRATIS_TOKEN_TYPE: &str = "stratis";
-pub static STRATIS_KEY_SIZE: usize = 512 / 8;
+pub const LUKS2_TOKEN_TYPE: &str = "luks2-keyring";
+pub const STRATIS_TOKEN_TYPE: &str = "stratis";
+pub const STRATIS_KEY_SIZE: usize = 512 / 8;
 
+/// Will be replaced with libc constants in libc v0.2.68
 mod consts {
     use libc::c_int;
 
     pub const KEYCTL_GET_PERSISTENT: c_int = 22;
     pub const KEYCTL_READ: c_int = 11;
-    pub const KEY_SPEC_PROCESS_KEYRING: c_int = -2;
+    pub const KEY_SPEC_SESSION_KEYRING: c_int = -3;
 }
 
-use self::consts::{KEYCTL_GET_PERSISTENT, KEYCTL_READ, KEY_SPEC_PROCESS_KEYRING};
+use self::consts::{KEYCTL_GET_PERSISTENT, KEYCTL_READ, KEY_SPEC_SESSION_KEYRING};
 
 /// Check that the token can open the device.
 ///
@@ -177,7 +178,7 @@ fn read_key(key_description: &str) -> Result<SafeMemHandle> {
             SYS_keyctl,
             KEYCTL_GET_PERSISTENT,
             0,
-            KEY_SPEC_PROCESS_KEYRING,
+            KEY_SPEC_SESSION_KEYRING,
         )
     } {
         i if i < 0 => return Err(LibcryptErr::IOError(io::Error::last_os_error())),
@@ -254,6 +255,10 @@ fn activate_and_check_device_path(crypt_device: &mut CryptDevice, name: &str) ->
     }
 }
 
+pub fn name_from_uuids(pool_uuid: PoolUuid, dev_uuid: DevUuid) -> String {
+    format!("{}-{}", pool_uuid, dev_uuid)
+}
+
 /// Lay down properly configured LUKS2 metadata on a new physical device
 pub fn initialize_encrypted_stratis_device(
     physical_path: &Path,
@@ -288,7 +293,7 @@ pub fn initialize_encrypted_stratis_device(
 
     // The default activation name is [POOLUUID]-[DEVUUID] which should be unique
     // across all Stratis pools.
-    let activation_name = format!("{}-{}", pool_uuid.to_simple_ref(), dev_uuid.to_simple_ref());
+    let activation_name = name_from_uuids(pool_uuid, dev_uuid);
 
     // Initialize stratis token
     crypt_device.token_handle().json_set(
@@ -317,4 +322,123 @@ pub fn activate_encrypted_stratis_device(physical_path: &Path) -> Result<PathBuf
     let stratis_device_name = get_stratis_device_name(&mut crypt_device)?;
 
     activate_and_check_device_path(&mut crypt_device, &stratis_device_name)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        error::Error,
+        ffi::CString,
+        fs::File,
+        io::{Read, Write},
+    };
+
+    use uuid::Uuid;
+
+    use crate::engine::strat_engine::tests::loopbacked;
+
+    use super::*;
+
+    fn insert_and_cleanup_key<F>(physical_path: &Path, test: F)
+    where
+        F: Fn(&Path, &str) -> std::result::Result<(), Box<dyn Error>>,
+    {
+        let type_cstring = "user\0";
+        let description = "test-description-for-stratisd";
+        let description_cstring = CString::new(description).unwrap();
+        let mut key_data = [0; STRATIS_KEY_SIZE];
+        File::open("/dev/urandom")
+            .unwrap()
+            .read_exact(&mut key_data)
+            .unwrap();
+
+        // This constant is not in the libc crate yet
+        const KEYCTL_UNLINK: i32 = 9;
+
+        let key_id = match unsafe {
+            libc::syscall(
+                libc::SYS_add_key,
+                type_cstring.as_ptr(),
+                description_cstring.as_ptr(),
+                key_data.as_ptr(),
+                key_data.len(),
+                KEY_SPEC_SESSION_KEYRING,
+            )
+        } {
+            i if i < 0 => panic!("Failed to create key in keyring"),
+            i => i,
+        };
+
+        let result = test(physical_path, description);
+
+        if unsafe {
+            libc::syscall(
+                libc::SYS_keyctl,
+                KEYCTL_UNLINK,
+                key_id,
+                KEY_SPEC_SESSION_KEYRING,
+            )
+        } < 0
+        {
+            panic!(
+                "Failed to clean up key with key description {} from keyring",
+                description
+            );
+        }
+
+        result.unwrap()
+    }
+
+    /// Test initializing and activating an encrypted device using
+    /// the utilities provided here.
+    fn test_crypt_device_ops(paths: &[&Path]) {
+        assert_eq!(paths.len(), 1);
+
+        let test = |path: &Path, key_desc: &str| -> std::result::Result<(), Box<dyn Error>> {
+            let pool_uuid = Uuid::new_v4();
+            let dev_uuid = Uuid::new_v4();
+
+            let logical_path =
+                initialize_encrypted_stratis_device(path, pool_uuid, dev_uuid, key_desc)?;
+
+            let mut test_file = logical_path;
+            test_file.push("test-file");
+            let test_string = "this is a test string to be checked for";
+            File::create(test_file)?.write_all(test_string.as_bytes())?;
+
+            let mut disk_buffer = Vec::new();
+            File::open(path)?.read_to_end(&mut disk_buffer)?;
+            let lossy_disk_string = String::from_utf8_lossy(&disk_buffer);
+            if lossy_disk_string.contains(test_string) {
+                return Err(Box::new(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Disk was not encrypted!",
+                )));
+            }
+
+            let mut crypt_device = libcryptsetup_rs::CryptInit::init(path)?;
+            crypt_device
+                .context_handle()
+                .load::<()>(libcryptsetup_rs::EncryptionFormat::Luks2, None)?;
+            crypt_device.activate_handle().deactivate(
+                &name_from_uuids(pool_uuid, dev_uuid),
+                libcryptsetup_rs::CryptDeactivateFlags::empty(),
+            )?;
+            std::mem::drop(crypt_device);
+
+            activate_encrypted_stratis_device(path)?;
+
+            Ok(())
+        };
+
+        insert_and_cleanup_key(paths[0], test);
+    }
+
+    #[test]
+    fn loop_test_crypt_device_ops() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_crypt_device_ops,
+        );
+    }
 }

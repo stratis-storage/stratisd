@@ -335,7 +335,7 @@ mod tests {
 
     use uuid::Uuid;
 
-    use crate::engine::strat_engine::tests::loopbacked;
+    use crate::engine::strat_engine::tests::{loopbacked, real};
 
     use super::*;
 
@@ -436,6 +436,22 @@ mod tests {
 
     #[test]
     fn loop_test_crypt_device_ops() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_crypt_device_ops,
+        );
+    }
+
+    #[test]
+    fn real_test_crypt_device_ops() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(1, None, None),
+            test_crypt_device_ops,
+        );
+    }
+
+    #[test]
+    fn travis_test_crypt_device_ops() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Exactly(1, None),
             test_crypt_device_ops,

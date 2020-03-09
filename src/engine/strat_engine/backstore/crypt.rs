@@ -454,7 +454,7 @@ mod tests {
     #[test]
     fn real_test_crypt_device_ops() {
         real::test_with_spec(
-            &real::DeviceLimits::Exactly(1, None, None),
+            &real::DeviceLimits::Exactly(1, None, Some()),
             test_crypt_device_ops,
         );
     }

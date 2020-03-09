@@ -226,7 +226,7 @@ impl StaticHeader {
             repair_location: MetadataLocation,
         ) -> StratisResult<Option<StaticHeader>>
         where
-            F: Read + Seek + SyncAll,
+            F: Seek + SyncAll,
         {
             if let Some(sh) = maybe_sh {
                 write_header(f, sh, repair_location)
@@ -249,7 +249,7 @@ impl StaticHeader {
             repair_location: MetadataLocation,
         ) -> StratisResult<Option<StaticHeader>>
         where
-            F: Read + Seek + SyncAll,
+            F: Seek + SyncAll,
         {
             match maybe_sh {
                 Ok(loc) => {
@@ -276,7 +276,7 @@ impl StaticHeader {
             sh_2: StaticHeader,
         ) -> StratisResult<Option<StaticHeader>>
         where
-            F: Read + Seek + SyncAll,
+            F: Seek + SyncAll,
         {
             if sh_1 == sh_2 {
                 Ok(Some(sh_1))
@@ -296,7 +296,7 @@ impl StaticHeader {
             repair_location: MetadataLocation,
         ) -> StratisResult<Option<StaticHeader>>
         where
-            F: Read + Seek + SyncAll,
+            F: Seek + SyncAll,
         {
             sh.write(f, repair_location)?;
             Ok(Some(sh))

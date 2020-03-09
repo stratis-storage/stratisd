@@ -85,7 +85,7 @@ macro_rules! properties_footer {
     };
 }
 
-macro_rules! pre_pool_op {
+macro_rules! pool_op_logging {
     ($oper:tt, $arg:ident; $postoper:tt $(, $args:ident)*; $engine_op:expr) => {{
         info!($oper, $arg);
         let result = $engine_op;

@@ -287,7 +287,7 @@ pub fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let mut engine = dbus_context.engine.borrow_mut();
 
-    let result = pre_pool_op!("preparing to rename pool with name {}", new_name; "successfully renamed pool with name {}, uuid {}", new_name; engine.rename_pool(pool_uuid, new_name));
+    let result = pool_op_logging!("preparing to rename pool with name {}", new_name; "successfully renamed pool with name {}, uuid {}", new_name; engine.rename_pool(pool_uuid, new_name));
 
     let msg = match result {
         Ok(RenameAction::NoSource) => {

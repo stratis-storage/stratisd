@@ -255,8 +255,8 @@ fn activate_and_check_device_path(crypt_device: &mut CryptDevice, name: &str) ->
     }
 }
 
-pub fn name_from_uuids(pool_uuid: PoolUuid, dev_uuid: DevUuid) -> String {
-    format!("{}-{}", pool_uuid, dev_uuid)
+pub fn name_from_uuids(pool_uuid: &PoolUuid, dev_uuid: &DevUuid) -> String {
+    format!("{}-{}", pool_uuid.to_simple_ref(), dev_uuid.to_simple_ref())
 }
 
 /// Lay down properly configured LUKS2 metadata on a new physical device
@@ -293,7 +293,7 @@ pub fn initialize_encrypted_stratis_device(
 
     // The default activation name is [POOLUUID]-[DEVUUID] which should be unique
     // across all Stratis pools.
-    let activation_name = name_from_uuids(pool_uuid, dev_uuid);
+    let activation_name = name_from_uuids(&pool_uuid, &dev_uuid);
 
     // Initialize stratis token
     crypt_device.token_handle().json_set(
@@ -329,7 +329,7 @@ mod tests {
     use std::{
         error::Error,
         ffi::CString,
-        fs::File,
+        fs::{File, OpenOptions},
         io::{Read, Write},
     };
 
@@ -401,13 +401,14 @@ mod tests {
             let logical_path =
                 initialize_encrypted_stratis_device(path, pool_uuid, dev_uuid, key_desc)?;
 
-            let mut test_file = logical_path;
-            test_file.push("test-file");
+            let mut devicenode = OpenOptions::new().write(true).open(logical_path)?;
             let test_string = "this is a test string to be checked for";
-            File::create(test_file)?.write_all(test_string.as_bytes())?;
+            devicenode.write_all(test_string.as_bytes())?;
+            std::mem::drop(devicenode);
 
             let mut disk_buffer = Vec::new();
-            File::open(path)?.read_to_end(&mut disk_buffer)?;
+            let mut devicenode = File::open(path)?;
+            devicenode.read_to_end(&mut disk_buffer)?;
             let lossy_disk_string = String::from_utf8_lossy(&disk_buffer);
             if lossy_disk_string.contains(test_string) {
                 return Err(Box::new(io::Error::new(
@@ -415,18 +416,26 @@ mod tests {
                     "Disk was not encrypted!",
                 )));
             }
+            std::mem::drop(devicenode);
 
-            let mut crypt_device = libcryptsetup_rs::CryptInit::init(path)?;
-            crypt_device
-                .context_handle()
-                .load::<()>(libcryptsetup_rs::EncryptionFormat::Luks2, None)?;
-            crypt_device.activate_handle().deactivate(
-                &name_from_uuids(pool_uuid, dev_uuid),
-                libcryptsetup_rs::CryptDeactivateFlags::empty(),
-            )?;
-            std::mem::drop(crypt_device);
+            let close_active = |name: &str| -> Result<()> {
+                let mut crypt_device =
+                    libcryptsetup_rs::CryptInit::init_by_name_and_header(name, None)?;
+                crypt_device
+                    .context_handle()
+                    .load::<()>(libcryptsetup_rs::EncryptionFormat::Luks2, None)?;
+                crypt_device
+                    .activate_handle()
+                    .deactivate(name, libcryptsetup_rs::CryptDeactivateFlags::empty())?;
+
+                Ok(())
+            };
+
+            let name = name_from_uuids(&pool_uuid, &dev_uuid);
+            close_active(&name)?;
 
             activate_encrypted_stratis_device(path)?;
+            close_active(&name)?;
 
             Ok(())
         };

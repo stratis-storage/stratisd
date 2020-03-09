@@ -86,7 +86,7 @@ macro_rules! properties_footer {
 }
 
 macro_rules! pool_op_logging {
-    ($oper:tt, $arg:ident; $postoper:tt $(, $args:ident)*; $engine_op:expr) => {{
+    ($oper:tt, $arg:expr; $postoper:tt $(, $args:expr)*; $engine_op:expr) => {{
         info!($oper, $arg);
         let result = $engine_op;
         if let Ok(ref uuid) = result {

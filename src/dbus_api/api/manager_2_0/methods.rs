@@ -37,7 +37,7 @@ pub fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let dbus_context = m.tree.get_data();
     let mut engine = dbus_context.engine.borrow_mut();
 
-    let result = pre_pool_op! {"preparing to create pool with name {}", name; "successfully created pool with name {}, uuid {}", name; engine.create_pool(name, &blockdevs, tuple_to_option(redundancy))};
+    let result = pre_pool_op!("preparing to create pool with name {}", name; "successfully created pool with name {}, uuid {}", name; engine.create_pool(name, &blockdevs, tuple_to_option(redundancy)));
 
     let return_message = message.method_return();
 
@@ -103,7 +103,7 @@ pub fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let mut engine = dbus_context.engine.borrow_mut();
 
-    let result = pre_pool_op! {"preparing to destroy pool with uuid {}", pool_uuid; "successfully destroyed pool with uuid {}"; engine.destroy_pool(pool_uuid)};
+    let result = pre_pool_op!("preparing to destroy pool with uuid {}", pool_uuid; "successfully destroyed pool with uuid {}"; engine.destroy_pool(pool_uuid));
 
     let msg = match result {
         Ok(DeleteAction::Deleted(uuid)) => {

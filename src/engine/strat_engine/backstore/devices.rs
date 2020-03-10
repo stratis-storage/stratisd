@@ -651,4 +651,44 @@ mod tests {
             test_failure_cleanup,
         );
     }
+
+    // Verify that resolve devices simply eliminates duplicate devnodes,
+    // without returning an error.
+    fn test_duplicate_devnodes(paths: &[&Path]) {
+        assert!(!paths.is_empty());
+
+        let duplicate_paths = paths
+            .iter()
+            .chain(paths.iter())
+            .copied()
+            .collect::<Vec<_>>();
+
+        let result = process_devices(&duplicate_paths).unwrap();
+
+        assert_eq!(result.len(), paths.len());
+    }
+
+    #[test]
+    fn loop_test_duplicate_devnodes() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 2, None),
+            test_duplicate_devnodes,
+        );
+    }
+
+    #[test]
+    fn real_test_duplicate_devnodes() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(1, None, None),
+            test_duplicate_devnodes,
+        );
+    }
+
+    #[test]
+    fn travis_test_duplicate_devnodes() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 2, None),
+            test_duplicate_devnodes,
+        );
+    }
 }

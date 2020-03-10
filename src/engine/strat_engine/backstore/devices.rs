@@ -271,6 +271,7 @@ pub fn initialize_devices(
         dev_info: &DeviceInfo,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
+        keyfile_path: Option<&Path>,
     ) -> StratisResult<StratBlockDev> {
         let mut f = OpenOptions::new().write(true).open(&dev_info.devnode)?;
 
@@ -319,7 +320,7 @@ pub fn initialize_devices(
 
     let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
     for dev_info in devices {
-        match initialize_one(&dev_info, pool_uuid, mda_data_size) {
+        match initialize_one(&dev_info, pool_uuid, mda_data_size, keyfile_path) {
             Ok(blockdev) => initialized_blockdevs.push(blockdev),
             Err(err) => {
                 if let Err(err) = wipe_blockdevs(&initialized_blockdevs) {
@@ -615,7 +616,7 @@ mod tests {
         devices.push(new_info);
 
         assert_matches!(
-            initialize_devices(devices, Uuid::new_v4(), MDADataSize::default()),
+            initialize_devices(devices, Uuid::new_v4(), MDADataSize::default(), None),
             Err(_)
         );
 

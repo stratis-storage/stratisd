@@ -335,6 +335,8 @@ mod tests {
 
     use uuid::Uuid;
 
+    use devicemapper::Sectors;
+
     use crate::engine::strat_engine::tests::{loopbacked, real};
 
     use super::*;
@@ -454,7 +456,7 @@ mod tests {
     #[test]
     fn real_test_crypt_device_ops() {
         real::test_with_spec(
-            &real::DeviceLimits::Exactly(1, None, Some(1024 * 1024 * 1024 / 512)),
+            &real::DeviceLimits::Exactly(1, None, Some(Sectors(1024 * 1024 * 1024 / 512))),
             test_crypt_device_ops,
         );
     }

@@ -120,7 +120,10 @@ impl fmt::Display for RenameAction<PoolUuid> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             RenameAction::Renamed(uuid) => write!(f, "uuid {} renamed", uuid.to_simple_ref()),
-            RenameAction::Identity => write!(f, "rename not performed -- old and new pool names are identical"),
+            RenameAction::Identity => write!(
+                f,
+                "rename not performed -- old and new pool names are identical"
+            ),
             RenameAction::NoSource => write!(f, "no pool found with old name"),
         }
     }
@@ -156,7 +159,9 @@ impl<T> EngineAction for DeleteAction<T> {
 impl fmt::Display for DeleteAction<PoolUuid> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            DeleteAction::Deleted(uuid) => write!(f, "pool with uuid {} destroyed", uuid.to_simple_ref()),
+            DeleteAction::Deleted(uuid) => {
+                write!(f, "pool with uuid {} destroyed", uuid.to_simple_ref())
+            }
             DeleteAction::Identity => write!(f, "pool to be destroyed does not exist"),
         }
     }

@@ -277,7 +277,8 @@ pub fn initialize_encrypted_stratis_device(
     )?;
     let key = read_key(key_description)?;
 
-    let keyslot = crypt_device.keyslot_handle(None).add_by_key(
+    let keyslot = crypt_device.keyslot_handle().add_by_key(
+        None,
         None,
         key.as_ref(),
         CryptVolumeKeyFlags::empty(),

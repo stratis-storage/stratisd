@@ -56,6 +56,10 @@ impl BlockDev for SimDev {
     fn get_dbus_path(&self) -> &MaybeDbusPath {
         &self.dbus_path
     }
+
+    fn is_encrypted(&self) -> bool {
+        false
+    }
 }
 
 impl SimDev {

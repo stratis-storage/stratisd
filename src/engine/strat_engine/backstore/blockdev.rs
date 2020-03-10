@@ -9,6 +9,7 @@ use std::{fs::OpenOptions, path::PathBuf};
 use chrono::{DateTime, TimeZone, Utc};
 
 use devicemapper::{Device, Sectors};
+use libcryptsetup_rs::{CryptInit, CryptKeyslot, CryptWipePattern, EncryptionFormat};
 
 use crate::{
     engine::{
@@ -81,8 +82,40 @@ impl StratBlockDev {
     }
 
     /// Remove information that identifies this device as belonging to Stratis
+    ///
+    /// If self.is_encrypted() is true, destroy all keyslots and wipe the LUKS2 header.
+    /// If self.is_encrypted() is false, wipe the Stratis metadata on the device.
+    /// Both of these actions will destroy the Stratis metadata so that it is no longer
+    /// accessible by stratisd or visible to blkid.
     pub fn disown(&self) -> StratisResult<()> {
-        disown_device(&mut OpenOptions::new().write(true).open(&self.devnode)?)
+        if !self.is_encrypted() {
+            disown_device(&mut OpenOptions::new().write(true).open(&self.devnode)?)?;
+        } else {
+            let mut device = CryptInit::init(&self.devnode())?;
+            device
+                .context_handle()
+                .load::<()>(EncryptionFormat::Luks2, None)?;
+
+            let max_keyslots = CryptKeyslot::max_keyslots(EncryptionFormat::Luks2)?;
+            for i in 0..max_keyslots {
+                device.keyslot_handle().destroy(i)?;
+            }
+
+            let (md_size, ks_size) = device.settings_handle().get_metadata_size()?;
+            let total_luks2_metadata_size = *md_size + *ks_size;
+            device.wipe_handle().wipe(
+                &self.devnode(),
+                CryptWipePattern::Zero,
+                0,
+                total_luks2_metadata_size,
+                4096,
+                false,
+                None,
+                // Hack until libcryptsetup-rs#43 is merged
+                &mut (),
+            )?;
+        }
+        Ok(())
     }
 
     pub fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> StratisResult<()> {
@@ -159,6 +192,10 @@ impl BlockDev for StratBlockDev {
 
     fn get_dbus_path(&self) -> &MaybeDbusPath {
         &self.dbus_path
+    }
+
+    fn is_encrypted(&self) -> bool {
+        false
     }
 }
 

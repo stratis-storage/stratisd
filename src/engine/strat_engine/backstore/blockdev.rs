@@ -103,7 +103,7 @@ impl StratBlockDev {
 
             let (md_size, ks_size) = device.settings_handle().get_metadata_size()?;
             let total_luks2_metadata_size = *md_size + *ks_size;
-            device.wipe_handle().wipe(
+            device.wipe_handle().wipe::<()>(
                 &self.devnode(),
                 CryptWipePattern::Zero,
                 0,
@@ -111,8 +111,7 @@ impl StratBlockDev {
                 4096,
                 false,
                 None,
-                // Hack until libcryptsetup-rs#43 is merged
-                &mut (),
+                None,
             )?;
         }
         Ok(())

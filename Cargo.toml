@@ -29,7 +29,7 @@ itertools = "0.8.0"
 [dependencies.libcryptsetup-rs]
 version = "0.2.0"
 git = "https://github.com/jbaublitz/libcryptsetup-rs"
-branch = "issue-libcryptsetup-rs-37"
+branch = "issue-libcryptsetup-rs-42"
 
 [dependencies.uuid]
 version = "0.7"

@@ -14,7 +14,7 @@ use chrono::Utc;
 use itertools::Itertools;
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Device, IEC};
+use devicemapper::{Bytes, DevId, Device, DmName, DM, IEC};
 
 use crate::{
     engine::{
@@ -22,7 +22,7 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                crypt::initialize_encrypted_stratis_device,
+                crypt::{initialize_encrypted_stratis_device, name_from_uuids},
                 metadata::{
                     device_identifiers, disown_device, BlockdevSize, MDADataSize,
                     StratisIdentifiers, BDA,
@@ -275,17 +275,29 @@ pub fn initialize_devices(
         key_description: Option<&str>,
     ) -> StratisResult<StratBlockDev> {
         let dev_uuid = Uuid::new_v4();
-        let physical_or_logical_path = match key_description {
+        let (path, deviceno) = match key_description {
             Some(desc) => {
-                initialize_encrypted_stratis_device(&dev_info.devnode, pool_uuid, dev_uuid, desc)?
+                let path = initialize_encrypted_stratis_device(
+                    &dev_info.devnode,
+                    pool_uuid,
+                    dev_uuid,
+                    desc,
+                )?;
+                let dm = DM::new()?;
+                let info = dm.device_info(&DevId::Name(DmName::new(&name_from_uuids(
+                    &pool_uuid, &dev_uuid,
+                ))?))?;
+                (path, info.device())
             }
-            None => dev_info.devnode.clone(),
+            None => (dev_info.devnode.clone(), dev_info.devno),
         };
 
-        let mut f = OpenOptions::new()
-            .write(true)
-            .open(physical_or_logical_path)?;
+        let mut f = OpenOptions::new().write(true).open(&path)?;
 
+        // NOTE: May need to rethink hw_id in the context of an encrypted device -
+        // for now it seems reasonable to leave this the same even after encryption
+        // as this doesn't change the hardware even though the device major/minor
+        // numbers and path change.
         let hw_id = match &dev_info.id_wwn {
             Some(Ok(hw_id)) => Some(hw_id.to_owned()),
             Some(Err(_)) => {
@@ -307,12 +319,13 @@ pub fn initialize_devices(
 
         let blockdev = bda.and_then(|bda| {
             StratBlockDev::new(
-                dev_info.devno,
-                dev_info.devnode.to_owned(),
+                deviceno,
+                path,
                 bda,
                 &[],
                 None,
                 hw_id,
+                key_description.map(|s| s.to_owned()),
             )
         });
 
@@ -330,7 +343,12 @@ pub fn initialize_devices(
 
     let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
     for dev_info in devices {
-        match initialize_one(&dev_info, pool_uuid, mda_data_size, key_description) {
+        match initialize_one(
+            &dev_info,
+            pool_uuid,
+            mda_data_size,
+            key_description.as_deref(),
+        ) {
             Ok(blockdev) => initialized_blockdevs.push(blockdev),
             Err(err) => {
                 if let Err(err) = wipe_blockdevs(&initialized_blockdevs) {

@@ -26,6 +26,7 @@ pub struct SimDev {
     hardware_info: Option<String>,
     initialization_time: u64,
     dbus_path: MaybeDbusPath,
+    key_description: Option<String>,
 }
 
 impl BlockDev for SimDev {
@@ -58,13 +59,17 @@ impl BlockDev for SimDev {
     }
 
     fn is_encrypted(&self) -> bool {
-        false
+        self.key_description.is_some()
     }
 }
 
 impl SimDev {
     /// Generates a new device from any devnode.
-    pub fn new(rdm: Rc<RefCell<Randomizer>>, devnode: &Path) -> (Uuid, SimDev) {
+    pub fn new(
+        rdm: Rc<RefCell<Randomizer>>,
+        devnode: &Path,
+        key_description: Option<String>,
+    ) -> (Uuid, SimDev) {
         (
             Uuid::new_v4(),
             SimDev {
@@ -74,6 +79,7 @@ impl SimDev {
                 hardware_info: None,
                 initialization_time: Utc::now().timestamp() as u64,
                 dbus_path: MaybeDbusPath(None),
+                key_description,
             },
         )
     }

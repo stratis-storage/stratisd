@@ -35,6 +35,7 @@ pub struct StratBlockDev {
     user_info: Option<String>,
     hardware_info: Option<String>,
     dbus_path: MaybeDbusPath,
+    key_description: Option<String>,
 }
 
 impl StratBlockDev {
@@ -60,6 +61,7 @@ impl StratBlockDev {
         upper_segments: &[(Sectors, Sectors)],
         user_info: Option<String>,
         hardware_info: Option<String>,
+        key_description: Option<String>,
     ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(upper_segments);
@@ -73,6 +75,7 @@ impl StratBlockDev {
             user_info,
             hardware_info,
             dbus_path: MaybeDbusPath(None),
+            key_description,
         })
     }
 
@@ -194,7 +197,7 @@ impl BlockDev for StratBlockDev {
     }
 
     fn is_encrypted(&self) -> bool {
-        false
+        self.key_description.is_some()
     }
 }
 

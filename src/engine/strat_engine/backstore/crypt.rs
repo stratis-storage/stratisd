@@ -1,4 +1,6 @@
-#![allow(dead_code)]
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
     ffi::CString,
@@ -124,6 +126,7 @@ fn stratis_token_is_valid(json: &serde_json::Value, key_description: String) -> 
 /// with encryption by Stratis. This requires that:
 /// * the device is a LUKS2 encrypted device.
 /// * the device has a valid Stratis LUKS2 token.
+#[allow(dead_code)]
 pub fn is_encrypted_stratis_device(physical_path: &Path) -> Result<bool> {
     if !device_is_luks2(physical_path)? {
         return Ok(false);
@@ -314,6 +317,7 @@ pub fn initialize_encrypted_stratis_device(
 
 /// Activate encrypted Stratis device using the name stored in the
 /// Stratis token
+#[allow(dead_code)]
 pub fn activate_encrypted_stratis_device(physical_path: &Path) -> Result<PathBuf> {
     let mut crypt_device = CryptInit::init(physical_path)?;
     crypt_device

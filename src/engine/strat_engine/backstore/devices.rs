@@ -377,17 +377,17 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_ownership() {
+    fn loop_test_ownership() {
         loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
     }
 
     #[test]
-    pub fn real_test_ownership() {
+    fn real_test_ownership() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_ownership);
     }
 
     #[test]
-    pub fn travis_test_ownership() {
+    fn travis_test_ownership() {
         loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_ownership);
     }
 
@@ -499,7 +499,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_initialize() {
+    fn loop_test_initialize() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_initialize,
@@ -507,12 +507,12 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_initialize() {
+    fn real_test_initialize() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_initialize);
     }
 
     #[test]
-    pub fn travis_test_initialize() {
+    fn travis_test_initialize() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_initialize,
@@ -530,7 +530,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_nonexistent_path() {
+    fn loop_test_nonexistent_path() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(1, 3, None),
             test_nonexistent_path,
@@ -538,7 +538,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_nonexistent_path() {
+    fn real_test_nonexistent_path() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(1, None, None),
             test_nonexistent_path,
@@ -546,7 +546,7 @@ mod tests {
     }
 
     #[test]
-    pub fn travis_test_nonexistent_path() {
+    fn travis_test_nonexistent_path() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(1, 3, None),
             test_nonexistent_path,
@@ -596,7 +596,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_failure_cleanup() {
+    fn loop_test_failure_cleanup() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_failure_cleanup,
@@ -604,7 +604,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_failure_cleanup() {
+    fn real_test_failure_cleanup() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
             test_failure_cleanup,
@@ -612,7 +612,7 @@ mod tests {
     }
 
     #[test]
-    pub fn travis_test_failure_cleanup() {
+    fn travis_test_failure_cleanup() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_failure_cleanup,

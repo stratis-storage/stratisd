@@ -361,7 +361,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_process_device_initialized() {
+    fn loop_test_process_device_initialized() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Exactly(1, None),
             test_process_device_initialized,
@@ -369,7 +369,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_process_device_initialized() {
+    fn real_test_process_device_initialized() {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(1, None, None),
             test_process_device_initialized,
@@ -377,7 +377,7 @@ mod tests {
     }
 
     #[test]
-    pub fn travis_test_process_device_initialized() {
+    fn travis_test_process_device_initialized() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Exactly(1, None),
             test_process_device_initialized,
@@ -428,7 +428,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_process_device_uninitialized() {
+    fn loop_test_process_device_uninitialized() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Exactly(1, None),
             test_process_device_uninitialized,
@@ -436,7 +436,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_process_device_uninitialized() {
+    fn real_test_process_device_uninitialized() {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(1, None, None),
             test_process_device_uninitialized,
@@ -444,7 +444,7 @@ mod tests {
     }
 
     #[test]
-    pub fn travis_test_process_device_uninitialized() {
+    fn travis_test_process_device_uninitialized() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Exactly(1, None),
             test_process_device_uninitialized,

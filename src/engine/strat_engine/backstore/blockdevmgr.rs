@@ -476,7 +476,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_blockdevmgr_used() {
+    fn loop_test_blockdevmgr_used() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(1, 3, None),
             test_blockdevmgr_used,
@@ -484,7 +484,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_blockdevmgr_used() {
+    fn real_test_blockdevmgr_used() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(1, None, None),
             test_blockdevmgr_used,
@@ -492,7 +492,7 @@ mod tests {
     }
 
     #[test]
-    pub fn travis_test_blockdevmgr_used() {
+    fn travis_test_blockdevmgr_used() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(1, 3, None),
             test_blockdevmgr_used,
@@ -530,7 +530,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_initialization_stratis() {
+    fn loop_test_initialization_stratis() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_initialization_add_stratis,
@@ -538,7 +538,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_initialization_stratis() {
+    fn real_test_initialization_stratis() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
             test_initialization_add_stratis,
@@ -546,7 +546,7 @@ mod tests {
     }
 
     #[test]
-    pub fn travis_test_initialization_stratis() {
+    fn travis_test_initialization_stratis() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_initialization_add_stratis,

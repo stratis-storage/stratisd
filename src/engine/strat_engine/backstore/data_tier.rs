@@ -226,7 +226,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_add_and_alloc() {
+    fn loop_test_add_and_alloc() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_add_and_alloc,
@@ -234,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_add_and_alloc() {
+    fn real_test_add_and_alloc() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
             test_add_and_alloc,
@@ -242,7 +242,7 @@ mod tests {
     }
 
     #[test]
-    pub fn travis_test_add_and_alloc() {
+    fn travis_test_add_and_alloc() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_add_and_alloc,

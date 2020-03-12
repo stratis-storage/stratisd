@@ -20,19 +20,19 @@ use crate::engine::{DevUuid, PoolUuid};
 type Result<T> = std::result::Result<T, LibcryptErr>;
 
 // Stratis token JSON keys
-pub const TOKEN_TYPE_KEY: &str = "type";
-pub const TOKEN_KEYSLOTS_KEY: &str = "keyslots";
-pub const STRATIS_TOKEN_DEVNAME_KEY: &str = "activation_name";
-pub const STRATIS_TOKEN_KEYDESC_KEY: &str = "key_description";
-pub const STRATIS_TOKEN_POOL_UUID_KEY: &str = "pool_uuid";
-pub const STRATIS_TOKEN_DEV_UUID_KEY: &str = "device_uuid";
+const TOKEN_TYPE_KEY: &str = "type";
+const TOKEN_KEYSLOTS_KEY: &str = "keyslots";
+const STRATIS_TOKEN_DEVNAME_KEY: &str = "activation_name";
+const STRATIS_TOKEN_KEYDESC_KEY: &str = "key_description";
+const STRATIS_TOKEN_POOL_UUID_KEY: &str = "pool_uuid";
+const STRATIS_TOKEN_DEV_UUID_KEY: &str = "device_uuid";
 
-pub const LUKS2_TOKEN_ID: c_uint = 0;
-pub const STRATIS_TOKEN_ID: c_uint = 1;
+const LUKS2_TOKEN_ID: c_uint = 0;
+const STRATIS_TOKEN_ID: c_uint = 1;
 
-pub const LUKS2_TOKEN_TYPE: &str = "luks2-keyring";
-pub const STRATIS_TOKEN_TYPE: &str = "stratis";
-pub const STRATIS_KEY_SIZE: usize = 512 / 8;
+const LUKS2_TOKEN_TYPE: &str = "luks2-keyring";
+const STRATIS_TOKEN_TYPE: &str = "stratis";
+const STRATIS_KEY_SIZE: usize = 512 / 8;
 
 /// Will be replaced with libc constants in libc v0.2.68
 mod consts {

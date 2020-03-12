@@ -9,13 +9,16 @@ use std::{fs::OpenOptions, path::PathBuf};
 use chrono::{DateTime, TimeZone, Utc};
 
 use devicemapper::{Device, Sectors};
-use libcryptsetup_rs::{CryptInit, CryptKeyslot, CryptWipePattern, EncryptionFormat};
 
 use crate::{
     engine::{
         engine::BlockDev,
         strat_engine::{
             backstore::{
+                crypt::{
+                    destroy_encrypted_stratis_device, encrypted_device_is_active,
+                    get_device_name_from_metadata, wipe_encrypted_stratis_device,
+                },
                 metadata::{disown_device, BDAExtendedSize, MDADataSize, BDA},
                 range_alloc::RangeAllocator,
             },
@@ -96,28 +99,12 @@ impl StratBlockDev {
         if !self.is_encrypted() {
             disown_device(&mut OpenOptions::new().write(true).open(&self.devnode)?)?;
         } else {
-            let mut device = CryptInit::init(&self.devnode())?;
-            device
-                .context_handle()
-                .load::<()>(EncryptionFormat::Luks2, None)?;
-
-            let max_keyslots = CryptKeyslot::max_keyslots(EncryptionFormat::Luks2)?;
-            for i in 0..max_keyslots {
-                device.keyslot_handle().destroy(i)?;
+            let device_name = get_device_name_from_metadata(&self.devnode)?;
+            if encrypted_device_is_active(&device_name) {
+                destroy_encrypted_stratis_device(&self.devnode, device_name.as_str())?;
+            } else {
+                wipe_encrypted_stratis_device(&self.devnode)?;
             }
-
-            let (md_size, ks_size) = device.settings_handle().get_metadata_size()?;
-            let total_luks2_metadata_size = *md_size + *ks_size;
-            device.wipe_handle().wipe::<()>(
-                &self.devnode(),
-                CryptWipePattern::Zero,
-                0,
-                total_luks2_metadata_size,
-                4096,
-                false,
-                None,
-                None,
-            )?;
         }
         Ok(())
     }

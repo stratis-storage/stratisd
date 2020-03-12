@@ -11,8 +11,9 @@ use std::{
 use libc::{c_void, syscall, SYS_keyctl, SYS_request_key};
 
 use libcryptsetup_rs::{
-    c_uint, CryptActivateFlags, CryptDevice, CryptInit, CryptStatusInfo, CryptVolumeKeyFlags,
-    EncryptionFormat, LibcryptErr, SafeMemHandle,
+    c_uint, CryptActivateFlags, CryptDeactivateFlags, CryptDevice, CryptInit, CryptKeyslot,
+    CryptStatusInfo, CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr,
+    SafeMemHandle,
 };
 
 use crate::engine::{DevUuid, PoolUuid};
@@ -237,8 +238,7 @@ fn activate_and_check_device_path(crypt_device: &mut CryptDevice, name: &str) ->
     )?;
 
     // Check activation status.
-    let status = crypt_device.status_handle().status(name)?;
-    if CryptStatusInfo::Active != status {
+    if encrypted_device_is_active(name) {
         return Err(LibcryptErr::Other("Failed to activate device".to_string()));
     }
 
@@ -256,6 +256,12 @@ fn activate_and_check_device_path(crypt_device: &mut CryptDevice, name: &str) ->
             io::ErrorKind::NotFound,
         )))
     }
+}
+
+pub fn encrypted_device_is_active(device_name: &str) -> bool {
+    libcryptsetup_rs::status(None, device_name)
+        .map(|status| status == CryptStatusInfo::Active)
+        .unwrap_or(false)
 }
 
 pub fn name_from_uuids(pool_uuid: &PoolUuid, dev_uuid: &DevUuid) -> String {
@@ -327,6 +333,89 @@ pub fn activate_encrypted_stratis_device(physical_path: &Path) -> Result<PathBuf
     let stratis_device_name = get_stratis_device_name(&mut crypt_device)?;
 
     activate_and_check_device_path(&mut crypt_device, &stratis_device_name)
+}
+
+/// Query the Stratis metadata for the device activation name.
+pub fn get_device_name_from_metadata(physical_path: &Path) -> Result<String> {
+    let mut crypt_device = CryptInit::init(physical_path)?;
+    get_stratis_device_name(&mut crypt_device)
+}
+
+/// Deactivate an encrypted Stratis device but do not wipe it. This is not
+/// a destructive action. `name` should be the name of the device as registered
+/// with devicemapper and cryptsetup.
+pub fn deactivate_encrypted_stratis_device(name: &str) -> Result<()> {
+    let mut crypt_device = CryptInit::init_by_name_and_header(name, None)?;
+    let deactivate_result = crypt_device
+        .activate_handle()
+        .deactivate(name, CryptDeactivateFlags::empty());
+    if deactivate_result.is_err() {
+        warn!("Failed to deactivate the crypt device with name {}; you will need to deactivate it manually", name);
+    }
+    deactivate_result
+}
+
+/// Destroy all keyslots and wipe the LUKS2 metadata from a physical volume.
+/// This should only be used if the device has already been deactivated.
+/// Otherwise, there will be a hanging devicemapper device left on the system.
+/// To destroy an active volume, use `destroy_encrypted_stratis_device`.
+pub fn wipe_encrypted_stratis_device(physical_path: &Path) -> Result<()> {
+    fn destroy_slots_and_wipe(physical_path: &Path) -> Result<()> {
+        let mut crypt_device = CryptInit::init(physical_path)?;
+        crypt_device
+            .context_handle()
+            .load::<()>(EncryptionFormat::Luks2, None)?;
+
+        let max_keyslots = CryptKeyslot::max_keyslots(EncryptionFormat::Luks2)?;
+        for i in 0..max_keyslots {
+            crypt_device.keyslot_handle().destroy(i)?;
+        }
+
+        let (md_size, ks_size) = crypt_device.settings_handle().get_metadata_size()?;
+        let total_luks2_metadata_size = *md_size + *ks_size;
+        crypt_device.wipe_handle().wipe::<()>(
+            physical_path,
+            CryptWipePattern::Zero,
+            0,
+            total_luks2_metadata_size,
+            4096,
+            false,
+            None,
+            None,
+        )
+    }
+
+    let wipe_result = destroy_slots_and_wipe(physical_path);
+    if wipe_result.is_err() {
+        warn!(
+            "Failed to wipe LUKS2 metadata from device {}; you will need to clean it up manually",
+            physical_path.display()
+        );
+    }
+    wipe_result
+}
+
+/// Deactivate and wipe the encrypted device. This is a destructive action and data
+/// will not be able to be recovered. Both physical path of the device to be wiped
+/// and the name of the activated device must be provided.
+pub fn destroy_encrypted_stratis_device(physical_path: &Path, name: &str) -> Result<()> {
+    // Pre-check that name and path are consistent
+    let mut crypt_device = CryptInit::init(physical_path)?;
+    let metadata_device_name = get_stratis_device_name(&mut crypt_device)?;
+    if metadata_device_name.as_str() != name {
+        return Err(LibcryptErr::Other(format!(
+            "Provided device name and device path are not consistent according to the Stratis \
+            metadata. Device name requested in destroy operation was {} while the device name \
+            recorded in the Stratis metadata on device {} is {}. Stopping destroy operation.",
+            name,
+            physical_path.display(),
+            metadata_device_name,
+        )));
+    }
+    std::mem::drop(crypt_device);
+
+    deactivate_encrypted_stratis_device(name)?;
+    wipe_encrypted_stratis_device(physical_path)
 }
 
 #[cfg(test)]

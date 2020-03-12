@@ -267,7 +267,6 @@ impl<T> Table<T> {
 #[cfg(test)]
 mod tests {
 
-    use rand;
     use uuid::Uuid;
 
     use crate::engine::Name;

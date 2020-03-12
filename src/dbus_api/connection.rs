@@ -9,7 +9,6 @@ use dbus::{
     ffidisp::{BusType, Connection, ConnectionItem, NameFlag, WatchEvent},
     tree::{MTFn, Tree},
 };
-use libc;
 
 use crate::{
     dbus_api::{

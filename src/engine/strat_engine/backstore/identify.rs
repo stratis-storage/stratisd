@@ -48,8 +48,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use libudev;
-
 use devicemapper::Device;
 
 use crate::engine::{

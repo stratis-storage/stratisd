@@ -5,6 +5,7 @@
 // Functions for dealing with devices.
 
 use std::{
+    collections::HashMap,
     fs::OpenOptions,
     path::{Path, PathBuf},
 };
@@ -176,15 +177,23 @@ pub struct DeviceInfo {
     pub size: Bytes,
 }
 
-/// Process a list of devices specified as device nodes. Return a vector
-/// of accumulated information about the device nodes. If the
-/// StratisIdentifiers value is not None, then the device has been
+/// Process a list of devices specified as device nodes.
+///
+/// * Reduce the list of devices to a set.
+/// * Return a vector of accumulated information about the device nodes.
+///
+/// If the StratisIdentifiers value is not None, then the device has been
 /// identified as a Stratis device.
+///
+/// Return an error if there was an error collecting the information or
+/// if it turns out that at least two of the specified devices have the same
+/// device number.
 pub fn process_devices(
     paths: &[&Path],
 ) -> StratisResult<Vec<(DeviceInfo, Option<StratisIdentifiers>)>> {
-    paths
+    let infos = paths
         .iter()
+        .unique()
         .map(|devnode| {
             dev_info(devnode).map(|(id_wwn, size, stratis_identifiers, devno)| {
                 (
@@ -205,13 +214,37 @@ pub fn process_devices(
                 err
             );
             StratisError::Engine(ErrorEnum::Invalid, error_message)
+        })?;
+
+    let duplicate_device_number_messages: Vec<String> = infos
+        .iter()
+        .map(|(info, _)| (info.devno, info.devnode.to_path_buf()))
+        .fold(HashMap::new(), |mut acc, (devno, devnode)| {
+            acc.entry(devno).or_insert_with(Vec::new).push(devnode);
+            acc
         })
-        .map(|infos| {
-            infos
-                .into_iter()
-                .unique_by(|(info, _)| info.devno)
-                .collect()
+        .iter()
+        .filter(|(_, devnodes)| devnodes.len() > 1)
+        .map(|(devno, devnodes)| {
+            format!(
+                "device nodes {} correspond to device number {}",
+                devnodes.iter().map(|d| d.display()).join(", "),
+                devno
+            )
         })
+        .collect();
+
+    if !duplicate_device_number_messages.is_empty() {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!(
+                "At least two of the devices specified have the same device number: {}",
+                duplicate_device_number_messages.join("; ")
+            ),
+        ));
+    }
+
+    Ok(infos)
 }
 
 /// Initialze devices in devices.
@@ -616,6 +649,46 @@ mod tests {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_failure_cleanup,
+        );
+    }
+
+    // Verify that resolve devices simply eliminates duplicate devnodes,
+    // without returning an error.
+    fn test_duplicate_devnodes(paths: &[&Path]) {
+        assert!(!paths.is_empty());
+
+        let duplicate_paths = paths
+            .iter()
+            .chain(paths.iter())
+            .copied()
+            .collect::<Vec<_>>();
+
+        let result = process_devices(&duplicate_paths).unwrap();
+
+        assert_eq!(result.len(), paths.len());
+    }
+
+    #[test]
+    fn loop_test_duplicate_devnodes() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 2, None),
+            test_duplicate_devnodes,
+        );
+    }
+
+    #[test]
+    fn real_test_duplicate_devnodes() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(1, None, None),
+            test_duplicate_devnodes,
+        );
+    }
+
+    #[test]
+    fn travis_test_duplicate_devnodes() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 2, None),
+            test_duplicate_devnodes,
         );
     }
 }

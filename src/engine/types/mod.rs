@@ -10,7 +10,6 @@ pub use crate::engine::types::actions::{
 };
 
 #[cfg(feature = "dbus_enabled")]
-use dbus;
 use uuid::Uuid;
 
 pub type DevUuid = Uuid;

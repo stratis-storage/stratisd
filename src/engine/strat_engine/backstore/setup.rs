@@ -12,7 +12,6 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use serde_json;
 
 use devicemapper::{Device, Sectors};
 

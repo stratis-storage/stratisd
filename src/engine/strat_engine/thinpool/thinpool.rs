@@ -1238,7 +1238,6 @@ mod tests {
     };
 
     use nix::mount::{mount, umount, MsFlags};
-    use tempfile;
     use uuid::Uuid;
 
     use devicemapper::{Bytes, SECTOR_SIZE};

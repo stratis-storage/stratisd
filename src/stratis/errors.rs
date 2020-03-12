@@ -5,13 +5,6 @@
 use std::{error::Error, fmt, io, str};
 
 #[cfg(feature = "dbus_enabled")]
-use dbus;
-use libudev;
-use nix;
-use serde_json;
-use uuid;
-
-use devicemapper;
 
 pub type StratisResult<T> = Result<T, StratisError>;
 

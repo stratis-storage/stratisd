@@ -4,8 +4,6 @@
 
 use std::{error::Error, fmt, io, str};
 
-#[cfg(feature = "dbus_enabled")]
-
 pub type StratisResult<T> = Result<T, StratisError>;
 
 #[derive(Debug, Clone)]

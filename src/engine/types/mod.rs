@@ -9,7 +9,6 @@ pub use crate::engine::types::actions::{
     CreateAction, DeleteAction, EngineAction, RenameAction, SetCreateAction, SetDeleteAction,
 };
 
-#[cfg(feature = "dbus_enabled")]
 use uuid::Uuid;
 
 pub type DevUuid = Uuid;

@@ -8,8 +8,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use libudev;
-
 use devicemapper::{Device, DmNameBuf};
 
 #[cfg(test)]

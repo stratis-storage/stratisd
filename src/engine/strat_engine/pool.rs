@@ -10,7 +10,6 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use serde_json;
 use uuid::Uuid;
 
 use devicemapper::{Device, DmName, DmNameBuf, Sectors};
@@ -525,7 +524,6 @@ mod tests {
     };
 
     use nix::mount::{mount, umount, MsFlags};
-    use tempfile;
 
     use devicemapper::{Bytes, IEC, SECTOR_SIZE};
 

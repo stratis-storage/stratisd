@@ -202,7 +202,14 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Devic
 
     let pool_map = enumerator
         .scan_devices()?
-        .filter_map(|dev| identify_stratis_device(&dev))
+        .filter_map(|dev| identify_stratis_device(&dev).map(|(identifiers, device, devnode)| {
+            info!("Stratis block device with device number \"{}\", pool UUID \"{}\", and device UUID \"{}\" discovered during initial search",
+                  device,
+                  identifiers.pool_uuid,
+                  identifiers.device_uuid
+            );
+            (identifiers, device, devnode)
+        }))
         .fold(HashMap::new(), |mut acc, (identifiers, device, devnode)| {
             acc.entry(identifiers.pool_uuid)
                 .or_insert_with(HashMap::new)

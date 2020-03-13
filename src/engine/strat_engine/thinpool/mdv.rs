@@ -15,7 +15,6 @@ use nix::{
     self,
     mount::{mount, umount, MsFlags},
 };
-use serde_json;
 
 use devicemapper::{DmDevice, LinearDev, LinearDevTargetParams, TargetLine};
 

@@ -5,8 +5,6 @@
 //! udev-related methods
 use std::{ffi::OsStr, fmt, path::Path};
 
-use libudev;
-
 use crate::stratis::{StratisError, StratisResult};
 
 /// Make an enumerator for enumerating block devices. Return an error if there

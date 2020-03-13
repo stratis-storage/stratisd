@@ -17,12 +17,10 @@ use devicemapper::{
     Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus, IEC,
 };
 
-use libmount;
 use nix::{
     mount::{mount, umount, MsFlags},
     sys::statvfs::statvfs,
 };
-use tempfile;
 
 use crate::{
     engine::{

@@ -10,8 +10,6 @@ use std::{
 };
 
 use loopdev::{LoopControl, LoopDevice};
-use nix;
-use tempfile;
 
 use devicemapper::{Bytes, Sectors, IEC};
 

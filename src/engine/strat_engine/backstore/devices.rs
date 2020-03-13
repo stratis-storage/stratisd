@@ -23,9 +23,8 @@ use crate::{
             backstore::{
                 blockdev::StratBlockDev,
                 crypt::{
-                    destroy_encrypted_stratis_device, encrypted_device_is_active,
-                    get_device_name_from_metadata, initialize_encrypted_stratis_device,
-                    name_from_uuids, wipe_encrypted_stratis_device,
+                    destroy_encrypted_stratis_device, get_device_name_from_metadata,
+                    initialize_encrypted_stratis_device, name_from_uuids,
                 },
                 metadata::{
                     device_identifiers, disown_device, BlockdevSize, MDADataSize,
@@ -293,23 +292,23 @@ pub fn initialize_devices(
     ) -> StratisResult<(PathBuf, Device)> {
         let device_name = name_from_uuids(pool_uuid, dev_uuid);
 
-        // Return early if initialization fails - nothing to clean up.
         let logical_path = initialize_encrypted_stratis_device(
             physical_device,
             *pool_uuid,
             *dev_uuid,
             key_description,
-        )?;
+        );
 
-        let mapped_info_result = map_device_nums(&device_name);
-        if mapped_info_result.is_err() {
-            if encrypted_device_is_active(&device_name) {
-                destroy_encrypted_stratis_device(&logical_path, &device_name)?;
-            } else {
-                wipe_encrypted_stratis_device(&logical_path)?;
-            }
+        let initialization_result = logical_path
+            .map_err(StratisError::from)
+            .and_then(|lp| map_device_nums(&device_name).map(|dn| (lp, dn)));
+        if initialization_result.is_err() {
+            // Clean up if any stage of initialization fails;
+            // destroy_encrypted_stratis_device should be able to handle
+            // any rollback state that a failed initialization is left in.
+            destroy_encrypted_stratis_device(physical_device, &device_name)?;
         }
-        mapped_info_result.map(|devno| (logical_path, devno))
+        initialization_result
     }
 
     fn initialize_stratis_metadata(
@@ -359,6 +358,8 @@ pub fn initialize_devices(
         })
     }
 
+    /// Clean up the Stratis metadata for unencrypted devices
+    /// and log a warning if the device could not be cleaned up.
     fn clean_up_unencrypted_device(
         physical_path: &Path,
         pool_uuid: &PoolUuid,
@@ -377,13 +378,10 @@ pub fn initialize_devices(
         Ok(())
     }
 
+    /// Clean up an encrypted device using the crypt module.
     fn clean_up_encrypted_device(physical_path: &Path) -> StratisResult<()> {
         let device_name = get_device_name_from_metadata(physical_path)?;
-        if encrypted_device_is_active(&device_name) {
-            destroy_encrypted_stratis_device(physical_path, &device_name)?;
-        } else {
-            wipe_encrypted_stratis_device(physical_path)?;
-        }
+        destroy_encrypted_stratis_device(physical_path, &device_name)?;
         Ok(())
     }
 

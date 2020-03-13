@@ -170,11 +170,11 @@ pub fn device_is_luks2(physical_path: &Path) -> Result<bool> {
     Ok(crypt_device.format_handle().get_type()? == EncryptionFormat::Luks2)
 }
 
-// Read key from keyring with the given key description
-//
-// Returns a safe owned memory segment that will clear itself when dropped.
-//
-// Requires cryptsetup 2.3
+/// Read key from keyring with the given key description
+///
+/// Returns a safe owned memory segment that will clear itself when dropped.
+///
+/// Requires cryptsetup 2.3
 fn read_key(key_description: &str) -> Result<SafeMemHandle> {
     // Attach persistent keyring to process keyring
     match unsafe {
@@ -226,8 +226,8 @@ fn read_key(key_description: &str) -> Result<SafeMemHandle> {
     Ok(key_buffer)
 }
 
-// Activate device by token then check that the logical path exists corresponding
-// to the activation name passed into this method.
+/// Activate device by token then check that the logical path exists corresponding
+/// to the activation name passed into this method.
 fn activate_and_check_device_path(crypt_device: &mut CryptDevice, name: &str) -> Result<PathBuf> {
     // Activate by token
     crypt_device.token_handle().activate_by_token::<()>(
@@ -258,12 +258,15 @@ fn activate_and_check_device_path(crypt_device: &mut CryptDevice, name: &str) ->
     }
 }
 
-pub fn encrypted_device_is_active(device_name: &str) -> bool {
+/// Check if an encrypted device's logical devicemapper path
+/// is active.
+fn encrypted_device_is_active(device_name: &str) -> bool {
     libcryptsetup_rs::status(None, device_name)
         .map(|status| status == CryptStatusInfo::Active)
         .unwrap_or(false)
 }
 
+/// Get a devicemapper name from the pool and device UUIDs.
 pub fn name_from_uuids(pool_uuid: &PoolUuid, dev_uuid: &DevUuid) -> String {
     format!("{}-{}", pool_uuid.to_simple_ref(), dev_uuid.to_simple_ref())
 }
@@ -359,7 +362,7 @@ pub fn deactivate_encrypted_stratis_device(name: &str) -> Result<()> {
 /// This should only be used if the device has already been deactivated.
 /// Otherwise, there will be a hanging devicemapper device left on the system.
 /// To destroy an active volume, use `destroy_encrypted_stratis_device`.
-pub fn wipe_encrypted_stratis_device(physical_path: &Path) -> Result<()> {
+fn wipe_encrypted_stratis_device(physical_path: &Path) -> Result<()> {
     fn destroy_slots_and_wipe(physical_path: &Path) -> Result<()> {
         let mut crypt_device = CryptInit::init(physical_path)?;
         crypt_device
@@ -414,7 +417,9 @@ pub fn destroy_encrypted_stratis_device(physical_path: &Path, name: &str) -> Res
     }
     std::mem::drop(crypt_device);
 
-    deactivate_encrypted_stratis_device(name)?;
+    if encrypted_device_is_active(name) {
+        deactivate_encrypted_stratis_device(name)?;
+    }
     wipe_encrypted_stratis_device(physical_path)
 }
 

@@ -15,10 +15,7 @@ use crate::{
         engine::BlockDev,
         strat_engine::{
             backstore::{
-                crypt::{
-                    destroy_encrypted_stratis_device, encrypted_device_is_active,
-                    get_device_name_from_metadata, wipe_encrypted_stratis_device,
-                },
+                crypt::{destroy_encrypted_stratis_device, get_device_name_from_metadata},
                 metadata::{disown_device, BDAExtendedSize, MDADataSize, BDA},
                 range_alloc::RangeAllocator,
             },
@@ -100,11 +97,7 @@ impl StratBlockDev {
             disown_device(&mut OpenOptions::new().write(true).open(&self.devnode)?)?;
         } else {
             let device_name = get_device_name_from_metadata(&self.devnode)?;
-            if encrypted_device_is_active(&device_name) {
-                destroy_encrypted_stratis_device(&self.devnode, device_name.as_str())?;
-            } else {
-                wipe_encrypted_stratis_device(&self.devnode)?;
-            }
+            destroy_encrypted_stratis_device(&self.devnode, device_name.as_str())?;
         }
         Ok(())
     }

@@ -339,7 +339,7 @@ pub fn activate_encrypted_stratis_device(physical_path: &Path) -> Result<PathBuf
 }
 
 /// Query the Stratis metadata for the device activation name.
-pub fn get_device_name_from_metadata(physical_path: &Path) -> Result<String> {
+fn get_device_name_from_metadata(physical_path: &Path) -> Result<String> {
     let mut crypt_device = CryptInit::init(physical_path)?;
     get_stratis_device_name(&mut crypt_device)
 }
@@ -401,24 +401,15 @@ fn wipe_encrypted_stratis_device(physical_path: &Path) -> Result<()> {
 /// Deactivate and wipe the encrypted device. This is a destructive action and data
 /// will not be able to be recovered. Both physical path of the device to be wiped
 /// and the name of the activated device must be provided.
-pub fn destroy_encrypted_stratis_device(physical_path: &Path, name: &str) -> Result<()> {
-    // Pre-check that name and path are consistent
-    let mut crypt_device = CryptInit::init(physical_path)?;
-    let metadata_device_name = get_stratis_device_name(&mut crypt_device)?;
-    if metadata_device_name.as_str() != name {
-        return Err(LibcryptErr::Other(format!(
-            "Provided device name and device path are not consistent according to the Stratis \
-            metadata. Device name requested in destroy operation was {} while the device name \
-            recorded in the Stratis metadata on device {} is {}. Stopping destroy operation.",
-            name,
-            physical_path.display(),
-            metadata_device_name,
-        )));
+pub fn destroy_encrypted_stratis_device(physical_path: &Path) -> Result<()> {
+    let metadata_device_name = get_device_name_from_metadata(physical_path);
+    if metadata_device_name.is_err() {
+        warn!("Failed to get active device name from Stratis LUKS2 metadata; cannot clean up encrypted volume");
     }
-    std::mem::drop(crypt_device);
+    let name = metadata_device_name?;
 
-    if encrypted_device_is_active(name) {
-        deactivate_encrypted_stratis_device(name)?;
+    if encrypted_device_is_active(&name) {
+        deactivate_encrypted_stratis_device(&name)?;
     }
     wipe_encrypted_stratis_device(physical_path)
 }

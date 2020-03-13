@@ -23,8 +23,8 @@ use crate::{
             backstore::{
                 blockdev::StratBlockDev,
                 crypt::{
-                    destroy_encrypted_stratis_device, get_device_name_from_metadata,
-                    initialize_encrypted_stratis_device, name_from_uuids,
+                    destroy_encrypted_stratis_device, initialize_encrypted_stratis_device,
+                    name_from_uuids,
                 },
                 metadata::{
                     device_identifiers, disown_device, BlockdevSize, MDADataSize,
@@ -306,7 +306,7 @@ pub fn initialize_devices(
             // Clean up if any stage of initialization fails;
             // destroy_encrypted_stratis_device should be able to handle
             // any rollback state that a failed initialization is left in.
-            destroy_encrypted_stratis_device(physical_device, &device_name)?;
+            destroy_encrypted_stratis_device(physical_device)?;
         }
         initialization_result
     }
@@ -380,8 +380,7 @@ pub fn initialize_devices(
 
     /// Clean up an encrypted device using the crypt module.
     fn clean_up_encrypted_device(physical_path: &Path) -> StratisResult<()> {
-        let device_name = get_device_name_from_metadata(physical_path)?;
-        destroy_encrypted_stratis_device(physical_path, &device_name)?;
+        destroy_encrypted_stratis_device(physical_path)?;
         Ok(())
     }
 

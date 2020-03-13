@@ -238,7 +238,7 @@ fn activate_and_check_device_path(crypt_device: &mut CryptDevice, name: &str) ->
     )?;
 
     // Check activation status.
-    if encrypted_device_is_active(name) {
+    if !encrypted_device_is_active(name) {
         return Err(LibcryptErr::Other("Failed to activate device".to_string()));
     }
 

@@ -484,9 +484,7 @@ mod tests {
     /// Test initializing and activating an encrypted device using
     /// the utilities provided here.
     fn test_crypt_device_ops(paths: &[&Path]) {
-        assert_eq!(paths.len(), 1);
-
-        let test = |path: &Path, key_desc: &str| -> std::result::Result<(), Box<dyn Error>> {
+        fn crypt_test(path: &Path, key_desc: &str) -> std::result::Result<(), Box<dyn Error>> {
             let pool_uuid = Uuid::new_v4();
             let dev_uuid = Uuid::new_v4();
 
@@ -494,45 +492,36 @@ mod tests {
                 initialize_encrypted_stratis_device(path, pool_uuid, dev_uuid, key_desc)?;
 
             let mut devicenode = OpenOptions::new().write(true).open(logical_path)?;
-            let test_string = "this is a test string to be checked for";
-            devicenode.write_all(test_string.as_bytes())?;
+            let mut random_buffer = [0; 32];
+            File::open("/dev/urandom")?.read_exact(&mut random_buffer)?;
+            devicenode.write_all(&random_buffer)?;
             std::mem::drop(devicenode);
 
             let mut disk_buffer = Vec::new();
             let mut devicenode = File::open(path)?;
             devicenode.read_to_end(&mut disk_buffer)?;
-            let lossy_disk_string = String::from_utf8_lossy(&disk_buffer);
-            if lossy_disk_string.contains(test_string) {
-                return Err(Box::new(io::Error::new(
-                    io::ErrorKind::Other,
-                    "Disk was not encrypted!",
-                )));
+            for window in disk_buffer.windows(32) {
+                if window == random_buffer {
+                    return Err(Box::new(io::Error::new(
+                        io::ErrorKind::Other,
+                        "Disk was not encrypted!",
+                    )));
+                }
             }
             std::mem::drop(devicenode);
 
-            let close_active = |name: &str| -> Result<()> {
-                let mut crypt_device =
-                    libcryptsetup_rs::CryptInit::init_by_name_and_header(name, None)?;
-                crypt_device
-                    .context_handle()
-                    .load::<()>(libcryptsetup_rs::EncryptionFormat::Luks2, None)?;
-                crypt_device
-                    .activate_handle()
-                    .deactivate(name, libcryptsetup_rs::CryptDeactivateFlags::empty())?;
-
-                Ok(())
-            };
-
             let name = name_from_uuids(&pool_uuid, &dev_uuid);
-            close_active(&name)?;
+            deactivate_encrypted_stratis_device(&name)?;
 
             activate_encrypted_stratis_device(path)?;
-            close_active(&name)?;
+            deactivate_encrypted_stratis_device(&name)?;
 
             Ok(())
-        };
+        }
 
-        insert_and_cleanup_key(paths[0], test);
+        assert_eq!(paths.len(), 1);
+
+        insert_and_cleanup_key(paths[0], crypt_test);
     }
 
     #[test]

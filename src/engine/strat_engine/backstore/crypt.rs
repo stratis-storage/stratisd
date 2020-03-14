@@ -443,7 +443,7 @@ fn wipe_encrypted_stratis_device(physical_path: &Path) -> Result<()> {
             CryptWipePattern::Zero,
             0,
             ceiling_sector_size_alignment(total_luks2_metadata_size),
-            4096,
+            SECTOR_SIZE as usize,
             false,
             None,
             None,

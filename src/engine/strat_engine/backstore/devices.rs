@@ -286,16 +286,16 @@ pub fn initialize_devices(
     /// process and clean up the device that it has just initialized.
     fn initialize_encrypted(
         physical_device: &Path,
-        pool_uuid: &PoolUuid,
-        dev_uuid: &DevUuid,
+        pool_uuid: PoolUuid,
+        dev_uuid: DevUuid,
         key_description: &str,
     ) -> StratisResult<(PathBuf, Device)> {
-        let device_name = name_from_uuids(pool_uuid, dev_uuid);
+        let device_name = name_from_uuids(&pool_uuid, &dev_uuid);
 
         let logical_path = initialize_encrypted_stratis_device(
             physical_device,
-            *pool_uuid,
-            *dev_uuid,
+            pool_uuid,
+            dev_uuid,
             key_description,
         );
 
@@ -315,8 +315,8 @@ pub fn initialize_devices(
         path: &Path,
         devno: Device,
         dev_info: &DeviceInfo,
-        pool_uuid: &PoolUuid,
-        dev_uuid: &DevUuid,
+        pool_uuid: PoolUuid,
+        dev_uuid: DevUuid,
         mda_data_size: MDADataSize,
         key_description: Option<&str>,
     ) -> StratisResult<StratBlockDev> {
@@ -339,7 +339,7 @@ pub fn initialize_devices(
 
         let bda = BDA::initialize(
             &mut f,
-            StratisIdentifiers::new(*pool_uuid, *dev_uuid),
+            StratisIdentifiers::new(pool_uuid, dev_uuid),
             mda_data_size,
             BlockdevSize::new(dev_info.size.sectors()),
             Utc::now().timestamp() as u64,
@@ -360,10 +360,7 @@ pub fn initialize_devices(
 
     /// Clean up the Stratis metadata for unencrypted devices
     /// and log a warning if the device could not be cleaned up.
-    fn clean_up_unencrypted_device(
-        physical_path: &Path,
-        pool_uuid: &PoolUuid,
-    ) -> StratisResult<()> {
+    fn clean_up_unencrypted_device(physical_path: &Path, pool_uuid: PoolUuid) -> StratisResult<()> {
         if let Err(err) = OpenOptions::new()
             .write(true)
             .open(physical_path)
@@ -406,7 +403,7 @@ pub fn initialize_devices(
     ) -> StratisResult<StratBlockDev> {
         let dev_uuid = Uuid::new_v4();
         let (devpath, devno) = match key_description {
-            Some(desc) => initialize_encrypted(&dev_info.devnode, &pool_uuid, &dev_uuid, desc)?,
+            Some(desc) => initialize_encrypted(&dev_info.devnode, pool_uuid, dev_uuid, desc)?,
             None => (dev_info.devnode.clone(), dev_info.devno),
         };
 
@@ -414,8 +411,8 @@ pub fn initialize_devices(
             &devpath,
             devno,
             dev_info,
-            &pool_uuid,
-            &dev_uuid,
+            pool_uuid,
+            dev_uuid,
             mda_data_size,
             key_description,
         );
@@ -423,7 +420,7 @@ pub fn initialize_devices(
             if key_description.is_some() {
                 clean_up_encrypted_device(&dev_info.devnode)?;
             } else {
-                clean_up_unencrypted_device(&dev_info.devnode, &pool_uuid)?;
+                clean_up_unencrypted_device(&dev_info.devnode, pool_uuid)?;
             }
         }
         blockdev

@@ -100,7 +100,8 @@ impl StratBlockDev {
             disown_device(&mut OpenOptions::new().write(true).open(&self.devnode)?)?;
         } else {
             let name = name_from_uuids(&self.bda.pool_uuid(), &self.bda.dev_uuid());
-            destroy_encrypted_stratis_device(&get_physical_device_path_from_name(&name)?)?;
+            let physical_path = get_physical_device_path_from_name(&name)?;
+            destroy_encrypted_stratis_device(&physical_path)?;
         }
         Ok(())
     }

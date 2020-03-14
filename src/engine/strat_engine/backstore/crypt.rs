@@ -135,7 +135,7 @@ fn stratis_token_is_valid(json: &serde_json::Value, key_description: String) -> 
 #[allow(dead_code)]
 pub fn is_encrypted_stratis_device(physical_path: &Path) -> bool {
     fn device_operations(physical_path: &Path) -> Result<bool> {
-        if !device_is_luks2(physical_path)? {
+        if !device_is_luks2(physical_path) {
             return Ok(false);
         }
 
@@ -185,9 +185,20 @@ pub fn is_encrypted_stratis_device(physical_path: &Path) -> bool {
 
 /// Returns `true` only if the given device path is for a device encrypted with
 /// the LUKS2 format.
-pub fn device_is_luks2(physical_path: &Path) -> Result<bool> {
-    let mut crypt_device = CryptInit::init(physical_path)?;
-    Ok(crypt_device.format_handle().get_type()? == EncryptionFormat::Luks2)
+pub fn device_is_luks2(physical_path: &Path) -> bool {
+    let mut crypt_device = match CryptInit::init(physical_path) {
+        Ok(d) => d,
+        Err(e) => {
+            warn!(
+                "Getting devicemapper context for device {} \
+                failed with error: {}; reporting as not a LUKS2 device.",
+                physical_path.display(),
+                e
+            );
+            return false;
+        }
+    };
+    crypt_device.format_handle().get_type().ok() == Some(EncryptionFormat::Luks2)
 }
 
 /// Read key from keyring with the given key description
@@ -258,7 +269,7 @@ fn activate_and_check_device_path(crypt_device: &mut CryptDevice, name: &str) ->
     )?;
 
     // Check activation status.
-    if !encrypted_device_is_active(name) {
+    if !device_is_active(crypt_device, name) {
         return Err(LibcryptErr::Other("Failed to activate device".to_string()));
     }
 
@@ -278,10 +289,35 @@ fn activate_and_check_device_path(crypt_device: &mut CryptDevice, name: &str) ->
     }
 }
 
-/// Check if an encrypted device's logical devicemapper path
-/// is active.
-fn encrypted_device_is_active(device_name: &str) -> bool {
-    libcryptsetup_rs::status(None, device_name)
+/// Check if the given device is active.
+fn encrypted_device_is_active(physical_path: &Path, device_name: &str) -> bool {
+    let mut device = match CryptInit::init(physical_path) {
+        Ok(d) => d,
+        Err(e) => {
+            warn!(
+                "Failed to get context for device {} with error: {}; \
+                reporting this device as inactive.",
+                physical_path.display(),
+                e
+            );
+            return false;
+        }
+    };
+    if let Err(e) = device
+        .context_handle()
+        .load::<()>(EncryptionFormat::Luks2, None)
+    {
+        warn!(
+            "Failed to load LUKS2 header into memory when checking activation \
+            status: {}",
+            e
+        );
+    }
+    device_is_active(&mut device, device_name)
+}
+
+fn device_is_active(device: &mut CryptDevice, device_name: &str) -> bool {
+    libcryptsetup_rs::status(Some(device), device_name)
         .map(|status| status == CryptStatusInfo::Active)
         .unwrap_or(false)
 }
@@ -470,7 +506,7 @@ pub fn destroy_encrypted_stratis_device(physical_path: &Path) -> Result<()> {
     }
     let name = metadata_device_name?;
 
-    if encrypted_device_is_active(&name) {
+    if encrypted_device_is_active(physical_path, &name) {
         deactivate_encrypted_stratis_device(&name)?;
     }
     wipe_encrypted_stratis_device(physical_path)
@@ -534,7 +570,7 @@ mod tests {
             deactivate_encrypted_stratis_device(&name)?;
 
             activate_encrypted_stratis_device(path)?;
-            deactivate_encrypted_stratis_device(&name)?;
+            destroy_encrypted_stratis_device(path)?;
 
             Ok(())
         }

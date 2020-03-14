@@ -205,8 +205,8 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Devic
         .filter_map(|dev| identify_stratis_device(&dev).map(|(identifiers, device, devnode)| {
             info!("Stratis block device with device number \"{}\", pool UUID \"{}\", and device UUID \"{}\" discovered during initial search",
                   device,
-                  identifiers.pool_uuid,
-                  identifiers.device_uuid
+                  identifiers.pool_uuid.to_simple_ref(),
+                  identifiers.device_uuid.to_simple_ref()
             );
             (identifiers, device, devnode)
         }))

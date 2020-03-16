@@ -238,6 +238,15 @@ fn identify_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
             }
         },
     }
+    .map(|(identifiers, device, devnode)| {
+        info!("Stratis block device with device number \"{}\", device node \"{}\", pool UUID \"{}\", and device UUID \"{}\" discovered during initial search",
+              device,
+              devnode.display(),
+              identifiers.pool_uuid.to_simple_ref(),
+              identifiers.device_uuid.to_simple_ref()
+        );
+        (identifiers, device, devnode)
+    })
 }
 
 /// Identify a block device in the context where a udev event has been
@@ -264,6 +273,15 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
             _ => None,
         },
     }
+    .map(|(identifiers, device, devnode)| {
+        info!("Stratis block device with device number \"{}\", device node \"{}\", pool UUID \"{}\", and device UUID \"{}\" discovered during initial search",
+              device,
+              devnode.display(),
+              identifiers.pool_uuid.to_simple_ref(),
+              identifiers.device_uuid.to_simple_ref()
+        );
+        (identifiers, device, devnode)
+    })
 }
 
 /// Retrieve all block devices that should be made use of by the

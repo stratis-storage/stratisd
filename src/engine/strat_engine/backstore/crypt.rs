@@ -7,17 +7,26 @@ use std::{
     io,
     path::{Path, PathBuf},
 };
+#[cfg(cryptsetup_compat)]
+use std::{ops::Deref, pin::Pin};
 
 use libc::{c_void, syscall, SYS_keyctl, SYS_request_key};
+#[cfg(cryptsetup_compat)]
+use zeroize::Zeroizing;
 
 use libcryptsetup_rs::{
     c_uint, CryptActivateFlags, CryptDeactivateFlags, CryptDevice, CryptInit, CryptStatusInfo,
-    CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr, SafeMemHandle,
+    CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr,
 };
 
 use crate::engine::{DevUuid, PoolUuid};
 
 type Result<T> = std::result::Result<T, LibcryptErr>;
+
+#[cfg(not(cryptsetup_compat))]
+type SafeMemHandle = libcryptsetup_rs::SafeMemHandle;
+#[cfg(cryptsetup_compat)]
+type SafeMemHandle = Pin<Box<Zeroizing<[u8; STRATIS_KEY_SIZE]>>>;
 
 // Stratis token JSON keys
 const TOKEN_TYPE_KEY: &str = "type";
@@ -237,8 +246,15 @@ fn read_key(key_description: &str) -> Result<SafeMemHandle> {
         i => i,
     };
 
+    #[cfg(not(cryptsetup_compat))]
     let mut key_buffer = SafeMemHandle::alloc(STRATIS_KEY_SIZE)?;
+    #[cfg(cryptsetup_compat)]
+    let mut key_buffer = Box::pin(Zeroizing::new([0; STRATIS_KEY_SIZE]));
+
+    #[cfg(not(cryptsetup_compat))]
     let mut_ref = key_buffer.as_mut();
+    #[cfg(cryptsetup_compat)]
+    let mut mut_ref = key_buffer.as_mut();
 
     // Read key from keyring
     match unsafe {
@@ -348,6 +364,9 @@ pub fn initialize_encrypted_stratis_device(
     let keyslot = crypt_device.keyslot_handle().add_by_key(
         None,
         None,
+        #[cfg(cryptsetup_compat)]
+        (*key).deref(),
+        #[cfg(not(cryptsetup_compat))]
         key.as_ref(),
         CryptVolumeKeyFlags::empty(),
     )?;

@@ -3,6 +3,7 @@ name = "libstratis"
 version = "2.0.1"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.com>"]
 edition = "2018"
+build = "build.rs"
 
 [dependencies]
 dbus = {version = "0.8", optional = true}
@@ -25,15 +26,20 @@ libudev = "0.2.0"
 lazy_static = "1.4.0"
 timerfd = "1.0.0"
 itertools = "0.8.0"
+zeroize = "1.1"
 
 [dependencies.libcryptsetup-rs]
 version = "0.2.0"
-git = "https://github.com/jbaublitz/libcryptsetup-rs"
-branch = "mut-ref"
+git = "https://github.com/stratis-storage/libcryptsetup-rs"
+branch = "master"
 
 [dependencies.uuid]
 version = "0.7"
 features = ["serde", "v4"]
+
+[build-dependencies]
+semver = "0.9"
+pkg-config = "0.3"
 
 [dev-dependencies]
 error-chain = "0.12.1"

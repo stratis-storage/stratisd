@@ -24,6 +24,7 @@ import time
 import unittest
 
 # isort: THIRDPARTY
+import psutil
 import pyudev
 
 # isort: LOCAL
@@ -269,16 +270,19 @@ class UdevAdd(unittest.TestCase):
     @staticmethod
     def _process_exists(name):
         """
-        Walk the process table looking for executable 'name', returns pid if one
-        found, else return None
+        Look through processes, using their pids, to find one matching 'name'.
+        Return None if no such process found, else return the pid.
+        :param name: name of process to check
+        :type name: str
+        :return: pid or None
+        :rtype: int or NoneType
         """
-        for p in [pid for pid in os.listdir("/proc") if pid.isdigit()]:
+        for proc in psutil.process_iter(["name"]):
             try:
-                exe_name = os.readlink(os.path.join("/proc/", p, "exe"))
-            except OSError:
-                continue
-            if exe_name and exe_name.endswith(os.path.join("/", name)):
-                return p
+                if proc.name() == name:
+                    return proc.pid
+            except psutil.NoSuchProcess:
+                pass
         return None
 
     # pylint: disable=too-many-locals

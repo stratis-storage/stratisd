@@ -62,8 +62,6 @@ class UdevAdd(unittest.TestCase):
     Test udev add event support.
     """
 
-    lib_blk_id = True
-
     @staticmethod
     def _create_pool(name, devices):
         """
@@ -219,37 +217,27 @@ class UdevAdd(unittest.TestCase):
     @staticmethod
     def _expected_stratis_block_devices(num_expected, expected_paths):
         """
-        Check that the expected number of stratis devices exist.  If not keep
-        checking until they do show up or our timeout has been exceeded.
-        :param num_expected:
+        Look for Stratis devices. Check as many times as can be done in
+        10 seconds or until the number of devices found equals the number
+        of devices expected. Always get the result of at least 1 Stratis
+        enumeration.
+        :param int num_expected: number of expected devnodes
+        :param expected_paths: devnodes of paths that should belong to Stratis
+        :type expected_paths: list of str
         :return: None (May assert)
         """
 
         assert num_expected == len(expected_paths)
 
-        found = 0
+        found = None
         context = pyudev.Context()
-        start = time.time()
-        end_time = start + 10
+        end_time = time.time() + 10.0
 
-        while UdevAdd.lib_blk_id and time.time() < end_time:
+        while time.time() < end_time and found != num_expected:
             found = sum(
                 1 for _ in context.list_devices(subsystem="block", ID_FS_TYPE="stratis")
             )
-            if found == num_expected:
-                break
             time.sleep(1)
-
-        # If we are not matching our expectations, we may be running on a box
-        # that doesn't have blkid support, so lets probe the disks instead.  If
-        # we find a stratis disk now, we will set the flag UdevAdd.lib_blk_id to
-        # false so we don't waste so much time checking the udev db.
-        if found != num_expected and found == 0:
-            for blk_dev in context.list_devices(subsystem="block"):
-                if "DEVNAME" in blk_dev:
-                    if stratis_signature(blk_dev["DEVNAME"]):
-                        UdevAdd.lib_blk_id = False
-                        found += 1
 
         if found != num_expected:
             UdevAdd.dump_state(context, expected_paths)

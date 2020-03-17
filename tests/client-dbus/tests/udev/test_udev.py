@@ -538,8 +538,8 @@ class UdevAdd(unittest.TestCase):
             current_pools = UdevAdd._get_pools()
 
             # Rename all active pools to a randomly selected new name
-            for p in current_pools:
-                Pool.Methods.SetName(get_object(p[0]), {"name": rs(10)})
+            for object_path, _ in current_pools:
+                Pool.Methods.SetName(get_object(object_path), {"name": rs(10)})
 
             # Generate synthetic add events for every loop backed device
             for d in (d for sublist in pool_tokens for d in sublist):

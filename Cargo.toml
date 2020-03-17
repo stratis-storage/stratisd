@@ -28,8 +28,8 @@ itertools = "0.8.0"
 
 [dependencies.libcryptsetup-rs]
 version = "0.2.0"
-git = "https://github.com/jbaublitz/libcryptsetup-rs"
-branch = "mut-ref"
+git = "https://github.com/stratis-storage/libcryptsetup-rs"
+branch = "master"
 
 [dependencies.uuid]
 version = "0.7"

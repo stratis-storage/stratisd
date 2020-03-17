@@ -207,113 +207,131 @@ pub fn device_is_luks2(physical_path: &Path) -> bool {
 ///
 /// Requires cryptsetup 2.3
 fn read_key(key_description: &str) -> Result<SafeMemHandle> {
-    // Attach persistent keyring to process keyring
-    match unsafe {
-        syscall(
-            SYS_keyctl,
-            KEYCTL_GET_PERSISTENT,
-            0,
-            KEY_SPEC_SESSION_KEYRING,
-        )
-    } {
-        i if i < 0 => return Err(LibcryptErr::IOError(io::Error::last_os_error())),
-        _ => (),
-    };
+    fn read_key_result(key_description: &str) -> Result<SafeMemHandle> {
+        // Attach persistent keyring to process keyring
+        match unsafe {
+            syscall(
+                SYS_keyctl,
+                KEYCTL_GET_PERSISTENT,
+                0,
+                KEY_SPEC_SESSION_KEYRING,
+            )
+        } {
+            i if i < 0 => return Err(LibcryptErr::IOError(io::Error::last_os_error())),
+            _ => (),
+        };
 
-    let key_type_cstring = CString::new("user").expect("String is valid");
-    let key_description_cstring = CString::new(key_description).map_err(LibcryptErr::NullError)?;
+        let key_type_cstring = CString::new("user").expect("String is valid");
+        let key_description_cstring =
+            CString::new(key_description).map_err(LibcryptErr::NullError)?;
 
-    // Request key ID from persistent keyring
-    let key_id = match unsafe {
-        syscall(
-            SYS_request_key,
-            key_type_cstring.as_ptr(),
-            key_description_cstring.as_ptr(),
-            std::ptr::null::<c_void>(),
-            0,
-        )
-    } {
-        i if i < 0 => return Err(LibcryptErr::IOError(io::Error::last_os_error())),
-        i => i,
-    };
+        // Request key ID from persistent keyring
+        let key_id = match unsafe {
+            syscall(
+                SYS_request_key,
+                key_type_cstring.as_ptr(),
+                key_description_cstring.as_ptr(),
+                std::ptr::null::<c_void>(),
+                0,
+            )
+        } {
+            i if i < 0 => return Err(LibcryptErr::IOError(io::Error::last_os_error())),
+            i => i,
+        };
 
-    let mut key_buffer = SafeMemHandle::alloc(STRATIS_KEY_SIZE)?;
-    let mut_ref = key_buffer.as_mut();
+        let mut key_buffer = SafeMemHandle::alloc(STRATIS_KEY_SIZE)?;
+        let mut_ref = key_buffer.as_mut();
 
-    // Read key from keyring
-    match unsafe {
-        syscall(
-            SYS_keyctl,
-            KEYCTL_READ,
-            key_id,
-            mut_ref.as_mut_ptr(),
-            mut_ref.len(),
-        )
-    } {
-        i if i < 0 => return Err(LibcryptErr::IOError(io::Error::last_os_error())),
-        _ => (),
-    };
+        // Read key from keyring
+        match unsafe {
+            syscall(
+                SYS_keyctl,
+                KEYCTL_READ,
+                key_id,
+                mut_ref.as_mut_ptr(),
+                mut_ref.len(),
+            )
+        } {
+            i if i < 0 => return Err(LibcryptErr::IOError(io::Error::last_os_error())),
+            _ => (),
+        };
+        Ok(key_buffer)
+    }
 
-    Ok(key_buffer)
+    let read_key_result = read_key_result(key_description);
+    if read_key_result.is_err() {
+        warn!(
+            "Failed to read the key with key description {} from the keyring; \
+            encryption cannot continue",
+            key_description
+        );
+    }
+    read_key_result
 }
 
 /// Activate device by token then check that the logical path exists corresponding
 /// to the activation name passed into this method.
 fn activate_and_check_device_path(crypt_device: &mut CryptDevice, name: &str) -> Result<PathBuf> {
-    // Activate by token
-    crypt_device.token_handle().activate_by_token::<()>(
-        Some(name),
-        Some(LUKS2_TOKEN_ID),
-        None,
-        CryptActivateFlags::empty(),
-    )?;
+    fn activation_result(crypt_device: &mut CryptDevice, name: &str) -> Result<PathBuf> {
+        // Activate by token
+        crypt_device.token_handle().activate_by_token::<()>(
+            Some(name),
+            Some(LUKS2_TOKEN_ID),
+            None,
+            CryptActivateFlags::empty(),
+        )?;
 
-    // Check activation status.
-    if !device_is_active(crypt_device, name) {
-        return Err(LibcryptErr::Other("Failed to activate device".to_string()));
+        // Check activation status.
+        if !device_is_active(crypt_device, name) {
+            return Err(LibcryptErr::Other("Failed to activate device".to_string()));
+        }
+
+        // Checking that the symlink was created may also be valuable in case a race
+        // condition occurs with udev.
+        let mut activated_path = PathBuf::from("/dev/mapper");
+        activated_path.push(name);
+
+        // Can potentially use inotify with a timeout to wait for the symlink
+        // if race conditions become a problem.
+        if activated_path.exists() {
+            Ok(activated_path)
+        } else {
+            Err(LibcryptErr::IOError(io::Error::from(
+                io::ErrorKind::NotFound,
+            )))
+        }
     }
 
-    // Checking that the symlink was created may also be valuable in case a race
-    // condition occurs with udev.
-    let mut activated_path = PathBuf::from("/dev/mapper");
-    activated_path.push(name);
-
-    // Can potentially use inotify with a timeout to wait for the symlink
-    // if race conditions become a problem.
-    if activated_path.exists() {
-        Ok(activated_path)
-    } else {
-        Err(LibcryptErr::IOError(io::Error::from(
-            io::ErrorKind::NotFound,
-        )))
+    let activation_result = activation_result(crypt_device, name);
+    if activation_result.is_err() {
+        warn!("Failed to activate device with name {}", name);
     }
+    activation_result
 }
 
 /// Check if the given device is active.
 fn encrypted_device_is_active(physical_path: &Path, device_name: &str) -> bool {
-    let mut device = match CryptInit::init(physical_path) {
-        Ok(d) => d,
+    fn is_active(physical_path: &Path, device_name: &str) -> Result<bool> {
+        let mut device = CryptInit::init(physical_path)?;
+        device
+            .context_handle()
+            .load::<()>(EncryptionFormat::Luks2, None)?;
+        Ok(device_is_active(&mut device, device_name))
+    }
+
+    let active_result = is_active(physical_path, device_name);
+    match active_result {
+        Ok(b) => b,
         Err(e) => {
             warn!(
-                "Failed to get context for device {} with error: {}; \
-                reporting this device as inactive.",
+                "Encountered an error checking activation status of \
+                device {}: {}; reporting as inactive",
                 physical_path.display(),
                 e
             );
-            return false;
+            false
         }
-    };
-    if let Err(e) = device
-        .context_handle()
-        .load::<()>(EncryptionFormat::Luks2, None)
-    {
-        warn!(
-            "Failed to load LUKS2 header into memory when checking activation \
-            status: {}",
-            e
-        );
     }
-    device_is_active(&mut device, device_name)
 }
 
 fn device_is_active(device: &mut CryptDevice, device_name: &str) -> bool {
@@ -421,14 +439,26 @@ fn get_keyslot_number(device: &mut CryptDevice) -> Result<Vec<c_uint>> {
     Ok(vec
         .iter()
         .filter_map(|int_val| {
-            let as_u64 = int_val.as_u64();
-            if as_u64.is_none() {
+            let as_str = int_val.as_str();
+            if as_str.is_none() {
                 warn!(
                     "Discarding invalid value in LUKS2 token keyslot array: {}",
                     int_val
                 );
             }
-            as_u64
+            let s = match as_str {
+                Some(s) => s,
+                None => return None,
+            };
+            let as_u64 = s.parse::<u64>();
+            if let Err(ref e) = as_u64 {
+                warn!(
+                    "Discard invalid value in LUKS2 token keyslot array: {}; \
+                    failed to convert it to an integer: {}",
+                    s, e,
+                );
+            }
+            as_u64.ok()
         })
         .map(|int| int as c_uint)
         .collect::<Vec<_>>())
@@ -438,13 +468,18 @@ fn get_keyslot_number(device: &mut CryptDevice) -> Result<Vec<c_uint>> {
 /// a destructive action. `name` should be the name of the device as registered
 /// with devicemapper and cryptsetup.
 pub fn deactivate_encrypted_stratis_device(name: &str) -> Result<()> {
-    let mut crypt_device = CryptInit::init_by_name_and_header(name, None)?;
-    crypt_device
-        .context_handle()
-        .load::<()>(EncryptionFormat::Luks2, None)?;
-    let deactivate_result = crypt_device
-        .activate_handle()
-        .deactivate(name, CryptDeactivateFlags::empty());
+    fn deactivate_device(name: &str) -> Result<()> {
+        let mut crypt_device = CryptInit::init_by_name_and_header(name, None)?;
+        crypt_device
+            .context_handle()
+            .load::<()>(EncryptionFormat::Luks2, None)?;
+        crypt_device
+            .activate_handle()
+            .deactivate(name, CryptDeactivateFlags::empty())?;
+        Ok(())
+    }
+
+    let deactivate_result = deactivate_device(name);
     if deactivate_result.is_err() {
         warn!("Failed to deactivate the crypt device with name {}; you will need to deactivate it manually", name);
     }

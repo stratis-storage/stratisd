@@ -177,10 +177,10 @@ class UdevAdd(unittest.TestCase):
             self._service.wait()
             self._service = None  # pylint: disable=attribute-defined-outside-init
 
-            assert UdevAdd._process_exists("stratisd") is None
+        remove_stratis_setup()
 
-            remove_stratis_setup()
-            assert _get_stratis_devices() == []
+        assert _get_stratis_devices() == []
+        assert UdevAdd._process_exists("stratisd") is None
 
     @staticmethod
     def _settle():

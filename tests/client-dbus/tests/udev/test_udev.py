@@ -94,8 +94,10 @@ class UdevAdd(unittest.TestCase):
     def _device_files(self, tokens):
         """
         Converts a list of loop back devices to a list of /dev file entries
-        :param tokens: Loop back device list
-        :return: List of loop back devices
+        :param tokens: list of UUIDs
+        :type tokens: list of uuid.UUID
+        :return: List of device nodes corresponding to tokens, may include None
+        :rtype: list of (str or NoneType)
         """
         return [self._lb_mgr.device_file(t) for t in tokens]
 

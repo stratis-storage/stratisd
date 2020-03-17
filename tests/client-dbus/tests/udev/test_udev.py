@@ -267,18 +267,27 @@ class UdevAdd(unittest.TestCase):
         self, number_of_pools, dev_count_pool, some_existing=False
     ):  # pylint: disable=too-many-locals
         """
-        We want to test 1..N number of devices in the following scenarios:
+        Run the following test:
 
-        * Devices with no signatures getting hot-plug
-        * 1 or more devices in pool
-          - All devices present @ startup
-          - 1 or more @ startup, but incomplete number of devices at startup
-          - 0 @ startup, systematically adding one @ a time
+        0. Start stratisd.
+        1. Create number_of_pools pools each with dev_count_pool devices.
+        2. Stop stratisd and take down all Stratis dm devices.
+        3. Verify that the number of devices with Stratis metadata is the
+        same as the number of devices used when creating pools.
+        4. Start stratisd, verify that it can find the correct number of pools.
+        5. Stop stratisd and take down all Stratis dm devices.
+        6. Unplug all the loopbacked devices.
+        7. Verify that no devices with Stratis metadata can be found.
+        8. Start stratisd, verify that no pools are found.
+        9. Plug all but the last device for each pool. Verify that stratisd
+        reports no pools.
+        10. Add the last device for each pool, verify that stratisd detects
+        all pools.
 
-        :param number_of_pools: Number of pools
-        :param dev_count_pool: Number of devices in each pool
-        :param some_existing: Hotplug some devices before we start the daemon
-        :return: None
+        :param int number_of_pools: the number of pools to use in the test
+        :param int dev_count_pool: the number of devices per pool
+        :param bool some_existing: if True, continually stop and start the
+             daemon during step (9)
         """
 
         pool_data = {}
@@ -301,22 +310,18 @@ class UdevAdd(unittest.TestCase):
             pool_data[pool_name] = device_tokens
             expected_stratis_devices.extend(devnodes)
 
-        # Start & Stop the service
         self._stop_service_remove_dm_tables()
 
         UdevAdd._expected_stratis_block_devices(expected_stratis_devices)
 
         self._start_service()
 
-        # We should have all the devices, so pool should exist after toggle
         self.assertEqual(len(UdevAdd._get_pools()), number_of_pools)
 
         self._stop_service_remove_dm_tables()
 
-        # Unplug all the devices
-        for device_tokens in pool_data.values():
-            for d in device_tokens:
-                self._lb_mgr.unplug(d)
+        for d in (d for device_tokens in pool_data.values() for d in device_tokens):
+            self._lb_mgr.unplug(d)
 
         UdevAdd._expected_stratis_block_devices([])
 
@@ -324,60 +329,43 @@ class UdevAdd(unittest.TestCase):
 
         self.assertEqual(len(UdevAdd._get_pools()), 0)
 
-        # Systematically add a device to each pool, checking that the pool
-        # isn't assembled until complete
-        pool_names = pool_data.keys()
-
-        activation_sequence = [
-            pool_data[p][i] for i in range(dev_count_pool) for p in pool_names
-        ]
-
         # Add all but the last device for each pool
         running_devices = []
-        for device_token in activation_sequence[:-number_of_pools]:
-            self._lb_mgr.hotplug(device_token)
-            running_devices.extend(self._device_files([device_token]))
-
-            UdevAdd._expected_stratis_block_devices(running_devices)
+        for i in range(dev_count_pool - 1):
+            for _, devices in pool_data.items():
+                device_token = devices[i]
+                self._lb_mgr.hotplug(device_token)
+                running_devices.extend(self._device_files([device_token]))
+                UdevAdd._expected_stratis_block_devices(running_devices)
 
             if some_existing:
                 self._stop_service_remove_dm_tables()
                 self._start_service()
             else:
                 self._settle()
-            self.assertEqual(len(UdevAdd._get_pools()), 0)
+
+        self.assertEqual(len(UdevAdd._get_pools()), 0)
 
         # Add the last device that makes each pool complete
-        for device_token in activation_sequence[-number_of_pools:]:
-            self._lb_mgr.hotplug(device_token)
+        last_index = dev_count_pool - 1
+        for _, devices in pool_data.items():
+            self._lb_mgr.hotplug(devices[last_index])
 
         self._settle()
         self.assertEqual(len(UdevAdd._get_pools()), number_of_pools)
 
-        for pn in pool_names:
+        for pn in pool_data:
             self.assertEqual(len(self._get_pools(pn)), 1)
 
-        # After this test we need to clean-up in case we are running again
-        # from same test fixture
-        self._stop_service_remove_dm_tables()
-        self._lb_mgr.destroy_devices()
-        UdevAdd._expected_stratis_block_devices([])
+    def test_no_stops(self):
+        """
+        See _test_driver for description.
+        """
+        self._test_driver(2, 4)
 
-    def test_combinations(self):
+    def test_with_stop(self):
         """
-        Test combinations of pools and number of devices in each pool
-        :return:
-        """
-        for pools_num in range(3):
-            for device_num in range(1, 4):
-                self._test_driver(pools_num, device_num)
-
-    def test_existing(self):
-        """
-        While we are adding devices back we will stop start the daemon to ensure
-        it can start with one or more devices present and complete when the
-        other devices come in later.
-        :return: None
+        See _test_driver for description.
         """
         self._test_driver(2, 4, True)
 

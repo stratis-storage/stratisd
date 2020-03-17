@@ -394,40 +394,48 @@ class UdevAdd(unittest.TestCase):
     def _single_pool(self, num_devices, num_hotplugs=0):
         """
         Creates a single pool with specified number of devices.
-        :param num_devices: Number of devices to use for pool
-        :param num_hotplugs: Number of extra udev "add" event per devices
+
+        Verifies the following:
+        * On service start there are no pools
+        * After pool creation there is one pool and all block devices passed
+        to the pool creation method have Stratis metadata
+        * After the daemon is brought down and restarted it has found a pool
+        * After the loop backed devices have been removed no devices with
+        Stratis metadata are found and the newly brought up daemon finds 0
+        pools.
+        * After the devices are re-added, they can all be found with Stratis
+        metadata and the daemon has a pool.
+        * Causing num_hotplugs synthetic udev events for each device has
+        no further effect, i.e., no additional pools suddenly appear.
+
+        :param int num_devices: Number of devices to use for pool
+        :param int num_hotplugs: Number of synthetic udev "add" event per device
         :return: None
         """
         self._start_service()
         self.assertEqual(len(UdevAdd._get_pools()), 0)
 
         device_tokens = [self._lb_mgr.create_device() for _ in range(num_devices)]
+        devnodes = self._device_files(device_tokens)
+
         self._settle()
 
-        self.assertEqual(len(device_tokens), num_devices)
-
         pool_name = rs(5)
-        UdevAdd._create_pool(pool_name, self._device_files(device_tokens))
-
+        UdevAdd._create_pool(pool_name, devnodes)
         self.assertEqual(len(UdevAdd._get_pools()), 1)
 
         self._stop_service_remove_dm_tables()
 
-        UdevAdd._expected_stratis_block_devices(
-            num_devices, self._device_files(device_tokens)
-        )
+        UdevAdd._expected_stratis_block_devices(num_devices, devnodes)
 
         self._start_service()
 
-        # Make sure on a start with all the devices the pool is there!
         self.assertEqual(len(UdevAdd._get_pools()), 1)
 
         self._stop_service_remove_dm_tables()
 
-        # Remove the devices
         for d in device_tokens:
             self._lb_mgr.unplug(d)
-
         UdevAdd._expected_stratis_block_devices(0, [])
 
         self._start_service()
@@ -438,21 +446,16 @@ class UdevAdd(unittest.TestCase):
             self._lb_mgr.hotplug(d)
 
         self._settle()
-        UdevAdd._expected_stratis_block_devices(
-            num_devices, self._device_files(device_tokens)
-        )
+        UdevAdd._expected_stratis_block_devices(num_devices, devnodes)
 
         self.assertEqual(len(UdevAdd._get_pools()), 1)
 
-        # Generate unnecessary hot plug adds
         for _ in range(num_hotplugs):
             for d in device_tokens:
                 self._lb_mgr.generate_udev_add_event(d)
 
         self._settle()
-        UdevAdd._expected_stratis_block_devices(
-            num_devices, self._device_files(device_tokens)
-        )
+        UdevAdd._expected_stratis_block_devices(num_devices, devnodes)
 
         self.assertEqual(len(UdevAdd._get_pools()), 1)
 

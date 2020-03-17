@@ -23,6 +23,8 @@ import uuid
 
 _LOSETUP_BIN = os.getenv("STRATIS_LOSETUP_BIN", "/usr/sbin/losetup")
 
+_SIZE_OF_DEVICE = 1024 ** 4  # 1 TiB
+
 
 class LoopBackDevices:
     """
@@ -53,11 +55,14 @@ class LoopBackDevices:
         self.count += 1
 
         with open(backing_file, "ab") as bd:
-            # Sparse file, so go big (1 TiB)
-            bd.truncate(1024 ** 4)
+            bd.truncate(_SIZE_OF_DEVICE)
 
-        result = subprocess.check_output([_LOSETUP_BIN, "-f", "--show", backing_file])
-        device = str.strip(result.decode("utf-8"))
+        device = str.strip(
+            subprocess.check_output(
+                [_LOSETUP_BIN, "-f", "--show", backing_file]
+            ).decode("utf-8")
+        )
+
         token = uuid.uuid4()
         self.devices[token] = (device, backing_file)
         return token
@@ -97,10 +102,11 @@ class LoopBackDevices:
         if token in self.devices:
             (_, backing_file) = self.devices[token]
 
-            result = subprocess.check_output(
-                [_LOSETUP_BIN, "-f", "--show", backing_file]
+            device = str.strip(
+                subprocess.check_output(
+                    [_LOSETUP_BIN, "-f", "--show", backing_file]
+                ).decode("utf-8")
             )
-            device = str.strip(result.decode("utf-8"))
             self.devices[token] = (device, backing_file)
 
             # Make sure an add occurs

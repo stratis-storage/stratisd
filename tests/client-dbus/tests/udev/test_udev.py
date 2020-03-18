@@ -143,7 +143,7 @@ class UdevAdd(unittest.TestCase):
             assert _get_stratis_devices() == []
 
             self._service = subprocess.Popen(  # pylint: disable=attribute-defined-outside-init
-                [_STRATISD, "--debug"]
+                [_STRATISD]
             )
 
             dbus_interface_present = False

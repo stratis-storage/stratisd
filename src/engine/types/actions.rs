@@ -160,7 +160,7 @@ impl fmt::Display for DeleteAction<PoolUuid> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             DeleteAction::Deleted(uuid) => {
-                write!(f, "pool UUID {} destroyed", uuid.to_simple_ref())
+                write!(f, "pool with UUID {} destroyed", uuid.to_simple_ref())
             }
             DeleteAction::Identity => write!(f, "pool to be destroyed does not exist"),
         }

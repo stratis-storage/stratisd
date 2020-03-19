@@ -186,16 +186,6 @@ class UdevAdd(unittest.TestCase):
     Test udev add event support.
     """
 
-    def _device_files(self, tokens):
-        """
-        Converts a list of loop back devices to a list of /dev file entries
-        :param tokens: list of UUIDs
-        :type tokens: list of uuid.UUID
-        :return: List of device nodes corresponding to tokens, may include None
-        :rtype: list of (str or NoneType)
-        """
-        return [self._lb_mgr.device_file(t) for t in tokens]
-
     def setUp(self):
         self._lb_mgr = LoopBackDevices()
         self.addCleanup(self._clean_up)
@@ -300,10 +290,11 @@ class UdevAdd(unittest.TestCase):
             device_tokens = [
                 self._lb_mgr.create_device() for _ in range(dev_count_pool)
             ]
+            devnodes = [self._lb_mgr.device_file(t) for t in device_tokens]
+
             _settle()
 
             pool_name = rs(5)
-            devnodes = self._device_files(device_tokens)
 
             _create_pool(pool_name, devnodes)
             pool_data[pool_name] = device_tokens
@@ -334,7 +325,7 @@ class UdevAdd(unittest.TestCase):
             for _, devices in pool_data.items():
                 device_token = devices[i]
                 self._lb_mgr.hotplug(device_token)
-                running_devices.extend(self._device_files([device_token]))
+                running_devices.append(self._lb_mgr.device_file(device_token))
                 _expected_stratis_block_devices(running_devices)
 
             if some_existing:
@@ -393,7 +384,7 @@ class UdevAdd(unittest.TestCase):
         self.assertEqual(len(_get_pools()), 0)
 
         device_tokens = [self._lb_mgr.create_device() for _ in range(num_devices)]
-        devnodes = self._device_files(device_tokens)
+        devnodes = [self._lb_mgr.device_file(t) for t in device_tokens]
 
         _settle()
 
@@ -473,11 +464,10 @@ class UdevAdd(unittest.TestCase):
             self._start_service()
 
             this_pool = [self._lb_mgr.create_device() for _ in range(i + 1)]
-
+            devices = [self._lb_mgr.device_file(t) for t in this_pool]
             _settle()
 
             pool_tokens.append(this_pool)
-            devices = self._device_files(this_pool)
             _create_pool(pool_name, devices)
 
             self._stop_service_remove_dm_tables()
@@ -497,7 +487,7 @@ class UdevAdd(unittest.TestCase):
         for i in range(num_pools):
             for d in pool_tokens[i]:
                 self._lb_mgr.hotplug(d)
-                devices_plugged.extend(self._device_files([d]))
+                devices_plugged.append(self._lb_mgr.device_file(d))
 
             _settle()
             _expected_stratis_block_devices(devices_plugged)

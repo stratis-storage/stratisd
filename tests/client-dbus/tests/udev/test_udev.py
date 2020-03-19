@@ -163,22 +163,76 @@ def _expected_stratis_block_devices(expected_paths):
     assert found == num_expected
 
 
-def _process_exists(name):
+def _processes(name):
     """
-    Look through processes, using their pids, to find one matching 'name'.
-    Return None if no such process found, else return the pid.
-    :param name: name of process to check
-    :type name: str
-    :return: pid or None
-    :rtype: int or NoneType
+    Find all process matching the given name.
+    :param str name: name of process to check
+    :return: sequence of psutil.Process
     """
     for proc in psutil.process_iter(["name"]):
         try:
             if proc.name() == name:
-                return proc.pid
+                yield proc
         except psutil.NoSuchProcess:
             pass
-    return None
+
+
+def _remove_stratis_dm_devices():
+    """
+    Remove Stratis device mapper devices, fail with an assertion error if
+    some have been missed.
+    """
+    remove_stratis_setup()
+    assert _get_stratis_devices() == []
+
+
+class _Service:
+    """
+    Start and stop stratisd.
+    """
+
+    def start_service(self):
+        """
+        Starts the stratisd service if it is not already started. Verifies
+        that it has not exited at the time the method returns. Verifies that
+        the D-Bus service is available.
+        """
+
+        _settle()
+
+        assert list(_processes("stratisd")) == []
+        assert _get_stratis_devices() == []
+
+        service = subprocess.Popen([_STRATISD])
+
+        dbus_interface_present = False
+        limit = time.time() + 120.0
+        while (  # pylint: disable=bad-continuation
+            time.time() <= limit
+            and not dbus_interface_present
+            and service.poll() is None
+        ):
+            try:
+                get_object(TOP_OBJECT)
+                dbus_interface_present = True
+            except dbus.exceptions.DBusException:
+                time.sleep(0.5)
+
+        time.sleep(1)
+        if service.poll() is not None:
+            raise Exception("Daemon unexpectedly exited with %s" % service.returncode)
+
+        assert dbus_interface_present, "No D-Bus interface for stratisd found"
+        self._service = service  # pylint: disable=attribute-defined-outside-init
+        return self
+
+    def stop_service(self):
+        """
+        Stops the stratisd daemon previously spawned.
+        """
+        self._service.terminate()
+        self._service.wait()
+        assert list(_processes("stratisd")) == []
 
 
 class UdevAdd(unittest.TestCase):
@@ -195,62 +249,13 @@ class UdevAdd(unittest.TestCase):
         Cleans up the test environment
         :return: None
         """
-        self._stop_service_remove_dm_tables()
+        stratisds = list(_processes("stratisd"))
+        for process in stratisds:
+            process.terminate()
+        psutil.wait_procs(stratisds)
+
+        _remove_stratis_dm_devices()
         self._lb_mgr.destroy_all()
-
-    def _start_service(self):
-        """
-        Starts the stratisd service if it is not already started. Verifies
-        that it has not exited at the time the method returns. Verifies that
-        the D-Bus service is available.
-        :return: None
-        """
-
-        if getattr(self, "_service", None) is None:
-            _settle()
-
-            assert _process_exists("stratisd") is None
-            assert _get_stratis_devices() == []
-
-            self._service = subprocess.Popen(  # pylint: disable=attribute-defined-outside-init
-                [_STRATISD]
-            )
-
-            dbus_interface_present = False
-            limit = time.time() + 120.0
-            while (  # pylint: disable=bad-continuation
-                time.time() <= limit
-                and not dbus_interface_present
-                and self._service.poll() is None
-            ):
-                try:
-                    get_object(TOP_OBJECT)
-                    dbus_interface_present = True
-                except dbus.exceptions.DBusException:
-                    time.sleep(0.5)
-
-            time.sleep(1)
-            if self._service.poll() is not None:
-                rc = self._service.returncode
-                self._service = None  # pylint: disable=attribute-defined-outside-init
-                raise Exception("Daemon unexpectedly exited with %s" % rc)
-
-            assert dbus_interface_present, "No D-Bus interface for stratisd found"
-
-    def _stop_service_remove_dm_tables(self):
-        """
-        Stops the service and removes any stratis dm table(s)
-        :return: None
-        """
-        if getattr(self, "_service", None) is not None:
-            self._service.terminate()
-            self._service.wait()
-            self._service = None  # pylint: disable=attribute-defined-outside-init
-
-        remove_stratis_setup()
-
-        assert _get_stratis_devices() == []
-        assert _process_exists("stratisd") is None
 
     def _test_driver(  # pylint: disable=bad-continuation
         self, number_of_pools, dev_count_pool, some_existing=False
@@ -281,7 +286,7 @@ class UdevAdd(unittest.TestCase):
 
         pool_data = {}
 
-        self._start_service()
+        service = _Service().start_service()
 
         expected_stratis_devices = []
 
@@ -300,28 +305,31 @@ class UdevAdd(unittest.TestCase):
             pool_data[pool_name] = device_tokens
             expected_stratis_devices.extend(devnodes)
 
-        self._stop_service_remove_dm_tables()
+        service.stop_service()
+        _remove_stratis_dm_devices()
 
         _expected_stratis_block_devices(expected_stratis_devices)
 
-        self._start_service()
+        service = _Service().start_service()
 
         self.assertEqual(len(_get_pools()), number_of_pools)
 
-        self._stop_service_remove_dm_tables()
+        service.stop_service()
+        _remove_stratis_dm_devices()
 
         for d in (d for device_tokens in pool_data.values() for d in device_tokens):
             self._lb_mgr.unplug(d)
 
         _expected_stratis_block_devices([])
 
-        self._start_service()
+        service = _Service().start_service()
 
         self.assertEqual(len(_get_pools()), 0)
 
         # Add all but the last device for each pool
         running_devices = []
-        for i in range(dev_count_pool - 1):
+        last_index = dev_count_pool - 1
+        for i in range(last_index):
             for _, devices in pool_data.items():
                 device_token = devices[i]
                 self._lb_mgr.hotplug(device_token)
@@ -329,15 +337,15 @@ class UdevAdd(unittest.TestCase):
                 _expected_stratis_block_devices(running_devices)
 
             if some_existing:
-                self._stop_service_remove_dm_tables()
-                self._start_service()
+                service.stop_service()
+                _remove_stratis_dm_devices()
+                service = _Service().start_service()
             else:
                 _settle()
 
         self.assertEqual(len(_get_pools()), 0)
 
         # Add the last device that makes each pool complete
-        last_index = dev_count_pool - 1
         for _, devices in pool_data.items():
             self._lb_mgr.hotplug(devices[last_index])
 
@@ -380,7 +388,7 @@ class UdevAdd(unittest.TestCase):
         :param int num_hotplugs: Number of synthetic udev "add" event per device
         :return: None
         """
-        self._start_service()
+        service = _Service().start_service()
         self.assertEqual(len(_get_pools()), 0)
 
         device_tokens = [self._lb_mgr.create_device() for _ in range(num_devices)]
@@ -392,21 +400,23 @@ class UdevAdd(unittest.TestCase):
         _create_pool(pool_name, devnodes)
         self.assertEqual(len(_get_pools()), 1)
 
-        self._stop_service_remove_dm_tables()
+        service.stop_service()
+        _remove_stratis_dm_devices()
 
         _expected_stratis_block_devices(devnodes)
 
-        self._start_service()
+        service = _Service().start_service()
 
         self.assertEqual(len(_get_pools()), 1)
 
-        self._stop_service_remove_dm_tables()
+        service.stop_service()
+        _remove_stratis_dm_devices()
 
         for d in device_tokens:
             self._lb_mgr.unplug(d)
         _expected_stratis_block_devices([])
 
-        self._start_service()
+        service = _Service().start_service()
 
         self.assertEqual(len(_get_pools()), 0)
 
@@ -461,7 +471,7 @@ class UdevAdd(unittest.TestCase):
 
         # Create some pools with duplicate names
         for i in range(num_pools):
-            self._start_service()
+            service = _Service().start_service()
 
             this_pool = [self._lb_mgr.create_device() for _ in range(i + 1)]
             devices = [self._lb_mgr.device_file(t) for t in this_pool]
@@ -470,7 +480,8 @@ class UdevAdd(unittest.TestCase):
             pool_tokens.append(this_pool)
             _create_pool(pool_name, devices)
 
-            self._stop_service_remove_dm_tables()
+            service.stop_service()
+            _remove_stratis_dm_devices()
 
             _expected_stratis_block_devices(devices)
 
@@ -479,7 +490,7 @@ class UdevAdd(unittest.TestCase):
 
             _expected_stratis_block_devices([])
 
-        self._start_service()
+        service = _Service().start_service()
 
         # Hot plug activate each pool in sequence and force a duplicate name
         # error.

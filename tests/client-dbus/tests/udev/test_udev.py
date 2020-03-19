@@ -129,7 +129,7 @@ def _dump_state(context, expected_paths):
 
     print("Udev db dump of all block devices")
     for d in context.list_devices(subsystem="block"):
-        for k, v in d.items():
+        for k, v in d.properties.items():
             print("%s:%s" % (k, str(v)))
         print("")
 

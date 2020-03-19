@@ -15,12 +15,10 @@ use crate::{
         engine::BlockDev,
         strat_engine::{
             backstore::{
-                crypt::{
-                    destroy_encrypted_stratis_device, get_physical_device_path_from_name,
-                    name_from_uuids,
-                },
+                crypt::CryptHandle,
                 metadata::{disown_device, BDAExtendedSize, MDADataSize, BDA},
                 range_alloc::RangeAllocator,
+                shared::BlockDevPath,
             },
             serde_structs::{BaseBlockDevSave, Recordable},
         },
@@ -32,7 +30,7 @@ use crate::{
 #[derive(Debug)]
 pub struct StratBlockDev {
     dev: Device,
-    devnode: PathBuf,
+    devnode: BlockDevPath,
     bda: BDA,
     used: RangeAllocator,
     user_info: Option<String>,
@@ -61,7 +59,7 @@ impl StratBlockDev {
     /// reported on the D-Bus.
     pub fn new(
         dev: Device,
-        devnode: PathBuf,
+        devnode: BlockDevPath,
         bda: BDA,
         upper_segments: &[(Sectors, Sectors)],
         user_info: Option<String>,
@@ -97,17 +95,22 @@ impl StratBlockDev {
     /// accessible by stratisd or visible to blkid.
     pub fn disown(&self) -> StratisResult<()> {
         if !self.is_encrypted() {
-            disown_device(&mut OpenOptions::new().write(true).open(&self.devnode)?)?;
+            disown_device(
+                &mut OpenOptions::new()
+                    .write(true)
+                    .open(self.devnode.metadata_path())?,
+            )?;
         } else {
-            let name = name_from_uuids(&self.bda.pool_uuid(), &self.bda.dev_uuid());
-            let physical_path = get_physical_device_path_from_name(&name)?;
-            destroy_encrypted_stratis_device(&physical_path)?;
+            let mut handle = CryptHandle::setup(self.devnode.physical_path())?;
+            handle.wipe()?;
         }
         Ok(())
     }
 
     pub fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> StratisResult<()> {
-        let mut f = OpenOptions::new().write(true).open(&self.devnode)?;
+        let mut f = OpenOptions::new()
+            .write(true)
+            .open(self.devnode.metadata_path())?;
         self.bda.save_state(time, metadata, &mut f)
     }
 
@@ -151,7 +154,7 @@ impl StratBlockDev {
 
 impl BlockDev for StratBlockDev {
     fn devnode(&self) -> PathBuf {
-        self.devnode.clone()
+        self.devnode.metadata_path().to_owned()
     }
 
     fn user_info(&self) -> Option<&str> {

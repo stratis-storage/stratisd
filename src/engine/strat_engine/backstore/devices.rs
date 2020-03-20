@@ -296,7 +296,7 @@ pub fn initialize_devices(
     /// device using the physical device as storage.
     fn map_device_nums(logical_path: &Path) -> StratisResult<Device> {
         let result = nix::sys::stat::stat(logical_path)?;
-        Ok(Device::from(result.st_dev))
+        Ok(Device::from(result.st_rdev))
     }
 
     /// Initialize an encrypted device on the given physical device

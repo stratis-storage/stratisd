@@ -31,7 +31,7 @@ zeroize = "1.1"
 [dependencies.libcryptsetup-rs]
 version = "0.2.0"
 git = "https://github.com/jbaublitz/libcryptsetup-rs"
-branch = "builder-fix"
+branch = "keyslot-size-fix"
 
 [dependencies.uuid]
 version = "0.7"

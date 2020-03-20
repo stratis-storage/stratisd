@@ -15,6 +15,12 @@ mod consts {
     pub const KEY_SPEC_SESSION_KEYRING: c_int = -3;
 }
 
+/// Takes physical device paths from loopback or real tests and passes
+/// them through to a compatible test definition. This method
+/// will also enrich the context passed to the test with a key description
+/// pointing to a key in the kernel keyring that has been randomly generated
+/// and added for this test. It will always be cleaned up after the test completes
+/// on both success and failure.
 pub fn insert_and_cleanup_key<F>(physical_paths: &[&Path], test: F)
 where
     F: Fn(&[&Path], &str) -> std::result::Result<(), Box<dyn Error>>,

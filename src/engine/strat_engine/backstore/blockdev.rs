@@ -4,7 +4,10 @@
 
 // Code to handle a single block device.
 
-use std::{fs::OpenOptions, path::PathBuf};
+use std::{
+    fs::OpenOptions,
+    path::{Path, PathBuf},
+};
 
 use chrono::{DateTime, TimeZone, Utc};
 
@@ -24,7 +27,7 @@ use crate::{
         },
         types::{DevUuid, MaybeDbusPath},
     },
-    stratis::StratisResult,
+    stratis::{StratisError, StratisResult},
 };
 
 #[derive(Debug)]
@@ -43,7 +46,8 @@ impl StratBlockDev {
     /// Make a new BlockDev from the parameters.
     /// Allocate space for the Stratis metadata on the device.
     /// - dev: the device, identified by number
-    /// - devnode: the device node
+    /// - devnode: for encrypted devices, the logical and physical
+    ///            paths; for unencrypted devices, the physical path
     /// - bda: the device's BDA
     /// - other_segments: segments claimed for non-Stratis metadata use
     /// - user_info: user settable identifying information
@@ -87,6 +91,12 @@ impl StratBlockDev {
         &self.dev
     }
 
+    /// Return the path to the physical device on which data is stored either
+    /// encrypted or unencrypted.
+    pub fn physical_path(&self) -> &Path {
+        self.devnode.physical_path()
+    }
+
     /// Remove information that identifies this device as belonging to Stratis
     ///
     /// If self.is_encrypted() is true, destroy all keyslots and wipe the LUKS2 header.
@@ -100,11 +110,20 @@ impl StratBlockDev {
                     .write(true)
                     .open(self.devnode.metadata_path())?,
             )?;
-        } else {
-            let mut handle = CryptHandle::setup(self.devnode.physical_path())?;
+            Ok(())
+        } else if let Some(ref mut handle) = CryptHandle::setup(self.devnode.physical_path())? {
             handle.wipe()?;
+            Ok(())
+        } else {
+            warn!(
+                "Device {} was determined to not be a Stratis device; cannot \
+                disown a device that does not belong to Stratis.",
+                self.devnode.physical_path().display()
+            );
+            Err(StratisError::Error(
+                "Device requested to be disowned did not belong to Stratis".to_string(),
+            ))
         }
-        Ok(())
     }
 
     pub fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> StratisResult<()> {

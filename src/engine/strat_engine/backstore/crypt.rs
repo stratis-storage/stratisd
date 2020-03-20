@@ -68,15 +68,338 @@ macro_rules! log_on_failure {
     }}
 }
 
+/// Get a devicemapper name from the pool and device UUIDs.
+pub fn name_from_uuids(pool_uuid: &PoolUuid, dev_uuid: &DevUuid) -> String {
+    format!("{}-{}", pool_uuid.to_simple_ref(), dev_uuid.to_simple_ref())
+}
+
+/// Handle for initialization actions on a physical device.
+pub struct CryptInitializer {
+    physical_path: PathBuf,
+    pool_uuid: PoolUuid,
+    dev_uuid: DevUuid,
+}
+
+impl CryptInitializer {
+    pub fn new(physical_path: PathBuf, pool_uuid: PoolUuid, dev_uuid: DevUuid) -> Self {
+        CryptInitializer {
+            physical_path,
+            pool_uuid,
+            dev_uuid,
+        }
+    }
+
+    pub fn initialize(self, key_description: &str) -> Result<CryptHandle> {
+        let physical_path = self.physical_path.clone();
+        let pool_uuid = self.pool_uuid;
+        let dev_uuid = self.dev_uuid;
+        let device = log_on_failure!(
+            CryptInit::init(physical_path.as_path()),
+            "Failed to acquire context for device {} while initializing; \
+            nothing to clean up",
+            physical_path.display()
+        );
+        let result = self.initialize_no_cleanup(device, key_description);
+        result.map_err(|device| {
+            if let Err(e) = Self::rollback(
+                device,
+                physical_path,
+                name_from_uuids(&pool_uuid, &dev_uuid),
+            ) {
+                e
+            } else {
+                LibcryptErr::Other("Device initialization failed".to_string())
+            }
+        })
+    }
+
+    fn initialize_with_err(&self, device: &mut CryptDevice, key_description: &str) -> Result<()> {
+        log_on_failure!(
+            device.context_handle().format::<()>(
+                EncryptionFormat::Luks2,
+                ("aes", "xts-plain64"),
+                None,
+                libcryptsetup_rs::Either::Right(STRATIS_KEY_SIZE),
+                None,
+            ),
+            "Failed to format device {} with LUKS2 header",
+            self.physical_path.display()
+        );
+        let key = log_on_failure!(
+            read_key(key_description),
+            "Failed to read key with key description {} from keyring",
+            key_description
+        );
+
+        let keyslot = log_on_failure!(
+            device.keyslot_handle().add_by_key(
+                None,
+                None,
+                #[cfg(cryptsetup_compat)]
+                (*key).deref(),
+                #[cfg(not(cryptsetup_compat))]
+                key.as_ref(),
+                CryptVolumeKeyFlags::empty(),
+            ),
+            "Failed to initialize keyslot with provided key in keyring"
+        );
+
+        // Initialize keyring token
+        log_on_failure!(
+            device
+                .token_handle()
+                .luks2_keyring_set(Some(LUKS2_TOKEN_ID), key_description),
+            "Failed to set create the the LUKS2 keyring token"
+        );
+        log_on_failure!(
+            device
+                .token_handle()
+                .assign_keyslot(LUKS2_TOKEN_ID, Some(keyslot)),
+            "Failed to assign the LUKS2 token to the Stratis keyslot"
+        );
+
+        // The default activation name is [POOLUUID]-[DEVUUID] which should be unique
+        // across all Stratis pools.
+        let activation_name = name_from_uuids(&self.pool_uuid, &self.dev_uuid);
+
+        // Initialize stratis token
+        log_on_failure!(
+            device.token_handle().json_set(
+                Some(STRATIS_TOKEN_ID),
+                &json!({
+                    TOKEN_TYPE_KEY: STRATIS_TOKEN_TYPE,
+                    TOKEN_KEYSLOTS_KEY: [],
+                    STRATIS_TOKEN_POOL_UUID_KEY: self.pool_uuid.to_simple_ref().to_string(),
+                    STRATIS_TOKEN_DEV_UUID_KEY: self.dev_uuid.to_simple_ref().to_string(),
+                    STRATIS_TOKEN_KEYDESC_KEY: key_description,
+                    STRATIS_TOKEN_DEVNAME_KEY: activation_name,
+                }),
+            ),
+            "Failed to create the Stratis token"
+        );
+
+        activate_and_check_device_path(device, &activation_name)
+    }
+
+    /// Lay down properly configured LUKS2 metadata on a new physical device
+    fn initialize_no_cleanup(
+        self,
+        mut device: CryptDevice,
+        key_description: &str,
+    ) -> std::result::Result<CryptHandle, CryptDevice> {
+        let pool_uuid = self.pool_uuid;
+        let dev_uuid = self.dev_uuid;
+        let result = self.initialize_with_err(&mut device, key_description);
+        match result {
+            Ok(_) => Ok(CryptHandle::new(
+                device,
+                self.physical_path,
+                name_from_uuids(&pool_uuid, &dev_uuid),
+            )),
+            Err(e) => {
+                warn!("Initialization failed with error: {}; rolling back.", e);
+                Err(device)
+            }
+        }
+    }
+
+    pub fn rollback(mut device: CryptDevice, physical_path: PathBuf, name: String) -> Result<()> {
+        ensure_wiped(&mut device, &physical_path, &name)
+    }
+}
+
+/// Handle for crypt device operations on an existing crypt device loaded
+/// from a physical device.
+pub struct CryptHandle {
+    device: CryptDevice,
+    physical_path: PathBuf,
+    name: String,
+}
+
+impl CryptHandle {
+    /// Create new
+    pub(crate) fn new(device: CryptDevice, physical_path: PathBuf, name: String) -> Self {
+        CryptHandle {
+            device,
+            physical_path,
+            name,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn can_setup(physical_path: &Path) -> bool {
+        fn can_setup_with_failures(physical_path: &Path) -> Result<bool> {
+            let mut device = CryptInit::init(physical_path)?;
+            Ok(is_encrypted_stratis_device(&mut device))
+        }
+
+        can_setup_with_failures(physical_path)
+            .map_err(|e| {
+                warn!(
+                    "Failed to check if device {} is a compatible encrypted Stratis \
+                device: {}; Reporting as not a Stratis device.",
+                    physical_path.display(),
+                    e
+                );
+            })
+            .unwrap_or(false)
+    }
+
+    pub fn setup(physical_path: &Path) -> Result<Option<Self>> {
+        let mut device = log_on_failure!(
+            CryptInit::init(physical_path),
+            "Failed to acquire handle to device {} while loading from disk",
+            physical_path.display()
+        );
+        if !device_is_luks2(&mut device) {
+            info!(
+                "Device {} was determined to not be a LUKS2 device; stopping \
+                attempt to load encrypted Stratis device.",
+                physical_path.display()
+            );
+            return Ok(None);
+        } else {
+            log_on_failure!(
+                device
+                    .context_handle()
+                    .load::<()>(EncryptionFormat::Luks2, None),
+                "Device reported being a LUKS2 volume but loading the LUKS2 \
+                header failed"
+            );
+        }
+        if !is_encrypted_stratis_device(&mut device) {
+            return Ok(None);
+        }
+        let name = Self::name_from_metadata(&mut device)?;
+        Ok(Some(CryptHandle {
+            device,
+            physical_path: physical_path.to_owned(),
+            name,
+        }))
+    }
+
+    /// Return the path to the device node of the underlying physical device
+    /// for the encrypted device.
+    pub fn physical_device_path(&self) -> &Path {
+        self.physical_path.as_path()
+    }
+
+    /// Get the logical path to use for unencrypted operations that is mapped
+    /// to and stored on the encrypted physical device.
+    ///
+    /// * Returns `Some` with the logical path if the device node generated
+    ///   from the name exists.
+    /// * Returns `None` if the logical path expected based on the activation name
+    ///   of the devicemapper device does not exist.
+    pub fn logical_device_path(&self) -> Option<PathBuf> {
+        let mut logical_path = PathBuf::from(DEVICEMAPPER_PATH);
+        logical_path.push(self.name.as_str());
+        if logical_path.exists() {
+            Some(logical_path)
+        } else {
+            None
+        }
+    }
+
+    /// Query the Stratis metadata for the device activation name.
+    fn name_from_metadata(device: &mut CryptDevice) -> Result<String> {
+        let json = log_on_failure!(
+            device.token_handle().json_get(STRATIS_TOKEN_ID),
+            "Failed to get Stratis JSON token from LUKS2 metadata"
+        );
+        let name = log_on_failure!(
+            json.get(STRATIS_TOKEN_DEVNAME_KEY)
+                .and_then(|type_val| type_val.as_str())
+                .map(|type_str| type_str.to_string())
+                .ok_or_else(|| {
+                    LibcryptErr::Other(
+                        "Malformed or missing JSON value for activation_name".to_string(),
+                    )
+                }),
+            "Could not get value for key activation_name from Stratis JSON token"
+        );
+        Ok(name)
+    }
+
+    /// Activate encrypted Stratis device using the name stored in the
+    /// Stratis token
+    #[allow(dead_code)]
+    pub fn activate(&mut self) -> Result<()> {
+        activate_and_check_device_path(&mut self.device, &self.name.to_owned())
+    }
+
+    #[allow(dead_code)]
+    pub fn deactivate(&mut self) -> Result<()> {
+        let name = self.name.to_owned();
+        ensure_inactive(&mut self.device, &name)
+    }
+
+    pub fn wipe(&mut self) -> Result<()> {
+        let physical_path = self.physical_path.to_owned();
+        let name = self.name.to_owned();
+        ensure_wiped(&mut self.device, &physical_path, &name)
+    }
+}
+
+/// Check whether the physical device path corresponds to an encrypted
+/// Stratis device.
+///
+/// This method works on activated and deactivated encrypted devices.
+///
+/// This device will only return true if the device was initialized
+/// with encryption by Stratis. This requires that:
+/// * the device is a LUKS2 encrypted device.
+/// * the device has a valid Stratis LUKS2 token.
+fn is_encrypted_stratis_device(device: &mut CryptDevice) -> bool {
+    fn device_operations(device: &mut CryptDevice) -> Result<bool> {
+        if !device_is_luks2(device) {
+            return Ok(false);
+        }
+
+        check_luks2_token(device)?;
+
+        // Checking the LUKS2 token type not be entirely necessary as we've already
+        // validated that the token can decrypt the volume which should also
+        // validate that the appropriate key is in the keyring.
+        //
+        // Only potential benefit of checking the type of the token is that a LUKS2 token
+        // of another type may be present and capable of unlocking a non-Stratis device
+        // using something other than the keyring for example.
+        //
+        // Given that only Stratis devices should have a Stratis token, this may
+        // still be superfluous as we will check for that after before determining
+        // whether or not it is a Stratis device and nothing is ever activated so
+        // we do not need to guard against unlocking a device that is not ours.
+        let luks_json = log_on_failure!(
+            device.token_handle().json_get(LUKS2_TOKEN_ID),
+            "Failed to get LUKS2 keyring JSON token"
+        );
+        let stratis_json = log_on_failure!(
+            device.token_handle().json_get(STRATIS_TOKEN_ID),
+            "Failed to get Stratis JSON token"
+        );
+        if !luks2_token_type_is_valid(&luks_json) || !stratis_token_is_valid(&stratis_json) {
+            Ok(false)
+        } else {
+            Ok(true)
+        }
+    }
+
+    device_operations(device)
+        .map_err(|e| {
+            warn!(
+                "Operations querying device to determine if it is a Stratis device \
+            failed with an error: {}; reporting as not a Stratis device.",
+                e
+            );
+        })
+        .unwrap_or(false)
+}
+
 fn device_is_active(device: &mut CryptDevice, device_name: &str) -> bool {
     libcryptsetup_rs::status(Some(device), device_name)
         .map(|status| status == CryptStatusInfo::Active)
         .unwrap_or(false)
-}
-
-/// Get a devicemapper name from the pool and device UUIDs.
-pub fn name_from_uuids(pool_uuid: &PoolUuid, dev_uuid: &DevUuid) -> String {
-    format!("{}-{}", pool_uuid.to_simple_ref(), dev_uuid.to_simple_ref())
 }
 
 /// Activate device by token then check that the logical path exists corresponding
@@ -242,139 +565,67 @@ fn ensure_wiped(device: &mut CryptDevice, physical_path: &Path, name: &str) -> R
     Ok(())
 }
 
-/// Handle for initialization actions on a physical device.
-pub struct CryptInitializer {
-    physical_path: PathBuf,
-    pool_uuid: PoolUuid,
-    dev_uuid: DevUuid,
+/// Returns `true` only if the given device path is for a device encrypted with
+/// the LUKS2 format.
+fn device_is_luks2(device: &mut CryptDevice) -> bool {
+    device.format_handle().get_type().ok() == Some(EncryptionFormat::Luks2)
 }
 
-impl CryptInitializer {
-    pub fn new(physical_path: PathBuf, pool_uuid: PoolUuid, dev_uuid: DevUuid) -> Self {
-        CryptInitializer {
-            physical_path,
-            pool_uuid,
-            dev_uuid,
-        }
-    }
+/// Check that the token can open the device.
+///
+/// No activation will actually occur, only validation.
+fn check_luks2_token(device: &mut CryptDevice) -> Result<()> {
+    log_on_failure!(
+        device.token_handle().activate_by_token::<()>(
+            None,
+            Some(LUKS2_TOKEN_ID),
+            None,
+            CryptActivateFlags::empty(),
+        ),
+        "libcryptsetup reported that the LUKS2 token is unable to \
+        open the encrypted device; this could be due to a malformed \
+        LUKS2 keyring token on the device or a missing or inaccessible \
+        key in the keyring"
+    );
+    Ok(())
+}
 
-    pub fn initialize(self, key_description: &str) -> Result<CryptHandle> {
-        let physical_path = self.physical_path.clone();
-        let pool_uuid = self.pool_uuid;
-        let dev_uuid = self.dev_uuid;
-        let device = log_on_failure!(
-            CryptInit::init(physical_path.as_path()),
-            "Failed to acquire context for device {} while initializing; \
-            nothing to clean up",
-            physical_path.display()
-        );
-        let result = self.initialize_no_cleanup(device, key_description);
-        result.map_err(|device| {
-            if let Err(e) = Self::rollback(
-                device,
-                physical_path,
-                name_from_uuids(&pool_uuid, &dev_uuid),
-            ) {
-                e
-            } else {
-                LibcryptErr::Other("Device initialization failed".to_string())
-            }
-        })
-    }
+/// Validate that the LUKS2 token is present and valid
+///
+/// May not be necessary. See the comment above the invocation.
+fn luks2_token_type_is_valid(json: &serde_json::Value) -> bool {
+    json.get(TOKEN_TYPE_KEY)
+        .and_then(|type_val| type_val.as_str())
+        .map(|type_str| type_str == LUKS2_TOKEN_TYPE)
+        .unwrap_or(false)
+}
 
-    fn initialize_with_err(&self, device: &mut CryptDevice, key_description: &str) -> Result<()> {
-        log_on_failure!(
-            device.context_handle().format::<()>(
-                EncryptionFormat::Luks2,
-                ("aes", "xts-plain64"),
-                None,
-                libcryptsetup_rs::Either::Right(STRATIS_KEY_SIZE),
-                None,
-            ),
-            "Failed to format device {} with LUKS2 header",
-            self.physical_path.display()
-        );
-        let key = log_on_failure!(
-            read_key(key_description),
-            "Failed to read key with key description {} from keyring",
-            key_description
-        );
-
-        let keyslot = log_on_failure!(
-            device.keyslot_handle().add_by_key(
-                None,
-                None,
-                #[cfg(cryptsetup_compat)]
-                (*key).deref(),
-                #[cfg(not(cryptsetup_compat))]
-                key.as_ref(),
-                CryptVolumeKeyFlags::empty(),
-            ),
-            "Failed to initialize keyslot with provided key in keyring"
-        );
-
-        // Initialize keyring token
-        log_on_failure!(
-            device
-                .token_handle()
-                .luks2_keyring_set(Some(LUKS2_TOKEN_ID), key_description),
-            "Failed to set create the the LUKS2 keyring token"
-        );
-        log_on_failure!(
-            device
-                .token_handle()
-                .assign_keyslot(LUKS2_TOKEN_ID, Some(keyslot)),
-            "Failed to assign the LUKS2 token to the Stratis keyslot"
-        );
-
-        // The default activation name is [POOLUUID]-[DEVUUID] which should be unique
-        // across all Stratis pools.
-        let activation_name = name_from_uuids(&self.pool_uuid, &self.dev_uuid);
-
-        // Initialize stratis token
-        log_on_failure!(
-            device.token_handle().json_set(
-                Some(STRATIS_TOKEN_ID),
-                &json!({
-                    TOKEN_TYPE_KEY: STRATIS_TOKEN_TYPE,
-                    TOKEN_KEYSLOTS_KEY: [],
-                    STRATIS_TOKEN_POOL_UUID_KEY: self.pool_uuid.to_simple_ref().to_string(),
-                    STRATIS_TOKEN_DEV_UUID_KEY: self.dev_uuid.to_simple_ref().to_string(),
-                    STRATIS_TOKEN_KEYDESC_KEY: key_description,
-                    STRATIS_TOKEN_DEVNAME_KEY: activation_name,
-                }),
-            ),
-            "Failed to create the Stratis token"
-        );
-
-        activate_and_check_device_path(device, &activation_name)
-    }
-
-    /// Lay down properly configured LUKS2 metadata on a new physical device
-    fn initialize_no_cleanup(
-        self,
-        mut device: CryptDevice,
-        key_description: &str,
-    ) -> std::result::Result<CryptHandle, CryptDevice> {
-        let pool_uuid = self.pool_uuid;
-        let dev_uuid = self.dev_uuid;
-        let result = self.initialize_with_err(&mut device, key_description);
-        match result {
-            Ok(_) => Ok(CryptHandle::new(
-                device,
-                self.physical_path,
-                name_from_uuids(&pool_uuid, &dev_uuid),
-            )),
-            Err(e) => {
-                warn!("Initialization failed with error: {}; rolling back.", e);
-                Err(device)
-            }
-        }
-    }
-
-    pub fn rollback(mut device: CryptDevice, physical_path: PathBuf, name: String) -> Result<()> {
-        ensure_wiped(&mut device, &physical_path, &name)
-    }
+/// Validate that the Stratis token is present and valid
+fn stratis_token_is_valid(json: &serde_json::Value) -> bool {
+    json.get(TOKEN_TYPE_KEY)
+        .and_then(|type_val| type_val.as_str())
+        .map(|type_str| type_str == STRATIS_TOKEN_TYPE)
+        .unwrap_or(false)
+        && json
+            .get(TOKEN_KEYSLOTS_KEY)
+            .and_then(|arr| arr.as_array())
+            .map(|arr| arr.is_empty())
+            .unwrap_or(false)
+        && json
+            .get(STRATIS_TOKEN_KEYDESC_KEY)
+            .map(|key| key.is_string())
+            .unwrap_or(false)
+        && json
+            .get(STRATIS_TOKEN_POOL_UUID_KEY)
+            .and_then(|uuid| uuid.as_str())
+            .and_then(|uuid_str| uuid::Uuid::from_slice(uuid_str.as_bytes()).ok())
+            .is_some()
+        && json
+            .get(STRATIS_TOKEN_POOL_UUID_KEY)
+            .and_then(|uuid| uuid.as_str())
+            .and_then(|uuid_str| uuid::Uuid::from_slice(uuid_str.as_bytes()).ok())
+            .is_some()
+        && json.get(STRATIS_TOKEN_DEVNAME_KEY).is_some()
 }
 
 /// Read key from keyring with the given key description
@@ -443,252 +694,6 @@ fn read_key(key_description: &str) -> Result<SafeMemHandle> {
         );
     }
     read_key_result
-}
-
-/// Handle for crypt device operations on an existing crypt device loaded
-/// from a physical device.
-pub struct CryptHandle {
-    device: CryptDevice,
-    physical_path: PathBuf,
-    name: String,
-}
-
-impl CryptHandle {
-    /// Create new
-    pub(crate) fn new(device: CryptDevice, physical_path: PathBuf, name: String) -> Self {
-        CryptHandle {
-            device,
-            physical_path,
-            name,
-        }
-    }
-
-    pub fn setup(physical_path: &Path) -> Result<Self> {
-        let mut device = log_on_failure!(
-            CryptInit::init(physical_path),
-            "Failed to acquire handle to device {} while loading from disk",
-            physical_path.display()
-        );
-        log_on_failure!(
-            device
-                .context_handle()
-                .load::<()>(EncryptionFormat::Luks2, None),
-            "Failed to load device activation name for LUKS2 metadata"
-        );
-        let name = Self::name_from_metadata(&mut device)?;
-        Ok(CryptHandle {
-            device,
-            physical_path: physical_path.to_owned(),
-            name,
-        })
-    }
-
-    /// Return the path to the device node of the underlying physical device
-    /// for the encrypted device.
-    pub fn physical_device_path(&self) -> &Path {
-        self.physical_path.as_path()
-    }
-
-    /// Get the logical path to use for unencrypted operations that is mapped
-    /// to and stored on the encrypted physical device.
-    ///
-    /// * Returns `Some` with the logical path if the device node generated
-    ///   from the name exists.
-    /// * Returns `None` if the logical path expected based on the activation name
-    ///   of the devicemapper device does not exist.
-    pub fn logical_device_path(&self) -> Option<PathBuf> {
-        let mut logical_path = PathBuf::from(DEVICEMAPPER_PATH);
-        logical_path.push(self.name.as_str());
-        if logical_path.exists() {
-            Some(logical_path)
-        } else {
-            None
-        }
-    }
-
-    /// Query the Stratis metadata for the device activation name.
-    fn name_from_metadata(device: &mut CryptDevice) -> Result<String> {
-        let json = log_on_failure!(
-            device.token_handle().json_get(STRATIS_TOKEN_ID),
-            "Failed to get Stratis JSON token from LUKS2 metadata"
-        );
-        let name = log_on_failure!(
-            json.get(STRATIS_TOKEN_DEVNAME_KEY)
-                .and_then(|type_val| type_val.as_str())
-                .map(|type_str| type_str.to_string())
-                .ok_or_else(|| {
-                    LibcryptErr::Other(
-                        "Malformed or missing JSON value for activation_name".to_string(),
-                    )
-                }),
-            "Could not get value for key activation_name from Stratis JSON token"
-        );
-        Ok(name)
-    }
-
-    /// Activate encrypted Stratis device using the name stored in the
-    /// Stratis token
-    #[allow(dead_code)]
-    pub fn activate(&mut self) -> Result<()> {
-        activate_and_check_device_path(&mut self.device, &self.name.to_owned())
-    }
-
-    #[allow(dead_code)]
-    pub fn deactivate(&mut self) -> Result<()> {
-        let name = self.name.to_owned();
-        ensure_inactive(&mut self.device, &name)
-    }
-
-    pub fn wipe(&mut self) -> Result<()> {
-        let physical_path = self.physical_path.to_owned();
-        let name = self.name.to_owned();
-        ensure_wiped(&mut self.device, &physical_path, &name)
-    }
-}
-
-impl AsMut<CryptDevice> for CryptHandle {
-    fn as_mut(&mut self) -> &mut CryptDevice {
-        &mut self.device
-    }
-}
-
-/// Check that the token can open the device.
-///
-/// No activation will actually occur, only validation.
-fn check_luks2_token(crypt_device: &mut CryptDevice) -> Result<()> {
-    crypt_device.token_handle().activate_by_token::<()>(
-        None,
-        Some(LUKS2_TOKEN_ID),
-        None,
-        CryptActivateFlags::empty(),
-    )?;
-    Ok(())
-}
-
-/// Validate that the LUKS2 token is present and valid
-///
-/// May not be necessary. See the comment above the invocation.
-fn luks2_token_type_is_valid(json: &serde_json::Value) -> bool {
-    json.get(TOKEN_TYPE_KEY)
-        .and_then(|type_val| type_val.as_str())
-        .map(|type_str| type_str == LUKS2_TOKEN_TYPE)
-        .unwrap_or(false)
-}
-
-/// Get the key description from a LUKS2 keyring token
-fn get_key_description(crypt_device: &mut CryptDevice) -> Result<String> {
-    let json = crypt_device.token_handle().json_get(LUKS2_TOKEN_ID)?;
-    json.get(STRATIS_TOKEN_KEYDESC_KEY)
-        .and_then(|type_val| type_val.as_str())
-        .map(|type_str| type_str.to_string())
-        .ok_or_else(|| LibcryptErr::Other("Malformed key_description in LUKS2 token".to_string()))
-}
-
-/// Validate that the Stratis token is present and valid
-fn stratis_token_is_valid(json: &serde_json::Value, key_description: String) -> bool {
-    json.get(TOKEN_TYPE_KEY)
-        .and_then(|type_val| type_val.as_str())
-        .map(|type_str| type_str == STRATIS_TOKEN_TYPE)
-        .unwrap_or(false)
-        && json
-            .get(TOKEN_KEYSLOTS_KEY)
-            .and_then(|arr| arr.as_array())
-            .map(|arr| arr.is_empty())
-            .unwrap_or(false)
-        && json
-            .get(STRATIS_TOKEN_KEYDESC_KEY)
-            .and_then(|key| key.as_str())
-            .map(|key_str| key_str == key_description.as_str())
-            .unwrap_or(false)
-        && json
-            .get(STRATIS_TOKEN_POOL_UUID_KEY)
-            .and_then(|uuid| uuid.as_str())
-            .and_then(|uuid_str| uuid::Uuid::from_slice(uuid_str.as_bytes()).ok())
-            .is_some()
-        && json
-            .get(STRATIS_TOKEN_POOL_UUID_KEY)
-            .and_then(|uuid| uuid.as_str())
-            .and_then(|uuid_str| uuid::Uuid::from_slice(uuid_str.as_bytes()).ok())
-            .is_some()
-        && json.get(STRATIS_TOKEN_DEVNAME_KEY).is_some()
-}
-
-/// Check whether the physical device path corresponds to an encrypted
-/// Stratis device.
-///
-/// This method works on activated and deactivated encrypted devices.
-///
-/// This device will only return true if the device was initialized
-/// with encryption by Stratis. This requires that:
-/// * the device is a LUKS2 encrypted device.
-/// * the device has a valid Stratis LUKS2 token.
-#[allow(dead_code)]
-pub fn is_encrypted_stratis_device(physical_path: &Path) -> bool {
-    fn device_operations(physical_path: &Path) -> Result<bool> {
-        if !device_is_luks2(physical_path) {
-            return Ok(false);
-        }
-
-        let mut crypt_device = CryptInit::init(physical_path)?;
-        crypt_device
-            .context_handle()
-            .load::<()>(EncryptionFormat::Luks2, None)?;
-        check_luks2_token(&mut crypt_device)?;
-
-        // Checking the LUKS2 token type not be entirely necessary as we've already
-        // validated that the token can decrypt the volume which should also
-        // validate that the appropriate key is in the keyring.
-        //
-        // Only potential benefit of checking the type of the token is that a LUKS2 token
-        // of another type may be present and capable of unlocking a non-Stratis device
-        // using something other than the keyring for example.
-        //
-        // Given that only Stratis devices should have a Stratis token, this may
-        // still be superfluous as we will check for that after before determining
-        // whether or not it is a Stratis device and nothing is ever activated so
-        // we do not need to guard against unlocking a device that is not ours.
-        let luks_json = crypt_device.token_handle().json_get(LUKS2_TOKEN_ID)?;
-        let key_description = get_key_description(&mut crypt_device)?;
-        let stratis_json = crypt_device.token_handle().json_get(STRATIS_TOKEN_ID)?;
-        if !luks2_token_type_is_valid(&luks_json)
-            || !stratis_token_is_valid(&stratis_json, key_description)
-        {
-            Ok(false)
-        } else {
-            Ok(true)
-        }
-    }
-
-    match device_operations(physical_path) {
-        Ok(b) => b,
-        Err(e) => {
-            warn!(
-                "Operations querying device {} to determine if it is a Stratis device \
-                failed with an error: {}; reporting as not a Stratis device",
-                physical_path.display(),
-                e
-            );
-            false
-        }
-    }
-}
-
-/// Returns `true` only if the given device path is for a device encrypted with
-/// the LUKS2 format.
-pub fn device_is_luks2(physical_path: &Path) -> bool {
-    let mut crypt_device = match CryptInit::init(physical_path) {
-        Ok(d) => d,
-        Err(e) => {
-            warn!(
-                "Getting devicemapper context for device {} \
-                failed with error: {}; reporting as not a LUKS2 device.",
-                physical_path.display(),
-                e
-            );
-            return false;
-        }
-    };
-    crypt_device.format_handle().get_type().ok() == Some(EncryptionFormat::Luks2)
 }
 
 #[cfg(test)]

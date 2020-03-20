@@ -44,7 +44,8 @@ pub trait Filesystem: Debug {
 }
 
 pub trait BlockDev: Debug {
-    /// Get the path of the device node for this device.
+    /// Get the path of the device node for writing Stratis metadata to this
+    /// device.
     fn devnode(&self) -> PathBuf;
 
     /// Get the user-settable string associated with this blockdev.

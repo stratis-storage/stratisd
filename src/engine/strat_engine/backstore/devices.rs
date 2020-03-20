@@ -18,7 +18,6 @@ use devicemapper::{Bytes, Device, IEC};
 
 use crate::{
     engine::{
-        engine::BlockDev,
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
@@ -293,7 +292,7 @@ pub fn initialize_devices(
 ) -> StratisResult<Vec<StratBlockDev>> {
     /// Map a major/minor device number of a physical device
     /// to the corresponding major/minor number of the encrypted
-    /// device using the physical device as storage.
+    /// device that uses the physical device as storage.
     fn map_device_nums(logical_path: &Path) -> StratisResult<Device> {
         let result = nix::sys::stat::stat(logical_path)?;
         Ok(Device::from(result.st_rdev))
@@ -484,9 +483,7 @@ pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
     let unerased_devnodes: Vec<_> = blockdevs
         .iter()
         .filter_map(|bd| match bd.disown() {
-            // NOTE: We may want to rethink error messaging here because
-            // it will report the logical path, not the physical path.
-            Err(_) => Some(bd.devnode()),
+            Err(_) => Some(bd.physical_path()),
             _ => None,
         })
         .collect();
@@ -512,8 +509,7 @@ mod tests {
         engine::BlockDev,
         strat_engine::{
             backstore::{
-                crypt::is_encrypted_stratis_device,
-                identify::find_all_block_devices_with_stratis_signatures,
+                crypt::CryptHandle, identify::find_all_block_devices_with_stratis_signatures,
                 metadata::device_identifiers, setup::get_metadata,
             },
             cmd,
@@ -571,7 +567,7 @@ mod tests {
 
         for path in paths {
             if key_description.is_some() {
-                if is_encrypted_stratis_device(path) {
+                if CryptHandle::can_setup(path) {
                     return Err(Box::new(StratisError::Error(
                         "LUKS2 metadata on Stratis devices was not successfully wiped".to_string(),
                     )));

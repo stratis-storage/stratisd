@@ -229,15 +229,27 @@ impl CryptHandle {
     #[allow(dead_code)]
     pub fn can_setup(physical_path: &Path) -> bool {
         fn can_setup_with_failures(physical_path: &Path) -> Result<bool> {
-            let mut device = CryptInit::init(physical_path)?;
-            Ok(is_encrypted_stratis_device(&mut device))
+            let mut device = log_on_failure!(
+                CryptInit::init(physical_path),
+                "Failed to acquire a context for device {}",
+                physical_path.display()
+            );
+            if device
+                .context_handle()
+                .load::<()>(EncryptionFormat::Luks2, None)
+                .is_err()
+            {
+                Ok(false)
+            } else {
+                Ok(is_encrypted_stratis_device(&mut device))
+            }
         }
 
         can_setup_with_failures(physical_path)
             .map_err(|e| {
                 warn!(
                     "Failed to check if device {} is a compatible encrypted Stratis \
-                device: {}; Reporting as not a Stratis device.",
+                    device: {}; Reporting as not a Stratis device.",
                     physical_path.display(),
                     e
                 );
@@ -251,23 +263,12 @@ impl CryptHandle {
             "Failed to acquire handle to device {} while loading from disk",
             physical_path.display()
         );
-        if !device_is_luks2(&mut device) {
-            info!(
-                "Device {} was determined to not be a LUKS2 device; stopping \
-                attempt to load encrypted Stratis device.",
-                physical_path.display()
-            );
-            return Ok(None);
-        } else {
-            log_on_failure!(
-                device
-                    .context_handle()
-                    .load::<()>(EncryptionFormat::Luks2, None),
-                "Device reported being a LUKS2 volume but loading the LUKS2 \
-                header failed"
-            );
-        }
-        if !is_encrypted_stratis_device(&mut device) {
+        if device
+            .context_handle()
+            .load::<()>(EncryptionFormat::Luks2, None)
+            .is_err()
+            || !is_encrypted_stratis_device(&mut device)
+        {
             return Ok(None);
         }
         let name = Self::name_from_metadata(&mut device)?;
@@ -352,10 +353,6 @@ impl CryptHandle {
 /// * the device has a valid Stratis LUKS2 token.
 fn is_encrypted_stratis_device(device: &mut CryptDevice) -> bool {
     fn device_operations(device: &mut CryptDevice) -> Result<bool> {
-        if !device_is_luks2(device) {
-            return Ok(false);
-        }
-
         check_luks2_token(device)?;
 
         // Checking the LUKS2 token type not be entirely necessary as we've already
@@ -545,7 +542,7 @@ fn ensure_wiped(device: &mut CryptDevice, physical_path: &Path, name: &str) -> R
     );
     info!("Metadata size of LUKS2 device: {}", *md_size);
     info!("Keyslot area size of LUKS2 device: {}", *ks_size);
-    let total_luks2_metadata_size = ceiling_sector_size_alignment(*md_size + *ks_size);
+    let total_luks2_metadata_size = ceiling_sector_size_alignment(*md_size * 2 + *ks_size);
     info!("Aligned total size: {}", total_luks2_metadata_size);
 
     log_on_failure!(
@@ -563,12 +560,6 @@ fn ensure_wiped(device: &mut CryptDevice, physical_path: &Path, name: &str) -> R
         name
     );
     Ok(())
-}
-
-/// Returns `true` only if the given device path is for a device encrypted with
-/// the LUKS2 format.
-fn device_is_luks2(device: &mut CryptDevice) -> bool {
-    device.format_handle().get_type().ok() == Some(EncryptionFormat::Luks2)
 }
 
 /// Check that the token can open the device.
@@ -602,30 +593,63 @@ fn luks2_token_type_is_valid(json: &serde_json::Value) -> bool {
 
 /// Validate that the Stratis token is present and valid
 fn stratis_token_is_valid(json: &serde_json::Value) -> bool {
-    json.get(TOKEN_TYPE_KEY)
+    debug!("Stratis LUKS2 token: {}", json);
+
+    let type_valid = json
+        .get(TOKEN_TYPE_KEY)
         .and_then(|type_val| type_val.as_str())
         .map(|type_str| type_str == STRATIS_TOKEN_TYPE)
-        .unwrap_or(false)
-        && json
-            .get(TOKEN_KEYSLOTS_KEY)
-            .and_then(|arr| arr.as_array())
-            .map(|arr| arr.is_empty())
-            .unwrap_or(false)
-        && json
-            .get(STRATIS_TOKEN_KEYDESC_KEY)
-            .map(|key| key.is_string())
-            .unwrap_or(false)
-        && json
-            .get(STRATIS_TOKEN_POOL_UUID_KEY)
-            .and_then(|uuid| uuid.as_str())
-            .and_then(|uuid_str| uuid::Uuid::from_slice(uuid_str.as_bytes()).ok())
-            .is_some()
-        && json
-            .get(STRATIS_TOKEN_POOL_UUID_KEY)
-            .and_then(|uuid| uuid.as_str())
-            .and_then(|uuid_str| uuid::Uuid::from_slice(uuid_str.as_bytes()).ok())
-            .is_some()
-        && json.get(STRATIS_TOKEN_DEVNAME_KEY).is_some()
+        .unwrap_or(false);
+    if !type_valid {
+        debug!("Type value is invalid");
+    }
+
+    let keyslots_valid = json
+        .get(TOKEN_KEYSLOTS_KEY)
+        .and_then(|arr| arr.as_array())
+        .map(|arr| arr.is_empty())
+        .unwrap_or(false);
+    if !keyslots_valid {
+        debug!("Keyslots value is invalid");
+    }
+
+    let key_desc_valid = json
+        .get(STRATIS_TOKEN_KEYDESC_KEY)
+        .map(|key| key.is_string())
+        .unwrap_or(false);
+    if !key_desc_valid {
+        debug!("Key description value is invalid");
+    }
+
+    let pool_uuid_valid = json
+        .get(STRATIS_TOKEN_POOL_UUID_KEY)
+        .and_then(|uuid| uuid.as_str())
+        .and_then(|uuid_str| uuid::Uuid::parse_str(uuid_str).ok())
+        .is_some();
+    if !pool_uuid_valid {
+        debug!("Pool UUID value is invalid");
+    }
+
+    let dev_uuid_valid = json
+        .get(STRATIS_TOKEN_DEV_UUID_KEY)
+        .and_then(|uuid| uuid.as_str())
+        .and_then(|uuid_str| uuid::Uuid::parse_str(uuid_str).ok())
+        .is_some();
+    if !dev_uuid_valid {
+        debug!("Device UUID value is invalid");
+    }
+
+    let device_name_valid = json.get(STRATIS_TOKEN_DEVNAME_KEY).is_some();
+    if !device_name_valid {
+        debug!("Device name value is invalid");
+    }
+
+    type_valid
+        && keyslots_valid
+        && key_desc_valid
+        && pool_uuid_valid
+        && dev_uuid_valid
+        && device_name_valid
 }
 
 /// Read key from keyring with the given key description

@@ -100,9 +100,16 @@ impl StratBlockDev {
     /// Remove information that identifies this device as belonging to Stratis
     ///
     /// If self.is_encrypted() is true, destroy all keyslots and wipe the LUKS2 header.
+    /// This will render all Stratis and LUKS2 metadata unreadable and unrecoverable
+    /// from the given device.
+    ///
     /// If self.is_encrypted() is false, wipe the Stratis metadata on the device.
-    /// Both of these actions will destroy the Stratis metadata so that it is no longer
-    /// accessible by stratisd or visible to blkid.
+    /// This will make the Stratis data and metadata invisible to all standard blkid
+    /// and stratisd operations.
+    ///
+    /// Precondition: if self.is_encrypted() == true, the data on
+    ///               self.devnode.physical_path() has been encrypted with
+    ///               aes-xts-plain64 encryption.
     pub fn disown(&self) -> StratisResult<()> {
         if !self.is_encrypted() {
             disown_device(

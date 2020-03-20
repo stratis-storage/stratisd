@@ -330,7 +330,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "libcryptsetup-rs"
 version = "0.2.0"
-source = "git+https://github.com/jbaublitz/libcryptsetup-rs?branch=keyslot-size-fix#6098782250d1ab78de94886f3b733819cac4d073"
+source = "git+https://github.com/jbaublitz/libcryptsetup-rs?branch=keyslot-size-fix#76262f5506b8ef01c2b479a6be802bc09f5f2ce4"
 dependencies = [
  "either 1.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.66 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -344,7 +344,7 @@ dependencies = [
 [[package]]
 name = "libcryptsetup-rs-sys"
 version = "0.1.1"
-source = "git+https://github.com/jbaublitz/libcryptsetup-rs?branch=keyslot-size-fix#6098782250d1ab78de94886f3b733819cac4d073"
+source = "git+https://github.com/jbaublitz/libcryptsetup-rs?branch=keyslot-size-fix#76262f5506b8ef01c2b479a6be802bc09f5f2ce4"
 dependencies = [
  "bindgen 0.53.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.50 (registry+https://github.com/rust-lang/crates.io-index)",

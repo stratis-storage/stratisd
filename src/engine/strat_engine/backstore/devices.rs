@@ -248,12 +248,25 @@ pub fn process_devices(
     Ok(infos)
 }
 
+/// A handle to a device that may or may not be encrypted. This handle
+/// contains the necessary information for writing metadata to both
+/// encrypted and unencrypted devices.
 enum MaybeEncrypted {
     Encrypted(CryptHandle),
     Unencrypted(PathBuf, PoolUuid),
 }
 
 impl MaybeEncrypted {
+    /// This method returns the appropriate path information for both
+    /// encrypted and unencrypted devices.
+    ///
+    /// * For encrypted devices, this will return the physical device path
+    ///   for devicemapper operations and the logical path for writing metadata.
+    /// * For unencrypted devices, this will return the physical path for
+    ///   writing metadata.
+    ///
+    /// The returned error is a `StratisError` to limit usage of
+    /// libcryptsetup-rs outside of the crypt module.
     fn to_blockdev_path(&self) -> StratisResult<BlockDevPath> {
         match *self {
             MaybeEncrypted::Unencrypted(ref path, _) => {
@@ -519,7 +532,7 @@ mod tests {
 
     use super::*;
 
-    /// Test that initialing devices claims all and that destroying
+    /// Test that initializing devices claims all and that destroying
     /// them releases all.
     fn test_ownership(
         paths: &[&Path],

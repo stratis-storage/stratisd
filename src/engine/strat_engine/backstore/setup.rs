@@ -162,13 +162,13 @@ pub fn get_blockdevs(
             let recorded_size = bda.dev_size().sectors();
             if actual_size_sectors < recorded_size {
                 let err_msg = format!(
-                    "Stratis device with device number {}, devnode {}, pool UUID {} and device UUID {} had recorded size ({}), but actual size is less at ({})",
+                    "Stratis device with device number {}, devnode {}, pool UUID {} and device UUID {} had recorded size {}, but actual size is less at {}",
                     device,
                     devnode.display(),
-                    bda.pool_uuid(),
-                    bda.dev_uuid(),
+                    bda.pool_uuid().to_simple_ref(),
+                    bda.dev_uuid().to_simple_ref(),
                     recorded_size,
-                    actual_size
+                    actual_size_sectors
                 );
                 Err(StratisError::Engine(ErrorEnum::Error, err_msg))
             } else {
@@ -193,8 +193,8 @@ pub fn get_blockdevs(
                         "Stratis device with device number {}, devnode {}, pool UUID {} and device UUID {} had no record in pool metadata",
                         device,
                         devnode.display(),
-                        bda.pool_uuid(),
-                        bda.dev_uuid()
+                        bda.pool_uuid().to_simple_ref(),
+                        bda.dev_uuid().to_simple_ref()
                     );
                 StratisError::Engine(ErrorEnum::NotFound, err_msg)
             })?;
@@ -224,7 +224,7 @@ pub fn get_blockdevs(
                                                  format!("Device {} with devnode {} was previously determined to belong to pool with uuid {} but no BDA was found",
                                                  device,
                                                  devnode.display(),
-                                                 pool_uuid))
+                                                 pool_uuid.to_simple_ref()))
         })?;
 
         get_blockdev(

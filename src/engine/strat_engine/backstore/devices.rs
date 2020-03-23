@@ -823,16 +823,27 @@ mod tests {
     // Verify that if the last device in a list of devices to intialize
     // can not be intialized, all the devices previously initialized are
     // properly cleaned up.
-    fn test_failure_cleanup(paths: &[&Path]) {
-        assert!(paths.len() > 1);
+    fn test_failure_cleanup(paths: &[&Path], key_desc: Option<&str>) -> Result<(), Box<dyn Error>> {
+        if paths.len() <= 1 {
+            return Err(Box::new(StratisError::Error(
+                "Test requires more than one device".to_string(),
+            )));
+        }
 
-        let mut devices: Vec<DeviceInfo> = process_devices(paths)
-            .unwrap()
+        let mut devices: Vec<DeviceInfo> = process_devices(paths)?
             .into_iter()
             .map(|(info, _)| info)
             .collect::<Vec<DeviceInfo>>();
 
-        let old_info = devices.pop().unwrap();
+        if devices.len() != paths.len() {
+            return Err(Box::new(StratisError::Error(
+                "Not all devices were successfully processed".to_string(),
+            )));
+        }
+
+        let old_info = devices
+            .pop()
+            .ok_or_else(|| StratisError::Error("No devices were processed".to_string()))?;
 
         let new_info = DeviceInfo {
             devnode: PathBuf::from("/srk/cheese"),
@@ -843,30 +854,82 @@ mod tests {
 
         devices.push(new_info);
 
-        assert_matches!(
-            initialize_devices(devices, Uuid::new_v4(), MDADataSize::default(), None),
-            Err(_)
-        );
-
-        // Just check all paths for absence of device identifiers.
-        // Initialization of the last path was never attempted, so it should
-        // be as bare of Stratis identifiers as all the other paths that
-        // were initialized.
-        for path in paths {
-            let mut f = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .open(path)
-                .unwrap();
-            assert_matches!(device_identifiers(&mut f), Ok(None));
+        if initialize_devices(devices, Uuid::new_v4(), MDADataSize::default(), key_desc).is_ok() {
+            return Err(Box::new(StratisError::Error(
+                "Initialization should not have succeeded".to_string(),
+            )));
         }
+
+        // Check all paths for absence of device identifiers or LUKS2 metadata
+        // depending on whether or not it is encrypted. Initialization of the
+        // last path was never attempted, so it should be as bare of Stratis
+        // identifiers as all the other paths that were initialized.
+        for path in paths {
+            if key_desc.is_some() {
+                if CryptHandle::can_setup(path) {
+                    return Err(Box::new(StratisError::Error(
+                        "Device should have no LUKS2 metadata".to_string(),
+                    )));
+                }
+            } else {
+                let mut f = OpenOptions::new().read(true).write(true).open(path)?;
+                match device_identifiers(&mut f) {
+                    Ok(None) => (),
+                    _ => {
+                        return Err(Box::new(StratisError::Error(
+                            "Device should have returned nothing for device identifiers"
+                                .to_string(),
+                        )))
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // Run test_failure_cleanup for encrypted devices
+    fn test_failure_cleanup_crypt(paths: &[&Path]) {
+        fn failure_cleanup_crypt(paths: &[&Path], key_desc: &str) -> Result<(), Box<dyn Error>> {
+            test_failure_cleanup(paths, Some(key_desc))
+        }
+
+        crypt::insert_and_cleanup_key(paths, failure_cleanup_crypt)
+    }
+
+    // Run test_failure_cleanup for unencrypted devices
+    fn test_failure_cleanup_no_crypt(paths: &[&Path]) {
+        test_failure_cleanup(paths, None).unwrap()
+    }
+
+    #[test]
+    fn loop_test_crypt_failure_cleanup() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_failure_cleanup_crypt,
+        );
+    }
+
+    #[test]
+    fn real_test_crypt_failure_cleanup() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_failure_cleanup_crypt,
+        );
+    }
+
+    #[test]
+    fn travis_test_crypt_failure_cleanup() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_failure_cleanup_crypt,
+        );
     }
 
     #[test]
     fn loop_test_failure_cleanup() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_failure_cleanup,
+            test_failure_cleanup_no_crypt,
         );
     }
 
@@ -874,7 +937,7 @@ mod tests {
     fn real_test_failure_cleanup() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
-            test_failure_cleanup,
+            test_failure_cleanup_no_crypt,
         );
     }
 
@@ -882,7 +945,7 @@ mod tests {
     fn travis_test_failure_cleanup() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_failure_cleanup,
+            test_failure_cleanup_no_crypt,
         );
     }
 

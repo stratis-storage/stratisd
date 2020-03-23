@@ -841,9 +841,7 @@ mod tests {
             )));
         }
 
-        let old_info = devices
-            .pop()
-            .ok_or_else(|| StratisError::Error("No devices were processed".to_string()))?;
+        let old_info = devices.pop().expect("Must contain at least two devices");
 
         let new_info = DeviceInfo {
             devnode: PathBuf::from("/srk/cheese"),
@@ -867,19 +865,20 @@ mod tests {
         for path in paths {
             if key_desc.is_some() {
                 if CryptHandle::can_setup(path) {
-                    return Err(Box::new(StratisError::Error(
-                        "Device should have no LUKS2 metadata".to_string(),
-                    )));
+                    return Err(Box::new(StratisError::Error(format!(
+                        "Device {} should have no LUKS2 metadata",
+                        path.display()
+                    ))));
                 }
             } else {
                 let mut f = OpenOptions::new().read(true).write(true).open(path)?;
                 match device_identifiers(&mut f) {
                     Ok(None) => (),
                     _ => {
-                        return Err(Box::new(StratisError::Error(
-                            "Device should have returned nothing for device identifiers"
-                                .to_string(),
-                        )))
+                        return Err(Box::new(StratisError::Error(format!(
+                            "Device {} should have returned nothing for device identifiers",
+                            path.display()
+                        ))))
                     }
                 }
             }

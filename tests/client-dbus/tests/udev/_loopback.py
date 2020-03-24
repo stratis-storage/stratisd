@@ -117,8 +117,12 @@ class LoopBackDevices:
         Return the block device full name for a loopback token
         :param token: Opaque representation of some loop back device
         :return: Full file path or None if not currently attached
+        :raises: KeyError if token is unknown
+        :raises: AssertionError if devnode is None
         """
-        return self.devices[token][0] if token in self.devices else None
+        devnode, _ = self.devices[token]
+        assert devnode is not None
+        return devnode
 
     def destroy_devices(self):
         """

@@ -139,7 +139,7 @@ impl BDA {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
+    use std::{io::Cursor, thread, time};
 
     use proptest::{collection::vec, num};
 
@@ -173,6 +173,7 @@ mod tests {
     /// of saved data is older than timestamp of most recently written data.
     fn test_early_times_err() {
         let data = [0u8; 3];
+        let sleep_time = time::Duration::from_secs(1);
 
         // Construct a BDA.
         let sh = random_static_header(0, 0);
@@ -187,8 +188,8 @@ mod tests {
         .unwrap();
 
         let timestamp0 = Utc::now();
+        thread::sleep(sleep_time);
         let timestamp1 = Utc::now();
-        assert_ne!(timestamp0, timestamp1);
 
         let mut buf = Cursor::new(vec![0; *sh.blkdev_size.sectors().bytes() as usize]);
         bda.save_state(&timestamp1, &data, &mut buf).unwrap();
@@ -197,8 +198,8 @@ mod tests {
         assert_matches!(bda.save_state(&timestamp0, &data, &mut buf), Err(_));
 
         let timestamp2 = Utc::now();
+        thread::sleep(sleep_time);
         let timestamp3 = Utc::now();
-        assert_ne!(timestamp2, timestamp3);
 
         bda.save_state(&timestamp3, &data, &mut buf).unwrap();
 

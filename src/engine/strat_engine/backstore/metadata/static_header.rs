@@ -235,6 +235,33 @@ impl StaticHeader {
             }
         }
 
+        // Action taken when both sigblocks are interpreted as valid.
+        //
+        // If both sigblocks are interpreted as a Stratis headers,
+        // compare contents of static headers.
+        //
+        // If only a single sigblock is interpreted as a Stratis header,
+        // overwrite the other sigblock with the contents of the valid
+        // Stratis header sigblock.
+        //
+        // If neither sigblocks are valid Stratis headers,
+        // return Ok(None)
+        fn ok_ok_static_header_handling<F>(
+            f: &mut F,
+            maybe_sh1: Option<StaticHeader>,
+            maybe_sh2: Option<StaticHeader>,
+        ) -> StratisResult<Option<StaticHeader>>
+        where
+            F: Seek + SyncAll,
+        {
+            match (maybe_sh1, maybe_sh2) {
+                (Some(loc_1), Some(loc_2)) => compare_headers(f, loc_1, loc_2),
+                (None, None) => Ok(None),
+                (Some(loc_1), None) => write_header(f, loc_1, MetadataLocation::Second),
+                (None, Some(loc_2)) => write_header(f, loc_2, MetadataLocation::First),
+            }
+        }
+
         // Action taken when there was an I/O error reading the other sigblock.
         //
         // * If this sigblock region is interpreted as having no siglblock, it returns None.
@@ -262,7 +289,8 @@ impl StaticHeader {
             }
         }
 
-        // Action taken when both signature blocks are interpreted as valid.
+        // Action taken when both signature blocks are interpreted as valid
+        // Stratis headers.
         //
         // If the contents of the signature blocks are equivalent,
         // return valid static header result.
@@ -270,7 +298,7 @@ impl StaticHeader {
         // If the contents of the signature blocks are not equivalent,
         // overwrite the older block with the contents of the newer one,
         // or return an error if the blocks have the same initialization time.
-        fn compare_static_headers<F>(
+        fn compare_headers<F>(
             f: &mut F,
             sh_1: StaticHeader,
             sh_2: StaticHeader,
@@ -309,12 +337,7 @@ impl StaticHeader {
         ) {
             // We read both copies without an IO error.
             (Ok(buf_loc_1), Ok(buf_loc_2)) => match (buf_loc_1, buf_loc_2) {
-                (Ok(loc_1), Ok(loc_2)) => match (loc_1, loc_2) {
-                    (Some(loc_1), Some(loc_2)) => compare_static_headers(f, loc_1, loc_2),
-                    (None, None) => Ok(None),
-                    (Some(loc_1), None) => write_header(f, loc_1, MetadataLocation::Second),
-                    (None, Some(loc_2)) => write_header(f, loc_2, MetadataLocation::First),
-                },
+                (Ok(loc_1), Ok(loc_2)) => ok_ok_static_header_handling(f, loc_1, loc_2),
                 (Ok(loc_1), Err(loc_2)) => {
                     ok_err_static_header_handling(f, loc_1, loc_2, MetadataLocation::Second)
                 }

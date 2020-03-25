@@ -235,7 +235,7 @@ impl StaticHeader {
             }
         }
 
-        // Action taken when both sigblocks are interpreted as valid.
+        // Action taken when both sigblock locations are analyzed without encountering an error.
         //
         // If both sigblocks are interpreted as a Stratis headers,
         // compare contents of static headers.
@@ -244,7 +244,7 @@ impl StaticHeader {
         // overwrite the other sigblock with the contents of the valid
         // Stratis header sigblock.
         //
-        // If neither sigblocks are valid Stratis headers,
+        // If neither sigblock is a valid Stratis header,
         // return Ok(None)
         fn ok_ok_static_header_handling<F>(
             f: &mut F,
@@ -335,7 +335,6 @@ impl StaticHeader {
             maybe_buf_1.map(|buf| StaticHeader::sigblock_from_buf(&buf)),
             maybe_buf_2.map(|buf| StaticHeader::sigblock_from_buf(&buf)),
         ) {
-            // We read both copies without an IO error.
             (Ok(buf_loc_1), Ok(buf_loc_2)) => match (buf_loc_1, buf_loc_2) {
                 (Ok(loc_1), Ok(loc_2)) => ok_ok_static_header_handling(f, loc_1, loc_2),
                 (Ok(loc_1), Err(loc_2)) => {
@@ -349,12 +348,9 @@ impl StaticHeader {
                     Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
                 }
             },
-            // Copy 1 read OK, 2 resulted in an IO error
             (Ok(buf_loc_1), Err(_)) => copy_ok_err_handling(f, buf_loc_1, MetadataLocation::Second),
-            // Copy 2 read OK, 1 resulted in IO Error
             (Err(_), Ok(buf_loc_2)) => copy_ok_err_handling(f, buf_loc_2, MetadataLocation::First),
             (Err(_), Err(_)) => {
-                // Unable to read the device at all.
                 let err_str = "Unable to read data at sigblock locations.";
                 Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
             }

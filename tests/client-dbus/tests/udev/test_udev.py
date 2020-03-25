@@ -440,24 +440,19 @@ class UdevAdd(unittest.TestCase):
 
     def test_simultaneous(self):
         """
-        Create a single pool with 16 devices and simulate them being hotplug
-        at same time
-        :return: None
+        See documentation for _single_pool.
         """
         self._single_pool(16)
 
     def test_spurious_adds(self):
         """
-        Create a single pool with 16 devices and simulate them being hotplug
-        at same time and with spurious additional "add" udev events
-        :return: None
+        See documentation for _single_pool.
         """
-        self._single_pool(16, 4)
+        self._single_pool(4, 4)
 
     def test_simple_udev_add(self):
         """
-        Create a single pool with 1 device!
-        :return: None
+        See documentation for _single_pool.
         """
         self._single_pool(1, 1)
 

@@ -274,7 +274,7 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
         },
     }
     .map(|(identifiers, device, devnode)| {
-        info!("Stratis block device with device number \"{}\", device node \"{}\", pool UUID \"{}\", and device UUID \"{}\" discovered during initial search",
+        debug!("Stratis block device with device number \"{}\", device node \"{}\", pool UUID \"{}\", and device UUID \"{}\" identified",
               device,
               devnode.display(),
               identifiers.pool_uuid.to_simple_ref(),

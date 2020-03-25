@@ -362,7 +362,7 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     */
     const FD_INDEX_UDEV: usize = 0;
     const FD_INDEX_SIGNALFD: usize = 1;
-    const FD_INDEX_ENGINE: usize = 2 ;
+    const FD_INDEX_ENGINE: usize = 2;
 
     /*
     fds is a Vec of libc::pollfd structs. Ideally, it would be possible

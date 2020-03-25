@@ -410,12 +410,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         SetTimeFlags::Default,
     );
 
-    fds.push(libc::pollfd {
-        fd: tfd.as_raw_fd(),
-        revents: 0,
-        events: libc::POLLIN,
-    });
-
     let eventable = engine.borrow().get_eventable();
 
     if let Some(evt) = eventable {

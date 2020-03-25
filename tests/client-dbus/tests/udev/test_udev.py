@@ -18,8 +18,10 @@ Used to test behavior of the udev device discovery mechanism.
 # isort: STDLIB
 import os
 import random
+import signal
 import string
 import subprocess
+import sys
 import time
 import unittest
 
@@ -203,7 +205,9 @@ class _Service:
         assert list(_processes("stratisd")) == []
         assert _get_stratis_devices() == []
 
-        service = subprocess.Popen([_STRATISD])
+        service = subprocess.Popen(
+            [_STRATISD], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
 
         dbus_interface_present = False
         limit = time.time() + 120.0
@@ -229,10 +233,12 @@ class _Service:
     def stop_service(self):
         """
         Stops the stratisd daemon previously spawned.
+        :return: a tuple of stdout and stderr
         """
-        self._service.terminate()
-        self._service.wait()
+        self._service.send_signal(signal.SIGINT)
+        output = self._service.communicate()
         assert list(_processes("stratisd")) == []
+        return output
 
 
 class _ServiceContextManager:  # pylint: disable=too-few-public-methods
@@ -248,7 +254,14 @@ class _ServiceContextManager:  # pylint: disable=too-few-public-methods
         self._service.start_service()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self._service.stop_service()
+        (_, stderrdata) = self._service.stop_service()
+
+        print("", file=sys.stdout, flush=True)
+        print(
+            "Log output from this invocation of stratisd:", file=sys.stdout, flush=True
+        )
+        print(stderrdata, file=sys.stdout, flush=True)
+
         _remove_stratis_dm_devices()
         return False
 
@@ -420,31 +433,26 @@ class UdevAdd(unittest.TestCase):
                 for d in device_tokens:
                     self._lb_mgr.generate_udev_add_event(d)
 
-                _settle()
+            _settle()
             _expected_stratis_block_devices(devnodes)
 
             self.assertEqual(len(_get_pools()), 1)
 
     def test_simultaneous(self):
         """
-        Create a single pool with 16 devices and simulate them being hotplug
-        at same time
-        :return: None
+        See documentation for _single_pool.
         """
         self._single_pool(16)
 
     def test_spurious_adds(self):
         """
-        Create a single pool with 16 devices and simulate them being hotplug
-        at same time and with spurious additional "add" udev events
-        :return: None
+        See documentation for _single_pool.
         """
-        self._single_pool(16, 4)
+        self._single_pool(4, 4)
 
     def test_simple_udev_add(self):
         """
-        Create a single pool with 1 device!
-        :return: None
+        See documentation for _single_pool.
         """
         self._single_pool(1, 1)
 
@@ -484,12 +492,12 @@ class UdevAdd(unittest.TestCase):
                     self._lb_mgr.hotplug(d)
                     devices_plugged.append(self._lb_mgr.device_file(d))
 
-                _settle()
-                _expected_stratis_block_devices(devices_plugged)
+            _settle()
+            _expected_stratis_block_devices(devices_plugged)
 
-                # The number of pools should never exceed one, since all the pools
-                # previously formed in the test have the same name.
-                self.assertEqual(len(_get_pools()), 1)
+            # The number of pools should never exceed one, since all the pools
+            # previously formed in the test have the same name.
+            self.assertEqual(len(_get_pools()), 1)
 
             # Dynamically rename all active pools to a randomly chosen name,
             # then generate synthetic add events for every loopbacked device.

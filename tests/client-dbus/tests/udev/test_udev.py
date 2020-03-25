@@ -18,8 +18,10 @@ Used to test behavior of the udev device discovery mechanism.
 # isort: STDLIB
 import os
 import random
+import signal
 import string
 import subprocess
+import sys
 import time
 import unittest
 
@@ -203,7 +205,9 @@ class _Service:
         assert list(_processes("stratisd")) == []
         assert _get_stratis_devices() == []
 
-        service = subprocess.Popen([_STRATISD])
+        service = subprocess.Popen(
+            [_STRATISD], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
 
         dbus_interface_present = False
         limit = time.time() + 120.0
@@ -229,10 +233,12 @@ class _Service:
     def stop_service(self):
         """
         Stops the stratisd daemon previously spawned.
+        :return: a tuple of stdout and stderr
         """
-        self._service.terminate()
-        self._service.wait()
+        self._service.send_signal(signal.SIGINT)
+        output = self._service.communicate()
         assert list(_processes("stratisd")) == []
+        return output
 
 
 class _ServiceContextManager:  # pylint: disable=too-few-public-methods
@@ -248,7 +254,14 @@ class _ServiceContextManager:  # pylint: disable=too-few-public-methods
         self._service.start_service()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self._service.stop_service()
+        (_, stderrdata) = self._service.stop_service()
+
+        print("", file=sys.stdout, flush=True)
+        print(
+            "Log output from this invocation of stratisd:", file=sys.stdout, flush=True
+        )
+        print(stderrdata, file=sys.stdout, flush=True)
+
         _remove_stratis_dm_devices()
         return False
 

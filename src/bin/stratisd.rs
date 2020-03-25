@@ -355,15 +355,14 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
 
     0   == Always udev fd index
     1   == SIGNAL FD index
-    2   == TIMER FD for periodic dump index
-    3   == engine index if eventable
-    3/4 == Start of dbus client file descriptor(s)
-            * 3 if engine is not eventable
-            * else 4
+    2   == engine index if eventable
+    2/3 == Start of dbus client file descriptor(s)
+            * 2 if engine is not eventable
+            * else 3
     */
     const FD_INDEX_UDEV: usize = 0;
     const FD_INDEX_SIGNALFD: usize = 1;
-    const FD_INDEX_ENGINE: usize = 3;
+    const FD_INDEX_ENGINE: usize = 2 ;
 
     /*
     fds is a Vec of libc::pollfd structs. Ideally, it would be possible

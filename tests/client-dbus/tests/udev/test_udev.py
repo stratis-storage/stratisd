@@ -433,7 +433,7 @@ class UdevAdd(unittest.TestCase):
                 for d in device_tokens:
                     self._lb_mgr.generate_udev_add_event(d)
 
-                _settle()
+            _settle()
             _expected_stratis_block_devices(devnodes)
 
             self.assertEqual(len(_get_pools()), 1)
@@ -492,12 +492,12 @@ class UdevAdd(unittest.TestCase):
                     self._lb_mgr.hotplug(d)
                     devices_plugged.append(self._lb_mgr.device_file(d))
 
-                _settle()
-                _expected_stratis_block_devices(devices_plugged)
+            _settle()
+            _expected_stratis_block_devices(devices_plugged)
 
-                # The number of pools should never exceed one, since all the pools
-                # previously formed in the test have the same name.
-                self.assertEqual(len(_get_pools()), 1)
+            # The number of pools should never exceed one, since all the pools
+            # previously formed in the test have the same name.
+            self.assertEqual(len(_get_pools()), 1)
 
             # Dynamically rename all active pools to a randomly chosen name,
             # then generate synthetic add events for every loopbacked device.

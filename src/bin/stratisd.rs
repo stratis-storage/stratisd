@@ -363,7 +363,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     */
     const FD_INDEX_UDEV: usize = 0;
     const FD_INDEX_SIGNALFD: usize = 1;
-    const FD_INDEX_DUMP_TIMERFD: usize = 2;
     const FD_INDEX_ENGINE: usize = 3;
 
     /*
@@ -450,12 +449,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 }
                 Err(e) => return Err(e),
             }
-        }
-
-        if fds[FD_INDEX_DUMP_TIMERFD].revents != 0 {
-            tfd.read(); // clear the event
-            info!("Dump timer expired, dumping state");
-            log_engine_state(&*engine.borrow());
         }
 
         if let Some(evt) = eventable {

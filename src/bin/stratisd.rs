@@ -30,7 +30,6 @@ use nix::{
     },
     unistd::getpid,
 };
-use timerfd::{SetTimeFlags, TimerFd, TimerState};
 use uuid::Uuid;
 
 #[cfg(feature = "dbus_enabled")]
@@ -46,20 +45,12 @@ use libstratis::{
 
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
 
-/// Interval at which to have stratisd dump its state
-const DEFAULT_STATE_DUMP_MINUTES: i64 = 10;
-
 /// Number of minutes to buffer log entries.
 const DEFAULT_LOG_HOLD_MINUTES: i64 = 30;
 
 /// If writing a program error to stderr fails, panic.
 fn print_err(err: &StratisError) {
     eprintln!("{}", err);
-}
-
-/// Log the engine state in a formatted way.
-fn log_engine_state(engine: &dyn Engine) {
-    debug!("Engine state: \n{:#?}", engine);
 }
 
 /// Configure the env_logger as necessary in order to allow the buffered
@@ -355,16 +346,14 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
 
     0   == Always udev fd index
     1   == SIGNAL FD index
-    2   == TIMER FD for periodic dump index
-    3   == engine index if eventable
-    3/4 == Start of dbus client file descriptor(s)
-            * 3 if engine is not eventable
-            * else 4
+    2   == engine index if eventable
+    2/3 == Start of dbus client file descriptor(s)
+            * 2 if engine is not eventable
+            * else 3
     */
     const FD_INDEX_UDEV: usize = 0;
     const FD_INDEX_SIGNALFD: usize = 1;
-    const FD_INDEX_DUMP_TIMERFD: usize = 2;
-    const FD_INDEX_ENGINE: usize = 3;
+    const FD_INDEX_ENGINE: usize = 2;
 
     /*
     fds is a Vec of libc::pollfd structs. Ideally, it would be possible
@@ -400,24 +389,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         events: libc::POLLIN,
     });
 
-    let mut tfd = TimerFd::new()?;
-    let interval = Duration::minutes(DEFAULT_STATE_DUMP_MINUTES)
-        .to_std()
-        .expect("std::Duration can represent positive values");
-    tfd.set_state(
-        TimerState::Periodic {
-            current: interval,
-            interval,
-        },
-        SetTimeFlags::Default,
-    );
-
-    fds.push(libc::pollfd {
-        fd: tfd.as_raw_fd(),
-        revents: 0,
-        events: libc::POLLIN,
-    });
-
     let eventable = engine.borrow().get_eventable();
 
     if let Some(evt) = eventable {
@@ -434,8 +405,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         FD_INDEX_ENGINE
     };
 
-    log_engine_state(&*engine.borrow());
-
     loop {
         if fds[FD_INDEX_UDEV].revents != 0 {
             udev_monitor.handle_events(&mut *engine.borrow_mut(), &mut dbus_support)
@@ -450,12 +419,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
                 }
                 Err(e) => return Err(e),
             }
-        }
-
-        if fds[FD_INDEX_DUMP_TIMERFD].revents != 0 {
-            tfd.read(); // clear the event
-            info!("Dump timer expired, dumping state");
-            log_engine_state(&*engine.borrow());
         }
 
         if let Some(evt) = eventable {

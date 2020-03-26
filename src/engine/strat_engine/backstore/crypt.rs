@@ -54,7 +54,7 @@ const DEVICEMAPPER_PATH: &str = "/dev/mapper";
 
 use self::consts::*;
 
-/// Will be replaced with libc constants in libc v0.2.68
+/// TODO: Will be replaced with libc constants in libc v0.2.68
 mod consts {
     use libc::c_int;
 
@@ -110,7 +110,7 @@ impl CryptInitializer {
         );
         let result = self.initialize_no_cleanup(device, key_description);
         result.map_err(|device| {
-            if let Err(e) = Self::rollback(
+            if let Err(e) = CryptInitializer::rollback(
                 device,
                 physical_path,
                 name_from_uuids(&pool_uuid, &dev_uuid),
@@ -158,13 +158,13 @@ impl CryptInitializer {
             device
                 .token_handle()
                 .luks2_keyring_set(Some(LUKS2_TOKEN_ID), key_description),
-            "Failed to set create the the LUKS2 keyring token"
+            "Failed to initialize the LUKS2 token for driving keyring activation operations"
         );
         log_on_failure!(
             device
                 .token_handle()
                 .assign_keyslot(LUKS2_TOKEN_ID, Some(keyslot)),
-            "Failed to assign the LUKS2 token to the Stratis keyslot"
+            "Failed to assign the LUKS2 keyring token to the Stratis keyslot"
         );
 
         // The default activation name is [POOLUUID]-[DEVUUID] which should be unique
@@ -280,7 +280,7 @@ impl CryptHandle {
         {
             return Ok(None);
         }
-        let name = Self::name_from_metadata(&mut device)?;
+        let name = CryptHandle::name_from_metadata(&mut device)?;
         Ok(Some(CryptHandle {
             device,
             physical_path: physical_path.to_owned(),

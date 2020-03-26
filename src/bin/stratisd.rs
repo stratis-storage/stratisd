@@ -30,7 +30,6 @@ use nix::{
     },
     unistd::getpid,
 };
-use timerfd::{SetTimeFlags, TimerFd, TimerState};
 use uuid::Uuid;
 
 #[cfg(feature = "dbus_enabled")]
@@ -45,9 +44,6 @@ use libstratis::{
 };
 
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
-
-/// Interval at which to have stratisd dump its state
-const DEFAULT_STATE_DUMP_MINUTES: i64 = 10;
 
 /// Number of minutes to buffer log entries.
 const DEFAULT_LOG_HOLD_MINUTES: i64 = 30;
@@ -392,18 +388,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
         revents: 0,
         events: libc::POLLIN,
     });
-
-    let mut tfd = TimerFd::new()?;
-    let interval = Duration::minutes(DEFAULT_STATE_DUMP_MINUTES)
-        .to_std()
-        .expect("std::Duration can represent positive values");
-    tfd.set_state(
-        TimerState::Periodic {
-            current: interval,
-            interval,
-        },
-        SetTimeFlags::Default,
-    );
 
     let eventable = engine.borrow().get_eventable();
 

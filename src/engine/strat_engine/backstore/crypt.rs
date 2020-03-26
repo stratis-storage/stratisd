@@ -540,10 +540,10 @@ fn ensure_wiped(device: &mut CryptDevice, physical_path: &Path, name: &str) -> R
         device.settings_handle().get_metadata_size(),
         "Failed to acquire LUKS2 metadata size"
     );
-    info!("Metadata size of LUKS2 device: {}", *md_size);
-    info!("Keyslot area size of LUKS2 device: {}", *ks_size);
+    debug!("Metadata size of LUKS2 device: {}", *md_size);
+    debug!("Keyslot area size of LUKS2 device: {}", *ks_size);
     let total_luks2_metadata_size = ceiling_sector_size_alignment(*md_size * 2 + *ks_size);
-    info!("Aligned total size: {}", total_luks2_metadata_size);
+    debug!("Aligned total size: {}", total_luks2_metadata_size);
 
     log_on_failure!(
         device.wipe_handle().wipe::<()>(

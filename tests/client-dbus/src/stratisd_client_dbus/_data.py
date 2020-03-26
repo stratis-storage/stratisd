@@ -82,7 +82,7 @@ SPECS = {
 <arg name="name" type="s" direction="in"/>
 <arg name="redundancy" type="(bq)" direction="in"/>
 <arg name="devices" type="as" direction="in"/>
-<arg name="keyfile_path" type="(bs)" direction="in"/>
+<arg name="key_desc" type="(bs)" direction="in"/>
 <arg name="result" type="(b(oao))" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>

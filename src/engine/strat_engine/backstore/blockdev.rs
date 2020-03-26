@@ -62,14 +62,14 @@ impl StratBlockDev {
         upper_segments: &[(Sectors, Sectors)],
         user_info: Option<String>,
         hardware_info: Option<String>,
-        keyfile_path: Option<&Path>,
+        key_desc: Option<&str>,
     ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(upper_segments);
         let allocator = RangeAllocator::new(bda.dev_size(), &segments)?;
 
-        let devnode_maybe_encrypted = match keyfile_path {
-            Some(path) => StratBlockDev::encrypt_blockdev(devnode.as_path(), path)?,
+        let devnode_maybe_encrypted = match key_desc {
+            Some(desc) => StratBlockDev::encrypt_blockdev(devnode.as_path(), desc)?,
             None => devnode,
         };
 
@@ -84,7 +84,7 @@ impl StratBlockDev {
         })
     }
 
-    fn encrypt_blockdev(_devnode: &Path, _keyfile_path: &Path) -> StratisResult<PathBuf> {
+    fn encrypt_blockdev(_devnode: &Path, _key_desc: &str) -> StratisResult<PathBuf> {
         Err(StratisError::Error(
             "Encryption is not yet supported.".to_string(),
         ))

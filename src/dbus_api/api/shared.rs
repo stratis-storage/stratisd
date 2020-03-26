@@ -2,10 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    path::{Path, PathBuf},
-    vec::Vec,
-};
+use std::{path::Path, vec::Vec};
 
 use dbus::{
     arg::Array,
@@ -26,15 +23,16 @@ use crate::{
 };
 
 /// Shared code for the creation of pools using the D-Bus API without the option
-/// for a keyfile path or with an optional keyfile in later versions of the interface.
-pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_keyfile: bool) -> MethodResult {
+/// for a key description or with an optional key description in later versions of
+/// the interface.
+pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
     let name: &str = get_next_arg(&mut iter, 0)?;
     let redundancy_tuple: (bool, u16) = get_next_arg(&mut iter, 1)?;
     let devs: Array<&str, _> = get_next_arg(&mut iter, 2)?;
-    let keyfile_tuple: Option<(bool, &str)> = if has_keyfile {
+    let key_desc_tuple: Option<(bool, &str)> = if has_key_desc {
         Some(get_next_arg(&mut iter, 3)?)
     } else {
         None
@@ -47,7 +45,9 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_keyfile: bool)
         name,
         &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
         tuple_to_option(redundancy_tuple),
-        keyfile_tuple.and_then(|kt| tuple_to_option(kt).map(PathBuf::from)),
+        key_desc_tuple
+            .and_then(tuple_to_option)
+            .map(|s| s.to_owned()),
     );
 
     let return_message = message.method_return();

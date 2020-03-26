@@ -169,13 +169,13 @@ impl Backstore {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        keyfile_path: Option<PathBuf>,
+        key_desc: Option<String>,
     ) -> StratisResult<Backstore> {
         let data_tier = DataTier::new(BlockDevMgr::initialize(
             pool_uuid,
             paths,
             mda_data_size,
-            keyfile_path,
+            key_desc,
         )?);
 
         Ok(Backstore {
@@ -199,7 +199,7 @@ impl Backstore {
         &mut self,
         pool_uuid: PoolUuid,
         paths: &[&Path],
-        keyfile_path: Option<PathBuf>,
+        key_desc: Option<String>,
     ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(_) => unreachable!("self.cache.is_none()"),
@@ -216,12 +216,8 @@ impl Backstore {
                 // If it is desired to change a cache dev to a data dev, it
                 // should be removed and then re-added in order to ensure
                 // that the MDA region is set to the correct size.
-                let bdm = BlockDevMgr::initialize(
-                    pool_uuid,
-                    paths,
-                    MDADataSize::default(),
-                    keyfile_path,
-                )?;
+                let bdm =
+                    BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default(), key_desc)?;
 
                 let cache_tier = CacheTier::new(bdm)?;
 
@@ -257,7 +253,7 @@ impl Backstore {
     /// Precondition: Must be invoked only after some space has been allocated
     /// from the backstore. This ensures that there is certainly a cap device.
     // Precondition: self.linear.is_none() && self.cache.is_some()
-    // Precondition: self.cache_keyfile_path has the desired keyfile path value
+    // Precondition: self.cache_key_desc has the desired key description
     // Precondition: self.cache.is_some() && self.linear.is_none()
     pub fn add_cachedevs(
         &mut self,
@@ -625,8 +621,8 @@ impl Backstore {
         )
     }
 
-    pub fn data_keyfile_path(&self) -> Option<&Path> {
-        self.data_tier.keyfile_path()
+    pub fn data_key_desc(&self) -> Option<&str> {
+        self.data_tier.key_desc()
     }
 
     pub fn data_tier_is_encrypted(&self) -> bool {

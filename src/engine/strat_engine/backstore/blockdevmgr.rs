@@ -7,7 +7,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use chrono::{DateTime, Duration, Utc};
@@ -121,7 +121,7 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParam
 pub struct BlockDevMgr {
     block_devs: Vec<StratBlockDev>,
     last_update_time: Option<DateTime<Utc>>,
-    keyfile_path: Option<PathBuf>,
+    key_desc: Option<String>,
 }
 
 // Check coherence of pool and device UUIDs with existing state of current
@@ -221,12 +221,12 @@ impl BlockDevMgr {
     pub fn new(
         block_devs: Vec<StratBlockDev>,
         last_update_time: Option<DateTime<Utc>>,
-        keyfile_path: Option<PathBuf>,
+        key_desc: Option<String>,
     ) -> BlockDevMgr {
         BlockDevMgr {
             block_devs,
             last_update_time,
-            keyfile_path,
+            key_desc,
         }
     }
 
@@ -235,14 +235,14 @@ impl BlockDevMgr {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        keyfile_path: Option<PathBuf>,
+        key_desc: Option<String>,
     ) -> StratisResult<BlockDevMgr> {
         let devices = check_device_ids(pool_uuid, &HashSet::new(), process_devices(paths)?)?;
 
         Ok(BlockDevMgr::new(
-            initialize_devices(devices, pool_uuid, mda_data_size, keyfile_path.as_deref())?,
+            initialize_devices(devices, pool_uuid, mda_data_size, key_desc.as_deref())?,
             None,
-            keyfile_path,
+            key_desc,
         ))
     }
 
@@ -273,7 +273,7 @@ impl BlockDevMgr {
             devices,
             pool_uuid,
             MDADataSize::default(),
-            self.keyfile_path.as_deref(),
+            self.key_desc.as_deref(),
         )?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
@@ -450,12 +450,12 @@ impl BlockDevMgr {
             .sum()
     }
 
-    pub fn keyfile_path(&self) -> Option<&Path> {
-        self.keyfile_path.as_deref()
+    pub fn key_desc(&self) -> Option<&str> {
+        self.key_desc.as_deref()
     }
 
     pub fn is_encrypted(&self) -> bool {
-        self.keyfile_path.is_some()
+        self.key_desc.is_some()
     }
 }
 

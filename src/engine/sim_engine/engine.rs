@@ -6,7 +6,7 @@ use std::{
     cell::RefCell,
     collections::{hash_map::RandomState, HashSet},
     iter::FromIterator,
-    path::{Path, PathBuf},
+    path::Path,
     rc::Rc,
 };
 
@@ -35,11 +35,11 @@ impl Engine for SimEngine {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        keyfile_path: Option<PathBuf>,
+        key_desc: Option<String>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
-        if keyfile_path.is_some() {
+        if key_desc.is_some() {
             return Err(StratisError::Error(
-                "Keyfile parameters not currently accepted".to_string(),
+                "Key description parameters not currently accepted".to_string(),
             ));
         }
 
@@ -58,7 +58,7 @@ impl Engine for SimEngine {
                     let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
 
                     let (pool_uuid, pool) =
-                        SimPool::new(&Rc::clone(&self.rdm), &devices, redundancy, keyfile_path);
+                        SimPool::new(&Rc::clone(&self.rdm), &devices, redundancy, key_desc);
 
                     if self.rdm.borrow_mut().throw_die() {
                         return Err(StratisError::Engine(ErrorEnum::Error, "X".into()));

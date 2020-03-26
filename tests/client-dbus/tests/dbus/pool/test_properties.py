@@ -43,7 +43,7 @@ class PropertyTestCase(SimTestCase):
                 "name": self._POOLNAME,
                 "redundancy": (True, 0),
                 "devices": _DEVICE_STRATEGY(),
-                "keyfile_path": (False, ""),
+                "key_desc": (False, ""),
             },
         )
 

@@ -261,7 +261,7 @@ pub fn initialize_devices(
     devices: Vec<DeviceInfo>,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
-    keyfile_path: Option<&Path>,
+    key_desc: Option<&str>,
 ) -> StratisResult<Vec<StratBlockDev>> {
     // Initialize a single device using information in dev_info.
     // If initialization fails at any stage clean up the device.
@@ -271,7 +271,7 @@ pub fn initialize_devices(
         dev_info: &DeviceInfo,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
-        keyfile_path: Option<&Path>,
+        key_desc: Option<&str>,
     ) -> StratisResult<StratBlockDev> {
         let mut f = OpenOptions::new().write(true).open(&dev_info.devnode)?;
 
@@ -302,7 +302,7 @@ pub fn initialize_devices(
                 &[],
                 None,
                 hw_id,
-                keyfile_path,
+                key_desc,
             )
         });
 
@@ -320,7 +320,7 @@ pub fn initialize_devices(
 
     let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
     for dev_info in devices {
-        match initialize_one(&dev_info, pool_uuid, mda_data_size, keyfile_path) {
+        match initialize_one(&dev_info, pool_uuid, mda_data_size, key_desc) {
             Ok(blockdev) => initialized_blockdevs.push(blockdev),
             Err(err) => {
                 if let Err(err) = wipe_blockdevs(&initialized_blockdevs) {

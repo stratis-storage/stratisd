@@ -63,7 +63,7 @@ impl SimDev {
     pub fn new(
         rdm: Rc<RefCell<Randomizer>>,
         devnode: &Path,
-        _keyfile_path: Option<&Path>,
+        _key_desc: Option<&str>,
     ) -> (Uuid, SimDev) {
         (
             Uuid::new_v4(),

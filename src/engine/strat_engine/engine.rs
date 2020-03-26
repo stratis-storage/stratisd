@@ -220,11 +220,11 @@ impl Engine for StratEngine {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        keyfile_path: Option<PathBuf>,
+        key_desc: Option<String>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
-        if keyfile_path.is_some() {
+        if key_desc.is_some() {
             return Err(StratisError::Error(
-                "Keyfile parameters not currently accepted".to_string(),
+                "Key description parameters not currently accepted".to_string(),
             ));
         }
 
@@ -242,7 +242,7 @@ impl Engine for StratEngine {
                     ))
                 } else {
                     let (uuid, pool) =
-                        StratPool::initialize(name, blockdev_paths, redundancy, keyfile_path)?;
+                        StratPool::initialize(name, blockdev_paths, redundancy, key_desc)?;
 
                     let name = Name::new(name.to_owned());
                     devlinks::pool_added(&name);

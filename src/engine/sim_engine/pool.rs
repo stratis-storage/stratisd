@@ -6,7 +6,7 @@ use std::{
     cell::RefCell,
     collections::{hash_map::RandomState, HashMap, HashSet},
     iter::FromIterator,
-    path::{Path, PathBuf},
+    path::Path,
     rc::Rc,
     vec::Vec,
 };
@@ -30,16 +30,16 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-// NOTE: There are currently two separate keyfile paths which currently must be the
+// NOTE: There are currently two separate key descriptions which currently must be the
 // same and as a result are functionally equivalent at the moment. The reason for this
-// separation is to allow ease in future development if separate keyfiles are ever
+// separation is to allow ease in future development if separate key descriptions are ever
 // needed for data devices and cache devices.
 #[derive(Debug)]
 pub struct SimPool {
     block_devs: HashMap<DevUuid, SimDev>,
-    block_devs_keyfile_path: Option<PathBuf>,
+    block_devs_key_desc: Option<String>,
     cache_devs: HashMap<DevUuid, SimDev>,
-    cache_devs_keyfile_path: Option<PathBuf>,
+    cache_devs_key_desc: Option<String>,
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
@@ -54,19 +54,19 @@ impl SimPool {
         rdm: &Rc<RefCell<Randomizer>>,
         paths: &[&Path],
         redundancy: Redundancy,
-        keyfile_path: Option<PathBuf>,
+        key_desc: Option<String>,
     ) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs = devices
             .iter()
-            .map(|p| SimDev::new(Rc::clone(rdm), p, keyfile_path.as_deref()));
+            .map(|p| SimDev::new(Rc::clone(rdm), p, key_desc.as_deref()));
         (
             Uuid::new_v4(),
             SimPool {
                 block_devs: HashMap::from_iter(device_pairs),
-                block_devs_keyfile_path: keyfile_path.clone(),
+                block_devs_key_desc: key_desc.clone(),
                 cache_devs: HashMap::new(),
-                cache_devs_keyfile_path: keyfile_path,
+                cache_devs_key_desc: key_desc,
                 filesystems: Table::default(),
                 redundancy,
                 rdm: Rc::clone(rdm),
@@ -95,7 +95,7 @@ impl SimPool {
     }
 
     fn datadevs_encrypted(&self) -> bool {
-        self.block_devs_keyfile_path.is_some()
+        self.block_devs_key_desc.is_some()
     }
 }
 
@@ -105,7 +105,7 @@ impl Pool for SimPool {
         _pool_uuid: PoolUuid,
         _pool_name: &str,
         blockdevs: &[&Path],
-        keyfile_path: Option<PathBuf>,
+        key_desc: Option<String>,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         if self.is_encrypted() {
             return Err(StratisError::Engine(
@@ -122,7 +122,7 @@ impl Pool for SimPool {
             }
             let blockdev_pairs: Vec<_> = blockdevs
                 .iter()
-                .map(|p| SimDev::new(Rc::clone(&self.rdm), p, keyfile_path.as_deref()))
+                .map(|p| SimDev::new(Rc::clone(&self.rdm), p, key_desc.as_deref()))
                 .collect();
             let blockdev_uuids: Vec<_> = blockdev_pairs.iter().map(|(uuid, _)| *uuid).collect();
             self.cache_devs.extend(blockdev_pairs);
@@ -186,8 +186,8 @@ impl Pool for SimPool {
                     Rc::clone(&self.rdm),
                     p,
                     match tier {
-                        BlockDevTier::Data => self.block_devs_keyfile_path.as_deref(),
-                        BlockDevTier::Cache => self.cache_devs_keyfile_path.as_deref(),
+                        BlockDevTier::Data => self.block_devs_key_desc.as_deref(),
+                        BlockDevTier::Cache => self.cache_devs_key_desc.as_deref(),
                     },
                 )
             })
@@ -384,8 +384,8 @@ impl Pool for SimPool {
         self.datadevs_encrypted()
     }
 
-    fn keyfile_path(&self) -> Option<&Path> {
-        self.block_devs_keyfile_path.as_deref()
+    fn key_desc(&self) -> Option<&str> {
+        self.block_devs_key_desc.as_deref()
     }
 }
 

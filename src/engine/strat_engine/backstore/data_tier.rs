@@ -157,9 +157,9 @@ impl DataTier {
         self.block_mgr.is_encrypted()
     }
 
-    /// Data tier keyfile_path
-    pub fn keyfile_path(&self) -> Option<&Path> {
-        self.block_mgr.keyfile_path()
+    /// Data tier key description
+    pub fn key_desc(&self) -> Option<&str> {
+        self.block_mgr.key_desc()
     }
 }
 

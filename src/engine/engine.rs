@@ -87,7 +87,7 @@ pub trait Pool: Debug {
         pool_uuid: PoolUuid,
         pool_name: &str,
         blockdevs: &[&Path],
-        keyfile_path: Option<PathBuf>,
+        key_desc: Option<String>,
     ) -> StratisResult<SetCreateAction<DevUuid>>;
 
     /// Creates the filesystems specified by specs.
@@ -213,8 +213,9 @@ pub trait Pool: Debug {
     /// Determine if the pool's data is encrypted
     fn is_encrypted(&self) -> bool;
 
-    /// Get pool's keyfile path if it is encrypted
-    fn keyfile_path(&self) -> Option<&Path>;
+    /// Get key description for the key in the kernel keyring used for encryption
+    /// if it is encrypted
+    fn key_desc(&self) -> Option<&str>;
 }
 
 pub trait Engine: Debug {
@@ -227,7 +228,7 @@ pub trait Engine: Debug {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        keyfile_path: Option<PathBuf>,
+        key_desc: Option<String>,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Handle a libudev event.

@@ -148,7 +148,7 @@ impl StratPool {
         name: &str,
         paths: &[&Path],
         redundancy: Redundancy,
-        keyfile_path: Option<PathBuf>,
+        key_desc: Option<String>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
@@ -156,7 +156,7 @@ impl StratPool {
         // enough. If there are enough devices specified, more space will be
         // required.
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), keyfile_path)?;
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), key_desc)?;
 
         let thinpool = ThinPool::new(
             pool_uuid,
@@ -287,7 +287,7 @@ impl Pool for StratPool {
         pool_uuid: PoolUuid,
         pool_name: &str,
         blockdevs: &[&Path],
-        keyfile_path: Option<PathBuf>,
+        key_desc: Option<String>,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         if self.is_encrypted() {
             return Err(StratisError::Engine(
@@ -306,9 +306,7 @@ impl Pool for StratPool {
             // If adding cache devices, must suspend the pool, since the cache
             // must be augmented with the new devices.
             self.thin_pool.suspend()?;
-            let devices_result = self
-                .backstore
-                .init_cache(pool_uuid, blockdevs, keyfile_path);
+            let devices_result = self.backstore.init_cache(pool_uuid, blockdevs, key_desc);
             self.thin_pool.resume()?;
             let devices = devices_result?;
             self.write_metadata(pool_name)?;
@@ -572,8 +570,8 @@ impl Pool for StratPool {
         self.datadevs_encrypted()
     }
 
-    fn keyfile_path(&self) -> Option<&Path> {
-        self.backstore.data_keyfile_path()
+    fn key_desc(&self) -> Option<&str> {
+        self.backstore.data_key_desc()
     }
 }
 

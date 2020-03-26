@@ -11,12 +11,12 @@ pub fn create_pool_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>
         .in_arg(("name", "s"))
         .in_arg(("redundancy", "(bq)"))
         .in_arg(("devices", "as"))
-        // Optional keyfile
+        // Optional key description of key in the kernel keyring
         // b: true if the pool should be encrypted
-        // s: Path to keyfile
+        // s: key description
         //
         // Rust representation: (bool, String)
-        .in_arg(("keyfile", "(bs)"))
+        .in_arg(("key_desc", "(bs)"))
         // In order from left to right:
         // b: true if a pool was created and object paths were returned
         // o: Object path for Pool

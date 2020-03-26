@@ -116,7 +116,7 @@ pub fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, op: BlockDevOp) -> Meth
             pool_uuid,
             &*pool_name,
             &blockdevs,
-            pool.keyfile_path().map(|kfp| kfp.to_path_buf()),
+            pool.key_desc().map(|kfp| kfp.to_owned()),
         ),
         BlockDevOp::AddCache => {
             pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Cache)

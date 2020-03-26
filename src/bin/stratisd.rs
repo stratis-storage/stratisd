@@ -57,11 +57,6 @@ fn print_err(err: &StratisError) {
     eprintln!("{}", err);
 }
 
-/// Log the engine state in a formatted way.
-fn log_engine_state(engine: &dyn Engine) {
-    debug!("Engine state: \n{:#?}", engine);
-}
-
 /// Configure the env_logger as necessary in order to allow the buffered
 /// logger to work correctly. Return a Handle to the underlying env_logger.
 pub fn from_env_logger(
@@ -425,8 +420,6 @@ fn run(matches: &ArgMatches, buff_log: &buff_log::Handle<env_logger::Logger>) ->
     } else {
         FD_INDEX_ENGINE
     };
-
-    log_engine_state(&*engine.borrow());
 
     loop {
         if fds[FD_INDEX_UDEV].revents != 0 {

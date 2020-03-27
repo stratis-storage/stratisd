@@ -49,7 +49,7 @@ impl SimPool {
         redundancy: Redundancy,
     ) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
-        let device_pairs = devices.iter().map(|p| SimDev::new(Rc::clone(rdm), p));
+        let device_pairs = devices.iter().map(|p| SimDev::new(Rc::clone(rdm), p, None));
         (
             Uuid::new_v4(),
             SimPool {
@@ -126,7 +126,7 @@ impl Pool for SimPool {
 
         let device_pairs: Vec<_> = devices
             .iter()
-            .map(|p| SimDev::new(Rc::clone(&self.rdm), p))
+            .map(|p| SimDev::new(Rc::clone(&self.rdm), p, None))
             .collect();
 
         let the_vec = match tier {

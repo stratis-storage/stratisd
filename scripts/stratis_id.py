@@ -21,7 +21,7 @@ import struct
 import sys
 from collections import namedtuple
 
-from ._crc32 import crc
+from _crc32 import crc
 
 BS = 512
 FIRST_COPY_OFFSET = BS

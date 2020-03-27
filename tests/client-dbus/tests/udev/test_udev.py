@@ -43,7 +43,6 @@ from stratisd_client_dbus._constants import TOP_OBJECT
 
 from ._dm import _get_stratis_devices, remove_stratis_setup
 from ._loopback import LoopBackDevices
-from ._stratis_id import dump_stratis_signature_area, stratis_signature
 
 _STRATISD = os.environ["STRATISD"]
 
@@ -111,31 +110,6 @@ def _settle():
     subprocess.check_call(["udevadm", "settle"])
 
 
-def _dump_state(context, expected_paths):
-    """
-    Dump everything we can when we are missing stratis devices!
-    :param context:  udev context
-    :param expected_paths: list of devices which we know should have
-           signatures
-    :return: None
-    """
-    print("We expect Stratis signatures on %d device(s)" % len(expected_paths))
-    for d in expected_paths:
-        signature = stratis_signature(d)
-        print("%s shows signature check of %s" % (d, signature))
-
-        if signature is None:
-            # We are really expecting this device to have the signature
-            # lets dump the signature area of the disk
-            dump_stratis_signature_area(d)
-
-    print("Udev db dump of all block devices")
-    for d in context.list_devices(subsystem="block"):
-        for k, v in d.properties.items():
-            print("%s:%s" % (k, str(v)))
-        print("")
-
-
 def _expected_stratis_block_devices(expected_paths):
     """
     Look for Stratis devices. Check as many times as can be done in
@@ -158,9 +132,6 @@ def _expected_stratis_block_devices(expected_paths):
             1 for _ in context.list_devices(subsystem="block", ID_FS_TYPE="stratis")
         )
         time.sleep(1)
-
-    if found != num_expected:
-        _dump_state(context, expected_paths)
 
     assert found == num_expected
 

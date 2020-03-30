@@ -40,7 +40,7 @@ pub fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let result = pool_op_logging!(
         "preparing to create pool with name {}", name;
         engine.create_pool(name, &blockdevs, tuple_to_option(redundancy));
-        "pool with name {}", name
+        "pool name is {}", name
     );
 
     let return_message = message.method_return();

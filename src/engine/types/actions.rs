@@ -8,8 +8,9 @@
 //! effect of the action at the time the action is requested. The action was
 //! completed succesfully; this type indicates what changes had to be made.
 
-use crate::engine::types::PoolUuid;
 use std::fmt;
+
+use crate::engine::types::PoolUuid;
 
 /// A trait for a generic kind of action. Defines the type of the thing to
 /// be changed, and also a method to indicate what changed.

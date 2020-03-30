@@ -90,7 +90,7 @@ macro_rules! pool_op_logging {
         info!($pre_oper, $($pre_args),*);
         let result = $engine_op;
         match result {
-            Ok(ref action) => info!(concat!($($post_oper, ", ",)? "{}"), $($($post_args,)*)? action),
+            Ok(ref action) => info!(concat!("{}" $(,": ", $post_oper,)?), action $($(, $post_args)*)?),
             Err(ref err) => {
                 warn!("pool operation failed with error: {}", err);
             }

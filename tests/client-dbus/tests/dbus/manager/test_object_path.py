@@ -31,7 +31,7 @@ class GetObjectTestCase(SimTestCase):
     Test get_object method.
     """
 
-    def testNonExisting(self):
+    def test_non_existing(self):
         """
         A proxy object is returned from a non-existant path.
         """
@@ -54,7 +54,7 @@ class GetObjectTestCase(SimTestCase):
             cause.get_dbus_name(), "org.freedesktop.DBus.Error.UnknownMethod"
         )
 
-    def testInvalid(self):
+    def test_invalid(self):
         """
         An invalid path causes an exception to be raised.
         """

@@ -58,32 +58,32 @@ class AddCacheDevsTestCase1(SimTestCase):
         self._pool_object = get_object(poolpath)
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
-    def testEmptyDevs(self):
+    def test_empty_devs(self):
         """
         Adding an empty list of cache devs should fail.
         """
-        ((is_some, _), rc, _) = Pool.Methods.AddCacheDevs(
+        ((is_some, _), return_code, _) = Pool.Methods.AddCacheDevs(
             self._pool_object, {"devices": []}
         )
 
         self.assertFalse(is_some)
-        self.assertEqual(rc, StratisdErrors.ERROR)
+        self.assertEqual(return_code, StratisdErrors.ERROR)
 
-    def testSomeDevs(self):
+    def test_some_devs(self):
         """
         Adding a non-empty list of cache devs should succeed.
         """
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (pool, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
 
-        ((is_some, result), rc, _) = Pool.Methods.AddCacheDevs(
+        ((is_some, result), return_code, _) = Pool.Methods.AddCacheDevs(
             self._pool_object, {"devices": _DEVICE_STRATEGY()}
         )
 
         num_devices_added = len(result)
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
 
-        if rc == StratisdErrors.OK:
+        if return_code == StratisdErrors.OK:
             self.assertTrue(is_some)
             self.assertGreater(num_devices_added, 0)
         else:

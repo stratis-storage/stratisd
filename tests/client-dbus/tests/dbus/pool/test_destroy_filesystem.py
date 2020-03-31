@@ -54,34 +54,34 @@ class DestroyFSTestCase(SimTestCase):
         )
         self._pool_object = get_object(poolpath)
 
-    def testDestroyNone(self):
+    def test_destroy_none(self):
         """
         Test calling with no actual volume specification. An empty volume
         list should always succeed, and it should not decrease the
         number of volumes.
         """
-        ((_, result_changed), rc, _) = Pool.Methods.DestroyFilesystems(
+        ((_, result_changed), return_code, _) = Pool.Methods.DestroyFilesystems(
             self._pool_object, {"filesystems": []}
         )
 
         self.assertEqual(len(result_changed), 0)
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
 
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
         self.assertEqual(len(list(result)), 0)
 
-    def testDestroyOne(self):
+    def test_destroy_one(self):
         """
         Test calling with a non-existant object path. This should succeed,
         because at the end the filesystem is not there.
         """
-        ((_, result), rc, _) = Pool.Methods.DestroyFilesystems(
+        ((_, result), return_code, _) = Pool.Methods.DestroyFilesystems(
             self._pool_object, {"filesystems": ["/"]}
         )
         self.assertEqual(len(result), 0)
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
 
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
@@ -116,39 +116,39 @@ class DestroyFSTestCase1(SimTestCase):
             self._pool_object, {"specs": [(self._FSNAME, "", None)]}
         )
 
-    def testDestroyOne(self):
+    def test_destroy_one(self):
         """
         Test calling by specifying the object path. Assume that destruction
         should always succeed.
         """
         fs_object_path = self._filesystems[0][0]
-        ((is_some, result), rc, _) = Pool.Methods.DestroyFilesystems(
+        ((is_some, result), return_code, _) = Pool.Methods.DestroyFilesystems(
             self._pool_object, {"filesystems": [fs_object_path]}
         )
 
         self.assertTrue(is_some)
         self.assertEqual(len(result), 1)
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
 
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
         self.assertEqual(len(list(result)), 0)
 
-    def testDestroyTwo(self):
+    def test_destroy_two(self):
         """
         Test calling by specifying one existing volume name and one
         non-existing. Should succeed, but only the existing name should be
         returned.
         """
         fs_object_path = self._filesystems[0][0]
-        ((is_some, result), rc, _) = Pool.Methods.DestroyFilesystems(
+        ((is_some, result), return_code, _) = Pool.Methods.DestroyFilesystems(
             self._pool_object, {"filesystems": [fs_object_path, "/"]}
         )
 
         self.assertTrue(is_some)
         self.assertEqual(len(result), 1)
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
 
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})

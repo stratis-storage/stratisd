@@ -52,7 +52,7 @@ class FetchPropertiesTestCase(SimTestCase):
         )
         self._pool_object = get_object(pool_object_path)
 
-    def testFetchSizeProperty(self):
+    def test_fetch_size_property(self):
         """
         Test FetchProperties for pool property, TotalPhysicalSize
         """
@@ -70,7 +70,7 @@ class FetchPropertiesTestCase(SimTestCase):
         self.assertEqual(size_success, True)
         self.assertTrue(size.isnumeric())
 
-    def testFetchUsedSizeProperty(self):
+    def test_fetch_used_size_property(self):
         """
         Test FetchProperties for pool property, TotalPhysicalUsed
         """
@@ -88,7 +88,7 @@ class FetchPropertiesTestCase(SimTestCase):
         self.assertEqual(size_success, True)
         self.assertTrue(size.isnumeric())
 
-    def testFetchHasCacheProperty(self):
+    def test_fetch_has_cache_property(self):
         """
         Test FetchProperties_2_1 for pool HasCache property
         """

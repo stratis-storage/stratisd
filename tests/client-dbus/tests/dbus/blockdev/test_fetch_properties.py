@@ -44,7 +44,7 @@ class FetchPropertiesTestCase(SimTestCase):
             },
         )
 
-    def testFetchSizeProperty(self):
+    def test_fetch_size_property(self):
         """
         Test FetchProperties for blockdev property, TotalPhysicalSize
         """

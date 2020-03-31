@@ -52,7 +52,7 @@ class FetchPropertiesTestCase(SimTestCase):
         )
         self._filesystem_object_path = created[0][0]
 
-    def testFetchUsedProperty(self):
+    def test_fetch_used_property(self):
         """
         Test FetchProperties for filesystem property, Used
         """

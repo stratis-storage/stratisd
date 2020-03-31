@@ -58,19 +58,19 @@ class CreateFSTestCase(SimTestCase):
         )
         self._pool_object = get_object(poolpath)
 
-    def testCreate(self):
+    def test_create(self):
         """
         Test calling with no actual volume specification. An empty volume
         list should always succeed, and it should not increase the
         number of volumes.
         """
-        ((is_some, result), rc, _) = Pool.Methods.CreateFilesystems(
+        ((is_some, result), return_code, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": []}
         )
 
         self.assertFalse(is_some)
         self.assertEqual(len(result), 0)
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
 
         result = filesystems().search(
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
@@ -78,19 +78,19 @@ class CreateFSTestCase(SimTestCase):
         self.assertEqual(len(list(result)), 0)
 
     @unittest.skip("skip until creating multiple filesystems is supported")
-    def testDuplicateSpecs(self):
+    def test_duplicate_specs(self):
         """
         Test calling with duplicate specification for same filesystem name.
         """
         new_name = "name"
 
-        ((is_some, result), rc, _) = Pool.Methods.CreateFilesystems(
+        ((is_some, result), return_code, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": [new_name, new_name]}
         )
 
         self.assertTrue(is_some)
         self.assertEqual(len(result), 1)
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
 
         (_, fs_name) = result[0]
         self.assertEqual(fs_name, new_name)
@@ -126,18 +126,18 @@ class CreateFSTestCase1(SimTestCase):
         self._pool_object = get_object(poolpath)
         Pool.Methods.CreateFilesystems(self._pool_object, {"specs": [self._FSNAME]})
 
-    def testCreate(self):
+    def test_create(self):
         """
         Test calling by specifying a volume name. Because there is already
         a volume with the given name, the creation of the new volume should
         return the volume information as unchanged, and no additional volume
         should be created.
         """
-        ((is_some, result), rc, _) = Pool.Methods.CreateFilesystems(
+        ((is_some, result), return_code, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": [self._FSNAME]}
         )
 
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
         self.assertFalse(is_some)
         self.assertEqual(len(result), 0)
 
@@ -146,18 +146,18 @@ class CreateFSTestCase1(SimTestCase):
         )
         self.assertEqual(len(list(result)), 1)
 
-    def testCreateOne(self):
+    def test_create_one(self):
         """
         Test calling by specifying a new and different volume name.
         The new volume will be created.
         """
         new_name = "newname"
 
-        ((is_some, result), rc, _) = Pool.Methods.CreateFilesystems(
+        ((is_some, result), return_code, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": [new_name]}
         )
 
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
         self.assertTrue(is_some)
         self.assertEqual(len(result), 1)
 
@@ -170,17 +170,17 @@ class CreateFSTestCase1(SimTestCase):
         self.assertEqual(len(list(result)), 2)
 
     @unittest.skip("skip until creating multiple filesystems is supported")
-    def testCreateWithConflict(self):
+    def test_create_with_conflict(self):
         """
         Test calling by specifying several volumes. Because there is already
         a volume with the given name, only the new volumes should be created
         and the command should succeed.
         """
-        ((is_some, result), rc, _) = Pool.Methods.CreateFilesystems(
+        ((is_some, result), return_code, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": [self._FSNAME, "newname"]}
         )
 
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
         self.assertTrue(is_some)
         self.assertEqual(len(result), 0)
         self.assertEqual(result[0][1], "newname")
@@ -190,17 +190,17 @@ class CreateFSTestCase1(SimTestCase):
         )
         self.assertEqual(len(list(result)), 1)
 
-    def testCreateMultiple(self):
+    def test_create_multiple(self):
         """
         Test calling by specifying multiple volume names.  Currently multiple
         volume names are not supported due to possible d-bus timeouts.  When
         multiple volume support is added back - this test should be removed.
         """
-        ((is_some, result), rc, _) = Pool.Methods.CreateFilesystems(
+        ((is_some, result), return_code, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": ["a", "b"]}
         )
 
-        self.assertEqual(rc, StratisdErrors.ERROR)
+        self.assertEqual(return_code, StratisdErrors.ERROR)
         self.assertFalse(is_some)
         self.assertEqual(len(result), 0)
 

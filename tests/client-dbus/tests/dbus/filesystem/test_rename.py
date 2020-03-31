@@ -60,27 +60,29 @@ class SetNameTestCase(SimTestCase):
         )
         self._filesystem_object_path = created[0][0]
 
-    def testNullMapping(self):
+    def test_null_mapping(self):
         """
         Test rename to same name.
         """
         filesystem = get_object(self._filesystem_object_path)
-        ((is_some, result), rc, _) = Filesystem.Methods.SetName(
+        ((is_some, result), return_code, _) = Filesystem.Methods.SetName(
             filesystem, {"name": self._FSNAME}
         )
 
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
         self.assertFalse(is_some)
         self.assertEqual(result, "0" * 32)
 
-    def testNewName(self):
+    def test_new_name(self):
         """
         Test rename to new name.
         """
         filesystem = get_object(self._filesystem_object_path)
-        (result, rc, _) = Filesystem.Methods.SetName(filesystem, {"name": "new"})
+        (result, return_code, _) = Filesystem.Methods.SetName(
+            filesystem, {"name": "new"}
+        )
 
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
         self.assertTrue(result)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})

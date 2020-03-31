@@ -54,8 +54,8 @@ class LoopBackDevices:
         backing_file = os.path.join(self.dir, "block_device_%d" % self.count)
         self.count += 1
 
-        with open(backing_file, "ab") as bd:
-            bd.truncate(_SIZE_OF_DEVICE)
+        with open(backing_file, "ab") as dev:
+            dev.truncate(_SIZE_OF_DEVICE)
 
         device = str.strip(
             subprocess.check_output(
@@ -90,8 +90,8 @@ class LoopBackDevices:
             if device is not None:
                 device_name = os.path.split(device)[-1]
                 ufile = os.path.join("/sys/block", device_name, "uevent")
-                with open(ufile, "w") as e:
-                    e.write("add")
+                with open(ufile, "w") as event:
+                    event.write("add")
 
     def hotplug(self, token):
         """

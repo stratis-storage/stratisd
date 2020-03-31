@@ -55,7 +55,7 @@ class SetNameTestCase(SimTestCase):
         )
         self._filesystem_object_path = created[0][0]
 
-    def testProps(self):
+    def test_props(self):
         """
         Test reading some filesystem properties.
         """

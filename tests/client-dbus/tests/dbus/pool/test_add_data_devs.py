@@ -57,7 +57,7 @@ class AddDataDevsTestCase(SimTestCase):
         self._pool_object = get_object(poolpath)
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
-    def testEmptyDevs(self):
+    def test_empty_devs(self):
         """
         Adding an empty list of devs should fail.
         """
@@ -67,12 +67,12 @@ class AddDataDevsTestCase(SimTestCase):
         blockdevs1 = blockdevs(props={"Pool": pool}).search(managed_objects)
         self.assertEqual(len(list(blockdevs1)), len(self._data_devices))
 
-        ((is_some, _), rc, _) = Pool.Methods.AddDataDevs(
+        ((is_some, _), return_code, _) = Pool.Methods.AddDataDevs(
             self._pool_object, {"devices": []}
         )
 
         self.assertFalse(is_some)
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         blockdevs2 = blockdevs(props={"Pool": pool}).search(managed_objects)
@@ -81,7 +81,7 @@ class AddDataDevsTestCase(SimTestCase):
         blockdevs3 = blockdevs(props={}).search(managed_objects)
         self.assertEqual(len(list(blockdevs3)), len(self._data_devices))
 
-    def testSomeDevs(self):
+    def test_some_devs(self):
         """
         Adding a non-empty list of devs should increase the number of devs
         in the pool.
@@ -92,14 +92,14 @@ class AddDataDevsTestCase(SimTestCase):
         blockdevs1 = blockdevs(props={"Pool": pool}).search(managed_objects)
         self.assertEqual(len(list(blockdevs1)), len(self._data_devices))
 
-        ((is_some, result), rc, _) = Pool.Methods.AddDataDevs(
+        ((is_some, result), return_code, _) = Pool.Methods.AddDataDevs(
             self._pool_object, {"devices": _DEVICE_STRATEGY()}
         )
 
         num_devices_added = len(result)
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
 
-        if rc == StratisdErrors.OK:
+        if return_code == StratisdErrors.OK:
             self.assertTrue(is_some)
             self.assertGreater(num_devices_added, 0)
         else:

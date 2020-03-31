@@ -49,7 +49,7 @@ class SimpleTestCase(SimTestCase):
             },
         )
 
-    def testOptionalProps(self):
+    def test_optional_props(self):
         """
         Test reading and setting some optional blockdev properties.
         """
@@ -64,20 +64,22 @@ class SimpleTestCase(SimTestCase):
         self.assertIsInstance(valid, int)
         self.assertIsInstance(value, str)
 
-        ((changed, _), rc, _) = Blockdev.Methods.SetUserInfo(
+        ((changed, _), return_code, _) = Blockdev.Methods.SetUserInfo(
             bop, {"id": (True, "new_id")}
         )
 
-        self.assertEqual(rc, 0)
+        self.assertEqual(return_code, 0)
         self.assertTrue(changed)
 
         (valid, value) = Blockdev.Properties.UserInfo.Get(bop)
         self.assertEqual(valid, True)
         self.assertEqual(value, "new_id")
 
-        ((changed, _), rc, _) = Blockdev.Methods.SetUserInfo(bop, {"id": (False, "")})
+        ((changed, _), return_code, _) = Blockdev.Methods.SetUserInfo(
+            bop, {"id": (False, "")}
+        )
 
-        self.assertEqual(rc, 0)
+        self.assertEqual(return_code, 0)
         self.assertTrue(changed)
 
         (valid, value) = Blockdev.Properties.UserInfo.Get(bop)

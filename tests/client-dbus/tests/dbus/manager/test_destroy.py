@@ -49,7 +49,7 @@ class Destroy1TestCase(SimTestCase):
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
 
-    def testExecution(self):
+    def test_execution(self):
         """
         Destroy should succeed since there is nothing to pass to DestroyPool.
         """
@@ -57,12 +57,12 @@ class Destroy1TestCase(SimTestCase):
         pool = next(pools(props={"Name": self._POOLNAME}).search(managed_objects), None)
         self.assertIsNone(pool)
 
-    def testBogusObjectPath(self):
+    def test_bogus_object_path(self):
         """
         Success should occur on a bogus object path.
         """
-        (_, rc, _) = Manager.Methods.DestroyPool(self._proxy, {"pool": "/"})
-        self.assertEqual(rc, StratisdErrors.OK)
+        (_, return_code, _) = Manager.Methods.DestroyPool(self._proxy, {"pool": "/"})
+        self.assertEqual(return_code, StratisdErrors.OK)
 
 
 class Destroy2TestCase(SimTestCase):
@@ -85,7 +85,7 @@ class Destroy2TestCase(SimTestCase):
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devices},
         )
 
-    def testExecution(self):
+    def test_execution(self):
         """
         The pool was just created, so it must always be possible to destroy it.
         """
@@ -97,7 +97,9 @@ class Destroy2TestCase(SimTestCase):
             frozenset(d for d in self._devices),
         )
 
-        (result, rc, _) = Manager.Methods.DestroyPool(self._proxy, {"pool": pool1})
+        (result, return_code, _) = Manager.Methods.DestroyPool(
+            self._proxy, {"pool": pool1}
+        )
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         blockdevs2 = blockdevs(props={"Pool": pool1}).search(managed_objects)
@@ -105,7 +107,7 @@ class Destroy2TestCase(SimTestCase):
             pools(props={"Name": self._POOLNAME}).search(managed_objects), None
         )
 
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
         self.assertIsNone(pool2)
         self.assertTrue(result)
         self.assertEqual(len(list(blockdevs2)), 0)
@@ -136,15 +138,17 @@ class Destroy3TestCase(SimTestCase):
         )
         Pool.Methods.CreateFilesystems(get_object(poolpath), {"specs": [self._FSNAME]})
 
-    def testExecution(self):
+    def test_execution(self):
         """
         This should fail since the pool has a filesystem on it.
         """
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         (pool, _) = next(pools(props={"Name": self._POOLNAME}).search(managed_objects))
 
-        ((is_some, _), rc, _) = Manager.Methods.DestroyPool(self._proxy, {"pool": pool})
-        self.assertEqual(rc, StratisdErrors.BUSY)
+        ((is_some, _), return_code, _) = Manager.Methods.DestroyPool(
+            self._proxy, {"pool": pool}
+        )
+        self.assertEqual(return_code, StratisdErrors.BUSY)
         self.assertFalse(is_some)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})

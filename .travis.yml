@@ -9,7 +9,6 @@ addons:
           - libdbus-1-dev
           - libudev-dev
           - libdbus-glib-1-dev
-          - libblkid-dev
 
 language: rust
 
@@ -19,7 +18,7 @@ before_install:
   - sudo add-apt-repository -y "deb http://us.archive.ubuntu.com/ubuntu/ eoan main" 
   - sudo apt-get -q update
   # Update to a more recent version of blkid
-  - sudo apt-get -y install blkid libblkid-dev
+  - sudo apt-get -y install util-linux libblkid-dev
   # cryptsetup-bin conflicts with custom built cryptsetup
   - sudo apt-get remove cryptsetup-bin
   - sudo apt-get install -y libargon2-0 libjson-c3

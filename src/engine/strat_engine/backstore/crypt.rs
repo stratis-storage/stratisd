@@ -484,13 +484,20 @@ fn get_keyslot_number(device: &mut CryptDevice) -> Result<Vec<c_uint>> {
 /// with devicemapper and cryptsetup. This method is idempotent and leaves
 /// the state as inactive.
 fn ensure_inactive(device: &mut CryptDevice, name: &str) -> Result<()> {
-    log_on_failure!(
-        device
-            .activate_handle()
-            .deactivate(name, CryptDeactivateFlags::empty()),
-        "Failed to deactivate the crypt device with name {}",
+    if log_on_failure!(
+        libcryptsetup_rs::status(Some(device), name),
+        "Failed to determine status of device with name {}",
         name
-    );
+    ) == CryptStatusInfo::Active
+    {
+        log_on_failure!(
+            device
+                .activate_handle()
+                .deactivate(name, CryptDeactivateFlags::empty()),
+            "Failed to deactivate the crypt device with name {}",
+            name
+        );
+    }
     if log_on_failure!(
         libcryptsetup_rs::status(Some(device), name),
         "Failed to determine status of device with name {}",
@@ -738,6 +745,53 @@ mod tests {
     };
 
     use super::*;
+
+    /// If this method is called without a key with the specified key description
+    /// in the kernel ring, it should always fail and allow us to test the rollback
+    /// of failed initializations.
+    fn test_failed_init(paths: &[&Path]) {
+        assert_eq!(paths.len(), 1);
+
+        let path = paths.get(0).expect("There must be exactly one path");
+        let key_description = "I am not a key";
+
+        let pool_uuid = Uuid::new_v4();
+        let dev_uuid = Uuid::new_v4();
+
+        let result = CryptInitializer::new((*path).to_owned(), pool_uuid, dev_uuid)
+            .initialize(key_description);
+
+        // Initialization cannot occur with a non-existent key
+        assert!(result.is_err());
+
+        assert!(!CryptHandle::can_setup(path));
+
+        // TODO: Check actual superblock with libblkid
+    }
+
+    #[test]
+    fn loop_test_failed_init() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_failed_init,
+        );
+    }
+
+    #[test]
+    fn real_test_failed_init() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(1, None, Some(Sectors(1024 * 1024 * 1024 / 512))),
+            test_failed_init,
+        );
+    }
+
+    #[test]
+    fn travis_test_failed_init() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_failed_init,
+        );
+    }
 
     /// Test initializing and activating an encrypted device using
     /// the utilities provided here.

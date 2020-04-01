@@ -74,14 +74,9 @@ impl StratBlockDev {
         segments.extend(upper_segments);
         let allocator = RangeAllocator::new(bda.dev_size(), &segments)?;
 
-        let devnode_maybe_encrypted = match key_description {
-            Some(ref desc) => StratBlockDev::encrypt_blockdev(devnode.physical_path(), desc)?,
-            None => devnode,
-        };
-
         Ok(StratBlockDev {
             dev,
-            devnode: devnode_maybe_encrypted,
+            devnode,
             bda,
             used: allocator,
             user_info,
@@ -89,12 +84,6 @@ impl StratBlockDev {
             dbus_path: MaybeDbusPath(None),
             key_description,
         })
-    }
-
-    fn encrypt_blockdev(_devnode: &Path, _key_desc: &str) -> StratisResult<BlockDevPath> {
-        Err(StratisError::Error(
-            "Encryption is not yet supported.".to_string(),
-        ))
     }
 
     /// Returns the blockdev's Device

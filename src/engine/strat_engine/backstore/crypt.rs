@@ -226,8 +226,18 @@ impl CryptHandle {
         }
     }
 
+    /// Determine whether a device can be set up as a Stratis device.
+    /// Returns false if:
+    ///   * the specified path does not exist
+    ///   * there was an error loading the encryption header as LUKS2
+    ///   * is_encrypted_stratis_device returns false
     #[cfg(test)]
     pub fn can_setup(physical_path: &Path) -> bool {
+        // Determine whether a device can be set up as a Stratis device.
+        // Returns an error if the specified physical path does not exist.
+        // Returns false if:
+        //   * there was an error loading the encryption header as LUKS2
+        //   * is_encrypted_stratis_device returns false
         fn can_setup_with_failures(physical_path: &Path) -> Result<bool> {
             let mut device = log_on_failure!(
                 CryptInit::init(physical_path),
@@ -572,6 +582,9 @@ fn ensure_wiped(device: &mut CryptDevice, physical_path: &Path, name: &str) -> R
 /// Check that the token can open the device.
 ///
 /// No activation will actually occur, only validation.
+///
+/// Note that this method requires that the correct key must be available
+/// in the kernel keyring.
 fn check_luks2_token(device: &mut CryptDevice) -> Result<()> {
     log_on_failure!(
         device.token_handle().activate_by_token::<()>(

@@ -226,7 +226,7 @@ impl CryptHandle {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn can_setup(physical_path: &Path) -> bool {
         fn can_setup_with_failures(physical_path: &Path) -> Result<bool> {
             let mut device = log_on_failure!(

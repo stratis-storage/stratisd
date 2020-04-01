@@ -52,14 +52,16 @@ class _Service:
     Handle starting and stopping the Rust service.
     """
 
-    def setUp(self):
+    def setup(self):
         """
         Start the stratisd daemon with the simulator.
         """
-        self._stratisd = subprocess.Popen([_STRATISD, "--sim"])
+        self._stratisd = subprocess.Popen(  # pylint: disable=attribute-defined-outside-init
+            [_STRATISD, "--sim"]
+        )
         time.sleep(1)
 
-    def tearDown(self):
+    def teardown(self):
         """
         Stop the stratisd simulator and daemon.
         """
@@ -71,7 +73,7 @@ class _Service:
         Stop the daemon if it has been started.
         """
         if hasattr(self, "_stratisd"):
-            self.tearDown()
+            self.teardown()
 
 
 class SimTestCase(unittest.TestCase):
@@ -98,4 +100,4 @@ class SimTestCase(unittest.TestCase):
         """
         self._service = _Service()
         self.addCleanup(self._service.cleanup)
-        self._service.setUp()
+        self._service.setup()

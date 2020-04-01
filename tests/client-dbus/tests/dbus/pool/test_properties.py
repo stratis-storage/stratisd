@@ -46,7 +46,7 @@ class PropertyTestCase(SimTestCase):
             },
         )
 
-    def testProps(self):
+    def test_props(self):
         """
         Test reading some pool properties.
         """

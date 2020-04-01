@@ -30,7 +30,7 @@ class StratisTestCase(SimTestCase):
     Test meta information about stratisd.
     """
 
-    def testStratisVersion(self):
+    def test_stratis_version(self):
         """
         Getting version should succeed.
 
@@ -53,14 +53,14 @@ class StratisTestCase2(SimTestCase):
         super().setUp()
         self._proxy = get_object(TOP_OBJECT)
 
-    def testArguments(self):
+    def test_arguments(self):
         """
         Incorrect arguments should cause a type error.
         """
         with self.assertRaises(TypeError):
             Manager.Properties.Version.Get(get_object(TOP_OBJECT), {})
 
-    def testFunctionName(self):
+    def test_function_name(self):
         """
         We know that it is impossible to set the Stratis version, so Set
         method should not exist, and this should result in an Attribute error.
@@ -68,7 +68,7 @@ class StratisTestCase2(SimTestCase):
         with self.assertRaises(AttributeError):
             Manager.Properties.Version.Set(get_object(TOP_OBJECT), {})
 
-    def testFunctionArgs(self):
+    def test_function_args(self):
         """
         If the arguments to the D-Bus method are incorrect, the exception is
         a DPClientInvalidArgError.

@@ -54,15 +54,15 @@ class SetNameTestCase(SimTestCase):
         )
         self._pool_object = get_object(self._pool_object_path)
 
-    def testNullMapping(self):
+    def test_null_mapping(self):
         """
         Test rename to same name.
         """
-        ((is_some, _), rc, _) = Pool.Methods.SetName(
+        ((is_some, _), return_code, _) = Pool.Methods.SetName(
             self._pool_object, {"name": self._POOLNAME}
         )
 
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
         self.assertFalse(is_some)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
@@ -73,18 +73,18 @@ class SetNameTestCase(SimTestCase):
         (pool, _) = result
         self.assertEqual(pool, self._pool_object_path)
 
-    def testNewName(self):
+    def test_new_name(self):
         """
         Test rename to new name.
         """
         new_name = "new"
 
-        ((is_some, _), rc, _) = Pool.Methods.SetName(
+        ((is_some, _), return_code, _) = Pool.Methods.SetName(
             self._pool_object, {"name": new_name}
         )
 
         self.assertTrue(is_some)
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         self.assertIsNone(

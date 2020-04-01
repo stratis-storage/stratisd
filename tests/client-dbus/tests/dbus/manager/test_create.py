@@ -46,13 +46,13 @@ class Create2TestCase(SimTestCase):
         self._devs = _DEVICE_STRATEGY()
         Manager.Methods.ConfigureSimulator(self._proxy, {"denominator": 8})
 
-    def testCreate(self):
+    def test_create(self):
         """
         Type of result should always be correct.
 
-        If rc is OK, then pool must exist.
+        If return_code is OK, then pool must exist.
         """
-        ((_, (poolpath, devnodes)), rc, _) = Manager.Methods.CreatePool(
+        ((_, (poolpath, devnodes)), return_code, _) = Manager.Methods.CreatePool(
             self._proxy,
             {"name": self._POOLNAME, "redundancy": (True, 0), "devices": self._devs},
         )
@@ -63,7 +63,7 @@ class Create2TestCase(SimTestCase):
             pools(props={"Name": self._POOLNAME}).search(managed_objects), None
         )
 
-        if rc == StratisdErrors.OK:
+        if return_code == StratisdErrors.OK:
             self.assertIsNotNone(result)
             (pool, _) = result
             self.assertEqual(pool, poolpath)
@@ -73,11 +73,11 @@ class Create2TestCase(SimTestCase):
             self.assertIsNone(result)
             self.assertEqual(len(all_pools), 0)
 
-    def testCreateBadRAID(self):
+    def test_create_bad_raid(self):
         """
         Creation should always fail if RAID value is wrong.
         """
-        (_, rc, _) = Manager.Methods.CreatePool(
+        (_, return_code, _) = Manager.Methods.CreatePool(
             self._proxy,
             {
                 "name": self._POOLNAME,
@@ -85,7 +85,7 @@ class Create2TestCase(SimTestCase):
                 "devices": _DEVICE_STRATEGY(),
             },
         )
-        self.assertEqual(rc, StratisdErrors.ERROR)
+        self.assertEqual(return_code, StratisdErrors.ERROR)
 
 
 class Create3TestCase(SimTestCase):
@@ -110,7 +110,7 @@ class Create3TestCase(SimTestCase):
             },
         )
 
-    def testCreateDifferentBlockdevs(self):
+    def test_create_different_blockdevs(self):
         """
         Create should fail trying to create new pool with same name
         and different blockdevs from previous.
@@ -119,7 +119,7 @@ class Create3TestCase(SimTestCase):
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
 
-        (_, rc, _) = Manager.Methods.CreatePool(
+        (_, return_code, _) = Manager.Methods.CreatePool(
             self._proxy,
             {
                 "name": self._POOLNAME,
@@ -127,7 +127,7 @@ class Create3TestCase(SimTestCase):
                 "devices": _DEVICE_STRATEGY(),
             },
         )
-        self.assertEqual(rc, StratisdErrors.ERROR)
+        self.assertEqual(return_code, StratisdErrors.ERROR)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         pools2 = list(pools().search(managed_objects))
@@ -162,7 +162,7 @@ class Create4TestCase(SimTestCase):
             },
         )
 
-    def testCreateSameBlockdevs(self):
+    def test_create_same_blockdevs(self):
         """
         Create should succeed trying to create new pool with same name
         and same blockdevs as previous.
@@ -171,7 +171,7 @@ class Create4TestCase(SimTestCase):
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
 
-        ((is_some, _), rc, _) = Manager.Methods.CreatePool(
+        ((is_some, _), return_code, _) = Manager.Methods.CreatePool(
             self._proxy,
             {
                 "name": self._POOLNAME,
@@ -179,7 +179,7 @@ class Create4TestCase(SimTestCase):
                 "devices": self._blockdevs,
             },
         )
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
         self.assertFalse(is_some)
 
         managed_objects = ObjectManager.Methods.GetManagedObjects(self._proxy, {})

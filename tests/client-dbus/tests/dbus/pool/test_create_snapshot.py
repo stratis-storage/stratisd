@@ -56,27 +56,27 @@ class CreateSnapshotTestCase(SimTestCase):
         )
         self._pool_object = get_object(poolpath)
 
-        ((_, fs_objects), rc, _) = Pool.Methods.CreateFilesystems(
+        ((_, fs_objects), return_code, _) = Pool.Methods.CreateFilesystems(
             self._pool_object, {"specs": [self._FSNAME]}
         )
 
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
 
         self._fs_object_path = fs_objects[0][0]
         self.assertNotEqual(self._fs_object_path, "/")
 
-    def testCreate(self):
+    def test_create(self):
         """
         Test creating a snapshot and ensure that it works.
         """
 
-        ((is_some, ss_object_path), rc, _) = Pool.Methods.SnapshotFilesystem(
+        ((is_some, ss_object_path), return_code, _) = Pool.Methods.SnapshotFilesystem(
             self._pool_object,
             {"origin": self._fs_object_path, "snapshot_name": self._SNAPSHOTNAME},
         )
 
         self.assertTrue(is_some)
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
         self.assertNotEqual(ss_object_path, "/")
 
         result = filesystems().search(
@@ -84,27 +84,31 @@ class CreateSnapshotTestCase(SimTestCase):
         )
         self.assertEqual(len(list(result)), 2)
 
-    def testDuplicateSnapshotName(self):
+    def test_duplicate_snapshot_name(self):
         """
         Test creating a snapshot with duplicate name.
         """
 
-        ((is_some, ss_object_path), rc, _) = Pool.Methods.SnapshotFilesystem(
+        ((is_some, ss_object_path), return_code, _) = Pool.Methods.SnapshotFilesystem(
             self._pool_object,
             {"origin": self._fs_object_path, "snapshot_name": self._SNAPSHOTNAME},
         )
 
         self.assertTrue(is_some)
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
         self.assertNotEqual(ss_object_path, "/")
 
-        ((is_some, ss_object_path_dupe_name), rc, _) = Pool.Methods.SnapshotFilesystem(
+        (
+            (is_some, ss_object_path_dupe_name),
+            return_code,
+            _,
+        ) = Pool.Methods.SnapshotFilesystem(
             self._pool_object,
             {"origin": self._fs_object_path, "snapshot_name": self._SNAPSHOTNAME},
         )
 
         self.assertFalse(is_some)
-        self.assertEqual(rc, StratisdErrors.OK)
+        self.assertEqual(return_code, StratisdErrors.OK)
         self.assertEqual(ss_object_path_dupe_name, "/")
 
         result = filesystems().search(

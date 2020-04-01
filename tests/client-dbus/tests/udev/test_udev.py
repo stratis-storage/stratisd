@@ -47,14 +47,14 @@ from ._loopback import LoopBackDevices
 _STRATISD = os.environ["STRATISD"]
 
 
-def rs(l):
+def random_string(length):
     """
     Generates a random string with the prefix 'stratis_'
-    :param l: Length of random part of string
+    :param length: Length of random part of string
     :return: String
     """
     return "stratis_{0}".format(
-        "".join(random.choice(string.ascii_uppercase) for _ in range(l))
+        "".join(random.choice(string.ascii_uppercase) for _ in range(length))
     )
 
 
@@ -296,7 +296,7 @@ class UdevAdd(unittest.TestCase):
 
                 _settle()
 
-                pool_name = rs(5)
+                pool_name = random_string(5)
 
                 _create_pool(pool_name, devnodes)
                 pool_data[pool_name] = device_tokens
@@ -307,8 +307,10 @@ class UdevAdd(unittest.TestCase):
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), number_of_pools)
 
-        for d in (d for device_tokens in pool_data.values() for d in device_tokens):
-            self._lb_mgr.unplug(d)
+        for dev in (
+            dev for device_tokens in pool_data.values() for dev in device_tokens
+        ):
+            self._lb_mgr.unplug(dev)
 
         _expected_stratis_block_devices([])
 
@@ -338,8 +340,8 @@ class UdevAdd(unittest.TestCase):
             _settle()
             self.assertEqual(len(_get_pools()), number_of_pools)
 
-            for pn in pool_data:
-                self.assertEqual(len(_get_pools(pn)), 1)
+            for name in pool_data:
+                self.assertEqual(len(_get_pools(name)), 1)
 
     def test_generic(self):
         """
@@ -375,7 +377,7 @@ class UdevAdd(unittest.TestCase):
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 0)
-            pool_name = rs(5)
+            pool_name = random_string(5)
             _create_pool(pool_name, devnodes)
             self.assertEqual(len(_get_pools()), 1)
 
@@ -384,16 +386,16 @@ class UdevAdd(unittest.TestCase):
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 1)
 
-        for d in device_tokens:
-            self._lb_mgr.unplug(d)
+        for dev in device_tokens:
+            self._lb_mgr.unplug(dev)
 
         _expected_stratis_block_devices([])
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 0)
 
-            for d in device_tokens:
-                self._lb_mgr.hotplug(d)
+            for dev in device_tokens:
+                self._lb_mgr.hotplug(dev)
 
             _settle()
             _expected_stratis_block_devices(devnodes)
@@ -401,8 +403,8 @@ class UdevAdd(unittest.TestCase):
             self.assertEqual(len(_get_pools()), 1)
 
             for _ in range(num_hotplugs):
-                for d in device_tokens:
-                    self._lb_mgr.generate_udev_add_event(d)
+                for dev in device_tokens:
+                    self._lb_mgr.generate_udev_add_event(dev)
 
             _settle()
             _expected_stratis_block_devices(devnodes)
@@ -432,7 +434,7 @@ class UdevAdd(unittest.TestCase):
         Create more than one pool with the same name, then dynamically fix it
         :return: None
         """
-        pool_name = rs(12)
+        pool_name = random_string(12)
         pool_tokens = []
         num_pools = 3
 
@@ -449,8 +451,8 @@ class UdevAdd(unittest.TestCase):
 
             _expected_stratis_block_devices(devices)
 
-            for d in this_pool:
-                self._lb_mgr.unplug(d)
+            for dev in this_pool:
+                self._lb_mgr.unplug(dev)
 
             _expected_stratis_block_devices([])
 
@@ -459,9 +461,9 @@ class UdevAdd(unittest.TestCase):
             # error.
             devices_plugged = []
             for i in range(num_pools):
-                for d in pool_tokens[i]:
-                    self._lb_mgr.hotplug(d)
-                    devices_plugged.append(self._lb_mgr.device_file(d))
+                for dev in pool_tokens[i]:
+                    self._lb_mgr.hotplug(dev)
+                    devices_plugged.append(self._lb_mgr.device_file(dev))
 
             _settle()
             _expected_stratis_block_devices(devices_plugged)
@@ -478,11 +480,13 @@ class UdevAdd(unittest.TestCase):
 
                 # Rename all active pools to a randomly selected new name
                 for object_path, _ in current_pools:
-                    Pool.Methods.SetName(get_object(object_path), {"name": rs(10)})
+                    Pool.Methods.SetName(
+                        get_object(object_path), {"name": random_string(10)}
+                    )
 
                 # Generate synthetic add events for every loop backed device
-                for d in (d for sublist in pool_tokens for d in sublist):
-                    self._lb_mgr.generate_udev_add_event(d)
+                for dev in (dev for sublist in pool_tokens for dev in sublist):
+                    self._lb_mgr.generate_udev_add_event(dev)
 
                 _settle()
                 _expected_stratis_block_devices(devices_plugged)

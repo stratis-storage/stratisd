@@ -222,12 +222,6 @@ impl Engine for StratEngine {
         redundancy: Option<u16>,
         key_desc: Option<String>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
-        if key_desc.is_some() {
-            return Err(StratisError::Error(
-                "Key description parameters not currently accepted".to_string(),
-            ));
-        }
-
         let redundancy = calculate_redundancy!(redundancy);
 
         validate_name(name)?;

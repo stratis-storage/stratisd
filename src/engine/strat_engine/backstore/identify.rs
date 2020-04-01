@@ -343,7 +343,8 @@ pub fn identify_possibly_encrypted_block_device(dev: &libudev::Device) -> Option
 /// appear to be a Stratis device. Log at an appropriate level on all errors.
 /// This method does not attempt any action on LUKS devices, instead ignoring
 /// them.
-pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
+#[cfg(test)]
+fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
     let initialized = dev.is_initialized();
     if !initialized {
         debug!("Found a udev entry for a device identified as a block device, but udev also identified it as uninitialized, disregarding the device");

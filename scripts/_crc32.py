@@ -289,8 +289,8 @@ def crc(buf):
     """
     crc_val = 0xFFFFFFFF
 
-    for b in buf:
-        tbl_idx = (crc_val ^ b) & 0xFF
+    for byte in buf:
+        tbl_idx = (crc_val ^ byte) & 0xFF
         crc_val = (_CASTAGNOLI_TABLE[tbl_idx] ^ (crc_val >> 8)) & 0xFFFFFFFF
 
     return ~crc_val & 0xFFFFFFFF

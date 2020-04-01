@@ -60,8 +60,8 @@ def stratis_signature(block_device):
     :return: None if not Stratis, else named tuple
     """
     try:
-        with open(block_device, "r+b") as h:
-            buf = h.read(SB_AREA_SIZE)
+        with open(block_device, "r+b") as header:
+            buf = header.read(SB_AREA_SIZE)
     # pylint: disable=bare-except
     except:
         return None
@@ -79,22 +79,21 @@ def _hex_dump(data):
     """
     full = len(data) // 16
     remain = len(data) % 16
-    ll = 0
+    slc_index = 0
     for _ in range(full):
-        slc = data[ll : ll + 16]
+        slc = data[slc_index : slc_index + 16]
         print(
             "0x%08x: %-47s  %s"
-            % (ll, " ".join(format(x, "02x") for x in slc), str(slc))
+            % (slc_index, " ".join(format(x, "02x") for x in slc), str(slc))
         )
-        ll += 16
+        slc_index += 16
 
     if remain > 0:
-        slc = data[ll:]
+        slc = data[slc_index:]
         print(
             "0x%08x: %-47s  %s"
-            % (ll, " ".join(format(x, "02x") for x in slc), str(slc))
+            % (slc_index, " ".join(format(x, "02x") for x in slc), str(slc))
         )
-
 
 def dump_stratis_signature_area(block_device):
     """
@@ -103,15 +102,15 @@ def dump_stratis_signature_area(block_device):
     :return: None if not Stratis, else named tuple
     """
     try:
-        with open(block_device, "r+b") as h:
-            buf = h.read(SB_AREA_SIZE)
+        with open(block_device, "r+b") as header:
+            buf = header.read(SB_AREA_SIZE)
             print("Stratis superblock area for %s" % block_device)
             _hex_dump(buf)
     # pylint: disable=broad-except
-    except BaseException as e:
+    except BaseException as exception:
         print(
             "Error reading up the super block area on %s reason: %s"
-            % (block_device, str(e))
+            % (block_device, str(exception))
         )
 
 

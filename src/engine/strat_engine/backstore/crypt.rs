@@ -10,6 +10,7 @@ use std::{
 
 use libc::{c_void, syscall, SYS_keyctl, SYS_request_key};
 
+use devicemapper::Sectors;
 use libcryptsetup_rs::{
     c_uint, CryptActivateFlags, CryptDeactivateFlags, CryptDevice, CryptInit, CryptStatusInfo,
     CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr, SafeMemHandle,
@@ -318,16 +319,29 @@ impl CryptHandle {
         activate_and_check_device_path(&mut self.device, &self.name.to_owned())
     }
 
+    /// Deactivate the device referenced by the current device handle.
     #[allow(dead_code)]
     pub fn deactivate(&mut self) -> Result<()> {
         let name = self.name.to_owned();
         ensure_inactive(&mut self.device, &name)
     }
 
+    /// Wipe all LUKS2 metadata on the device safely using libcryptsetup.
     pub fn wipe(&mut self) -> Result<()> {
         let physical_path = self.physical_path.to_owned();
         let name = self.name.to_owned();
         ensure_wiped(&mut self.device, &physical_path, &name)
+    }
+
+    /// Get the size of the logical device built on the underlying encrypted physical
+    /// device. `devicemapper` will return the size in terms of number of sectors.
+    pub fn logical_device_size(&mut self) -> Result<Sectors> {
+        let name = self.name.clone();
+        let active_device = log_on_failure!(
+            self.device.runtime_handle(&name).get_active_device(),
+            "Failed to get device size for encrypted logical device"
+        );
+        Ok(Sectors(active_device.size))
     }
 }
 
@@ -519,17 +533,25 @@ fn ceiling_sector_size_alignment(bytes: u64) -> u64 {
 /// This method is idempotent and leaves the disk as wiped.
 fn ensure_wiped(device: &mut CryptDevice, physical_path: &Path, name: &str) -> Result<()> {
     ensure_inactive(device, name)?;
-    for i in log_on_failure!(
-        get_keyslot_number(device),
-        "Failed to get the keyslot number to destroy from LUKS2 metadata"
-    )
-    .iter()
-    {
-        log_on_failure!(
-            device.keyslot_handle().destroy(*i),
-            "Failed to destroy keyslot at index {}",
-            i
-        );
+    let keyslot_number = get_keyslot_number(device);
+    match keyslot_number {
+        Ok(nums) => {
+            for i in nums.iter() {
+                log_on_failure!(
+                    device.keyslot_handle().destroy(*i),
+                    "Failed to destroy keyslot at index {}",
+                    i
+                );
+            }
+        }
+        Err(e) => {
+            info!(
+                "Keyslot numbers were not found; skipping explicit \
+                destruction of keyslots; the keyslot area will still \
+                be wiped in the next step: {}",
+                e,
+            );
+        }
     }
 
     let (md_size, ks_size) = log_on_failure!(

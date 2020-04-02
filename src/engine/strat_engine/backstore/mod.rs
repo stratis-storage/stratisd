@@ -26,4 +26,4 @@ pub use self::{
 };
 
 #[cfg(test)]
-pub use self::{crypt::STRATIS_KEY_SIZE, identify::find_all_block_devices_with_stratis_signatures};
+pub use self::crypt::STRATIS_KEY_SIZE;

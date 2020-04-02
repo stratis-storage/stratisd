@@ -35,12 +35,8 @@
 //! in general, general purpose methods that can be used in any situation.
 //!
 //! find_all is public because it is the method that is invoked by the
-//! engine on startup. find_all_block_devices_with_stratis_signatures is
-//! public for use in testing. identify_block_device is public because it
-//! is suitable for identifying a block device associated with a uevent,
-//! as the situation in which the uevent is handled is equivalent to that
-//! provided by the execution of the
-//! find_all_block_devices_with_stratis_signatures method.
+//! engine on startup. identify_block_device is public because it
+//! is suitable for identifying a block device associated with a uevent.
 
 use std::{
     collections::HashMap,
@@ -135,65 +131,6 @@ fn process_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
     }
 }
 
-/// Process a device which udev information indicates is unowned.
-fn process_unowned_device(dev: &libudev::Device) -> Option<StratisInfo> {
-    match dev.devnode() {
-        Some(devnode) => {
-            match (
-                device_to_devno_wrapper(dev),
-                device_identifiers_wrapper(devnode),
-            ) {
-                (Err(err), _) | (_, Err(err)) => {
-                    warn!("udev identified device {} as a block device but {}, disregarding the device",
-                          devnode.display(),
-                          err);
-                    None
-                }
-                // FIXME: Refine error return in StaticHeader::setup(),
-                // so it can be used to distinguish between signficant
-                // and insignficant errors and then use that ability to
-                // distinguish here between different levels of
-                // severity.
-                (_, Ok(Err(err))) => {
-                    debug!("udev identified device {} as a block device but {}, disregarding the device",
-                           devnode.display(),
-                           err);
-                    None
-                }
-                (_, Ok(Ok(None))) => None,
-                (Ok(devno), Ok(Ok(Some(identifiers)))) => {
-                    Some((identifiers, devno, devnode.to_path_buf()))
-                }
-            }
-        }
-        None => {
-            warn!("udev identified a device as a block device, but the udev entry for the device had no device node, disregarding the device");
-            None
-        }
-    }
-}
-
-// Use udev to identify all block devices and return the subset of those
-// that have Stratis signatures.
-#[cfg(test)]
-pub fn find_all_block_devices_with_stratis_signatures(
-) -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
-    let context = libudev::Context::new()?;
-    let mut enumerator = block_enumerator(&context)?;
-
-    let pool_map = enumerator
-        .scan_devices()?
-        .filter_map(|dev| identify_block_device(&dev))
-        .fold(HashMap::new(), |mut acc, (identifiers, device, devnode)| {
-            acc.entry(identifiers.pool_uuid)
-                .or_insert_with(HashMap::new)
-                .insert(device, devnode);
-            acc
-        });
-
-    Ok(pool_map)
-}
-
 // Find all devices identified by udev as Stratis devices.
 fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     let context = libudev::Context::new()?;
@@ -269,7 +206,6 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
         }
         Ok(ownership) => match ownership {
             UdevOwnership::Stratis => process_stratis_device(dev),
-            UdevOwnership::Unowned => process_unowned_device(dev),
             _ => None,
         },
     }
@@ -348,14 +284,6 @@ mod tests {
                     .unwrap();
             assert_eq!(identifiers.pool_uuid, pool_uuid);
             assert_eq!(&&dev_node, path);
-
-            let (identifiers, _, dev_node) =
-                block_device_apply(path, |dev| process_unowned_device(dev))
-                    .unwrap()
-                    .unwrap()
-                    .unwrap();
-            assert_eq!(identifiers.pool_uuid, pool_uuid);
-            assert_eq!(&&dev_node, path);
         }
     }
 
@@ -401,24 +329,12 @@ mod tests {
                     .unwrap(),
                 None
             );
-            assert_eq!(
-                block_device_apply(path, |dev| process_unowned_device(dev))
-                    .unwrap()
-                    .unwrap(),
-                None
-            );
         }
 
         for path in paths {
             create_fs(path, None).unwrap();
             assert_eq!(
                 block_device_apply(path, |dev| process_stratis_device(dev))
-                    .unwrap()
-                    .unwrap(),
-                None
-            );
-            assert_eq!(
-                block_device_apply(path, |dev| process_unowned_device(dev))
                     .unwrap()
                     .unwrap(),
                 None

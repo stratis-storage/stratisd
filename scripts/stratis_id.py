@@ -114,7 +114,10 @@ def dump_stratis_signature_area(block_device):
         )
 
 
-if __name__ == "__main__":
+def main():
+    """
+    The main method
+    """
     if len(sys.argv) != 2:
         print("syntax: stratis_signature.py <block device>")
         sys.exit(2)
@@ -127,3 +130,7 @@ if __name__ == "__main__":
 
     print(sig)
     sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

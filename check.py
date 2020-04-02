@@ -9,7 +9,6 @@ arg_map = {
     "scripts": [
         "--reports=no",
         "--disable=I",
-        "--disable=invalid-name",
         "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'",
     ],
 }

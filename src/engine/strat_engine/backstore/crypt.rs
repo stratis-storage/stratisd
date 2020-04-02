@@ -830,8 +830,10 @@ mod tests {
                 ))
             })?;
 
+            // Make window size a MiB wide to speed up scanning.
+            const WINDOW_SIZE: usize = 1024 * 1024;
             let mut devicenode = OpenOptions::new().write(true).open(logical_path)?;
-            let mut random_buffer = [0; 32];
+            let mut random_buffer = [0; WINDOW_SIZE];
             File::open("/dev/urandom")?.read_exact(&mut random_buffer)?;
             devicenode.write_all(&random_buffer)?;
             std::mem::drop(devicenode);
@@ -839,8 +841,8 @@ mod tests {
             let mut disk_buffer = Vec::new();
             let mut devicenode = File::open(path)?;
             devicenode.read_to_end(&mut disk_buffer)?;
-            for window in disk_buffer.windows(32) {
-                if window == random_buffer {
+            for window in disk_buffer.windows(WINDOW_SIZE) {
+                if window == &random_buffer as &[u8] {
                     return Err(Box::new(io::Error::new(
                         io::ErrorKind::Other,
                         "Disk was not encrypted!",

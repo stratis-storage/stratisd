@@ -6,15 +6,6 @@ use std::{error::Error, ffi::CString, fs::File, io::Read, path::Path};
 
 use crate::engine::strat_engine::backstore::STRATIS_KEY_SIZE;
 
-use self::consts::*;
-
-/// Will be replaced with libc constants in libc v0.2.68
-mod consts {
-    use libc::c_int;
-
-    pub const KEY_SPEC_SESSION_KEYRING: c_int = -3;
-}
-
 /// Takes physical device paths from loopback or real tests and passes
 /// them through to a compatible test definition. This method
 /// will also enrich the context passed to the test with a key description
@@ -34,9 +25,6 @@ where
         .read_exact(&mut key_data)
         .unwrap();
 
-    // This constant is not in the libc crate yet
-    const KEYCTL_UNLINK: i32 = 9;
-
     let key_id = match unsafe {
         libc::syscall(
             libc::SYS_add_key,
@@ -44,7 +32,7 @@ where
             description_cstring.as_ptr(),
             key_data.as_ptr(),
             key_data.len(),
-            KEY_SPEC_SESSION_KEYRING,
+            libc::KEY_SPEC_SESSION_KEYRING,
         )
     } {
         i if i < 0 => panic!("Failed to create key in keyring"),
@@ -56,9 +44,9 @@ where
     if unsafe {
         libc::syscall(
             libc::SYS_keyctl,
-            KEYCTL_UNLINK,
+            libc::KEYCTL_UNLINK,
             key_id,
-            KEY_SPEC_SESSION_KEYRING,
+            libc::KEY_SPEC_SESSION_KEYRING,
         )
     } < 0
     {

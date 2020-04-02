@@ -131,44 +131,6 @@ fn process_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
     }
 }
 
-/// Process a device which udev information indicates is unowned.
-fn process_unowned_device(dev: &libudev::Device) -> Option<StratisInfo> {
-    match dev.devnode() {
-        Some(devnode) => {
-            match (
-                device_to_devno_wrapper(dev),
-                device_identifiers_wrapper(devnode),
-            ) {
-                (Err(err), _) | (_, Err(err)) => {
-                    warn!("udev identified device {} as a block device but {}, disregarding the device",
-                          devnode.display(),
-                          err);
-                    None
-                }
-                // FIXME: Refine error return in StaticHeader::setup(),
-                // so it can be used to distinguish between signficant
-                // and insignficant errors and then use that ability to
-                // distinguish here between different levels of
-                // severity.
-                (_, Ok(Err(err))) => {
-                    debug!("udev identified device {} as a block device but {}, disregarding the device",
-                           devnode.display(),
-                           err);
-                    None
-                }
-                (_, Ok(Ok(None))) => None,
-                (Ok(devno), Ok(Ok(Some(identifiers)))) => {
-                    Some((identifiers, devno, devnode.to_path_buf()))
-                }
-            }
-        }
-        None => {
-            warn!("udev identified a device as a block device, but the udev entry for the device had no device node, disregarding the device");
-            None
-        }
-    }
-}
-
 // Find all devices identified by udev as Stratis devices.
 fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
     let context = libudev::Context::new()?;
@@ -244,7 +206,6 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
         }
         Ok(ownership) => match ownership {
             UdevOwnership::Stratis => process_stratis_device(dev),
-            UdevOwnership::Unowned => process_unowned_device(dev),
             _ => None,
         },
     }
@@ -323,14 +284,6 @@ mod tests {
                     .unwrap();
             assert_eq!(identifiers.pool_uuid, pool_uuid);
             assert_eq!(&&dev_node, path);
-
-            let (identifiers, _, dev_node) =
-                block_device_apply(path, |dev| process_unowned_device(dev))
-                    .unwrap()
-                    .unwrap()
-                    .unwrap();
-            assert_eq!(identifiers.pool_uuid, pool_uuid);
-            assert_eq!(&&dev_node, path);
         }
     }
 
@@ -376,24 +329,12 @@ mod tests {
                     .unwrap(),
                 None
             );
-            assert_eq!(
-                block_device_apply(path, |dev| process_unowned_device(dev))
-                    .unwrap()
-                    .unwrap(),
-                None
-            );
         }
 
         for path in paths {
             create_fs(path, None).unwrap();
             assert_eq!(
                 block_device_apply(path, |dev| process_stratis_device(dev))
-                    .unwrap()
-                    .unwrap(),
-                None
-            );
-            assert_eq!(
-                block_device_apply(path, |dev| process_unowned_device(dev))
                     .unwrap()
                     .unwrap(),
                 None

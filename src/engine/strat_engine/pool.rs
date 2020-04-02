@@ -529,8 +529,8 @@ mod tests {
 
     use crate::engine::{
         strat_engine::{
-            backstore::{find_all_block_devices_with_stratis_signatures, get_metadata},
-            cmd, devlinks,
+            backstore::get_metadata,
+            devlinks,
             tests::{loopbacked, real},
         },
         types::{EngineAction, PoolExtendState, PoolState, Redundancy},
@@ -545,14 +545,9 @@ mod tests {
     /// Verify that metadata can be read from pools.
     /// 1. Split paths into two separate sets.
     /// 2. Create pools from the two sets.
-    /// 3. Use find_all() to get the devices in the pool.
-    /// 4. Use get_metadata to find metadata for each pool and verify
+    /// 3. Use get_metadata to find metadata for each pool and verify
     /// correctness.
-    /// 5. Teardown the engine and repeat.
-    // This method uses the fallback method for finding all Stratis devices,
-    // since udev sometimes can not catch up to the changes made in this test
-    // in the time the test allows. The fallback method has the long name
-    // "find_all_block_devices_with_stratis_signatures".
+    /// 4. Teardown the engine and repeat.
     fn test_basic_metadata(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
@@ -570,26 +565,30 @@ mod tests {
 
         let metadata2 = pool2.record(name2);
 
-        cmd::udev_settle().unwrap();
-        let pools = find_all_block_devices_with_stratis_signatures().unwrap();
-        assert_eq!(pools.len(), 2);
-        let devnodes1 = &pools[&uuid1];
-        let devnodes2 = &pools[&uuid2];
-        let (_, pool_save1) = get_metadata(uuid1, devnodes1).unwrap().unwrap();
-        let (_, pool_save2) = get_metadata(uuid2, devnodes2).unwrap().unwrap();
+        let devnodes1 = pool1
+            .backstore
+            .blockdevs()
+            .iter()
+            .map(|(_, blockdev)| (*blockdev.device(), blockdev.devnode()))
+            .collect();
+
+        let devnodes2 = pool2
+            .backstore
+            .blockdevs()
+            .iter()
+            .map(|(_, blockdev)| (*blockdev.device(), blockdev.devnode()))
+            .collect();
+
+        let (_, pool_save1) = get_metadata(uuid1, &devnodes1).unwrap().unwrap();
+        let (_, pool_save2) = get_metadata(uuid2, &devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
 
         pool1.teardown().unwrap();
         pool2.teardown().unwrap();
 
-        cmd::udev_settle().unwrap();
-        let pools = find_all_block_devices_with_stratis_signatures().unwrap();
-        assert_eq!(pools.len(), 2);
-        let devnodes1 = &pools[&uuid1];
-        let devnodes2 = &pools[&uuid2];
-        let (_, pool_save1) = get_metadata(uuid1, devnodes1).unwrap().unwrap();
-        let (_, pool_save2) = get_metadata(uuid2, devnodes2).unwrap().unwrap();
+        let (_, pool_save1) = get_metadata(uuid1, &devnodes1).unwrap().unwrap();
+        let (_, pool_save2) = get_metadata(uuid2, &devnodes2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
     }
@@ -634,10 +633,6 @@ mod tests {
     /// Verify that teardown and setup of pool allows reading from filesystem
     /// written before cache was added. Check some basic facts about the
     /// metadata.
-    // This method uses the fallback method for finding all Stratis devices,
-    // since udev sometimes can not catch up to the changes made in this test
-    // in the time the test allows. The fallback method has the long name
-    // "find_all_block_devices_with_stratis_signatures".
     fn test_add_cachedevs(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
@@ -705,16 +700,17 @@ mod tests {
 
         umount(tmp_dir.path()).unwrap();
 
+        let devices = pool
+            .backstore
+            .blockdevs()
+            .iter()
+            .map(|(_, blockdev)| (*blockdev.device(), blockdev.devnode()))
+            .collect();
+
         pool.teardown().unwrap();
 
-        cmd::udev_settle().unwrap();
-
-        let pools = find_all_block_devices_with_stratis_signatures().unwrap();
-        assert_eq!(pools.len(), 1);
-        let devices = &pools[&uuid];
-
-        let (timestamp, metadata) = get_metadata(uuid, devices).unwrap().unwrap();
-        let (name, pool) = StratPool::setup(uuid, devices, timestamp, &metadata).unwrap();
+        let (timestamp, metadata) = get_metadata(uuid, &devices).unwrap().unwrap();
+        let (name, pool) = StratPool::setup(uuid, &devices, timestamp, &metadata).unwrap();
         invariant(&pool, &name);
 
         let mut buf = [0u8; 10];

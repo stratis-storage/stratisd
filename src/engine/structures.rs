@@ -6,6 +6,7 @@ use std::{
     collections::{hash_map, HashMap},
     fmt,
     iter::IntoIterator,
+    ops::Deref,
 };
 
 use uuid::Uuid;
@@ -13,12 +14,16 @@ use uuid::Uuid;
 use crate::engine::types::Name;
 
 /// Map UUID and name to T items.
-pub struct Table<T> {
-    name_to_uuid: HashMap<Name, Uuid>,
-    items: HashMap<Uuid, (Name, T)>,
+pub struct Table<T, U> {
+    name_to_uuid: HashMap<Name, U>,
+    items: HashMap<U, (Name, T)>,
 }
 
-impl<T: fmt::Debug> fmt::Debug for Table<T> {
+impl<T, U> fmt::Debug for Table<T, U>
+where
+    T: fmt::Debug,
+    U: fmt::Debug + Deref<Target = Uuid>,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_map()
             .entries(
@@ -29,8 +34,11 @@ impl<T: fmt::Debug> fmt::Debug for Table<T> {
     }
 }
 
-impl<T> Default for Table<T> {
-    fn default() -> Table<T> {
+impl<T, U> Default for Table<T, U>
+where
+    U: Deref<Target = Uuid>,
+{
+    fn default() -> Table<T, U> {
         Table {
             name_to_uuid: HashMap::default(),
             items: HashMap::default(),
@@ -38,15 +46,18 @@ impl<T> Default for Table<T> {
     }
 }
 
-pub struct Iter<'a, T: 'a> {
-    items: hash_map::Iter<'a, Uuid, (Name, T)>,
+pub struct Iter<'a, T: 'a, U: 'a> {
+    items: hash_map::Iter<'a, U, (Name, T)>,
 }
 
-impl<'a, T> Iterator for Iter<'a, T> {
-    type Item = (&'a Name, &'a Uuid, &'a T);
+impl<'a, T, U> Iterator for Iter<'a, T, U>
+where
+    U: Deref<Target = Uuid>,
+{
+    type Item = (&'a Name, &'a U, &'a T);
 
     #[inline]
-    fn next(&mut self) -> Option<(&'a Name, &'a Uuid, &'a T)> {
+    fn next(&mut self) -> Option<(&'a Name, &'a U, &'a T)> {
         self.items
             .next()
             .map(|(uuid, &(ref name, ref item))| (&*name, uuid, item))
@@ -58,15 +69,18 @@ impl<'a, T> Iterator for Iter<'a, T> {
     }
 }
 
-pub struct IterMut<'a, T: 'a> {
-    items: hash_map::IterMut<'a, Uuid, (Name, T)>,
+pub struct IterMut<'a, T: 'a, U: 'a> {
+    items: hash_map::IterMut<'a, U, (Name, T)>,
 }
 
-impl<'a, T> Iterator for IterMut<'a, T> {
-    type Item = (&'a Name, &'a Uuid, &'a mut T);
+impl<'a, T, U> Iterator for IterMut<'a, T, U>
+where
+    U: Deref<Target = Uuid>,
+{
+    type Item = (&'a Name, &'a U, &'a mut T);
 
     #[inline]
-    fn next(&mut self) -> Option<(&'a Name, &'a Uuid, &'a mut T)> {
+    fn next(&mut self) -> Option<(&'a Name, &'a U, &'a mut T)> {
         self.items
             .next()
             .map(|(uuid, &mut (ref name, ref mut item))| (&*name, uuid, item))
@@ -78,15 +92,18 @@ impl<'a, T> Iterator for IterMut<'a, T> {
     }
 }
 
-pub struct IntoIter<T> {
-    items: hash_map::IntoIter<Uuid, (Name, T)>,
+pub struct IntoIter<T, U> {
+    items: hash_map::IntoIter<U, (Name, T)>,
 }
 
-impl<T> Iterator for IntoIter<T> {
-    type Item = (Name, Uuid, T);
+impl<T, U> Iterator for IntoIter<T, U>
+where
+    U: Deref<Target = Uuid>,
+{
+    type Item = (Name, U, T);
 
     #[inline]
-    fn next(&mut self) -> Option<(Name, Uuid, T)> {
+    fn next(&mut self) -> Option<(Name, U, T)> {
         self.items
             .next()
             .map(|(uuid, (name, item))| (name, uuid, item))
@@ -98,29 +115,38 @@ impl<T> Iterator for IntoIter<T> {
     }
 }
 
-impl<T> IntoIterator for Table<T> {
-    type Item = (Name, Uuid, T);
-    type IntoIter = IntoIter<T>;
+impl<T, U> IntoIterator for Table<T, U>
+where
+    U: Deref<Target = Uuid>,
+{
+    type Item = (Name, U, T);
+    type IntoIter = IntoIter<T, U>;
 
-    fn into_iter(self) -> IntoIter<T> {
+    fn into_iter(self) -> IntoIter<T, U> {
         self.into_iter()
     }
 }
 
-impl<'a, T> IntoIterator for &'a Table<T> {
-    type Item = (&'a Name, &'a Uuid, &'a T);
-    type IntoIter = Iter<'a, T>;
+impl<'a, T, U> IntoIterator for &'a Table<T, U>
+where
+    U: Deref<Target = Uuid>,
+{
+    type Item = (&'a Name, &'a U, &'a T);
+    type IntoIter = Iter<'a, T, U>;
 
-    fn into_iter(self) -> Iter<'a, T> {
+    fn into_iter(self) -> Iter<'a, T, U> {
         self.iter()
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut Table<T> {
-    type Item = (&'a Name, &'a Uuid, &'a mut T);
-    type IntoIter = IterMut<'a, T>;
+impl<'a, T, U> IntoIterator for &'a mut Table<T, U>
+where
+    U: Deref<Target = Uuid>,
+{
+    type Item = (&'a Name, &'a U, &'a mut T);
+    type IntoIter = IterMut<'a, T, U>;
 
-    fn into_iter(self) -> IterMut<'a, T> {
+    fn into_iter(self) -> IterMut<'a, T, U> {
         self.iter_mut()
     }
 }
@@ -128,7 +154,10 @@ impl<'a, T> IntoIterator for &'a mut Table<T> {
 /// All operations are O(1), although Name lookups are slightly disadvantaged
 /// vs. Uuid lookups. In order to rename a T item, it must be removed,
 /// renamed, and reinserted under the new name.
-impl<T> Table<T> {
+impl<T, U> Table<T, U>
+where
+    U: Deref<Target = Uuid>,
+{
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
     }
@@ -137,19 +166,19 @@ impl<T> Table<T> {
         self.items.len()
     }
 
-    pub fn iter(&self) -> Iter<T> {
+    pub fn iter(&self) -> Iter<T, U> {
         Iter {
             items: self.items.iter(),
         }
     }
 
-    pub fn iter_mut(&mut self) -> IterMut<T> {
+    pub fn iter_mut(&mut self) -> IterMut<T, U> {
         IterMut {
             items: self.items.iter_mut(),
         }
     }
 
-    pub fn into_iter(self) -> IntoIter<T> {
+    pub fn into_iter(self) -> IntoIter<T, U> {
         IntoIter {
             items: self.items.into_iter(),
         }
@@ -161,26 +190,26 @@ impl<T> Table<T> {
     }
 
     /// Returns true if map has an item corresponding to this uuid, else false.
-    pub fn contains_uuid(&self, uuid: Uuid) -> bool {
+    pub fn contains_uuid(&self, uuid: U) -> bool {
         self.items.contains_key(&uuid)
     }
 
     /// Get item by name.
-    pub fn get_by_name(&self, name: &str) -> Option<(Uuid, &T)> {
+    pub fn get_by_name(&self, name: &str) -> Option<(U, &T)> {
         self.name_to_uuid
             .get(&*name)
             .and_then(|uuid| self.items.get(uuid).map(|&(_, ref item)| (*uuid, item)))
     }
 
     /// Get item by uuid.
-    pub fn get_by_uuid(&self, uuid: Uuid) -> Option<(Name, &T)> {
+    pub fn get_by_uuid(&self, uuid: U) -> Option<(Name, &T)> {
         self.items
             .get(&uuid)
             .map(|&(ref name, ref item)| (name.clone(), item))
     }
 
     /// Get mutable item by name.
-    pub fn get_mut_by_name(&mut self, name: &str) -> Option<(Uuid, &mut T)> {
+    pub fn get_mut_by_name(&mut self, name: &str) -> Option<(U, &mut T)> {
         let uuid = match self.name_to_uuid.get(name) {
             Some(uuid) => uuid,
             None => return None,
@@ -191,21 +220,21 @@ impl<T> Table<T> {
     }
 
     /// Get mutable item by uuid.
-    pub fn get_mut_by_uuid(&mut self, uuid: Uuid) -> Option<(Name, &mut T)> {
+    pub fn get_mut_by_uuid(&mut self, uuid: U) -> Option<(Name, &mut T)> {
         self.items
             .get_mut(&uuid)
             .map(|&mut (ref name, ref mut item)| (name.clone(), item))
     }
 
     /// Removes the item corresponding to name if there is one.
-    pub fn remove_by_name(&mut self, name: &str) -> Option<(Uuid, T)> {
+    pub fn remove_by_name(&mut self, name: &str) -> Option<(U, T)> {
         self.name_to_uuid
             .remove(name)
             .and_then(|uuid| self.items.remove(&uuid).map(|(_, item)| (uuid, item)))
     }
 
     /// Removes the item corresponding to the uuid if there is one.
-    pub fn remove_by_uuid(&mut self, uuid: Uuid) -> Option<(Name, T)> {
+    pub fn remove_by_uuid(&mut self, uuid: U) -> Option<(Name, T)> {
         self.items.remove(&uuid).and_then(|(name, item)| {
             self.name_to_uuid.remove(&name);
             Some((name, item))
@@ -216,7 +245,7 @@ impl<T> Table<T> {
     /// Possibly returns the items displaced.
     /// If two items are displaced, the one displaced by matching name is
     /// returned first.
-    pub fn insert(&mut self, name: Name, uuid: Uuid, item: T) -> Option<Vec<(Name, Uuid, T)>> {
+    pub fn insert(&mut self, name: Name, uuid: U, item: T) -> Option<Vec<(Name, U, T)>> {
         let old_uuid = self.name_to_uuid.insert(name.clone(), uuid);
         let old_pair = self.items.insert(uuid, (name.clone(), item));
         match (old_uuid, old_pair) {
@@ -282,7 +311,10 @@ mod tests {
 
     // A global invariant checker for the table.
     // Verifies proper relationship between internal data structures.
-    fn table_invariant<T>(table: &Table<T>) {
+    fn table_invariant<T, U>(table: &Table<T, U>)
+    where
+        U: Deref<Target = Uuid>,
+    {
         for (uuid, &(ref name, _)) in &table.items {
             assert_eq!(uuid, &table.name_to_uuid[name])
         }

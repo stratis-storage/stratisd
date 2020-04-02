@@ -802,6 +802,16 @@ mod tests {
 
     /// Test initializing and activating an encrypted device using
     /// the utilities provided here.
+    ///
+    /// The overall format of the test involves generating a random byte buffer
+    /// of size 1 MiB, encrypting it on disk, and then ensuring that the plaintext
+    /// cannot be found on the encrypted disk by doing a scan of the disk using
+    /// a sliding window.
+    ///
+    /// The sliding window size of 1 MiB was chosen to lower the number of
+    /// searches that need to be done compared to a smaller sliding window
+    /// and also to decrease the probability of the random sequence being found
+    /// on the disk due to leftover data from other tests.
     fn test_crypt_device_ops(paths: &[&Path]) {
         fn crypt_test(paths: &[&Path], key_desc: &str) -> std::result::Result<(), Box<dyn Error>> {
             let path = paths.get(0).ok_or_else(|| {
@@ -821,8 +831,9 @@ mod tests {
                 ))
             })?;
 
+            const WINDOW_SIZE: usize = 1024 * 1024;
             let mut devicenode = OpenOptions::new().write(true).open(logical_path)?;
-            let mut random_buffer = [0; 32];
+            let mut random_buffer = [0; WINDOW_SIZE];
             File::open("/dev/urandom")?.read_exact(&mut random_buffer)?;
             devicenode.write_all(&random_buffer)?;
             std::mem::drop(devicenode);
@@ -830,8 +841,8 @@ mod tests {
             let mut disk_buffer = Vec::new();
             let mut devicenode = File::open(path)?;
             devicenode.read_to_end(&mut disk_buffer)?;
-            for window in disk_buffer.windows(32) {
-                if window == random_buffer {
+            for window in disk_buffer.windows(WINDOW_SIZE) {
+                if window == &random_buffer as &[u8] {
                     return Err(Box::new(io::Error::new(
                         io::ErrorKind::Other,
                         "Disk was not encrypted!",

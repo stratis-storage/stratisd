@@ -33,12 +33,18 @@ pub fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let filesystem_data = get_data!(filesystem_path; default_return; return_message);
 
     let pool_path = get_parent!(m; filesystem_data; default_return; return_message);
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
 
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let msg = match pool.rename_filesystem(&pool_name, filesystem_data.uuid, new_name) {
+    let uuid = typed_uuid!(filesystem_data.uuid; Fs; default_return; return_message);
+    let msg = match log_action!(pool.rename_filesystem(&pool_name, uuid, new_name)) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!(
                 "pool {} doesn't know about filesystem {}",

@@ -6,7 +6,6 @@ use std::{collections::HashMap, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
-use uuid::Uuid;
 
 use devicemapper::{DmName, DmNameBuf, Sectors};
 
@@ -22,9 +21,9 @@ use crate::{
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-            MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
+            FilesystemUuid, MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction,
+            SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -149,7 +148,7 @@ impl StratPool {
         redundancy: Redundancy,
         key_desc: Option<&KeyDescription>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
 
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be
@@ -373,19 +372,23 @@ impl Pool for StratPool {
         }
     }
 
-    fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<CreateAction<()>> {
+    fn bind_clevis(
+        &mut self,
+        pin: String,
+        clevis_info: Value,
+    ) -> StratisResult<CreateAction<Clevis>> {
         let changed = self.backstore.bind_clevis(pin, clevis_info)?;
         if changed {
-            Ok(CreateAction::Created(()))
+            Ok(CreateAction::Created(Clevis))
         } else {
             Ok(CreateAction::Identity)
         }
     }
 
-    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<()>> {
+    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
         let changed = self.backstore.unbind_clevis()?;
         if changed {
-            Ok(DeleteAction::Deleted(()))
+            Ok(DeleteAction::Deleted(Clevis))
         } else {
             Ok(DeleteAction::Identity)
         }

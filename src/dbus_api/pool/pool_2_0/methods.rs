@@ -43,17 +43,21 @@ pub fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
 
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
-
-    let result = pool.create_filesystems(
+    let result = log_action!(pool.create_filesystems(
         pool_uuid,
         &filesystems
             .map(|x| (x, None))
             .collect::<Vec<(&str, Option<Sectors>)>>(),
-    );
+    ));
 
     let infos = match result {
         Ok(created_set) => created_set.changed(),
@@ -113,25 +117,32 @@ pub fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
 
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = filesystems
-        .filter_map(|path| {
-            m.tree.get(&path).and_then(|op| {
-                op.get_data()
-                    .as_ref()
-                    .map(|d| (d.uuid, op.get_name().clone()))
-            })
-        })
-        .collect();
+    let mut filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = HashMap::new();
+    for path in filesystems {
+        if let Some((u, path)) = m.tree.get(&path).and_then(|op| {
+            op.get_data()
+                .as_ref()
+                .map(|d| (&d.uuid, op.get_name().clone()))
+        }) {
+            let uuid = *typed_uuid!(u; Fs; default_return; return_message);
+            filesystem_map.insert(uuid, path);
+        }
+    }
 
-    let result = pool.destroy_filesystems(
+    let result = log_action!(pool.destroy_filesystems(
         &pool_name,
         &filesystem_map.keys().cloned().collect::<Vec<_>>(),
-    );
+    ));
     let msg = match result {
         Ok(uuids) => {
             // Only get changed values here as non-existant filesystems will have been filtered out
@@ -180,10 +191,20 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
 
     let fs_uuid = match m.tree.get(&filesystem) {
-        Some(op) => get_data!(op; default_return; return_message).uuid,
+        Some(op) => typed_uuid!(
+            get_data!(op; default_return; return_message).uuid;
+            Fs;
+            default_return;
+            return_message
+        ),
         None => {
             let message = format!("no data for object path {}", filesystem);
             let (rc, rs) = (DbusErrorEnum::NOTFOUND as u16, message);
@@ -194,7 +215,7 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let msg = match pool.snapshot_filesystem(pool_uuid, fs_uuid, snapshot_name) {
+    let msg = match log_action!(pool.snapshot_filesystem(pool_uuid, fs_uuid, snapshot_name)) {
         Ok(CreateAction::Created((uuid, fs))) => {
             let fs_object_path: dbus::Path = create_dbus_filesystem(
                 dbus_context,
@@ -239,7 +260,12 @@ pub fn add_cachedevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
     let cache_initialized = {
         let dbus_context = m.tree.get_data();
         let engine = dbus_context.engine.borrow();
@@ -271,12 +297,17 @@ pub fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
 
-    let msg = match dbus_context
+    let msg = match log_action!(dbus_context
         .engine
         .borrow_mut()
-        .rename_pool(pool_uuid, new_name)
+        .rename_pool(pool_uuid, new_name))
     {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", pool_uuid);

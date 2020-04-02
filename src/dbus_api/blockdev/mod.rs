@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use dbus::{arg::Variant, tree::Factory};
-use uuid::Uuid;
 
 use crate::{
     dbus_api::{
@@ -11,7 +10,7 @@ use crate::{
         types::{DbusContext, InterfacesAdded, OPContext, ObjectPathType},
         util::make_object_path,
     },
-    engine::{BlockDev, BlockDevTier, DevUuid, MaybeDbusPath},
+    engine::{BlockDev, BlockDevTier, DevUuid, MaybeDbusPath, StratisUuid},
 };
 
 mod blockdev_2_0;
@@ -22,7 +21,7 @@ mod shared;
 pub fn create_dbus_blockdev<'a>(
     dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
-    uuid: Uuid,
+    uuid: DevUuid,
     tier: BlockDevTier,
     blockdev: &mut dyn BlockDev,
 ) -> dbus::Path<'a> {
@@ -35,7 +34,7 @@ pub fn create_dbus_blockdev<'a>(
             object_name,
             Some(OPContext::new(
                 parent.clone(),
-                uuid,
+                StratisUuid::Dev(uuid),
                 ObjectPathType::Blockdev,
             )),
         )

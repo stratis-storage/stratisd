@@ -10,7 +10,7 @@ use crate::{
         types::{DbusContext, InterfacesAdded, OPContext, ObjectPathType},
         util::make_object_path,
     },
-    engine::{Filesystem, FilesystemUuid, MaybeDbusPath, Name},
+    engine::{Filesystem, FilesystemUuid, MaybeDbusPath, Name, StratisUuid},
 };
 
 mod fetch_properties_2_0;
@@ -34,7 +34,7 @@ pub fn create_dbus_filesystem<'a>(
             object_name,
             Some(OPContext::new(
                 parent.clone(),
-                uuid,
+                StratisUuid::Fs(uuid),
                 ObjectPathType::Filesystem,
             )),
         )

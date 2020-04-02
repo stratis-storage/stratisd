@@ -10,7 +10,6 @@ use std::{
 };
 
 use serde_json::{Map, Value};
-use uuid::Uuid;
 
 use devicemapper::{Sectors, IEC};
 
@@ -22,9 +21,9 @@ use crate::{
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem},
         structures::Table,
         types::{
-            BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-            MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
+            FilesystemUuid, MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction,
+            SetCreateAction, SetDeleteAction,
         },
         EngineEvent,
     },
@@ -35,7 +34,7 @@ use crate::{
 pub struct SimPool {
     block_devs: HashMap<DevUuid, SimDev>,
     cache_devs: HashMap<DevUuid, SimDev>,
-    filesystems: Table<SimFilesystem>,
+    filesystems: Table<FilesystemUuid, SimFilesystem>,
     redundancy: Redundancy,
     dbus_path: MaybeDbusPath,
 }
@@ -49,7 +48,7 @@ impl SimPool {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs = devices.iter().map(|p| SimDev::new(p, enc_info.as_ref()));
         (
-            Uuid::new_v4(),
+            PoolUuid::new_v4(),
             SimPool {
                 block_devs: device_pairs.collect(),
                 cache_devs: HashMap::new(),
@@ -112,7 +111,7 @@ impl<'a> Into<Value> for &'a SimPool {
                 self.filesystems.iter()
                     .map(|(name, uuid, _)| json!({
                         "name": name.to_string(),
-                        "uuid": uuid.to_simple_ref().to_string(),
+                        "uuid": uuid.to_string(),
                     }))
                     .collect()
             ),
@@ -121,7 +120,7 @@ impl<'a> Into<Value> for &'a SimPool {
                     self.block_devs.iter()
                         .map(|(uuid, dev)| {
                             let mut json = Map::new();
-                            json.insert("uuid".to_string(), Value::from(uuid.to_simple_ref().to_string()));
+                            json.insert("uuid".to_string(), Value::from(uuid.to_string()));
                             if let Value::Object(map) = dev.into() {
                                 json.extend(map.into_iter());
                             } else {
@@ -135,7 +134,7 @@ impl<'a> Into<Value> for &'a SimPool {
                     self.cache_devs.iter()
                         .map(|(uuid, dev)| {
                             let mut json = Map::new();
-                            json.insert("uuid".to_string(), Value::from(uuid.to_simple_ref().to_string()));
+                            json.insert("uuid".to_string(), Value::from(uuid.to_string()));
                             if let Value::Object(map) = dev.into() {
                                 json.extend(map.into_iter());
                             } else {
@@ -200,7 +199,7 @@ impl Pool for SimPool {
         let mut result = Vec::new();
         for name in names.keys() {
             if !self.filesystems.contains_name(name) {
-                let uuid = Uuid::new_v4();
+                let uuid = FilesystemUuid::new_v4();
                 let new_filesystem = SimFilesystem::new();
                 self.filesystems
                     .insert(Name::new((&**name).to_owned()), uuid, new_filesystem);
@@ -266,7 +265,11 @@ impl Pool for SimPool {
         Ok(SetCreateAction::new(ret_uuids))
     }
 
-    fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<CreateAction<()>> {
+    fn bind_clevis(
+        &mut self,
+        pin: String,
+        clevis_info: Value,
+    ) -> StratisResult<CreateAction<Clevis>> {
         let encryption_info = self.encryption_info();
         let clevis_info_current = encryption_info.and_then(|info| info.clevis_info.as_ref());
         if encryption_info.is_some() {
@@ -283,7 +286,7 @@ impl Pool for SimPool {
                 }
             } else {
                 self.add_clevis_info(pin, clevis_info);
-                Ok(CreateAction::Created(()))
+                Ok(CreateAction::Created(Clevis))
             }
         } else {
             Err(StratisError::Error(
@@ -292,13 +295,13 @@ impl Pool for SimPool {
         }
     }
 
-    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<()>> {
+    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
         let encryption_info = self.encryption_info();
         let clevis_info = encryption_info.and_then(|info| info.clevis_info.as_ref());
         if encryption_info.is_some() {
             Ok(if clevis_info.is_some() {
                 self.clear_clevis_info();
-                DeleteAction::Deleted(())
+                DeleteAction::Deleted(Clevis)
             } else {
                 DeleteAction::Identity
             })
@@ -362,7 +365,7 @@ impl Pool for SimPool {
             return Ok(CreateAction::Identity);
         }
 
-        let uuid = Uuid::new_v4();
+        let uuid = FilesystemUuid::new_v4();
         let snapshot = match self.get_filesystem(origin_uuid) {
             Some(_filesystem) => SimFilesystem::new(),
             None => {
@@ -505,8 +508,6 @@ mod tests {
 
     use std::path::Path;
 
-    use uuid::Uuid;
-
     use crate::engine::Engine;
 
     use crate::engine::sim_engine::SimEngine;
@@ -532,7 +533,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert_matches!(
-            pool.rename_filesystem(pool_name, Uuid::new_v4(), "new_name"),
+            pool.rename_filesystem(pool_name, FilesystemUuid::new_v4(), "new_name"),
             Ok(RenameAction::NoSource)
         );
     }
@@ -613,7 +614,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert_matches!(
-            pool.rename_filesystem(pool_name, Uuid::new_v4(), new_name),
+            pool.rename_filesystem(pool_name, FilesystemUuid::new_v4(), new_name),
             Ok(RenameAction::NoSource)
         );
     }
@@ -657,7 +658,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert_matches!(
-            pool.destroy_filesystems(pool_name, &[Uuid::new_v4()]),
+            pool.destroy_filesystems(pool_name, &[FilesystemUuid::new_v4()]),
             Ok(_)
         );
     }

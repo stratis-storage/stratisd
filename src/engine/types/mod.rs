@@ -5,30 +5,114 @@
 use std::{
     borrow::Borrow,
     convert::TryFrom,
-    fmt,
+    fmt::{self, Debug, Display},
+    hash::Hash,
     ops::Deref,
     path::{Path, PathBuf},
     rc::Rc,
     sync::Arc,
 };
 
-mod actions;
-mod keys;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 pub use crate::engine::types::{
     actions::{
-        CreateAction, DeleteAction, EngineAction, MappingCreateAction, RenameAction,
+        Clevis, CreateAction, DeleteAction, EngineAction, Key, MappingCreateAction, RenameAction,
         SetCreateAction, SetDeleteAction, SetUnlockAction,
     },
     keys::{EncryptionInfo, KeyDescription, SizedKeyMemory},
 };
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use uuid::Uuid;
+mod actions;
+mod keys;
 
-pub type DevUuid = Uuid;
-pub type FilesystemUuid = Uuid;
-pub type PoolUuid = Uuid;
+macro_rules! uuid {
+    ($vis:vis $ident:ident) => {
+        #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Deserialize, Serialize)]
+        $vis struct $ident(pub uuid::Uuid);
+
+        impl $ident {
+            pub fn new_v4() -> Self {
+                $ident(uuid::Uuid::new_v4())
+            }
+
+            pub fn parse_str(s: &str) -> $crate::stratis::StratisResult<Self> {
+                Ok($ident(uuid::Uuid::parse_str(s)?))
+            }
+
+            pub fn nil() -> Self {
+                $ident(uuid::Uuid::nil())
+            }
+        }
+
+        impl std::ops::Deref for $ident {
+            type Target = uuid::Uuid;
+
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+
+        impl std::fmt::Display for $ident {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+
+        impl $crate::engine::types::AsUuid for $ident {}
+    }
+}
+
+pub trait AsUuid:
+    Copy
+    + Clone
+    + Debug
+    + Hash
+    + Eq
+    + PartialEq
+    + for<'a> Deserialize<'a>
+    + Serialize
+    + Deref<Target = Uuid>
+    + Display
+{
+}
+
+uuid!(pub DevUuid);
+
+uuid!(pub FilesystemUuid);
+
+uuid!(pub PoolUuid);
+
+#[derive(Debug)]
+pub enum StratisUuid {
+    Dev(DevUuid),
+    Fs(FilesystemUuid),
+    Pool(PoolUuid),
+}
+
+impl Deref for StratisUuid {
+    type Target = Uuid;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            StratisUuid::Dev(d) => &*d,
+            StratisUuid::Fs(f) => &*f,
+            StratisUuid::Pool(p) => &*p,
+        }
+    }
+}
+
+impl Display for StratisUuid {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            StratisUuid::Dev(d) => Display::fmt(d, f),
+            StratisUuid::Fs(fs) => Display::fmt(fs, f),
+            StratisUuid::Pool(p) => Display::fmt(p, f),
+        }
+    }
+}
 
 /// Use Clevis or keyring to unlock LUKS volume.
 #[derive(Clone, Copy)]

@@ -167,8 +167,6 @@ impl Recordable<DataTierSave> for DataTier {
 #[cfg(test)]
 mod tests {
 
-    use uuid::Uuid;
-
     use crate::engine::strat_engine::{
         metadata::MDADataSize,
         tests::{loopbacked, real},
@@ -183,7 +181,7 @@ mod tests {
         assert!(paths.len() > 1);
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
 
         let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
 

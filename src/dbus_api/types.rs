@@ -17,9 +17,10 @@ use dbus::{
     Path,
 };
 
-use uuid::Uuid;
-
-use crate::{dbus_api::consts, engine::Engine};
+use crate::{
+    dbus_api::consts,
+    engine::{Engine, StratisUuid},
+};
 
 /// Type for interfaces parameter for `ObjectManagerInterfacesAdded`.
 pub type InterfacesAdded = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
@@ -71,12 +72,12 @@ pub enum ObjectPathType {
 #[derive(Debug)]
 pub struct OPContext {
     pub(super) parent: Path<'static>,
-    pub(super) uuid: Uuid,
+    pub(super) uuid: StratisUuid,
     pub(super) op_type: ObjectPathType,
 }
 
 impl OPContext {
-    pub fn new(parent: Path<'static>, uuid: Uuid, op_type: ObjectPathType) -> OPContext {
+    pub fn new(parent: Path<'static>, uuid: StratisUuid, op_type: ObjectPathType) -> OPContext {
         OPContext {
             parent,
             uuid,

@@ -700,8 +700,6 @@ impl Recordable<BackstoreSave> for Backstore {
 mod tests {
     use std::fs::OpenOptions;
 
-    use uuid::Uuid;
-
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
     use crate::engine::strat_engine::{
@@ -753,7 +751,7 @@ mod tests {
         let (cachedevpaths, paths) = paths.split_at(1);
         let (datadevpaths, initdatapaths) = paths.split_at(1);
 
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
         let mut backstore =
             Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::default(), None).unwrap();
 
@@ -848,7 +846,7 @@ mod tests {
     fn test_request(paths: &[&Path]) {
         assert!(!paths.is_empty());
 
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
 
@@ -908,7 +906,7 @@ mod tests {
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
 
         let mut backstore =
             Backstore::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();

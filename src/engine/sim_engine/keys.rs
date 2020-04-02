@@ -10,7 +10,7 @@ use crate::{
     engine::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
         shared,
-        types::{DeleteAction, KeyDescription, MappingCreateAction, SizedKeyMemory},
+        types::{DeleteAction, Key, KeyDescription, MappingCreateAction, SizedKeyMemory},
     },
     stratis::StratisResult,
 };
@@ -42,7 +42,7 @@ impl KeyActions for SimKeyActions {
         &mut self,
         key_desc: &KeyDescription,
         key_fd: RawFd,
-    ) -> StratisResult<MappingCreateAction<()>> {
+    ) -> StratisResult<MappingCreateAction<Key>> {
         let memory = shared::set_key_shared(key_fd)?;
 
         match self.read(key_desc) {
@@ -51,12 +51,12 @@ impl KeyActions for SimKeyActions {
                     Ok(MappingCreateAction::Identity)
                 } else {
                     self.0.insert((*key_desc).clone(), memory);
-                    Ok(MappingCreateAction::ValueChanged(()))
+                    Ok(MappingCreateAction::ValueChanged(Key))
                 }
             }
             Ok(None) => {
                 self.0.insert((*key_desc).clone(), memory);
-                Ok(MappingCreateAction::Created(()))
+                Ok(MappingCreateAction::Created(Key))
             }
             Err(e) => Err(e),
         }
@@ -66,9 +66,9 @@ impl KeyActions for SimKeyActions {
         Ok(self.0.keys().cloned().collect())
     }
 
-    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<DeleteAction<()>> {
+    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<DeleteAction<Key>> {
         match self.0.remove(key_desc) {
-            Some(_) => Ok(DeleteAction::Deleted(())),
+            Some(_) => Ok(DeleteAction::Deleted(Key)),
             None => Ok(DeleteAction::Identity),
         }
     }

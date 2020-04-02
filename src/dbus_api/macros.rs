@@ -36,6 +36,40 @@ macro_rules! get_parent {
     };
 }
 
+macro_rules! typed_uuid_string_err {
+    ($uuid:expr; $type:ident) => {
+        match $uuid {
+            $crate::engine::StratisUuid::$type(uuid) => uuid,
+            ref u => {
+                return Err(format!(
+                    "expected {} UUID but found UUID with type {:?}",
+                    stringify!($type),
+                    u,
+                ))
+            }
+        }
+    };
+}
+
+macro_rules! typed_uuid {
+    ($uuid:expr; $type:ident; $default:expr; $message:expr) => {
+        if let $crate::engine::StratisUuid::$type(uuid) = $uuid {
+            uuid
+        } else {
+            let message = format!(
+                "expected {} UUID but found UUID with type {:?}",
+                stringify!($type),
+                $uuid,
+            );
+            let (rc, rs) = (
+                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                message,
+            );
+            return Ok(vec![$message.append3($default, rc, rs)]);
+        }
+    };
+}
+
 /// Macro for early return with Ok dbus message on failure to get immutable pool.
 macro_rules! get_pool {
     ($engine:ident; $uuid:ident; $default:expr; $message:expr) => {
@@ -128,5 +162,15 @@ macro_rules! initial_properties {
                 .map(|s| (s, std::collections::HashMap::new()))
         );
         interfaces
+    }};
+}
+
+macro_rules! log_action {
+    ($action:expr) => {{
+        let action = $action;
+        if let Ok(ref a) = action {
+            log::info!("{}", a);
+        }
+        action
     }};
 }

@@ -34,7 +34,7 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 
 #[derive(Debug)]
 pub struct StratEngine {
-    pools: Table<StratPool>,
+    pools: Table<PoolUuid, StratPool>,
 
     // Maps pool UUIDs to information about sets of devices that are
     // associated with that UUID but have not been converted into a pool.

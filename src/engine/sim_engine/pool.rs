@@ -42,7 +42,7 @@ pub struct SimPool {
     block_devs_key_desc: Option<KeyDescription>,
     cache_devs: HashMap<DevUuid, SimDev>,
     cache_devs_key_desc: Option<KeyDescription>,
-    filesystems: Table<SimFilesystem>,
+    filesystems: Table<FilesystemUuid, SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
     dbus_path: MaybeDbusPath,

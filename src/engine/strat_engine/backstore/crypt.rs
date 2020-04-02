@@ -43,17 +43,6 @@ const SECTOR_SIZE: u64 = 512;
 /// Path to logical devices for encrypted devices
 const DEVICEMAPPER_PATH: &str = "/dev/mapper";
 
-use self::consts::*;
-
-/// TODO: Will be replaced with libc constants in libc v0.2.68
-mod consts {
-    use libc::c_int;
-
-    pub const KEY_SPEC_SESSION_KEYRING: c_int = -3;
-    pub const KEYCTL_READ: c_int = 11;
-    pub const KEYCTL_GET_PERSISTENT: c_int = 22;
-}
-
 macro_rules! log_on_failure {
     ($op:expr, $fmt:tt $(, $arg:expr)*) => {{
         let result = $op;
@@ -670,9 +659,9 @@ fn read_key(key_description: &str) -> Result<SafeMemHandle> {
         match unsafe {
             syscall(
                 SYS_keyctl,
-                KEYCTL_GET_PERSISTENT,
+                libc::KEYCTL_GET_PERSISTENT,
                 0,
-                KEY_SPEC_SESSION_KEYRING,
+                libc::KEY_SPEC_SESSION_KEYRING,
             )
         } {
             i if i < 0 => return Err(LibcryptErr::IOError(io::Error::last_os_error())),
@@ -704,7 +693,7 @@ fn read_key(key_description: &str) -> Result<SafeMemHandle> {
         match unsafe {
             syscall(
                 SYS_keyctl,
-                KEYCTL_READ,
+                libc::KEYCTL_READ,
                 key_id,
                 mut_ref.as_mut_ptr(),
                 mut_ref.len(),

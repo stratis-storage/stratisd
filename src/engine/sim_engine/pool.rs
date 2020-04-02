@@ -37,7 +37,7 @@ use crate::{
 pub struct SimPool {
     block_devs: HashMap<DevUuid, SimDev>,
     cache_devs: HashMap<DevUuid, SimDev>,
-    filesystems: Table<SimFilesystem>,
+    filesystems: Table<FilesystemUuid, SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
     dbus_path: MaybeDbusPath,

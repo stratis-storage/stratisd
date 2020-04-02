@@ -267,7 +267,7 @@ pub struct ThinPool {
     thin_pool: ThinPoolDev,
     segments: Segments,
     id_gen: ThinDevIdPool,
-    filesystems: Table<StratFilesystem>,
+    filesystems: Table<FilesystemUuid, StratFilesystem>,
     mdv: MetadataVol,
     /// The single DM device that the backstore presents as its upper-most
     /// layer. All DM components obtain their storage from this layer.

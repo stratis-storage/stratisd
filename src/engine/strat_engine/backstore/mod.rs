@@ -26,4 +26,4 @@ pub use self::{
 };
 
 #[cfg(test)]
-pub use self::crypt::STRATIS_KEY_SIZE;
+pub use self::crypt::STRATIS_MEK_SIZE;

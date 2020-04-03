@@ -4,7 +4,7 @@
 
 use std::{error::Error, ffi::CString, fs::File, io::Read, path::Path};
 
-use crate::engine::strat_engine::backstore::STRATIS_KEY_SIZE;
+use crate::engine::strat_engine::backstore::STRATIS_MEK_SIZE;
 
 use self::consts::*;
 
@@ -28,7 +28,7 @@ where
     let type_cstring = "user\0";
     let description = "test-description-for-stratisd";
     let description_cstring = CString::new(description).unwrap();
-    let mut key_data = [0; STRATIS_KEY_SIZE];
+    let mut key_data = [0; STRATIS_MEK_SIZE];
     File::open("/dev/urandom")
         .unwrap()
         .read_exact(&mut key_data)

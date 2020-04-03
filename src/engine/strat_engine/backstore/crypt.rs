@@ -34,9 +34,9 @@ const STRATIS_TOKEN_ID: c_uint = 1;
 const LUKS2_TOKEN_TYPE: &str = "luks2-keyring";
 const STRATIS_TOKEN_TYPE: &str = "stratis";
 #[cfg(not(test))]
-const STRATIS_KEY_SIZE: usize = 512 / 8;
+const STRATIS_MEK_SIZE: usize = 512 / 8;
 #[cfg(test)]
-pub const STRATIS_KEY_SIZE: usize = 512 / 8;
+pub const STRATIS_MEK_SIZE: usize = 512 / 8;
 
 /// Sector size as determined in `cryptsetup/lib/internal.h`
 const SECTOR_SIZE: u64 = 512;
@@ -109,7 +109,7 @@ impl CryptInitializer {
                 EncryptionFormat::Luks2,
                 ("aes", "xts-plain64"),
                 None,
-                libcryptsetup_rs::Either::Right(STRATIS_KEY_SIZE),
+                libcryptsetup_rs::Either::Right(STRATIS_MEK_SIZE),
                 None,
             ),
             "Failed to format device {} with LUKS2 header",
@@ -708,7 +708,7 @@ fn read_key(key_description: &str) -> Result<SafeMemHandle> {
             i => i,
         };
 
-        let mut key_buffer = SafeMemHandle::alloc(STRATIS_KEY_SIZE)?;
+        let mut key_buffer = SafeMemHandle::alloc(STRATIS_MEK_SIZE)?;
         let mut_ref = key_buffer.as_mut();
 
         // Read key from keyring

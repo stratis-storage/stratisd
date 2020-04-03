@@ -16,7 +16,7 @@ use libcryptsetup_rs::{
     CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr, SafeMemHandle,
 };
 
-use crate::engine::{DevUuid, PoolUuid};
+use crate::engine::{strat_engine::names::format_crypt_name, DevUuid, PoolUuid};
 
 type Result<T> = std::result::Result<T, LibcryptErr>;
 
@@ -66,11 +66,6 @@ macro_rules! log_on_failure {
     }}
 }
 
-/// Get a devicemapper name from the pool and device UUIDs.
-pub fn name_from_uuids(pool_uuid: &PoolUuid, dev_uuid: &DevUuid) -> String {
-    format!("{}-{}", pool_uuid.to_simple_ref(), dev_uuid.to_simple_ref())
-}
-
 /// Handle for initialization actions on a physical device.
 pub struct CryptInitializer {
     physical_path: PathBuf,
@@ -89,7 +84,6 @@ impl CryptInitializer {
 
     pub fn initialize(self, key_description: &str) -> Result<CryptHandle> {
         let physical_path = self.physical_path.clone();
-        let pool_uuid = self.pool_uuid;
         let dev_uuid = self.dev_uuid;
         let device = log_on_failure!(
             CryptInit::init(physical_path.as_path()),
@@ -99,11 +93,9 @@ impl CryptInitializer {
         );
         let result = self.initialize_no_cleanup(device, key_description);
         result.map_err(|device| {
-            if let Err(e) = CryptInitializer::rollback(
-                device,
-                physical_path,
-                name_from_uuids(&pool_uuid, &dev_uuid),
-            ) {
+            if let Err(e) =
+                CryptInitializer::rollback(device, physical_path, format_crypt_name(&dev_uuid))
+            {
                 e
             } else {
                 LibcryptErr::Other("Device initialization failed".to_string())
@@ -155,7 +147,7 @@ impl CryptInitializer {
 
         // The default activation name is [POOLUUID]-[DEVUUID] which should be unique
         // across all Stratis pools.
-        let activation_name = name_from_uuids(&self.pool_uuid, &self.dev_uuid);
+        let activation_name = format_crypt_name(&self.dev_uuid);
 
         // Initialize stratis token
         log_on_failure!(
@@ -182,14 +174,13 @@ impl CryptInitializer {
         mut device: CryptDevice,
         key_description: &str,
     ) -> std::result::Result<CryptHandle, CryptDevice> {
-        let pool_uuid = self.pool_uuid;
         let dev_uuid = self.dev_uuid;
         let result = self.initialize_with_err(&mut device, key_description);
         match result {
             Ok(_) => Ok(CryptHandle::new(
                 device,
                 self.physical_path,
-                name_from_uuids(&pool_uuid, &dev_uuid),
+                format_crypt_name(&dev_uuid),
             )),
             Err(e) => {
                 warn!("Initialization failed with error: {}; rolling back.", e);

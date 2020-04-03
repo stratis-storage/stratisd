@@ -12,11 +12,20 @@ use std::{
 use devicemapper::{DmNameBuf, DmUuidBuf};
 
 use crate::{
-    engine::types::{FilesystemUuid, PoolUuid},
+    engine::types::{DevUuid, FilesystemUuid, PoolUuid},
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
 const FORMAT_VERSION: u16 = 1;
+
+/// Get a devicemapper name from the device UUIDs.
+pub fn format_crypt_name(dev_uuid: &DevUuid) -> String {
+    format!(
+        "stratis-{}-private-{}-crypt",
+        FORMAT_VERSION,
+        dev_uuid.to_simple_ref()
+    )
+}
 
 #[derive(Clone, Copy)]
 pub enum FlexRole {
